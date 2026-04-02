@@ -1,0 +1,28 @@
+name: CI Check
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  basic-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check project structure
+        run: |
+          echo "=== Checking project structure ==="
+          test -d frontend && echo "frontend/ OK" || echo "frontend/ MISSING"
+          test -d backend && echo "backend/ OK" || echo "backend/ MISSING"
+          test -d docs && echo "docs/ OK" || echo "docs/ MISSING"
+          test -f README.md && echo "README.md OK" || echo "README.md MISSING"
+
+      - name: Check commit message convention
+        if: github.event_name == 'push'
+        run: |
+          MSG=$(git log -1 --pretty=format:"%s")
+          echo "Latest commit: $MSG"
+          echo "Reminder: use [AI-assisted] or [Human-written] prefix!"
