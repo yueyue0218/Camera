@@ -1,0 +1,163 @@
+<svg width="100%" viewBox="0 0 680 920" xmlns="http://www.w3.org/2000/svg" style="background:#fff; font-family:Arial,sans-serif;">
+<style>
+  .title { font-size:16px; font-weight:600; fill:#2B579A; }
+  .label { font-size:12px; fill:#333; }
+  .label-bold { font-size:13px; font-weight:600; fill:#333; }
+  .legend-text { font-size:11px; fill:#555; }
+  .actor-label { font-size:13px; font-weight:600; fill:#333; text-anchor:middle; }
+  .teal-fill { fill:#E1F5EE; stroke:#0F6E56; }
+  .teal-text { fill:#085041; font-size:11px; text-anchor:middle; }
+  .purple-fill { fill:#EEEDFE; stroke:#534AB7; }
+  .purple-text { fill:#26215C; font-size:11px; text-anchor:middle; }
+  .coral-fill { fill:#FAECE7; stroke:#993C1D; }
+  .coral-text { fill:#4A1B0C; font-size:11px; text-anchor:middle; }
+  .amber-fill { fill:#FAEEDA; stroke:#854F0B; }
+  .amber-text { fill:#412402; font-size:11px; text-anchor:middle; }
+  .conn { stroke:#999; stroke-width:0.8; fill:none; }
+  .conn-shared { stroke:#999; stroke-width:0.8; fill:none; stroke-dasharray:5 3; }
+  .boundary { fill:none; stroke:#888; stroke-width:1.2; stroke-dasharray:8 4; rx:16; }
+</style>
+
+<!-- System boundary -->
+<rect x="105" y="30" width="470" height="860" class="boundary"/>
+<text x="340" y="55" class="title" text-anchor="middle">SnapMatch 约拍服务平台</text>
+
+<!-- ═══ ACTOR: 需求方 (left) ═══ -->
+<g transform="translate(42, 160)">
+  <circle cx="0" cy="0" r="10" fill="none" stroke="#333" stroke-width="1.3"/>
+  <line x1="0" y1="10" x2="0" y2="32" stroke="#333" stroke-width="1.3"/>
+  <line x1="-12" y1="18" x2="12" y2="18" stroke="#333" stroke-width="1.3"/>
+  <line x1="0" y1="32" x2="-10" y2="46" stroke="#333" stroke-width="1.3"/>
+  <line x1="0" y1="32" x2="10" y2="46" stroke="#333" stroke-width="1.3"/>
+  <text x="0" y="64" class="actor-label">需求方</text>
+</g>
+
+<!-- ═══ ACTOR: 服务方 (right top) ═══ -->
+<g transform="translate(638, 240)">
+  <circle cx="0" cy="0" r="10" fill="none" stroke="#333" stroke-width="1.3"/>
+  <line x1="0" y1="10" x2="0" y2="32" stroke="#333" stroke-width="1.3"/>
+  <line x1="-12" y1="18" x2="12" y2="18" stroke="#333" stroke-width="1.3"/>
+  <line x1="0" y1="32" x2="-10" y2="46" stroke="#333" stroke-width="1.3"/>
+  <line x1="0" y1="32" x2="10" y2="46" stroke="#333" stroke-width="1.3"/>
+  <text x="0" y="64" class="actor-label">服务方</text>
+</g>
+
+<!-- ═══ ACTOR: 管理员 (right bottom) ═══ -->
+<g transform="translate(638, 720)">
+  <circle cx="0" cy="0" r="10" fill="none" stroke="#333" stroke-width="1.3"/>
+  <line x1="0" y1="10" x2="0" y2="32" stroke="#333" stroke-width="1.3"/>
+  <line x1="-12" y1="18" x2="12" y2="18" stroke="#333" stroke-width="1.3"/>
+  <line x1="0" y1="32" x2="-10" y2="46" stroke="#333" stroke-width="1.3"/>
+  <line x1="0" y1="32" x2="10" y2="46" stroke="#333" stroke-width="1.3"/>
+  <text x="0" y="64" class="actor-label">管理员</text>
+</g>
+
+<!-- ═══ USE CASES: 需求方 (left column, teal) ═══ -->
+<ellipse cx="230" cy="100" rx="82" ry="22" class="teal-fill" stroke-width="0.8"/>
+<text x="230" y="104" class="teal-text">UC-01 注册登录</text>
+
+<ellipse cx="230" cy="170" rx="82" ry="22" class="teal-fill" stroke-width="0.8"/>
+<text x="230" y="174" class="teal-text">UC-02 搜索/浏览服务方</text>
+
+<ellipse cx="230" cy="240" rx="82" ry="22" class="teal-fill" stroke-width="0.8"/>
+<text x="230" y="244" class="teal-text">UC-03 发布约拍需求</text>
+
+<ellipse cx="230" cy="310" rx="82" ry="22" class="teal-fill" stroke-width="0.8"/>
+<text x="230" y="314" class="teal-text">UC-04 在线沟通</text>
+
+<ellipse cx="230" cy="380" rx="82" ry="22" class="teal-fill" stroke-width="0.8"/>
+<text x="230" y="384" class="teal-text">UC-05 下单支付</text>
+
+<ellipse cx="230" cy="450" rx="82" ry="22" class="teal-fill" stroke-width="0.8"/>
+<text x="230" y="454" class="teal-text">UC-06 确认收货</text>
+
+<ellipse cx="230" cy="520" rx="82" ry="22" class="teal-fill" stroke-width="0.8"/>
+<text x="230" y="524" class="teal-text">UC-07 评价服务方</text>
+
+<ellipse cx="230" cy="590" rx="82" ry="22" class="coral-fill" stroke-width="0.8"/>
+<text x="230" y="594" class="coral-text">UC-08 发起质量申诉</text>
+
+<!-- ═══ USE CASES: 服务方 (right column, purple) ═══ -->
+<ellipse cx="450" cy="100" rx="82" ry="22" class="purple-fill" stroke-width="0.8"/>
+<text x="450" y="104" class="purple-text">UC-09 入驻认证</text>
+
+<ellipse cx="450" cy="170" rx="82" ry="22" class="purple-fill" stroke-width="0.8"/>
+<text x="450" y="174" class="purple-text">UC-10 管理作品集</text>
+
+<ellipse cx="450" cy="240" rx="82" ry="22" class="purple-fill" stroke-width="0.8"/>
+<text x="450" y="244" class="purple-text">UC-11 管理档期</text>
+
+<ellipse cx="450" cy="310" rx="82" ry="22" class="purple-fill" stroke-width="0.8"/>
+<text x="450" y="314" class="purple-text">UC-12 接单确认</text>
+
+<ellipse cx="450" cy="380" rx="82" ry="22" class="purple-fill" stroke-width="0.8"/>
+<text x="450" y="384" class="purple-text">UC-13 发送报价单</text>
+
+<ellipse cx="450" cy="450" rx="82" ry="22" class="purple-fill" stroke-width="0.8"/>
+<text x="450" y="454" class="purple-text">UC-14 上传交付作品</text>
+
+<ellipse cx="450" cy="520" rx="82" ry="22" class="purple-fill" stroke-width="0.8"/>
+<text x="450" y="524" class="purple-text">UC-15 评价需求方</text>
+
+<ellipse cx="450" cy="590" rx="82" ry="22" class="purple-fill" stroke-width="0.8"/>
+<text x="450" y="594" class="purple-text">UC-16 提现</text>
+
+<!-- ═══ USE CASES: 管理员 (bottom, amber) ═══ -->
+<ellipse cx="230" cy="700" rx="82" ry="22" class="amber-fill" stroke-width="0.8"/>
+<text x="230" y="704" class="amber-text">UC-17 审核入驻申请</text>
+
+<ellipse cx="450" cy="700" rx="82" ry="22" class="amber-fill" stroke-width="0.8"/>
+<text x="450" y="704" class="amber-text">UC-18 纠纷仲裁</text>
+
+<ellipse cx="230" cy="770" rx="82" ry="22" class="amber-fill" stroke-width="0.8"/>
+<text x="230" y="774" class="amber-text">UC-19 内容审核</text>
+
+<ellipse cx="450" cy="770" rx="82" ry="22" class="amber-fill" stroke-width="0.8"/>
+<text x="450" y="774" class="amber-text">UC-20 查看运营数据</text>
+
+<!-- ═══ CONNECTIONS: 需求方 → 用例 ═══ -->
+<line x1="62" y1="172" x2="148" y2="100" class="conn"/>
+<line x1="62" y1="180" x2="148" y2="170" class="conn"/>
+<line x1="62" y1="188" x2="148" y2="240" class="conn"/>
+<line x1="62" y1="196" x2="148" y2="310" class="conn"/>
+<line x1="62" y1="204" x2="148" y2="380" class="conn"/>
+<line x1="62" y1="210" x2="148" y2="450" class="conn"/>
+<line x1="62" y1="216" x2="148" y2="520" class="conn"/>
+<line x1="62" y1="222" x2="148" y2="590" class="conn"/>
+
+<!-- ═══ CONNECTIONS: 服务方 → 用例 ═══ -->
+<line x1="618" y1="248" x2="532" y2="100" class="conn"/>
+<line x1="618" y1="253" x2="532" y2="170" class="conn"/>
+<line x1="618" y1="258" x2="532" y2="240" class="conn"/>
+<line x1="618" y1="263" x2="532" y2="310" class="conn"/>
+<line x1="618" y1="268" x2="532" y2="380" class="conn"/>
+<line x1="618" y1="273" x2="532" y2="450" class="conn"/>
+<line x1="618" y1="278" x2="532" y2="520" class="conn"/>
+<line x1="618" y1="283" x2="532" y2="590" class="conn"/>
+<!-- 服务方 also uses 在线沟通 (shared, dashed) -->
+<line x1="618" y1="256" x2="312" y2="310" class="conn-shared"/>
+
+<!-- ═══ CONNECTIONS: 管理员 → 用例 ═══ -->
+<line x1="618" y1="728" x2="312" y2="700" class="conn"/>
+<line x1="618" y1="733" x2="532" y2="700" class="conn"/>
+<line x1="618" y1="738" x2="312" y2="770" class="conn"/>
+<line x1="618" y1="743" x2="532" y2="770" class="conn"/>
+<!-- 管理员 also participates in 质量申诉 -->
+<line x1="618" y1="725" x2="312" y2="590" class="conn-shared"/>
+
+<!-- ═══ LEGEND ═══ -->
+<rect x="120" y="825" width="16" height="12" rx="3" class="teal-fill" stroke-width="0.6"/>
+<text x="142" y="835" class="legend-text">需求方用例</text>
+
+<rect x="225" y="825" width="16" height="12" rx="3" class="purple-fill" stroke-width="0.6"/>
+<text x="247" y="835" class="legend-text">服务方用例</text>
+
+<rect x="330" y="825" width="16" height="12" rx="3" class="coral-fill" stroke-width="0.6"/>
+<text x="352" y="835" class="legend-text">安全保障用例</text>
+
+<rect x="445" y="825" width="16" height="12" rx="3" class="amber-fill" stroke-width="0.6"/>
+<text x="467" y="835" class="legend-text">管理员用例</text>
+
+<text x="340" y="865" style="font-size:11px;fill:#888;text-anchor:middle;">实线 = 直接参与 ｜ 虚线 = 共享用例（在线沟通由需求方和服务方共同参与；质量申诉涉及管理员仲裁）</text>
+
+</svg>
