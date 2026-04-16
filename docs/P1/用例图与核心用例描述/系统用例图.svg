@@ -18,6 +18,7 @@
   .boundary { fill:none; stroke:#888; stroke-width:1.2; stroke-dasharray:8 4; rx:16; }
 </style>
 
+  
 <!-- System boundary -->
 <rect x="105" y="30" width="470" height="860" class="boundary"/>
 <text x="340" y="55" class="title" text-anchor="middle">约拍服务平台</text>
