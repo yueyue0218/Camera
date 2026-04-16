@@ -20,7 +20,7 @@
 
 <!-- System boundary -->
 <rect x="105" y="30" width="470" height="860" class="boundary"/>
-<text x="340" y="55" class="title" text-anchor="middle">SnapMatch 约拍服务平台</text>
+<text x="340" y="55" class="title" text-anchor="middle">约拍服务平台</text>
 
 <!-- ═══ ACTOR: 需求方 (left) ═══ -->
 <g transform="translate(42, 160)">
