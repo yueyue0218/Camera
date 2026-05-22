@@ -1,10 +1,11 @@
 spring:
+  config:
+    import: optional:application-local.yml
   datasource:
     url: jdbc:mysql://localhost:3306/camera_app?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
     username: root
-    password: yueyue747906
+    password: ${DB_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
-
   jpa:
     hibernate:
       ddl-auto: none
@@ -12,7 +13,6 @@ spring:
     properties:
       hibernate:
         format_sql: true
-
   servlet:
     multipart:
       max-file-size: 50MB

@@ -34,3 +34,4 @@ build/
 
 uploads/
 run.log
+application-local.yml
