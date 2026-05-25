@@ -2,8 +2,11 @@ package com.action.camera.message.service;
 
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
+import com.action.camera.message.entity.Conversation;
 import com.action.camera.message.entity.Quote;
 import com.action.camera.message.enums.QuoteStatus;
+import com.action.camera.message.model.CreateQuoteCommand;
+import com.action.camera.message.repository.ConversationRepository;
 import com.action.camera.message.repository.QuoteRepository;
 import com.action.camera.order.entity.Order;
 import com.action.camera.order.service.OrderService;
@@ -19,7 +22,28 @@ import java.util.Objects;
 public class QuoteService {
 
     private final QuoteRepository quoteRepository;
+    private final ConversationRepository conversationRepository;
     private final OrderService orderService;
+
+    @Transactional
+    public Quote createQuoteFromConversation(CreateQuoteCommand command, Long operatorId) {
+        validateCreateQuoteCommand(command);
+        Conversation conversation = conversationRepository.findById(command.getConversationId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND,
+                        "Conversation not found: " + command.getConversationId()));
+
+        if (!Objects.equals(conversation.getParticipantBId(), operatorId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only the provider can create quote in this conversation");
+        }
+        if (quoteRepository.findFirstByConversationIdAndStatus(
+                command.getConversationId(), QuoteStatus.PENDING_CONFIRM).isPresent()) {
+            throw new BusinessException(ErrorCode.DUPLICATE_OPERATION,
+                    "Conversation already has a pending quote: " + command.getConversationId());
+        }
+
+        Quote quote = buildPendingQuote(command, conversation);
+        return quoteRepository.save(quote);
+    }
 
     @Transactional
     public Order confirmQuote(Long quoteId, Long operatorId, String confirmRemark) {
@@ -81,5 +105,92 @@ public class QuoteService {
             return operationRemark;
         }
         return originalRemark + "\nReject reason: " + operationRemark;
+    }
+
+    private void validateCreateQuoteCommand(CreateQuoteCommand command) {
+        if (command == null || command.getConversationId() == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "conversationId must not be null");
+        }
+        if (command.getAmountCent() == null || command.getAmountCent() <= 0) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "quote amount must be positive");
+        }
+        if (command.getShootStartTime() == null || command.getShootEndTime() == null
+                || !command.getShootStartTime().isBefore(command.getShootEndTime())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "shootStartTime must be before shootEndTime");
+        }
+        if (command.getLocation() == null || command.getLocation().isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "location must not be blank");
+        }
+        if (command.getServiceContent() == null || command.getServiceContent().trim().isEmpty()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "serviceContent must not be blank");
+        }
+        if (command.getDeliveryDeadline() == null
+                || !command.getDeliveryDeadline().isAfter(command.getShootEndTime())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR,
+                    "deliveryDeadline must be after shootEndTime");
+        }
+        if (command.getOriginalCount() != null && command.getOriginalCount() < 0) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "originalCount must not be negative");
+        }
+        if (command.getRefinedCount() != null && command.getRefinedCount() < 0) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "refinedCount must not be negative");
+        }
+    }
+
+    private Quote buildPendingQuote(CreateQuoteCommand command, Conversation conversation) {
+        LocalDateTime now = LocalDateTime.now();
+        Quote quote = new Quote();
+        quote.setQuoteNo("Q" + now.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+                + conversation.getId() + Math.abs(System.nanoTime() % 10000));
+        quote.setConversationId(conversation.getId());
+        quote.setProviderUserId(conversation.getParticipantBId());
+        quote.setCustomerId(conversation.getParticipantAId());
+        quote.setSourceType(conversation.getSourceType());
+        quote.setSourceId(conversation.getSourceId());
+        quote.setAmountCent(command.getAmountCent());
+        quote.setShootStartTime(command.getShootStartTime());
+        quote.setShootEndTime(command.getShootEndTime());
+        quote.setLocation(command.getLocation());
+        quote.setServiceContent(command.getServiceContent());
+        quote.setOriginalCount(defaultNonNegative(command.getOriginalCount()));
+        quote.setRefinedCount(defaultNonNegative(command.getRefinedCount()));
+        quote.setDeliveryDeadline(command.getDeliveryDeadline());
+        quote.setPhotoUsageScope(defaultText(command.getPhotoUsageScope(), "PERSONAL_ONLY"));
+        quote.setTerms(command.getTerms());
+        quote.setContractTerms(command.getContractTerms());
+        quote.setSafetyNoticeVersion(command.getSafetyNoticeVersion());
+        quote.setServiceSnapshotJson(buildServiceSnapshot(command));
+        quote.setRemark(command.getRemark());
+        quote.setStatus(QuoteStatus.PENDING_CONFIRM);
+        quote.setExpireTime(command.getExpireTime() == null ? now.plusDays(1) : command.getExpireTime());
+        quote.setCreatedAt(now);
+        quote.setUpdatedAt(now);
+        return quote;
+    }
+
+    private Integer defaultNonNegative(Integer value) {
+        return value == null ? 0 : value;
+    }
+
+    private String defaultText(String value, String defaultValue) {
+        return value == null || value.isBlank() ? defaultValue : value;
+    }
+
+    private String buildServiceSnapshot(CreateQuoteCommand command) {
+        return "{"
+                + "\"amountCent\":" + command.getAmountCent()
+                + ",\"location\":\"" + escape(command.getLocation()) + "\""
+                + ",\"serviceContent\":\"" + escape(command.getServiceContent()) + "\""
+                + ",\"originalCount\":" + defaultNonNegative(command.getOriginalCount())
+                + ",\"refinedCount\":" + defaultNonNegative(command.getRefinedCount())
+                + ",\"photoUsageScope\":\"" + escape(defaultText(command.getPhotoUsageScope(), "PERSONAL_ONLY")) + "\""
+                + "}";
+    }
+
+    private String escape(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

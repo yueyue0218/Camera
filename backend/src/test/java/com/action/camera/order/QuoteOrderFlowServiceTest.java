@@ -3,6 +3,7 @@ package com.action.camera.order;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.message.entity.Quote;
 import com.action.camera.message.enums.QuoteStatus;
+import com.action.camera.message.repository.ConversationRepository;
 import com.action.camera.message.repository.QuoteRepository;
 import com.action.camera.message.service.QuoteService;
 import com.action.camera.order.entity.Order;
@@ -49,6 +50,9 @@ class QuoteOrderFlowServiceTest {
     private QuoteRepository quoteRepository;
 
     @Mock
+    private ConversationRepository conversationRepository;
+
+    @Mock
     private OrderRepository orderRepository;
 
     @Mock
@@ -64,7 +68,7 @@ class QuoteOrderFlowServiceTest {
     @BeforeEach
     void setUp() {
         orderService = new OrderService(orderRepository, paymentRecordRepository, orderStatusLogRepository);
-        quoteService = new QuoteService(quoteRepository, orderService);
+        quoteService = new QuoteService(quoteRepository, conversationRepository, orderService);
     }
 
     @Test
