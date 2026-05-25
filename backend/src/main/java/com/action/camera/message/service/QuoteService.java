@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Objects;
 
 @Service
@@ -78,6 +79,21 @@ public class QuoteService {
         quote.setRemark(mergeRemark(quote.getRemark(), rejectReason));
         quote.setUpdatedAt(LocalDateTime.now());
         return quoteRepository.save(quote);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Quote> listQuotesInConversation(Long conversationId, QuoteStatus status, Long operatorId) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND,
+                        "Conversation not found: " + conversationId));
+        if (!conversation.hasParticipant(operatorId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN,
+                    "Only conversation participants can view quotes");
+        }
+        if (status == null) {
+            return quoteRepository.findByConversationIdOrderByCreatedAtDesc(conversationId);
+        }
+        return quoteRepository.findByConversationIdAndStatusOrderByCreatedAtDesc(conversationId, status);
     }
 
     private Quote getQuoteOrThrow(Long quoteId) {
