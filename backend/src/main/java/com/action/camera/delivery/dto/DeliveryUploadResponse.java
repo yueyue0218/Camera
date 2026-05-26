@@ -12,7 +12,7 @@ public class DeliveryUploadResponse {
     private Long deliveryId;
     private Long orderId;
     private Integer deliveryRound;
-    private String fileKey;
+    private Long fileId;
     private String fileName;
     private Long uploadedBy;
     private LocalDateTime uploadTime;

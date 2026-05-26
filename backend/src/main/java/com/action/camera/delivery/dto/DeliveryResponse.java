@@ -15,6 +15,8 @@ public class DeliveryResponse {
     private Boolean isLatest;
     private Integer originalCount;
     private Integer refinedCount;
+    private Long fileId;
+    private String fileName;
     private String status;
     private String remark;
     private LocalDateTime uploadTime;

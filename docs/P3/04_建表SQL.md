@@ -12,6 +12,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 CREATE TABLE users (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  student_no VARCHAR(9) NULL COMMENT 'Student number used by current email/password login flow',
   mobile_cipher VARBINARY(512) NULL COMMENT 'Encrypted phone number; plaintext phone is forbidden',
   mobile_hash CHAR(64) NULL COMMENT 'SHA-256/HMAC hash for login lookup and uniqueness',
   mobile_masked VARCHAR(32) NULL COMMENT 'Masked display value such as 138****1234',
@@ -27,6 +28,7 @@ CREATE TABLE users (
   credit_score DECIMAL(5,2) NOT NULL DEFAULT 80.00,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_users_student_no (student_no),
   UNIQUE KEY uk_users_mobile_hash (mobile_hash),
   KEY idx_users_role_status (current_role, status),
   KEY idx_users_city (city_code)

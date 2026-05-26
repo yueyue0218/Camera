@@ -1,9 +1,9 @@
 package com.action.camera.review.service;
 
+import com.action.camera.application.CreditService;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
-import com.action.camera.credit.service.CreditService;
 import com.action.camera.delivery.port.OrderQueryPort;
 import com.action.camera.delivery.port.OrderSnapshot;
 import com.action.camera.notification.dto.NotificationCreateRequest;
@@ -26,6 +26,7 @@ public class ReviewService {
     private static final String PROVIDER_TO_CUSTOMER = "PROVIDER_TO_CUSTOMER";
     private static final String REVIEW_RECEIVED = "REVIEW_RECEIVED";
     private static final String RELATED_ORDER = "ORDER";
+    private static final String CREDIT_EVENT_REVIEW = "REVIEW";
 
     private final ReviewRepository reviewRepository;
     private final OrderQueryPort orderQueryPort;
@@ -68,10 +69,11 @@ public class ReviewService {
         review.setCreatedAt(LocalDateTime.now());
 
         Review savedReview = reviewRepository.save(review);
-        creditService.createReviewCreditRecord(
+        creditService.updateCreditScore(
                 savedReview.getTargetUserId(),
+                calculateReviewScoreChange(savedReview.getRating()),
+                CREDIT_EVENT_REVIEW,
                 savedReview.getOrderId(),
-                savedReview.getRating(),
                 "收到订单评价"
         );
         notificationService.createNotification(new NotificationCreateRequest(
@@ -126,6 +128,17 @@ public class ReviewService {
         if (request.rating() < 1 || request.rating() > 5) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "评分必须在 1-5 之间");
         }
+    }
+
+    private int calculateReviewScoreChange(Integer rating) {
+        return switch (rating) {
+            case 5 -> 2;
+            case 4 -> 1;
+            case 3 -> 0;
+            case 2 -> -2;
+            case 1 -> -5;
+            default -> throw new BusinessException(ErrorCode.VALIDATION_ERROR, "评分必须在 1-5 之间");
+        };
     }
 
     private ReviewResponse toResponse(Review review) {
