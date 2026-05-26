@@ -192,6 +192,49 @@ class ConversationMessageQuoteServiceTest {
     }
 
     @Test
+    void participantAAndParticipantBCanListOwnConversations() {
+        Conversation asCustomer = conversationWith(1L, CUSTOMER_ID, PROVIDER_USER_ID,
+                LocalDateTime.of(2026, 6, 1, 10, 0), null);
+        Conversation asProvider = conversationWith(2L, STRANGER_ID, CUSTOMER_ID,
+                LocalDateTime.of(2026, 6, 1, 9, 0), null);
+        when(conversationRepository.findByParticipantAIdOrParticipantBId(CUSTOMER_ID, CUSTOMER_ID))
+                .thenReturn(List.of(asCustomer, asProvider));
+
+        List<Conversation> conversations = conversationService.listMyConversations(CUSTOMER_ID);
+
+        assertEquals(2, conversations.size());
+        assertTrue(conversations.stream().allMatch(conversation -> conversation.hasParticipant(CUSTOMER_ID)));
+    }
+
+    @Test
+    void strangerDoesNotSeeOtherUsersConversations() {
+        when(conversationRepository.findByParticipantAIdOrParticipantBId(STRANGER_ID, STRANGER_ID))
+                .thenReturn(List.of());
+
+        List<Conversation> conversations = conversationService.listMyConversations(STRANGER_ID);
+
+        assertTrue(conversations.isEmpty());
+    }
+
+    @Test
+    void conversationListSortsByLastMessageTimeThenCreatedAt() {
+        Conversation noMessageNewestCreated = conversationWith(1L, CUSTOMER_ID, PROVIDER_USER_ID,
+                LocalDateTime.of(2026, 6, 3, 10, 0), null);
+        Conversation olderLastMessage = conversationWith(2L, CUSTOMER_ID, PROVIDER_USER_ID,
+                LocalDateTime.of(2026, 6, 1, 10, 0), LocalDateTime.of(2026, 6, 2, 10, 0));
+        Conversation newerLastMessage = conversationWith(3L, CUSTOMER_ID, PROVIDER_USER_ID,
+                LocalDateTime.of(2026, 6, 1, 10, 0), LocalDateTime.of(2026, 6, 4, 10, 0));
+        when(conversationRepository.findByParticipantAIdOrParticipantBId(CUSTOMER_ID, CUSTOMER_ID))
+                .thenReturn(List.of(olderLastMessage, noMessageNewestCreated, newerLastMessage));
+
+        List<Conversation> conversations = conversationService.listMyConversations(CUSTOMER_ID);
+
+        assertEquals(3L, conversations.get(0).getId());
+        assertEquals(1L, conversations.get(1).getId());
+        assertEquals(2L, conversations.get(2).getId());
+    }
+
+    @Test
     void providerCanCreatePendingQuoteInConversation() {
         when(conversationRepository.findById(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
         when(quoteRepository.findFirstByConversationIdAndStatus(CONVERSATION_ID, QuoteStatus.PENDING_CONFIRM))
@@ -345,6 +388,19 @@ class ConversationMessageQuoteServiceTest {
         conversation.setSourceType(ConversationService.SOURCE_TYPE_DEMAND_RESPONSE);
         conversation.setSourceId(RESPONSE_ID);
         conversation.setCreatedAt(LocalDateTime.now());
+        return conversation;
+    }
+
+    private Conversation conversationWith(Long id, Long participantAId, Long participantBId,
+                                          LocalDateTime createdAt, LocalDateTime lastMessageTime) {
+        Conversation conversation = new Conversation();
+        conversation.setId(id);
+        conversation.setParticipantAId(participantAId);
+        conversation.setParticipantBId(participantBId);
+        conversation.setSourceType(ConversationService.SOURCE_TYPE_DEMAND_RESPONSE);
+        conversation.setSourceId(RESPONSE_ID + id);
+        conversation.setCreatedAt(createdAt);
+        conversation.setLastMessageTime(lastMessageTime);
         return conversation;
     }
 

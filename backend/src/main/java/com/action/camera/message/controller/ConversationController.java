@@ -4,6 +4,7 @@ import com.action.camera.common.ErrorCode;
 import com.action.camera.common.Result;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
+import com.action.camera.message.dto.ConversationListItemResponse;
 import com.action.camera.message.dto.ConversationResponse;
 import com.action.camera.message.dto.CreateConversationFromResponseRequest;
 import com.action.camera.message.dto.MessageResponse;
@@ -33,6 +34,16 @@ public class ConversationController {
     private final ConversationService conversationService;
     private final MessageService messageService;
     private final QuoteService quoteService;
+
+    @GetMapping("/conversations")
+    public Result<List<ConversationListItemResponse>> listMyConversations() {
+        Long operatorId = currentUserId();
+        List<ConversationListItemResponse> conversations = conversationService.listMyConversations(operatorId)
+                .stream()
+                .map(conversation -> ConversationListItemResponse.from(conversation, operatorId))
+                .toList();
+        return Result.success(conversations);
+    }
 
     @PostMapping("/conversations/from-response")
     public Result<ConversationResponse> createFromAcceptedResponse(

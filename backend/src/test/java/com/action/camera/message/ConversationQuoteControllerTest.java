@@ -7,6 +7,7 @@ import com.action.camera.message.controller.ConversationController;
 import com.action.camera.message.controller.QuoteController;
 import com.action.camera.message.dto.ConfirmQuoteRequest;
 import com.action.camera.message.dto.ConfirmQuoteResponse;
+import com.action.camera.message.dto.ConversationListItemResponse;
 import com.action.camera.message.dto.ConversationResponse;
 import com.action.camera.message.dto.CreateConversationFromResponseRequest;
 import com.action.camera.message.dto.CreateQuoteRequest;
@@ -41,6 +42,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -143,6 +145,56 @@ class ConversationQuoteControllerTest {
 
         assertThrows(BusinessException.class,
                 () -> conversationController.createFromAcceptedResponse(request));
+    }
+
+    @Test
+    void currentUserCanListOwnConversationsEndpoint() {
+        UserContext.setUserId(CUSTOMER_ID);
+        Conversation conversation = conversation();
+        when(conversationRepository.findByParticipantAIdOrParticipantBId(CUSTOMER_ID, CUSTOMER_ID))
+                .thenReturn(List.of(conversation));
+
+        Result<List<ConversationListItemResponse>> result = conversationController.listMyConversations();
+
+        assertEquals(200, result.getCode());
+        assertEquals(1, result.getData().size());
+        ConversationListItemResponse item = result.getData().get(0);
+        assertEquals(CONVERSATION_ID, item.getConversationId());
+        assertEquals(CUSTOMER_ID, item.getParticipantAId());
+        assertEquals(PROVIDER_USER_ID, item.getParticipantBId());
+        assertEquals(PROVIDER_USER_ID, item.getOtherUserId());
+        assertEquals(ConversationService.SOURCE_TYPE_DEMAND_RESPONSE, item.getSourceType());
+        assertEquals(RESPONSE_ID, item.getSourceId());
+        assertEquals(conversation.getLastMessageTime(), item.getLastMessageTime());
+        assertEquals(conversation.getCreatedAt(), item.getCreatedAt());
+    }
+
+    @Test
+    void providerGetsCustomerAsOtherUserInConversationListEndpoint() {
+        UserContext.setUserId(PROVIDER_USER_ID);
+        Conversation conversation = conversation();
+        when(conversationRepository.findByParticipantAIdOrParticipantBId(PROVIDER_USER_ID, PROVIDER_USER_ID))
+                .thenReturn(List.of(conversation));
+
+        Result<List<ConversationListItemResponse>> result = conversationController.listMyConversations();
+
+        assertEquals(CUSTOMER_ID, result.getData().get(0).getOtherUserId());
+    }
+
+    @Test
+    void conversationListEndpointReturnsEmptyListForNoConversations() {
+        UserContext.setUserId(STRANGER_ID);
+        when(conversationRepository.findByParticipantAIdOrParticipantBId(STRANGER_ID, STRANGER_ID))
+                .thenReturn(List.of());
+
+        Result<List<ConversationListItemResponse>> result = conversationController.listMyConversations();
+
+        assertTrue(result.getData().isEmpty());
+    }
+
+    @Test
+    void conversationListEndpointDoesNotAcceptOperatorIdParameter() throws NoSuchMethodException {
+        assertEquals(0, ConversationController.class.getDeclaredMethod("listMyConversations").getParameterCount());
     }
 
     @Test
