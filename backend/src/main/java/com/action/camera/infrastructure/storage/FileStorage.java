@@ -1,5 +1,6 @@
 package com.action.camera.infrastructure.storage;
 
+import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
@@ -11,6 +12,9 @@ public interface FileStorage {
 
     /** 存文件，返回唯一 fileKey（用来以后定位/访问该文件） */
     String store(MultipartFile file);
+
+    /** 按 fileKey 读取文件（下载用） */
+    Resource load(String fileKey);
 
     /** 按 fileKey 删除文件 */
     void delete(String fileKey);
