@@ -19,6 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Objects;
 
 @Service
@@ -78,12 +81,89 @@ public class OrderService {
         return applyStatusChange(order, fromStatus, targetStatus, operatorId, resolveOperatorRole(order, operatorId), reason);
     }
 
+    @Transactional(readOnly = true)
+    public List<Order> listMyOrders(Long operatorId, String role, OrderStatus status) {
+        if (operatorId == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "operatorId must not be null");
+        }
+        if ("customer".equalsIgnoreCase(role)) {
+            return listCustomerOrders(operatorId, status);
+        }
+        if ("provider".equalsIgnoreCase(role)) {
+            return listProviderOrders(operatorId, status);
+        }
+        if (role != null && !role.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Unsupported order role: " + role);
+        }
+
+        List<Order> orders = new ArrayList<>();
+        orders.addAll(listCustomerOrders(operatorId, status));
+        orders.addAll(listProviderOrders(operatorId, status));
+        orders.sort(Comparator.comparing(Order::getUpdatedAt,
+                Comparator.nullsLast(Comparator.reverseOrder())));
+        return orders;
+    }
+
+    @Transactional(readOnly = true)
+    public Order getOrderForUser(Long orderId, Long operatorId) {
+        Order order = getOrderOrThrow(orderId);
+        ensureOrderParticipant(order, operatorId);
+        return order;
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrderStatusLog> listStatusLogs(Long orderId, Long operatorId) {
+        Order order = getOrderForUser(orderId, operatorId);
+        return orderStatusLogRepository.findByOrderIdOrderByCreatedAtAsc(order.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public PaymentRecord getPaymentRecordForOrder(Long orderId, Long operatorId) {
+        Order order = getOrderForUser(orderId, operatorId);
+        return paymentRecordRepository.findByOrderId(order.getId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND,
+                        "Payment record not found for order: " + orderId));
+    }
+
+    @Transactional(readOnly = true)
+    public OrderStatusLog getLatestStatusLog(Long orderId, Long operatorId) {
+        List<OrderStatusLog> logs = listStatusLogs(orderId, operatorId);
+        if (logs.isEmpty()) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "Order status log not found for order: " + orderId);
+        }
+        return logs.get(logs.size() - 1);
+    }
+
     private Order getOrderOrThrow(Long orderId) {
         if (orderId == null) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "orderId must not be null");
         }
         return orderRepository.findById(orderId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Order not found: " + orderId));
+    }
+
+    private List<Order> listCustomerOrders(Long customerId, OrderStatus status) {
+        if (status == null) {
+            return orderRepository.findByCustomerIdOrderByUpdatedAtDesc(customerId);
+        }
+        return orderRepository.findByCustomerIdAndStatusOrderByUpdatedAtDesc(customerId, status);
+    }
+
+    private List<Order> listProviderOrders(Long providerUserId, OrderStatus status) {
+        if (status == null) {
+            return orderRepository.findByProviderUserIdOrderByUpdatedAtDesc(providerUserId);
+        }
+        return orderRepository.findByProviderUserIdAndStatusOrderByUpdatedAtDesc(providerUserId, status);
+    }
+
+    private void ensureOrderParticipant(Order order, Long operatorId) {
+        if (operatorId == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "operatorId must not be null");
+        }
+        if (!Objects.equals(order.getCustomerId(), operatorId)
+                && !Objects.equals(order.getProviderUserId(), operatorId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only order participants can operate this order");
+        }
     }
 
     private void validateConfirmedQuote(Quote quote) {
