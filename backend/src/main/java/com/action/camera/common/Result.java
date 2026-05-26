@@ -29,6 +29,11 @@ public class Result<T> {
         return new Result<>(200, "success", null);
     }
 
+    /** 成功，自定义提示文案 */
+    public static <T> Result<T> success(T data, String message) {
+        return new Result<>(200, message, data);
+    }
+
     /** 失败，用错误码枚举 */
     public static <T> Result<T> error(ErrorCode errorCode) {
         return new Result<>(errorCode.getCode(), errorCode.getMessage(), null);

@@ -22,7 +22,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addInterceptor(authInterceptor)
                 .addPathPatterns("/**")          // 拦截所有
                 .excludePathPatterns(            // 这些免登录
-                        "/test/**",              // 测试接口
+                        "/test/success",
+                        "/test/error",
+                        "/test/upload",
                         "/auth/**",              // 登录/验证码
                         "/users/register",       // 注册
                         "/users/login"           // 登录

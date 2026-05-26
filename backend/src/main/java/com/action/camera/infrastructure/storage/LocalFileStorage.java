@@ -3,10 +3,13 @@ package com.action.camera.infrastructure.storage;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -39,6 +42,24 @@ public class LocalFileStorage implements FileStorage {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "文件保存失败: " + e.getMessage());
         }
         return fileKey;
+    }
+
+    @Override
+    public Resource load(String fileKey) {
+        try {
+            Path base = Paths.get(basePath).toAbsolutePath().normalize();
+            Path file = base.resolve(fileKey).normalize();
+            if (!file.startsWith(base)) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "非法文件路径");
+            }
+            Resource resource = new UrlResource(file.toUri());
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new BusinessException(ErrorCode.NOT_FOUND, "文件不存在");
+            }
+            return resource;
+        } catch (MalformedURLException e) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "文件读取失败");
+        }
     }
 
     @Override
