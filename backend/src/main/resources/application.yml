@@ -42,3 +42,8 @@ jwt:
 file:
   storage:
     local-path: ./uploads
+
+camera:
+  order:
+    adapter: mock
+    c-base-url: http://localhost:8080

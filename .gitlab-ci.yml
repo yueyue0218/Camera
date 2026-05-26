@@ -1,0 +1,54 @@
+stages:
+  - test
+  - package
+
+variables:
+  MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
+  MYSQL_DATABASE: "camera_app"
+  MYSQL_USER: "camera_dev"
+  MYSQL_PASSWORD: "Camera_dev_2026"
+  MYSQL_ROOT_PASSWORD: "root"
+  DB_PASSWORD: "Camera_dev_2026"
+
+cache:
+  key: "maven-${CI_COMMIT_REF_SLUG}"
+  paths:
+    - .m2/repository
+
+.backend_maven:
+  image: maven:3.9-eclipse-temurin-17
+  services:
+    - name: mysql:8.0
+      alias: mysql
+  variables:
+    SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/camera_app?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false"
+    SPRING_DATASOURCE_USERNAME: "camera_dev"
+    SPRING_DATASOURCE_PASSWORD: "Camera_dev_2026"
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends default-mysql-client && rm -rf /var/lib/apt/lists/*
+    - until mysqladmin ping -h mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --silent; do sleep 2; done
+    - mysql -h mysql -uroot -p"$MYSQL_ROOT_PASSWORD" < docs/P3/04_建表SQL.sql
+    - mysql -h mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "GRANT ALL PRIVILEGES ON camera_app.* TO '$MYSQL_USER'@'%'; FLUSH PRIVILEGES;"
+  only:
+    - main
+    - dev
+    - merge_requests
+
+backend_test:
+  extends: .backend_maven
+  stage: test
+  script:
+    - cd backend
+    - mvn test
+
+backend_package:
+  extends: .backend_maven
+  stage: package
+  script:
+    - cd backend
+    - mvn -DskipTests package
+  artifacts:
+    when: always
+    expire_in: 7 days
+    paths:
+      - backend/target/*.jar
