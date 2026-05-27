@@ -32,7 +32,7 @@ public class CreditRecord {
     @Column(name = "score_after", nullable = false, precision = 5, scale = 2)
     private BigDecimal scoreAfter;
 
-    @Column(name = "reason", columnDefinition = "TEXT")
+    @Column(name = "reason", length = 1000)
     private String reason;
 
     @Column(name = "created_at", nullable = false, updatable = false)
