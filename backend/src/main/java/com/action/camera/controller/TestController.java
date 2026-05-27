@@ -1,7 +1,6 @@
 package com.action.camera.controller;
 
 import com.action.camera.common.ErrorCode;
-import com.action.camera.common.JwtUtil;
 import com.action.camera.common.Result;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
@@ -12,11 +11,9 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 public class TestController {
 
-    private final JwtUtil jwtUtil;
     private final FileStorage fileStorage;
 
-    public TestController(JwtUtil jwtUtil, FileStorage fileStorage) {
-        this.jwtUtil = jwtUtil;
+    public TestController(FileStorage fileStorage) {
         this.fileStorage = fileStorage;
     }
 
@@ -30,9 +27,10 @@ public class TestController {
         throw new BusinessException(ErrorCode.UNAUTHORIZED);
     }
 
+    /** 需携带 Bearer token；由拦截器解析后从 UserContext 取当前用户 id */
     @GetMapping("/test/token")
     public Result<String> testToken() {
-        return Result.success(jwtUtil.generateToken(1L));
+        return Result.success("Current user ID: " + UserContext.getUserId());
     }
 
     @GetMapping("/secure/me")
