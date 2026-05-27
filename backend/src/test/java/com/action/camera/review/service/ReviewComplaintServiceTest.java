@@ -182,41 +182,47 @@ class ReviewComplaintServiceTest {
 
     private void insertUser(Long userId, String nickname, String currentRole) {
         jdbcTemplate.update("""
-                INSERT INTO users (id, nickname, current_role, status)
-                VALUES (?, ?, ?, 'ACTIVE')
+                INSERT INTO users (id, nickname, current_role, status, credit_score, created_at, updated_at)
+                VALUES (?, ?, ?, 'ACTIVE', 80.00, NOW(), NOW())
                 ON DUPLICATE KEY UPDATE nickname = VALUES(nickname), current_role = VALUES(current_role)
                 """, userId, nickname, currentRole);
     }
 
     private void insertCompletedOrder() {
         jdbcTemplate.update("""
-                INSERT INTO conversations (id, participant_a_id, participant_b_id, source_type)
-                VALUES (?, ?, ?, 'DIRECT')
+                INSERT INTO conversations (id, participant_a_id, participant_b_id, source_type, created_at)
+                VALUES (?, ?, ?, 'DIRECT', NOW())
                 ON DUPLICATE KEY UPDATE participant_a_id = VALUES(participant_a_id)
                 """, CONVERSATION_ID, CUSTOMER_ID, PROVIDER_ID);
         jdbcTemplate.update("""
                 INSERT INTO quotes (
                     id, quote_no, conversation_id, provider_user_id, customer_id, source_type,
                     shoot_start_time, shoot_end_time, location, original_count, refined_count,
-                    delivery_deadline, service_snapshot_json, total_amount, expire_time
+                    delivery_deadline, photo_usage_scope, service_snapshot_json, total_amount,
+                    status, expire_time, created_at, updated_at
                 )
                 VALUES (
                     ?, 'QUOTE-COMPLAINT-TEST', ?, ?, ?, 'DIRECT',
-                    NOW(), DATE_ADD(NOW(), INTERVAL 1 HOUR), 'test-location', 0, 1,
-                    DATE_ADD(NOW(), INTERVAL 1 DAY), JSON_OBJECT(), 100.00, DATE_ADD(NOW(), INTERVAL 1 DAY)
+                    NOW(), DATEADD('HOUR', 1, NOW()), 'test-location', 0, 1,
+                    DATEADD('DAY', 1, NOW()), 'PERSONAL_ONLY', JSON_OBJECT(), 100.00,
+                    'CONFIRMED', DATEADD('DAY', 1, NOW()), NOW(), NOW()
                 )
                 ON DUPLICATE KEY UPDATE conversation_id = VALUES(conversation_id)
                 """, QUOTE_ID, CONVERSATION_ID, PROVIDER_ID, CUSTOMER_ID);
         jdbcTemplate.update("""
                 INSERT INTO orders (
                     id, order_no, quote_id, conversation_id, customer_id, provider_user_id,
-                    status, total_amount, shoot_start_time, shoot_end_time, shoot_location,
-                    delivery_deadline, photo_usage_scope, quote_snapshot_json
+                    status, escrow_status, settlement_status, refund_status, total_amount,
+                    platform_fee, provider_income, shoot_start_time, shoot_end_time, shoot_location,
+                    delivery_deadline, photo_usage_scope, quote_snapshot_json, safety_notice_confirmed,
+                    created_at, updated_at
                 )
                 VALUES (
                     ?, 'ORDER-COMPLAINT-TEST', ?, ?, ?, ?,
-                    'COMPLETED', 100.00, NOW(), DATE_ADD(NOW(), INTERVAL 1 HOUR), 'test-location',
-                    DATE_ADD(NOW(), INTERVAL 1 DAY), 'PERSONAL_ONLY', JSON_OBJECT()
+                    'COMPLETED', 'HELD', 'NOT_SETTLED', 'NONE', 100.00,
+                    0.00, 100.00, NOW(), DATEADD('HOUR', 1, NOW()), 'test-location',
+                    DATEADD('DAY', 1, NOW()), 'PERSONAL_ONLY', JSON_OBJECT(), FALSE,
+                    NOW(), NOW()
                 )
                 ON DUPLICATE KEY UPDATE status = VALUES(status)
                 """, COMPLETED_ORDER_ID, QUOTE_ID, CONVERSATION_ID, CUSTOMER_ID, PROVIDER_ID);
