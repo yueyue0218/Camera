@@ -75,7 +75,12 @@ public class ConversationController {
             @PathVariable Long conversationId,
             @RequestBody SendTextMessageRequest request) {
         Long operatorId = currentUserId();
-        Message message = messageService.sendTextMessage(conversationId, operatorId, request.getContent());
+        Message message = messageService.sendMessage(
+                conversationId,
+                operatorId,
+                request.getMessageType(),
+                request.getContent()
+        );
         return Result.success(MessageResponse.from(message));
     }
 
