@@ -18,14 +18,21 @@ import java.util.List;
 public class MessageService {
 
     public static final String MESSAGE_TYPE_TEXT = "TEXT";
+    public static final String MESSAGE_TYPE_IMAGE = "IMAGE";
 
     private final ConversationRepository conversationRepository;
     private final MessageRepository messageRepository;
 
     @Transactional
     public Message sendTextMessage(Long conversationId, Long senderId, String content) {
+        return sendMessage(conversationId, senderId, MESSAGE_TYPE_TEXT, content);
+    }
+
+    @Transactional
+    public Message sendMessage(Long conversationId, Long senderId, String messageType, String content) {
         Conversation conversation = getConversationOrThrow(conversationId);
         ensureParticipant(conversation, senderId);
+        String normalizedType = normalizeMessageType(messageType);
         if (content == null || content.isBlank()) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "message content must not be blank");
         }
@@ -34,7 +41,7 @@ public class MessageService {
         Message message = new Message();
         message.setConversationId(conversationId);
         message.setSenderId(senderId);
-        message.setMessageType(MESSAGE_TYPE_TEXT);
+        message.setMessageType(normalizedType);
         message.setContent(content);
         message.setIsRead(false);
         message.setCreatedAt(now);
@@ -43,6 +50,17 @@ public class MessageService {
         conversation.setLastMessageTime(now);
         conversationRepository.save(conversation);
         return savedMessage;
+    }
+
+    private String normalizeMessageType(String messageType) {
+        if (messageType == null || messageType.isBlank()) {
+            return MESSAGE_TYPE_TEXT;
+        }
+        String normalized = messageType.trim().toUpperCase();
+        if (MESSAGE_TYPE_TEXT.equals(normalized) || MESSAGE_TYPE_IMAGE.equals(normalized)) {
+            return normalized;
+        }
+        throw new BusinessException(ErrorCode.VALIDATION_ERROR, "unsupported message type: " + messageType);
     }
 
     @Transactional(readOnly = true)
