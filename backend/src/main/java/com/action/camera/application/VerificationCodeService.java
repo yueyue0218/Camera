@@ -20,7 +20,7 @@ public class VerificationCodeService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${spring.mail.username}")
+    @Value("${spring.mail.username:camera@example.local}")
     private String fromEmail;
 
     private final ConcurrentHashMap<String, CodeEntry> store = new ConcurrentHashMap<>();
