@@ -124,8 +124,8 @@ class NotificationServiceTest {
 
     private void insertUser(Long userId, String nickname) {
         jdbcTemplate.update("""
-                INSERT INTO users (id, nickname, current_role, status)
-                VALUES (?, ?, 'CUSTOMER', 'ACTIVE')
+                INSERT INTO users (id, nickname, current_role, status, credit_score, created_at, updated_at)
+                VALUES (?, ?, 'CUSTOMER', 'ACTIVE', 80.00, NOW(), NOW())
                 ON DUPLICATE KEY UPDATE nickname = VALUES(nickname)
                 """, userId, nickname);
     }

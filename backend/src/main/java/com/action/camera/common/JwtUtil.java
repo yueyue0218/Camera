@@ -42,6 +42,10 @@ public class JwtUtil {
                 .compact();
     }
 
+    public long getExpireSeconds() {
+        return expireHours * 3600;
+    }
+
     /** 从 token 解析出用户 id；无效或过期会抛异常 */
     public Long parseUserId(String token) {
         Claims claims = Jwts.parser()
