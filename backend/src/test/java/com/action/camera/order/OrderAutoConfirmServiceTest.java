@@ -3,7 +3,6 @@ package com.action.camera.order;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.order.entity.Order;
 import com.action.camera.order.entity.OrderStatusLog;
-import com.action.camera.order.entity.PaymentRecord;
 import com.action.camera.order.enums.EscrowStatus;
 import com.action.camera.order.enums.OrderStatus;
 import com.action.camera.order.repository.OrderRepository;
@@ -24,7 +23,6 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -59,6 +57,7 @@ class OrderAutoConfirmServiceTest {
     void autoConfirmDeliveredOrderAfterSevenDaysAndWriteStatusLog() {
         Order order = order(ORDER_ID, OrderStatus.DELIVERED_PENDING_CONFIRM);
         when(orderRepository.findByStatus(OrderStatus.DELIVERED_PENDING_CONFIRM)).thenReturn(List.of(order));
+        whenLocked(order);
         whenLatestDeliveredLog(ORDER_ID, NOW.minusDays(7).minusMinutes(1));
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderStatusLogRepository.save(any(OrderStatusLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -67,6 +66,8 @@ class OrderAutoConfirmServiceTest {
 
         assertEquals(1, confirmedCount);
         assertEquals(OrderStatus.COMPLETED, order.getStatus());
+        assertEquals(EscrowStatus.RELEASED, order.getEscrowStatus());
+        assertEquals("SETTLED", order.getSettlementStatus());
         assertEquals(NOW, order.getAutoConfirmTime());
         assertEquals(NOW, order.getCompleteTime());
 
@@ -86,6 +87,8 @@ class OrderAutoConfirmServiceTest {
         Order waitingOrder = order(SECOND_ORDER_ID, OrderStatus.DELIVERED_PENDING_CONFIRM);
         when(orderRepository.findByStatus(OrderStatus.DELIVERED_PENDING_CONFIRM))
                 .thenReturn(List.of(timedOutOrder, waitingOrder));
+        whenLocked(timedOutOrder);
+        whenLocked(waitingOrder);
         whenLatestDeliveredLog(ORDER_ID, NOW.minusDays(7));
         whenLatestDeliveredLog(SECOND_ORDER_ID, NOW.minusDays(6).minusHours(23));
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -95,19 +98,26 @@ class OrderAutoConfirmServiceTest {
 
         assertEquals(1, confirmedCount);
         assertEquals(OrderStatus.COMPLETED, timedOutOrder.getStatus());
+        assertEquals(EscrowStatus.RELEASED, timedOutOrder.getEscrowStatus());
+        assertEquals("SETTLED", timedOutOrder.getSettlementStatus());
         assertEquals(OrderStatus.DELIVERED_PENDING_CONFIRM, waitingOrder.getStatus());
+        assertEquals(EscrowStatus.HELD, waitingOrder.getEscrowStatus());
+        assertEquals("NOT_SETTLED", waitingOrder.getSettlementStatus());
     }
 
     @Test
     void autoConfirmSkipsDeliveredOrderBeforeSevenDays() {
         Order order = order(ORDER_ID, OrderStatus.DELIVERED_PENDING_CONFIRM);
         when(orderRepository.findByStatus(OrderStatus.DELIVERED_PENDING_CONFIRM)).thenReturn(List.of(order));
+        whenLocked(order);
         whenLatestDeliveredLog(ORDER_ID, NOW.minusDays(7).plusSeconds(1));
 
         int confirmedCount = orderService.autoConfirmTimeoutOrders(NOW);
 
         assertEquals(0, confirmedCount);
         assertEquals(OrderStatus.DELIVERED_PENDING_CONFIRM, order.getStatus());
+        assertEquals(EscrowStatus.HELD, order.getEscrowStatus());
+        assertEquals("NOT_SETTLED", order.getSettlementStatus());
         verify(orderRepository, never()).save(any(Order.class));
         verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
     }
@@ -116,6 +126,7 @@ class OrderAutoConfirmServiceTest {
     void autoConfirmUsesLatestDeliveredPendingConfirmLogAfterRework() {
         Order order = order(ORDER_ID, OrderStatus.DELIVERED_PENDING_CONFIRM);
         when(orderRepository.findByStatus(OrderStatus.DELIVERED_PENDING_CONFIRM)).thenReturn(List.of(order));
+        whenLocked(order);
         whenLatestDeliveredLog(ORDER_ID, NOW.minusDays(1));
 
         int confirmedCount = orderService.autoConfirmTimeoutOrders(NOW);
@@ -130,6 +141,25 @@ class OrderAutoConfirmServiceTest {
     }
 
     @Test
+    void autoConfirmLocksOrderAndSkipsWhenConcurrentCallAlreadyCompletedIt() {
+        Order candidate = order(ORDER_ID, OrderStatus.DELIVERED_PENDING_CONFIRM);
+        Order lockedOrder = order(ORDER_ID, OrderStatus.COMPLETED);
+        lockedOrder.setEscrowStatus(EscrowStatus.RELEASED);
+        lockedOrder.setSettlementStatus("SETTLED");
+        when(orderRepository.findByStatus(OrderStatus.DELIVERED_PENDING_CONFIRM)).thenReturn(List.of(candidate));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(lockedOrder));
+
+        int confirmedCount = orderService.autoConfirmTimeoutOrders(NOW);
+
+        assertEquals(0, confirmedCount);
+        verify(orderRepository).findByIdForUpdate(ORDER_ID);
+        verify(orderStatusLogRepository, never())
+                .findFirstByOrderIdAndToStatusOrderByCreatedAtDesc(any(), any());
+        verify(orderRepository, never()).save(any(Order.class));
+        verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
+    }
+
+    @Test
     void autoConfirmSkipsReworkAppealingAndTerminalOrdersDefensively() {
         List<Order> orders = List.of(
                 order(8003L, OrderStatus.REWORK_REQUIRED),
@@ -139,12 +169,17 @@ class OrderAutoConfirmServiceTest {
                 order(8007L, OrderStatus.REFUNDED)
         );
         when(orderRepository.findByStatus(OrderStatus.DELIVERED_PENDING_CONFIRM)).thenReturn(orders);
+        for (Order order : orders) {
+            whenLocked(order);
+        }
 
         int confirmedCount = orderService.autoConfirmTimeoutOrders(NOW);
 
         assertEquals(0, confirmedCount);
         for (Order order : orders) {
             assertNotNull(order.getStatus());
+            assertEquals(EscrowStatus.HELD, order.getEscrowStatus());
+            assertEquals("NOT_SETTLED", order.getSettlementStatus());
         }
         verify(orderStatusLogRepository, never())
                 .findFirstByOrderIdAndToStatusOrderByCreatedAtDesc(any(), any());
@@ -156,6 +191,7 @@ class OrderAutoConfirmServiceTest {
     void autoConfirmSkipsOrderWithoutDeliveredPendingConfirmLog() {
         Order order = order(ORDER_ID, OrderStatus.DELIVERED_PENDING_CONFIRM);
         when(orderRepository.findByStatus(OrderStatus.DELIVERED_PENDING_CONFIRM)).thenReturn(List.of(order));
+        whenLocked(order);
         when(orderStatusLogRepository.findFirstByOrderIdAndToStatusOrderByCreatedAtDesc(
                 ORDER_ID,
                 OrderStatus.DELIVERED_PENDING_CONFIRM
@@ -165,6 +201,8 @@ class OrderAutoConfirmServiceTest {
 
         assertEquals(0, confirmedCount);
         assertEquals(OrderStatus.DELIVERED_PENDING_CONFIRM, order.getStatus());
+        assertEquals(EscrowStatus.HELD, order.getEscrowStatus());
+        assertEquals("NOT_SETTLED", order.getSettlementStatus());
         verify(orderRepository, never()).save(any(Order.class));
         verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
     }
@@ -179,6 +217,10 @@ class OrderAutoConfirmServiceTest {
                 orderId,
                 OrderStatus.DELIVERED_PENDING_CONFIRM
         )).thenReturn(Optional.of(statusLog(orderId, createdAt)));
+    }
+
+    private void whenLocked(Order order) {
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
     }
 
     private OrderStatusLog statusLog(Long orderId, LocalDateTime createdAt) {

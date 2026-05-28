@@ -32,6 +32,7 @@ public class OrderService {
     public static final String MOCK_PAY_METHOD = "MOCK_PAY";
     private static final int REWORK_REASON_MAX_LENGTH = 200;
     private static final String PAYMENT_SUCCESS = "SUCCESS";
+    private static final String SETTLEMENT_SETTLED = "SETTLED";
     private static final long SYSTEM_OPERATOR_ID = 0L;
     private static final String SYSTEM_OPERATOR_ROLE = "SYSTEM";
     private static final String AUTO_CONFIRM_REASON = "交付后 7 天未操作，系统自动确认完成";
@@ -139,7 +140,12 @@ public class OrderService {
         }
         LocalDateTime timeoutBoundary = now.minusDays(7);
         int confirmedCount = 0;
-        for (Order order : orderRepository.findByStatus(OrderStatus.DELIVERED_PENDING_CONFIRM)) {
+        for (Order candidate : orderRepository.findByStatus(OrderStatus.DELIVERED_PENDING_CONFIRM)) {
+            Optional<Order> lockedOrder = orderRepository.findByIdForUpdate(candidate.getId());
+            if (lockedOrder.isEmpty()) {
+                continue;
+            }
+            Order order = lockedOrder.get();
             if (order.getStatus() != OrderStatus.DELIVERED_PENDING_CONFIRM) {
                 continue;
             }
@@ -156,6 +162,8 @@ public class OrderService {
                 continue;
             }
             ensureCanChangeStatus(order.getStatus(), OrderStatus.COMPLETED);
+            order.setEscrowStatus(EscrowStatus.RELEASED);
+            order.setSettlementStatus(SETTLEMENT_SETTLED);
             order.setAutoConfirmTime(now);
             order.setCompleteTime(now);
             applyStatusChange(
