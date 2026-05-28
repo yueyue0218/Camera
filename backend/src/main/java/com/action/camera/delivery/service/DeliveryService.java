@@ -18,6 +18,7 @@ import com.action.camera.dto.FileUploadResponse;
 import com.action.camera.repository.FileRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
@@ -39,22 +40,30 @@ public class DeliveryService {
     private final FileRepository fileRepository;
     private final OrderQueryPort orderQueryPort;
     private final OrderStatusPort orderStatusPort;
+    private final TransactionTemplate txTemplate;
 
     public DeliveryService(DeliveryRepository deliveryRepository,
                            DeliveryFileRepository deliveryFileRepository,
                            FileService fileService,
                            FileRepository fileRepository,
                            OrderQueryPort orderQueryPort,
-                           OrderStatusPort orderStatusPort) {
+                           OrderStatusPort orderStatusPort,
+                           TransactionTemplate txTemplate) {
         this.deliveryRepository = deliveryRepository;
         this.deliveryFileRepository = deliveryFileRepository;
         this.fileService = fileService;
         this.fileRepository = fileRepository;
         this.orderQueryPort = orderQueryPort;
         this.orderStatusPort = orderStatusPort;
+        this.txTemplate = txTemplate;
     }
 
-    @Transactional
+    // 注意：此方法不加 @Transactional。
+    // 原因：upload() 内部会通过 COrderHttpAdapter 向本地 OrderController 发起 HTTP 回调以更新订单状态。
+    // 若在外层事务中先向 deliveries 表 INSERT（触发 orders.id 的 FK 共享锁），
+    // 再发起回调 UPDATE orders，会造成同一行的 S 锁与 X 锁跨线程等待，产生死锁。
+    // 修复方案：先在 txTemplate 的独立事务中提交 deliveries/delivery_files，
+    // 释放 FK 共享锁后，再调用 orderStatusPort.changeStatus()。
     public DeliveryUploadResponse upload(Long orderId, MultipartFile file, String remark) {
         Long currentUserId = requireCurrentUserId();
         OrderSnapshot order = orderQueryPort.getOrderSnapshot(orderId);
@@ -71,28 +80,36 @@ public class DeliveryService {
                 DELIVERY_BIZ_TYPE,
                 PRIVATE_VISIBILITY
         );
-        LocalDateTime now = LocalDateTime.now();
-        Delivery delivery = new Delivery();
-        delivery.setOrderId(orderId);
-        delivery.setDeliveryRound(1);
-        delivery.setIsLatest(true);
-        delivery.setOriginalCount(0);
-        delivery.setRefinedCount(1);
-        delivery.setDeadline(order.getDeliveryDeadline());
-        delivery.setStatus(DELIVERY_UPLOADED);
-        delivery.setRemark(remark);
-        delivery.setUploadTime(now);
-        delivery.setAutoConfirmDeadline(now.plusDays(7));
-        Delivery saved = deliveryRepository.save(delivery);
 
-        DeliveryFile deliveryFile = new DeliveryFile();
-        deliveryFile.setDeliveryId(saved.getId());
-        deliveryFile.setFileId(uploadedFile.getFileId());
-        deliveryFile.setFileType(RETOUCHED_FILE_TYPE);
-        deliveryFile.setSortOrder(0);
-        deliveryFile.setUploadTime(now);
-        deliveryFileRepository.save(deliveryFile);
+        // 在独立事务中保存交付记录后立即提交，释放 deliveries→orders FK 共享锁，
+        // 避免后续 changeStatus HTTP 回调时产生 S/X 锁死锁。
+        final Long finalUserId = currentUserId;
+        final LocalDateTime now = LocalDateTime.now();
+        Delivery saved = txTemplate.execute(status -> {
+            Delivery delivery = new Delivery();
+            delivery.setOrderId(orderId);
+            delivery.setDeliveryRound(1);
+            delivery.setIsLatest(true);
+            delivery.setOriginalCount(0);
+            delivery.setRefinedCount(1);
+            delivery.setDeadline(order.getDeliveryDeadline());
+            delivery.setStatus(DELIVERY_UPLOADED);
+            delivery.setRemark(remark);
+            delivery.setUploadTime(now);
+            delivery.setAutoConfirmDeadline(now.plusDays(7));
+            Delivery d = deliveryRepository.save(delivery);
 
+            DeliveryFile deliveryFile = new DeliveryFile();
+            deliveryFile.setDeliveryId(d.getId());
+            deliveryFile.setFileId(uploadedFile.getFileId());
+            deliveryFile.setFileType(RETOUCHED_FILE_TYPE);
+            deliveryFile.setSortOrder(0);
+            deliveryFile.setUploadTime(now);
+            deliveryFileRepository.save(deliveryFile);
+            return d;
+        });
+
+        // deliveries 事务已提交，FK 共享锁已释放，可安全发起 HTTP 回调
         String orderStatus = orderStatusPort.changeStatus(
                 orderId,
                 DELIVERED_PENDING_CONFIRM,
@@ -106,7 +123,7 @@ public class DeliveryService {
                 saved.getDeliveryRound(),
                 uploadedFile.getFileId(),
                 uploadedFile.getOriginalName(),
-                currentUserId,
+                finalUserId,
                 saved.getUploadTime(),
                 orderStatus
         );

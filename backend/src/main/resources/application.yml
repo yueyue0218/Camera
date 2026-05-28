@@ -6,6 +6,9 @@ spring:
     username: root
     password: ${DB_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
   jpa:
     hibernate:
       ddl-auto: none
@@ -45,5 +48,5 @@ file:
 
 camera:
   order:
-    adapter: mock
+    adapter: c-http
     c-base-url: http://localhost:8080
