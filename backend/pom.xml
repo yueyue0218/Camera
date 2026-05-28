@@ -77,6 +77,13 @@
             <artifactId>spring-security-crypto</artifactId>
         </dependency>
 
+        <!-- MyBatis-Plus（与现有 JPA 共存，用于 certification 模块） -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <version>3.5.9</version>
+        </dependency>
+
         <!-- 单元测试用 H2 内存数据库 -->
         <dependency>
             <groupId>com.h2database</groupId>

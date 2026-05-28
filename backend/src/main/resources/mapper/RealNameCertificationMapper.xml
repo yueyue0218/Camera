@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.action.camera.certification.mapper.RealNameCertificationMapper">
+
+    <!--
+        按状态分页查询认证申请。
+        status 为 null 或空字符串时不过滤状态，查询全部记录。
+        MyBatis-Plus 分页插件会自动在外层包一个 SELECT COUNT(*) 和 LIMIT。
+    -->
+    <select id="selectPageByStatus"
+            resultType="com.action.camera.certification.entity.RealNameCertification">
+        SELECT id,
+               user_id,
+               real_name,
+               id_card_number,
+               id_card_front_file_id,
+               id_card_back_file_id,
+               status,
+               reject_reason,
+               created_at,
+               reviewed_at,
+               reviewer_admin_id
+        FROM real_name_certifications
+        <where>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+        ORDER BY created_at DESC
+    </select>
+
+</mapper>

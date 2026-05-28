@@ -46,6 +46,11 @@ file:
   storage:
     local-path: ./uploads
 
+mybatis-plus:
+  mapper-locations: classpath*:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
 camera:
   order:
     adapter: c-http
