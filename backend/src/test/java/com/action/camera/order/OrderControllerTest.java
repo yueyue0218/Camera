@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -245,13 +246,62 @@ class OrderControllerTest {
         UserContext.setUserId(CUSTOMER_ID);
         Order order = order(OrderStatus.DELIVERED_PENDING_CONFIRM);
         prepareTransitionMocks(order);
+        ArgumentCaptor<OrderStatusLog> logCaptor = ArgumentCaptor.forClass(OrderStatusLog.class);
 
         Result<StatusTransitionResponse> result =
                 orderController.changeStatus(ORDER_ID, transitionRequest(OrderStatus.COMPLETED));
 
         assertEquals(OrderStatus.COMPLETED, result.getData().getToStatus());
         assertEquals("CUSTOMER", result.getData().getOperatorRole());
-        verify(orderStatusLogRepository, times(1)).save(any(OrderStatusLog.class));
+        assertEquals(OrderStatus.COMPLETED, order.getStatus());
+        assertEquals(EscrowStatus.RELEASED, order.getEscrowStatus());
+        assertEquals("SETTLED", order.getSettlementStatus());
+        assertTrue(order.getCompleteTime() != null);
+        assertNull(order.getAutoConfirmTime());
+        verify(orderStatusLogRepository, times(1)).save(logCaptor.capture());
+        assertEquals(OrderStatus.DELIVERED_PENDING_CONFIRM, logCaptor.getValue().getFromStatus());
+        assertEquals(OrderStatus.COMPLETED, logCaptor.getValue().getToStatus());
+        assertEquals(CUSTOMER_ID, logCaptor.getValue().getOperatorId());
+        assertEquals("CUSTOMER", logCaptor.getValue().getOperatorRole());
+    }
+
+    @Test
+    void strangerCannotConfirmCompleted() {
+        UserContext.setUserId(STRANGER_ID);
+        Order order = order(OrderStatus.DELIVERED_PENDING_CONFIRM);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+
+        assertThrows(BusinessException.class,
+                () -> orderController.changeStatus(ORDER_ID, transitionRequest(OrderStatus.COMPLETED)));
+
+        assertEquals(OrderStatus.DELIVERED_PENDING_CONFIRM, order.getStatus());
+        assertEquals(EscrowStatus.HELD, order.getEscrowStatus());
+        assertEquals("NOT_SETTLED", order.getSettlementStatus());
+        verify(orderRepository, never()).save(any(Order.class));
+        verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
+    }
+
+    @Test
+    void customerCannotConfirmCompletedFromNonDeliveredPendingConfirmStatuses() {
+        for (OrderStatus status : List.of(
+                OrderStatus.REWORK_REQUIRED,
+                OrderStatus.APPEALING,
+                OrderStatus.CANCELLED,
+                OrderStatus.REFUNDED
+        )) {
+            UserContext.setUserId(CUSTOMER_ID);
+            Order order = order(status);
+            when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+
+            assertThrows(BusinessException.class,
+                    () -> orderController.changeStatus(ORDER_ID, transitionRequest(OrderStatus.COMPLETED)));
+
+            assertEquals(status, order.getStatus());
+            assertEquals(EscrowStatus.HELD, order.getEscrowStatus());
+            assertEquals("NOT_SETTLED", order.getSettlementStatus());
+            verify(orderRepository, never()).save(any(Order.class));
+            verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
+        }
     }
 
     @Test

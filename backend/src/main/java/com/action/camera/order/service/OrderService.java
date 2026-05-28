@@ -84,6 +84,9 @@ public class OrderService {
         Order order = getOrderOrThrow(orderId);
         OrderStatus fromStatus = order.getStatus();
         ensureCanChangeStatus(fromStatus, targetStatus);
+        if (fromStatus == OrderStatus.DELIVERED_PENDING_CONFIRM && targetStatus == OrderStatus.COMPLETED) {
+            markCompletedAndReleaseEscrow(order, LocalDateTime.now(), false);
+        }
         return applyStatusChange(order, fromStatus, targetStatus, operatorId, resolveOperatorRole(order, operatorId), reason);
     }
 
@@ -162,10 +165,7 @@ public class OrderService {
                 continue;
             }
             ensureCanChangeStatus(order.getStatus(), OrderStatus.COMPLETED);
-            order.setEscrowStatus(EscrowStatus.RELEASED);
-            order.setSettlementStatus(SETTLEMENT_SETTLED);
-            order.setAutoConfirmTime(now);
-            order.setCompleteTime(now);
+            markCompletedAndReleaseEscrow(order, now, true);
             applyStatusChange(
                     order,
                     OrderStatus.DELIVERED_PENDING_CONFIRM,
@@ -356,6 +356,15 @@ public class OrderService {
         orderStatusLogRepository.save(statusLog);
 
         return savedOrder;
+    }
+
+    private void markCompletedAndReleaseEscrow(Order order, LocalDateTime completedAt, boolean autoConfirmed) {
+        order.setEscrowStatus(EscrowStatus.RELEASED);
+        order.setSettlementStatus(SETTLEMENT_SETTLED);
+        order.setCompleteTime(completedAt);
+        if (autoConfirmed) {
+            order.setAutoConfirmTime(completedAt);
+        }
     }
 
     private String resolveOperatorRole(Order order, Long operatorId) {
