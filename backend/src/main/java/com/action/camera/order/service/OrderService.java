@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +32,9 @@ public class OrderService {
     public static final String MOCK_PAY_METHOD = "MOCK_PAY";
     private static final int REWORK_REASON_MAX_LENGTH = 200;
     private static final String PAYMENT_SUCCESS = "SUCCESS";
+    private static final long SYSTEM_OPERATOR_ID = 0L;
+    private static final String SYSTEM_OPERATOR_ROLE = "SYSTEM";
+    private static final String AUTO_CONFIRM_REASON = "交付后 7 天未操作，系统自动确认完成";
 
     private final OrderRepository orderRepository;
     private final PaymentRecordRepository paymentRecordRepository;
@@ -126,6 +130,45 @@ public class OrderService {
                 "PROVIDER",
                 reason
         );
+    }
+
+    @Transactional
+    public int autoConfirmTimeoutOrders(LocalDateTime now) {
+        if (now == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "now must not be null");
+        }
+        LocalDateTime timeoutBoundary = now.minusDays(7);
+        int confirmedCount = 0;
+        for (Order order : orderRepository.findByStatus(OrderStatus.DELIVERED_PENDING_CONFIRM)) {
+            if (order.getStatus() != OrderStatus.DELIVERED_PENDING_CONFIRM) {
+                continue;
+            }
+            Optional<OrderStatusLog> latestDeliveredLog =
+                    orderStatusLogRepository.findFirstByOrderIdAndToStatusOrderByCreatedAtDesc(
+                            order.getId(),
+                            OrderStatus.DELIVERED_PENDING_CONFIRM
+                    );
+            if (latestDeliveredLog.isEmpty()) {
+                continue;
+            }
+            LocalDateTime deliveredAt = latestDeliveredLog.get().getCreatedAt();
+            if (deliveredAt == null || deliveredAt.isAfter(timeoutBoundary)) {
+                continue;
+            }
+            ensureCanChangeStatus(order.getStatus(), OrderStatus.COMPLETED);
+            order.setAutoConfirmTime(now);
+            order.setCompleteTime(now);
+            applyStatusChange(
+                    order,
+                    OrderStatus.DELIVERED_PENDING_CONFIRM,
+                    OrderStatus.COMPLETED,
+                    SYSTEM_OPERATOR_ID,
+                    SYSTEM_OPERATOR_ROLE,
+                    AUTO_CONFIRM_REASON
+            );
+            confirmedCount++;
+        }
+        return confirmedCount;
     }
 
     @Transactional(readOnly = true)
