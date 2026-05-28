@@ -8,4 +8,6 @@ import java.util.Optional;
 public interface DeliveryFileRepository extends JpaRepository<DeliveryFile, Long> {
 
     Optional<DeliveryFile> findFirstByDeliveryIdOrderBySortOrderAsc(Long deliveryId);
+
+    void deleteByDeliveryId(Long deliveryId);
 }

@@ -29,6 +29,7 @@ import java.util.Objects;
 public class OrderService {
 
     public static final String MOCK_PAY_METHOD = "MOCK_PAY";
+    private static final int REWORK_REASON_MAX_LENGTH = 200;
     private static final String PAYMENT_SUCCESS = "SUCCESS";
 
     private final OrderRepository orderRepository;
@@ -79,6 +80,52 @@ public class OrderService {
         OrderStatus fromStatus = order.getStatus();
         ensureCanChangeStatus(fromStatus, targetStatus);
         return applyStatusChange(order, fromStatus, targetStatus, operatorId, resolveOperatorRole(order, operatorId), reason);
+    }
+
+    @Transactional
+    public Order requestRework(Long orderId, Long customerId, String reason) {
+        Order order = getOrderOrThrow(orderId);
+        if (!Objects.equals(order.getCustomerId(), customerId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only the customer can request rework");
+        }
+        if (order.getStatus() != OrderStatus.DELIVERED_PENDING_CONFIRM) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                    "Only delivered orders pending confirmation can request rework");
+        }
+        OrderStatus fromStatus = order.getStatus();
+        OrderStatus targetStatus = OrderStatus.REWORK_REQUIRED;
+        ensureCanChangeStatus(fromStatus, targetStatus);
+        return applyStatusChange(order, fromStatus, targetStatus, customerId, "CUSTOMER", reworkReason(reason));
+    }
+
+    @Transactional
+    public Order completeReworkDelivery(Long orderId, Long providerId, String reason) {
+        Order order = getOrderOrThrow(orderId);
+        if (!Objects.equals(order.getProviderUserId(), providerId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only the provider can upload rework delivery");
+        }
+        if (order.getStatus() != OrderStatus.REWORK_REQUIRED) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                    "Only rework required orders can complete rework delivery");
+        }
+        ensureCanChangeStatus(OrderStatus.REWORK_REQUIRED, OrderStatus.PENDING_DELIVERY);
+        Order pendingDelivery = applyStatusChange(
+                order,
+                OrderStatus.REWORK_REQUIRED,
+                OrderStatus.PENDING_DELIVERY,
+                providerId,
+                "PROVIDER",
+                "服务方开始返修交付"
+        );
+        ensureCanChangeStatus(OrderStatus.PENDING_DELIVERY, OrderStatus.DELIVERED_PENDING_CONFIRM);
+        return applyStatusChange(
+                pendingDelivery,
+                OrderStatus.PENDING_DELIVERY,
+                OrderStatus.DELIVERED_PENDING_CONFIRM,
+                providerId,
+                "PROVIDER",
+                reason
+        );
     }
 
     @Transactional(readOnly = true)
@@ -268,6 +315,18 @@ public class OrderService {
             return "PROVIDER";
         }
         return "SYSTEM";
+    }
+
+    private String reworkReason(String reason) {
+        if (reason == null || reason.isBlank()) {
+            return "需求方请求返修";
+        }
+        String trimmedReason = reason.trim();
+        if (trimmedReason.length() > REWORK_REASON_MAX_LENGTH) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR,
+                    "Rework reason must not exceed " + REWORK_REASON_MAX_LENGTH + " characters");
+        }
+        return "需求方请求返修：" + trimmedReason;
     }
 
     private String buildQuoteSnapshot(Quote quote) {
