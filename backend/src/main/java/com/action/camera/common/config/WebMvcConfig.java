@@ -31,7 +31,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/users/login",
                         "/demands/**",
                         "/moments/**",
-                        "/messages/**"
+                        "/messages/**",
+                        // 公开摄影师主页；PUT /me/profile 共享该 pattern，在 Controller 内手动鉴权
+                        "/api/v1/providers/*/profile"
                 );
     }
 

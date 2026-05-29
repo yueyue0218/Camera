@@ -28,13 +28,13 @@ public class UserController {
 
     @PostMapping("/register")
     public Result<Void> register(@Valid @RequestBody RegisterRequest req) {
-        userService.register(req.getEmail(), req.getCode(), req.getPassword(), req.getNickname());
+        userService.register(req.getEmail(), req.getCode(), req.getPassword(), req.getNickname(), req.getRole());
         return Result.success(null, "注册成功");
     }
 
     @PostMapping("/login")
     public Result<LoginResponse> login(@Valid @RequestBody LoginRequest req) {
-        LoginResponse response = userService.login(req.getStudentNo(), req.getPassword());
+        LoginResponse response = userService.login(req.getStudentNo(), req.getPassword(), req.getRole());
         return Result.success(response);
     }
 

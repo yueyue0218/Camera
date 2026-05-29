@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.action.camera.provider.mapper.ProviderProfileMapper">
+
+    <resultMap id="PublicProfileResultMap"
+               type="com.action.camera.provider.dto.ProviderProfilePublicVO">
+        <id     property="providerId"       column="provider_id"/>
+        <result property="nickname"         column="nickname"/>
+        <result property="gender"           column="gender"/>
+        <result property="avatarUrl"        column="avatar_url"/>
+        <result property="cityCode"         column="city_code"/>
+        <result property="cityArea"         column="city_area"/>
+        <result property="creditScore"      column="credit_score"/>
+        <result property="avgRating"        column="avg_rating"/>
+        <result property="completedOrders"  column="completed_orders"/>
+        <result property="equipment"        column="equipment"/>
+        <result property="age"              column="age"/>
+        <result property="priceMin"         column="price_min"/>
+        <result property="priceMax"         column="price_max"/>
+        <result property="acceptingOrders"  column="accepting_orders"/>
+        <result property="serviceType"      column="service_type"/>
+        <!-- nested select：按 profile_id 查风格标签 name 列表，避免 JOIN 引入 null 行 -->
+        <collection property="styleTags"
+                    select="selectTagNamesByProfileId"
+                    column="profile_id"
+                    ofType="String"/>
+    </resultMap>
+
+    <select id="selectPublicProfile" resultMap="PublicProfileResultMap">
+        SELECT
+            pp.id            AS profile_id,
+            pp.user_id       AS provider_id,
+            u.nickname,
+            u.gender,
+            f.url            AS avatar_url,
+            pp.city_code,
+            pp.city_area,
+            u.credit_score,
+            pp.avg_rating,
+            pp.completed_orders,
+            pp.equipment,
+            pp.age,
+            pp.price_min,
+            pp.price_max,
+            pp.accepting_orders,
+            pp.service_type
+        FROM provider_profiles pp
+        JOIN  users u ON u.id = pp.user_id
+        LEFT JOIN files f ON f.id = u.avatar_file_id
+        WHERE pp.user_id = #{providerUserId}
+    </select>
+
+    <select id="selectTagNamesByProfileId" resultType="String">
+        SELECT st.name
+        FROM provider_style_tags pst
+        JOIN style_tags st ON st.id = pst.tag_id
+        WHERE pst.provider_profile_id = #{profileId}
+        ORDER BY st.name
+    </select>
+
+</mapper>

@@ -7,10 +7,14 @@ import com.action.camera.domain.User;
 import com.action.camera.dto.LoginResponse;
 import com.action.camera.dto.UserBriefResponse;
 import com.action.camera.dto.UserProfileResponse;
+import com.action.camera.provider.entity.ProviderProfile;
+import com.action.camera.provider.mapper.ProviderProfileMapper;
 import com.action.camera.repository.UserRepository;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 
 @Service
 public class UserService {
@@ -18,18 +22,21 @@ public class UserService {
     private final UserRepository userRepository;
     private final VerificationCodeService codeService;
     private final JwtUtil jwtUtil;
+    private final ProviderProfileMapper providerProfileMapper;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public UserService(UserRepository userRepository,
                        VerificationCodeService codeService,
-                       JwtUtil jwtUtil) {
+                       JwtUtil jwtUtil,
+                       ProviderProfileMapper providerProfileMapper) {
         this.userRepository = userRepository;
         this.codeService = codeService;
         this.jwtUtil = jwtUtil;
+        this.providerProfileMapper = providerProfileMapper;
     }
 
     @Transactional
-    public void register(String email, String code, String password, String nickname) {
+    public void register(String email, String code, String password, String nickname, String role) {
         codeService.verify(email, code);
 
         String studentNo = email.substring(0, 9);
@@ -38,18 +45,21 @@ public class UserService {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "该学号已注册");
         }
 
-        String passwordHash = passwordEncoder.encode(password);
-
         User user = new User();
         user.setStudentNo(studentNo);
-        user.setPasswordHash(passwordHash);
+        user.setPasswordHash(passwordEncoder.encode(password));
         user.setNickname(nickname);
         user.setSchool("南京大学");
-
+        user.setCurrentRole(role);
         userRepository.save(user);
+
+        if ("PROVIDER".equals(role)) {
+            ensureProviderProfile(user.getId());
+        }
     }
 
-    public LoginResponse login(String studentNo, String password) {
+    @Transactional
+    public LoginResponse login(String studentNo, String password, String role) {
         User user = userRepository.findByStudentNo(studentNo)
                 .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_ERROR, "学号或密码错误"));
 
@@ -61,8 +71,28 @@ public class UserService {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "学号或密码错误");
         }
 
+        if (!role.equals(user.getCurrentRole())) {
+            user.setCurrentRole(role);
+            userRepository.save(user);
+        }
+
+        if ("PROVIDER".equals(role)) {
+            ensureProviderProfile(user.getId());
+        }
+
         String token = jwtUtil.generateToken(user.getId());
-        return new LoginResponse(token, user.getId(), user.getNickname());
+        return new LoginResponse(token, user.getId(), user.getNickname(), role);
+    }
+
+    private void ensureProviderProfile(Long userId) {
+        long exists = providerProfileMapper.selectCount(
+                new LambdaQueryWrapper<ProviderProfile>().eq(ProviderProfile::getUserId, userId)
+        );
+        if (exists == 0) {
+            ProviderProfile profile = new ProviderProfile();
+            profile.setUserId(userId);
+            providerProfileMapper.insert(profile);
+        }
     }
 
     /** GET /users/me：返回当前用户完整资料 */

@@ -21,20 +21,31 @@ public class ProviderProfile {
 
     private Long userId;
 
-    /** 认证通过时间 */
-    private LocalDateTime certifiedAt;
+    private String serviceType;
 
-    /** 个人简介，待摄影师自行补充 */
+    private String displayName;
+
     private String bio;
 
-    /** 风格标签，逗号分隔，待摄影师自行补充 */
-    private String styleTags;
-
-    /** 所在城市，待摄影师自行补充 */
     private String cityCode;
 
-    /** 每小时收费（元），待摄影师自行补充 */
-    private BigDecimal pricePerHour;
+    private String cityArea;
+
+    private BigDecimal priceMin;
+
+    private BigDecimal priceMax;
+
+    private Boolean acceptingOrders;
+
+    private BigDecimal avgRating;
+
+    private Integer completedOrders;
+
+    private String auditStatus;
+
+    private Integer age;
+
+    private String equipment;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
