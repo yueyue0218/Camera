@@ -46,28 +46,27 @@ public class PhotoAuthorizationService {
     private final PhotoAuthorizationFileRepository photoAuthorizationFileRepository;
 
     @Transactional
-    public PhotoAuthorizationResponse authorize(
+    public PhotoAuthorizationResponse requestAuthorization(
             Long orderId,
             Long operatorId,
             PhotoAuthorizationRequest request
     ) {
         Order order = getOrder(orderId);
-        ensureCustomer(order, operatorId);
+        ensureProvider(order, operatorId);
         ensureCompleted(order);
 
         LinkedHashSet<Long> requestedFileIds = normalizeFileIds(request);
         String remark = normalizeRemark(request == null ? null : request.getRemark());
         Map<Long, DeliveryFile> deliveryFiles = findOrderDeliveryFiles(orderId, requestedFileIds);
-        ensureNotAuthorizedBefore(orderId, requestedFileIds);
+        ensureNoExistingAuthorization(orderId, requestedFileIds);
 
         PhotoAuthorization authorization = new PhotoAuthorization();
         authorization.setOrderId(orderId);
         authorization.setCustomerId(order.getCustomerId());
         authorization.setProviderUserId(order.getProviderUserId());
         authorization.setPhotoUsageScope(PhotoAuthorization.USAGE_SCOPE_PORTFOLIO_DISPLAY);
-        authorization.setStatus(PhotoAuthorization.STATUS_GRANTED);
+        authorization.setStatus(PhotoAuthorization.STATUS_PENDING);
         authorization.setRemark(remark);
-        authorization.setAuthorizedAt(LocalDateTime.now());
         PhotoAuthorization savedAuthorization = photoAuthorizationRepository.save(authorization);
 
         List<PhotoAuthorizationFile> savedFiles = new ArrayList<>();
@@ -81,6 +80,33 @@ public class PhotoAuthorizationService {
         }
 
         return PhotoAuthorizationResponse.from(savedAuthorization, savedFiles);
+    }
+
+    @Transactional
+    public PhotoAuthorizationResponse approve(Long authorizationId, Long operatorId, String remark) {
+        PhotoAuthorization authorization = getAuthorization(authorizationId);
+        Order order = getOrder(authorization.getOrderId());
+        ensureCustomer(order, operatorId);
+        ensurePending(authorization);
+
+        authorization.setStatus(PhotoAuthorization.STATUS_GRANTED);
+        authorization.setRemark(normalizeRemark(remark));
+        authorization.setAuthorizedAt(LocalDateTime.now());
+        PhotoAuthorization savedAuthorization = photoAuthorizationRepository.save(authorization);
+        return PhotoAuthorizationResponse.from(savedAuthorization, findFilesByAuthorizationIds(List.of(authorizationId)));
+    }
+
+    @Transactional
+    public PhotoAuthorizationResponse reject(Long authorizationId, Long operatorId, String remark) {
+        PhotoAuthorization authorization = getAuthorization(authorizationId);
+        Order order = getOrder(authorization.getOrderId());
+        ensureCustomer(order, operatorId);
+        ensurePending(authorization);
+
+        authorization.setStatus(PhotoAuthorization.STATUS_REJECTED);
+        authorization.setRemark(normalizeRemark(remark));
+        PhotoAuthorization savedAuthorization = photoAuthorizationRepository.save(authorization);
+        return PhotoAuthorizationResponse.from(savedAuthorization, findFilesByAuthorizationIds(List.of(authorizationId)));
     }
 
     @Transactional(readOnly = true)
@@ -106,9 +132,20 @@ public class PhotoAuthorizationService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Order not found"));
     }
 
+    private PhotoAuthorization getAuthorization(Long authorizationId) {
+        return photoAuthorizationRepository.findById(authorizationId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Photo authorization not found"));
+    }
+
     private void ensureCustomer(Order order, Long operatorId) {
         if (!Objects.equals(order.getCustomerId(), operatorId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "Only customer can authorize delivered photos");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only customer can approve or reject photo authorization");
+        }
+    }
+
+    private void ensureProvider(Order order, Long operatorId) {
+        if (!Objects.equals(order.getProviderUserId(), operatorId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only provider can request photo authorization");
         }
     }
 
@@ -116,6 +153,13 @@ public class PhotoAuthorizationService {
         if (order.getStatus() != OrderStatus.COMPLETED) {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT,
                     "Photo authorization is only allowed for completed orders");
+        }
+    }
+
+    private void ensurePending(PhotoAuthorization authorization) {
+        if (!PhotoAuthorization.STATUS_PENDING.equals(authorization.getStatus())) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                    "Only pending photo authorization can be approved or rejected");
         }
     }
 
@@ -173,7 +217,7 @@ public class PhotoAuthorizationService {
         return files;
     }
 
-    private void ensureNotAuthorizedBefore(Long orderId, Collection<Long> requestedFileIds) {
+    private void ensureNoExistingAuthorization(Long orderId, Collection<Long> requestedFileIds) {
         List<PhotoAuthorizationFile> existingFiles = photoAuthorizationFileRepository.findByFileIdIn(requestedFileIds);
         if (existingFiles.isEmpty()) {
             return;
@@ -188,8 +232,7 @@ public class PhotoAuthorizationService {
         for (PhotoAuthorizationFile file : existingFiles) {
             PhotoAuthorization authorization = authorizations.get(file.getAuthorizationId());
             if (authorization != null
-                    && Objects.equals(authorization.getOrderId(), orderId)
-                    && PhotoAuthorization.STATUS_GRANTED.equals(authorization.getStatus())) {
+                    && Objects.equals(authorization.getOrderId(), orderId)) {
                 duplicateFileIds.add(file.getFileId());
             }
         }
@@ -197,6 +240,13 @@ public class PhotoAuthorizationService {
             throw new BusinessException(ErrorCode.DUPLICATE_OPERATION,
                     "Photo authorization already exists for fileIds: " + duplicateFileIds);
         }
+    }
+
+    private List<PhotoAuthorizationFile> findFilesByAuthorizationIds(List<Long> authorizationIds) {
+        return photoAuthorizationFileRepository.findByAuthorizationIdIn(authorizationIds)
+                .stream()
+                .sorted(Comparator.comparing(PhotoAuthorizationFile::getSortOrder))
+                .toList();
     }
 
     private List<PhotoAuthorizationResponse> mapResponses(List<PhotoAuthorization> authorizations) {
@@ -207,9 +257,8 @@ public class PhotoAuthorizationService {
                 .map(PhotoAuthorization::getId)
                 .toList();
         Map<Long, List<PhotoAuthorizationFile>> filesByAuthorizationId =
-                photoAuthorizationFileRepository.findByAuthorizationIdIn(authorizationIds)
+                findFilesByAuthorizationIds(authorizationIds)
                         .stream()
-                        .sorted(Comparator.comparing(PhotoAuthorizationFile::getSortOrder))
                         .collect(Collectors.groupingBy(PhotoAuthorizationFile::getAuthorizationId, HashMap::new,
                                 Collectors.toList()));
         return authorizations.stream()

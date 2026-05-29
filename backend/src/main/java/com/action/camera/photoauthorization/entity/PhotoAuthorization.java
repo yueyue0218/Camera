@@ -20,7 +20,9 @@ import java.time.LocalDateTime;
 @Table(name = "photo_authorizations")
 public class PhotoAuthorization {
 
+    public static final String STATUS_PENDING = "PENDING";
     public static final String STATUS_GRANTED = "GRANTED";
+    public static final String STATUS_REJECTED = "REJECTED";
     public static final String USAGE_SCOPE_PORTFOLIO_DISPLAY = "PORTFOLIO_DISPLAY";
 
     @Id
@@ -40,12 +42,12 @@ public class PhotoAuthorization {
     private String photoUsageScope = USAGE_SCOPE_PORTFOLIO_DISPLAY;
 
     @Column(name = "status", nullable = false, length = 30)
-    private String status = STATUS_GRANTED;
+    private String status = STATUS_PENDING;
 
     @Column(name = "remark")
     private String remark;
 
-    @Column(name = "authorized_at", nullable = false)
+    @Column(name = "authorized_at")
     private LocalDateTime authorizedAt;
 
     @Column(name = "expire_time")
@@ -53,14 +55,11 @@ public class PhotoAuthorization {
 
     @PrePersist
     void prePersist() {
-        if (authorizedAt == null) {
-            authorizedAt = LocalDateTime.now();
-        }
         if (photoUsageScope == null || photoUsageScope.isBlank()) {
             photoUsageScope = USAGE_SCOPE_PORTFOLIO_DISPLAY;
         }
         if (status == null || status.isBlank()) {
-            status = STATUS_GRANTED;
+            status = STATUS_PENDING;
         }
     }
 }

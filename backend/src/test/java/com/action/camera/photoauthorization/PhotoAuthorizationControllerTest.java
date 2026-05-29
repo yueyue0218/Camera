@@ -48,26 +48,56 @@ class PhotoAuthorizationControllerTest {
     }
 
     @Test
-    void customerAuthorizeEndpointUsesCurrentUser() {
-        UserContext.setUserId(CUSTOMER_ID);
+    void providerRequestEndpointUsesCurrentUser() {
+        UserContext.setUserId(PROVIDER_ID);
         PhotoAuthorizationRequest request = new PhotoAuthorizationRequest();
         request.setFileIds(List.of(5001L));
-        PhotoAuthorizationResponse response = response();
-        when(photoAuthorizationService.authorize(ORDER_ID, CUSTOMER_ID, request)).thenReturn(response);
+        PhotoAuthorizationResponse response = response(PhotoAuthorization.STATUS_PENDING);
+        when(photoAuthorizationService.requestAuthorization(ORDER_ID, PROVIDER_ID, request)).thenReturn(response);
 
         Result<PhotoAuthorizationResponse> result =
-                photoAuthorizationController.authorize(ORDER_ID, request);
+                photoAuthorizationController.requestAuthorization(ORDER_ID, request);
 
         assertEquals(200, result.getCode());
-        assertEquals(AUTHORIZATION_ID, result.getData().getId());
-        verify(photoAuthorizationService).authorize(ORDER_ID, CUSTOMER_ID, request);
+        assertEquals(PhotoAuthorization.STATUS_PENDING, result.getData().getStatus());
+        verify(photoAuthorizationService).requestAuthorization(ORDER_ID, PROVIDER_ID, request);
+    }
+
+    @Test
+    void approveEndpointUsesCurrentUserAndRemark() {
+        UserContext.setUserId(CUSTOMER_ID);
+        PhotoAuthorizationRequest request = new PhotoAuthorizationRequest();
+        request.setRemark("同意展示");
+        when(photoAuthorizationService.approve(AUTHORIZATION_ID, CUSTOMER_ID, "同意展示"))
+                .thenReturn(response(PhotoAuthorization.STATUS_GRANTED));
+
+        Result<PhotoAuthorizationResponse> result =
+                photoAuthorizationController.approve(AUTHORIZATION_ID, request);
+
+        assertEquals(PhotoAuthorization.STATUS_GRANTED, result.getData().getStatus());
+        verify(photoAuthorizationService).approve(AUTHORIZATION_ID, CUSTOMER_ID, "同意展示");
+    }
+
+    @Test
+    void rejectEndpointUsesCurrentUserAndRemark() {
+        UserContext.setUserId(CUSTOMER_ID);
+        PhotoAuthorizationRequest request = new PhotoAuthorizationRequest();
+        request.setRemark("不同意公开");
+        when(photoAuthorizationService.reject(AUTHORIZATION_ID, CUSTOMER_ID, "不同意公开"))
+                .thenReturn(response(PhotoAuthorization.STATUS_REJECTED));
+
+        Result<PhotoAuthorizationResponse> result =
+                photoAuthorizationController.reject(AUTHORIZATION_ID, request);
+
+        assertEquals(PhotoAuthorization.STATUS_REJECTED, result.getData().getStatus());
+        verify(photoAuthorizationService).reject(AUTHORIZATION_ID, CUSTOMER_ID, "不同意公开");
     }
 
     @Test
     void listOrderAuthorizationsUsesCurrentUser() {
         UserContext.setUserId(CUSTOMER_ID);
         when(photoAuthorizationService.listOrderAuthorizations(ORDER_ID, CUSTOMER_ID))
-                .thenReturn(List.of(response()));
+                .thenReturn(List.of(response(PhotoAuthorization.STATUS_PENDING)));
 
         Result<List<PhotoAuthorizationResponse>> result =
                 photoAuthorizationController.listOrderAuthorizations(ORDER_ID);
@@ -79,7 +109,8 @@ class PhotoAuthorizationControllerTest {
     @Test
     void providerListEndpointUsesCurrentUser() {
         UserContext.setUserId(PROVIDER_ID);
-        when(photoAuthorizationService.listProviderAuthorizations(PROVIDER_ID)).thenReturn(List.of(response()));
+        when(photoAuthorizationService.listProviderAuthorizations(PROVIDER_ID))
+                .thenReturn(List.of(response(PhotoAuthorization.STATUS_GRANTED)));
 
         Result<List<PhotoAuthorizationResponse>> result =
                 photoAuthorizationController.listProviderAuthorizations();
@@ -96,15 +127,17 @@ class PhotoAuthorizationControllerTest {
         assertEquals(ErrorCode.UNAUTHORIZED, exception.getErrorCode());
     }
 
-    private PhotoAuthorizationResponse response() {
+    private PhotoAuthorizationResponse response(String status) {
         return PhotoAuthorizationResponse.builder()
                 .id(AUTHORIZATION_ID)
                 .orderId(ORDER_ID)
                 .customerId(CUSTOMER_ID)
                 .providerUserId(PROVIDER_ID)
-                .status(PhotoAuthorization.STATUS_GRANTED)
+                .status(status)
                 .photoUsageScope(PhotoAuthorization.USAGE_SCOPE_PORTFOLIO_DISPLAY)
-                .authorizedAt(LocalDateTime.of(2026, 6, 20, 12, 0))
+                .authorizedAt(PhotoAuthorization.STATUS_GRANTED.equals(status)
+                        ? LocalDateTime.of(2026, 6, 20, 12, 0)
+                        : null)
                 .files(List.of())
                 .build();
     }

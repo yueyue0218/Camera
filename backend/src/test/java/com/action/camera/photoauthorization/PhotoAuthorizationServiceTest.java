@@ -25,11 +25,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,7 +44,6 @@ import static org.mockito.Mockito.when;
 class PhotoAuthorizationServiceTest {
 
     private static final Long ORDER_ID = 8001L;
-    private static final Long OTHER_ORDER_ID = 8002L;
     private static final Long CUSTOMER_ID = 1001L;
     private static final Long PROVIDER_ID = 2001L;
     private static final Long STRANGER_ID = 3001L;
@@ -81,70 +81,118 @@ class PhotoAuthorizationServiceTest {
     }
 
     @Test
-    void customerCanAuthorizeCompletedOrderDeliveryFiles() {
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
-        when(deliveryRepository.findByOrderIdOrderByUploadTimeDesc(ORDER_ID)).thenReturn(List.of(delivery()));
-        when(deliveryFileRepository.findByDeliveryIdInAndFileIdIn(
-                eq(List.of(DELIVERY_ID)),
-                eq(new java.util.LinkedHashSet<>(List.of(FILE_ID, SECOND_FILE_ID)))
-        )).thenReturn(List.of(deliveryFile(FILE_ID), deliveryFile(SECOND_FILE_ID)));
-        when(photoAuthorizationFileRepository.findByFileIdIn(anyCollection())).thenReturn(List.of());
-        when(photoAuthorizationRepository.save(any(PhotoAuthorization.class))).thenAnswer(invocation -> {
-            PhotoAuthorization authorization = invocation.getArgument(0);
-            authorization.setId(AUTHORIZATION_ID);
-            return authorization;
-        });
-        when(photoAuthorizationFileRepository.save(any(PhotoAuthorizationFile.class))).thenAnswer(invocation -> {
-            PhotoAuthorizationFile file = invocation.getArgument(0);
-            file.setId(file.getFileId() + 100);
-            return file;
-        });
+    void providerCanRequestAuthorizationForCompletedOrderDeliveryFilesAsPending() {
+        prepareRequestMocks();
 
-        PhotoAuthorizationResponse response = photoAuthorizationService.authorize(
+        PhotoAuthorizationResponse response = photoAuthorizationService.requestAuthorization(
                 ORDER_ID,
-                CUSTOMER_ID,
-                request(List.of(FILE_ID, SECOND_FILE_ID), " 同意用于作品集 ")
+                PROVIDER_ID,
+                request(List.of(FILE_ID, SECOND_FILE_ID), " 希望展示到作品集 ")
         );
 
         assertEquals(AUTHORIZATION_ID, response.getId());
         assertEquals(ORDER_ID, response.getOrderId());
         assertEquals(CUSTOMER_ID, response.getCustomerId());
         assertEquals(PROVIDER_ID, response.getProviderUserId());
-        assertEquals(PhotoAuthorization.STATUS_GRANTED, response.getStatus());
+        assertEquals(PhotoAuthorization.STATUS_PENDING, response.getStatus());
         assertEquals(PhotoAuthorization.USAGE_SCOPE_PORTFOLIO_DISPLAY, response.getPhotoUsageScope());
-        assertEquals("同意用于作品集", response.getRemark());
-        assertNotNull(response.getAuthorizedAt());
+        assertEquals("希望展示到作品集", response.getRemark());
+        assertNull(response.getAuthorizedAt());
         assertEquals(List.of(FILE_ID, SECOND_FILE_ID),
                 response.getFiles().stream().map(file -> file.getFileId()).toList());
 
         ArgumentCaptor<PhotoAuthorization> authorizationCaptor = ArgumentCaptor.forClass(PhotoAuthorization.class);
         verify(photoAuthorizationRepository).save(authorizationCaptor.capture());
-        assertEquals(ORDER_ID, authorizationCaptor.getValue().getOrderId());
-        assertEquals(CUSTOMER_ID, authorizationCaptor.getValue().getCustomerId());
-        assertEquals(PROVIDER_ID, authorizationCaptor.getValue().getProviderUserId());
+        assertEquals(PhotoAuthorization.STATUS_PENDING, authorizationCaptor.getValue().getStatus());
+        assertNull(authorizationCaptor.getValue().getAuthorizedAt());
     }
 
     @Test
-    void providerAndStrangerCannotAuthorizeForCustomer() {
+    void customerCanApprovePendingAuthorization() {
+        PhotoAuthorization authorization = authorization(PhotoAuthorization.STATUS_PENDING);
+        when(photoAuthorizationRepository.findById(AUTHORIZATION_ID)).thenReturn(Optional.of(authorization));
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
+        when(photoAuthorizationRepository.save(any(PhotoAuthorization.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(photoAuthorizationFileRepository.findByAuthorizationIdIn(List.of(AUTHORIZATION_ID)))
+                .thenReturn(List.of(authorizationFile(AUTHORIZATION_ID, FILE_ID, 0)));
+
+        PhotoAuthorizationResponse response =
+                photoAuthorizationService.approve(AUTHORIZATION_ID, CUSTOMER_ID, "同意展示");
+
+        assertEquals(PhotoAuthorization.STATUS_GRANTED, response.getStatus());
+        assertEquals("同意展示", response.getRemark());
+        assertTrue(response.getAuthorizedAt() != null);
+        assertEquals(List.of(FILE_ID), response.getFiles().stream().map(file -> file.getFileId()).toList());
+    }
+
+    @Test
+    void customerCanRejectPendingAuthorization() {
+        PhotoAuthorization authorization = authorization(PhotoAuthorization.STATUS_PENDING);
+        when(photoAuthorizationRepository.findById(AUTHORIZATION_ID)).thenReturn(Optional.of(authorization));
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
+        when(photoAuthorizationRepository.save(any(PhotoAuthorization.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(photoAuthorizationFileRepository.findByAuthorizationIdIn(List.of(AUTHORIZATION_ID)))
+                .thenReturn(List.of(authorizationFile(AUTHORIZATION_ID, FILE_ID, 0)));
+
+        PhotoAuthorizationResponse response =
+                photoAuthorizationService.reject(AUTHORIZATION_ID, CUSTOMER_ID, "不希望公开展示");
+
+        assertEquals(PhotoAuthorization.STATUS_REJECTED, response.getStatus());
+        assertEquals("不希望公开展示", response.getRemark());
+        assertNull(response.getAuthorizedAt());
+    }
+
+    @Test
+    void providerAndStrangerCannotApproveOrRejectForCustomer() {
+        PhotoAuthorization authorization = authorization(PhotoAuthorization.STATUS_PENDING);
+        when(photoAuthorizationRepository.findById(AUTHORIZATION_ID)).thenReturn(Optional.of(authorization));
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
 
-        BusinessException providerException = assertThrows(BusinessException.class,
-                () -> photoAuthorizationService.authorize(ORDER_ID, PROVIDER_ID, request(List.of(FILE_ID), null)));
-        BusinessException strangerException = assertThrows(BusinessException.class,
-                () -> photoAuthorizationService.authorize(ORDER_ID, STRANGER_ID, request(List.of(FILE_ID), null)));
+        BusinessException providerApprove = assertThrows(BusinessException.class,
+                () -> photoAuthorizationService.approve(AUTHORIZATION_ID, PROVIDER_ID, null));
+        BusinessException strangerReject = assertThrows(BusinessException.class,
+                () -> photoAuthorizationService.reject(AUTHORIZATION_ID, STRANGER_ID, null));
 
-        assertEquals(ErrorCode.FORBIDDEN, providerException.getErrorCode());
+        assertEquals(ErrorCode.FORBIDDEN, providerApprove.getErrorCode());
+        assertEquals(ErrorCode.FORBIDDEN, strangerReject.getErrorCode());
+        verify(photoAuthorizationRepository, never()).save(any(PhotoAuthorization.class));
+    }
+
+    @Test
+    void nonProviderCannotRequestAuthorization() {
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
+
+        BusinessException customerException = assertThrows(BusinessException.class,
+                () -> photoAuthorizationService.requestAuthorization(
+                        ORDER_ID,
+                        CUSTOMER_ID,
+                        request(List.of(FILE_ID), null)
+                ));
+        BusinessException strangerException = assertThrows(BusinessException.class,
+                () -> photoAuthorizationService.requestAuthorization(
+                        ORDER_ID,
+                        STRANGER_ID,
+                        request(List.of(FILE_ID), null)
+                ));
+
+        assertEquals(ErrorCode.FORBIDDEN, customerException.getErrorCode());
         assertEquals(ErrorCode.FORBIDDEN, strangerException.getErrorCode());
         verify(deliveryRepository, never()).findByOrderIdOrderByUploadTimeDesc(any());
         verify(photoAuthorizationRepository, never()).save(any(PhotoAuthorization.class));
     }
 
     @Test
-    void unfinishedOrderCannotAuthorizePhotos() {
+    void unfinishedOrderCannotRequestAuthorization() {
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.DELIVERED_PENDING_CONFIRM)));
 
         BusinessException exception = assertThrows(BusinessException.class,
-                () -> photoAuthorizationService.authorize(ORDER_ID, CUSTOMER_ID, request(List.of(FILE_ID), null)));
+                () -> photoAuthorizationService.requestAuthorization(
+                        ORDER_ID,
+                        PROVIDER_ID,
+                        request(List.of(FILE_ID), null)
+                ));
 
         assertEquals(ErrorCode.STATUS_CONFLICT, exception.getErrorCode());
         verify(deliveryRepository, never()).findByOrderIdOrderByUploadTimeDesc(any());
@@ -152,49 +200,72 @@ class PhotoAuthorizationServiceTest {
     }
 
     @Test
-    void fileOutsideOrderCannotBeAuthorized() {
+    void fileOutsideOrderCannotBeRequested() {
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
         when(deliveryRepository.findByOrderIdOrderByUploadTimeDesc(ORDER_ID)).thenReturn(List.of(delivery()));
         when(deliveryFileRepository.findByDeliveryIdInAndFileIdIn(
                 eq(List.of(DELIVERY_ID)),
-                eq(new java.util.LinkedHashSet<>(List.of(FILE_ID)))
+                eq(new LinkedHashSet<>(List.of(FILE_ID)))
         )).thenReturn(List.of());
 
         BusinessException exception = assertThrows(BusinessException.class,
-                () -> photoAuthorizationService.authorize(ORDER_ID, CUSTOMER_ID, request(List.of(FILE_ID), null)));
+                () -> photoAuthorizationService.requestAuthorization(
+                        ORDER_ID,
+                        PROVIDER_ID,
+                        request(List.of(FILE_ID), null)
+                ));
 
         assertEquals(ErrorCode.VALIDATION_ERROR, exception.getErrorCode());
         verify(photoAuthorizationRepository, never()).save(any(PhotoAuthorization.class));
     }
 
     @Test
-    void duplicateAuthorizationForSameOrderAndFileIsRejected() {
+    void duplicateRequestForSameOrderAndFileIsRejected() {
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
         when(deliveryRepository.findByOrderIdOrderByUploadTimeDesc(ORDER_ID)).thenReturn(List.of(delivery()));
         when(deliveryFileRepository.findByDeliveryIdInAndFileIdIn(
                 eq(List.of(DELIVERY_ID)),
-                eq(new java.util.LinkedHashSet<>(List.of(FILE_ID)))
+                eq(new LinkedHashSet<>(List.of(FILE_ID)))
         )).thenReturn(List.of(deliveryFile(FILE_ID)));
 
-        PhotoAuthorization existingAuthorization = authorization(AUTHORIZATION_ID, ORDER_ID, PROVIDER_ID);
+        PhotoAuthorization existingAuthorization = authorization(PhotoAuthorization.STATUS_REJECTED);
         PhotoAuthorizationFile existingFile = authorizationFile(AUTHORIZATION_ID, FILE_ID, 0);
         when(photoAuthorizationFileRepository.findByFileIdIn(anyCollection())).thenReturn(List.of(existingFile));
         when(photoAuthorizationRepository.findAllById(anyCollection())).thenReturn(List.of(existingAuthorization));
 
         BusinessException exception = assertThrows(BusinessException.class,
-                () -> photoAuthorizationService.authorize(ORDER_ID, CUSTOMER_ID, request(List.of(FILE_ID), null)));
+                () -> photoAuthorizationService.requestAuthorization(
+                        ORDER_ID,
+                        PROVIDER_ID,
+                        request(List.of(FILE_ID), null)
+                ));
 
         assertEquals(ErrorCode.DUPLICATE_OPERATION, exception.getErrorCode());
         verify(photoAuthorizationRepository, never()).save(any(PhotoAuthorization.class));
     }
 
     @Test
-    void providerCanListOwnAuthorizedPhotos() {
-        PhotoAuthorization authorization = authorization(AUTHORIZATION_ID, ORDER_ID, PROVIDER_ID);
+    void cannotApproveOrRejectNonPendingAuthorization() {
+        PhotoAuthorization grantedAuthorization = authorization(PhotoAuthorization.STATUS_GRANTED);
+        grantedAuthorization.setAuthorizedAt(LocalDateTime.of(2026, 6, 20, 12, 0));
+        when(photoAuthorizationRepository.findById(AUTHORIZATION_ID)).thenReturn(Optional.of(grantedAuthorization));
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> photoAuthorizationService.approve(AUTHORIZATION_ID, CUSTOMER_ID, null));
+
+        assertEquals(ErrorCode.STATUS_CONFLICT, exception.getErrorCode());
+        verify(photoAuthorizationRepository, never()).save(any(PhotoAuthorization.class));
+    }
+
+    @Test
+    void providerListOnlyReturnsGrantedAuthorizations() {
+        PhotoAuthorization grantedAuthorization = authorization(PhotoAuthorization.STATUS_GRANTED);
+        grantedAuthorization.setAuthorizedAt(LocalDateTime.of(2026, 6, 20, 12, 0));
         when(photoAuthorizationRepository.findByProviderUserIdAndStatusOrderByAuthorizedAtDesc(
                 PROVIDER_ID,
                 PhotoAuthorization.STATUS_GRANTED
-        )).thenReturn(List.of(authorization));
+        )).thenReturn(List.of(grantedAuthorization));
         when(photoAuthorizationFileRepository.findByAuthorizationIdIn(List.of(AUTHORIZATION_ID)))
                 .thenReturn(List.of(authorizationFile(AUTHORIZATION_ID, FILE_ID, 0)));
 
@@ -202,6 +273,7 @@ class PhotoAuthorizationServiceTest {
                 photoAuthorizationService.listProviderAuthorizations(PROVIDER_ID);
 
         assertEquals(1, responses.size());
+        assertEquals(PhotoAuthorization.STATUS_GRANTED, responses.get(0).getStatus());
         assertEquals(PROVIDER_ID, responses.get(0).getProviderUserId());
         assertEquals(List.of(FILE_ID), responses.get(0).getFiles().stream().map(file -> file.getFileId()).toList());
     }
@@ -221,14 +293,44 @@ class PhotoAuthorizationServiceTest {
     }
 
     @Test
-    void orderAuthorizationListIsLimitedToOrderParticipants() {
+    void orderParticipantsCanListAuthorizationsAndStrangerCannot() {
+        PhotoAuthorization pendingAuthorization = authorization(PhotoAuthorization.STATUS_PENDING);
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
+        when(photoAuthorizationRepository.findByOrderIdOrderByAuthorizedAtDesc(ORDER_ID))
+                .thenReturn(List.of(pendingAuthorization));
+        when(photoAuthorizationFileRepository.findByAuthorizationIdIn(List.of(AUTHORIZATION_ID)))
+                .thenReturn(List.of(authorizationFile(AUTHORIZATION_ID, FILE_ID, 0)));
 
-        BusinessException exception = assertThrows(BusinessException.class,
+        List<PhotoAuthorizationResponse> customerResponses =
+                photoAuthorizationService.listOrderAuthorizations(ORDER_ID, CUSTOMER_ID);
+        List<PhotoAuthorizationResponse> providerResponses =
+                photoAuthorizationService.listOrderAuthorizations(ORDER_ID, PROVIDER_ID);
+        BusinessException strangerException = assertThrows(BusinessException.class,
                 () -> photoAuthorizationService.listOrderAuthorizations(ORDER_ID, STRANGER_ID));
 
-        assertEquals(ErrorCode.FORBIDDEN, exception.getErrorCode());
-        verify(photoAuthorizationRepository, never()).findByOrderIdOrderByAuthorizedAtDesc(any());
+        assertEquals(PhotoAuthorization.STATUS_PENDING, customerResponses.get(0).getStatus());
+        assertEquals(PhotoAuthorization.STATUS_PENDING, providerResponses.get(0).getStatus());
+        assertEquals(ErrorCode.FORBIDDEN, strangerException.getErrorCode());
+    }
+
+    private void prepareRequestMocks() {
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
+        when(deliveryRepository.findByOrderIdOrderByUploadTimeDesc(ORDER_ID)).thenReturn(List.of(delivery()));
+        when(deliveryFileRepository.findByDeliveryIdInAndFileIdIn(
+                eq(List.of(DELIVERY_ID)),
+                eq(new LinkedHashSet<>(List.of(FILE_ID, SECOND_FILE_ID)))
+        )).thenReturn(List.of(deliveryFile(FILE_ID), deliveryFile(SECOND_FILE_ID)));
+        when(photoAuthorizationFileRepository.findByFileIdIn(anyCollection())).thenReturn(List.of());
+        when(photoAuthorizationRepository.save(any(PhotoAuthorization.class))).thenAnswer(invocation -> {
+            PhotoAuthorization authorization = invocation.getArgument(0);
+            authorization.setId(AUTHORIZATION_ID);
+            return authorization;
+        });
+        when(photoAuthorizationFileRepository.save(any(PhotoAuthorizationFile.class))).thenAnswer(invocation -> {
+            PhotoAuthorizationFile file = invocation.getArgument(0);
+            file.setId(file.getFileId() + 100);
+            return file;
+        });
     }
 
     private PhotoAuthorizationRequest request(List<Long> fileIds, String remark) {
@@ -266,15 +368,14 @@ class PhotoAuthorizationServiceTest {
         return file;
     }
 
-    private PhotoAuthorization authorization(Long authorizationId, Long orderId, Long providerId) {
+    private PhotoAuthorization authorization(String status) {
         PhotoAuthorization authorization = new PhotoAuthorization();
-        authorization.setId(authorizationId);
-        authorization.setOrderId(orderId);
+        authorization.setId(AUTHORIZATION_ID);
+        authorization.setOrderId(ORDER_ID);
         authorization.setCustomerId(CUSTOMER_ID);
-        authorization.setProviderUserId(providerId);
-        authorization.setStatus(PhotoAuthorization.STATUS_GRANTED);
+        authorization.setProviderUserId(PROVIDER_ID);
+        authorization.setStatus(status);
         authorization.setPhotoUsageScope(PhotoAuthorization.USAGE_SCOPE_PORTFOLIO_DISPLAY);
-        authorization.setAuthorizedAt(LocalDateTime.of(2026, 6, 20, 12, 0));
         return authorization;
     }
 

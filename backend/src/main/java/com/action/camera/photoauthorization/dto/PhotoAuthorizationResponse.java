@@ -28,6 +28,8 @@ public class PhotoAuthorizationResponse {
 
     private LocalDateTime authorizedAt;
 
+    private LocalDateTime expireTime;
+
     private List<PhotoAuthorizationFileResponse> files;
 
     public static PhotoAuthorizationResponse from(
@@ -43,6 +45,7 @@ public class PhotoAuthorizationResponse {
                 .status(authorization.getStatus())
                 .remark(authorization.getRemark())
                 .authorizedAt(authorization.getAuthorizedAt())
+                .expireTime(authorization.getExpireTime())
                 .files(files.stream()
                         .map(PhotoAuthorizationFileResponse::from)
                         .toList())

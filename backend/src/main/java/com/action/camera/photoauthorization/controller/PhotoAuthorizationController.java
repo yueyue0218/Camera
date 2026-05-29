@@ -22,12 +22,30 @@ public class PhotoAuthorizationController {
 
     private final PhotoAuthorizationService photoAuthorizationService;
 
-    @PostMapping("/orders/{orderId}/photo-authorizations")
-    public Result<PhotoAuthorizationResponse> authorize(
+    @PostMapping("/orders/{orderId}/photo-authorizations/requests")
+    public Result<PhotoAuthorizationResponse> requestAuthorization(
             @PathVariable Long orderId,
             @RequestBody PhotoAuthorizationRequest request
     ) {
-        return Result.success(photoAuthorizationService.authorize(orderId, currentUserId(), request));
+        return Result.success(photoAuthorizationService.requestAuthorization(orderId, currentUserId(), request));
+    }
+
+    @PostMapping("/photo-authorizations/{authorizationId}/approve")
+    public Result<PhotoAuthorizationResponse> approve(
+            @PathVariable Long authorizationId,
+            @RequestBody(required = false) PhotoAuthorizationRequest request
+    ) {
+        String remark = request == null ? null : request.getRemark();
+        return Result.success(photoAuthorizationService.approve(authorizationId, currentUserId(), remark));
+    }
+
+    @PostMapping("/photo-authorizations/{authorizationId}/reject")
+    public Result<PhotoAuthorizationResponse> reject(
+            @PathVariable Long authorizationId,
+            @RequestBody(required = false) PhotoAuthorizationRequest request
+    ) {
+        String remark = request == null ? null : request.getRemark();
+        return Result.success(photoAuthorizationService.reject(authorizationId, currentUserId(), remark));
     }
 
     @GetMapping("/orders/{orderId}/photo-authorizations")
