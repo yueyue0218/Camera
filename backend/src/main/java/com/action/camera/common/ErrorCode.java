@@ -32,6 +32,8 @@ public enum ErrorCode {
     // --- 409 状态冲突 ---
     STATUS_CONFLICT(40901, "当前状态不允许该操作"),
     DUPLICATE_OPERATION(40902, "重复操作"),
+    CERT_PENDING(40903, "已有待审核的认证申请，请勿重复提交"),
+    CERT_APPROVED(40904, "实名认证已通过，无需重复提交"),
 
     // --- 500 系统 ---
     INTERNAL_ERROR(50001, "系统内部错误");

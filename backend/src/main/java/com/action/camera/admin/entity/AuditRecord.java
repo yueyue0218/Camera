@@ -22,7 +22,7 @@ public class AuditRecord {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "audit_type", nullable = false, length = 40)
+    @Column(name = "target_type", nullable = false, length = 40)
     private String auditType;
 
     @Column(name = "target_id", nullable = false)
@@ -31,10 +31,10 @@ public class AuditRecord {
     @Column(name = "admin_id", nullable = false)
     private Long adminId;
 
-    @Column(name = "audit_result", nullable = false, length = 30)
+    @Column(name = "action", nullable = false, length = 30)
     private String auditResult;
 
-    @Column(name = "remark")
+    @Column(name = "reason")
     private String remark;
 
     @Column(name = "created_at", nullable = false)

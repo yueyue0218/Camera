@@ -6,9 +6,6 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-/**
- * Registers auth interception and local demo CORS rules.
- */
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
 
@@ -32,7 +29,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/demands/**",
                         "/moments/**",
                         "/providers/*/schedules",
-                        "/messages/**"
+                        "/messages/**",
+                        "/api/v1/providers/*/profile"
                 );
     }
 

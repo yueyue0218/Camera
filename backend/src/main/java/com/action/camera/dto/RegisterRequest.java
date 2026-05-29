@@ -25,4 +25,8 @@ public class RegisterRequest {
     @NotBlank(message = "昵称不能为空")
     @Size(max = 64, message = "昵称不能超过 64 字")
     private String nickname;
+
+    @NotBlank(message = "请选择身份")
+    @Pattern(regexp = "^(CUSTOMER|PROVIDER)$", message = "身份只能为 CUSTOMER 或 PROVIDER")
+    private String role;
 }

@@ -1,12 +1,11 @@
 package com.action.camera.common;
 
-/**
- * 保存当前请求的登录用户 id。
- * 拦截器验证 token 后把 userId 存进来，业务代码用 UserContext.getUserId() 取。
- */
+import com.action.camera.common.security.UserRole;
+
 public class UserContext {
 
     private static final ThreadLocal<Long> CURRENT_USER = new ThreadLocal<>();
+    private static final ThreadLocal<UserRole> CURRENT_ROLE = new ThreadLocal<>();
 
     public static void setUserId(Long userId) {
         CURRENT_USER.set(userId);
@@ -16,7 +15,16 @@ public class UserContext {
         return CURRENT_USER.get();
     }
 
+    public static void setCurrentRole(UserRole role) {
+        CURRENT_ROLE.set(role);
+    }
+
+    public static UserRole getCurrentRole() {
+        return CURRENT_ROLE.get();
+    }
+
     public static void clear() {
         CURRENT_USER.remove();
+        CURRENT_ROLE.remove();
     }
 }

@@ -8,6 +8,7 @@ import com.action.camera.order.dto.MockPaymentRequest;
 import com.action.camera.order.dto.OrderResponse;
 import com.action.camera.order.dto.OrderStatusLogResponse;
 import com.action.camera.order.dto.PaymentResponse;
+import com.action.camera.order.dto.ReworkRequest;
 import com.action.camera.order.dto.StatusTransitionRequest;
 import com.action.camera.order.dto.StatusTransitionResponse;
 import com.action.camera.order.entity.Order;
@@ -71,6 +72,17 @@ public class OrderController {
         Order order = orderService.getOrderForUser(orderId, operatorId);
         validateP4Transition(order, operatorId, request.getTargetStatus());
         orderService.changeStatus(orderId, operatorId, request.getTargetStatus(), request.getReason());
+        OrderStatusLog latestLog = orderService.getLatestStatusLog(orderId, operatorId);
+        return Result.success(StatusTransitionResponse.from(latestLog));
+    }
+
+    @PostMapping("/orders/{orderId}/request-rework")
+    public Result<StatusTransitionResponse> requestRework(
+            @PathVariable Long orderId,
+            @RequestBody(required = false) ReworkRequest request) {
+        Long operatorId = currentUserId();
+        String reason = request == null ? null : request.getReason();
+        orderService.requestRework(orderId, operatorId, reason);
         OrderStatusLog latestLog = orderService.getLatestStatusLog(orderId, operatorId);
         return Result.success(StatusTransitionResponse.from(latestLog));
     }
