@@ -4,6 +4,7 @@ import com.action.camera.application.FileService;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
+import com.action.camera.common.security.UserRole;
 import com.action.camera.delivery.dto.DeliveryResponse;
 import com.action.camera.delivery.dto.DeliveryUploadResponse;
 import com.action.camera.delivery.entity.Delivery;
@@ -72,6 +73,9 @@ public class DeliveryService {
     // 释放 FK 共享锁后，再调用 orderStatusPort.changeStatus()。
     public DeliveryUploadResponse upload(Long orderId, MultipartFile file, String remark) {
         Long currentUserId = requireCurrentUserId();
+        if (UserContext.getCurrentRole() != UserRole.PROVIDER) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "需要以服务方身份操作");
+        }
         OrderSnapshot order = orderQueryPort.getOrderSnapshot(orderId);
         if (!currentUserId.equals(order.getProviderId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "只有订单服务方可以上传交付文件");

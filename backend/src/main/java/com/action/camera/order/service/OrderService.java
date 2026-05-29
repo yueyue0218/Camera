@@ -1,7 +1,9 @@
 package com.action.camera.order.service;
 
 import com.action.camera.common.ErrorCode;
+import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
+import com.action.camera.common.security.UserRole;
 import com.action.camera.message.entity.Quote;
 import com.action.camera.message.enums.QuoteStatus;
 import com.action.camera.order.entity.Order;
@@ -384,6 +386,10 @@ public class OrderService {
     }
 
     private String resolveOperatorRole(Order order, Long operatorId) {
+        UserRole contextRole = UserContext.getCurrentRole();
+        if (contextRole != null) {
+            return contextRole.name();
+        }
         if (Objects.equals(order.getCustomerId(), operatorId)) {
             return "CUSTOMER";
         }

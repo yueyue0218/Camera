@@ -3,8 +3,10 @@ package com.action.camera.application;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.JwtUtil;
 import com.action.camera.common.exception.BusinessException;
+import com.action.camera.common.security.UserRole;
 import com.action.camera.domain.User;
 import com.action.camera.dto.LoginResponse;
+import com.action.camera.dto.SwitchRoleResponse;
 import com.action.camera.dto.UserBriefResponse;
 import com.action.camera.dto.UserProfileResponse;
 import com.action.camera.provider.entity.ProviderProfile;
@@ -121,5 +123,28 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_ERROR, "用户不存在"));
         return new UserBriefResponse(user.getId(), user.getNickname(), user.getAvatarFileId());
+    }
+
+    /** POST /users/me/role：切换当前用户角色（仅允许 CUSTOMER/PROVIDER） */
+    @Transactional
+    public SwitchRoleResponse switchRole(Long userId, String targetRoleStr) {
+        if (targetRoleStr == null || targetRoleStr.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "role 不能为空");
+        }
+        UserRole targetRole = UserRole.parse(targetRoleStr, null);
+        if (targetRole == UserRole.ADMIN) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "不允许切换为 ADMIN");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
+
+        if (targetRole.name().equals(user.getCurrentRole())) {
+            return new SwitchRoleResponse(user.getId(), user.getCurrentRole(), user.getNickname());
+        }
+
+        user.setCurrentRole(targetRole.name());
+        userRepository.save(user);
+        return new SwitchRoleResponse(user.getId(), user.getCurrentRole(), user.getNickname());
     }
 }
