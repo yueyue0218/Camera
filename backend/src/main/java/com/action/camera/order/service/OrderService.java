@@ -33,6 +33,7 @@ public class OrderService {
     private static final int REWORK_REASON_MAX_LENGTH = 200;
     private static final String PAYMENT_SUCCESS = "SUCCESS";
     private static final String SETTLEMENT_SETTLED = "SETTLED";
+    private static final String SOURCE_TYPE_SERVICE_PACKAGE = "SERVICE_PACKAGE";
     private static final long SYSTEM_OPERATOR_ID = 0L;
     private static final String SYSTEM_OPERATOR_ROLE = "SYSTEM";
     private static final String AUTO_CONFIRM_REASON = "交付后 7 天未操作，系统自动确认完成";
@@ -210,6 +211,18 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
+    public Order validateCompletedProviderOrder(Long orderId, Long providerId) {
+        Order order = getOrderOrThrow(orderId);
+        if (!Objects.equals(order.getProviderUserId(), providerId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only order provider can use this completed order");
+        }
+        if (order.getStatus() != OrderStatus.COMPLETED) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Only completed order can be used as portfolio source");
+        }
+        return order;
+    }
+
+    @Transactional(readOnly = true)
     public List<OrderStatusLog> listStatusLogs(Long orderId, Long operatorId) {
         Order order = getOrderForUser(orderId, operatorId);
         return orderStatusLogRepository.findByOrderIdOrderByCreatedAtAsc(order.getId());
@@ -291,6 +304,9 @@ public class OrderService {
         order.setShootingPlanId(quote.getShootingPlanId());
         order.setSourceType(quote.getSourceType());
         order.setSourceId(quote.getSourceId());
+        if (SOURCE_TYPE_SERVICE_PACKAGE.equals(quote.getSourceType())) {
+            order.setServicePackageId(quote.getSourceId());
+        }
         order.setStatus(OrderStatus.PENDING_PAYMENT);
         order.setEscrowStatus(EscrowStatus.NOT_PAID);
         order.setSettlementStatus("NOT_SETTLED");

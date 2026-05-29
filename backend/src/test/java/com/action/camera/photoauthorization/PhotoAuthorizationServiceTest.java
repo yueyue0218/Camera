@@ -279,6 +279,80 @@ class PhotoAuthorizationServiceTest {
     }
 
     @Test
+    void grantedAuthorizationProviderAndFileValidationSucceeds() {
+        PhotoAuthorization grantedAuthorization = authorization(PhotoAuthorization.STATUS_GRANTED);
+        when(photoAuthorizationRepository.findById(AUTHORIZATION_ID)).thenReturn(Optional.of(grantedAuthorization));
+        when(photoAuthorizationFileRepository.findByAuthorizationIdIn(List.of(AUTHORIZATION_ID)))
+                .thenReturn(List.of(authorizationFile(AUTHORIZATION_ID, FILE_ID, 0)));
+
+        PhotoAuthorization validatedAuthorization =
+                photoAuthorizationService.validateGrantedAuthorizationForProvider(
+                        AUTHORIZATION_ID,
+                        PROVIDER_ID,
+                        FILE_ID
+                );
+
+        assertEquals(AUTHORIZATION_ID, validatedAuthorization.getId());
+    }
+
+    @Test
+    void pendingAndRejectedAuthorizationsCannotBeUsedAsPortfolioSource() {
+        when(photoAuthorizationRepository.findById(AUTHORIZATION_ID))
+                .thenReturn(Optional.of(authorization(PhotoAuthorization.STATUS_PENDING)))
+                .thenReturn(Optional.of(authorization(PhotoAuthorization.STATUS_REJECTED)));
+
+        BusinessException pendingException = assertThrows(BusinessException.class,
+                () -> photoAuthorizationService.validateGrantedAuthorizationForProvider(
+                        AUTHORIZATION_ID,
+                        PROVIDER_ID,
+                        FILE_ID
+                ));
+        BusinessException rejectedException = assertThrows(BusinessException.class,
+                () -> photoAuthorizationService.validateGrantedAuthorizationForProvider(
+                        AUTHORIZATION_ID,
+                        PROVIDER_ID,
+                        FILE_ID
+                ));
+
+        assertEquals(ErrorCode.STATUS_CONFLICT, pendingException.getErrorCode());
+        assertEquals(ErrorCode.STATUS_CONFLICT, rejectedException.getErrorCode());
+        verify(photoAuthorizationFileRepository, never()).findByAuthorizationIdIn(List.of(AUTHORIZATION_ID));
+    }
+
+    @Test
+    void mismatchedProviderCannotUsePhotoAuthorization() {
+        when(photoAuthorizationRepository.findById(AUTHORIZATION_ID))
+                .thenReturn(Optional.of(authorization(PhotoAuthorization.STATUS_GRANTED)));
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> photoAuthorizationService.validateGrantedAuthorizationForProvider(
+                        AUTHORIZATION_ID,
+                        STRANGER_ID,
+                        FILE_ID
+                ));
+
+        assertEquals(ErrorCode.FORBIDDEN, exception.getErrorCode());
+        verify(photoAuthorizationFileRepository, never()).findByAuthorizationIdIn(List.of(AUTHORIZATION_ID));
+    }
+
+    @Test
+    void fileOutsideAuthorizationCannotBeUsedAsPortfolioSource() {
+        when(photoAuthorizationRepository.findById(AUTHORIZATION_ID))
+                .thenReturn(Optional.of(authorization(PhotoAuthorization.STATUS_GRANTED)));
+        when(photoAuthorizationFileRepository.findByAuthorizationIdIn(List.of(AUTHORIZATION_ID)))
+                .thenReturn(List.of(authorizationFile(AUTHORIZATION_ID, SECOND_FILE_ID, 0)));
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> photoAuthorizationService.validateGrantedAuthorizationForProvider(
+                        AUTHORIZATION_ID,
+                        PROVIDER_ID,
+                        FILE_ID
+                ));
+
+        assertEquals(ErrorCode.VALIDATION_ERROR, exception.getErrorCode());
+    }
+
+    @Test
     void unrelatedProviderCannotSeeOtherProvidersAuthorizedPhotos() {
         when(photoAuthorizationRepository.findByProviderUserIdAndStatusOrderByAuthorizedAtDesc(
                 STRANGER_ID,

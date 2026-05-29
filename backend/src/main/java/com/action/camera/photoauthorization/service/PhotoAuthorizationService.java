@@ -127,6 +127,29 @@ public class PhotoAuthorizationService {
         ));
     }
 
+    @Transactional(readOnly = true)
+    public PhotoAuthorization validateGrantedAuthorizationForProvider(
+            Long authorizationId,
+            Long providerUserId,
+            Long fileId
+    ) {
+        PhotoAuthorization authorization = getAuthorization(authorizationId);
+        if (!Objects.equals(authorization.getProviderUserId(), providerUserId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only authorization provider can use this photo authorization");
+        }
+        if (!PhotoAuthorization.STATUS_GRANTED.equals(authorization.getStatus())) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                    "Only granted photo authorization can be used as portfolio source");
+        }
+        if (fileId != null && findFilesByAuthorizationIds(List.of(authorizationId))
+                .stream()
+                .noneMatch(file -> Objects.equals(file.getFileId(), fileId))) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR,
+                    "fileId does not belong to this photo authorization");
+        }
+        return authorization;
+    }
+
     private Order getOrder(Long orderId) {
         return orderRepository.findById(orderId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Order not found"));
