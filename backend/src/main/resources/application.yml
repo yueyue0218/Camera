@@ -45,5 +45,5 @@ file:
 
 camera:
   order:
-    adapter: mock
+    adapter: local
     c-base-url: http://localhost:8080

@@ -16,4 +16,6 @@ public interface ReviewComplaintRepository extends JpaRepository<ReviewComplaint
     List<ReviewComplaint> findByStatusOrderByCreatedAtAsc(String status);
 
     List<ReviewComplaint> findAllByOrderByCreatedAtDesc();
+
+    long countByStatusIn(List<String> statuses);
 }

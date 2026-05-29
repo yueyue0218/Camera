@@ -29,6 +29,11 @@ class ReviewServiceTest {
     private static final Long PROVIDER_ID = 2001L;
     private static final Long OUTSIDER_ID = 3001L;
     private static final Long COMPLETED_ORDER_ID = 8002L;
+    private static final Long PROVIDER_FAULT_REFUNDED_ORDER_ID = 8003L;
+    private static final Long CUSTOMER_FAULT_REFUNDED_ORDER_ID = 8004L;
+    private static final Long BOTH_FAULT_REFUNDED_ORDER_ID = 8005L;
+    private static final Long MUTUAL_REFUNDED_ORDER_ID = 8006L;
+    private static final Long UNDETERMINED_REFUNDED_ORDER_ID = 8007L;
     private static final Long CONVERSATION_ID = 9002L;
     private static final Long QUOTE_ID = 7002L;
 
@@ -134,6 +139,92 @@ class ReviewServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.STATUS_CONFLICT);
+    }
+
+    @Test
+    void customerCanReviewProviderFaultRefundAndCreditIsDeducted() {
+        UserContext.setUserId(CUSTOMER_ID);
+
+        ReviewResponse response = reviewService.create(
+                PROVIDER_FAULT_REFUNDED_ORDER_ID,
+                new ReviewCreateRequest(1, "Provider broke the refund responsibility")
+        );
+
+        assertThat(response.targetUserId()).isEqualTo(PROVIDER_ID);
+        assertThat(response.direction()).isEqualTo("CUSTOMER_TO_PROVIDER");
+        assertThat(response.rating()).isEqualTo(1);
+        assertThat(creditRecordRepository.findByUserIdOrderByCreatedAtDesc(PROVIDER_ID))
+                .hasSize(1)
+                .first()
+                .satisfies(record -> {
+                    assertThat(record.getRelatedOrderId()).isEqualTo(PROVIDER_FAULT_REFUNDED_ORDER_ID);
+                    assertThat(record.getEventType()).isEqualTo("REVIEW");
+                    assertThat(record.getScoreChange()).isEqualTo(-5);
+                });
+    }
+
+    @Test
+    void providerCanReviewCustomerFaultRefundAndCreditIsDeducted() {
+        UserContext.setUserId(PROVIDER_ID);
+
+        ReviewResponse response = reviewService.create(
+                CUSTOMER_FAULT_REFUNDED_ORDER_ID,
+                new ReviewCreateRequest(2, "Customer broke the refund responsibility")
+        );
+
+        assertThat(response.targetUserId()).isEqualTo(CUSTOMER_ID);
+        assertThat(response.direction()).isEqualTo("PROVIDER_TO_CUSTOMER");
+        assertThat(creditRecordRepository.findByUserIdOrderByCreatedAtDesc(CUSTOMER_ID))
+                .hasSize(1)
+                .first()
+                .satisfies(record -> {
+                    assertThat(record.getRelatedOrderId()).isEqualTo(CUSTOMER_FAULT_REFUNDED_ORDER_ID);
+                    assertThat(record.getEventType()).isEqualTo("REVIEW");
+                    assertThat(record.getScoreChange()).isEqualTo(-2);
+                });
+    }
+
+    @Test
+    void bothFaultRefundAllowsBothDirections() {
+        UserContext.setUserId(CUSTOMER_ID);
+        reviewService.create(BOTH_FAULT_REFUNDED_ORDER_ID, new ReviewCreateRequest(2, "Provider also at fault"));
+
+        UserContext.setUserId(PROVIDER_ID);
+        reviewService.create(BOTH_FAULT_REFUNDED_ORDER_ID, new ReviewCreateRequest(2, "Customer also at fault"));
+
+        assertThat(reviewRepository.findByOrderIdOrderByCreatedAtDesc(BOTH_FAULT_REFUNDED_ORDER_ID))
+                .extracting("direction")
+                .containsExactlyInAnyOrder("CUSTOMER_TO_PROVIDER", "PROVIDER_TO_CUSTOMER");
+        assertThat(creditRecordRepository.findByUserIdOrderByCreatedAtDesc(PROVIDER_ID))
+                .extracting("scoreChange")
+                .containsExactly(-2);
+        assertThat(creditRecordRepository.findByUserIdOrderByCreatedAtDesc(CUSTOMER_ID))
+                .extracting("scoreChange")
+                .containsExactly(-2);
+    }
+
+    @Test
+    void mutualOrUndeterminedRefundCannotBeReviewed() {
+        UserContext.setUserId(CUSTOMER_ID);
+
+        assertThatThrownBy(() -> reviewService.create(MUTUAL_REFUNDED_ORDER_ID, new ReviewCreateRequest(1, "Mutual refund")))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.STATUS_CONFLICT);
+        assertThatThrownBy(() -> reviewService.create(UNDETERMINED_REFUNDED_ORDER_ID, new ReviewCreateRequest(1, "Unknown fault")))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.STATUS_CONFLICT);
+    }
+
+    @Test
+    void faultPartyCannotReviewNonFaultPartyForRefund() {
+        UserContext.setUserId(PROVIDER_ID);
+
+        assertThatThrownBy(() -> reviewService.create(PROVIDER_FAULT_REFUNDED_ORDER_ID, new ReviewCreateRequest(1, "Counter review")))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.FORBIDDEN);
     }
 
     @Test

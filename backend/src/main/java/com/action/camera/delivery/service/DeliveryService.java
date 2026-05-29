@@ -15,7 +15,10 @@ import com.action.camera.delivery.repository.DeliveryFileRepository;
 import com.action.camera.delivery.repository.DeliveryRepository;
 import com.action.camera.domain.FileRecord;
 import com.action.camera.dto.FileUploadResponse;
+import com.action.camera.notification.dto.NotificationCreateRequest;
+import com.action.camera.notification.service.NotificationService;
 import com.action.camera.repository.FileRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -39,6 +42,9 @@ public class DeliveryService {
     private final FileRepository fileRepository;
     private final OrderQueryPort orderQueryPort;
     private final OrderStatusPort orderStatusPort;
+
+    @Autowired(required = false)
+    private NotificationService notificationService;
 
     public DeliveryService(DeliveryRepository deliveryRepository,
                            DeliveryFileRepository deliveryFileRepository,
@@ -100,6 +106,8 @@ public class DeliveryService {
                 "服务方上传交付文件"
         );
 
+        notifyDeliveryUploaded(order);
+
         return new DeliveryUploadResponse(
                 saved.getId(),
                 saved.getOrderId(),
@@ -160,5 +168,19 @@ public class DeliveryService {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
         return currentUserId;
+    }
+
+    private void notifyDeliveryUploaded(OrderSnapshot order) {
+        if (notificationService == null) {
+            return;
+        }
+        notificationService.createNotification(new NotificationCreateRequest(
+                order.getCustomerId(),
+                "Delivery uploaded",
+                "The provider has uploaded delivery files for your order.",
+                "DELIVERY_UPLOADED",
+                "ORDER",
+                order.getOrderId()
+        ));
     }
 }

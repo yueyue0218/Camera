@@ -111,6 +111,12 @@ public class OrderController {
             ensureCustomer(order, operatorId);
             return;
         }
+        if ((order.getStatus() == OrderStatus.PENDING_PAYMENT
+                || order.getStatus() == OrderStatus.PAID_PENDING_SHOOT)
+                && targetStatus == OrderStatus.CANCELLED) {
+            ensureCustomer(order, operatorId);
+            return;
+        }
 
         throw new BusinessException(ErrorCode.STATUS_CONFLICT,
                 "This status transition is not exposed in P4 order API: "

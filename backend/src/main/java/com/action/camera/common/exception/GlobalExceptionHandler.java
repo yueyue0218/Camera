@@ -2,9 +2,11 @@ package com.action.camera.common.exception;
 
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.Result;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 /**
  * 全局异常处理器。不管哪个 Controller 抛异常，都会被这里兜住，
@@ -30,6 +32,14 @@ public class GlobalExceptionHandler {
     }
 
     /** 兜底：未预料的异常 → 返回 50001 */
+    @ExceptionHandler({
+            MissingServletRequestPartException.class,
+            MissingServletRequestParameterException.class
+    })
+    public Result<?> handleMissingRequestPart(Exception e) {
+        return Result.error(ErrorCode.VALIDATION_ERROR.getCode(), e.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public Result<?> handleException(Exception e) {
         return Result.error(ErrorCode.INTERNAL_ERROR.getCode(),

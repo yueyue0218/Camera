@@ -4,16 +4,22 @@ import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.message.entity.Quote;
 import com.action.camera.message.enums.QuoteStatus;
+import com.action.camera.notification.dto.NotificationCreateRequest;
+import com.action.camera.notification.service.NotificationService;
 import com.action.camera.order.entity.Order;
 import com.action.camera.order.entity.OrderStatusLog;
 import com.action.camera.order.entity.PaymentRecord;
 import com.action.camera.order.enums.EscrowStatus;
 import com.action.camera.order.enums.OrderStatus;
+import com.action.camera.order.event.OrderCancelledEvent;
+import com.action.camera.order.event.OrderPaidEvent;
 import com.action.camera.order.repository.OrderRepository;
 import com.action.camera.order.repository.OrderStatusLogRepository;
 import com.action.camera.order.repository.PaymentRecordRepository;
 import com.action.camera.order.statemachine.OrderStatusMachine;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +40,12 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final PaymentRecordRepository paymentRecordRepository;
     private final OrderStatusLogRepository orderStatusLogRepository;
+
+    @Autowired(required = false)
+    private ApplicationEventPublisher eventPublisher;
+
+    @Autowired(required = false)
+    private NotificationService notificationService;
 
     @Transactional
     public Order createOrderFromConfirmedQuote(Quote quote) {
@@ -70,7 +82,10 @@ public class OrderService {
         PaymentRecord paymentRecord = buildMockPaymentRecord(order, payerId, amountCent);
         paymentRecordRepository.save(paymentRecord);
 
-        return applyStatusChange(order, fromStatus, targetStatus, payerId, "CUSTOMER", "模拟支付成功，资金进入平台托管");
+        Order paidOrder = applyStatusChange(order, fromStatus, targetStatus, payerId, "CUSTOMER", "模拟支付成功，资金进入平台托管");
+        publishEvent(new OrderPaidEvent(paidOrder));
+        notifyOrderPaid(paidOrder);
+        return paidOrder;
     }
 
     @Transactional
@@ -78,7 +93,17 @@ public class OrderService {
         Order order = getOrderOrThrow(orderId);
         OrderStatus fromStatus = order.getStatus();
         ensureCanChangeStatus(fromStatus, targetStatus);
-        return applyStatusChange(order, fromStatus, targetStatus, operatorId, resolveOperatorRole(order, operatorId), reason);
+        Order changedOrder = applyStatusChange(order, fromStatus, targetStatus, operatorId,
+                resolveOperatorRole(order, operatorId), reason);
+        if (targetStatus == OrderStatus.CANCELLED) {
+            changedOrder.setCancelTime(LocalDateTime.now());
+            publishEvent(new OrderCancelledEvent(changedOrder));
+            notifyOrderCancelled(changedOrder);
+        } else if (targetStatus == OrderStatus.COMPLETED) {
+            changedOrder.setCompleteTime(LocalDateTime.now());
+            notifyOrderCompleted(changedOrder);
+        }
+        return changedOrder;
     }
 
     @Transactional(readOnly = true)
@@ -289,5 +314,65 @@ public class OrderService {
             return "";
         }
         return value.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
+    private void publishEvent(Object event) {
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(event);
+        }
+    }
+
+    private void notifyOrderPaid(Order order) {
+        createNotification(order.getProviderUserId(),
+                "Order paid",
+                "A customer has paid an order and the schedule has been locked.",
+                "ORDER_PAID",
+                "ORDER",
+                order.getId());
+        createNotification(order.getCustomerId(),
+                "Payment successful",
+                "Your order payment has succeeded.",
+                "ORDER_PAID",
+                "ORDER",
+                order.getId());
+    }
+
+    private void notifyOrderCancelled(Order order) {
+        createNotification(order.getProviderUserId(),
+                "Order cancelled",
+                "An order has been cancelled and related schedule slots have been released.",
+                "ORDER_CANCELLED",
+                "ORDER",
+                order.getId());
+        createNotification(order.getCustomerId(),
+                "Order cancelled",
+                "Your order has been cancelled.",
+                "ORDER_CANCELLED",
+                "ORDER",
+                order.getId());
+    }
+
+    private void notifyOrderCompleted(Order order) {
+        createNotification(order.getProviderUserId(),
+                "Order completed",
+                "A customer has confirmed order completion.",
+                "ORDER_COMPLETED",
+                "ORDER",
+                order.getId());
+    }
+
+    private void createNotification(Long userId, String title, String content, String type,
+                                    String relatedType, Long relatedId) {
+        if (notificationService == null) {
+            return;
+        }
+        notificationService.createNotification(new NotificationCreateRequest(
+                userId,
+                title,
+                content,
+                type,
+                relatedType,
+                relatedId
+        ));
     }
 }

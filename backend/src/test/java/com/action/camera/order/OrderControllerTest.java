@@ -10,6 +10,8 @@ import com.action.camera.order.dto.OrderStatusLogResponse;
 import com.action.camera.order.dto.PaymentResponse;
 import com.action.camera.order.dto.StatusTransitionRequest;
 import com.action.camera.order.dto.StatusTransitionResponse;
+import com.action.camera.notification.dto.NotificationCreateRequest;
+import com.action.camera.notification.service.NotificationService;
 import com.action.camera.order.entity.Order;
 import com.action.camera.order.entity.OrderStatusLog;
 import com.action.camera.order.entity.PaymentRecord;
@@ -26,6 +28,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -60,6 +63,9 @@ class OrderControllerTest {
     @Mock
     private OrderStatusLogRepository orderStatusLogRepository;
 
+    @Mock
+    private NotificationService notificationService;
+
     private OrderController orderController;
 
     private final List<OrderStatusLog> savedLogs = new ArrayList<>();
@@ -67,6 +73,7 @@ class OrderControllerTest {
     @BeforeEach
     void setUp() {
         OrderService orderService = new OrderService(orderRepository, paymentRecordRepository, orderStatusLogRepository);
+        ReflectionTestUtils.setField(orderService, "notificationService", notificationService);
         orderController = new OrderController(orderService);
         savedLogs.clear();
     }
@@ -159,6 +166,13 @@ class OrderControllerTest {
         assertEquals(OrderService.MOCK_PAY_METHOD, result.getData().getPayMethod());
         verify(paymentRecordRepository, times(1)).save(any(PaymentRecord.class));
         verify(orderStatusLogRepository, times(1)).save(any(OrderStatusLog.class));
+        ArgumentCaptor<NotificationCreateRequest> notificationCaptor =
+                ArgumentCaptor.forClass(NotificationCreateRequest.class);
+        verify(notificationService, times(2)).createNotification(notificationCaptor.capture());
+        assertEquals(List.of("ORDER_PAID", "ORDER_PAID"),
+                notificationCaptor.getAllValues().stream()
+                        .map(NotificationCreateRequest::type)
+                        .toList());
     }
 
     @Test
@@ -250,6 +264,33 @@ class OrderControllerTest {
         assertEquals(OrderStatus.COMPLETED, result.getData().getToStatus());
         assertEquals("CUSTOMER", result.getData().getOperatorRole());
         verify(orderStatusLogRepository, times(1)).save(any(OrderStatusLog.class));
+        ArgumentCaptor<NotificationCreateRequest> notificationCaptor =
+                ArgumentCaptor.forClass(NotificationCreateRequest.class);
+        verify(notificationService, times(1)).createNotification(notificationCaptor.capture());
+        assertEquals("ORDER_COMPLETED", notificationCaptor.getValue().type());
+        assertEquals(PROVIDER_USER_ID, notificationCaptor.getValue().userId());
+    }
+
+    @Test
+    void customerCanCancelBeforeShooting() {
+        UserContext.setUserId(CUSTOMER_ID);
+        Order order = order(OrderStatus.PAID_PENDING_SHOOT);
+        prepareTransitionMocks(order);
+
+        Result<StatusTransitionResponse> result =
+                orderController.changeStatus(ORDER_ID, transitionRequest(OrderStatus.CANCELLED));
+
+        assertEquals(OrderStatus.CANCELLED, result.getData().getToStatus());
+        assertEquals("CUSTOMER", result.getData().getOperatorRole());
+        assertEquals(OrderStatus.CANCELLED, order.getStatus());
+        verify(orderStatusLogRepository, times(1)).save(any(OrderStatusLog.class));
+        ArgumentCaptor<NotificationCreateRequest> notificationCaptor =
+                ArgumentCaptor.forClass(NotificationCreateRequest.class);
+        verify(notificationService, times(2)).createNotification(notificationCaptor.capture());
+        assertEquals(List.of("ORDER_CANCELLED", "ORDER_CANCELLED"),
+                notificationCaptor.getAllValues().stream()
+                        .map(NotificationCreateRequest::type)
+                        .toList());
     }
 
     @Test
