@@ -50,8 +50,8 @@ class CertificationAccessTest {
     }
 
     /**
-     * 用户没有 APPROVED 认证时，也没有 provider_profile 记录，
-     * 调用 updateProfile 应得到 NOT_FOUND（"相应错误"）。
+     * CUSTOMER 角色（非 PROVIDER）调用 updateProfile，
+     * 因角色检查先于档案存在性检查，应得到 FORBIDDEN。
      */
     @Test
     void unapprovedUserCannotUpdateProviderProfileWithoutProviderProfile() {
@@ -61,7 +61,7 @@ class CertificationAccessTest {
         assertThatThrownBy(() -> providerProfileService.updateProfile(CUSTOMER_ID, dto))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
-                .isEqualTo(ErrorCode.NOT_FOUND);
+                .isEqualTo(ErrorCode.FORBIDDEN);
     }
 
     /**

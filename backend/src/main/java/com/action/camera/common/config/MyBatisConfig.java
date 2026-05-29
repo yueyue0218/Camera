@@ -12,10 +12,6 @@ import org.springframework.context.annotation.Configuration;
 })
 public class MyBatisConfig {
 
-    /**
-     * MyBatis-Plus 3.5.9+ 分页由 MybatisPlusInterceptor 内置处理，
-     * 无需再单独添加 PaginationInnerInterceptor。
-     */
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
         return new MybatisPlusInterceptor();
