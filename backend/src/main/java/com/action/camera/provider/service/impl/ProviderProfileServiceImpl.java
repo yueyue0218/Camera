@@ -2,12 +2,14 @@ package com.action.camera.provider.service.impl;
 
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
+import com.action.camera.domain.User;
 import com.action.camera.provider.dto.ProviderProfilePublicVO;
 import com.action.camera.provider.dto.ProviderProfileUpdateDTO;
 import com.action.camera.provider.entity.ProviderProfile;
 import com.action.camera.provider.mapper.ProviderProfileMapper;
 import com.action.camera.provider.mapper.ProviderStyleTagMapper;
 import com.action.camera.provider.service.ProviderProfileService;
+import com.action.camera.repository.UserRepository;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,16 +21,25 @@ public class ProviderProfileServiceImpl implements ProviderProfileService {
 
     private final ProviderProfileMapper providerProfileMapper;
     private final ProviderStyleTagMapper providerStyleTagMapper;
+    private final UserRepository userRepository;
 
     public ProviderProfileServiceImpl(ProviderProfileMapper providerProfileMapper,
-                                      ProviderStyleTagMapper providerStyleTagMapper) {
+                                      ProviderStyleTagMapper providerStyleTagMapper,
+                                      UserRepository userRepository) {
         this.providerProfileMapper = providerProfileMapper;
         this.providerStyleTagMapper = providerStyleTagMapper;
+        this.userRepository = userRepository;
     }
 
     @Override
     @Transactional
     public void updateProfile(Long currentUserId, ProviderProfileUpdateDTO dto) {
+        User user = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
+        if (!"PROVIDER".equals(user.getCurrentRole())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "需要摄影师权限");
+        }
+
         ProviderProfile profile = providerProfileMapper.selectOne(
                 new LambdaQueryWrapper<ProviderProfile>()
                         .eq(ProviderProfile::getUserId, currentUserId)

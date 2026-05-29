@@ -94,15 +94,15 @@ public class DisputeService {
 
         Dispute dispute = getDisputeOrThrow(disputeId);
 
-        if (!STATUS_OPEN.equals(dispute.getStatus())) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "只有 OPEN 状态的申诉可以回复");
-        }
-
         Order order = getOrderOrThrow(dispute.getOrderId());
         boolean isParticipant = replierId.equals(order.getCustomerId())
                 || replierId.equals(order.getProviderUserId());
         if (!isParticipant || replierId.equals(dispute.getInitiatorId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "只有订单另一方（非申诉发起人）可以回复");
+        }
+
+        if (!STATUS_OPEN.equals(dispute.getStatus())) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "只有 OPEN 状态的申诉可以回复");
         }
 
         DisputeReply reply = new DisputeReply();

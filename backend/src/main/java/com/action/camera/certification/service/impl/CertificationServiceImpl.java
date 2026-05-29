@@ -116,7 +116,16 @@ public class CertificationServiceImpl implements CertificationService {
     }
 
     @Override
-    public PageResult<CertificationResponse> listByStatus(String status, int page, int size) {
+    public PageResult<CertificationResponse> listByStatus(Long adminId, String status, int page, int size) {
+        checkAdminRole(adminId);
+
+        // 先 count，再查数据（MyBatis-Plus 3.5.9 去掉了 PaginationInnerInterceptor，total 需手动计算）
+        LambdaQueryWrapper<RealNameCertification> countWrapper = new LambdaQueryWrapper<RealNameCertification>();
+        if (status != null && !status.isBlank()) {
+            countWrapper.eq(RealNameCertification::getStatus, status);
+        }
+        long total = certificationMapper.selectCount(countWrapper);
+
         // API 用 0-indexed page，MyBatis-Plus 用 1-indexed
         Page<RealNameCertification> pageParam = new Page<>(page + 1L, size);
         var result = certificationMapper.selectPageByStatus(pageParam, status);
@@ -125,7 +134,7 @@ public class CertificationServiceImpl implements CertificationService {
                 .map(CertificationResponse::from)
                 .toList();
 
-        return new PageResult<>(records, page, size, result.getTotal());
+        return new PageResult<>(records, page, size, total);
     }
 
     // ---- 私有工具方法 ----

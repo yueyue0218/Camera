@@ -35,7 +35,7 @@ public class AdminCertificationController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Long adminId = UserContext.getUserId();
-        return Result.success(certificationService.listByStatus(status, page, size));
+        return Result.success(certificationService.listByStatus(adminId, status, page, size));
     }
 
     /**
