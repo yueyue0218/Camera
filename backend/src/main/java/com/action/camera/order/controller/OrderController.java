@@ -8,6 +8,7 @@ import com.action.camera.order.dto.MockPaymentRequest;
 import com.action.camera.order.dto.OrderResponse;
 import com.action.camera.order.dto.OrderStatusLogResponse;
 import com.action.camera.order.dto.PaymentResponse;
+import com.action.camera.order.dto.ReworkRequest;
 import com.action.camera.order.dto.StatusTransitionRequest;
 import com.action.camera.order.dto.StatusTransitionResponse;
 import com.action.camera.order.entity.Order;
@@ -75,6 +76,17 @@ public class OrderController {
         return Result.success(StatusTransitionResponse.from(latestLog));
     }
 
+    @PostMapping("/orders/{orderId}/request-rework")
+    public Result<StatusTransitionResponse> requestRework(
+            @PathVariable Long orderId,
+            @RequestBody(required = false) ReworkRequest request) {
+        Long operatorId = currentUserId();
+        String reason = request == null ? null : request.getReason();
+        orderService.requestRework(orderId, operatorId, reason);
+        OrderStatusLog latestLog = orderService.getLatestStatusLog(orderId, operatorId);
+        return Result.success(StatusTransitionResponse.from(latestLog));
+    }
+
     @GetMapping("/orders/{orderId}/status-logs")
     public Result<List<OrderStatusLogResponse>> listStatusLogs(@PathVariable Long orderId) {
         Long operatorId = currentUserId();
@@ -111,7 +123,6 @@ public class OrderController {
             ensureCustomer(order, operatorId);
             return;
         }
-
         throw new BusinessException(ErrorCode.STATUS_CONFLICT,
                 "This status transition is not exposed in P4 order API: "
                         + order.getStatus() + " -> " + targetStatus);

@@ -15,6 +15,8 @@ import com.action.camera.delivery.repository.DeliveryFileRepository;
 import com.action.camera.delivery.repository.DeliveryRepository;
 import com.action.camera.domain.FileRecord;
 import com.action.camera.dto.FileUploadResponse;
+import com.action.camera.order.entity.Order;
+import com.action.camera.order.service.OrderService;
 import com.action.camera.repository.FileRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +31,7 @@ public class DeliveryService {
 
     private static final String PENDING_DELIVERY = "PENDING_DELIVERY";
     private static final String DELIVERED_PENDING_CONFIRM = "DELIVERED_PENDING_CONFIRM";
+    private static final String REWORK_REQUIRED = "REWORK_REQUIRED";
     private static final String DELIVERY_UPLOADED = "UPLOADED";
     private static final String DELIVERY_BIZ_TYPE = "DELIVERY";
     private static final String PRIVATE_VISIBILITY = "PRIVATE";
@@ -40,6 +43,7 @@ public class DeliveryService {
     private final FileRepository fileRepository;
     private final OrderQueryPort orderQueryPort;
     private final OrderStatusPort orderStatusPort;
+    private final OrderService orderService;
     private final TransactionTemplate txTemplate;
 
     public DeliveryService(DeliveryRepository deliveryRepository,
@@ -48,6 +52,7 @@ public class DeliveryService {
                            FileRepository fileRepository,
                            OrderQueryPort orderQueryPort,
                            OrderStatusPort orderStatusPort,
+                           OrderService orderService,
                            TransactionTemplate txTemplate) {
         this.deliveryRepository = deliveryRepository;
         this.deliveryFileRepository = deliveryFileRepository;
@@ -55,6 +60,7 @@ public class DeliveryService {
         this.fileRepository = fileRepository;
         this.orderQueryPort = orderQueryPort;
         this.orderStatusPort = orderStatusPort;
+        this.orderService = orderService;
         this.txTemplate = txTemplate;
     }
 
@@ -70,7 +76,7 @@ public class DeliveryService {
         if (!currentUserId.equals(order.getProviderId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "只有订单服务方可以上传交付文件");
         }
-        if (!PENDING_DELIVERY.equals(order.getStatus())) {
+        if (!PENDING_DELIVERY.equals(order.getStatus()) && !REWORK_REQUIRED.equals(order.getStatus())) {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT, "订单当前状态不允许上传交付文件");
         }
 
@@ -109,13 +115,28 @@ public class DeliveryService {
             return d;
         });
 
-        // deliveries 事务已提交，FK 共享锁已释放，可安全发起 HTTP 回调
-        String orderStatus = orderStatusPort.changeStatus(
-                orderId,
-                DELIVERED_PENDING_CONFIRM,
-                currentUserId,
-                "服务方上传交付文件"
-        );
+        String orderStatus;
+        try {
+            if (REWORK_REQUIRED.equals(order.getStatus())) {
+                Order completedOrder = orderService.completeReworkDelivery(
+                        orderId,
+                        currentUserId,
+                        "服务方上传交付文件"
+                );
+                orderStatus = completedOrder.getStatus().name();
+            } else {
+                // deliveries 事务已提交，FK 共享锁已释放，可安全发起 HTTP 回调
+                orderStatus = orderStatusPort.changeStatus(
+                        orderId,
+                        DELIVERED_PENDING_CONFIRM,
+                        currentUserId,
+                        "服务方上传交付文件"
+                );
+            }
+        } catch (RuntimeException e) {
+            rollbackSavedDelivery(saved.getId());
+            throw e;
+        }
 
         return new DeliveryUploadResponse(
                 saved.getId(),
@@ -127,6 +148,18 @@ public class DeliveryService {
                 saved.getUploadTime(),
                 orderStatus
         );
+    }
+
+    private void rollbackSavedDelivery(Long deliveryId) {
+        try {
+            txTemplate.execute(status -> {
+                deliveryFileRepository.deleteByDeliveryId(deliveryId);
+                deliveryRepository.deleteById(deliveryId);
+                return null;
+            });
+        } catch (RuntimeException ignored) {
+            // Preserve the original order status failure for the caller.
+        }
     }
 
     @Transactional(readOnly = true)

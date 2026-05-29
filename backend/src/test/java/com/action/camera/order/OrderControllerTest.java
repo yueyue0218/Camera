@@ -1,5 +1,6 @@
 package com.action.camera.order;
 
+import com.action.camera.common.ErrorCode;
 import com.action.camera.common.Result;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
@@ -8,6 +9,7 @@ import com.action.camera.order.dto.MockPaymentRequest;
 import com.action.camera.order.dto.OrderResponse;
 import com.action.camera.order.dto.OrderStatusLogResponse;
 import com.action.camera.order.dto.PaymentResponse;
+import com.action.camera.order.dto.ReworkRequest;
 import com.action.camera.order.dto.StatusTransitionRequest;
 import com.action.camera.order.dto.StatusTransitionResponse;
 import com.action.camera.order.entity.Order;
@@ -33,6 +35,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -243,13 +246,129 @@ class OrderControllerTest {
         UserContext.setUserId(CUSTOMER_ID);
         Order order = order(OrderStatus.DELIVERED_PENDING_CONFIRM);
         prepareTransitionMocks(order);
+        ArgumentCaptor<OrderStatusLog> logCaptor = ArgumentCaptor.forClass(OrderStatusLog.class);
 
         Result<StatusTransitionResponse> result =
                 orderController.changeStatus(ORDER_ID, transitionRequest(OrderStatus.COMPLETED));
 
         assertEquals(OrderStatus.COMPLETED, result.getData().getToStatus());
         assertEquals("CUSTOMER", result.getData().getOperatorRole());
-        verify(orderStatusLogRepository, times(1)).save(any(OrderStatusLog.class));
+        assertEquals(OrderStatus.COMPLETED, order.getStatus());
+        assertEquals(EscrowStatus.RELEASED, order.getEscrowStatus());
+        assertEquals("SETTLED", order.getSettlementStatus());
+        assertTrue(order.getCompleteTime() != null);
+        assertNull(order.getAutoConfirmTime());
+        verify(orderStatusLogRepository, times(1)).save(logCaptor.capture());
+        assertEquals(OrderStatus.DELIVERED_PENDING_CONFIRM, logCaptor.getValue().getFromStatus());
+        assertEquals(OrderStatus.COMPLETED, logCaptor.getValue().getToStatus());
+        assertEquals(CUSTOMER_ID, logCaptor.getValue().getOperatorId());
+        assertEquals("CUSTOMER", logCaptor.getValue().getOperatorRole());
+    }
+
+    @Test
+    void strangerCannotConfirmCompleted() {
+        UserContext.setUserId(STRANGER_ID);
+        Order order = order(OrderStatus.DELIVERED_PENDING_CONFIRM);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+
+        assertThrows(BusinessException.class,
+                () -> orderController.changeStatus(ORDER_ID, transitionRequest(OrderStatus.COMPLETED)));
+
+        assertEquals(OrderStatus.DELIVERED_PENDING_CONFIRM, order.getStatus());
+        assertEquals(EscrowStatus.HELD, order.getEscrowStatus());
+        assertEquals("NOT_SETTLED", order.getSettlementStatus());
+        verify(orderRepository, never()).save(any(Order.class));
+        verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
+    }
+
+    @Test
+    void customerCannotConfirmCompletedFromNonDeliveredPendingConfirmStatuses() {
+        for (OrderStatus status : List.of(
+                OrderStatus.REWORK_REQUIRED,
+                OrderStatus.APPEALING,
+                OrderStatus.CANCELLED,
+                OrderStatus.REFUNDED
+        )) {
+            UserContext.setUserId(CUSTOMER_ID);
+            Order order = order(status);
+            when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+
+            assertThrows(BusinessException.class,
+                    () -> orderController.changeStatus(ORDER_ID, transitionRequest(OrderStatus.COMPLETED)));
+
+            assertEquals(status, order.getStatus());
+            assertEquals(EscrowStatus.HELD, order.getEscrowStatus());
+            assertEquals("NOT_SETTLED", order.getSettlementStatus());
+            verify(orderRepository, never()).save(any(Order.class));
+            verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
+        }
+    }
+
+    @Test
+    void customerCanRequestReworkFromDeliveredPendingConfirm() {
+        UserContext.setUserId(CUSTOMER_ID);
+        Order order = order(OrderStatus.DELIVERED_PENDING_CONFIRM);
+        prepareTransitionMocks(order);
+        ArgumentCaptor<OrderStatusLog> logCaptor = ArgumentCaptor.forClass(OrderStatusLog.class);
+
+        Result<StatusTransitionResponse> result = orderController.requestRework(
+                ORDER_ID,
+                reworkRequest("精修肤色与约定不一致")
+        );
+
+        assertEquals(OrderStatus.DELIVERED_PENDING_CONFIRM, result.getData().getFromStatus());
+        assertEquals(OrderStatus.REWORK_REQUIRED, result.getData().getToStatus());
+        assertEquals("CUSTOMER", result.getData().getOperatorRole());
+        assertTrue(result.getData().getReason().contains("精修肤色与约定不一致"));
+        verify(orderStatusLogRepository, times(1)).save(logCaptor.capture());
+        assertTrue(logCaptor.getValue().getReason().contains("精修肤色与约定不一致"));
+    }
+
+    @Test
+    void reworkRequestRejectsNonDeliveredPendingConfirmStatus() {
+        UserContext.setUserId(CUSTOMER_ID);
+        Order order = order(OrderStatus.PENDING_DELIVERY);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+
+        assertThrows(BusinessException.class,
+                () -> orderController.requestRework(ORDER_ID, reworkRequest("还未交付不能返修")));
+
+        assertEquals(OrderStatus.PENDING_DELIVERY, order.getStatus());
+        verify(orderRepository, never()).save(any(Order.class));
+        verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
+    }
+
+    @Test
+    void reworkRequestRejectsProviderAndStranger() {
+        Order order = order(OrderStatus.DELIVERED_PENDING_CONFIRM);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+
+        UserContext.setUserId(PROVIDER_USER_ID);
+        assertThrows(BusinessException.class,
+                () -> orderController.requestRework(ORDER_ID, reworkRequest("服务方不能替客户返修")));
+
+        UserContext.setUserId(STRANGER_ID);
+        assertThrows(BusinessException.class,
+                () -> orderController.requestRework(ORDER_ID, reworkRequest("无关用户不能返修")));
+
+        assertEquals(OrderStatus.DELIVERED_PENDING_CONFIRM, order.getStatus());
+        verify(orderRepository, never()).save(any(Order.class));
+        verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
+    }
+
+    @Test
+    void reworkRequestRejectsTooLongReason() {
+        UserContext.setUserId(CUSTOMER_ID);
+        Order order = order(OrderStatus.DELIVERED_PENDING_CONFIRM);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> orderController.requestRework(ORDER_ID, reworkRequest("x".repeat(201))));
+
+        assertEquals(ErrorCode.VALIDATION_ERROR, exception.getErrorCode());
+        assertEquals(OrderStatus.DELIVERED_PENDING_CONFIRM, order.getStatus());
+        verify(orderRepository, never()).save(any(Order.class));
+        verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
     }
 
     @Test
@@ -272,6 +391,21 @@ class OrderControllerTest {
         assertThrows(BusinessException.class,
                 () -> orderController.changeStatus(ORDER_ID, transitionRequest(OrderStatus.SHOOTING)));
 
+        verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
+    }
+
+    @Test
+    void genericStatusTransitionRejectsReworkRequiredToPendingDelivery() {
+        UserContext.setUserId(PROVIDER_USER_ID);
+        Order order = order(OrderStatus.REWORK_REQUIRED);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> orderController.changeStatus(ORDER_ID, transitionRequest(OrderStatus.PENDING_DELIVERY)));
+
+        assertEquals(ErrorCode.STATUS_CONFLICT, exception.getErrorCode());
+        assertEquals(OrderStatus.REWORK_REQUIRED, order.getStatus());
+        verify(orderRepository, never()).save(any(Order.class));
         verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
     }
 
@@ -323,6 +457,12 @@ class OrderControllerTest {
         StatusTransitionRequest request = new StatusTransitionRequest();
         request.setTargetStatus(targetStatus);
         request.setReason("P4 status transition");
+        return request;
+    }
+
+    private ReworkRequest reworkRequest(String reason) {
+        ReworkRequest request = new ReworkRequest();
+        request.setReason(reason);
         return request;
     }
 
