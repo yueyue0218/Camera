@@ -1,0 +1,35 @@
+package com.action.camera.order.dto;
+
+import com.action.camera.order.entity.OrderStatusLog;
+import com.action.camera.order.enums.OrderStatus;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+
+import java.time.LocalDateTime;
+
+@Data
+@AllArgsConstructor
+public class OrderStatusLogResponse {
+
+    private Long logId;
+    private Long orderId;
+    private OrderStatus fromStatus;
+    private OrderStatus toStatus;
+    private Long operatorId;
+    private String operatorRole;
+    private String reason;
+    private LocalDateTime createdAt;
+
+    public static OrderStatusLogResponse from(OrderStatusLog log) {
+        return new OrderStatusLogResponse(
+                log.getId(),
+                log.getOrderId(),
+                log.getFromStatus(),
+                log.getToStatus(),
+                log.getOperatorId(),
+                log.getOperatorRole(),
+                log.getReason(),
+                log.getCreatedAt()
+        );
+    }
+}

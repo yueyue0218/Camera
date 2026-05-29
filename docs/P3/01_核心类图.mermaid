@@ -1,0 +1,958 @@
+%% ═══════════════════════════════════════════════════════════
+%% Camera 约拍服务平台 — 核心类图
+%% 所属阶段：P3 详细设计 · 任务 1.1
+%% 设计依据：P1 需求规格说明书、P2 架构设计文档、Camera 平台 API 规范文档
+%% 覆盖范围：用户身份、文件资源、服务方主页、作品集、需求、档期、会话报价、订单交易、作品交付、照片授权、评价信用、后台审核仲裁、通知与领域事件
+%% ═══════════════════════════════════════════════════════════
+
+classDiagram
+    direction TB
+
+    %% ============================================
+    %% 一、用户与身份模块 (com.camera.user)
+    %% ============================================
+    class User {
+        -Long id
+        -String phone
+        -String passwordHash
+        -String nickname
+        -Long avatarFileId
+        -UserRole currentRole
+        -UserStatus status
+        -Double creditScore
+        -LocalDateTime createTime
+        -LocalDateTime updateTime
+        +switchRole(role) void
+        +updateProfile(dto) void
+        +getCreditLevel() CreditLevel
+    }
+
+    class UserRole {
+        <<enumeration>>
+        CUSTOMER
+        PROVIDER
+        ADMIN
+    }
+
+    class UserStatus {
+        <<enumeration>>
+        ACTIVE
+        FROZEN
+        DEACTIVATED
+    }
+
+    class CreditLevel {
+        <<enumeration>>
+        NEWBIE
+        BRONZE
+        SILVER
+        GOLD
+        DIAMOND
+    }
+
+    class StudentCertification {
+        -Long id
+        -Long userId
+        -String university
+        -String studentId
+        -Long studentCardFileId
+        -CertStatus status
+        -LocalDateTime applyTime
+        +apply() void
+        +approve() void
+        +reject(reason) void
+    }
+
+    class RealNameCertification {
+        -Long id
+        -Long userId
+        -String realName
+        -String idCardNo
+        -Long idCardFrontFileId
+        -Long idCardBackFileId
+        -CertStatus status
+        -LocalDateTime applyTime
+        +apply() void
+        +approve() void
+        +reject(reason) void
+    }
+
+    class CertStatus {
+        <<enumeration>>
+        PENDING_REVIEW
+        APPROVED
+        REJECTED
+    }
+
+    User "1" --> "0..1" StudentCertification : 拥有
+    User "1" --> "0..1" RealNameCertification : 拥有
+    User --> UserRole
+    User --> UserStatus
+    StudentCertification --> CertStatus
+    RealNameCertification --> CertStatus
+    StudentCertification --> StoredFile : studentCardFileId
+    RealNameCertification --> StoredFile : idCardFrontFileId/idCardBackFileId
+
+    %% ============================================
+    %% 一点五、文件资源模块 (com.camera.file)
+    %% 统一支撑头像、作品集、需求参考图、交付文件、认证材料和申诉证据
+    %% ============================================
+    class StoredFile {
+        -Long id
+        -Long ownerUserId
+        -FileBizType bizType
+        -FileVisibility visibility
+        -String storageKey
+        -String publicUrl
+        -StoredFileType fileType
+        -Long sizeBytes
+        -LocalDateTime createTime
+        +isPublic() boolean
+        +canAccess(userId, context) boolean
+    }
+
+    class FileBizType {
+        <<enumeration>>
+        AVATAR
+        PORTFOLIO
+        ID_CARD
+        STUDENT_CARD
+        DELIVERY
+        APPEAL_EVIDENCE
+    }
+
+    class FileVisibility {
+        <<enumeration>>
+        PUBLIC
+        PRIVATE
+    }
+
+    class StoredFileType {
+        <<enumeration>>
+        IMAGE
+        VIDEO
+        DOCUMENT
+        OTHER
+    }
+
+    StoredFile --> FileBizType
+    StoredFile --> FileVisibility
+    StoredFile --> StoredFileType
+    StoredFile --> User : ownerUserId
+
+    %% ============================================
+    %% 二、服务方主页模块 (com.camera.provider)
+    %% ============================================
+    class ProviderProfile {
+        -Long id
+        -Long userId
+        -ServiceType serviceType
+        -String bio
+        -String[] styleTags
+        -String cityArea
+        -BigDecimal priceMin
+        -BigDecimal priceMax
+        -Boolean acceptingOrders
+        -Double avgRating
+        -Integer completedOrders
+        -LocalDateTime createTime
+        +updateProfile(dto) void
+        +toggleAcceptOrders() void
+        +getDisplayInfo() ProviderDisplayDTO
+    }
+
+    class ServiceType {
+        <<enumeration>>
+        PHOTOGRAPHER
+        MAKEUP_ARTIST
+        BOTH
+    }
+
+    class ServicePackage {
+        -Long id
+        -Long providerProfileId
+        -Long providerUserId
+        -String packageNo
+        -String title
+        -Long coverFileId
+        -ShootScene scene
+        -BigDecimal basePrice
+        -Integer durationMinutes
+        -Integer originalCount
+        -Integer refinedCount
+        -Integer deliveryDays
+        -String cityCode
+        -String locationNote
+        -Integer minParticipants
+        -Integer maxParticipants
+        -String includedItems
+        -String bookingNotice
+        -String description
+        -ServicePackageStatus status
+        -LocalDateTime createTime
+        +publish() void
+        +offline() void
+        +updatePackage(dto) void
+    }
+
+    class ServicePackageStatus {
+        <<enumeration>>
+        DRAFT
+        ONLINE
+        OFFLINE
+        PENDING_REVIEW
+        REJECTED
+    }
+
+    User "1" --> "0..1" ProviderProfile : 创建
+    ProviderProfile --> ServiceType
+    ProviderProfile "1" *-- "0..*" ServicePackage : 发布套餐
+    ServicePackage --> ServicePackageStatus
+    User --> StoredFile : avatarFileId
+    ServicePackage --> StoredFile : coverFileId
+
+    %% ============================================
+    %% 三、作品集模块 (com.camera.portfolio)
+    %% ============================================
+    class PortfolioWork {
+        -Long id
+        -Long providerProfileId
+        -Long providerUserId
+        -String title
+        -String description
+        -WorkCategory category
+        -String[] styleTags
+        -Long coverFileId
+        -Long relatedOrderId
+        -Long photoAuthorizationId
+        -Integer likeCount
+        -Integer viewCount
+        -LocalDateTime createTime
+        +delete() void
+        +updateTags(tags) void
+    }
+
+    class WorkImage {
+        -Long id
+        -Long workId
+        -Long fileId
+        -ImageType imageType
+        -Integer sortOrder
+    }
+
+    class WorkCategory {
+        <<enumeration>>
+        SAMPLE
+        CUSTOMER_WORK
+    }
+
+    class ImageType {
+        <<enumeration>>
+        RAW
+        RETOUCHED
+    }
+
+    ProviderProfile "1" *-- "0..*" PortfolioWork : 包含
+    PortfolioWork "1" *-- "1..*" WorkImage : 包含
+    PortfolioWork --> WorkCategory
+    WorkImage --> ImageType
+    WorkImage --> StoredFile : fileId
+    PortfolioWork --> StoredFile : coverFileId
+
+    %% ============================================
+    %% 四、需求发布模块 (com.camera.demand)
+    %% ============================================
+    class Demand {
+        -Long id
+        -Long customerId
+        -ShootScene scene
+        -String[] styleTags
+        -LocalDate expectedDate
+        -String timeSlot
+        -String location
+        -BudgetRange budgetRange
+        -Long[] referenceImageFileIds
+        -String description
+        -DemandStatus status
+        -Integer responseCount
+        -LocalDateTime createTime
+        -LocalDateTime expireTime
+        +publish() void
+        +edit(dto) void
+        +close() void
+        +isExpired() boolean
+    }
+
+    class ShootScene {
+        <<enumeration>>
+        PERSONAL_PORTRAIT
+        GRADUATION
+        COUPLE
+        COSPLAY
+        COMMERCIAL
+        EVENT
+        OTHER
+    }
+
+    class BudgetRange {
+        <<enumeration>>
+        UNDER_100
+        RANGE_100_200
+        RANGE_200_500
+        RANGE_500_1000
+        ABOVE_1000
+        NEGOTIABLE
+    }
+
+    class DemandStatus {
+        <<enumeration>>
+        DRAFT
+        OPEN
+        MATCHED
+        QUOTED
+        ORDER_CREATED
+        CLOSED
+        EXPIRED
+    }
+
+    class DemandResponse {
+        -Long id
+        -Long demandId
+        -Long providerUserId
+        -String message
+        -ResponseStatus status
+        -Long quoteId
+        -String rejectReason
+        -LocalDateTime responseTime
+        +respond() void
+        +accept() void
+        +reject(reason) void
+        +withdraw() void
+    }
+
+    class ResponseStatus {
+        <<enumeration>>
+        PENDING_CUSTOMER_ACCEPT
+        ACCEPTED
+        REJECTED
+        WITHDRAWN
+        QUOTED
+        ORDER_CREATED
+    }
+
+    User "1" *-- "0..*" Demand : 发布
+    Demand "1" o-- "0..*" DemandResponse : 收到响应
+    Demand --> ShootScene
+    Demand --> BudgetRange
+    Demand --> DemandStatus
+    DemandResponse --> ResponseStatus
+    DemandResponse --> ProviderProfile
+    Demand --> StoredFile : referenceImageFileIds
+
+    %% ============================================
+    %% 五、档期模块 (com.camera.schedule)
+    %% ============================================
+    class Schedule {
+        -Long id
+        -Long providerUserId
+        -LocalDate date
+        -String timeSlot
+        -ScheduleStatus status
+        -Long lockedByOrderId
+        -LocalDateTime lockExpireTime
+        -LocalDateTime createTime
+        +setAvailable() void
+        +lock(orderId) void
+        +release() void
+        +isAvailable() boolean
+        +releaseIfExpired() void
+    }
+
+    class ScheduleStatus {
+        <<enumeration>>
+        AVAILABLE
+        LOCKED
+        BOOKED
+    }
+
+    ProviderProfile "1" *-- "0..*" Schedule : 管理
+    Schedule --> ScheduleStatus
+
+    %% ============================================
+    %% 六、消息与报价模块 (com.camera.message)
+    %% ============================================
+    class Conversation {
+        -Long id
+        -Long participantAId
+        -Long participantBId
+        -ConversationSourceType sourceType
+        -Long sourceId
+        -LocalDateTime lastMessageTime
+        -LocalDateTime createTime
+        +getMessages(page) List~Message~
+    }
+
+    class ConversationSourceType {
+        <<enumeration>>
+        DEMAND_RESPONSE
+        SERVICE_PACKAGE
+        PORTFOLIO
+        DIRECT
+    }
+
+    class Message {
+        -Long id
+        -Long conversationId
+        -Long senderId
+        -MessageType type
+        -String content
+        -Long fileId
+        -Long referenceId
+        -ReferenceType referenceType
+        -Boolean isRead
+        -LocalDateTime createTime
+        +markRead() void
+    }
+
+    class MessageType {
+        <<enumeration>>
+        TEXT
+        IMAGE
+        QUOTE_CARD
+        SYSTEM_NOTICE
+    }
+
+    class ReferenceType {
+        <<enumeration>>
+        QUOTE
+        PORTFOLIO
+        DEMAND_RESPONSE
+        SERVICE_PACKAGE
+    }
+
+    class Quote {
+        -Long id
+        -String quoteNo
+        -Long conversationId
+        -Long providerUserId
+        -Long customerId
+        -QuoteSourceType sourceType
+        -Long sourceId
+        -LocalDateTime shootStartTime
+        -LocalDateTime shootEndTime
+        -String location
+        -String serviceContent
+        -Integer originalCount
+        -Integer refinedCount
+        -LocalDateTime deliveryDeadline
+        -String photoUsageScope
+        -String terms
+        -String contractTerms
+        -String safetyNoticeVersion
+        -String serviceSnapshotJson
+        -BigDecimal totalAmount
+        -QuoteStatus status
+        -LocalDateTime createTime
+        -LocalDateTime expireTime
+        -Long relatedOrderId
+        +create() void
+        +confirm() Order
+        +reject() void
+        +cancel(reason) void
+        +isExpired() boolean
+    }
+
+    class QuoteSourceType {
+        <<enumeration>>
+        DEMAND_RESPONSE
+        SERVICE_PACKAGE
+        DIRECT
+    }
+
+    class QuoteStatus {
+        <<enumeration>>
+        PENDING_CONFIRM
+        CONFIRMED
+        REJECTED
+        CANCELLED
+        EXPIRED
+    }
+
+    Conversation "1" *-- "0..*" Message : 包含
+    Conversation --> ConversationSourceType
+    Message --> MessageType
+    Message --> ReferenceType
+    Message --> StoredFile : fileId
+    Conversation "1" o-- "0..*" Quote : 关联报价
+    Quote --> QuoteSourceType
+    Quote --> QuoteStatus
+
+    %% ============================================
+    %% 七、订单与交易模块 (com.camera.order)
+    %% ============================================
+    class Order {
+        -Long id
+        -String orderNo
+        -Long customerId
+        -Long providerUserId
+        -Long quoteId
+        -Long conversationId
+        -Long demandId
+        -Long servicePackageId
+        -OrderStatus status
+        -EscrowStatus escrowStatus
+        -SettlementStatus settlementStatus
+        -RefundStatus refundStatus
+        -BigDecimal totalAmount
+        -BigDecimal platformFee
+        -BigDecimal providerIncome
+        -LocalDateTime shootStartTime
+        -LocalDateTime shootEndTime
+        -String shootLocation
+        -LocalDateTime deliveryDeadline
+        -String photoUsageScope
+        -String quoteSnapshotJson
+        -Boolean safetyNoticeConfirmed
+        -String contractTerms
+        -LocalDateTime createTime
+        -LocalDateTime completeTime
+        -LocalDateTime cancelTime
+        -LocalDateTime autoConfirmTime
+        +create(quote) Order
+        +pay() void
+        +cancel(reason) void
+        +startShooting() void
+        +markPendingDelivery() void
+        +confirmDelivery() void
+        +autoComplete() void
+        +applyDispute() void
+        +settleToProvider() void
+        +refund(amount, reason) void
+        +canTransitTo(status) boolean
+    }
+
+    class OrderStatus {
+        <<enumeration>>
+        PENDING_PAYMENT
+        PAID_PENDING_SHOOT
+        SHOOTING
+        PENDING_DELIVERY
+        DELIVERED_PENDING_CONFIRM
+        APPEALING
+        REWORK_REQUIRED
+        COMPLETED
+        CANCELLED
+        REFUNDED
+        +getAllowedTransitions() Set~OrderStatus~
+    }
+
+    class EscrowStatus {
+        <<enumeration>>
+        NOT_PAID
+        HELD
+        RELEASED
+        REFUNDED
+    }
+
+    class SettlementStatus {
+        <<enumeration>>
+        NOT_SETTLED
+        SETTLING
+        SETTLED
+        SETTLEMENT_FAILED
+    }
+
+    class RefundStatus {
+        <<enumeration>>
+        NONE
+        PENDING_REFUND
+        REFUNDED
+        REFUND_FAILED
+    }
+
+    class OrderStatusLog {
+        -Long id
+        -Long orderId
+        -OrderStatus fromStatus
+        -OrderStatus toStatus
+        -String operator
+        -String remark
+        -LocalDateTime createTime
+    }
+
+    class PaymentRecord {
+        -Long id
+        -Long orderId
+        -String paymentNo
+        -String thirdPartyTradeNo
+        -BigDecimal amount
+        -PayMethod payMethod
+        -PayStatus status
+        -LocalDateTime payTime
+        +completePay(thirdPartyTradeNo) void
+        +failPay() void
+    }
+
+    class PayStatus {
+        <<enumeration>>
+        PENDING
+        SUCCESS
+        FAILED
+        REFUNDED
+    }
+
+    class PayMethod {
+        <<enumeration>>
+        WECHAT_PAY
+        ALIPAY
+    }
+
+    Order --> OrderStatus
+    Order --> EscrowStatus
+    Order --> SettlementStatus
+    Order --> RefundStatus
+    Order "1" *-- "1..*" OrderStatusLog : 记录流转
+    Order "1" --> "1" Quote : 基于报价
+    Order --> User : customerId
+    Order --> User : providerUserId
+    Order "1" *-- "0..*" PaymentRecord : 支付流水
+    PaymentRecord --> PayStatus
+    PaymentRecord --> PayMethod
+    Order --> Conversation
+    Order --> ServicePackage
+
+    %% ============================================
+    %% 八、作品交付模块 (com.camera.delivery)
+    %% ============================================
+    class Delivery {
+        -Long id
+        -Long orderId
+        -Integer deliveryRound
+        -Boolean isLatest
+        -Integer originalCount
+        -Integer refinedCount
+        -LocalDate deadline
+        -DeliveryStatus status
+        -String remark
+        -LocalDateTime uploadTime
+        -LocalDateTime confirmTime
+        -LocalDateTime autoConfirmDeadline
+        +confirmReceive() void
+        +isOverdue() boolean
+    }
+
+    class DeliveryFile {
+        -Long id
+        -Long deliveryId
+        -Long fileId
+        -String fileName
+        -Long fileSize
+        -ImageType fileType
+        -Integer sortOrder
+        -LocalDateTime uploadTime
+    }
+
+    class DeliveryStatus {
+        <<enumeration>>
+        PENDING_UPLOAD
+        UPLOADED
+        CONFIRMED
+        REWORK_REQUIRED
+    }
+
+    Order "1" o-- "0..*" Delivery : 多轮交付
+    Delivery "1" *-- "0..*" DeliveryFile : 包含文件
+    Delivery --> DeliveryStatus
+    DeliveryFile --> ImageType
+    DeliveryFile --> StoredFile : fileId
+
+    %% ============================================
+    %% 八点五、照片授权模块 (com.camera.authorization)
+    %% 真实客片进入公开作品集前必须有订单或照片授权依据
+    %% ============================================
+    class PhotoAuthorization {
+        -Long id
+        -Long orderId
+        -Long customerId
+        -Long providerUserId
+        -String usageScope
+        -PhotoAuthorizationStatus status
+        -LocalDateTime authorizeTime
+        -LocalDateTime expireTime
+        -String remark
+        +grant() void
+        +revoke() void
+        +isValid() boolean
+    }
+
+    class PhotoAuthorizationFile {
+        -Long id
+        -Long authorizationId
+        -Long fileId
+        -Integer sortOrder
+    }
+
+    class PhotoAuthorizationStatus {
+        <<enumeration>>
+        GRANTED
+        REVOKED
+        EXPIRED
+    }
+
+    Order "1" o-- "0..*" PhotoAuthorization : 授权记录
+    PhotoAuthorization "1" *-- "1..*" PhotoAuthorizationFile : 授权文件
+    PhotoAuthorization --> PhotoAuthorizationStatus
+    PhotoAuthorizationFile --> StoredFile : fileId
+    PortfolioWork --> PhotoAuthorization : photoAuthorizationId
+
+    %% ============================================
+    %% 九、评价与信用模块 (com.camera.review)
+    %% ============================================
+    class Review {
+        -Long id
+        -Long orderId
+        -Long reviewerId
+        -Long targetId
+        -ReviewDirection direction
+        -Integer rating
+        -String content
+        -Long[] imageFileIds
+        -Boolean isVisible
+        -String providerReply
+        -LocalDateTime createTime
+        -LocalDateTime replyTime
+        +create() void
+        +reply(content) void
+        +report(reason) void
+        +hide() void
+    }
+
+    class ReviewDirection {
+        <<enumeration>>
+        CUSTOMER_TO_PROVIDER
+        PROVIDER_TO_CUSTOMER
+    }
+
+    class CreditRecord {
+        -Long id
+        -Long userId
+        -String eventType
+        -Integer scoreChange
+        -String reason
+        -Long relatedOrderId
+        -LocalDateTime createTime
+    }
+
+    Order "1" o-- "0..2" Review : 双向评价
+    Review --> User : reviewerId
+    Review --> User : targetId
+    Review --> ReviewDirection
+    Review --> StoredFile : imageFileIds
+    User "1" *-- "0..*" CreditRecord : 信用记录
+
+    %% ============================================
+    %% 十、后台审核与仲裁模块 (com.camera.admin)
+    %% ============================================
+    class Dispute {
+        -Long id
+        -Long orderId
+        -Long applicantId
+        -Long respondentId
+        -DisputeType type
+        -String description
+        -Long[] evidenceFileIds
+        -String respondentReply
+        -Long[] respondentEvidenceFileIds
+        -DisputeStatus status
+        -DisputeResult result
+        -Long adminId
+        -String adminRemark
+        -BigDecimal refundAmount
+        -LocalDateTime createTime
+        -LocalDateTime respondDeadline
+        -LocalDateTime resolveTime
+        +submit() void
+        +respond(reply, evidence) void
+        +resolve(result, remark) void
+    }
+
+    class DisputeType {
+        <<enumeration>>
+        STYLE_MISMATCH
+        QUALITY_POOR
+        COUNT_INSUFFICIENT
+        FORMAT_WRONG
+        DELIVERY_OVERDUE
+        CUSTOMER_NO_SHOW
+        UNAUTHORIZED_USE
+        REFUND_DISPUTE
+        OTHER
+    }
+
+    class DisputeStatus {
+        <<enumeration>>
+        PENDING_RESPONSE
+        PENDING_ARBITRATION
+        RESOLVED
+        APPEAL
+    }
+
+    class DisputeResult {
+        <<enumeration>>
+        FULL_REFUND
+        PARTIAL_REFUND
+        REJECTED
+        REWORK
+    }
+
+    class AuditRecord {
+        -Long id
+        -AuditType auditType
+        -Long targetId
+        -Long adminId
+        -AuditResult auditResult
+        -String remark
+        -LocalDateTime createTime
+    }
+
+    class AuditType {
+        <<enumeration>>
+        REAL_NAME_CERTIFICATION
+        STUDENT_CERTIFICATION
+        PROVIDER_PROFILE
+        SERVICE_PACKAGE
+        PORTFOLIO_WORK
+        REVIEW_REPORT
+        DISPUTE
+    }
+
+    class AuditResult {
+        <<enumeration>>
+        APPROVED
+        REJECTED
+        NEED_REVISION
+    }
+
+    Order "1" o-- "0..*" Dispute : 发起申诉
+    Dispute --> DisputeType
+    Dispute --> DisputeStatus
+    Dispute --> DisputeResult
+    AuditRecord --> AuditType
+    AuditRecord --> AuditResult
+    Dispute --> StoredFile : evidenceFileIds
+    Dispute --> StoredFile : respondentEvidenceFileIds
+
+    %% ============================================
+    %% 十一、通知模块 (com.camera.common)
+    %% ============================================
+    class Notification {
+        -Long id
+        -Long userId
+        -String title
+        -String content
+        -NotificationType type
+        -NotificationTargetType relatedType
+        -Long relatedId
+        -Boolean isRead
+        -LocalDateTime createTime
+        +markRead() void
+    }
+
+    class NotificationType {
+        <<enumeration>>
+        ORDER_STATUS
+        NEW_MESSAGE
+        NEW_DEMAND_MATCH
+        REVIEW_RECEIVED
+        DISPUTE_UPDATE
+        SYSTEM
+    }
+
+    class NotificationTargetType {
+        <<enumeration>>
+        ORDER
+        CONVERSATION
+        DEMAND
+        REVIEW
+        DISPUTE
+        AUDIT
+    }
+
+    User "1" *-- "0..*" Notification : 接收
+    Notification --> NotificationType
+    Notification --> NotificationTargetType
+
+    %% ============================================
+    %% 十二、领域事件 (Spring Event)
+    %% ============================================
+    class OrderPaidEvent {
+        <<event>>
+        -Long orderId
+        -Long customerId
+        -Long providerUserId
+        -LocalDateTime shootStartTime
+    }
+
+    class OrderCompletedEvent {
+        <<event>>
+        -Long orderId
+        -Long customerId
+        -Long providerUserId
+    }
+
+    class OrderCancelledEvent {
+        <<event>>
+        -Long orderId
+        -String cancelReason
+    }
+
+    class DeliveryUploadedEvent {
+        <<event>>
+        -Long orderId
+        -Long deliveryId
+        -Integer deliveryRound
+    }
+
+    class DeliveryAutoConfirmedEvent {
+        <<event>>
+        -Long orderId
+        -Long deliveryId
+    }
+
+    class ReviewCreatedEvent {
+        <<event>>
+        -Long reviewId
+        -Long targetUserId
+        -ReviewDirection direction
+    }
+
+    class DisputeOpenedEvent {
+        <<event>>
+        -Long disputeId
+        -Long orderId
+        -Long applicantId
+    }
+
+    class DisputeResolvedEvent {
+        <<event>>
+        -Long disputeId
+        -Long orderId
+        -DisputeResult result
+    }
+
+    class RefundCreatedEvent {
+        <<event>>
+        -Long orderId
+        -BigDecimal refundAmount
+        -String reason
+    }
+
+    Order ..> OrderPaidEvent : 发布
+    Order ..> OrderCompletedEvent : 发布
+    Order ..> OrderCancelledEvent : 发布
+    Delivery ..> DeliveryUploadedEvent : 发布
+    Delivery ..> DeliveryAutoConfirmedEvent : 发布
+    Review ..> ReviewCreatedEvent : 发布
+    Dispute ..> DisputeOpenedEvent : 发布
+    Dispute ..> DisputeResolvedEvent : 发布
+    Order ..> RefundCreatedEvent : 发布

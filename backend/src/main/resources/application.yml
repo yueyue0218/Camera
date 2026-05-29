@@ -1,0 +1,52 @@
+spring:
+  config:
+    import: optional:application-local.yml
+  datasource:
+    url: jdbc:mysql://localhost:3306/camera_app?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: ${DB_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  mail:
+    host: smtp.qq.com
+    port: 465
+    protocol: smtps
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+          socketFactory:
+            class: javax.net.ssl.SSLSocketFactory
+            port: 465
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+jwt:
+  secret: camera-platform-secret-key-please-change-in-production-2026
+  expire-hours: 24
+
+file:
+  storage:
+    local-path: ./uploads
+
+camera:
+  order:
+    adapter: c-http
+    c-base-url: http://localhost:8080
