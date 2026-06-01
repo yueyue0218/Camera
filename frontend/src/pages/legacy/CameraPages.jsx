@@ -64,6 +64,7 @@ import {
   conversationApi,
   creditApi,
   demandApi,
+  deliveryApi,
   momentApi,
   orderApi,
   quoteApi,
@@ -73,6 +74,14 @@ import {
   userApi,
   yuanToCent
 } from '../../api.js'
+import {
+  canCustomerConfirm,
+  canCustomerPay,
+  canCustomerRequestRework,
+  canProviderUploadDelivery,
+  canShowOrderNormalActions,
+  ORDER_STATUS_LABELS
+} from '../orders/orderActions.js'
 import cameraLogoUrl from '../../assets/camera-logo-mark.png'
 import filmAutumnUrl from '../../assets/film-autumn.png'
 import filmLibraryUrl from '../../assets/film-library.png'
@@ -166,6 +175,7 @@ const quoteStatusMap = {
 }
 
 const orderStatusMap = {
+  ...ORDER_STATUS_LABELS,
   PENDING_PAYMENT: '待支付',
   PAID_PENDING_SHOOT: '已支付待拍摄',
   SHOOTING: '拍摄中',
@@ -173,7 +183,9 @@ const orderStatusMap = {
   DELIVERED_PENDING_CONFIRM: '已交付待确认',
   COMPLETED: '已完成',
   CANCELLED: '已取消',
-  REFUNDED: '已退款'
+  REFUNDED: '已退款',
+  APPEALING: '申诉中',
+  REWORK_REQUIRED: '返修中'
 }
 
 const escrowStatusMap = {
@@ -1838,6 +1850,9 @@ function OrdersPage() {
   const [orders, setOrders] = useState([])
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [statusLogs, setStatusLogs] = useState([])
+  const [deliveryRecords, setDeliveryRecords] = useState([])
+  const [deliveryForm, setDeliveryForm] = useState({ file: null, remark: '' })
+  const [reworkReason, setReworkReason] = useState('')
   const [orderReviews, setOrderReviews] = useState([])
   const [reviewForm, setReviewForm] = useState({ rating: 5, content: '沟通顺畅，履约体验很好。' })
   const [showReviewForm, setShowReviewForm] = useState(false)
@@ -1890,6 +1905,7 @@ function OrdersPage() {
       } else {
         setSelectedOrder(null)
         setStatusLogs([])
+        setDeliveryRecords([])
         setOrderReviews([])
         setArbitrations([])
       }
@@ -1900,6 +1916,7 @@ function OrdersPage() {
     const orderId = typeof orderOrId === 'object' ? orderOrId.orderId : orderOrId
     const detail = await orderApi.detail(orderId, currentUser)
     const logs = await orderApi.statusLogs(orderId, currentUser)
+    const deliveries = await deliveryApi.listByOrder(orderId, currentUser)
     let reviews = getLocalReviewsByOrder(orderId)
     try {
       reviews = mergeReviewLists(await reviewApi.listByOrder(orderId, currentUser), reviews)
@@ -1921,6 +1938,9 @@ function OrdersPage() {
     setSelectedOrder(detail)
     saveOrderSnapshots([detail])
     setStatusLogs(logs)
+    setDeliveryRecords(deliveries)
+    setDeliveryForm({ file: null, remark: '' })
+    setReworkReason('')
     setOrderReviews(reviews)
     setArbitrations(complaints)
     setShowReviewForm(false)
@@ -1937,6 +1957,35 @@ function OrdersPage() {
       return orderApi.transition(selectedOrder.orderId, action.targetStatus, action.reason, currentUser)
     }, action.successText)
     if (result) {
+      await loadOrders(selectedOrder.orderId)
+    }
+  }
+
+  async function submitDelivery(event) {
+    event.preventDefault()
+    if (!selectedOrder || !deliveryForm.file) return
+    const result = await run(async () => deliveryApi.upload(
+      selectedOrder.orderId,
+      deliveryForm.file,
+      deliveryForm.remark.trim(),
+      currentUser
+    ), selectedOrder.status === 'REWORK_REQUIRED' ? '返修交付已上传' : '交付文件已上传')
+    if (result) {
+      setDeliveryForm({ file: null, remark: '' })
+      await loadOrders(selectedOrder.orderId)
+    }
+  }
+
+  async function submitRework(event) {
+    event.preventDefault()
+    if (!selectedOrder) return
+    const result = await run(async () => orderApi.requestRework(
+      selectedOrder.orderId,
+      reworkReason.trim(),
+      currentUser
+    ), '返修请求已提交')
+    if (result) {
+      setReworkReason('')
       await loadOrders(selectedOrder.orderId)
     }
   }
@@ -2008,6 +2057,8 @@ function OrdersPage() {
 
   const action = selectedOrder ? getOrderAction(selectedOrder, currentUser) : null
   const quoteSnapshot = parseQuoteSnapshot(selectedOrder?.quoteSnapshotJson)
+  const canUploadDelivery = selectedOrder && canProviderUploadDelivery(selectedOrder, currentUser)
+  const canRequestRework = selectedOrder && canCustomerRequestRework(selectedOrder, currentUser)
   const canReviewSelectedOrder = selectedOrder?.status === 'COMPLETED' && isOrderParticipant(selectedOrder, currentUser.userId)
   const currentReviewDirection = selectedOrder ? getOrderReviewDirection(selectedOrder, currentUser.userId) : ''
   const myReview = orderReviews.find(review => Number(review.reviewerId) === currentUser.userId || review.direction === currentReviewDirection)
@@ -2125,7 +2176,7 @@ function OrdersPage() {
                     ]} />
                   </>
                 )}
-                {action ? (
+                {action && canShowOrderNormalActions(selectedOrder) ? (
                   <Button
                     variant="contained"
                     startIcon={action.icon}
@@ -2138,6 +2189,91 @@ function OrdersPage() {
                 ) : (
                   <Chip icon={<TaskAltRoundedIcon />} label="当前没有可执行操作" sx={{ alignSelf: 'flex-start' }} />
                 )}
+              </Stack>
+            </Paper>
+
+            <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 } }}>
+              <Stack spacing={2}>
+                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
+                  <Box>
+                    <Typography variant="h6">交付作品</Typography>
+                    <Typography color="text.secondary">摄影师必须通过上传交付文件推进待确认状态，返修也从这里重新上传。</Typography>
+                  </Box>
+                  {canUploadDelivery && (
+                    <Chip color="secondary" label={selectedOrder.status === 'REWORK_REQUIRED' ? '可上传返修交付' : '可上传交付'} />
+                  )}
+                </Stack>
+
+                {canUploadDelivery && (
+                  <Paper component="form" variant="outlined" onSubmit={submitDelivery} sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
+                    <Stack spacing={1.5}>
+                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.2} alignItems={{ xs: 'stretch', sm: 'center' }}>
+                        <Button variant="outlined" component="label" startIcon={<AddPhotoAlternateRoundedIcon />}>
+                          选择交付文件
+                          <input
+                            hidden
+                            type="file"
+                            onChange={event => setDeliveryForm({ ...deliveryForm, file: event.target.files?.[0] || null })}
+                          />
+                        </Button>
+                        <Typography color="text.secondary" variant="body2">
+                          {deliveryForm.file ? deliveryForm.file.name : '尚未选择文件'}
+                        </Typography>
+                      </Stack>
+                      <TextField
+                        label="交付说明"
+                        value={deliveryForm.remark}
+                        onChange={event => setDeliveryForm({ ...deliveryForm, remark: event.target.value })}
+                        multiline
+                        minRows={2}
+                        placeholder="说明本次交付内容、返修修改点或注意事项"
+                      />
+                      <Button type="submit" variant="contained" startIcon={<TaskAltRoundedIcon />} disabled={loading || !deliveryForm.file}>
+                        上传交付
+                      </Button>
+                    </Stack>
+                  </Paper>
+                )}
+
+                {canRequestRework && (
+                  <Paper component="form" variant="outlined" onSubmit={submitRework} sx={{ p: 1.5, bgcolor: '#fffaf0' }}>
+                    <Stack spacing={1.5}>
+                      <Typography fontWeight={800}>请写出后续返修建议</Typography>
+                      <TextField
+                        label="返修建议"
+                        value={reworkReason}
+                        onChange={event => setReworkReason(event.target.value)}
+                        multiline
+                        minRows={3}
+                        placeholder="说明哪里不满意、希望摄影师怎么调整。未填写时后端会使用默认文案。"
+                      />
+                      <Button type="submit" variant="contained" color="warning" startIcon={<RefreshRoundedIcon />} disabled={loading}>
+                        请求返修
+                      </Button>
+                    </Stack>
+                  </Paper>
+                )}
+
+                <Stack spacing={1}>
+                  <Typography variant="overline" color="text.secondary">交付记录</Typography>
+                  {deliveryRecords.map(record => (
+                    <Paper key={record.deliveryId || `${record.orderId}-${record.fileId}-${record.uploadTime}`} variant="outlined" sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
+                      <Stack spacing={0.7}>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
+                          <Typography fontWeight={800}>
+                            {record.fileName || `文件 ${record.fileId || '-'}`}
+                          </Typography>
+                          <Chip size="small" label={`第 ${record.deliveryRound || 1} 次交付${record.isLatest ? ' · 最新' : ''}`} />
+                        </Stack>
+                        <Typography color="text.secondary" variant="body2">
+                          fileId {record.fileId || '-'} · {record.status || 'DELIVERED'} · {formatTime(record.uploadTime)}
+                        </Typography>
+                        <Typography>{record.remark || '无交付说明'}</Typography>
+                      </Stack>
+                    </Paper>
+                  ))}
+                  {!deliveryRecords.length && <Typography color="text.secondary">暂无交付记录</Typography>}
+                </Stack>
               </Stack>
             </Paper>
 
@@ -2925,14 +3061,13 @@ function parseQuoteSnapshot(raw) {
 }
 
 function getOrderAction(order, currentUser) {
-  const isCustomer = Number(order.customerId) === currentUser.userId
   const isProvider = Number(order.providerUserId) === currentUser.userId
-  if (order.status === 'PENDING_PAYMENT') {
+  if (canCustomerPay(order, currentUser)) {
     return {
       kind: 'pay',
       label: '模拟支付',
       icon: <PaidRoundedIcon />,
-      allowed: isCustomer,
+      allowed: true,
       successText: '模拟支付成功，资金已进入平台托管'
     }
   }
@@ -2958,24 +3093,13 @@ function getOrderAction(order, currentUser) {
       successText: '订单已进入待交付'
     }
   }
-  if (order.status === 'PENDING_DELIVERY') {
-    return {
-      kind: 'transition',
-      targetStatus: 'DELIVERED_PENDING_CONFIRM',
-      label: '模拟交付',
-      icon: <TaskAltRoundedIcon />,
-      allowed: isProvider,
-      reason: '服务方已上传交付文件',
-      successText: '订单已进入待确认交付'
-    }
-  }
-  if (order.status === 'DELIVERED_PENDING_CONFIRM') {
+  if (canCustomerConfirm(order, currentUser)) {
     return {
       kind: 'transition',
       targetStatus: 'COMPLETED',
       label: '确认完成',
       icon: <CheckCircleRoundedIcon />,
-      allowed: isCustomer,
+      allowed: true,
       reason: '需求方确认完成',
       successText: '订单已完成'
     }
