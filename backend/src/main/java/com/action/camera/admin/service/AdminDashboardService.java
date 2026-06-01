@@ -3,6 +3,7 @@ package com.action.camera.admin.service;
 import com.action.camera.admin.dto.AdminDashboardResponse;
 import com.action.camera.admin.repository.RealNameCertificationRepository;
 import com.action.camera.admin.repository.StudentCertificationRepository;
+import com.action.camera.certification.enums.CertificationStatus;
 import com.action.camera.order.repository.PaymentRecordRepository;
 import com.action.camera.repository.UserRepository;
 import com.action.camera.review.repository.ReviewComplaintRepository;
@@ -18,7 +19,8 @@ import java.util.List;
 @Service
 public class AdminDashboardService {
 
-    private static final String PENDING_REVIEW = "PENDING_REVIEW";
+    private static final String REAL_NAME_PENDING = CertificationStatus.PENDING.name();
+    private static final String STUDENT_PENDING = "PENDING_REVIEW";
 
     private final AdminPermissionService permissionService;
     private final UserRepository userRepository;
@@ -47,8 +49,8 @@ public class AdminDashboardService {
         LocalDateTime start = LocalDate.now().atStartOfDay();
         LocalDateTime end = start.plusDays(1);
         long todayGmvCent = toCent(paymentRecordRepository.sumPaidAmountYuanBetween(start, end).orElse(BigDecimal.ZERO));
-        long pendingAuditCount = realNameCertificationRepository.countByStatus(PENDING_REVIEW)
-                + studentCertificationRepository.countByStatus(PENDING_REVIEW);
+        long pendingAuditCount = realNameCertificationRepository.countByStatus(REAL_NAME_PENDING)
+                + studentCertificationRepository.countByStatus(STUDENT_PENDING);
         long pendingArbitrationCount = reviewComplaintRepository.countByStatusIn(List.of("PENDING", "PROCESSING"));
         return new AdminDashboardResponse(
                 userRepository.count(),

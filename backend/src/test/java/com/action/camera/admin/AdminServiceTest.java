@@ -10,6 +10,9 @@ import com.action.camera.admin.repository.RealNameCertificationRepository;
 import com.action.camera.admin.repository.StudentCertificationRepository;
 import com.action.camera.admin.service.AdminCertificationService;
 import com.action.camera.admin.service.AdminDashboardService;
+import com.action.camera.certification.dto.CertificationRequest;
+import com.action.camera.certification.dto.CertificationResponse;
+import com.action.camera.certification.service.CertificationService;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
@@ -45,6 +48,9 @@ class AdminServiceTest {
 
     @Autowired
     private AdminCertificationService certificationService;
+
+    @Autowired
+    private CertificationService submissionService;
 
     @Autowired
     private RealNameCertificationRepository realNameCertificationRepository;
@@ -115,7 +121,7 @@ class AdminServiceTest {
         UserContext.setUserId(ADMIN_ID);
         RealNameCertification certification = savePendingRealNameCertification(PROVIDER_ID);
 
-        List<CertificationReviewResponse> responses = certificationService.list("REAL_NAME", "PENDING_REVIEW");
+        List<CertificationReviewResponse> responses = certificationService.list("REAL_NAME", "PENDING");
 
         assertThat(responses)
                 .extracting(CertificationReviewResponse::id)
@@ -128,6 +134,25 @@ class AdminServiceTest {
         assertThat(response.idCardNoMasked()).isEqualTo("3201********1234");
         assertThat(response.evidenceFrontFileId()).isEqualTo(7001L);
         assertThat(response.university()).isNull();
+    }
+
+    @Test
+    void adminCanReviewRealNameCertificationSubmittedByUserFlow() {
+        UserContext.setUserId(ADMIN_ID);
+        CertificationResponse submitted = submissionService.submit(PROVIDER_ID, realNameCertificationRequest());
+
+        assertThat(certificationService.list("REAL_NAME", null))
+                .extracting(CertificationReviewResponse::id)
+                .contains(submitted.getId());
+
+        CertificationReviewResponse reviewed = certificationService.review(
+                "REAL_NAME",
+                submitted.getId(),
+                new CertificationReviewRequest("APPROVED", null, "manual review")
+        );
+
+        assertThat(reviewed.status()).isEqualTo("APPROVED");
+        assertThat(reviewed.reviewerId()).isEqualTo(ADMIN_ID);
     }
 
     @Test
@@ -200,7 +225,7 @@ class AdminServiceTest {
         certification.setIdCardFrontFileId(7001L);
         certification.setIdCardBackFileId(7002L);
         certification.setFaceVerifyResult("PASSED");
-        certification.setStatus("PENDING_REVIEW");
+        certification.setStatus("PENDING");
         certification.setAppliedAt(LocalDateTime.now().minusHours(1));
         return realNameCertificationRepository.saveAndFlush(certification);
     }
@@ -216,6 +241,15 @@ class AdminServiceTest {
         certification.setStatus("PENDING_REVIEW");
         certification.setAppliedAt(LocalDateTime.now().minusMinutes(30));
         return studentCertificationRepository.saveAndFlush(certification);
+    }
+
+    private CertificationRequest realNameCertificationRequest() {
+        CertificationRequest request = new CertificationRequest();
+        request.setRealName("Li Ming");
+        request.setIdCardNumber("320101200001011234");
+        request.setIdCardFrontFileId(7001L);
+        request.setIdCardBackFileId(7002L);
+        return request;
     }
 
     private void savePaidPayment(Long orderId, String paymentNo, Long amountCent, LocalDateTime paidAt) {
