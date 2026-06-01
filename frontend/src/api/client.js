@@ -1,8 +1,9 @@
 export const API_BASE = import.meta.env.VITE_API_BASE_URL || `http://${window.location.hostname || 'localhost'}:8080`
 
 export async function request(path, options = {}, currentUser) {
+  const isFormDataBody = typeof FormData !== 'undefined' && options.body instanceof FormData
   const headers = {
-    'Content-Type': 'application/json',
+    ...(!isFormDataBody ? { 'Content-Type': 'application/json' } : {}),
     ...(currentUser?.token ? {
       Authorization: `Bearer ${currentUser.token}`
     } : {}),

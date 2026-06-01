@@ -1,3 +1,18 @@
-// Reserved for the C module delivery upload flow. Keep this module empty until the
-// frontend starts wiring the existing backend delivery endpoints.
-export const deliveryApi = {}
+import { request } from './client.js'
+
+export const deliveryApi = {
+  upload(orderId, file, remark, currentUser) {
+    const body = new FormData()
+    body.append('file', file)
+    if (remark !== undefined && remark !== null && remark !== '') {
+      body.append('remark', remark)
+    }
+    return request(`/orders/${orderId}/deliveries`, {
+      method: 'POST',
+      body
+    }, currentUser)
+  },
+  listByOrder(orderId, currentUser) {
+    return request(`/orders/${orderId}/deliveries`, {}, currentUser)
+  }
+}
