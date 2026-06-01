@@ -67,6 +67,7 @@ import {
   deliveryApi,
   momentApi,
   orderApi,
+  photoAuthorizationApi,
   quoteApi,
   reviewApi,
   reviewComplaintApi,
@@ -78,9 +79,12 @@ import {
   canCustomerConfirm,
   canCustomerPay,
   canCustomerRequestRework,
+  canCustomerReviewPhotoAuthorization,
+  canProviderRequestPhotoAuthorization,
   canProviderUploadDelivery,
   canShowOrderNormalActions,
-  ORDER_STATUS_LABELS
+  ORDER_STATUS_LABELS,
+  PHOTO_AUTHORIZATION_STATUS_LABELS
 } from '../orders/orderActions.js'
 import cameraLogoUrl from '../../assets/camera-logo-mark.png'
 import filmAutumnUrl from '../../assets/film-autumn.png'
@@ -1853,6 +1857,9 @@ function OrdersPage() {
   const [deliveryRecords, setDeliveryRecords] = useState([])
   const [deliveryForm, setDeliveryForm] = useState({ file: null, remark: '' })
   const [reworkReason, setReworkReason] = useState('')
+  const [photoAuthorizations, setPhotoAuthorizations] = useState([])
+  const [photoAuthorizationForm, setPhotoAuthorizationForm] = useState({ fileIds: [], remark: '' })
+  const [authorizationRemarks, setAuthorizationRemarks] = useState({})
   const [orderReviews, setOrderReviews] = useState([])
   const [reviewForm, setReviewForm] = useState({ rating: 5, content: '沟通顺畅，履约体验很好。' })
   const [showReviewForm, setShowReviewForm] = useState(false)
@@ -1906,6 +1913,7 @@ function OrdersPage() {
         setSelectedOrder(null)
         setStatusLogs([])
         setDeliveryRecords([])
+        setPhotoAuthorizations([])
         setOrderReviews([])
         setArbitrations([])
       }
@@ -1917,6 +1925,7 @@ function OrdersPage() {
     const detail = await orderApi.detail(orderId, currentUser)
     const logs = await orderApi.statusLogs(orderId, currentUser)
     const deliveries = await deliveryApi.listByOrder(orderId, currentUser)
+    const authorizations = await photoAuthorizationApi.listByOrder(orderId, currentUser)
     let reviews = getLocalReviewsByOrder(orderId)
     try {
       reviews = mergeReviewLists(await reviewApi.listByOrder(orderId, currentUser), reviews)
@@ -1941,6 +1950,9 @@ function OrdersPage() {
     setDeliveryRecords(deliveries)
     setDeliveryForm({ file: null, remark: '' })
     setReworkReason('')
+    setPhotoAuthorizations(authorizations)
+    setPhotoAuthorizationForm({ fileIds: [], remark: '' })
+    setAuthorizationRemarks({})
     setOrderReviews(reviews)
     setArbitrations(complaints)
     setShowReviewForm(false)
@@ -1987,6 +1999,31 @@ function OrdersPage() {
     if (result) {
       setReworkReason('')
       await loadOrders(selectedOrder.orderId)
+    }
+  }
+
+  async function submitPhotoAuthorizationRequest(event) {
+    event.preventDefault()
+    if (!selectedOrder || !photoAuthorizationForm.fileIds.length) return
+    const result = await run(async () => photoAuthorizationApi.request(selectedOrder.orderId, {
+      fileIds: photoAuthorizationForm.fileIds,
+      remark: photoAuthorizationForm.remark.trim()
+    }, currentUser), '照片展示授权申请已发送')
+    if (result) {
+      setPhotoAuthorizationForm({ fileIds: [], remark: '' })
+      setPhotoAuthorizations(await photoAuthorizationApi.listByOrder(selectedOrder.orderId, currentUser))
+    }
+  }
+
+  async function handlePhotoAuthorizationDecision(authorization, decision) {
+    if (!selectedOrder) return
+    const remark = (authorizationRemarks[authorization.id] || '').trim()
+    const action = decision === 'approve' ? photoAuthorizationApi.approve : photoAuthorizationApi.reject
+    const successText = decision === 'approve' ? '已同意照片展示授权' : '已拒绝照片展示授权'
+    const result = await run(async () => action(authorization.id, { remark }, currentUser), successText)
+    if (result) {
+      setAuthorizationRemarks({ ...authorizationRemarks, [authorization.id]: '' })
+      setPhotoAuthorizations(await photoAuthorizationApi.listByOrder(selectedOrder.orderId, currentUser))
     }
   }
 
@@ -2059,6 +2096,26 @@ function OrdersPage() {
   const quoteSnapshot = parseQuoteSnapshot(selectedOrder?.quoteSnapshotJson)
   const canUploadDelivery = selectedOrder && canProviderUploadDelivery(selectedOrder, currentUser)
   const canRequestRework = selectedOrder && canCustomerRequestRework(selectedOrder, currentUser)
+  const canRequestPhotoAuthorization = selectedOrder && canProviderRequestPhotoAuthorization(selectedOrder, currentUser)
+  const deliveryFileOptions = useMemo(() => {
+    const map = new Map()
+    deliveryRecords
+      .filter(record => record.fileId)
+      .forEach(record => {
+        const fileId = Number(record.fileId)
+        if (!map.has(fileId)) {
+          map.set(fileId, {
+            fileId,
+            fileName: record.fileName || `文件 ${fileId}`,
+            uploadTime: record.uploadTime
+          })
+        }
+      })
+    return Array.from(map.values())
+  }, [deliveryRecords])
+  const deliveryFileNameMap = useMemo(() => new Map(
+    deliveryFileOptions.map(file => [Number(file.fileId), file.fileName])
+  ), [deliveryFileOptions])
   const canReviewSelectedOrder = selectedOrder?.status === 'COMPLETED' && isOrderParticipant(selectedOrder, currentUser.userId)
   const currentReviewDirection = selectedOrder ? getOrderReviewDirection(selectedOrder, currentUser.userId) : ''
   const myReview = orderReviews.find(review => Number(review.reviewerId) === currentUser.userId || review.direction === currentReviewDirection)
@@ -2273,6 +2330,158 @@ function OrdersPage() {
                     </Paper>
                   ))}
                   {!deliveryRecords.length && <Typography color="text.secondary">暂无交付记录</Typography>}
+                </Stack>
+              </Stack>
+            </Paper>
+
+            <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 } }}>
+              <Stack spacing={2}>
+                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
+                  <Box>
+                    <Typography variant="h6">照片展示授权</Typography>
+                    <Typography color="text.secondary">客户同意后，摄影师才能把本订单交付照片作为真实客片展示。</Typography>
+                  </Box>
+                  {selectedOrder.status === 'COMPLETED' && (
+                    <Chip color="success" label="订单已完成，可处理授权" />
+                  )}
+                </Stack>
+
+                {canRequestPhotoAuthorization && (
+                  <Paper component="form" variant="outlined" onSubmit={submitPhotoAuthorizationRequest} sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
+                    <Stack spacing={1.5}>
+                      <Typography fontWeight={800}>发起展示授权申请</Typography>
+                      {deliveryFileOptions.length ? (
+                        <>
+                          <FormControl size="small">
+                            <InputLabel>选择交付文件</InputLabel>
+                            <Select
+                              multiple
+                              label="选择交付文件"
+                              value={photoAuthorizationForm.fileIds}
+                              onChange={event => {
+                                const value = event.target.value
+                                setPhotoAuthorizationForm({
+                                  ...photoAuthorizationForm,
+                                  fileIds: (typeof value === 'string' ? value.split(',') : value).map(Number)
+                                })
+                              }}
+                              renderValue={selected => selected
+                                .map(fileId => deliveryFileNameMap.get(Number(fileId)) || `文件 ${fileId}`)
+                                .join('、')}
+                            >
+                              {deliveryFileOptions.map(file => (
+                                <MenuItem key={file.fileId} value={file.fileId}>
+                                  {file.fileName} · {formatTime(file.uploadTime)}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                          <TextField
+                            label="申请说明"
+                            value={photoAuthorizationForm.remark}
+                            onChange={event => setPhotoAuthorizationForm({ ...photoAuthorizationForm, remark: event.target.value })}
+                            multiline
+                            minRows={2}
+                            placeholder="说明希望展示这些照片的用途，例如作品集客片展示"
+                          />
+                          <Button
+                            type="submit"
+                            variant="contained"
+                            startIcon={<ImageRoundedIcon />}
+                            disabled={loading || !photoAuthorizationForm.fileIds.length}
+                          >
+                            发送授权申请
+                          </Button>
+                        </>
+                      ) : (
+                        <Alert severity="info">暂无可授权交付文件，请先完成交付。</Alert>
+                      )}
+                    </Stack>
+                  </Paper>
+                )}
+
+                <Stack spacing={1}>
+                  <Typography variant="overline" color="text.secondary">授权申请记录</Typography>
+                  {photoAuthorizations.map(authorization => {
+                    const canReviewAuthorization = canCustomerReviewPhotoAuthorization(selectedOrder, currentUser, authorization)
+                    const statusLabel = PHOTO_AUTHORIZATION_STATUS_LABELS[authorization.status] || authorization.status
+                    return (
+                      <Paper key={authorization.id} variant="outlined" sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
+                        <Stack spacing={1}>
+                          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
+                            <Box>
+                              <Typography fontWeight={800}>授权申请 {authorization.id}</Typography>
+                              <Typography color="text.secondary" variant="body2">
+                                服务方 {authorization.providerUserId} · 客户 {authorization.customerId}
+                              </Typography>
+                            </Box>
+                            <Chip
+                              size="small"
+                              color={authorization.status === 'GRANTED' ? 'success' : authorization.status === 'REJECTED' ? 'default' : 'warning'}
+                              label={statusLabel}
+                            />
+                          </Stack>
+                          <Typography color="text.secondary" variant="body2">
+                            {authorization.status === 'GRANTED'
+                              ? '可用于作品集'
+                              : authorization.status === 'REJECTED'
+                                ? '客户已拒绝'
+                                : '等待客户确认'}
+                            {authorization.authorizedAt ? ` · ${formatTime(authorization.authorizedAt)}` : ''}
+                          </Typography>
+                          <Typography>{authorization.remark || '无备注'}</Typography>
+                          <Stack direction="row" spacing={1} flexWrap="wrap">
+                            {(authorization.files || []).map(file => (
+                              <Chip
+                                key={file.id || file.fileId}
+                                size="small"
+                                icon={<ImageRoundedIcon />}
+                                label={deliveryFileNameMap.get(Number(file.fileId)) || `文件 ${file.fileId}`}
+                              />
+                            ))}
+                            {!(authorization.files || []).length && (
+                              <Typography color="text.secondary" variant="body2">未返回授权文件信息</Typography>
+                            )}
+                          </Stack>
+
+                          {canReviewAuthorization && (
+                            <Stack spacing={1.2}>
+                              <TextField
+                                size="small"
+                                label="处理备注（可选）"
+                                value={authorizationRemarks[authorization.id] || ''}
+                                onChange={event => setAuthorizationRemarks({
+                                  ...authorizationRemarks,
+                                  [authorization.id]: event.target.value
+                                })}
+                              />
+                              <Stack direction="row" spacing={1} flexWrap="wrap">
+                                <Button
+                                  variant="contained"
+                                  color="success"
+                                  startIcon={<CheckCircleRoundedIcon />}
+                                  onClick={() => handlePhotoAuthorizationDecision(authorization, 'approve')}
+                                  disabled={loading}
+                                >
+                                  同意展示
+                                </Button>
+                                <Button
+                                  variant="outlined"
+                                  color="inherit"
+                                  startIcon={<CloseRoundedIcon />}
+                                  onClick={() => handlePhotoAuthorizationDecision(authorization, 'reject')}
+                                  disabled={loading}
+                                >
+                                  拒绝展示
+                                </Button>
+                              </Stack>
+                            </Stack>
+                          )}
+                        </Stack>
+                      </Paper>
+                    )
+                  })}
+                  {!photoAuthorizations.length && <Typography color="text.secondary">暂无照片授权申请</Typography>}
                 </Stack>
               </Stack>
             </Paper>
