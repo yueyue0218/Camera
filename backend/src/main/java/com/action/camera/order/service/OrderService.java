@@ -1,19 +1,27 @@
 package com.action.camera.order.service;
 
 import com.action.camera.common.ErrorCode;
+import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
+import com.action.camera.common.security.UserRole;
 import com.action.camera.message.entity.Quote;
 import com.action.camera.message.enums.QuoteStatus;
+import com.action.camera.notification.dto.NotificationCreateRequest;
+import com.action.camera.notification.service.NotificationService;
 import com.action.camera.order.entity.Order;
 import com.action.camera.order.entity.OrderStatusLog;
 import com.action.camera.order.entity.PaymentRecord;
 import com.action.camera.order.enums.EscrowStatus;
 import com.action.camera.order.enums.OrderStatus;
+import com.action.camera.order.event.OrderCancelledEvent;
+import com.action.camera.order.event.OrderPaidEvent;
 import com.action.camera.order.repository.OrderRepository;
 import com.action.camera.order.repository.OrderStatusLogRepository;
 import com.action.camera.order.repository.PaymentRecordRepository;
 import com.action.camera.order.statemachine.OrderStatusMachine;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,17 +31,30 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 public class OrderService {
 
     public static final String MOCK_PAY_METHOD = "MOCK_PAY";
+    private static final int REWORK_REASON_MAX_LENGTH = 200;
     private static final String PAYMENT_SUCCESS = "SUCCESS";
+    private static final String SETTLEMENT_SETTLED = "SETTLED";
+    private static final String SOURCE_TYPE_SERVICE_PACKAGE = "SERVICE_PACKAGE";
+    private static final long SYSTEM_OPERATOR_ID = 0L;
+    private static final String SYSTEM_OPERATOR_ROLE = "SYSTEM";
+    private static final String AUTO_CONFIRM_REASON = "交付后 7 天未操作，系统自动确认完成";
 
     private final OrderRepository orderRepository;
     private final PaymentRecordRepository paymentRecordRepository;
     private final OrderStatusLogRepository orderStatusLogRepository;
+
+    @Autowired(required = false)
+    private ApplicationEventPublisher eventPublisher;
+
+    @Autowired(required = false)
+    private NotificationService notificationService;
 
     @Transactional
     public Order createOrderFromConfirmedQuote(Quote quote) {
@@ -70,7 +91,10 @@ public class OrderService {
         PaymentRecord paymentRecord = buildMockPaymentRecord(order, payerId, amountCent);
         paymentRecordRepository.save(paymentRecord);
 
-        return applyStatusChange(order, fromStatus, targetStatus, payerId, "CUSTOMER", "模拟支付成功，资金进入平台托管");
+        Order paidOrder = applyStatusChange(order, fromStatus, targetStatus, payerId, "CUSTOMER", "模拟支付成功，资金进入平台托管");
+        publishEvent(new OrderPaidEvent(paidOrder));
+        notifyOrderPaid(paidOrder);
+        return paidOrder;
     }
 
     @Transactional
@@ -78,7 +102,109 @@ public class OrderService {
         Order order = getOrderOrThrow(orderId);
         OrderStatus fromStatus = order.getStatus();
         ensureCanChangeStatus(fromStatus, targetStatus);
-        return applyStatusChange(order, fromStatus, targetStatus, operatorId, resolveOperatorRole(order, operatorId), reason);
+        if (fromStatus == OrderStatus.DELIVERED_PENDING_CONFIRM && targetStatus == OrderStatus.COMPLETED) {
+            markCompletedAndReleaseEscrow(order, LocalDateTime.now(), false);
+        } else if (targetStatus == OrderStatus.CANCELLED) {
+            order.setCancelTime(LocalDateTime.now());
+        }
+        Order changedOrder = applyStatusChange(order, fromStatus, targetStatus, operatorId,
+                resolveOperatorRole(order, operatorId), reason);
+        if (targetStatus == OrderStatus.CANCELLED) {
+            publishEvent(new OrderCancelledEvent(changedOrder));
+            notifyOrderCancelled(changedOrder);
+        } else if (targetStatus == OrderStatus.COMPLETED) {
+            notifyOrderCompleted(changedOrder);
+        }
+        return changedOrder;
+    }
+
+    @Transactional
+    public Order requestRework(Long orderId, Long customerId, String reason) {
+        Order order = getOrderOrThrow(orderId);
+        if (!Objects.equals(order.getCustomerId(), customerId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only the customer can request rework");
+        }
+        if (order.getStatus() != OrderStatus.DELIVERED_PENDING_CONFIRM) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                    "Only delivered orders pending confirmation can request rework");
+        }
+        OrderStatus fromStatus = order.getStatus();
+        OrderStatus targetStatus = OrderStatus.REWORK_REQUIRED;
+        ensureCanChangeStatus(fromStatus, targetStatus);
+        return applyStatusChange(order, fromStatus, targetStatus, customerId, "CUSTOMER", reworkReason(reason));
+    }
+
+    @Transactional
+    public Order completeReworkDelivery(Long orderId, Long providerId, String reason) {
+        Order order = getOrderOrThrow(orderId);
+        if (!Objects.equals(order.getProviderUserId(), providerId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only the provider can upload rework delivery");
+        }
+        if (order.getStatus() != OrderStatus.REWORK_REQUIRED) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                    "Only rework required orders can complete rework delivery");
+        }
+        ensureCanChangeStatus(OrderStatus.REWORK_REQUIRED, OrderStatus.PENDING_DELIVERY);
+        Order pendingDelivery = applyStatusChange(
+                order,
+                OrderStatus.REWORK_REQUIRED,
+                OrderStatus.PENDING_DELIVERY,
+                providerId,
+                "PROVIDER",
+                "服务方开始返修交付"
+        );
+        ensureCanChangeStatus(OrderStatus.PENDING_DELIVERY, OrderStatus.DELIVERED_PENDING_CONFIRM);
+        return applyStatusChange(
+                pendingDelivery,
+                OrderStatus.PENDING_DELIVERY,
+                OrderStatus.DELIVERED_PENDING_CONFIRM,
+                providerId,
+                "PROVIDER",
+                reason
+        );
+    }
+
+    @Transactional
+    public int autoConfirmTimeoutOrders(LocalDateTime now) {
+        if (now == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "now must not be null");
+        }
+        LocalDateTime timeoutBoundary = now.minusDays(7);
+        int confirmedCount = 0;
+        for (Order candidate : orderRepository.findByStatus(OrderStatus.DELIVERED_PENDING_CONFIRM)) {
+            Optional<Order> lockedOrder = orderRepository.findByIdForUpdate(candidate.getId());
+            if (lockedOrder.isEmpty()) {
+                continue;
+            }
+            Order order = lockedOrder.get();
+            if (order.getStatus() != OrderStatus.DELIVERED_PENDING_CONFIRM) {
+                continue;
+            }
+            Optional<OrderStatusLog> latestDeliveredLog =
+                    orderStatusLogRepository.findFirstByOrderIdAndToStatusOrderByCreatedAtDesc(
+                            order.getId(),
+                            OrderStatus.DELIVERED_PENDING_CONFIRM
+                    );
+            if (latestDeliveredLog.isEmpty()) {
+                continue;
+            }
+            LocalDateTime deliveredAt = latestDeliveredLog.get().getCreatedAt();
+            if (deliveredAt == null || deliveredAt.isAfter(timeoutBoundary)) {
+                continue;
+            }
+            ensureCanChangeStatus(order.getStatus(), OrderStatus.COMPLETED);
+            markCompletedAndReleaseEscrow(order, now, true);
+            applyStatusChange(
+                    order,
+                    OrderStatus.DELIVERED_PENDING_CONFIRM,
+                    OrderStatus.COMPLETED,
+                    SYSTEM_OPERATOR_ID,
+                    SYSTEM_OPERATOR_ROLE,
+                    AUTO_CONFIRM_REASON
+            );
+            confirmedCount++;
+        }
+        return confirmedCount;
     }
 
     @Transactional(readOnly = true)
@@ -108,6 +234,18 @@ public class OrderService {
     public Order getOrderForUser(Long orderId, Long operatorId) {
         Order order = getOrderOrThrow(orderId);
         ensureOrderParticipant(order, operatorId);
+        return order;
+    }
+
+    @Transactional(readOnly = true)
+    public Order validateCompletedProviderOrder(Long orderId, Long providerId) {
+        Order order = getOrderOrThrow(orderId);
+        if (!Objects.equals(order.getProviderUserId(), providerId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only order provider can use this completed order");
+        }
+        if (order.getStatus() != OrderStatus.COMPLETED) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Only completed order can be used as portfolio source");
+        }
         return order;
     }
 
@@ -193,6 +331,9 @@ public class OrderService {
         order.setShootingPlanId(quote.getShootingPlanId());
         order.setSourceType(quote.getSourceType());
         order.setSourceId(quote.getSourceId());
+        if (SOURCE_TYPE_SERVICE_PACKAGE.equals(quote.getSourceType())) {
+            order.setServicePackageId(quote.getSourceId());
+        }
         order.setStatus(OrderStatus.PENDING_PAYMENT);
         order.setEscrowStatus(EscrowStatus.NOT_PAID);
         order.setSettlementStatus("NOT_SETTLED");
@@ -260,7 +401,20 @@ public class OrderService {
         return savedOrder;
     }
 
+    private void markCompletedAndReleaseEscrow(Order order, LocalDateTime completedAt, boolean autoConfirmed) {
+        order.setEscrowStatus(EscrowStatus.RELEASED);
+        order.setSettlementStatus(SETTLEMENT_SETTLED);
+        order.setCompleteTime(completedAt);
+        if (autoConfirmed) {
+            order.setAutoConfirmTime(completedAt);
+        }
+    }
+
     private String resolveOperatorRole(Order order, Long operatorId) {
+        UserRole contextRole = UserContext.getCurrentRole();
+        if (contextRole != null) {
+            return contextRole.name();
+        }
         if (Objects.equals(order.getCustomerId(), operatorId)) {
             return "CUSTOMER";
         }
@@ -268,6 +422,18 @@ public class OrderService {
             return "PROVIDER";
         }
         return "SYSTEM";
+    }
+
+    private String reworkReason(String reason) {
+        if (reason == null || reason.isBlank()) {
+            return "需求方请求返修";
+        }
+        String trimmedReason = reason.trim();
+        if (trimmedReason.length() > REWORK_REASON_MAX_LENGTH) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR,
+                    "Rework reason must not exceed " + REWORK_REASON_MAX_LENGTH + " characters");
+        }
+        return "需求方请求返修：" + trimmedReason;
     }
 
     private String buildQuoteSnapshot(Quote quote) {
@@ -289,5 +455,65 @@ public class OrderService {
             return "";
         }
         return value.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
+    private void publishEvent(Object event) {
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(event);
+        }
+    }
+
+    private void notifyOrderPaid(Order order) {
+        createNotification(order.getProviderUserId(),
+                "Order paid",
+                "A customer has paid an order and the schedule has been locked.",
+                "ORDER_PAID",
+                "ORDER",
+                order.getId());
+        createNotification(order.getCustomerId(),
+                "Payment successful",
+                "Your order payment has succeeded.",
+                "ORDER_PAID",
+                "ORDER",
+                order.getId());
+    }
+
+    private void notifyOrderCancelled(Order order) {
+        createNotification(order.getProviderUserId(),
+                "Order cancelled",
+                "An order has been cancelled and related schedule slots have been released.",
+                "ORDER_CANCELLED",
+                "ORDER",
+                order.getId());
+        createNotification(order.getCustomerId(),
+                "Order cancelled",
+                "Your order has been cancelled.",
+                "ORDER_CANCELLED",
+                "ORDER",
+                order.getId());
+    }
+
+    private void notifyOrderCompleted(Order order) {
+        createNotification(order.getProviderUserId(),
+                "Order completed",
+                "A customer has confirmed order completion.",
+                "ORDER_COMPLETED",
+                "ORDER",
+                order.getId());
+    }
+
+    private void createNotification(Long userId, String title, String content, String type,
+                                    String relatedType, Long relatedId) {
+        if (notificationService == null) {
+            return;
+        }
+        notificationService.createNotification(new NotificationCreateRequest(
+                userId,
+                title,
+                content,
+                type,
+                relatedType,
+                relatedId
+        ));
     }
 }

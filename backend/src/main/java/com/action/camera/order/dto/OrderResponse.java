@@ -19,6 +19,7 @@ public class OrderResponse {
     private Long customerId;
     private Long providerUserId;
     private Long demandId;
+    private Long servicePackageId;
     private OrderStatus status;
     private EscrowStatus escrowStatus;
     private String settlementStatus;
@@ -40,6 +41,7 @@ public class OrderResponse {
                 order.getCustomerId(),
                 order.getProviderUserId(),
                 order.getDemandId(),
+                order.getServicePackageId(),
                 order.getStatus(),
                 order.getEscrowStatus(),
                 order.getSettlementStatus(),

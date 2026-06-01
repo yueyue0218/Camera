@@ -6,6 +6,9 @@ spring:
     username: root
     password: ${DB_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
   jpa:
     hibernate:
       ddl-auto: none
@@ -43,7 +46,12 @@ file:
   storage:
     local-path: ./uploads
 
+mybatis-plus:
+  mapper-locations: classpath*:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
 camera:
   order:
-    adapter: mock
+    adapter: local
     c-base-url: http://localhost:8080

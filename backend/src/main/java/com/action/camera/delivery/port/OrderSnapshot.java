@@ -13,5 +13,6 @@ public class OrderSnapshot {
     private Long customerId;
     private Long providerId;
     private String status;
+    private String refundStatus;
     private LocalDateTime deliveryDeadline;
 }

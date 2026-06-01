@@ -22,6 +22,7 @@ import java.util.List;
 public class ReviewService {
 
     private static final String COMPLETED = "COMPLETED";
+    private static final String REFUNDED = "REFUNDED";
     private static final String CUSTOMER_TO_PROVIDER = "CUSTOMER_TO_PROVIDER";
     private static final String PROVIDER_TO_CUSTOMER = "PROVIDER_TO_CUSTOMER";
     private static final String REVIEW_RECEIVED = "REVIEW_RECEIVED";
@@ -49,13 +50,9 @@ public class ReviewService {
         validateRequest(request);
 
         OrderSnapshot order = orderQueryPort.getOrderSnapshot(orderId);
-        if (!COMPLETED.equals(order.getStatus())) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "订单完成后才能评价");
-        }
-
         ReviewTarget target = resolveReviewTarget(order, currentUserId);
         if (reviewRepository.findByOrderIdAndDirection(orderId, target.direction()).isPresent()) {
-            throw new BusinessException(ErrorCode.DUPLICATE_OPERATION, "该订单已评价过");
+            throw new BusinessException(ErrorCode.DUPLICATE_OPERATION, "This order direction has already been reviewed");
         }
 
         Review review = new Review();
@@ -74,12 +71,12 @@ public class ReviewService {
                 calculateReviewScoreChange(savedReview.getRating()),
                 CREDIT_EVENT_REVIEW,
                 savedReview.getOrderId(),
-                "收到订单评价"
+                "Received order review"
         );
         notificationService.createNotification(new NotificationCreateRequest(
                 savedReview.getTargetUserId(),
-                "收到新的评价",
-                "你收到了一条新的订单评价",
+                "New review received",
+                "You have received a new order review.",
                 REVIEW_RECEIVED,
                 RELATED_ORDER,
                 savedReview.getOrderId()
@@ -93,7 +90,7 @@ public class ReviewService {
         Long currentUserId = requireCurrentUserId();
         OrderSnapshot order = orderQueryPort.getOrderSnapshot(orderId);
         if (!currentUserId.equals(order.getCustomerId()) && !currentUserId.equals(order.getProviderId())) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "只有订单双方可以查看订单评价");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only order participants can view order reviews");
         }
         return reviewRepository.findByOrderIdOrderByCreatedAtDesc(orderId).stream()
                 .map(this::toResponse)
@@ -109,24 +106,66 @@ public class ReviewService {
     }
 
     private ReviewTarget resolveReviewTarget(OrderSnapshot order, Long reviewerId) {
+        if (COMPLETED.equals(order.getStatus())) {
+            return resolveParticipantReviewTarget(order, reviewerId);
+        }
+        if (REFUNDED.equals(order.getStatus())) {
+            return resolveRefundResponsibilityReviewTarget(order, reviewerId);
+        }
+        throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                "Order can be reviewed only after completion or fault-based refund resolution");
+    }
+
+    private ReviewTarget resolveParticipantReviewTarget(OrderSnapshot order, Long reviewerId) {
         if (reviewerId.equals(order.getCustomerId())) {
             if (reviewerId.equals(order.getProviderId())) {
-                throw new BusinessException(ErrorCode.STATUS_CONFLICT, "不能评价自己");
+                throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Cannot review yourself");
             }
             return new ReviewTarget(order.getProviderId(), CUSTOMER_TO_PROVIDER);
         }
         if (reviewerId.equals(order.getProviderId())) {
             return new ReviewTarget(order.getCustomerId(), PROVIDER_TO_CUSTOMER);
         }
-        throw new BusinessException(ErrorCode.FORBIDDEN, "只有订单双方可以评价");
+        throw new BusinessException(ErrorCode.FORBIDDEN, "Only order participants can create a review");
+    }
+
+    private ReviewTarget resolveRefundResponsibilityReviewTarget(OrderSnapshot order, Long reviewerId) {
+        RefundResolution resolution = RefundResolution.from(order.getRefundStatus());
+        return switch (resolution) {
+            case PROVIDER_FAULT -> {
+                ensureCustomer(order, reviewerId);
+                yield new ReviewTarget(order.getProviderId(), CUSTOMER_TO_PROVIDER);
+            }
+            case CUSTOMER_FAULT -> {
+                ensureProvider(order, reviewerId);
+                yield new ReviewTarget(order.getCustomerId(), PROVIDER_TO_CUSTOMER);
+            }
+            case BOTH_FAULT -> resolveParticipantReviewTarget(order, reviewerId);
+            case MUTUAL_AGREEMENT, NO_FAULT, UNDETERMINED, NONE -> throw new BusinessException(
+                    ErrorCode.STATUS_CONFLICT,
+                    "Refund order can be reviewed only when a fault party is determined"
+            );
+        };
+    }
+
+    private void ensureCustomer(OrderSnapshot order, Long reviewerId) {
+        if (!reviewerId.equals(order.getCustomerId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only the non-fault customer can review this refund responsibility");
+        }
+    }
+
+    private void ensureProvider(OrderSnapshot order, Long reviewerId) {
+        if (!reviewerId.equals(order.getProviderId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only the non-fault provider can review this refund responsibility");
+        }
     }
 
     private void validateRequest(ReviewCreateRequest request) {
         if (request == null || request.rating() == null) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "评分不能为空");
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Rating is required");
         }
         if (request.rating() < 1 || request.rating() > 5) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "评分必须在 1-5 之间");
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Rating must be between 1 and 5");
         }
     }
 
@@ -137,7 +176,7 @@ public class ReviewService {
             case 3 -> 0;
             case 2 -> -2;
             case 1 -> -5;
-            default -> throw new BusinessException(ErrorCode.VALIDATION_ERROR, "评分必须在 1-5 之间");
+            default -> throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Rating must be between 1 and 5");
         };
     }
 
@@ -164,5 +203,30 @@ public class ReviewService {
     }
 
     private record ReviewTarget(Long targetUserId, String direction) {
+    }
+
+    private enum RefundResolution {
+        PROVIDER_FAULT,
+        CUSTOMER_FAULT,
+        BOTH_FAULT,
+        MUTUAL_AGREEMENT,
+        NO_FAULT,
+        UNDETERMINED,
+        NONE;
+
+        static RefundResolution from(String value) {
+            if (value == null || value.isBlank()) {
+                return NONE;
+            }
+            return switch (value.trim().toUpperCase()) {
+                case "PROVIDER_FAULT", "REFUNDED_PROVIDER_FAULT" -> PROVIDER_FAULT;
+                case "CUSTOMER_FAULT", "REFUNDED_CUSTOMER_FAULT" -> CUSTOMER_FAULT;
+                case "BOTH_FAULT", "REFUNDED_BOTH_FAULT" -> BOTH_FAULT;
+                case "MUTUAL_AGREEMENT", "REFUNDED_MUTUAL_AGREEMENT" -> MUTUAL_AGREEMENT;
+                case "NO_FAULT", "REFUNDED_NO_FAULT" -> NO_FAULT;
+                case "UNDETERMINED", "REFUNDED_UNDETERMINED" -> UNDETERMINED;
+                default -> NONE;
+            };
+        }
     }
 }

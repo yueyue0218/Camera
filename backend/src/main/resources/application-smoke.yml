@@ -1,0 +1,42 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:camera_smoke;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;NON_KEYWORDS=CURRENT_ROLE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  mail:
+    host: localhost
+    port: 3025
+    username: test@example.com
+    password: test
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+jwt:
+  secret: smoke-test-secret-key-for-testing-2026-camera-platform
+  expire-hours: 24
+
+file:
+  storage:
+    local-path: ./target/smoke-uploads
+
+camera:
+  demo:
+    seed-users: true
+  order:
+    adapter: local
+    c-base-url: http://localhost:8080

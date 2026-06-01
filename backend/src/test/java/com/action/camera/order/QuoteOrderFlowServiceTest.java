@@ -6,6 +6,7 @@ import com.action.camera.message.enums.QuoteStatus;
 import com.action.camera.message.repository.ConversationRepository;
 import com.action.camera.message.repository.QuoteRepository;
 import com.action.camera.message.service.QuoteService;
+import com.action.camera.order.dto.OrderResponse;
 import com.action.camera.order.entity.Order;
 import com.action.camera.order.entity.OrderStatusLog;
 import com.action.camera.order.entity.PaymentRecord;
@@ -45,6 +46,7 @@ class QuoteOrderFlowServiceTest {
     private static final Long QUOTE_ID = 7001L;
     private static final Long ORDER_ID = 8001L;
     private static final Long AMOUNT_CENT = 39900L;
+    private static final Long SERVICE_PACKAGE_ID = 9101L;
 
     @Mock
     private QuoteRepository quoteRepository;
@@ -103,6 +105,55 @@ class QuoteOrderFlowServiceTest {
         assertNotNull(order.getQuoteSnapshotJson());
         assertTrue(order.getQuoteSnapshotJson().contains("\"quoteId\":" + QUOTE_ID));
         verify(orderRepository, times(1)).save(any(Order.class));
+    }
+
+    @Test
+    void servicePackageQuoteGeneratesOrderWithPersistedServicePackageIdAndResponseField() {
+        Quote quote = pendingQuote();
+        quote.setSourceType("SERVICE_PACKAGE");
+        quote.setSourceId(SERVICE_PACKAGE_ID);
+        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.save(any(Quote.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderRepository.findByQuoteId(QUOTE_ID)).thenReturn(Optional.empty());
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
+            Order order = invocation.getArgument(0);
+            order.setId(ORDER_ID);
+            return order;
+        });
+
+        Order order = quoteService.confirmQuote(QUOTE_ID, CUSTOMER_ID, "确认服务包报价");
+        OrderResponse response = OrderResponse.from(order);
+
+        assertEquals(SERVICE_PACKAGE_ID, order.getServicePackageId());
+        assertEquals(SERVICE_PACKAGE_ID, response.getServicePackageId());
+    }
+
+    @Test
+    void completedOrderProviderValidationSucceedsOnlyForCompletedOwnerOrder() {
+        Order completedOrder = pendingPaymentOrder();
+        completedOrder.setStatus(OrderStatus.COMPLETED);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(completedOrder));
+
+        Order validatedOrder = orderService.validateCompletedProviderOrder(ORDER_ID, PROVIDER_USER_ID);
+
+        assertSame(completedOrder, validatedOrder);
+    }
+
+    @Test
+    void completedOrderProviderValidationRejectsNonCompletedMismatchedAndMissingOrders() {
+        Order nonCompletedOrder = pendingPaymentOrder();
+        nonCompletedOrder.setStatus(OrderStatus.DELIVERED_PENDING_CONFIRM);
+        when(orderRepository.findById(ORDER_ID))
+                .thenReturn(Optional.of(nonCompletedOrder))
+                .thenReturn(Optional.of(pendingPaymentOrder()))
+                .thenReturn(Optional.empty());
+
+        assertThrows(BusinessException.class,
+                () -> orderService.validateCompletedProviderOrder(ORDER_ID, PROVIDER_USER_ID));
+        assertThrows(BusinessException.class,
+                () -> orderService.validateCompletedProviderOrder(ORDER_ID, 9999L));
+        assertThrows(BusinessException.class,
+                () -> orderService.validateCompletedProviderOrder(ORDER_ID, PROVIDER_USER_ID));
     }
 
     @Test

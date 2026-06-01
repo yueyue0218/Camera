@@ -4,21 +4,22 @@ import com.action.camera.common.ErrorCode;
 import com.action.camera.common.JwtUtil;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
+import com.action.camera.common.security.UserRole;
+import com.action.camera.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-/**
- * 鉴权拦截器：请求到达 Controller 前先检查通行证(token)。
- */
 @Component
 public class AuthInterceptor implements HandlerInterceptor {
 
     private final JwtUtil jwtUtil;
+    private final UserRepository userRepository;
 
-    public AuthInterceptor(JwtUtil jwtUtil) {
+    public AuthInterceptor(JwtUtil jwtUtil, UserRepository userRepository) {
         this.jwtUtil = jwtUtil;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -30,7 +31,9 @@ public class AuthInterceptor implements HandlerInterceptor {
         String demoUserId = request.getHeader("X-User-Id");
         if (demoUserId != null && !demoUserId.isBlank()) {
             try {
-                UserContext.setUserId(Long.parseLong(demoUserId.trim()));
+                Long userId = Long.parseLong(demoUserId.trim());
+                UserContext.setUserId(userId);
+                loadAndSetRole(userId);
                 return true;
             } catch (NumberFormatException e) {
                 throw new BusinessException(ErrorCode.UNAUTHORIZED);
@@ -41,10 +44,11 @@ public class AuthInterceptor implements HandlerInterceptor {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
-        String token = authHeader.substring(7); // 去掉 "Bearer "
+        String token = authHeader.substring(7);
         try {
             Long userId = jwtUtil.parseUserId(token);
             UserContext.setUserId(userId);
+            loadAndSetRole(userId);
         } catch (Exception e) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
@@ -54,6 +58,12 @@ public class AuthInterceptor implements HandlerInterceptor {
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response,
                                 Object handler, Exception ex) {
-        UserContext.clear(); // 请求结束清理，避免内存泄漏
+        UserContext.clear();
+    }
+
+    private void loadAndSetRole(Long userId) {
+        userRepository.findById(userId).ifPresent(user ->
+                UserContext.setCurrentRole(UserRole.parse(user.getCurrentRole(), UserRole.CUSTOMER))
+        );
     }
 }

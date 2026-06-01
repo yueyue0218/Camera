@@ -59,7 +59,7 @@ class UserServiceTest {
         doNothing().when(codeService).verify(anyString(), anyString());
 
         userService.register(
-                "241880166@smail.nju.edu.cn", "123456", "test123456", "测试用户");
+                "241880166@smail.nju.edu.cn", "123456", "test123456", "测试用户", "CUSTOMER");
 
         User saved = userRepository.findByStudentNo("241880166").orElseThrow();
         assertThat(saved.getNickname()).isEqualTo("测试用户");
@@ -74,11 +74,11 @@ class UserServiceTest {
     void register_duplicateStudentNo() {
         doNothing().when(codeService).verify(anyString(), anyString());
         userService.register(
-                "241880166@smail.nju.edu.cn", "123456", "test123456", "用户一");
+                "241880166@smail.nju.edu.cn", "123456", "test123456", "用户一", "CUSTOMER");
 
         assertThatThrownBy(() ->
             userService.register(
-                    "241880166@smail.nju.edu.cn", "654321", "password2", "用户二")
+                    "241880166@smail.nju.edu.cn", "654321", "password2", "用户二", "CUSTOMER")
         ).isInstanceOf(BusinessException.class)
          .hasMessageContaining("该学号已注册");
     }
@@ -91,7 +91,7 @@ class UserServiceTest {
 
         assertThatThrownBy(() ->
             userService.register(
-                    "241880166@smail.nju.edu.cn", "000000", "test123456", "测试用户")
+                    "241880166@smail.nju.edu.cn", "000000", "test123456", "测试用户", "CUSTOMER")
         ).isInstanceOf(BusinessException.class)
          .hasMessageContaining("验证码错误");
     }
@@ -101,7 +101,7 @@ class UserServiceTest {
     void login_success() {
         createTestUser("241880166", "test123456", "ACTIVE");
 
-        LoginResponse response = userService.login("241880166", "test123456");
+        LoginResponse response = userService.login("241880166", "test123456", "CUSTOMER");
 
         assertThat(response.getToken()).isNotBlank();
         assertThat(response.getUserId()).isNotNull();
@@ -111,7 +111,7 @@ class UserServiceTest {
     @Test
     @DisplayName("登录-异常：学号不存在 → 抛出 BusinessException（学号或密码错误）")
     void login_studentNoNotFound() {
-        assertThatThrownBy(() -> userService.login("999999999", "test123456"))
+        assertThatThrownBy(() -> userService.login("999999999", "test123456", "CUSTOMER"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("学号或密码错误");
     }
@@ -121,7 +121,7 @@ class UserServiceTest {
     void login_wrongPassword() {
         createTestUser("241880166", "test123456", "ACTIVE");
 
-        assertThatThrownBy(() -> userService.login("241880166", "wrongpassword"))
+        assertThatThrownBy(() -> userService.login("241880166", "wrongpassword", "CUSTOMER"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("学号或密码错误");
     }
@@ -131,7 +131,7 @@ class UserServiceTest {
     void login_accountDisabled() {
         createTestUser("241880166", "test123456", "BANNED");
 
-        assertThatThrownBy(() -> userService.login("241880166", "test123456"))
+        assertThatThrownBy(() -> userService.login("241880166", "test123456", "CUSTOMER"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("账号已被禁用");
     }

@@ -1,0 +1,22 @@
+CREATE TABLE schedules (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    provider_user_id BIGINT NOT NULL,
+    schedule_date DATE NOT NULL,
+    time_slot VARCHAR(80) NULL,
+    start_time DATETIME NOT NULL,
+    end_time DATETIME NOT NULL,
+    city_code VARCHAR(32) NOT NULL,
+    location_hint VARCHAR(255) NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE',
+    locked_by_order_id BIGINT NULL,
+    lock_expire_time DATETIME NULL,
+    private_remark VARCHAR(500) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_schedule_provider_time (provider_user_id, start_time, end_time),
+    KEY idx_schedule_public_search (provider_user_id, status, start_time, end_time),
+    KEY idx_schedule_city_time (city_code, start_time, status),
+    KEY idx_schedule_lock_expire (status, lock_expire_time),
+    KEY idx_schedule_locked_order (locked_by_order_id),
+    CONSTRAINT fk_schedule_provider_user FOREIGN KEY (provider_user_id) REFERENCES users(id),
+    CONSTRAINT ck_schedule_time CHECK (end_time > start_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Provider schedules with temporary lock support';

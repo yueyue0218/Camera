@@ -49,6 +49,7 @@ public class COrderHttpAdapter implements OrderQueryPort, OrderStatusPort {
                 longValue(data, "customerId"),
                 longValue(data, "providerUserId"),
                 stringValue(data, "status"),
+                optionalStringValue(data, "refundStatus", "NONE"),
                 localDateTimeValue(data, "deliveryDeadline")
         );
     }
@@ -155,6 +156,14 @@ public class COrderHttpAdapter implements OrderQueryPort, OrderStatusPort {
             return stringValue;
         }
         throw new BusinessException(ErrorCode.INTERNAL_ERROR, "C 订单接口缺少字段: " + field);
+    }
+
+    private String optionalStringValue(Map<String, Object> data, String field, String defaultValue) {
+        Object value = data.get(field);
+        if (value instanceof String stringValue && !stringValue.isBlank()) {
+            return stringValue;
+        }
+        return defaultValue;
     }
 
     private LocalDateTime localDateTimeValue(Map<String, Object> data, String field) {

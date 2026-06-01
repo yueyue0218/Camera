@@ -8,6 +8,7 @@ import com.action.camera.order.dto.MockPaymentRequest;
 import com.action.camera.order.dto.OrderResponse;
 import com.action.camera.order.dto.OrderStatusLogResponse;
 import com.action.camera.order.dto.PaymentResponse;
+import com.action.camera.order.dto.ReworkRequest;
 import com.action.camera.order.dto.StatusTransitionRequest;
 import com.action.camera.order.dto.StatusTransitionResponse;
 import com.action.camera.order.entity.Order;
@@ -75,6 +76,17 @@ public class OrderController {
         return Result.success(StatusTransitionResponse.from(latestLog));
     }
 
+    @PostMapping("/orders/{orderId}/request-rework")
+    public Result<StatusTransitionResponse> requestRework(
+            @PathVariable Long orderId,
+            @RequestBody(required = false) ReworkRequest request) {
+        Long operatorId = currentUserId();
+        String reason = request == null ? null : request.getReason();
+        orderService.requestRework(orderId, operatorId, reason);
+        OrderStatusLog latestLog = orderService.getLatestStatusLog(orderId, operatorId);
+        return Result.success(StatusTransitionResponse.from(latestLog));
+    }
+
     @GetMapping("/orders/{orderId}/status-logs")
     public Result<List<OrderStatusLogResponse>> listStatusLogs(@PathVariable Long orderId) {
         Long operatorId = currentUserId();
@@ -108,6 +120,12 @@ public class OrderController {
             return;
         }
         if (order.getStatus() == OrderStatus.DELIVERED_PENDING_CONFIRM && targetStatus == OrderStatus.COMPLETED) {
+            ensureCustomer(order, operatorId);
+            return;
+        }
+        if ((order.getStatus() == OrderStatus.PENDING_PAYMENT
+                || order.getStatus() == OrderStatus.PAID_PENDING_SHOOT)
+                && targetStatus == OrderStatus.CANCELLED) {
             ensureCustomer(order, operatorId);
             return;
         }
