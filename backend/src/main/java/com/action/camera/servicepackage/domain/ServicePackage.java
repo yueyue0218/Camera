@@ -54,8 +54,15 @@ public class ServicePackage {
     @Column(name = "style_tags", columnDefinition = "TEXT")
     private List<String> styleTags = List.of();
 
+    @Convert(converter = StringListJsonConverter.class)
+    @Column(name = "images", columnDefinition = "TEXT")
+    private List<String> images = List.of();
+
     @Column(name = "base_price_cent", nullable = false)
     private Long basePriceCent;
+
+    @Column(name = "price_range", length = 120)
+    private String priceRange;
 
     @Column(name = "duration_minutes", nullable = false)
     private Integer durationMinutes;
@@ -79,6 +86,13 @@ public class ServicePackage {
 
     @Column(columnDefinition = "TEXT")
     private String description;
+
+    @Column(name = "time_description", nullable = false, columnDefinition = "TEXT")
+    private String timeDescription;
+
+    @Convert(converter = StringListJsonConverter.class)
+    @Column(name = "time_tags", columnDefinition = "TEXT")
+    private List<String> timeTags = List.of();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
@@ -126,11 +140,17 @@ public class ServicePackage {
         if (styleTags == null) {
             styleTags = List.of();
         }
+        if (images == null) {
+            images = List.of();
+        }
         if (availableDates == null) {
             availableDates = List.of();
         }
         if (portfolioIds == null) {
             portfolioIds = List.of();
+        }
+        if (timeTags == null) {
+            timeTags = List.of();
         }
     }
 

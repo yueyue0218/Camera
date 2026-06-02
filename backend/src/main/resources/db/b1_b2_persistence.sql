@@ -9,7 +9,9 @@ CREATE TABLE IF NOT EXISTS service_packages (
     service_area VARCHAR(120) NULL,
     scene VARCHAR(80) NOT NULL,
     style_tags TEXT NOT NULL,
+    images TEXT NOT NULL,
     base_price_cent BIGINT NOT NULL,
+    price_range VARCHAR(120) NULL,
     duration_minutes INT NOT NULL,
     original_count INT NOT NULL,
     refined_count INT NOT NULL,
@@ -17,6 +19,8 @@ CREATE TABLE IF NOT EXISTS service_packages (
     available_dates TEXT NOT NULL,
     portfolio_ids TEXT NOT NULL,
     description TEXT NULL,
+    time_description TEXT NOT NULL,
+    time_tags TEXT NOT NULL,
     status VARCHAR(30) NOT NULL DEFAULT 'ONLINE',
     is_available BOOLEAN NOT NULL DEFAULT TRUE,
     temporary_schedule_hold_id BIGINT NULL,
@@ -34,6 +38,8 @@ CREATE TABLE IF NOT EXISTS demands (
     style_tags TEXT NOT NULL,
     expected_date DATE NULL,
     time_slot VARCHAR(80) NULL,
+    time_description TEXT NOT NULL,
+    time_tags TEXT NOT NULL,
     city_code VARCHAR(40) NOT NULL,
     location VARCHAR(255) NOT NULL,
     budget_min_cent INT NULL,
@@ -49,6 +55,16 @@ CREATE TABLE IF NOT EXISTS demands (
     KEY idx_demands_budget_cent (budget_min_cent, budget_max_cent),
     KEY idx_demands_customer_status (customer_id, status, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Customer demand hall posts';
+
+CREATE TABLE IF NOT EXISTS service_package_interests (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    service_package_id BIGINT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_service_package_interest_user_package (user_id, service_package_id),
+    KEY idx_service_package_interest_user (user_id, created_at),
+    KEY idx_service_package_interest_package (service_package_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Customer interests in service showcase packages';
 
 CREATE TABLE IF NOT EXISTS demand_responses (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -190,9 +206,13 @@ DELIMITER ;
 CALL b1b2_add_column_if_missing('service_packages', 'provider_id', 'provider_id BIGINT NULL');
 CALL b1b2_add_column_if_missing('service_packages', 'service_area', 'service_area VARCHAR(120) NULL');
 CALL b1b2_add_column_if_missing('service_packages', 'style_tags', 'style_tags TEXT NULL');
+CALL b1b2_add_column_if_missing('service_packages', 'images', 'images TEXT NULL');
 CALL b1b2_add_column_if_missing('service_packages', 'base_price_cent', 'base_price_cent BIGINT NULL');
+CALL b1b2_add_column_if_missing('service_packages', 'price_range', 'price_range VARCHAR(120) NULL');
 CALL b1b2_add_column_if_missing('service_packages', 'available_dates', 'available_dates TEXT NULL');
 CALL b1b2_add_column_if_missing('service_packages', 'portfolio_ids', 'portfolio_ids TEXT NULL');
+CALL b1b2_add_column_if_missing('service_packages', 'time_description', 'time_description TEXT NULL');
+CALL b1b2_add_column_if_missing('service_packages', 'time_tags', 'time_tags TEXT NULL');
 CALL b1b2_add_column_if_missing('service_packages', 'is_available', 'is_available BOOLEAN NULL');
 CALL b1b2_add_column_if_missing('service_packages', 'temporary_schedule_hold_id', 'temporary_schedule_hold_id BIGINT NULL');
 
@@ -218,8 +238,14 @@ CALL b1b2_exec_if_tables_exist(
 );
 
 UPDATE service_packages SET style_tags = '[]' WHERE style_tags IS NULL;
+UPDATE service_packages SET images = portfolio_ids WHERE images IS NULL AND portfolio_ids IS NOT NULL;
+UPDATE service_packages SET images = '[]' WHERE images IS NULL;
 UPDATE service_packages SET available_dates = '[]' WHERE available_dates IS NULL;
 UPDATE service_packages SET portfolio_ids = '[]' WHERE portfolio_ids IS NULL;
+UPDATE service_packages
+SET time_description = COALESCE(NULLIF(time_description, ''), NULLIF(available_dates, '[]'), title)
+WHERE time_description IS NULL OR time_description = '';
+UPDATE service_packages SET time_tags = '[]' WHERE time_tags IS NULL;
 UPDATE service_packages SET is_available = (status = 'ONLINE') WHERE is_available IS NULL;
 
 CALL b1b2_modify_column_if_exists('service_packages', 'provider_profile_id', 'provider_profile_id BIGINT NULL');
@@ -232,8 +258,11 @@ CALL b1b2_modify_column_if_exists('service_packages', 'title', 'title VARCHAR(12
 CALL b1b2_modify_column_if_exists('service_packages', 'city_code', 'city_code VARCHAR(40) NOT NULL');
 CALL b1b2_modify_column_if_exists('service_packages', 'scene', 'scene VARCHAR(80) NOT NULL');
 CALL b1b2_modify_column_if_exists('service_packages', 'style_tags', 'style_tags TEXT NOT NULL');
+CALL b1b2_modify_column_if_exists('service_packages', 'images', 'images TEXT NOT NULL');
 CALL b1b2_modify_column_if_exists('service_packages', 'available_dates', 'available_dates TEXT NOT NULL');
 CALL b1b2_modify_column_if_exists('service_packages', 'portfolio_ids', 'portfolio_ids TEXT NOT NULL');
+CALL b1b2_modify_column_if_exists('service_packages', 'time_description', 'time_description TEXT NOT NULL');
+CALL b1b2_modify_column_if_exists('service_packages', 'time_tags', 'time_tags TEXT NOT NULL');
 CALL b1b2_modify_column_if_exists('service_packages', 'is_available', 'is_available BOOLEAN NOT NULL DEFAULT TRUE');
 
 CALL b1b2_add_index_if_missing('service_packages', 'idx_service_package_status', 'INDEX idx_service_package_status (status)');
@@ -241,6 +270,8 @@ CALL b1b2_add_index_if_missing('service_packages', 'idx_service_package_provider
 CALL b1b2_add_index_if_missing('service_packages', 'idx_service_package_hall', 'INDEX idx_service_package_hall (status, city_code, scene, base_price_cent)');
 
 CALL b1b2_add_column_if_missing('demands', 'style_tags', 'style_tags TEXT NULL');
+CALL b1b2_add_column_if_missing('demands', 'time_description', 'time_description TEXT NULL');
+CALL b1b2_add_column_if_missing('demands', 'time_tags', 'time_tags TEXT NULL');
 CALL b1b2_add_column_if_missing('demands', 'budget_min_cent', 'budget_min_cent INT NULL');
 CALL b1b2_add_column_if_missing('demands', 'budget_max_cent', 'budget_max_cent INT NULL');
 CALL b1b2_add_column_if_missing('demands', 'reference_file_ids', 'reference_file_ids TEXT NULL');
@@ -263,9 +294,15 @@ CALL b1b2_exec_if_tables_exist(
 );
 
 UPDATE demands SET style_tags = '[]' WHERE style_tags IS NULL;
+UPDATE demands
+SET time_description = COALESCE(NULLIF(time_description, ''), NULLIF(time_slot, ''), DATE_FORMAT(expected_date, '%Y-%m-%d'), description, scene)
+WHERE time_description IS NULL OR time_description = '';
+UPDATE demands SET time_tags = '[]' WHERE time_tags IS NULL;
 UPDATE demands SET reference_file_ids = '[]' WHERE reference_file_ids IS NULL;
 
 CALL b1b2_modify_column_if_exists('demands', 'style_tags', 'style_tags TEXT NOT NULL');
+CALL b1b2_modify_column_if_exists('demands', 'time_description', 'time_description TEXT NOT NULL');
+CALL b1b2_modify_column_if_exists('demands', 'time_tags', 'time_tags TEXT NOT NULL');
 CALL b1b2_modify_column_if_exists('demands', 'reference_file_ids', 'reference_file_ids TEXT NOT NULL');
 CALL b1b2_modify_column_if_exists('demands', 'scene', 'scene VARCHAR(80) NOT NULL');
 CALL b1b2_modify_column_if_exists('demands', 'city_code', 'city_code VARCHAR(40) NOT NULL');

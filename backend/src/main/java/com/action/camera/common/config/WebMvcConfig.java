@@ -29,7 +29,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/demands/**",
                         "/services/**",
                         "/moments/**",
-                        "/providers/*/schedules",
                         "/messages/**",
                         "/api/v1/providers/*/profile"
                 );
@@ -60,7 +59,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "http://172.30.*:*",
                         "http://172.31.*:*"
                 )
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
                 .allowedHeaders("*");
     }
 }

@@ -18,7 +18,11 @@ public class CreateServicePackageRequest {
 
     private List<String> styleTags;
 
+    private List<String> images;
+
     private Long basePriceCent;
+
+    private String priceRange;
 
     private Integer durationMinutes;
 
@@ -33,4 +37,8 @@ public class CreateServicePackageRequest {
     private List<Long> portfolioIds;
 
     private String description;
+
+    private String timeDescription;
+
+    private List<String> timeTags;
 }

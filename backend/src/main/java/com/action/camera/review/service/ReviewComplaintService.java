@@ -110,6 +110,19 @@ public class ReviewComplaintService {
     }
 
     @Transactional(readOnly = true)
+    public ReviewComplaintResponse detail(Long complaintId) {
+        Long currentUserId = requireCurrentUserId();
+        ReviewComplaint complaint = complaintRepository.findById(complaintId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Complaint not found"));
+        if (!currentUserId.equals(complaint.getComplainantId())
+                && !currentUserId.equals(complaint.getRespondentId())
+                && !isArbitrator(currentUserId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "No permission to view complaint");
+        }
+        return toResponse(complaint);
+    }
+
+    @Transactional(readOnly = true)
     public List<ReviewComplaintResponse> listByReview(Long reviewId) {
         Long currentUserId = requireCurrentUserId();
         Review review = reviewRepository.findById(reviewId)

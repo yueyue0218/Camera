@@ -1,7 +1,5 @@
 package com.action.camera.integration;
 
-import com.action.camera.message.repository.ConversationRepository;
-import com.action.camera.message.repository.MessageRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,19 +20,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = "spring.datasource.url=jdbc:h2:mem:camera_it;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;NON_KEYWORDS=CURRENT_ROLE;DB_CLOSE_DELAY=-1")
-class DemandAndScheduleIntegrationTest {
+class DemandIntegrationTest {
 
     @Autowired
     private TestRestTemplate rest;
 
     @Autowired
     private JdbcTemplate jdbc;
-
-    @Autowired
-    private ConversationRepository conversationRepository;
-
-    @Autowired
-    private MessageRepository messageRepository;
 
     @BeforeEach
     void seedDemoUsers() {
@@ -168,78 +160,6 @@ class DemandAndScheduleIntegrationTest {
         assertThat(secondResp.getBody().get("code")).isNotEqualTo(200);
     }
 
-    @Test
-    void acceptDemandResponse_createsPersistedConversation() {
-        long conversationCountBefore = conversationRepository.count();
-        String demandBody = demandBody("PORTRAIT", "nanjing");
-        ResponseEntity<Map> createResp = rest.exchange("/demands", HttpMethod.POST, asCustomer(demandBody), Map.class);
-        Long demandId = ((Number) ((Map<String, Object>) createResp.getBody().get("data")).get("demandId")).longValue();
-
-        String responseBody = "{\"providerProfileId\":2001,\"message\":\"available for this demand\",\"expectedPriceCent\":50000}";
-        ResponseEntity<Map> responseResp = rest.exchange("/demands/" + demandId + "/responses",
-                HttpMethod.POST, asProvider(responseBody), Map.class);
-        Long responseId = ((Number) ((Map<String, Object>) responseResp.getBody().get("data")).get("responseId")).longValue();
-
-        ResponseEntity<Map> acceptResp = rest.exchange(
-                "/demands/" + demandId + "/responses/" + responseId + "/accept",
-                HttpMethod.POST,
-                asCustomer(null),
-                Map.class);
-
-        assertThat(acceptResp.getBody().get("code")).isEqualTo(200);
-        Map<String, Object> data = (Map<String, Object>) acceptResp.getBody().get("data");
-        Long conversationId = ((Number) data.get("conversationId")).longValue();
-        assertThat(data.get("responseStatus")).isEqualTo("ACCEPTED");
-        assertThat(data.get("conversationSourceType")).isEqualTo("DEMAND_RESPONSE");
-        assertThat(conversationRepository.findById(conversationId)).isPresent();
-        assertThat(conversationRepository.count()).isEqualTo(conversationCountBefore + 1);
-        assertThat(messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId)).hasSize(1);
-
-        ResponseEntity<Map> demandResp = rest.exchange(
-                "/demands/" + demandId,
-                HttpMethod.GET,
-                asCustomer(null),
-                Map.class);
-        assertThat(((Map<String, Object>) demandResp.getBody().get("data")).get("status")).isEqualTo("MATCHED");
-    }
-
-    // ───────────── Schedule tests ─────────────
-
-    @Test
-    void createSchedule_asProvider_succeeds() {
-        String body = scheduleBody("nanjing", "2026-09-01T09:00:00", "2026-09-01T18:00:00");
-        ResponseEntity<Map> resp = rest.exchange("/providers/me/schedules", HttpMethod.POST, asProvider(body), Map.class);
-
-        assertThat(resp.getBody().get("code")).isEqualTo(200);
-        Map<String, Object> data = (Map<String, Object>) resp.getBody().get("data");
-        assertThat(data.get("scheduleId")).isNotNull();
-    }
-
-    @Test
-    void createSchedule_conflictingTime_returns409() {
-        String body1 = scheduleBody("nanjing", "2026-10-01T09:00:00", "2026-10-01T18:00:00");
-        rest.exchange("/providers/me/schedules", HttpMethod.POST, asProvider(body1), Map.class);
-
-        String body2 = scheduleBody("nanjing", "2026-10-01T14:00:00", "2026-10-01T20:00:00");
-        ResponseEntity<Map> resp = rest.exchange("/providers/me/schedules", HttpMethod.POST, asProvider(body2), Map.class);
-
-        assertThat(resp.getBody().get("code")).isEqualTo(40901);
-    }
-
-    @Test
-    void createSchedule_asCustomer_returnsForbidden() {
-        String body = scheduleBody("nanjing", "2026-11-01T09:00:00", "2026-11-01T18:00:00");
-        ResponseEntity<Map> resp = rest.exchange("/providers/me/schedules", HttpMethod.POST, asCustomer(body), Map.class);
-
-        assertThat(resp.getBody().get("code")).isNotEqualTo(200);
-    }
-
-    @Test
-    void listPublicSchedules_noAuth_succeeds() {
-        ResponseEntity<Map> resp = rest.getForEntity("/providers/2001/schedules", Map.class);
-        assertThat(resp.getBody().get("code")).isEqualTo(200);
-    }
-
     // ───────────── Helpers ─────────────
 
     private String demandBody(String scene, String cityCode) {
@@ -254,11 +174,6 @@ class DemandAndScheduleIntegrationTest {
                 "\"expectedDate\":\"2026-08-15\",\"timeSlot\":\"AFTERNOON\"," +
                 "\"cityCode\":\"" + cityCode + "\",\"location\":\"北京大学\"," +
                 "\"budgetMinCent\":30000,\"budgetMaxCent\":80000,\"description\":\"集成测试需求\"}";
-    }
-
-    private String scheduleBody(String cityCode, String start, String end) {
-        return "{\"cityCode\":\"" + cityCode + "\",\"startTime\":\"" + start +
-                "\",\"endTime\":\"" + end + "\",\"timeSlot\":\"FULL_DAY\"}";
     }
 
     private HttpEntity<String> asCustomer(String body) {

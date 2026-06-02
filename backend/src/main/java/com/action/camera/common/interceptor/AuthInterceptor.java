@@ -24,6 +24,9 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        if (isPublicServicePackageGet(request)) {
+            return true;
+        }
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
             return true;
         }
@@ -53,6 +56,15 @@ public class AuthInterceptor implements HandlerInterceptor {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
         return true;
+    }
+
+    private boolean isPublicServicePackageGet(HttpServletRequest request) {
+        if (!"GET".equalsIgnoreCase(request.getMethod())) {
+            return false;
+        }
+        String uri = request.getRequestURI();
+        return uri.equals("/service-packages")
+                || uri.matches("^/service-packages/\\d+$");
     }
 
     @Override

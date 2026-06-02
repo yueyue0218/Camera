@@ -14,6 +14,14 @@ public class ServicePackageCardDto {
 
     private Long providerId;
 
+    private Long photographerId;
+
+    private String photographerNickname;
+
+    private Long photographerAvatarFileId;
+
+    private String photographerAvatarUrl;
+
     private String title;
 
     private String cityCode;
@@ -22,7 +30,13 @@ public class ServicePackageCardDto {
 
     private List<String> styleTags;
 
+    private String coverImage;
+
+    private List<String> images;
+
     private Long basePriceCent;
+
+    private String priceRange;
 
     private Integer durationMinutes;
 
@@ -35,4 +49,8 @@ public class ServicePackageCardDto {
     private Boolean isAvailable;
 
     private List<LocalDate> availableDates;
+
+    private String timeDescription;
+
+    private List<String> timeTags;
 }

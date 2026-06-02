@@ -21,35 +21,60 @@ public final class ServicePackageMapper {
     }
 
     public static ServicePackageCardDto toCard(ServicePackage servicePackage) {
+        return toCard(servicePackage, null);
+    }
+
+    public static ServicePackageCardDto toCard(ServicePackage servicePackage, PhotographerInfo photographerInfo) {
         List<Long> portfolioIds = servicePackage.getPortfolioIds();
         Long coverPortfolioId = portfolioIds == null || portfolioIds.isEmpty() ? null : portfolioIds.get(0);
+        List<String> images = servicePackage.getImages();
+        String coverImage = images == null || images.isEmpty() ? null : images.get(0);
         return new ServicePackageCardDto(
                 servicePackage.getId(),
                 servicePackage.getProviderId(),
+                photographerId(servicePackage, photographerInfo),
+                nickname(photographerInfo),
+                avatarFileId(photographerInfo),
+                avatarUrl(photographerInfo),
                 servicePackage.getTitle(),
                 servicePackage.getCityCode(),
                 servicePackage.getScene(),
                 servicePackage.getStyleTags(),
+                coverImage,
+                images,
                 servicePackage.getBasePriceCent(),
+                servicePackage.getPriceRange(),
                 servicePackage.getDurationMinutes(),
                 coverPortfolioId,
                 portfolioIds,
                 servicePackage.getStatus().name(),
                 servicePackage.getIsAvailable(),
-                servicePackage.getAvailableDates()
+                servicePackage.getAvailableDates(),
+                servicePackage.getTimeDescription(),
+                servicePackage.getTimeTags()
         );
     }
 
     public static ServicePackageDetailDto toDetail(ServicePackage servicePackage) {
+        return toDetail(servicePackage, null);
+    }
+
+    public static ServicePackageDetailDto toDetail(ServicePackage servicePackage, PhotographerInfo photographerInfo) {
         return new ServicePackageDetailDto(
                 servicePackage.getId(),
                 servicePackage.getProviderId(),
+                photographerId(servicePackage, photographerInfo),
+                nickname(photographerInfo),
+                avatarFileId(photographerInfo),
+                avatarUrl(photographerInfo),
                 servicePackage.getTitle(),
                 servicePackage.getCityCode(),
                 servicePackage.getServiceArea(),
                 servicePackage.getScene(),
                 servicePackage.getStyleTags(),
+                servicePackage.getImages(),
                 servicePackage.getBasePriceCent(),
+                servicePackage.getPriceRange(),
                 servicePackage.getDurationMinutes(),
                 servicePackage.getOriginalCount(),
                 servicePackage.getRefinedCount(),
@@ -57,10 +82,28 @@ public final class ServicePackageMapper {
                 servicePackage.getAvailableDates(),
                 servicePackage.getPortfolioIds(),
                 servicePackage.getDescription(),
+                servicePackage.getTimeDescription(),
+                servicePackage.getTimeTags(),
                 servicePackage.getStatus().name(),
                 servicePackage.getIsAvailable(),
                 servicePackage.getCreatedAt(),
                 servicePackage.getUpdatedAt()
         );
+    }
+
+    private static Long photographerId(ServicePackage servicePackage, PhotographerInfo photographerInfo) {
+        return photographerInfo == null ? servicePackage.getProviderId() : photographerInfo.photographerId();
+    }
+
+    private static String nickname(PhotographerInfo photographerInfo) {
+        return photographerInfo == null ? null : photographerInfo.nickname();
+    }
+
+    private static Long avatarFileId(PhotographerInfo photographerInfo) {
+        return photographerInfo == null ? null : photographerInfo.avatarFileId();
+    }
+
+    private static String avatarUrl(PhotographerInfo photographerInfo) {
+        return photographerInfo == null ? null : photographerInfo.avatarUrl();
     }
 }
