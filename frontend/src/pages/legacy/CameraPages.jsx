@@ -2222,6 +2222,9 @@ function OrdersPage() {
   ), [deliveryFileOptions])
   const latestDeliveryUploadTime = useMemo(() => getLatestDeliveryUploadTime(deliveryRecords), [deliveryRecords])
   const estimatedAutoConfirmTime = latestDeliveryUploadTime ? addDays(latestDeliveryUploadTime, 7) : null
+  const fulfillmentNotice = selectedOrder
+    ? getOrderFulfillmentNotice(selectedOrder, statusLogs, deliveryRecords, latestDeliveryUploadTime, estimatedAutoConfirmTime)
+    : null
   const canReviewSelectedOrder = selectedOrder?.status === 'COMPLETED' && isOrderParticipant(selectedOrder, currentUser.userId)
   const currentReviewDirection = selectedOrder ? getOrderReviewDirection(selectedOrder, currentUser.userId) : ''
   const myReview = orderReviews.find(review => Number(review.reviewerId) === currentUser.userId || review.direction === currentReviewDirection)
@@ -2328,6 +2331,21 @@ function OrdersPage() {
                   ['交付截止', formatTime(selectedOrder.deliveryDeadline)],
                   ['结算/退款', `${selectedOrder.settlementStatus || 'NOT_SETTLED'} / ${selectedOrder.refundStatus || 'NONE'}`]
                 ]} />
+                {fulfillmentNotice && (
+                  <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
+                    <Stack spacing={1}>
+                      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
+                        <Box>
+                          <Typography fontWeight={900}>{fulfillmentNotice.title}</Typography>
+                          <Typography color="text.secondary" variant="body2">{fulfillmentNotice.description}</Typography>
+                        </Box>
+                        <Chip size="small" color={fulfillmentNotice.color} label={orderStatusMap[selectedOrder.status] || selectedOrder.status} />
+                      </Stack>
+                      <InfoRows rows={fulfillmentNotice.rows} />
+                      {fulfillmentNotice.note && <Alert severity={fulfillmentNotice.severity}>{fulfillmentNotice.note}</Alert>}
+                    </Stack>
+                  </Paper>
+                )}
                 {quoteSnapshot && (
                   <>
                     <Divider />
@@ -2396,13 +2414,6 @@ function OrdersPage() {
                       </Button>
                     </Stack>
                   </Paper>
-                )}
-
-                {selectedOrder.status === 'DELIVERED_PENDING_CONFIRM' && (
-                  <Alert severity="info">
-                    摄影师已交付作品。客户需在交付后 7 天内确认接收或提交返修要求；若 7 天内未处理，系统将自动确认订单完成并释放托管资金。
-                    {estimatedAutoConfirmTime && ` 预计自动确认时间：${formatTime(estimatedAutoConfirmTime)}`}
-                  </Alert>
                 )}
 
                 {canRequestRework && (
@@ -4167,6 +4178,166 @@ function getLatestDeliveryUploadTime(records) {
     .filter(timestamp => Number.isFinite(timestamp))
     .reduce((latest, timestamp) => Math.max(latest, timestamp), 0)
   return latestTimestamp ? new Date(latestTimestamp) : null
+}
+
+function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, latestDeliveryUploadTime, estimatedAutoConfirmTime) {
+  const status = order.status
+  const baseRows = [
+    ['托管状态', escrowStatusMap[order.escrowStatus] || order.escrowStatus || '当前接口未返回'],
+    ['结算状态', settlementStatusMap[order.settlementStatus] || order.settlementStatus || '当前接口未返回']
+  ]
+  const latestReworkLog = getLatestStatusLog(statusLogs, 'REWORK_REQUIRED')
+  const latestCompletedLog = getLatestStatusLog(statusLogs, 'COMPLETED')
+
+  if (status === 'PENDING_PAYMENT') {
+    return {
+      title: '等待客户支付',
+      description: '客户支付后，资金进入平台托管，订单再进入待拍摄履约阶段。',
+      color: 'warning',
+      severity: 'info',
+      rows: [
+        ['订单金额', centToYuan(order.amountCent)],
+        ...baseRows
+      ],
+      note: '当前支付入口调用后端模拟支付接口；未支付前不应进入拍摄或交付。'
+    }
+  }
+
+  if (status === 'PAID_PENDING_SHOOT') {
+    return {
+      title: '已支付，等待拍摄',
+      description: '平台托管资金已建立，双方应按报价约定的拍摄时间履约。',
+      color: 'info',
+      severity: 'warning',
+      rows: [
+        ['拍摄开始', formatTimeOrMissing(order.shootStartTime)],
+        ['拍摄结束', formatTimeOrMissing(order.shootEndTime)],
+        ...baseRows
+      ],
+      note: '当前状态推进由后端状态接口完成；按拍摄时间自动推进仍待后端定时任务或接口接入。'
+    }
+  }
+
+  if (status === 'SHOOTING') {
+    return {
+      title: '拍摄中',
+      description: '订单处于拍摄履约阶段，拍摄完成后才进入待交付。',
+      color: 'info',
+      severity: 'warning',
+      rows: [
+        ['拍摄开始', formatTimeOrMissing(order.shootStartTime)],
+        ['拍摄结束', formatTimeOrMissing(order.shootEndTime)],
+        ...baseRows
+      ],
+      note: '当前状态推进由后端状态接口完成；按拍摄时间自动推进仍待后端定时任务或接口接入。'
+    }
+  }
+
+  if (status === 'PENDING_DELIVERY') {
+    return {
+      title: '等待服务方上传作品',
+      description: '摄影师需通过交付入口上传作品，上传成功后订单进入待客户确认。',
+      color: 'secondary',
+      severity: 'info',
+      rows: [
+        ['最晚交付时间', formatTimeOrMissing(order.deliveryDeadline)],
+        ['已有交付记录', `${deliveryRecords.length} 条`],
+        ...baseRows
+      ],
+      note: '超时未交付退款规则待后端接口确认/接入；前端本轮不会触发退款。'
+    }
+  }
+
+  if (status === 'DELIVERED_PENDING_CONFIRM') {
+    return {
+      title: '已交付，等待客户确认',
+      description: '客户需确认接收作品，或提交返修要求；未处理时由后端自动确认任务处理。',
+      color: 'primary',
+      severity: latestDeliveryUploadTime ? 'info' : 'warning',
+      rows: [
+        ['最新交付时间', formatTimeOrMissing(latestDeliveryUploadTime)],
+        ['预计自动确认时间', estimatedAutoConfirmTime ? formatTime(estimatedAutoConfirmTime) : '当前接口未返回可靠交付时间'],
+        ['交付记录', `${deliveryRecords.length} 条`],
+        ...baseRows
+      ],
+      note: '摄影师已交付作品。客户需在交付后 7 天内确认接收或提交返修要求；若 7 天内未处理，系统将自动确认订单完成并释放托管资金。前端仅展示规则，不模拟自动确认。'
+    }
+  }
+
+  if (status === 'REWORK_REQUIRED') {
+    return {
+      title: '返修中',
+      description: '客户已提交返修要求，等待服务方重新上传作品。',
+      color: 'warning',
+      severity: 'warning',
+      rows: [
+        ['最近返修要求', latestReworkLog?.reason || latestReworkLog?.remark || '当前接口未返回'],
+        ['返修状态时间', formatTimeOrMissing(latestReworkLog?.createdAt)],
+        ['已有交付记录', `${deliveryRecords.length} 条`],
+        ...baseRows
+      ],
+      note: '服务方必须通过交付入口重新上传作品；页面不会提供绕过上传的返修完成按钮。'
+    }
+  }
+
+  if (status === 'COMPLETED') {
+    return {
+      title: '订单已完成',
+      description: '订单完成后，托管资金应释放给服务方，并进入结算完成状态。',
+      color: 'success',
+      severity: 'success',
+      rows: [
+        ['完成记录时间', formatTimeOrMissing(latestCompletedLog?.createdAt || order.completeTime)],
+        ['自动确认时间', formatTimeOrMissing(order.autoConfirmTime)],
+        ...baseRows
+      ],
+      note: '完成后的评价入口和照片授权入口在下方展示；若订单由 7 天规则自动确认，可通过状态日志查看系统完成记录。'
+    }
+  }
+
+  if (status === 'APPEALING') {
+    return {
+      title: '订单申诉中',
+      description: '订单处于争议处理阶段，正常履约动作应暂停。',
+      color: 'error',
+      severity: 'warning',
+      rows: baseRows,
+      note: '申诉/仲裁结果、退款或结算裁定仍待后端正式接口接入，本轮不假实现。'
+    }
+  }
+
+  if (status === 'REFUNDED' || status === 'CANCELLED') {
+    return {
+      title: status === 'REFUNDED' ? '订单已退款' : '订单已取消',
+      description: '订单已结束，不再展示正常履约动作。',
+      color: 'default',
+      severity: 'info',
+      rows: [
+        ['退款状态', order.refundStatus || '当前接口未返回'],
+        ...baseRows
+      ],
+      note: '退款/取消后的后续处理以状态日志和后端返回为准。'
+    }
+  }
+
+  return {
+    title: '订单履约状态',
+    description: '当前状态暂无专门提示。',
+    color: 'default',
+    severity: 'info',
+    rows: baseRows,
+    note: ''
+  }
+}
+
+function getLatestStatusLog(statusLogs, targetStatus) {
+  return statusLogs
+    .filter(log => (log.toStatus || log.targetStatus || log.status) === targetStatus)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+}
+
+function formatTimeOrMissing(value) {
+  return value ? formatTime(value) : '当前接口未返回'
 }
 
 function addDays(value, days) {
