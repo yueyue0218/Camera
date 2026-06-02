@@ -1,8 +1,10 @@
 package com.action.camera.order;
 
 import com.action.camera.common.exception.BusinessException;
+import com.action.camera.delivery.repository.DeliveryRepository;
 import com.action.camera.order.entity.Order;
 import com.action.camera.order.entity.OrderStatusLog;
+import com.action.camera.order.entity.PaymentRecord;
 import com.action.camera.order.enums.EscrowStatus;
 import com.action.camera.order.enums.OrderStatus;
 import com.action.camera.order.repository.OrderRepository;
@@ -25,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -46,11 +49,14 @@ class OrderAutoConfirmServiceTest {
     @Mock
     private OrderStatusLogRepository orderStatusLogRepository;
 
+    @Mock
+    private DeliveryRepository deliveryRepository;
+
     private OrderService orderService;
 
     @BeforeEach
     void setUp() {
-        orderService = new OrderService(orderRepository, paymentRecordRepository, orderStatusLogRepository);
+        orderService = new OrderService(orderRepository, paymentRecordRepository, orderStatusLogRepository, deliveryRepository);
     }
 
     @Test
@@ -212,6 +218,227 @@ class OrderAutoConfirmServiceTest {
         assertThrows(BusinessException.class, () -> orderService.autoConfirmTimeoutOrders(null));
     }
 
+    @Test
+    void autoAdvanceKeepsPaidOrderBeforeShootStart() {
+        Order order = order(ORDER_ID, OrderStatus.PAID_PENDING_SHOOT);
+        when(orderRepository.findByStatus(OrderStatus.PAID_PENDING_SHOOT)).thenReturn(List.of(order));
+        when(orderRepository.findByStatus(OrderStatus.SHOOTING)).thenReturn(List.of());
+        whenLocked(order);
+
+        int advancedCount = orderService.autoAdvanceShootingOrders(order.getShootStartTime().minusSeconds(1));
+
+        assertEquals(0, advancedCount);
+        assertEquals(OrderStatus.PAID_PENDING_SHOOT, order.getStatus());
+        verify(orderRepository, never()).save(any(Order.class));
+        verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
+    }
+
+    @Test
+    void autoAdvancePaidOrderToShootingDuringShootWindow() {
+        Order order = order(ORDER_ID, OrderStatus.PAID_PENDING_SHOOT);
+        when(orderRepository.findByStatus(OrderStatus.PAID_PENDING_SHOOT)).thenReturn(List.of(order));
+        when(orderRepository.findByStatus(OrderStatus.SHOOTING)).thenReturn(List.of());
+        whenLocked(order);
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderStatusLogRepository.save(any(OrderStatusLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        int advancedCount = orderService.autoAdvanceShootingOrders(order.getShootStartTime().plusMinutes(10));
+
+        assertEquals(1, advancedCount);
+        assertEquals(OrderStatus.SHOOTING, order.getStatus());
+        ArgumentCaptor<OrderStatusLog> logCaptor = ArgumentCaptor.forClass(OrderStatusLog.class);
+        verify(orderStatusLogRepository).save(logCaptor.capture());
+        assertEquals(OrderStatus.PAID_PENDING_SHOOT, logCaptor.getValue().getFromStatus());
+        assertEquals(OrderStatus.SHOOTING, logCaptor.getValue().getToStatus());
+        assertEquals("系统根据拍摄开始时间自动进入拍摄中", logCaptor.getValue().getRemark());
+    }
+
+    @Test
+    void autoAdvancePaidOrderPastShootEndThroughShootingToPendingDelivery() {
+        Order order = order(ORDER_ID, OrderStatus.PAID_PENDING_SHOOT);
+        when(orderRepository.findByStatus(OrderStatus.PAID_PENDING_SHOOT)).thenReturn(List.of(order));
+        when(orderRepository.findByStatus(OrderStatus.SHOOTING)).thenReturn(List.of());
+        whenLocked(order);
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderStatusLogRepository.save(any(OrderStatusLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        int advancedCount = orderService.autoAdvanceShootingOrders(order.getShootEndTime().plusMinutes(1));
+
+        assertEquals(2, advancedCount);
+        assertEquals(OrderStatus.PENDING_DELIVERY, order.getStatus());
+        ArgumentCaptor<OrderStatusLog> logCaptor = ArgumentCaptor.forClass(OrderStatusLog.class);
+        verify(orderStatusLogRepository, times(2)).save(logCaptor.capture());
+        List<OrderStatusLog> logs = logCaptor.getAllValues();
+        assertEquals(OrderStatus.PAID_PENDING_SHOOT, logs.get(0).getFromStatus());
+        assertEquals(OrderStatus.SHOOTING, logs.get(0).getToStatus());
+        assertEquals(OrderStatus.SHOOTING, logs.get(1).getFromStatus());
+        assertEquals(OrderStatus.PENDING_DELIVERY, logs.get(1).getToStatus());
+    }
+
+    @Test
+    void autoAdvanceKeepsShootingOrderBeforeShootEnd() {
+        Order order = order(ORDER_ID, OrderStatus.SHOOTING);
+        when(orderRepository.findByStatus(OrderStatus.PAID_PENDING_SHOOT)).thenReturn(List.of());
+        when(orderRepository.findByStatus(OrderStatus.SHOOTING)).thenReturn(List.of(order));
+        whenLocked(order);
+
+        int advancedCount = orderService.autoAdvanceShootingOrders(order.getShootEndTime().minusSeconds(1));
+
+        assertEquals(0, advancedCount);
+        assertEquals(OrderStatus.SHOOTING, order.getStatus());
+        verify(orderRepository, never()).save(any(Order.class));
+        verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
+    }
+
+    @Test
+    void autoAdvanceShootingOrderToPendingDeliveryAfterShootEnd() {
+        Order order = order(ORDER_ID, OrderStatus.SHOOTING);
+        when(orderRepository.findByStatus(OrderStatus.PAID_PENDING_SHOOT)).thenReturn(List.of());
+        when(orderRepository.findByStatus(OrderStatus.SHOOTING)).thenReturn(List.of(order));
+        whenLocked(order);
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderStatusLogRepository.save(any(OrderStatusLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        int advancedCount = orderService.autoAdvanceShootingOrders(order.getShootEndTime());
+
+        assertEquals(1, advancedCount);
+        assertEquals(OrderStatus.PENDING_DELIVERY, order.getStatus());
+        ArgumentCaptor<OrderStatusLog> logCaptor = ArgumentCaptor.forClass(OrderStatusLog.class);
+        verify(orderStatusLogRepository).save(logCaptor.capture());
+        assertEquals(OrderStatus.SHOOTING, logCaptor.getValue().getFromStatus());
+        assertEquals(OrderStatus.PENDING_DELIVERY, logCaptor.getValue().getToStatus());
+        assertEquals("系统根据拍摄结束时间自动进入待交付", logCaptor.getValue().getRemark());
+    }
+
+    @Test
+    void autoAdvanceSkipsConcurrentTerminalOrDisputedOrdersDefensively() {
+        Order paidCandidate = order(ORDER_ID, OrderStatus.PAID_PENDING_SHOOT);
+        Order shootingCandidate = order(SECOND_ORDER_ID, OrderStatus.SHOOTING);
+        Order completedLocked = order(ORDER_ID, OrderStatus.COMPLETED);
+        Order appealingLocked = order(SECOND_ORDER_ID, OrderStatus.APPEALING);
+        when(orderRepository.findByStatus(OrderStatus.PAID_PENDING_SHOOT)).thenReturn(List.of(paidCandidate));
+        when(orderRepository.findByStatus(OrderStatus.SHOOTING)).thenReturn(List.of(shootingCandidate));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(completedLocked));
+        when(orderRepository.findByIdForUpdate(SECOND_ORDER_ID)).thenReturn(Optional.of(appealingLocked));
+
+        int advancedCount = orderService.autoAdvanceShootingOrders(NOW);
+
+        assertEquals(0, advancedCount);
+        assertEquals(OrderStatus.COMPLETED, completedLocked.getStatus());
+        assertEquals(OrderStatus.APPEALING, appealingLocked.getStatus());
+        verify(orderRepository, never()).save(any(Order.class));
+        verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
+    }
+
+    @Test
+    void autoAdvanceRejectsNullNow() {
+        assertThrows(BusinessException.class, () -> orderService.autoAdvanceShootingOrders(null));
+    }
+
+    @Test
+    void autoRefundKeepsPendingDeliveryBeforeDeadline() {
+        Order order = order(ORDER_ID, OrderStatus.PENDING_DELIVERY);
+        when(orderRepository.findByStatus(OrderStatus.PENDING_DELIVERY)).thenReturn(List.of(order));
+        whenLocked(order);
+
+        int refundedCount = orderService.autoRefundOverdueUndeliveredOrders(order.getDeliveryDeadline());
+
+        assertEquals(0, refundedCount);
+        assertEquals(OrderStatus.PENDING_DELIVERY, order.getStatus());
+        verify(deliveryRepository, never()).existsByOrderId(any());
+        verify(orderRepository, never()).save(any(Order.class));
+    }
+
+    @Test
+    void autoRefundKeepsPendingDeliveryAfterDeadlineWhenDeliveryExists() {
+        Order order = order(ORDER_ID, OrderStatus.PENDING_DELIVERY);
+        when(orderRepository.findByStatus(OrderStatus.PENDING_DELIVERY)).thenReturn(List.of(order));
+        whenLocked(order);
+        when(deliveryRepository.existsByOrderId(ORDER_ID)).thenReturn(true);
+
+        int refundedCount = orderService.autoRefundOverdueUndeliveredOrders(order.getDeliveryDeadline().plusMinutes(1));
+
+        assertEquals(0, refundedCount);
+        assertEquals(OrderStatus.PENDING_DELIVERY, order.getStatus());
+        verify(orderRepository, never()).save(any(Order.class));
+        verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
+    }
+
+    @Test
+    void autoRefundOverduePendingDeliveryWithoutDeliveryAndUpdatePaymentRecord() {
+        Order order = order(ORDER_ID, OrderStatus.PENDING_DELIVERY);
+        PaymentRecord paymentRecord = paymentRecord(order);
+        when(orderRepository.findByStatus(OrderStatus.PENDING_DELIVERY)).thenReturn(List.of(order));
+        whenLocked(order);
+        when(deliveryRepository.existsByOrderId(ORDER_ID)).thenReturn(false);
+        when(paymentRecordRepository.findByOrderId(ORDER_ID)).thenReturn(Optional.of(paymentRecord));
+        when(paymentRecordRepository.save(any(PaymentRecord.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderStatusLogRepository.save(any(OrderStatusLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        int refundedCount = orderService.autoRefundOverdueUndeliveredOrders(order.getDeliveryDeadline().plusMinutes(1));
+
+        assertEquals(1, refundedCount);
+        assertEquals(OrderStatus.REFUNDED, order.getStatus());
+        assertEquals(EscrowStatus.REFUNDED, order.getEscrowStatus());
+        assertEquals("NOT_SETTLED", order.getSettlementStatus());
+        assertEquals("REFUNDED", order.getRefundStatus());
+        assertEquals(order.getTotalAmountCent(), paymentRecord.getRefundAmountCent());
+        assertEquals("REFUNDED", paymentRecord.getStatus());
+        assertNotNull(paymentRecord.getRefundedAt());
+        ArgumentCaptor<OrderStatusLog> logCaptor = ArgumentCaptor.forClass(OrderStatusLog.class);
+        verify(orderStatusLogRepository).save(logCaptor.capture());
+        assertEquals(OrderStatus.PENDING_DELIVERY, logCaptor.getValue().getFromStatus());
+        assertEquals(OrderStatus.REFUNDED, logCaptor.getValue().getToStatus());
+        assertEquals("超过最晚交付时间仍未上传作品，系统自动退款并结束订单", logCaptor.getValue().getRemark());
+    }
+
+    @Test
+    void autoRefundSkipsPendingDeliveryWithoutDeadline() {
+        Order order = order(ORDER_ID, OrderStatus.PENDING_DELIVERY);
+        order.setDeliveryDeadline(null);
+        when(orderRepository.findByStatus(OrderStatus.PENDING_DELIVERY)).thenReturn(List.of(order));
+        whenLocked(order);
+
+        int refundedCount = orderService.autoRefundOverdueUndeliveredOrders(NOW);
+
+        assertEquals(0, refundedCount);
+        assertEquals(OrderStatus.PENDING_DELIVERY, order.getStatus());
+        verify(deliveryRepository, never()).existsByOrderId(any());
+        verify(orderRepository, never()).save(any(Order.class));
+    }
+
+    @Test
+    void autoRefundSkipsNonPendingDeliveryStatusesDefensively() {
+        List<Order> candidates = List.of(
+                order(8003L, OrderStatus.DELIVERED_PENDING_CONFIRM),
+                order(8004L, OrderStatus.REWORK_REQUIRED),
+                order(8005L, OrderStatus.APPEALING),
+                order(8006L, OrderStatus.COMPLETED)
+        );
+        when(orderRepository.findByStatus(OrderStatus.PENDING_DELIVERY)).thenReturn(candidates);
+        for (Order order : candidates) {
+            whenLocked(order);
+        }
+
+        int refundedCount = orderService.autoRefundOverdueUndeliveredOrders(NOW);
+
+        assertEquals(0, refundedCount);
+        for (Order order : candidates) {
+            assertNotNull(order.getStatus());
+            assertEquals(EscrowStatus.HELD, order.getEscrowStatus());
+            assertEquals("NONE", order.getRefundStatus());
+        }
+        verify(deliveryRepository, never()).existsByOrderId(any());
+        verify(orderRepository, never()).save(any(Order.class));
+        verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
+    }
+
+    @Test
+    void autoRefundRejectsNullNow() {
+        assertThrows(BusinessException.class, () -> orderService.autoRefundOverdueUndeliveredOrders(null));
+    }
+
     private void whenLatestDeliveredLog(Long orderId, LocalDateTime createdAt) {
         when(orderStatusLogRepository.findFirstByOrderIdAndToStatusOrderByCreatedAtDesc(
                 orderId,
@@ -233,6 +460,20 @@ class OrderAutoConfirmServiceTest {
         log.setReason("服务方上传交付文件");
         log.setCreatedAt(createdAt);
         return log;
+    }
+
+    private PaymentRecord paymentRecord(Order order) {
+        PaymentRecord paymentRecord = new PaymentRecord();
+        paymentRecord.setId(6001L);
+        paymentRecord.setPaymentNo("P202606010001");
+        paymentRecord.setOrderId(order.getId());
+        paymentRecord.setAmountCent(order.getTotalAmountCent());
+        paymentRecord.setRefundAmountCent(0L);
+        paymentRecord.setPayMethod(OrderService.MOCK_PAY_METHOD);
+        paymentRecord.setStatus("SUCCESS");
+        paymentRecord.setRequestedAt(LocalDateTime.of(2026, 5, 30, 10, 1));
+        paymentRecord.setPaidAt(LocalDateTime.of(2026, 5, 30, 10, 1));
+        return paymentRecord;
     }
 
     private Order order(Long orderId, OrderStatus status) {

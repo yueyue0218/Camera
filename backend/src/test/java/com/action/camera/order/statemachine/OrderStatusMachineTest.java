@@ -17,6 +17,7 @@ class OrderStatusMachineTest {
         assertAllowed(OrderStatus.PAID_PENDING_SHOOT, OrderStatus.SHOOTING);
         assertAllowed(OrderStatus.SHOOTING, OrderStatus.PENDING_DELIVERY);
         assertAllowed(OrderStatus.PENDING_DELIVERY, OrderStatus.DELIVERED_PENDING_CONFIRM);
+        assertAllowed(OrderStatus.PENDING_DELIVERY, OrderStatus.REFUNDED);
         assertAllowed(OrderStatus.DELIVERED_PENDING_CONFIRM, OrderStatus.COMPLETED);
         assertAllowed(OrderStatus.DELIVERED_PENDING_CONFIRM, OrderStatus.REWORK_REQUIRED);
         assertAllowed(OrderStatus.REWORK_REQUIRED, OrderStatus.PENDING_DELIVERY);
