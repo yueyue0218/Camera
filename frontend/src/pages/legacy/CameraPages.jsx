@@ -1534,6 +1534,7 @@ function ConversationDetailPage() {
   const [imageSending, setImageSending] = useState(false)
   const [quoteForm, setQuoteForm] = useState(() => createDefaultQuoteForm())
   const [showQuoteForm, setShowQuoteForm] = useState(false)
+  const [quoteValidationErrors, setQuoteValidationErrors] = useState([])
   const [notice, setNotice] = useState(null)
   const [loading, setLoading] = useState(false)
 
@@ -1647,8 +1648,10 @@ function ConversationDetailPage() {
 
   async function createQuote(event) {
     event.preventDefault()
-    if (!conversation || conversation.isLocal) {
-      setNotice({ type: 'warning', text: '当前会话还没有真实 C conversationId，报价接口暂不能调用。' })
+    const validationErrors = validateQuoteForm(quoteForm, conversation, currentUser, quotes)
+    setQuoteValidationErrors(validationErrors)
+    if (validationErrors.length) {
+      setNotice({ type: 'warning', text: validationErrors[0] })
       return
     }
     const quote = await run(async () => quoteApi.create({
@@ -1669,6 +1672,7 @@ function ConversationDetailPage() {
     }, currentUser), '报价已发送')
     if (quote) {
       setShowQuoteForm(false)
+      setQuoteValidationErrors([])
       setQuoteForm(createDefaultQuoteForm())
       await loadConversationData()
     }
@@ -1679,6 +1683,9 @@ function ConversationDetailPage() {
     if (result?.orderId) {
       await loadConversationData()
       navigate(`/orders?orderId=${result.orderId}`)
+    } else if (result) {
+      await loadConversationData()
+      setNotice({ type: 'success', text: '报价已确认，可在订单页查看关联订单。' })
     }
   }
 
@@ -1687,12 +1694,22 @@ function ConversationDetailPage() {
     if (result) await loadConversationData()
   }
 
+  const isBackendConversation = Boolean(conversation && !conversation.isLocal && getBackendConversationId(conversation))
+  const isConversationProvider = conversation && currentUser.userId === Number(conversation.participantBId)
+  const isConversationCustomer = conversation && currentUser.userId === Number(conversation.participantAId)
+  const pendingQuote = hasPendingQuote(quotes)
   const canCreateQuote = conversation
     && currentUser.role === 'PROVIDER'
-    && currentUser.userId === Number(conversation.participantBId || USERS.provider.userId)
+    && isConversationProvider
+    && isBackendConversation
+    && !pendingQuote
   const canConfirmQuote = conversation
     && currentUser.role === 'CUSTOMER'
-    && currentUser.userId === Number(conversation.participantAId || USERS.customer.userId)
+    && isConversationCustomer
+  const canSeeQuoteEntry = conversation && currentUser.role === 'PROVIDER' && isConversationProvider
+  const quoteEntryHint = getQuoteEntryHint(conversation, currentUser, quotes)
+  const sourceLabel = getConversationSourceLabel(conversation)
+  const sourceHint = getConversationSourceHint(conversation)
 
   return (
     <Stack spacing={2}>
@@ -1719,6 +1736,136 @@ function ConversationDetailPage() {
 
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
       {conversation?.interfaceNote && <Alert severity="warning">{conversation.interfaceNote}</Alert>}
+
+      <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, bgcolor: '#fbfdff' }}>
+        <Stack spacing={1.5}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
+            <Box>
+              <Typography variant="h6">会话工作台</Typography>
+              <Typography color="text.secondary">这里承载沟通、报价、订单入口和后续履约协作，不是普通私聊。</Typography>
+            </Box>
+            <Stack direction="row" spacing={1} flexWrap="wrap">
+              <Chip size="small" color={isBackendConversation ? 'primary' : 'default'} label={isBackendConversation ? '真实 C 会话' : '本地 fallback 会话'} />
+              <Chip size="small" label={currentUser.role === 'PROVIDER' ? '当前身份：服务方' : '当前身份：顾客'} />
+            </Stack>
+          </Stack>
+          <InfoRows rows={[
+            ['会话 ID', conversation?.conversationId || '未加载'],
+            ['后端 conversationId', getBackendConversationId(conversation) || '当前接口未返回该字段'],
+            ['对方用户 ID', conversation ? getOppositeUserId(conversation, currentUser.userId) : '未加载'],
+            ['来源类型', conversation?.sourceType || '当前接口未返回该字段'],
+            ['来源 ID', conversation?.sourceId || '当前接口未返回该字段'],
+            ['业务来源', sourceLabel],
+            ['需求 ID', conversation?.demandId || (conversation?.sourceType === 'DEMAND_RESPONSE' ? conversation.sourceId : '当前接口未返回该字段')],
+            ['服务橱窗 ID', conversation?.sourceType === 'SERVICE_PACKAGE' ? conversation.sourceId : '当前接口未返回该字段'],
+            ['档期 ID', conversation?.scheduleId || '当前接口未返回该字段']
+          ]} />
+          <Alert severity="info">{sourceHint}</Alert>
+        </Stack>
+      </Paper>
+
+      <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, bgcolor: '#fffaf8' }}>
+        <Stack spacing={1.5}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
+            <Box>
+              <Typography variant="h6">报价 / 订单协作区</Typography>
+              <Typography color="text.secondary">服务方发正式报价，顾客确认后生成订单，再进入托管和交付流程。</Typography>
+            </Box>
+            {canSeeQuoteEntry && (
+              <Button
+                variant={showQuoteForm ? 'contained' : 'outlined'}
+                startIcon={<LocalOfferRoundedIcon />}
+                onClick={() => setShowQuoteForm(value => !value)}
+                disabled={!canCreateQuote}
+              >
+                发起报价
+              </Button>
+            )}
+          </Stack>
+
+          {quoteEntryHint && canSeeQuoteEntry && <Alert severity={canCreateQuote ? 'info' : 'warning'}>{quoteEntryHint}</Alert>}
+
+          {quotes.map(quote => {
+            const orderId = getQuoteOrderId(quote)
+            return (
+              <Paper key={quote.quotationId} variant="outlined" sx={{ p: 1.6, bgcolor: '#fbfdff' }}>
+                <Stack spacing={1.2}>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
+                    <Box>
+                      <Typography fontWeight={900}>{centToYuan(quote.amountCent)}</Typography>
+                      <Typography color="text.secondary" variant="body2">
+                        报价 ID {quote.quotationId} · {quote.quoteNo || '当前接口未返回报价编号'}
+                      </Typography>
+                    </Box>
+                    <Chip size="small" color={quote.status === 'PENDING_CONFIRM' ? 'warning' : quote.status === 'CONFIRMED' ? 'success' : 'default'} label={quoteStatusMap[quote.status] || quote.status} />
+                  </Stack>
+                  <InfoRows rows={[
+                    ['拍摄地点', quote.location || '未填写'],
+                    ['拍摄开始', formatTime(quote.shootStartTime)],
+                    ['拍摄结束', formatTime(quote.shootEndTime)],
+                    ['最晚交付', formatTime(quote.deliveryDeadline)],
+                    ['服务内容', quote.serviceContent || '未填写'],
+                    ['原片/精修', `${quote.originalCount ?? 0} / ${quote.refinedCount ?? 0}`],
+                    ['照片使用范围', quote.photoUsageScope || '未填写'],
+                    ['条款', quote.terms || '当前报价接口未返回该字段'],
+                    ['合同条款', quote.contractTerms || '当前报价接口未返回该字段'],
+                    ['备注', quote.remark || '当前报价接口未返回该字段']
+                  ]} />
+                  {quote.status === 'PENDING_CONFIRM' && canConfirmQuote && (
+                    <Stack direction="row" spacing={1} flexWrap="wrap">
+                      <Button size="small" variant="contained" onClick={() => confirmQuote(quote)}>确认报价</Button>
+                      <Button size="small" variant="outlined" color="inherit" onClick={() => rejectQuote(quote)}>拒绝报价</Button>
+                    </Stack>
+                  )}
+                  {quote.status === 'CONFIRMED' && (
+                    orderId ? (
+                      <Button size="small" variant="outlined" startIcon={<ReceiptLongRoundedIcon />} onClick={() => navigate(`/orders?orderId=${orderId}`)} sx={{ alignSelf: 'flex-start' }}>
+                        查看订单
+                      </Button>
+                    ) : (
+                      <Alert severity="info">报价已确认，可在订单页查看关联订单；当前报价列表接口未返回 orderId。</Alert>
+                    )
+                  )}
+                </Stack>
+              </Paper>
+            )
+          })}
+          {!quotes.length && <Typography color="text.secondary">当前会话还没有正式报价。</Typography>}
+
+          {showQuoteForm && canSeeQuoteEntry && (
+            <Paper component="form" variant="outlined" onSubmit={createQuote} sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
+              <Stack spacing={1.5}>
+                {!!quoteValidationErrors.length && (
+                  <Alert severity="warning">
+                    <Stack spacing={0.5}>
+                      {quoteValidationErrors.map(error => <Typography key={error} variant="body2">{error}</Typography>)}
+                    </Stack>
+                  </Alert>
+                )}
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.5 }}>
+                  <TextField label="报价金额" type="number" size="small" value={quoteForm.amountYuan} onChange={event => setQuoteForm({ ...quoteForm, amountYuan: event.target.value })} required />
+                  <TextField label="拍摄地点" size="small" value={quoteForm.location} onChange={event => setQuoteForm({ ...quoteForm, location: event.target.value })} required />
+                  <TextField label="开始时间" type="datetime-local" size="small" value={quoteForm.shootStartTime} onChange={event => setQuoteForm({ ...quoteForm, shootStartTime: event.target.value })} InputLabelProps={{ shrink: true }} required />
+                  <TextField label="结束时间" type="datetime-local" size="small" value={quoteForm.shootEndTime} onChange={event => setQuoteForm({ ...quoteForm, shootEndTime: event.target.value })} InputLabelProps={{ shrink: true }} required />
+                  <TextField label="交付截止" type="datetime-local" size="small" value={quoteForm.deliveryDeadline} onChange={event => setQuoteForm({ ...quoteForm, deliveryDeadline: event.target.value })} InputLabelProps={{ shrink: true }} required />
+                  <TextField label="原片数量" type="number" size="small" value={quoteForm.originalCount} onChange={event => setQuoteForm({ ...quoteForm, originalCount: event.target.value })} />
+                  <TextField label="精修数量" type="number" size="small" value={quoteForm.refinedCount} onChange={event => setQuoteForm({ ...quoteForm, refinedCount: event.target.value })} />
+                  <TextField label="照片使用范围" size="small" value={quoteForm.photoUsageScope} onChange={event => setQuoteForm({ ...quoteForm, photoUsageScope: event.target.value })} />
+                  <TextField label="服务内容" multiline minRows={2} size="small" value={quoteForm.serviceContent} onChange={event => setQuoteForm({ ...quoteForm, serviceContent: event.target.value })} sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }} required />
+                  <TextField label="条款" multiline minRows={2} size="small" value={quoteForm.terms} onChange={event => setQuoteForm({ ...quoteForm, terms: event.target.value })} sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }} />
+                  <TextField label="合同条款" multiline minRows={2} size="small" value={quoteForm.contractTerms} onChange={event => setQuoteForm({ ...quoteForm, contractTerms: event.target.value })} sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }} />
+                  <TextField label="备注" multiline minRows={2} size="small" value={quoteForm.remark} onChange={event => setQuoteForm({ ...quoteForm, remark: event.target.value })} sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }} />
+                </Box>
+                <Alert severity="info">当前会话接口未返回明确档期开始/结束字段，因此本轮无法做档期范围校验，只校验报价时间顺序。</Alert>
+                <Stack direction="row" spacing={1}>
+                  <Button type="submit" variant="contained" disabled={loading || !canCreateQuote}>发送报价</Button>
+                  <Button variant="text" color="inherit" onClick={() => setShowQuoteForm(false)}>收起</Button>
+                </Stack>
+              </Stack>
+            </Paper>
+          )}
+        </Stack>
+      </Paper>
 
       <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, minHeight: 520, display: 'flex', flexDirection: 'column' }}>
         <Stack spacing={1.2} sx={{ flex: 1, overflowY: 'auto', pr: 0.5 }}>
@@ -1760,54 +1907,15 @@ function ConversationDetailPage() {
               </Box>
             )
           })}
-          {quotes.map(quote => (
-            <Paper key={quote.quotationId} variant="outlined" sx={{ p: 1.6, alignSelf: 'center', width: 'min(520px, 100%)', bgcolor: '#fbfdff' }}>
-              <Stack spacing={1.2}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
-                  <Typography fontWeight={900}>{centToYuan(quote.amountCent)}</Typography>
-                  <Chip size="small" color={quote.status === 'PENDING_CONFIRM' ? 'warning' : quote.status === 'CONFIRMED' ? 'success' : 'default'} label={quoteStatusMap[quote.status] || quote.status} />
-                </Stack>
-                <Typography>{quote.serviceContent}</Typography>
-                <Typography color="text.secondary" variant="body2">{quote.location} · {formatTime(quote.shootStartTime)}</Typography>
-                {quote.status === 'PENDING_CONFIRM' && canConfirmQuote && (
-                  <Stack direction="row" spacing={1}>
-                    <Button size="small" variant="contained" onClick={() => confirmQuote(quote)}>确认报价</Button>
-                    <Button size="small" variant="outlined" color="inherit" onClick={() => rejectQuote(quote)}>拒绝</Button>
-                  </Stack>
-                )}
-              </Stack>
-            </Paper>
-          ))}
-          {!messages.length && !quotes.length && <Typography color="text.secondary">还没有消息</Typography>}
+          {!messages.length && <Typography color="text.secondary">还没有消息</Typography>}
         </Stack>
-
-        {showQuoteForm && canCreateQuote && (
-          <Paper component="form" variant="outlined" onSubmit={createQuote} sx={{ p: 1.5, mt: 1.5, bgcolor: '#fbfdff' }}>
-            <Stack spacing={1.5}>
-              {conversation?.isLocal && <Alert severity="warning">报价需要真实 C conversationId；当前服务方主动对话缺少后端接口。</Alert>}
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.5 }}>
-                <TextField label="报价金额" type="number" size="small" value={quoteForm.amountYuan} onChange={event => setQuoteForm({ ...quoteForm, amountYuan: event.target.value })} required />
-                <TextField label="拍摄地点" size="small" value={quoteForm.location} onChange={event => setQuoteForm({ ...quoteForm, location: event.target.value })} required />
-                <TextField label="开始时间" type="datetime-local" size="small" value={quoteForm.shootStartTime} onChange={event => setQuoteForm({ ...quoteForm, shootStartTime: event.target.value })} InputLabelProps={{ shrink: true }} required />
-                <TextField label="结束时间" type="datetime-local" size="small" value={quoteForm.shootEndTime} onChange={event => setQuoteForm({ ...quoteForm, shootEndTime: event.target.value })} InputLabelProps={{ shrink: true }} required />
-                <TextField label="交付截止" type="datetime-local" size="small" value={quoteForm.deliveryDeadline} onChange={event => setQuoteForm({ ...quoteForm, deliveryDeadline: event.target.value })} InputLabelProps={{ shrink: true }} required />
-                <TextField label="精修数量" type="number" size="small" value={quoteForm.refinedCount} onChange={event => setQuoteForm({ ...quoteForm, refinedCount: event.target.value })} />
-                <TextField label="服务内容" multiline minRows={2} size="small" value={quoteForm.serviceContent} onChange={event => setQuoteForm({ ...quoteForm, serviceContent: event.target.value })} sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }} required />
-              </Box>
-              <Stack direction="row" spacing={1}>
-                <Button type="submit" variant="contained" disabled={loading || conversation?.isLocal}>发送报价</Button>
-                <Button variant="text" color="inherit" onClick={() => setShowQuoteForm(false)}>收起</Button>
-              </Stack>
-            </Stack>
-          </Paper>
-        )}
 
         <Divider sx={{ my: 1.5 }} />
         <Stack direction="row" alignItems="center" spacing={1}>
-          {canCreateQuote && (
+          {canSeeQuoteEntry && (
             <Tooltip title="发起报价">
               <span>
-                <IconButton color={showQuoteForm ? 'primary' : 'default'} onClick={() => setShowQuoteForm(value => !value)}>
+                <IconButton color={showQuoteForm ? 'primary' : 'default'} onClick={() => setShowQuoteForm(value => !value)} disabled={!canCreateQuote}>
                   <LocalOfferRoundedIcon />
                 </IconButton>
               </span>
@@ -3267,6 +3375,127 @@ function parseQuoteSnapshot(raw) {
   } catch {
     return null
   }
+}
+
+function getBackendConversationId(conversation) {
+  const value = conversation?.backendConversationId || conversation?.conversationId
+  const id = Number(value)
+  return Number.isFinite(id) && id > 0 ? id : null
+}
+
+function getConversationSourceLabel(conversation) {
+  const sourceType = conversation?.sourceType
+  if (!sourceType) return '当前接口未返回该字段'
+  if (sourceType === 'DEMAND_RESPONSE') return '需求大厅沟通'
+  if (sourceType === 'SERVICE_PACKAGE') return '服务橱窗预订沟通'
+  if (sourceType.includes('SCHEDULE')) return '档期预约沟通'
+  return sourceType
+}
+
+function getConversationSourceHint(conversation) {
+  if (!conversation) return '会话仍在加载。'
+  if (conversation.isLocal) {
+    return '当前是本地 fallback 会话，只能聊天演示，不能创建真实报价或订单。'
+  }
+  if (conversation.sourceType === 'DEMAND_RESPONSE') {
+    return '该会话来自需求大厅响应接受，后续应在这里沟通、报价并生成托管订单。'
+  }
+  if (conversation.sourceType === 'SERVICE_PACKAGE') {
+    return '该会话来自服务橱窗咨询或预约意向；当前前端只展示来源，不实现橱窗预订、锁档期或付款。'
+  }
+  return '当前来源类型不属于已明确的需求大厅或服务橱窗流程，本轮只做展示，不新增业务动作。'
+}
+
+function getQuoteOrderId(quote) {
+  return quote?.orderId || quote?.order?.orderId || quote?.confirmedOrderId || null
+}
+
+function hasPendingQuote(quotes) {
+  return quotes.some(quote => quote.status === 'PENDING_CONFIRM')
+}
+
+function getQuoteEntryHint(conversation, currentUser, quotes) {
+  if (!conversation) return ''
+  if (currentUser.role !== 'PROVIDER') return ''
+  if (currentUser.userId !== Number(conversation.participantBId)) {
+    return '只有该会话的服务方可以发起正式报价。'
+  }
+  if (conversation.isLocal || !getBackendConversationId(conversation)) {
+    return '当前不是后端真实会话，不能生成报价。'
+  }
+  if (hasPendingQuote(quotes)) {
+    return '已有待确认报价，需客户确认或拒绝后再发新报价。'
+  }
+  return '可以基于本次沟通发起正式报价，顾客确认后会生成订单。'
+}
+
+function validateQuoteForm(form, conversation, currentUser, quotes) {
+  const errors = []
+  if (!conversation || conversation.isLocal || !getBackendConversationId(conversation)) {
+    errors.push('当前会话必须是真实后端会话，才能发起报价。')
+  }
+  if (currentUser.role !== 'PROVIDER' || currentUser.userId !== Number(conversation?.participantBId)) {
+    errors.push('只有该会话的服务方可以发起报价。')
+  }
+  if (hasPendingQuote(quotes)) {
+    errors.push('已有待确认报价，需客户确认或拒绝后再发新报价。')
+  }
+
+  const amountCent = yuanToCent(form.amountYuan)
+  if (!Number.isInteger(amountCent) || amountCent <= 0) {
+    errors.push('报价金额必须大于 0，且转换成分后必须是有效整数。')
+  }
+
+  const shootStart = parseInputDate(form.shootStartTime)
+  const shootEnd = parseInputDate(form.shootEndTime)
+  const deliveryDeadline = parseInputDate(form.deliveryDeadline)
+  const now = new Date()
+  if (!shootStart) errors.push('拍摄开始时间必填。')
+  if (!shootEnd) errors.push('拍摄结束时间必填。')
+  if (!deliveryDeadline) errors.push('最晚交付时间必填。')
+  if (shootStart && shootStart <= now) {
+    errors.push('拍摄开始时间必须晚于当前时间。')
+  }
+  if (shootStart && shootEnd && shootEnd <= shootStart) {
+    errors.push('拍摄结束时间必须晚于拍摄开始时间。')
+  }
+  if (shootEnd && deliveryDeadline && deliveryDeadline <= shootEnd) {
+    errors.push('最晚交付时间必须晚于拍摄结束时间。')
+  }
+
+  if (!String(form.location || '').trim()) {
+    errors.push('拍摄地点不能为空。')
+  }
+  if (!String(form.serviceContent || '').trim()) {
+    errors.push('服务内容不能为空。')
+  }
+  if (!isNonNegativeInteger(form.originalCount)) {
+    errors.push('原片数量必须是非负整数。')
+  }
+  if (!isNonNegativeInteger(form.refinedCount)) {
+    errors.push('精修数量必须是非负整数。')
+  }
+
+  if (conversation?.scheduleStartTime && conversation?.scheduleEndTime && shootStart && shootEnd) {
+    const scheduleStart = parseInputDate(conversation.scheduleStartTime)
+    const scheduleEnd = parseInputDate(conversation.scheduleEndTime)
+    if (scheduleStart && scheduleEnd && (shootStart < scheduleStart || shootEnd > scheduleEnd)) {
+      errors.push('拍摄时间必须落在该会话明确返回的档期范围内。')
+    }
+  }
+  return errors
+}
+
+function parseInputDate(value) {
+  if (!value) return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function isNonNegativeInteger(value) {
+  if (value === '' || value === null || value === undefined) return true
+  const number = Number(value)
+  return Number.isInteger(number) && number >= 0
 }
 
 function getOrderAction(order, currentUser) {
