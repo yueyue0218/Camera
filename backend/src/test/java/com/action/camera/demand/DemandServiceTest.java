@@ -6,6 +6,7 @@ import com.action.camera.common.security.CurrentUser;
 import com.action.camera.common.security.UserRole;
 import com.action.camera.demand.domain.DemandResponseStatus;
 import com.action.camera.demand.domain.DemandStatus;
+import com.action.camera.demand.controller.DemandController;
 import com.action.camera.demand.dto.AcceptDemandResponseResult;
 import com.action.camera.demand.dto.AcceptedDemandResponseSnapshot;
 import com.action.camera.demand.dto.CreateDemandRequest;
@@ -15,21 +16,31 @@ import com.action.camera.demand.dto.DemandResponseDto;
 import com.action.camera.demand.repository.InMemoryDemandRepository;
 import com.action.camera.demand.repository.InMemoryDemandResponseRepository;
 import com.action.camera.demand.service.DemandService;
+import com.action.camera.message.model.CreateConversationCommand;
+import com.action.camera.message.model.CreateConversationResult;
+import com.action.camera.message.service.ConversationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class DemandServiceTest {
 
     private InMemoryDemandRepository demandRepository;
     private InMemoryDemandResponseRepository responseRepository;
+    private ConversationService conversationService;
     private DemandService demandService;
 
     private final CurrentUser customer = new CurrentUser(1001L, UserRole.CUSTOMER);
@@ -42,7 +53,10 @@ class DemandServiceTest {
     void setUp() {
         demandRepository = new InMemoryDemandRepository();
         responseRepository = new InMemoryDemandResponseRepository();
-        demandService = new DemandService(demandRepository, responseRepository);
+        conversationService = mock(ConversationService.class);
+        when(conversationService.createConversationWithInitialMessage(any(CreateConversationCommand.class)))
+                .thenReturn(new CreateConversationResult(91001L));
+        demandService = new DemandService(demandRepository, responseRepository, conversationService);
     }
 
     @Test
@@ -641,7 +655,18 @@ class DemandServiceTest {
         assertThat(result.getResponseStatus()).isEqualTo(DemandResponseStatus.ACCEPTED.name());
         assertThat(result.getConversationSourceType()).isEqualTo("DEMAND_RESPONSE");
         assertThat(result.getSourceId()).isEqualTo(response.getResponseId());
-        assertThat(result.getNextAction()).isEqualTo("PASS_SNAPSHOT_TO_C_CREATE_CONVERSATION");
+        assertThat(result.getConversationId()).isEqualTo(91001L);
+
+        ArgumentCaptor<CreateConversationCommand> commandCaptor =
+                ArgumentCaptor.forClass(CreateConversationCommand.class);
+        verify(conversationService).createConversationWithInitialMessage(commandCaptor.capture());
+        CreateConversationCommand command = commandCaptor.getValue();
+        assertThat(command.getCustomerId()).isEqualTo(customer.getUserId());
+        assertThat(command.getProviderId()).isEqualTo(provider.getUserId());
+        assertThat(command.getInitiatorId()).isEqualTo(customer.getUserId());
+        assertThat(command.getSourceType()).isEqualTo("DEMAND_RESPONSE");
+        assertThat(command.getSourceId()).isEqualTo(response.getResponseId());
+        assertThat(command.getInitialMessage()).isNotBlank();
     }
 
     @Test
@@ -721,6 +746,21 @@ class DemandServiceTest {
         assertThatThrownBy(() -> demandService.getAcceptedSnapshot(response.getResponseId(), provider))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("尚未被接受");
+    }
+
+    @Test
+    void demandControllerNoLongerExposesInvitationEndpoints() {
+        List<String> methodNames = Arrays.stream(DemandController.class.getDeclaredMethods())
+                .map(java.lang.reflect.Method::getName)
+                .toList();
+
+        assertThat(methodNames).doesNotContain(
+                "createInvitation",
+                "listReceivedInvitations",
+                "listSentInvitations",
+                "acceptInvitation",
+                "rejectInvitation"
+        );
     }
 
     private AcceptDemandResponseResult acceptOneResponse(DemandDto demand) {

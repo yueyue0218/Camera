@@ -6,11 +6,9 @@ import com.action.camera.common.security.CurrentUser;
 import com.action.camera.common.security.MockCurrentUserProvider;
 import com.action.camera.demand.dto.AcceptDemandResponseResult;
 import com.action.camera.demand.dto.AcceptedDemandResponseSnapshot;
-import com.action.camera.demand.dto.CreateDemandInvitationRequest;
 import com.action.camera.demand.dto.CreateDemandRequest;
 import com.action.camera.demand.dto.CreateDemandResponseRequest;
 import com.action.camera.demand.dto.DemandDto;
-import com.action.camera.demand.dto.DemandInvitationDto;
 import com.action.camera.demand.dto.DemandResponseDto;
 import com.action.camera.demand.service.DemandService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -80,40 +78,6 @@ public class DemandController {
                                                      HttpServletRequest httpRequest) {
         CurrentUser currentUser = currentUserProvider.getCurrentUser(httpRequest);
         return Result.success(demandService.respondToDemand(demandId, currentUser, request));
-    }
-
-    @PostMapping("/{demandId}/invitations")
-    public Result<DemandInvitationDto> createInvitation(@PathVariable Long demandId,
-                                                       @RequestBody CreateDemandInvitationRequest request,
-                                                       HttpServletRequest httpRequest) {
-        CurrentUser currentUser = currentUserProvider.getCurrentUser(httpRequest);
-        return Result.success(demandService.createInvitation(demandId, currentUser, request));
-    }
-
-    @GetMapping("/invitations/received")
-    public Result<List<DemandInvitationDto>> listReceivedInvitations(HttpServletRequest httpRequest) {
-        CurrentUser currentUser = currentUserProvider.getCurrentUser(httpRequest);
-        return Result.success(demandService.listReceivedInvitations(currentUser));
-    }
-
-    @GetMapping("/invitations/sent")
-    public Result<List<DemandInvitationDto>> listSentInvitations(HttpServletRequest httpRequest) {
-        CurrentUser currentUser = currentUserProvider.getCurrentUser(httpRequest);
-        return Result.success(demandService.listSentInvitations(currentUser));
-    }
-
-    @PostMapping("/invitations/{invitationId}/accept")
-    public Result<AcceptDemandResponseResult> acceptInvitation(@PathVariable Long invitationId,
-                                                               HttpServletRequest httpRequest) {
-        CurrentUser currentUser = currentUserProvider.getCurrentUser(httpRequest);
-        return Result.success(demandService.acceptInvitation(invitationId, currentUser));
-    }
-
-    @PostMapping("/invitations/{invitationId}/reject")
-    public Result<DemandInvitationDto> rejectInvitation(@PathVariable Long invitationId,
-                                                       HttpServletRequest httpRequest) {
-        CurrentUser currentUser = currentUserProvider.getCurrentUser(httpRequest);
-        return Result.success(demandService.rejectInvitation(invitationId, currentUser));
     }
 
     @GetMapping("/{demandId}/responses")

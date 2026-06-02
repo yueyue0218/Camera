@@ -6,6 +6,8 @@ import com.action.camera.message.entity.Message;
 import com.action.camera.message.entity.Quote;
 import com.action.camera.message.enums.QuoteStatus;
 import com.action.camera.message.model.AcceptedResponseSnapshot;
+import com.action.camera.message.model.CreateConversationCommand;
+import com.action.camera.message.model.CreateConversationResult;
 import com.action.camera.message.model.CreateQuoteCommand;
 import com.action.camera.message.repository.ConversationRepository;
 import com.action.camera.message.repository.MessageRepository;
@@ -66,8 +68,8 @@ class ConversationMessageQuoteServiceTest {
 
     @BeforeEach
     void setUp() {
-        conversationService = new ConversationService(conversationRepository);
         messageService = new MessageService(conversationRepository, messageRepository);
+        conversationService = new ConversationService(conversationRepository, messageService);
         quoteService = new QuoteService(quoteRepository, conversationRepository, orderService);
     }
 
@@ -105,6 +107,40 @@ class ConversationMessageQuoteServiceTest {
 
         assertEquals(existing, conversation);
         verify(conversationRepository, never()).save(any(Conversation.class));
+    }
+
+    @Test
+    void createConversationWithInitialMessageSavesFirstMessage() {
+        when(conversationRepository.findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBId(
+                ConversationService.SOURCE_TYPE_SERVICE_PACKAGE, 9101L, CUSTOMER_ID, PROVIDER_USER_ID))
+                .thenReturn(Optional.empty());
+        when(conversationRepository.save(any(Conversation.class))).thenAnswer(invocation -> {
+            Conversation conversation = invocation.getArgument(0);
+            if (conversation.getId() == null) {
+                conversation.setId(CONVERSATION_ID);
+            }
+            return conversation;
+        });
+        when(conversationRepository.findById(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
+        when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> {
+            Message message = invocation.getArgument(0);
+            message.setId(1L);
+            return message;
+        });
+
+        CreateConversationResult result = conversationService.createConversationWithInitialMessage(
+                new CreateConversationCommand(
+                        CUSTOMER_ID,
+                        PROVIDER_USER_ID,
+                        CUSTOMER_ID,
+                        ConversationService.SOURCE_TYPE_SERVICE_PACKAGE,
+                        9101L,
+                        "I want to reserve this service."
+                )
+        );
+
+        assertEquals(CONVERSATION_ID, result.getConversationId());
+        verify(messageRepository, times(1)).save(any(Message.class));
     }
 
     @Test
@@ -419,7 +455,7 @@ class ConversationMessageQuoteServiceTest {
         command.setTerms("P4 quote terms");
         command.setContractTerms("P4 contract terms");
         command.setSafetyNoticeVersion("P4-DEMO");
-        command.setExpireTime(LocalDateTime.of(2026, 5, 30, 23, 59));
+        command.setExpireTime(LocalDateTime.now().plusDays(1));
         command.setRemark("Basic retouch included");
         return command;
     }

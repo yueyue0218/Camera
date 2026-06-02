@@ -70,6 +70,12 @@ class ScheduleServiceTest {
                 eq(request.startTime()),
                 eq(request.endTime()),
                 eq(null))).thenReturn(List.of());
+        when(scheduleRepository.findOverlappingSchedules(
+                eq(PROVIDER_ID),
+                eq(ScheduleStatus.HELD),
+                eq(request.startTime()),
+                eq(request.endTime()),
+                eq(null))).thenReturn(List.of());
         when(scheduleRepository.save(any(Schedule.class))).thenAnswer(invocation -> {
             Schedule schedule = invocation.getArgument(0);
             schedule.setId(SCHEDULE_ID);
@@ -112,7 +118,57 @@ class ScheduleServiceTest {
         when(scheduleRepository
                 .findFirstByProviderUserIdAndStatusAndStartTimeLessThanEqualAndEndTimeGreaterThanEqualOrderByStartTimeAsc(
                         PROVIDER_ID,
+                        ScheduleStatus.HELD,
+                        order.getShootStartTime(),
+                        order.getShootEndTime())).thenReturn(Optional.empty());
+        when(scheduleRepository
+                .findFirstByProviderUserIdAndStatusAndStartTimeLessThanEqualAndEndTimeGreaterThanEqualOrderByStartTimeAsc(
+                        PROVIDER_ID,
                         ScheduleStatus.AVAILABLE,
+                        order.getShootStartTime(),
+                        order.getShootEndTime())).thenReturn(Optional.of(schedule));
+
+        scheduleService.lockForPaidOrder(order);
+
+        ArgumentCaptor<Schedule> captor = ArgumentCaptor.forClass(Schedule.class);
+        verify(scheduleRepository).save(captor.capture());
+        assertEquals(ScheduleStatus.BOOKED, captor.getValue().getStatus());
+        assertEquals(ORDER_ID, captor.getValue().getLockedByOrderId());
+    }
+
+    @Test
+    void temporaryHoldMarksAvailableScheduleHeld() {
+        Schedule schedule = availableSchedule();
+        when(scheduleRepository.findFirstByProviderUserIdAndStatusAndScheduleDateOrderByStartTimeAsc(
+                PROVIDER_ID,
+                ScheduleStatus.AVAILABLE,
+                LocalDate.of(2026, 6, 1))).thenReturn(Optional.of(schedule));
+        when(scheduleRepository.save(any(Schedule.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Long holdId = scheduleService.createTemporaryHold(PROVIDER_ID, 9101L, LocalDate.of(2026, 6, 1));
+
+        ArgumentCaptor<Schedule> captor = ArgumentCaptor.forClass(Schedule.class);
+        verify(scheduleRepository).save(captor.capture());
+        assertEquals(SCHEDULE_ID, holdId);
+        assertEquals(ScheduleStatus.HELD, captor.getValue().getStatus());
+        assertEquals(null, captor.getValue().getLockedByOrderId());
+    }
+
+    @Test
+    void paidOrderConfirmsHeldScheduleBeforeAvailableSchedule() {
+        Order order = order();
+        Schedule schedule = availableSchedule();
+        schedule.setStatus(ScheduleStatus.HELD);
+        when(scheduleRepository.findOverlappingSchedules(
+                PROVIDER_ID,
+                ScheduleStatus.BOOKED,
+                order.getShootStartTime(),
+                order.getShootEndTime(),
+                null)).thenReturn(List.of());
+        when(scheduleRepository
+                .findFirstByProviderUserIdAndStatusAndStartTimeLessThanEqualAndEndTimeGreaterThanEqualOrderByStartTimeAsc(
+                        PROVIDER_ID,
+                        ScheduleStatus.HELD,
                         order.getShootStartTime(),
                         order.getShootEndTime())).thenReturn(Optional.of(schedule));
 

@@ -10,14 +10,15 @@ import com.action.camera.demand.domain.DemandResponseStatus;
 import com.action.camera.demand.domain.DemandStatus;
 import com.action.camera.demand.dto.AcceptDemandResponseResult;
 import com.action.camera.demand.dto.AcceptedDemandResponseSnapshot;
-import com.action.camera.demand.dto.CreateDemandInvitationRequest;
 import com.action.camera.demand.dto.CreateDemandRequest;
 import com.action.camera.demand.dto.CreateDemandResponseRequest;
 import com.action.camera.demand.dto.DemandDto;
-import com.action.camera.demand.dto.DemandInvitationDto;
 import com.action.camera.demand.dto.DemandResponseDto;
 import com.action.camera.demand.repository.DemandRepository;
 import com.action.camera.demand.repository.DemandResponseRepository;
+import com.action.camera.message.model.CreateConversationCommand;
+import com.action.camera.message.model.CreateConversationResult;
+import com.action.camera.message.service.ConversationService;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -26,26 +27,24 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 @Service
 public class DemandService {
 
     private static final int DEFAULT_EXPIRE_DAYS = 30;
-    private static final String INVITATION_ACCEPTED = "ACCEPTED";
-    private static final String INVITATION_REJECTED = "REJECTED";
+    private static final String DEFAULT_ACCEPT_INITIAL_MESSAGE = "Demand response accepted; conversation opened.";
 
     private final DemandRepository demandRepository;
     private final DemandResponseRepository responseRepository;
-    private final AtomicLong invitationIdGenerator = new AtomicLong(7000);
-    private final ConcurrentMap<Long, DemandInvitationDto> invitations = new ConcurrentHashMap<>();
+    private final ConversationService conversationService;
 
-    public DemandService(DemandRepository demandRepository, DemandResponseRepository responseRepository) {
+    public DemandService(DemandRepository demandRepository,
+                         DemandResponseRepository responseRepository,
+                         ConversationService conversationService) {
         this.demandRepository = demandRepository;
         this.responseRepository = responseRepository;
+        this.conversationService = conversationService;
     }
 
     public DemandDto createDemand(CurrentUser user, CreateDemandRequest request) {
@@ -165,98 +164,18 @@ public class DemandService {
     }
 
     public AcceptDemandResponseResult acceptResponse(Long demandId, Long responseId, CurrentUser user) {
-        return new AcceptDemandResponseResult(acceptResponseAndBuildSnapshot(demandId, responseId, user));
-    }
-
-    public DemandInvitationDto createInvitation(Long demandId, CurrentUser user, CreateDemandInvitationRequest request) {
-        requireProvider(user);
-        Demand demand = findDemand(demandId);
-        if (demand.getCustomerId().equals(user.getUserId())) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "不能向自己发布的需求发起邀请");
-        }
-        if (demand.getStatus() != DemandStatus.OPEN) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "只有开放中的需求可以发起邀请");
-        }
-        if (request == null || isBlank(request.getMessage())) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "邀请说明不能为空");
-        }
-        validateCent(request.getExpectedPriceCent(), "邀请报价不能为负数");
-        boolean duplicated = invitations.values().stream()
-                .anyMatch(invitation -> invitation.getDemandId().equals(demandId)
-                        && invitation.getProviderId().equals(user.getUserId()));
-        if (duplicated) {
-            throw new BusinessException(ErrorCode.DUPLICATE_OPERATION, "同一服务方不能重复邀请同一需求");
-        }
-        DemandInvitationDto invitation = new DemandInvitationDto(
-                invitationIdGenerator.incrementAndGet(),
-                demand.getId(),
-                demand.getCustomerId(),
-                user.getUserId(),
-                demand.getScene(),
-                trim(request.getMessage()),
-                request.getExpectedPriceCent(),
-                LocalDateTime.now()
+        AcceptedDemandResponseSnapshot snapshot = acceptResponseAndBuildSnapshot(demandId, responseId, user);
+        CreateConversationResult conversation = conversationService.createConversationWithInitialMessage(
+                new CreateConversationCommand(
+                        snapshot.getCustomerId(),
+                        snapshot.getProviderId(),
+                        user.getUserId(),
+                        ConversationService.SOURCE_TYPE_DEMAND_RESPONSE,
+                        snapshot.getResponseId(),
+                        DEFAULT_ACCEPT_INITIAL_MESSAGE
+                )
         );
-        invitations.put(invitation.getInvitationId(), invitation);
-        return invitation;
-    }
-
-    public List<DemandInvitationDto> listReceivedInvitations(CurrentUser user) {
-        requireCustomer(user);
-        return invitations.values().stream()
-                .filter(invitation -> invitation.getCustomerId().equals(user.getUserId()))
-                .sorted(Comparator.comparing(DemandInvitationDto::getCreatedAt).reversed())
-                .collect(Collectors.toList());
-    }
-
-    public List<DemandInvitationDto> listSentInvitations(CurrentUser user) {
-        requireProvider(user);
-        return invitations.values().stream()
-                .filter(invitation -> invitation.getProviderId().equals(user.getUserId()))
-                .sorted(Comparator.comparing(DemandInvitationDto::getCreatedAt).reversed())
-                .collect(Collectors.toList());
-    }
-
-    public AcceptDemandResponseResult acceptInvitation(Long invitationId, CurrentUser user) {
-        requireCustomer(user);
-        DemandInvitationDto invitation = findInvitation(invitationId);
-        ensureInvitationOwner(invitation, user);
-
-        if (INVITATION_REJECTED.equals(invitation.getStatus())) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "该邀请已被暂不接受，不能再次接受");
-        }
-        if (INVITATION_ACCEPTED.equals(invitation.getStatus()) && invitation.getResponseId() != null) {
-            return new AcceptDemandResponseResult(getAcceptedSnapshot(invitation.getResponseId(), user));
-        }
-
-        Demand demand = findDemand(invitation.getDemandId());
-        if (!demand.getCustomerId().equals(user.getUserId())) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "只有需求发布者可以接受邀请");
-        }
-        DemandResponse response = responseRepository
-                .findByDemandIdAndProviderId(invitation.getDemandId(), invitation.getProviderId())
-                .orElseGet(() -> createResponseFromInvitation(invitation, demand));
-
-        AcceptedDemandResponseSnapshot snapshot =
-                acceptResponseAndBuildSnapshot(invitation.getDemandId(), response.getId(), user);
-        invitations.put(invitationId, invitation.accepted(snapshot.getResponseId(), LocalDateTime.now()));
-        return new AcceptDemandResponseResult(snapshot);
-    }
-
-    public DemandInvitationDto rejectInvitation(Long invitationId, CurrentUser user) {
-        requireCustomer(user);
-        DemandInvitationDto invitation = findInvitation(invitationId);
-        ensureInvitationOwner(invitation, user);
-
-        if (INVITATION_ACCEPTED.equals(invitation.getStatus())) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "该邀请已接受，不能再暂不接受");
-        }
-        if (INVITATION_REJECTED.equals(invitation.getStatus())) {
-            return invitation;
-        }
-        DemandInvitationDto rejected = invitation.rejected(LocalDateTime.now());
-        invitations.put(invitationId, rejected);
-        return rejected;
+        return new AcceptDemandResponseResult(snapshot, conversation.getConversationId());
     }
 
     public AcceptedDemandResponseSnapshot getAcceptedSnapshot(Long responseId, CurrentUser user) {
@@ -325,39 +244,6 @@ public class DemandService {
         }
         return demandRepository.findById(demandId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "需求不存在"));
-    }
-
-    private DemandInvitationDto findInvitation(Long invitationId) {
-        if (invitationId == null) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "invitationId 不能为空");
-        }
-        DemandInvitationDto invitation = invitations.get(invitationId);
-        if (invitation == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "邀请不存在");
-        }
-        return invitation;
-    }
-
-    private void ensureInvitationOwner(DemandInvitationDto invitation, CurrentUser user) {
-        if (!invitation.getCustomerId().equals(user.getUserId())) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "只有收到邀请的需求方可以处理邀请");
-        }
-    }
-
-    private DemandResponse createResponseFromInvitation(DemandInvitationDto invitation, Demand demand) {
-        DemandResponse response = new DemandResponse(
-                responseRepository.nextId(),
-                invitation.getDemandId(),
-                invitation.getProviderId(),
-                invitation.getProviderId(),
-                trim(invitation.getMessage()),
-                invitation.getExpectedPriceCent(),
-                LocalDateTime.now()
-        );
-        responseRepository.save(response);
-        demand.increaseResponseCount();
-        demandRepository.save(demand);
-        return response;
     }
 
     private DemandResponse findResponse(Long responseId) {

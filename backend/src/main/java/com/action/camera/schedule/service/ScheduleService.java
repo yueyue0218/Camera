@@ -66,8 +66,8 @@ public class ScheduleService {
         ensureProvider(currentUser);
         Schedule schedule = getOwnedSchedule(scheduleId, currentUser.getUserId());
 
-        if (schedule.getStatus() == ScheduleStatus.BOOKED) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Booked schedule cannot be edited");
+        if (schedule.getStatus() == ScheduleStatus.BOOKED || schedule.getStatus() == ScheduleStatus.HELD) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Locked schedule cannot be edited");
         }
         validateUpdateRequest(request);
         schedule.setCityCode(request.cityCode().trim());
@@ -78,8 +78,8 @@ public class ScheduleService {
         schedule.setTimeSlot(normalize(request.timeSlot()));
         schedule.setPrivateRemark(normalize(request.remark()));
         schedule.setStatus(request.status() == null ? ScheduleStatus.AVAILABLE : request.status());
-        if (schedule.getStatus() == ScheduleStatus.BOOKED) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Provider cannot manually mark a schedule booked");
+        if (schedule.getStatus() == ScheduleStatus.BOOKED || schedule.getStatus() == ScheduleStatus.HELD) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Provider cannot manually mark a schedule locked");
         }
         ensureNoOverlappingActiveSchedule(schedule, schedule.getId());
 
@@ -90,10 +90,35 @@ public class ScheduleService {
     public void deleteSchedule(CurrentUser currentUser, Long scheduleId) {
         ensureProvider(currentUser);
         Schedule schedule = getOwnedSchedule(scheduleId, currentUser.getUserId());
-        if (schedule.getStatus() == ScheduleStatus.BOOKED) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Booked schedule cannot be deleted");
+        if (schedule.getStatus() == ScheduleStatus.BOOKED || schedule.getStatus() == ScheduleStatus.HELD) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Locked schedule cannot be deleted");
         }
         scheduleRepository.delete(schedule);
+    }
+
+    @Transactional
+    public Long createTemporaryHold(Long providerUserId, Long servicePackageId, LocalDate selectedDate) {
+        if (providerUserId == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "providerUserId must not be null");
+        }
+        if (servicePackageId == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "servicePackageId must not be null");
+        }
+        if (selectedDate == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "selectedDate must not be null");
+        }
+        Schedule schedule = scheduleRepository
+                .findFirstByProviderUserIdAndStatusAndScheduleDateOrderByStartTimeAsc(
+                        providerUserId,
+                        ScheduleStatus.AVAILABLE,
+                        selectedDate)
+                .orElseThrow(() -> new BusinessException(ErrorCode.STATUS_CONFLICT,
+                        "No available schedule can be held for selected date"));
+        schedule.setStatus(ScheduleStatus.HELD);
+        schedule.setLockExpireTime(LocalDateTime.now().plusMinutes(30));
+        schedule.setPrivateRemark(mergeRemark(schedule.getPrivateRemark(),
+                "Temporary hold for service package " + servicePackageId));
+        return scheduleRepository.save(schedule).getId();
     }
 
     @Transactional(readOnly = true)
@@ -151,10 +176,19 @@ public class ScheduleService {
         Schedule schedule = scheduleRepository
                 .findFirstByProviderUserIdAndStatusAndStartTimeLessThanEqualAndEndTimeGreaterThanEqualOrderByStartTimeAsc(
                         order.getProviderUserId(),
-                        ScheduleStatus.AVAILABLE,
+                        ScheduleStatus.HELD,
                         order.getShootStartTime(),
                         order.getShootEndTime())
                 .orElse(null);
+        if (schedule == null) {
+            schedule = scheduleRepository
+                    .findFirstByProviderUserIdAndStatusAndStartTimeLessThanEqualAndEndTimeGreaterThanEqualOrderByStartTimeAsc(
+                            order.getProviderUserId(),
+                            ScheduleStatus.AVAILABLE,
+                            order.getShootStartTime(),
+                            order.getShootEndTime())
+                    .orElse(null);
+        }
         if (schedule == null) {
             return;
         }
@@ -228,15 +262,28 @@ public class ScheduleService {
         if (schedule.getStatus() == ScheduleStatus.UNAVAILABLE) {
             return;
         }
-        List<Schedule> overlaps = scheduleRepository.findOverlappingSchedules(
+        List<Schedule> availableOverlaps = scheduleRepository.findOverlappingSchedules(
                 schedule.getProviderUserId(),
                 ScheduleStatus.AVAILABLE,
                 schedule.getStartTime(),
                 schedule.getEndTime(),
                 excludeScheduleId);
-        if (!overlaps.isEmpty()) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Schedule overlaps with existing available slot");
+        List<Schedule> heldOverlaps = scheduleRepository.findOverlappingSchedules(
+                schedule.getProviderUserId(),
+                ScheduleStatus.HELD,
+                schedule.getStartTime(),
+                schedule.getEndTime(),
+                excludeScheduleId);
+        if (!availableOverlaps.isEmpty() || !heldOverlaps.isEmpty()) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Schedule overlaps with existing active slot");
         }
+    }
+
+    private String mergeRemark(String originalRemark, String addition) {
+        if (originalRemark == null || originalRemark.isBlank()) {
+            return addition;
+        }
+        return originalRemark + " | " + addition;
     }
 
     private String normalize(String value) {

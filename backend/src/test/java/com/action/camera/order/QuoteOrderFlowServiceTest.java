@@ -210,6 +210,20 @@ class QuoteOrderFlowServiceTest {
     }
 
     @Test
+    void expiredQuoteCannotBeConfirmedAndDoesNotCreateOrder() {
+        Quote quote = pendingQuote();
+        quote.setExpireTime(LocalDateTime.now().minusMinutes(1));
+        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.save(any(Quote.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThrows(BusinessException.class,
+                () -> quoteService.confirmQuote(QUOTE_ID, CUSTOMER_ID, "确认已过期报价"));
+
+        assertEquals(QuoteStatus.EXPIRED, quote.getStatus());
+        verify(orderRepository, never()).save(any(Order.class));
+    }
+
+    @Test
     void mockPayHoldsFundsAndWritesPaymentRecordAndStatusLog() {
         Order order = pendingPaymentOrder();
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
@@ -307,7 +321,7 @@ class QuoteOrderFlowServiceTest {
         quote.setDeliveryDays(7);
         quote.setRemark("含基础调色");
         quote.setStatus(QuoteStatus.PENDING_CONFIRM);
-        quote.setExpireTime(LocalDateTime.of(2026, 5, 30, 23, 59));
+        quote.setExpireTime(LocalDateTime.now().plusDays(1));
         quote.setCreatedAt(LocalDateTime.now());
         quote.setUpdatedAt(LocalDateTime.now());
         return quote;

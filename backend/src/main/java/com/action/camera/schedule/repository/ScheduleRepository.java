@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -19,6 +20,11 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
             ScheduleStatus status,
             LocalDateTime startTime,
             LocalDateTime endTime);
+
+    Optional<Schedule> findFirstByProviderUserIdAndStatusAndScheduleDateOrderByStartTimeAsc(
+            Long providerUserId,
+            ScheduleStatus status,
+            LocalDate scheduleDate);
 
     List<Schedule> findByLockedByOrderIdAndStatus(Long lockedByOrderId, ScheduleStatus status);
 
