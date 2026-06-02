@@ -52,6 +52,7 @@ public final class OrderStatusMachine {
         ));
         transitions.put(OrderStatus.PENDING_DELIVERY, immutableEnumSet(
                 OrderStatus.DELIVERED_PENDING_CONFIRM,
+                OrderStatus.REFUNDED,
                 OrderStatus.APPEALING
         ));
         transitions.put(OrderStatus.DELIVERED_PENDING_CONFIRM, immutableEnumSet(

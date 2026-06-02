@@ -4,6 +4,7 @@ import com.action.camera.common.ErrorCode;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.security.UserRole;
+import com.action.camera.delivery.repository.DeliveryRepository;
 import com.action.camera.message.entity.Quote;
 import com.action.camera.message.enums.QuoteStatus;
 import com.action.camera.notification.dto.NotificationCreateRequest;
@@ -40,15 +41,23 @@ public class OrderService {
     public static final String MOCK_PAY_METHOD = "MOCK_PAY";
     private static final int REWORK_REASON_MAX_LENGTH = 200;
     private static final String PAYMENT_SUCCESS = "SUCCESS";
+    private static final String PAYMENT_REFUNDED = "REFUNDED";
+    private static final String SETTLEMENT_NOT_SETTLED = "NOT_SETTLED";
     private static final String SETTLEMENT_SETTLED = "SETTLED";
+    private static final String REFUND_NONE = "NONE";
+    private static final String REFUND_SUCCESS = "REFUNDED";
     private static final String SOURCE_TYPE_SERVICE_PACKAGE = "SERVICE_PACKAGE";
     private static final long SYSTEM_OPERATOR_ID = 0L;
     private static final String SYSTEM_OPERATOR_ROLE = "SYSTEM";
     private static final String AUTO_CONFIRM_REASON = "交付后 7 天未操作，系统自动确认完成";
+    private static final String AUTO_SHOOTING_START_REASON = "系统根据拍摄开始时间自动进入拍摄中";
+    private static final String AUTO_SHOOTING_END_REASON = "系统根据拍摄结束时间自动进入待交付";
+    private static final String AUTO_REFUND_UNDELIVERED_REASON = "超过最晚交付时间仍未上传作品，系统自动退款并结束订单";
 
     private final OrderRepository orderRepository;
     private final PaymentRecordRepository paymentRecordRepository;
     private final OrderStatusLogRepository orderStatusLogRepository;
+    private final DeliveryRepository deliveryRepository;
 
     @Autowired(required = false)
     private ApplicationEventPublisher eventPublisher;
@@ -207,6 +216,106 @@ public class OrderService {
         return confirmedCount;
     }
 
+    @Transactional
+    public int autoAdvanceShootingOrders(LocalDateTime now) {
+        if (now == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "now must not be null");
+        }
+        int advancedCount = 0;
+        for (Order candidate : orderRepository.findByStatus(OrderStatus.PAID_PENDING_SHOOT)) {
+            Optional<Order> lockedOrder = orderRepository.findByIdForUpdate(candidate.getId());
+            if (lockedOrder.isEmpty()) {
+                continue;
+            }
+            Order order = lockedOrder.get();
+            if (order.getStatus() != OrderStatus.PAID_PENDING_SHOOT
+                    || order.getShootStartTime() == null
+                    || order.getShootStartTime().isAfter(now)) {
+                continue;
+            }
+            ensureCanChangeStatus(OrderStatus.PAID_PENDING_SHOOT, OrderStatus.SHOOTING);
+            Order shootingOrder = applyStatusChange(
+                    order,
+                    OrderStatus.PAID_PENDING_SHOOT,
+                    OrderStatus.SHOOTING,
+                    SYSTEM_OPERATOR_ID,
+                    SYSTEM_OPERATOR_ROLE,
+                    AUTO_SHOOTING_START_REASON
+            );
+            advancedCount++;
+            if (shootingOrder.getShootEndTime() != null && !shootingOrder.getShootEndTime().isAfter(now)) {
+                ensureCanChangeStatus(OrderStatus.SHOOTING, OrderStatus.PENDING_DELIVERY);
+                applyStatusChange(
+                        shootingOrder,
+                        OrderStatus.SHOOTING,
+                        OrderStatus.PENDING_DELIVERY,
+                        SYSTEM_OPERATOR_ID,
+                        SYSTEM_OPERATOR_ROLE,
+                        AUTO_SHOOTING_END_REASON
+                );
+                advancedCount++;
+            }
+        }
+        for (Order candidate : orderRepository.findByStatus(OrderStatus.SHOOTING)) {
+            Optional<Order> lockedOrder = orderRepository.findByIdForUpdate(candidate.getId());
+            if (lockedOrder.isEmpty()) {
+                continue;
+            }
+            Order order = lockedOrder.get();
+            if (order.getStatus() != OrderStatus.SHOOTING
+                    || order.getShootEndTime() == null
+                    || order.getShootEndTime().isAfter(now)) {
+                continue;
+            }
+            ensureCanChangeStatus(OrderStatus.SHOOTING, OrderStatus.PENDING_DELIVERY);
+            applyStatusChange(
+                    order,
+                    OrderStatus.SHOOTING,
+                    OrderStatus.PENDING_DELIVERY,
+                    SYSTEM_OPERATOR_ID,
+                    SYSTEM_OPERATOR_ROLE,
+                    AUTO_SHOOTING_END_REASON
+            );
+            advancedCount++;
+        }
+        return advancedCount;
+    }
+
+    @Transactional
+    public int autoRefundOverdueUndeliveredOrders(LocalDateTime now) {
+        if (now == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "now must not be null");
+        }
+        int refundedCount = 0;
+        for (Order candidate : orderRepository.findByStatus(OrderStatus.PENDING_DELIVERY)) {
+            Optional<Order> lockedOrder = orderRepository.findByIdForUpdate(candidate.getId());
+            if (lockedOrder.isEmpty()) {
+                continue;
+            }
+            Order order = lockedOrder.get();
+            if (order.getStatus() != OrderStatus.PENDING_DELIVERY
+                    || order.getDeliveryDeadline() == null
+                    || !now.isAfter(order.getDeliveryDeadline())) {
+                continue;
+            }
+            if (deliveryRepository.existsByOrderId(order.getId())) {
+                continue;
+            }
+            ensureCanChangeStatus(OrderStatus.PENDING_DELIVERY, OrderStatus.REFUNDED);
+            markRefunded(order, now);
+            applyStatusChange(
+                    order,
+                    OrderStatus.PENDING_DELIVERY,
+                    OrderStatus.REFUNDED,
+                    SYSTEM_OPERATOR_ID,
+                    SYSTEM_OPERATOR_ROLE,
+                    AUTO_REFUND_UNDELIVERED_REASON
+            );
+            refundedCount++;
+        }
+        return refundedCount;
+    }
+
     @Transactional(readOnly = true)
     public List<Order> listMyOrders(Long operatorId, String role, OrderStatus status) {
         if (operatorId == null) {
@@ -336,8 +445,8 @@ public class OrderService {
         }
         order.setStatus(OrderStatus.PENDING_PAYMENT);
         order.setEscrowStatus(EscrowStatus.NOT_PAID);
-        order.setSettlementStatus("NOT_SETTLED");
-        order.setRefundStatus("NONE");
+        order.setSettlementStatus(SETTLEMENT_NOT_SETTLED);
+        order.setRefundStatus(REFUND_NONE);
         order.setTotalAmountCent(quote.getAmountCent());
         order.setPlatformFeeCent(0L);
         order.setProviderIncomeCent(quote.getAmountCent());
@@ -408,6 +517,18 @@ public class OrderService {
         if (autoConfirmed) {
             order.setAutoConfirmTime(completedAt);
         }
+    }
+
+    private void markRefunded(Order order, LocalDateTime refundedAt) {
+        order.setEscrowStatus(EscrowStatus.REFUNDED);
+        order.setSettlementStatus(SETTLEMENT_NOT_SETTLED);
+        order.setRefundStatus(REFUND_SUCCESS);
+        paymentRecordRepository.findByOrderId(order.getId()).ifPresent(paymentRecord -> {
+            paymentRecord.setRefundAmountCent(order.getTotalAmountCent());
+            paymentRecord.setRefundedAt(refundedAt);
+            paymentRecord.setStatus(PAYMENT_REFUNDED);
+            paymentRecordRepository.save(paymentRecord);
+        });
     }
 
     private String resolveOperatorRole(Order order, Long operatorId) {

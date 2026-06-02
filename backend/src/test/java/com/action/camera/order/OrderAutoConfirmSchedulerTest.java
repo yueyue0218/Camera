@@ -17,6 +17,10 @@ class OrderAutoConfirmSchedulerTest {
     @Test
     void schedulerDelegatesToOrderService() {
         OrderService orderService = mock(OrderService.class);
+        when(orderService.autoAdvanceShootingOrders(org.mockito.ArgumentMatchers.any(LocalDateTime.class)))
+                .thenReturn(3);
+        when(orderService.autoRefundOverdueUndeliveredOrders(org.mockito.ArgumentMatchers.any(LocalDateTime.class)))
+                .thenReturn(1);
         when(orderService.autoConfirmTimeoutOrders(org.mockito.ArgumentMatchers.any(LocalDateTime.class)))
                 .thenReturn(2);
         OrderAutoConfirmScheduler scheduler = new OrderAutoConfirmScheduler(orderService);
@@ -24,7 +28,9 @@ class OrderAutoConfirmSchedulerTest {
         scheduler.runAutoConfirm();
 
         ArgumentCaptor<LocalDateTime> nowCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
-        verify(orderService).autoConfirmTimeoutOrders(nowCaptor.capture());
+        verify(orderService).autoAdvanceShootingOrders(nowCaptor.capture());
+        verify(orderService).autoRefundOverdueUndeliveredOrders(org.mockito.ArgumentMatchers.any(LocalDateTime.class));
+        verify(orderService).autoConfirmTimeoutOrders(org.mockito.ArgumentMatchers.any(LocalDateTime.class));
         assertNotNull(nowCaptor.getValue());
     }
 }

@@ -4,6 +4,7 @@ import com.action.camera.common.ErrorCode;
 import com.action.camera.common.Result;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
+import com.action.camera.delivery.repository.DeliveryRepository;
 import com.action.camera.order.controller.OrderController;
 import com.action.camera.order.dto.MockPaymentRequest;
 import com.action.camera.order.dto.OrderResponse;
@@ -67,6 +68,9 @@ class OrderControllerTest {
     private OrderStatusLogRepository orderStatusLogRepository;
 
     @Mock
+    private DeliveryRepository deliveryRepository;
+
+    @Mock
     private NotificationService notificationService;
 
     private OrderController orderController;
@@ -75,7 +79,7 @@ class OrderControllerTest {
 
     @BeforeEach
     void setUp() {
-        OrderService orderService = new OrderService(orderRepository, paymentRecordRepository, orderStatusLogRepository);
+        OrderService orderService = new OrderService(orderRepository, paymentRecordRepository, orderStatusLogRepository, deliveryRepository);
         ReflectionTestUtils.setField(orderService, "notificationService", notificationService);
         orderController = new OrderController(orderService);
         savedLogs.clear();

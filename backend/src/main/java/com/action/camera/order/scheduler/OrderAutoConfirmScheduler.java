@@ -17,7 +17,16 @@ public class OrderAutoConfirmScheduler {
 
     @Scheduled(fixedDelay = 3_600_000L, initialDelay = 60_000L)
     public void runAutoConfirm() {
-        int confirmedCount = orderService.autoConfirmTimeoutOrders(LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        int advancedCount = orderService.autoAdvanceShootingOrders(now);
+        if (advancedCount > 0) {
+            log.info("Auto-advanced {} shooting order status transitions", advancedCount);
+        }
+        int refundedCount = orderService.autoRefundOverdueUndeliveredOrders(now);
+        if (refundedCount > 0) {
+            log.info("Auto-refunded {} overdue undelivered orders", refundedCount);
+        }
+        int confirmedCount = orderService.autoConfirmTimeoutOrders(now);
         if (confirmedCount > 0) {
             log.info("Auto-confirmed {} delivered orders after timeout", confirmedCount);
         }
