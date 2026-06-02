@@ -2400,7 +2400,7 @@ function OrdersPage() {
 
                 {selectedOrder.status === 'DELIVERED_PENDING_CONFIRM' && (
                   <Alert severity="info">
-                    交付后 7 天内客户未确认、未申请返修、未发起申诉，系统将自动确认验收并释放托管资金。
+                    摄影师已交付作品。客户需在交付后 7 天内确认接收或提交返修要求；若 7 天内未处理，系统将自动确认订单完成并释放托管资金。
                     {estimatedAutoConfirmTime && ` 预计自动确认时间：${formatTime(estimatedAutoConfirmTime)}`}
                   </Alert>
                 )}
