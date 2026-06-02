@@ -95,7 +95,7 @@ class ProjectDesignFullCoverageTest {
         addNotContains(tests, "frontend no longer calls removed student login endpoint", sources.frontendApi + sources.frontendApp, "/users/login");
         addContains(tests, "frontend current user profile endpoint", sources.frontendApi, "'/users/me'");
         addContains(tests, "frontend public user brief endpoint", sources.frontendApi, "`/users/${userId}/brief`");
-        addContains(tests, "frontend demand list and create endpoint", sources.frontendApi, "`/demands${suffix}`");
+        addContains(tests, "frontend demand list and create endpoint", sources.frontendApi, "`/demands${buildQuery(params)}`");
         addContains(tests, "frontend demand response endpoint", sources.frontendApi, "`/demands/${demandId}/responses`");
         addContains(tests, "frontend demand response accept endpoint", sources.frontendApi, "`/demands/${demandId}/responses/${responseId}/accept`");
         addContains(tests, "frontend invitations received endpoint", sources.frontendApi, "'/demands/invitations/received'");
@@ -105,7 +105,7 @@ class ProjectDesignFullCoverageTest {
         addContains(tests, "frontend conversation quotations endpoint", sources.frontendApi, "`/conversations/${conversationId}/quotations${suffix}`");
         addContains(tests, "frontend create quotation endpoint", sources.frontendApi, "'/quotations'");
         addContains(tests, "frontend confirm quotation endpoint", sources.frontendApi, "`/quotations/${quotationId}/confirm`");
-        addContains(tests, "frontend order list endpoint", sources.frontendApi, "`/orders${suffix}`");
+        addContains(tests, "frontend order list endpoint", sources.frontendApi, "`/orders${buildQuery(params)}`");
         addContains(tests, "frontend order payment endpoint", sources.frontendApi, "`/orders/${orderId}/payments`");
         addContains(tests, "frontend order transition endpoint", sources.frontendApi, "`/orders/${orderId}/status-transitions`");
         addContains(tests, "frontend order reviews endpoint", sources.frontendApi, "`/orders/${orderId}/reviews`");
@@ -181,8 +181,8 @@ class ProjectDesignFullCoverageTest {
             Path backendRoot = backendRoot();
             Path repoRoot = backendRoot.getParent();
             return new Sources(
-                    read(repoRoot.resolve("frontend/src/api.js")),
-                    read(repoRoot.resolve("frontend/src/App.jsx")),
+                    readFrontendApi(repoRoot),
+                    readFrontendApp(repoRoot),
                     read(backendRoot.resolve("src/main/java/com/action/camera/auth/controller/SessionController.java")),
                     read(backendRoot.resolve("src/main/java/com/action/camera/controller/AuthController.java")),
                     read(backendRoot.resolve("src/main/java/com/action/camera/controller/UserController.java")),
@@ -213,6 +213,57 @@ class ProjectDesignFullCoverageTest {
 
         private static String read(Path path) throws IOException {
             return Files.readString(path, StandardCharsets.UTF_8);
+        }
+
+        private static String readFrontendApi(Path repoRoot) throws IOException {
+            return readExistingSources(
+                    repoRoot.resolve("frontend/src/api.js"),
+                    repoRoot.resolve("frontend/src/api")
+            );
+        }
+
+        private static String readFrontendApp(Path repoRoot) throws IOException {
+            return readExistingSources(
+                    repoRoot.resolve("frontend/src/App.jsx"),
+                    repoRoot.resolve("frontend/src/main.jsx"),
+                    repoRoot.resolve("frontend/src/routes.jsx"),
+                    repoRoot.resolve("frontend/src/pages"),
+                    repoRoot.resolve("frontend/src/layout")
+            );
+        }
+
+        private static String readExistingSources(Path... paths) throws IOException {
+            StringBuilder content = new StringBuilder();
+            for (Path path : paths) {
+                if (!Files.exists(path)) {
+                    continue;
+                }
+                if (Files.isDirectory(path)) {
+                    try (Stream<Path> stream = Files.walk(path)) {
+                        List<Path> files = stream
+                                .filter(Files::isRegularFile)
+                                .filter(Sources::isFrontendSource)
+                                .sorted()
+                                .toList();
+                        for (Path file : files) {
+                            appendSource(content, file);
+                        }
+                    }
+                } else if (isFrontendSource(path)) {
+                    appendSource(content, path);
+                }
+            }
+            return content.toString();
+        }
+
+        private static boolean isFrontendSource(Path path) {
+            String name = path.getFileName().toString();
+            return name.endsWith(".js") || name.endsWith(".jsx");
+        }
+
+        private static void appendSource(StringBuilder content, Path path) throws IOException {
+            content.append("\n// ").append(path).append('\n');
+            content.append(read(path));
         }
     }
 }
