@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = "spring.datasource.url=jdbc:h2:mem:camera_it;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;NON_KEYWORDS=CURRENT_ROLE;DB_CLOSE_DELAY=-1")
-class DemandAndScheduleIntegrationTest {
+class DemandIntegrationTest {
 
     @Autowired
     private TestRestTemplate rest;
@@ -160,43 +160,6 @@ class DemandAndScheduleIntegrationTest {
         assertThat(secondResp.getBody().get("code")).isNotEqualTo(200);
     }
 
-    // ───────────── Schedule tests ─────────────
-
-    @Test
-    void createSchedule_asProvider_succeeds() {
-        String body = scheduleBody("nanjing", "2026-09-01T09:00:00", "2026-09-01T18:00:00");
-        ResponseEntity<Map> resp = rest.exchange("/providers/me/schedules", HttpMethod.POST, asProvider(body), Map.class);
-
-        assertThat(resp.getBody().get("code")).isEqualTo(200);
-        Map<String, Object> data = (Map<String, Object>) resp.getBody().get("data");
-        assertThat(data.get("scheduleId")).isNotNull();
-    }
-
-    @Test
-    void createSchedule_conflictingTime_returns409() {
-        String body1 = scheduleBody("nanjing", "2026-10-01T09:00:00", "2026-10-01T18:00:00");
-        rest.exchange("/providers/me/schedules", HttpMethod.POST, asProvider(body1), Map.class);
-
-        String body2 = scheduleBody("nanjing", "2026-10-01T14:00:00", "2026-10-01T20:00:00");
-        ResponseEntity<Map> resp = rest.exchange("/providers/me/schedules", HttpMethod.POST, asProvider(body2), Map.class);
-
-        assertThat(resp.getBody().get("code")).isEqualTo(40901);
-    }
-
-    @Test
-    void createSchedule_asCustomer_returnsForbidden() {
-        String body = scheduleBody("nanjing", "2026-11-01T09:00:00", "2026-11-01T18:00:00");
-        ResponseEntity<Map> resp = rest.exchange("/providers/me/schedules", HttpMethod.POST, asCustomer(body), Map.class);
-
-        assertThat(resp.getBody().get("code")).isNotEqualTo(200);
-    }
-
-    @Test
-    void listPublicSchedules_noAuth_succeeds() {
-        ResponseEntity<Map> resp = rest.getForEntity("/providers/2001/schedules", Map.class);
-        assertThat(resp.getBody().get("code")).isEqualTo(200);
-    }
-
     // ───────────── Helpers ─────────────
 
     private String demandBody(String scene, String cityCode) {
@@ -211,11 +174,6 @@ class DemandAndScheduleIntegrationTest {
                 "\"expectedDate\":\"2026-08-15\",\"timeSlot\":\"AFTERNOON\"," +
                 "\"cityCode\":\"" + cityCode + "\",\"location\":\"北京大学\"," +
                 "\"budgetMinCent\":30000,\"budgetMaxCent\":80000,\"description\":\"集成测试需求\"}";
-    }
-
-    private String scheduleBody(String cityCode, String start, String end) {
-        return "{\"cityCode\":\"" + cityCode + "\",\"startTime\":\"" + start +
-                "\",\"endTime\":\"" + end + "\",\"timeSlot\":\"FULL_DAY\"}";
     }
 
     private HttpEntity<String> asCustomer(String body) {
