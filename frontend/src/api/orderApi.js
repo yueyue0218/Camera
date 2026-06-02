@@ -29,5 +29,11 @@ export const orderApi = {
       method: 'POST',
       body: JSON.stringify({ targetStatus, reason })
     }, currentUser)
+  },
+  requestRework(orderId, reason, currentUser) {
+    return request(`/orders/${orderId}/request-rework`, {
+      method: 'POST',
+      body: JSON.stringify({ reason })
+    }, currentUser)
   }
 }
