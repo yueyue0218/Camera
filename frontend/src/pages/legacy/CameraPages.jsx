@@ -1710,6 +1710,7 @@ function ConversationDetailPage() {
   const quoteEntryHint = getQuoteEntryHint(conversation, currentUser, quotes)
   const sourceLabel = getConversationSourceLabel(conversation)
   const sourceHint = getConversationSourceHint(conversation)
+  const sourceRows = buildConversationSourceRows(conversation, currentUser, sourceLabel)
 
   return (
     <Stack spacing={2}>
@@ -1749,17 +1750,7 @@ function ConversationDetailPage() {
               <Chip size="small" label={currentUser.role === 'PROVIDER' ? '当前身份：服务方' : '当前身份：顾客'} />
             </Stack>
           </Stack>
-          <InfoRows rows={[
-            ['会话 ID', conversation?.conversationId || '未加载'],
-            ['后端 conversationId', getBackendConversationId(conversation) || '当前接口未返回该字段'],
-            ['对方用户 ID', conversation ? getOppositeUserId(conversation, currentUser.userId) : '未加载'],
-            ['来源类型', conversation?.sourceType || '当前接口未返回该字段'],
-            ['来源 ID', conversation?.sourceId || '当前接口未返回该字段'],
-            ['业务来源', sourceLabel],
-            ['需求 ID', conversation?.demandId || (conversation?.sourceType === 'DEMAND_RESPONSE' ? conversation.sourceId : '当前接口未返回该字段')],
-            ['服务橱窗 ID', conversation?.sourceType === 'SERVICE_PACKAGE' ? conversation.sourceId : '当前接口未返回该字段'],
-            ['档期 ID', conversation?.scheduleId || '当前接口未返回该字段']
-          ]} />
+          <InfoRows rows={sourceRows} />
           <Alert severity="info">{sourceHint}</Alert>
         </Stack>
       </Paper>
@@ -1964,7 +1955,7 @@ function OrdersPage() {
   const [statusLogs, setStatusLogs] = useState([])
   const [deliveryRecords, setDeliveryRecords] = useState([])
   const [deliveryForm, setDeliveryForm] = useState({ file: null, remark: '' })
-  const [reworkReason, setReworkReason] = useState('')
+  const [reworkRequirement, setReworkRequirement] = useState('')
   const [photoAuthorizations, setPhotoAuthorizations] = useState([])
   const [photoAuthorizationForm, setPhotoAuthorizationForm] = useState({ fileIds: [], remark: '' })
   const [authorizationRemarks, setAuthorizationRemarks] = useState({})
@@ -2057,7 +2048,7 @@ function OrdersPage() {
     setStatusLogs(logs)
     setDeliveryRecords(deliveries)
     setDeliveryForm({ file: null, remark: '' })
-    setReworkReason('')
+    setReworkRequirement('')
     setPhotoAuthorizations(authorizations)
     setPhotoAuthorizationForm({ fileIds: [], remark: '' })
     setAuthorizationRemarks({})
@@ -2099,13 +2090,18 @@ function OrdersPage() {
   async function submitRework(event) {
     event.preventDefault()
     if (!selectedOrder) return
+    const trimmedRequirement = reworkRequirement.trim()
+    if (!trimmedRequirement) {
+      setNotice({ type: 'warning', text: '请填写返修要求' })
+      return
+    }
     const result = await run(async () => orderApi.requestRework(
       selectedOrder.orderId,
-      reworkReason.trim(),
+      trimmedRequirement,
       currentUser
     ), '返修请求已提交')
     if (result) {
-      setReworkReason('')
+      setReworkRequirement('')
       await loadOrders(selectedOrder.orderId)
     }
   }
@@ -2224,6 +2220,8 @@ function OrdersPage() {
   const deliveryFileNameMap = useMemo(() => new Map(
     deliveryFileOptions.map(file => [Number(file.fileId), file.fileName])
   ), [deliveryFileOptions])
+  const latestDeliveryUploadTime = useMemo(() => getLatestDeliveryUploadTime(deliveryRecords), [deliveryRecords])
+  const estimatedAutoConfirmTime = latestDeliveryUploadTime ? addDays(latestDeliveryUploadTime, 7) : null
   const canReviewSelectedOrder = selectedOrder?.status === 'COMPLETED' && isOrderParticipant(selectedOrder, currentUser.userId)
   const currentReviewDirection = selectedOrder ? getOrderReviewDirection(selectedOrder, currentUser.userId) : ''
   const myReview = orderReviews.find(review => Number(review.reviewerId) === currentUser.userId || review.direction === currentReviewDirection)
@@ -2400,17 +2398,25 @@ function OrdersPage() {
                   </Paper>
                 )}
 
+                {selectedOrder.status === 'DELIVERED_PENDING_CONFIRM' && (
+                  <Alert severity="info">
+                    交付后 7 天内客户未确认、未申请返修、未发起申诉，系统将自动确认验收并释放托管资金。
+                    {estimatedAutoConfirmTime && ` 预计自动确认时间：${formatTime(estimatedAutoConfirmTime)}`}
+                  </Alert>
+                )}
+
                 {canRequestRework && (
                   <Paper component="form" variant="outlined" onSubmit={submitRework} sx={{ p: 1.5, bgcolor: '#fffaf0' }}>
                     <Stack spacing={1.5}>
-                      <Typography fontWeight={800}>请写出后续返修建议</Typography>
+                      <Typography fontWeight={800}>请写出后续返修要求</Typography>
                       <TextField
-                        label="返修建议"
-                        value={reworkReason}
-                        onChange={event => setReworkReason(event.target.value)}
+                        label="返修要求"
+                        value={reworkRequirement}
+                        onChange={event => setReworkRequirement(event.target.value)}
                         multiline
                         minRows={3}
-                        placeholder="说明哪里不满意、希望摄影师怎么调整。未填写时后端会使用默认文案。"
+                        placeholder="请说明需要返修的照片、问题和期望修改方向"
+                        required
                       />
                       <Button type="submit" variant="contained" color="warning" startIcon={<RefreshRoundedIcon />} disabled={loading}>
                         请求返修
@@ -3392,6 +3398,34 @@ function getConversationSourceLabel(conversation) {
   return sourceType
 }
 
+function buildConversationSourceRows(conversation, currentUser, sourceLabel) {
+  const rows = [
+    ['会话 ID', conversation?.conversationId || '未加载'],
+    ['后端 conversationId', getBackendConversationId(conversation) || '当前接口未返回该字段'],
+    ['对方用户 ID', conversation ? getOppositeUserId(conversation, currentUser.userId) : '未加载'],
+    ['来源类型', conversation?.sourceType || '当前接口未返回该字段'],
+    ['业务来源', sourceLabel]
+  ]
+
+  if (conversation?.sourceType === 'DEMAND_RESPONSE') {
+    rows.push(['响应 ID', conversation.sourceId || '当前接口未返回该字段'])
+    rows.push(['需求 ID', conversation.demandId || '当前接口未返回'])
+    return rows
+  }
+
+  if (conversation?.sourceType === 'SERVICE_PACKAGE') {
+    rows.push(['服务橱窗 ID', conversation.sourceId || '当前接口未返回该字段'])
+    rows.push(['档期 ID', conversation.scheduleId || '当前接口未返回'])
+    return rows
+  }
+
+  rows.push(['来源 ID', conversation?.sourceId || '当前接口未返回该字段'])
+  rows.push(['需求 ID', conversation?.demandId || '当前接口未返回该字段'])
+  rows.push(['服务橱窗 ID', conversation?.servicePackageId || '当前接口未返回该字段'])
+  rows.push(['档期 ID', conversation?.scheduleId || '当前接口未返回该字段'])
+  return rows
+}
+
 function getConversationSourceHint(conversation) {
   if (!conversation) return '会话仍在加载。'
   if (conversation.isLocal) {
@@ -3442,6 +3476,9 @@ function validateQuoteForm(form, conversation, currentUser, quotes) {
   }
 
   const amountCent = yuanToCent(form.amountYuan)
+  if (!hasAtMostTwoDecimalPlaces(form.amountYuan)) {
+    errors.push('金额最多保留两位小数。')
+  }
   if (!Number.isInteger(amountCent) || amountCent <= 0) {
     errors.push('报价金额必须大于 0，且转换成分后必须是有效整数。')
   }
@@ -3484,6 +3521,11 @@ function validateQuoteForm(form, conversation, currentUser, quotes) {
     }
   }
   return errors
+}
+
+function hasAtMostTwoDecimalPlaces(value) {
+  const text = String(value ?? '').trim()
+  return /^\d+(\.\d{1,2})?$/.test(text)
 }
 
 function parseInputDate(value) {
@@ -4117,6 +4159,20 @@ function ReviewList({ reviews, emptyText = '暂无历史评价' }) {
 function formatTime(value) {
   if (!value) return '刚刚'
   return new Date(value).toLocaleString('zh-CN', { hour12: false })
+}
+
+function getLatestDeliveryUploadTime(records) {
+  const latestTimestamp = records
+    .map(record => new Date(record.uploadTime).getTime())
+    .filter(timestamp => Number.isFinite(timestamp))
+    .reduce((latest, timestamp) => Math.max(latest, timestamp), 0)
+  return latestTimestamp ? new Date(latestTimestamp) : null
+}
+
+function addDays(value, days) {
+  const date = new Date(value)
+  date.setDate(date.getDate() + days)
+  return date
 }
 
 export {
