@@ -1,5 +1,6 @@
 package com.action.camera.admin.entity;
 
+import com.action.camera.certification.enums.CertificationStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -48,7 +49,7 @@ public class RealNameCertification {
     private String faceVerifyResult;
 
     @Column(name = "status", nullable = false, length = 30)
-    private String status = "PENDING_REVIEW";
+    private String status = CertificationStatus.PENDING.name();
 
     @Column(name = "reject_reason", length = 255)
     private String rejectReason;
@@ -68,7 +69,7 @@ public class RealNameCertification {
             appliedAt = LocalDateTime.now();
         }
         if (status == null || status.isBlank()) {
-            status = "PENDING_REVIEW";
+            status = CertificationStatus.PENDING.name();
         }
     }
 }

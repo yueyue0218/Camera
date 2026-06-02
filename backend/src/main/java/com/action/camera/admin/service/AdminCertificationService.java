@@ -8,6 +8,7 @@ import com.action.camera.admin.entity.StudentCertification;
 import com.action.camera.admin.repository.AuditRecordRepository;
 import com.action.camera.admin.repository.RealNameCertificationRepository;
 import com.action.camera.admin.repository.StudentCertificationRepository;
+import com.action.camera.certification.enums.CertificationStatus;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.notification.dto.NotificationCreateRequest;
@@ -23,9 +24,10 @@ public class AdminCertificationService {
 
     private static final String TYPE_REAL_NAME = "REAL_NAME";
     private static final String TYPE_STUDENT = "STUDENT";
-    private static final String PENDING_REVIEW = "PENDING_REVIEW";
-    private static final String APPROVED = "APPROVED";
-    private static final String REJECTED = "REJECTED";
+    private static final String REAL_NAME_PENDING = CertificationStatus.PENDING.name();
+    private static final String STUDENT_PENDING = "PENDING_REVIEW";
+    private static final String APPROVED = CertificationStatus.APPROVED.name();
+    private static final String REJECTED = CertificationStatus.REJECTED.name();
 
     private final AdminPermissionService permissionService;
     private final RealNameCertificationRepository realNameCertificationRepository;
@@ -49,7 +51,7 @@ public class AdminCertificationService {
     public List<CertificationReviewResponse> list(String type, String status) {
         permissionService.requireAdmin();
         String normalizedType = normalizeType(type);
-        String normalizedStatus = isBlank(status) ? PENDING_REVIEW : status.trim();
+        String normalizedStatus = isBlank(status) ? pendingStatus(normalizedType) : status.trim();
         if (TYPE_REAL_NAME.equals(normalizedType)) {
             return realNameCertificationRepository.findByStatusOrderByAppliedAtAsc(normalizedStatus).stream()
                     .map(this::toResponse)
@@ -68,7 +70,7 @@ public class AdminCertificationService {
         if (TYPE_REAL_NAME.equals(normalizedType)) {
             RealNameCertification certification = realNameCertificationRepository.findById(certificationId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Certification not found"));
-            ensurePending(certification.getStatus());
+            ensurePending(certification.getStatus(), REAL_NAME_PENDING);
             applyReview(certification, adminId, result, request);
             saveAudit("REAL_NAME_CERTIFICATION", certification.getId(), adminId, result, request);
             notifyCertificationReviewed(certification.getUserId(), "REAL_NAME_CERTIFICATION", certification.getId(), result);
@@ -77,7 +79,7 @@ public class AdminCertificationService {
 
         StudentCertification certification = studentCertificationRepository.findById(certificationId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Certification not found"));
-        ensurePending(certification.getStatus());
+        ensurePending(certification.getStatus(), STUDENT_PENDING);
         applyReview(certification, adminId, result, request);
         saveAudit("STUDENT_CERTIFICATION", certification.getId(), adminId, result, request);
         notifyCertificationReviewed(certification.getUserId(), "STUDENT_CERTIFICATION", certification.getId(), result);
@@ -101,10 +103,14 @@ public class AdminCertificationService {
         return result;
     }
 
-    private void ensurePending(String status) {
-        if (!PENDING_REVIEW.equals(status)) {
+    private void ensurePending(String status, String pendingStatus) {
+        if (!pendingStatus.equals(status)) {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Certification has been reviewed");
         }
+    }
+
+    private String pendingStatus(String type) {
+        return TYPE_REAL_NAME.equals(type) ? REAL_NAME_PENDING : STUDENT_PENDING;
     }
 
     private void applyReview(RealNameCertification certification,

@@ -4,6 +4,7 @@ import com.action.camera.certification.dto.CertificationRequest;
 import com.action.camera.certification.dto.CertificationResponse;
 import com.action.camera.certification.entity.AuditRecord;
 import com.action.camera.certification.entity.RealNameCertification;
+import com.action.camera.certification.enums.CertificationStatus;
 import com.action.camera.certification.event.CertificationApprovedEvent;
 import com.action.camera.certification.mapper.AuditRecordMapper;
 import com.action.camera.certification.mapper.RealNameCertificationMapper;
@@ -24,6 +25,10 @@ import java.util.List;
 
 @Service
 public class CertificationServiceImpl implements CertificationService {
+
+    private static final String PENDING = CertificationStatus.PENDING.name();
+    private static final String APPROVED = CertificationStatus.APPROVED.name();
+    private static final String REJECTED = CertificationStatus.REJECTED.name();
 
     private final RealNameCertificationMapper certificationMapper;
     private final AuditRecordMapper auditRecordMapper;
@@ -46,13 +51,13 @@ public class CertificationServiceImpl implements CertificationService {
         RealNameCertification existing = certificationMapper.selectOne(
                 new LambdaQueryWrapper<RealNameCertification>()
                         .eq(RealNameCertification::getUserId, userId)
-                        .in(RealNameCertification::getStatus, "PENDING", "APPROVED")
+                        .in(RealNameCertification::getStatus, PENDING, APPROVED)
                         .orderByDesc(RealNameCertification::getCreatedAt)
                         .last("LIMIT 1")
         );
 
         if (existing != null) {
-            if ("PENDING".equals(existing.getStatus())) {
+            if (PENDING.equals(existing.getStatus())) {
                 throw new BusinessException(ErrorCode.CERT_PENDING);
             }
             throw new BusinessException(ErrorCode.CERT_APPROVED);
@@ -64,7 +69,7 @@ public class CertificationServiceImpl implements CertificationService {
         cert.setIdCardNumber(maskIdCard(request.getIdCardNumber()));
         cert.setIdCardFrontFileId(request.getIdCardFrontFileId());
         cert.setIdCardBackFileId(request.getIdCardBackFileId());
-        cert.setStatus("PENDING");
+        cert.setStatus(PENDING);
         certificationMapper.insert(cert);
 
         return CertificationResponse.from(cert);
@@ -90,7 +95,7 @@ public class CertificationServiceImpl implements CertificationService {
         checkAdminRole(adminId);
 
         RealNameCertification cert = requirePendingCert(certId);
-        cert.setStatus("APPROVED");
+        cert.setStatus(APPROVED);
         cert.setReviewedAt(LocalDateTime.now());
         cert.setReviewerAdminId(adminId);
         certificationMapper.updateById(cert);
@@ -106,7 +111,7 @@ public class CertificationServiceImpl implements CertificationService {
         checkAdminRole(adminId);
 
         RealNameCertification cert = requirePendingCert(certId);
-        cert.setStatus("REJECTED");
+        cert.setStatus(REJECTED);
         cert.setRejectReason(rejectReason);
         cert.setReviewedAt(LocalDateTime.now());
         cert.setReviewerAdminId(adminId);
@@ -162,7 +167,7 @@ public class CertificationServiceImpl implements CertificationService {
         if (cert == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "认证申请不存在");
         }
-        if (!"PENDING".equals(cert.getStatus())) {
+        if (!PENDING.equals(cert.getStatus())) {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT, "该申请当前状态不可审批");
         }
         return cert;
