@@ -6,6 +6,7 @@ import com.action.camera.common.exception.BusinessException;
 import com.action.camera.notification.repository.NotificationRepository;
 import com.action.camera.repository.CreditRecordRepository;
 import com.action.camera.review.dto.ReviewCreateRequest;
+import com.action.camera.review.dto.ReviewFollowUpRequest;
 import com.action.camera.review.dto.ReviewResponse;
 import com.action.camera.review.repository.ReviewRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -164,6 +165,48 @@ class ReviewServiceTest {
     }
 
     @Test
+    void originalReviewerCanAddSingleFollowUpWithoutChangingCreditAgain() {
+        UserContext.setUserId(CUSTOMER_ID);
+        ReviewResponse review = reviewService.create(COMPLETED_ORDER_ID, new ReviewCreateRequest(5, "第一次评价"));
+
+        ReviewResponse response = reviewService.followUp(
+                review.reviewId(),
+                new ReviewFollowUpRequest("  补充：交付后的沟通也很顺畅。  ")
+        );
+
+        assertThat(response.replyContent()).isEqualTo("补充：交付后的沟通也很顺畅。");
+        assertThat(response.replyTime()).isNotNull();
+        assertThat(creditRecordRepository.findByUserIdOrderByCreatedAtDesc(PROVIDER_ID)).hasSize(1);
+        assertThat(notificationRepository.findByUserIdOrderByCreatedAtDesc(PROVIDER_ID))
+                .extracting("type")
+                .containsExactlyInAnyOrder("REVIEW_RECEIVED", "REVIEW_FOLLOW_UP_RECEIVED");
+    }
+
+    @Test
+    void duplicateFollowUpIsRejected() {
+        UserContext.setUserId(CUSTOMER_ID);
+        ReviewResponse review = reviewService.create(COMPLETED_ORDER_ID, new ReviewCreateRequest(5, "第一次评价"));
+        reviewService.followUp(review.reviewId(), new ReviewFollowUpRequest("第一次追评"));
+
+        assertThatThrownBy(() -> reviewService.followUp(review.reviewId(), new ReviewFollowUpRequest("重复追评")))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.DUPLICATE_OPERATION);
+    }
+
+    @Test
+    void reviewedUserCannotAddFollowUp() {
+        UserContext.setUserId(CUSTOMER_ID);
+        ReviewResponse review = reviewService.create(COMPLETED_ORDER_ID, new ReviewCreateRequest(5, "第一次评价"));
+
+        UserContext.setUserId(PROVIDER_ID);
+        assertThatThrownBy(() -> reviewService.followUp(review.reviewId(), new ReviewFollowUpRequest("不是我的追评")))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.FORBIDDEN);
+    }
+
+    @Test
     void providerCanReviewCustomerFaultRefundAndCreditIsDeducted() {
         UserContext.setUserId(PROVIDER_ID);
 
@@ -249,6 +292,15 @@ class ReviewServiceTest {
         assertThat(responses)
                 .extracting(ReviewResponse::targetUserId)
                 .containsExactly(PROVIDER_ID);
+    }
+
+    @Test
+    void listReceivedByUserExcludesHiddenReviews() {
+        UserContext.setUserId(CUSTOMER_ID);
+        ReviewResponse review = reviewService.create(COMPLETED_ORDER_ID, new ReviewCreateRequest(5, "服务很好"));
+        reviewRepository.findById(review.reviewId()).ifPresent(item -> item.setIsVisible(false));
+
+        assertThat(reviewService.listReceivedByUser(PROVIDER_ID)).isEmpty();
     }
 
     private void insertUser(Long userId, String nickname) {

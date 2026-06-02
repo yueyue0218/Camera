@@ -11,6 +11,8 @@ public record ReviewResponse(
         Integer rating,
         String content,
         Boolean isVisible,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        String replyContent,
+        LocalDateTime replyTime
 ) {
 }
