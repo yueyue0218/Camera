@@ -35,6 +35,11 @@ public class ReviewComplaintController {
         return Result.success(complaintService.listMine());
     }
 
+    @GetMapping("/reviews/complaints/{complaintId}")
+    public Result<ReviewComplaintResponse> detail(@PathVariable Long complaintId) {
+        return Result.success(complaintService.detail(complaintId));
+    }
+
     @GetMapping("/reviews/{reviewId}/complaints")
     public Result<List<ReviewComplaintResponse>> listByReview(@PathVariable Long reviewId) {
         return Result.success(complaintService.listByReview(reviewId));

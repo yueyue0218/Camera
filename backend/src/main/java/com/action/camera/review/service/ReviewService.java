@@ -9,6 +9,7 @@ import com.action.camera.delivery.port.OrderSnapshot;
 import com.action.camera.notification.dto.NotificationCreateRequest;
 import com.action.camera.notification.service.NotificationService;
 import com.action.camera.review.dto.ReviewCreateRequest;
+import com.action.camera.review.dto.ReviewFollowUpRequest;
 import com.action.camera.review.dto.ReviewResponse;
 import com.action.camera.review.entity.Review;
 import com.action.camera.review.repository.ReviewRepository;
@@ -26,6 +27,7 @@ public class ReviewService {
     private static final String CUSTOMER_TO_PROVIDER = "CUSTOMER_TO_PROVIDER";
     private static final String PROVIDER_TO_CUSTOMER = "PROVIDER_TO_CUSTOMER";
     private static final String REVIEW_RECEIVED = "REVIEW_RECEIVED";
+    private static final String REVIEW_FOLLOW_UP_RECEIVED = "REVIEW_FOLLOW_UP_RECEIVED";
     private static final String RELATED_ORDER = "ORDER";
     private static final String CREDIT_EVENT_REVIEW = "REVIEW";
 
@@ -85,6 +87,37 @@ public class ReviewService {
         return toResponse(savedReview);
     }
 
+    @Transactional
+    public ReviewResponse followUp(Long reviewId, ReviewFollowUpRequest request) {
+        Long currentUserId = requireCurrentUserId();
+        validateFollowUpRequest(request);
+
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Review not found"));
+        if (!currentUserId.equals(review.getReviewerId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only the original reviewer can add a follow-up review");
+        }
+        if (!Boolean.TRUE.equals(review.getIsVisible())) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Hidden review cannot be followed up");
+        }
+        if (!isBlank(review.getReplyContent())) {
+            throw new BusinessException(ErrorCode.DUPLICATE_OPERATION, "Follow-up review already exists");
+        }
+
+        review.setReplyContent(request.content().trim());
+        review.setReplyTime(LocalDateTime.now());
+        Review savedReview = reviewRepository.save(review);
+        notificationService.createNotification(new NotificationCreateRequest(
+                savedReview.getTargetUserId(),
+                "Review follow-up received",
+                "You have received a follow-up to an order review.",
+                REVIEW_FOLLOW_UP_RECEIVED,
+                RELATED_ORDER,
+                savedReview.getOrderId()
+        ));
+        return toResponse(savedReview);
+    }
+
     @Transactional(readOnly = true)
     public List<ReviewResponse> listByOrder(Long orderId) {
         Long currentUserId = requireCurrentUserId();
@@ -100,7 +133,7 @@ public class ReviewService {
     @Transactional(readOnly = true)
     public List<ReviewResponse> listReceivedByUser(Long userId) {
         requireCurrentUserId();
-        return reviewRepository.findByTargetUserIdOrderByCreatedAtDesc(userId).stream()
+        return reviewRepository.findByTargetUserIdAndIsVisibleTrueOrderByCreatedAtDesc(userId).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -169,6 +202,15 @@ public class ReviewService {
         }
     }
 
+    private void validateFollowUpRequest(ReviewFollowUpRequest request) {
+        if (request == null || isBlank(request.content())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Follow-up review content is required");
+        }
+        if (request.content().trim().length() > 1000) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Follow-up review content is too long");
+        }
+    }
+
     private int calculateReviewScoreChange(Integer rating) {
         return switch (rating) {
             case 5 -> 2;
@@ -190,8 +232,14 @@ public class ReviewService {
                 review.getRating(),
                 review.getContent(),
                 review.getIsVisible(),
-                review.getCreatedAt()
+                review.getCreatedAt(),
+                review.getReplyContent(),
+                review.getReplyTime()
         );
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     private Long requireCurrentUserId() {

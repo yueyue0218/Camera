@@ -2,6 +2,7 @@ package com.action.camera.review.controller;
 
 import com.action.camera.common.Result;
 import com.action.camera.review.dto.ReviewCreateRequest;
+import com.action.camera.review.dto.ReviewFollowUpRequest;
 import com.action.camera.review.dto.ReviewResponse;
 import com.action.camera.review.service.ReviewService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,6 +27,12 @@ public class ReviewController {
     public Result<ReviewResponse> create(@PathVariable Long orderId,
                                          @RequestBody ReviewCreateRequest request) {
         return Result.success(reviewService.create(orderId, request));
+    }
+
+    @PostMapping("/reviews/{reviewId}/follow-up")
+    public Result<ReviewResponse> followUp(@PathVariable Long reviewId,
+                                           @RequestBody ReviewFollowUpRequest request) {
+        return Result.success(reviewService.followUp(reviewId, request));
     }
 
     @GetMapping("/orders/{orderId}/reviews")
