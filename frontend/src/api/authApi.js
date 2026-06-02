@@ -32,7 +32,7 @@ export const authApi = {
     throw fallbackError
   },
   async login(body) {
-    if (body.loginType === 'MOBILE') {
+    if (body.loginType === 'MOBILE' || body.loginType === 'EMAIL') {
       try {
         return await request('/sessions', { method: 'POST', body: JSON.stringify(body) })
       } catch (error) {
@@ -46,7 +46,7 @@ export const authApi = {
       }
     }
 
-    const error = new Error('当前登录页仅支持手机号验证码登录')
+    const error = new Error('当前登录页仅支持邮箱密码登录')
     error.canUseDemoLogin = true
     throw error
   }
