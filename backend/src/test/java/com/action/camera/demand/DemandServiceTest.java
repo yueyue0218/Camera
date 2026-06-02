@@ -13,8 +13,8 @@ import com.action.camera.demand.dto.CreateDemandRequest;
 import com.action.camera.demand.dto.CreateDemandResponseRequest;
 import com.action.camera.demand.dto.DemandDto;
 import com.action.camera.demand.dto.DemandResponseDto;
-import com.action.camera.demand.repository.InMemoryDemandRepository;
-import com.action.camera.demand.repository.InMemoryDemandResponseRepository;
+import com.action.camera.demand.repository.DemandRepository;
+import com.action.camera.demand.repository.DemandResponseRepository;
 import com.action.camera.demand.service.DemandService;
 import com.action.camera.message.model.CreateConversationCommand;
 import com.action.camera.message.model.CreateConversationResult;
@@ -22,6 +22,10 @@ import com.action.camera.message.service.ConversationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.TestPropertySource;
 
 import java.time.Duration;
 import java.time.LocalDate;
@@ -32,15 +36,30 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+@SpringBootTest
+@TestPropertySource(properties = {
+        "spring.datasource.url=jdbc:h2:mem:demand_service_test;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;NON_KEYWORDS=CURRENT_ROLE;DB_CLOSE_DELAY=-1",
+        "spring.datasource.driver-class-name=org.h2.Driver",
+        "spring.datasource.username=sa",
+        "spring.datasource.password=",
+        "spring.jpa.hibernate.ddl-auto=create-drop",
+        "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect"
+})
 class DemandServiceTest {
 
-    private InMemoryDemandRepository demandRepository;
-    private InMemoryDemandResponseRepository responseRepository;
+    @Autowired
+    private DemandRepository demandRepository;
+
+    @Autowired
+    private DemandResponseRepository responseRepository;
+
+    @MockBean
     private ConversationService conversationService;
+
+    @Autowired
     private DemandService demandService;
 
     private final CurrentUser customer = new CurrentUser(1001L, UserRole.CUSTOMER);
@@ -51,12 +70,10 @@ class DemandServiceTest {
 
     @BeforeEach
     void setUp() {
-        demandRepository = new InMemoryDemandRepository();
-        responseRepository = new InMemoryDemandResponseRepository();
-        conversationService = mock(ConversationService.class);
+        responseRepository.deleteAll();
+        demandRepository.deleteAll();
         when(conversationService.createConversationWithInitialMessage(any(CreateConversationCommand.class)))
                 .thenReturn(new CreateConversationResult(91001L));
-        demandService = new DemandService(demandRepository, responseRepository, conversationService);
     }
 
     @Test

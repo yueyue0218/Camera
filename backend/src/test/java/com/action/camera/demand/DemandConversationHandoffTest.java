@@ -12,19 +12,20 @@ import com.action.camera.demand.dto.CreateDemandRequest;
 import com.action.camera.demand.dto.CreateDemandResponseRequest;
 import com.action.camera.demand.dto.DemandDto;
 import com.action.camera.demand.dto.DemandResponseDto;
-import com.action.camera.demand.repository.InMemoryDemandRepository;
-import com.action.camera.demand.repository.InMemoryDemandResponseRepository;
+import com.action.camera.demand.repository.DemandRepository;
+import com.action.camera.demand.repository.DemandResponseRepository;
 import com.action.camera.demand.service.DemandService;
 import com.action.camera.message.model.CreateConversationCommand;
 import com.action.camera.message.model.CreateConversationResult;
 import com.action.camera.message.service.ConversationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -43,7 +44,15 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
-@ExtendWith(MockitoExtension.class)
+@SpringBootTest
+@TestPropertySource(properties = {
+        "spring.datasource.url=jdbc:h2:mem:demand_handoff_test;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;NON_KEYWORDS=CURRENT_ROLE;DB_CLOSE_DELAY=-1",
+        "spring.datasource.driver-class-name=org.h2.Driver",
+        "spring.datasource.username=sa",
+        "spring.datasource.password=",
+        "spring.jpa.hibernate.ddl-auto=create-drop",
+        "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect"
+})
 class DemandConversationHandoffTest {
 
     private static final CurrentUser CUSTOMER = new CurrentUser(1001L, UserRole.CUSTOMER);
@@ -51,18 +60,22 @@ class DemandConversationHandoffTest {
     private static final CurrentUser PROVIDER = new CurrentUser(2001L, UserRole.PROVIDER);
     private static final CurrentUser OTHER_PROVIDER = new CurrentUser(2002L, UserRole.PROVIDER);
 
-    @Mock
+    @MockBean
     private ConversationService conversationService;
 
-    private InMemoryDemandRepository demandRepository;
-    private InMemoryDemandResponseRepository responseRepository;
+    @Autowired
+    private DemandRepository demandRepository;
+
+    @Autowired
+    private DemandResponseRepository responseRepository;
+
+    @Autowired
     private DemandService demandService;
 
     @BeforeEach
     void setUp() {
-        demandRepository = new InMemoryDemandRepository();
-        responseRepository = new InMemoryDemandResponseRepository();
-        demandService = new DemandService(demandRepository, responseRepository, conversationService);
+        responseRepository.deleteAll();
+        demandRepository.deleteAll();
     }
 
     @Test

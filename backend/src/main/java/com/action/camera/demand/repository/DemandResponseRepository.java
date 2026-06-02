@@ -1,19 +1,21 @@
 package com.action.camera.demand.repository;
 
 import com.action.camera.demand.domain.DemandResponse;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
 
-public interface DemandResponseRepository {
+public interface DemandResponseRepository extends JpaRepository<DemandResponse, Long> {
 
-    Long nextId();
-
-    DemandResponse save(DemandResponse response);
-
-    Optional<DemandResponse> findById(Long id);
-
-    List<DemandResponse> findByDemandId(Long demandId);
+    @Query("""
+            select r from DemandResponse r
+            where r.demandId = :demandId
+            order by r.responseTime desc, r.id desc
+            """)
+    List<DemandResponse> findByDemandId(@Param("demandId") Long demandId);
 
     Optional<DemandResponse> findByDemandIdAndProviderId(Long demandId, Long providerId);
 }

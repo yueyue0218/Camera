@@ -1,5 +1,7 @@
 package com.action.camera.integration;
 
+import com.action.camera.message.repository.ConversationRepository;
+import com.action.camera.message.repository.MessageRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +29,12 @@ class DemandAndScheduleIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private ConversationRepository conversationRepository;
+
+    @Autowired
+    private MessageRepository messageRepository;
 
     @BeforeEach
     void seedDemoUsers() {
@@ -158,6 +166,41 @@ class DemandAndScheduleIntegrationTest {
         ResponseEntity<Map> secondResp = rest.exchange("/demands/" + demandId + "/responses",
                 HttpMethod.POST, asProvider(responseBody), Map.class);
         assertThat(secondResp.getBody().get("code")).isNotEqualTo(200);
+    }
+
+    @Test
+    void acceptDemandResponse_createsPersistedConversation() {
+        long conversationCountBefore = conversationRepository.count();
+        String demandBody = demandBody("PORTRAIT", "nanjing");
+        ResponseEntity<Map> createResp = rest.exchange("/demands", HttpMethod.POST, asCustomer(demandBody), Map.class);
+        Long demandId = ((Number) ((Map<String, Object>) createResp.getBody().get("data")).get("demandId")).longValue();
+
+        String responseBody = "{\"providerProfileId\":2001,\"message\":\"available for this demand\",\"expectedPriceCent\":50000}";
+        ResponseEntity<Map> responseResp = rest.exchange("/demands/" + demandId + "/responses",
+                HttpMethod.POST, asProvider(responseBody), Map.class);
+        Long responseId = ((Number) ((Map<String, Object>) responseResp.getBody().get("data")).get("responseId")).longValue();
+
+        ResponseEntity<Map> acceptResp = rest.exchange(
+                "/demands/" + demandId + "/responses/" + responseId + "/accept",
+                HttpMethod.POST,
+                asCustomer(null),
+                Map.class);
+
+        assertThat(acceptResp.getBody().get("code")).isEqualTo(200);
+        Map<String, Object> data = (Map<String, Object>) acceptResp.getBody().get("data");
+        Long conversationId = ((Number) data.get("conversationId")).longValue();
+        assertThat(data.get("responseStatus")).isEqualTo("ACCEPTED");
+        assertThat(data.get("conversationSourceType")).isEqualTo("DEMAND_RESPONSE");
+        assertThat(conversationRepository.findById(conversationId)).isPresent();
+        assertThat(conversationRepository.count()).isEqualTo(conversationCountBefore + 1);
+        assertThat(messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId)).hasSize(1);
+
+        ResponseEntity<Map> demandResp = rest.exchange(
+                "/demands/" + demandId,
+                HttpMethod.GET,
+                asCustomer(null),
+                Map.class);
+        assertThat(((Map<String, Object>) demandResp.getBody().get("data")).get("status")).isEqualTo("MATCHED");
     }
 
     // ───────────── Schedule tests ─────────────

@@ -20,6 +20,7 @@ import com.action.camera.message.model.CreateConversationCommand;
 import com.action.camera.message.model.CreateConversationResult;
 import com.action.camera.message.service.ConversationService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -47,12 +48,12 @@ public class DemandService {
         this.conversationService = conversationService;
     }
 
+    @Transactional
     public DemandDto createDemand(CurrentUser user, CreateDemandRequest request) {
         requireCustomer(user);
         validateDemandRequest(request);
         LocalDateTime now = LocalDateTime.now();
         Demand demand = new Demand(
-                demandRepository.nextId(),
                 user.getUserId(),
                 trim(request.getScene()),
                 normalizeTags(request.getStyleTags()),
@@ -67,14 +68,16 @@ public class DemandService {
                 now,
                 now.plusDays(DEFAULT_EXPIRE_DAYS)
         );
-        demandRepository.save(demand);
-        return DemandMapper.toDemandDto(demand);
+        Demand savedDemand = demandRepository.save(demand);
+        return DemandMapper.toDemandDto(savedDemand);
     }
 
+    @Transactional(readOnly = true)
     public PageResult<DemandDto> listDemands(int page, int size, String cityCode, String scene, String status) {
         return listDemands(page, size, cityCode, scene, status, null, null, null, null);
     }
 
+    @Transactional(readOnly = true)
     public PageResult<DemandDto> listDemands(int page,
                                              int size,
                                              String cityCode,
@@ -102,6 +105,7 @@ public class DemandService {
         return new PageResult<>(filtered.subList(fromIndex, toIndex), safePage, safeSize, filtered.size());
     }
 
+    @Transactional
     public void deleteDemand(Long demandId, CurrentUser user) {
         Demand demand = findDemand(demandId);
         if (!user.isAdmin() && !demand.getCustomerId().equals(user.getUserId())) {
@@ -113,6 +117,7 @@ public class DemandService {
         demandRepository.deleteById(demandId);
     }
 
+    @Transactional(readOnly = true)
     public DemandDto getDemand(Long demandId, CurrentUser user) {
         Demand demand = findDemand(demandId);
         if (user.isAdmin() || demand.getCustomerId().equals(user.getUserId())
@@ -122,6 +127,7 @@ public class DemandService {
         throw new BusinessException(ErrorCode.FORBIDDEN, "无权限查看该需求");
     }
 
+    @Transactional
     public DemandResponseDto respondToDemand(Long demandId, CurrentUser user, CreateDemandResponseRequest request) {
         requireProvider(user);
         Demand demand = findDemand(demandId);
@@ -139,7 +145,6 @@ public class DemandService {
                 ? user.getUserId()
                 : request.getProviderProfileId();
         DemandResponse response = new DemandResponse(
-                responseRepository.nextId(),
                 demandId,
                 user.getUserId(),
                 providerProfileId,
@@ -147,12 +152,13 @@ public class DemandService {
                 request.getExpectedPriceCent(),
                 LocalDateTime.now()
         );
-        responseRepository.save(response);
+        DemandResponse savedResponse = responseRepository.save(response);
         demand.increaseResponseCount();
         demandRepository.save(demand);
-        return DemandMapper.toResponseDto(response);
+        return DemandMapper.toResponseDto(savedResponse);
     }
 
+    @Transactional(readOnly = true)
     public List<DemandResponseDto> listResponses(Long demandId, CurrentUser user) {
         Demand demand = findDemand(demandId);
         if (!user.isAdmin() && !demand.getCustomerId().equals(user.getUserId())) {
@@ -163,6 +169,7 @@ public class DemandService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public AcceptDemandResponseResult acceptResponse(Long demandId, Long responseId, CurrentUser user) {
         AcceptedDemandResponseSnapshot snapshot = acceptResponseAndBuildSnapshot(demandId, responseId, user);
         CreateConversationResult conversation = conversationService.createConversationWithInitialMessage(
@@ -178,6 +185,7 @@ public class DemandService {
         return new AcceptDemandResponseResult(snapshot, conversation.getConversationId());
     }
 
+    @Transactional(readOnly = true)
     public AcceptedDemandResponseSnapshot getAcceptedSnapshot(Long responseId, CurrentUser user) {
         DemandResponse response = findResponse(responseId);
         Demand demand = findDemand(response.getDemandId());

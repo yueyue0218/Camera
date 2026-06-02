@@ -8,6 +8,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -23,7 +24,11 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "service_packages")
+@Table(name = "service_packages", indexes = {
+        @Index(name = "idx_service_package_status", columnList = "status"),
+        @Index(name = "idx_service_package_provider", columnList = "provider_id,status"),
+        @Index(name = "idx_service_package_hall", columnList = "status,city_code,scene,base_price_cent")
+})
 public class ServicePackage {
 
     @Id
