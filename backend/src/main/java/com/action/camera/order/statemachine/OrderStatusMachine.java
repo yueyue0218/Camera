@@ -44,6 +44,7 @@ public final class OrderStatusMachine {
         transitions.put(OrderStatus.PAID_PENDING_SHOOT, immutableEnumSet(
                 OrderStatus.SHOOTING,
                 OrderStatus.CANCELLED,
+                OrderStatus.REFUNDED,
                 OrderStatus.APPEALING
         ));
         transitions.put(OrderStatus.SHOOTING, immutableEnumSet(

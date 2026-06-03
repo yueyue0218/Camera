@@ -49,6 +49,16 @@ public class OrderService {
     private static final String AUTO_SHOOTING_START_REASON = "系统根据拍摄开始时间自动进入拍摄中";
     private static final String AUTO_SHOOTING_END_REASON = "系统根据拍摄结束时间自动进入待交付";
     private static final String AUTO_REFUND_UNDELIVERED_REASON = "超过最晚交付时间仍未上传作品，系统自动退款并结束订单";
+    private static final List<OrderStatus> PROVIDER_TIME_CONFLICT_STATUSES = List.of(
+            OrderStatus.PENDING_PAYMENT,
+            OrderStatus.PAID_PENDING_SHOOT,
+            OrderStatus.SHOOTING,
+            OrderStatus.PENDING_DELIVERY,
+            OrderStatus.DELIVERED_PENDING_CONFIRM,
+            OrderStatus.REWORK_REQUIRED,
+            OrderStatus.APPEALING,
+            OrderStatus.COMPLETED
+    );
 
     private final OrderRepository orderRepository;
     private final PaymentRecordRepository paymentRecordRepository;
@@ -62,8 +72,15 @@ public class OrderService {
     public Order createOrderFromConfirmedQuote(Quote quote) {
         validateConfirmedQuote(quote);
 
-        return orderRepository.findByQuoteId(quote.getId())
-                .orElseGet(() -> orderRepository.save(buildOrderFromQuote(quote)));
+        Optional<Order> existingOrder = orderRepository.findByQuoteId(quote.getId());
+        if (existingOrder.isPresent()) {
+            return existingOrder.get();
+        }
+        ensureProviderTimeAvailable(
+                quote.getProviderUserId(),
+                quote.getShootStartTime(),
+                quote.getShootEndTime());
+        return orderRepository.save(buildOrderFromQuote(quote));
     }
 
     @Transactional
@@ -116,6 +133,54 @@ public class OrderService {
             notifyOrderCompleted(changedOrder);
         }
         return changedOrder;
+    }
+
+    @Transactional
+    public Order cancelOrder(Long orderId, Long customerId, String reason) {
+        return cancelOrder(orderId, customerId, reason, LocalDateTime.now());
+    }
+
+    @Transactional
+    public Order cancelOrder(Long orderId, Long customerId, String reason, LocalDateTime now) {
+        Order order = getOrderOrThrow(orderId);
+        if (!Objects.equals(order.getCustomerId(), customerId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only the customer can cancel this order");
+        }
+        if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
+            ensureCanChangeStatus(OrderStatus.PENDING_PAYMENT, OrderStatus.CANCELLED);
+            order.setCancelTime(now);
+            Order cancelledOrder = applyStatusChange(
+                    order,
+                    OrderStatus.PENDING_PAYMENT,
+                    OrderStatus.CANCELLED,
+                    customerId,
+                    "CUSTOMER",
+                    cancelReason(reason, "客户取消未支付订单")
+            );
+            notifyOrderCancelled(cancelledOrder);
+            return cancelledOrder;
+        }
+        if (order.getStatus() == OrderStatus.PAID_PENDING_SHOOT) {
+            if (order.getShootStartTime() == null || !now.isBefore(order.getShootStartTime())) {
+                throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                        "Paid orders can only be cancelled before shoot start time");
+            }
+            ensureCanChangeStatus(OrderStatus.PAID_PENDING_SHOOT, OrderStatus.REFUNDED);
+            order.setCancelTime(now);
+            markRefunded(order, now);
+            Order refundedOrder = applyStatusChange(
+                    order,
+                    OrderStatus.PAID_PENDING_SHOOT,
+                    OrderStatus.REFUNDED,
+                    customerId,
+                    "CUSTOMER",
+                    cancelReason(reason, "客户拍摄前取消，托管款原路退回")
+            );
+            notifyOrderCancelled(refundedOrder);
+            return refundedOrder;
+        }
+        throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                "Order status does not allow cancellation: " + order.getStatus());
     }
 
     @Transactional
@@ -350,6 +415,25 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
+    public void ensureProviderTimeAvailable(Long providerUserId, LocalDateTime shootStartTime, LocalDateTime shootEndTime) {
+        if (providerUserId == null || shootStartTime == null || shootEndTime == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR,
+                    "providerUserId, shootStartTime and shootEndTime must not be null");
+        }
+        if (!shootStartTime.isBefore(shootEndTime)) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "shootStartTime must be before shootEndTime");
+        }
+        if (orderRepository.existsProviderTimeConflict(
+                providerUserId,
+                shootStartTime,
+                shootEndTime,
+                PROVIDER_TIME_CONFLICT_STATUSES)) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                    "Provider already has an active order in this shoot time range");
+        }
+    }
+
+    @Transactional(readOnly = true)
     public List<OrderStatusLog> listStatusLogs(Long orderId, Long operatorId) {
         Order order = getOrderForUser(orderId, operatorId);
         return orderStatusLogRepository.findByOrderIdOrderByCreatedAtAsc(order.getId());
@@ -520,6 +604,13 @@ public class OrderService {
             paymentRecord.setStatus(PAYMENT_REFUNDED);
             paymentRecordRepository.save(paymentRecord);
         });
+    }
+
+    private String cancelReason(String reason, String defaultReason) {
+        if (reason == null || reason.isBlank()) {
+            return defaultReason;
+        }
+        return reason.trim();
     }
 
     private String resolveOperatorRole(Order order, Long operatorId) {
