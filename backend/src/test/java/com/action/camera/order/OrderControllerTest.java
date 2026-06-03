@@ -6,6 +6,7 @@ import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.delivery.repository.DeliveryRepository;
 import com.action.camera.order.controller.OrderController;
+import com.action.camera.order.dto.CancelOrderRequest;
 import com.action.camera.order.dto.MockPaymentRequest;
 import com.action.camera.order.dto.OrderResponse;
 import com.action.camera.order.dto.OrderStatusLogResponse;
@@ -292,14 +293,23 @@ class OrderControllerTest {
     void customerCanCancelBeforeShooting() {
         UserContext.setUserId(CUSTOMER_ID);
         Order order = order(OrderStatus.PAID_PENDING_SHOOT);
+        order.setShootStartTime(LocalDateTime.now().plusDays(1));
+        order.setShootEndTime(LocalDateTime.now().plusDays(1).plusHours(3));
+        PaymentRecord paymentRecord = paymentRecord();
         prepareTransitionMocks(order);
+        when(paymentRecordRepository.findByOrderId(ORDER_ID)).thenReturn(Optional.of(paymentRecord));
+        when(paymentRecordRepository.save(any(PaymentRecord.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Result<StatusTransitionResponse> result =
-                orderController.changeStatus(ORDER_ID, transitionRequest(OrderStatus.CANCELLED));
+                orderController.cancelOrder(ORDER_ID, cancelOrderRequest("拍摄前取消"));
 
-        assertEquals(OrderStatus.CANCELLED, result.getData().getToStatus());
+        assertEquals(OrderStatus.REFUNDED, result.getData().getToStatus());
         assertEquals("CUSTOMER", result.getData().getOperatorRole());
-        assertEquals(OrderStatus.CANCELLED, order.getStatus());
+        assertEquals(OrderStatus.REFUNDED, order.getStatus());
+        assertEquals(EscrowStatus.REFUNDED, order.getEscrowStatus());
+        assertEquals("REFUNDED", order.getRefundStatus());
+        assertEquals("REFUNDED", paymentRecord.getStatus());
+        assertEquals(AMOUNT_CENT, paymentRecord.getRefundAmountCent());
         verify(orderStatusLogRepository, times(1)).save(any(OrderStatusLog.class));
         ArgumentCaptor<NotificationCreateRequest> notificationCaptor =
                 ArgumentCaptor.forClass(NotificationCreateRequest.class);
@@ -308,6 +318,21 @@ class OrderControllerTest {
                 notificationCaptor.getAllValues().stream()
                         .map(NotificationCreateRequest::type)
                         .toList());
+    }
+
+    @Test
+    void genericStatusTransitionCannotCancelPaidOrderWithoutRefund() {
+        UserContext.setUserId(CUSTOMER_ID);
+        Order order = order(OrderStatus.PAID_PENDING_SHOOT);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+
+        assertThrows(BusinessException.class,
+                () -> orderController.changeStatus(ORDER_ID, transitionRequest(OrderStatus.CANCELLED)));
+
+        assertEquals(OrderStatus.PAID_PENDING_SHOOT, order.getStatus());
+        assertEquals(EscrowStatus.HELD, order.getEscrowStatus());
+        verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
+        verify(paymentRecordRepository, never()).save(any(PaymentRecord.class));
     }
 
     @Test
@@ -507,6 +532,12 @@ class OrderControllerTest {
 
     private ReworkRequest reworkRequest(String reason) {
         ReworkRequest request = new ReworkRequest();
+        request.setReason(reason);
+        return request;
+    }
+
+    private CancelOrderRequest cancelOrderRequest(String reason) {
+        CancelOrderRequest request = new CancelOrderRequest();
         request.setReason(reason);
         return request;
     }

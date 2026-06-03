@@ -1,5 +1,1 @@
-export {
-  LoginChoicePage,
-  LoginInfoPage,
-  RegisterPage
-} from '../legacy/CameraPages.jsx'
+export { LoginChoicePage, LoginInfoPage, RegisterPage } from './AuthPages.jsx'

@@ -35,7 +35,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -74,18 +73,14 @@ class ConversationQuoteControllerTest {
     @Mock
     private OrderService orderService;
 
-    @Mock
-    private PlatformTransactionManager transactionManager;
-
     private ConversationController conversationController;
 
     private QuoteController quoteController;
 
     @BeforeEach
     void setUp() {
+        ConversationService conversationService = new ConversationService(conversationRepository);
         MessageService messageService = new MessageService(conversationRepository, messageRepository);
-        ConversationService conversationService =
-                new ConversationService(conversationRepository, messageService, transactionManager);
         QuoteService quoteService = new QuoteService(quoteRepository, conversationRepository, orderService);
         conversationController = new ConversationController(conversationService, messageService, quoteService);
         quoteController = new QuoteController(quoteService);
@@ -437,21 +432,22 @@ class ConversationQuoteControllerTest {
     }
 
     private CreateQuoteRequest validQuoteRequest() {
+        LocalDateTime now = LocalDateTime.now();
         CreateQuoteRequest request = new CreateQuoteRequest();
         request.setConversationId(CONVERSATION_ID);
         request.setAmountCent(AMOUNT_CENT);
-        request.setShootStartTime(LocalDateTime.of(2026, 6, 1, 9, 0));
-        request.setShootEndTime(LocalDateTime.of(2026, 6, 1, 12, 0));
+        request.setShootStartTime(now.plusDays(2));
+        request.setShootEndTime(now.plusDays(2).plusHours(2));
         request.setLocation("南京大学鼓楼校区");
         request.setServiceContent("毕业照半日约拍");
         request.setOriginalCount(30);
         request.setRefinedCount(9);
-        request.setDeliveryDeadline(LocalDateTime.of(2026, 6, 8, 12, 0));
+        request.setDeliveryDeadline(now.plusDays(7));
         request.setPhotoUsageScope("PERSONAL_ONLY");
         request.setTerms("P4 quote terms");
         request.setContractTerms("P4 contract terms");
         request.setSafetyNoticeVersion("P4-DEMO");
-        request.setExpireTime(LocalDateTime.now().plusDays(1));
+        request.setExpireTime(now.plusDays(1));
         request.setRemark("Basic retouch included");
         return request;
     }
@@ -479,6 +475,7 @@ class ConversationQuoteControllerTest {
     }
 
     private Quote pendingQuote() {
+        LocalDateTime now = LocalDateTime.now();
         Quote quote = new Quote();
         quote.setId(QUOTE_ID);
         quote.setQuoteNo("Q202606010001");
@@ -488,19 +485,19 @@ class ConversationQuoteControllerTest {
         quote.setSourceType(ConversationService.SOURCE_TYPE_DEMAND_RESPONSE);
         quote.setSourceId(RESPONSE_ID);
         quote.setAmountCent(AMOUNT_CENT);
-        quote.setShootStartTime(LocalDateTime.of(2026, 6, 1, 9, 0));
-        quote.setShootEndTime(LocalDateTime.of(2026, 6, 1, 12, 0));
+        quote.setShootStartTime(now.plusDays(2));
+        quote.setShootEndTime(now.plusDays(2).plusHours(2));
         quote.setLocation("南京大学鼓楼校区");
         quote.setServiceContent("毕业照半日约拍");
         quote.setOriginalCount(30);
         quote.setRefinedCount(9);
-        quote.setDeliveryDeadline(LocalDateTime.of(2026, 6, 8, 12, 0));
+        quote.setDeliveryDeadline(now.plusDays(7));
         quote.setPhotoUsageScope("PERSONAL_ONLY");
         quote.setServiceSnapshotJson("{}");
         quote.setStatus(QuoteStatus.PENDING_CONFIRM);
-        quote.setExpireTime(LocalDateTime.now().plusDays(1));
-        quote.setCreatedAt(LocalDateTime.now());
-        quote.setUpdatedAt(LocalDateTime.now());
+        quote.setExpireTime(now.plusDays(1));
+        quote.setCreatedAt(now);
+        quote.setUpdatedAt(now);
         return quote;
     }
 

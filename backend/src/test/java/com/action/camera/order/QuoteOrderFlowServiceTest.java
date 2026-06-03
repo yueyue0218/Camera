@@ -4,6 +4,7 @@ import com.action.camera.common.exception.BusinessException;
 import com.action.camera.delivery.repository.DeliveryRepository;
 import com.action.camera.message.entity.Quote;
 import com.action.camera.message.enums.QuoteStatus;
+import com.action.camera.message.model.CreateQuoteCommand;
 import com.action.camera.message.repository.ConversationRepository;
 import com.action.camera.message.repository.QuoteRepository;
 import com.action.camera.message.service.QuoteService;
@@ -25,15 +26,22 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -224,6 +232,131 @@ class QuoteOrderFlowServiceTest {
     }
 
     @Test
+    void confirmingQuoteWithProviderTimeConflictDoesNotCreateOrder() {
+        Quote quote = pendingQuote();
+        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.save(any(Quote.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderRepository.findByQuoteId(QUOTE_ID)).thenReturn(Optional.empty());
+        when(orderRepository.existsProviderTimeConflict(anyLong(), any(), any(), anyCollection()))
+                .thenReturn(true);
+
+        assertThrows(BusinessException.class,
+                () -> quoteService.confirmQuote(QUOTE_ID, CUSTOMER_ID, "确认冲突报价"));
+
+        verify(orderRepository, never()).save(any(Order.class));
+    }
+
+    @Test
+    void providerCanEditPendingQuoteBeforeCustomerConfirmation() {
+        Quote quote = pendingQuote();
+        CreateQuoteCommand command = quoteCommand();
+        command.setAmountCent(AMOUNT_CENT + 1000);
+        command.setLocation("南京大学仙林校区");
+        command.setServiceContent("更新后的毕业照方案");
+        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.save(any(Quote.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Quote updatedQuote = quoteService.updatePendingQuote(QUOTE_ID, command, PROVIDER_USER_ID);
+
+        assertSame(quote, updatedQuote);
+        assertEquals(QuoteStatus.PENDING_CONFIRM, updatedQuote.getStatus());
+        assertEquals(AMOUNT_CENT + 1000, updatedQuote.getAmountCent());
+        assertEquals("南京大学仙林校区", updatedQuote.getLocation());
+        assertEquals("更新后的毕业照方案", updatedQuote.getServiceContent());
+        verify(quoteRepository, times(1)).save(quote);
+    }
+
+    @Test
+    void confirmedQuoteCannotBeEdited() {
+        Quote quote = pendingQuote();
+        quote.setStatus(QuoteStatus.CONFIRMED);
+        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+
+        assertThrows(BusinessException.class,
+                () -> quoteService.updatePendingQuote(QUOTE_ID, quoteCommand(), PROVIDER_USER_ID));
+
+        verify(quoteRepository, never()).save(any(Quote.class));
+    }
+
+    @Test
+    void pendingQuoteEditFailsWhenProviderTimeConflicts() {
+        Quote quote = pendingQuote();
+        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(orderRepository.existsProviderTimeConflict(anyLong(), any(), any(), anyCollection()))
+                .thenReturn(true);
+
+        assertThrows(BusinessException.class,
+                () -> quoteService.updatePendingQuote(QUOTE_ID, quoteCommand(), PROVIDER_USER_ID));
+
+        verify(quoteRepository, never()).save(any(Quote.class));
+    }
+
+    @Test
+    void rejectedQuoteCannotBeEdited() {
+        Quote quote = pendingQuote();
+        quote.setStatus(QuoteStatus.REJECTED);
+        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+
+        assertThrows(BusinessException.class,
+                () -> quoteService.updatePendingQuote(QUOTE_ID, quoteCommand(), PROVIDER_USER_ID));
+
+        verify(quoteRepository, never()).save(any(Quote.class));
+    }
+
+    @Test
+    void adjacentProviderShootTimeDoesNotConflict() {
+        when(orderRepository.existsProviderTimeConflict(anyLong(), any(), any(), anyCollection()))
+                .thenReturn(false);
+
+        assertDoesNotThrow(() -> orderService.ensureProviderTimeAvailable(
+                PROVIDER_USER_ID,
+                LocalDateTime.of(2026, 6, 1, 12, 0),
+                LocalDateTime.of(2026, 6, 1, 14, 0)));
+
+        verify(orderRepository).existsProviderTimeConflict(
+                eq(PROVIDER_USER_ID),
+                eq(LocalDateTime.of(2026, 6, 1, 12, 0)),
+                eq(LocalDateTime.of(2026, 6, 1, 14, 0)),
+                anyCollection());
+    }
+
+    @Test
+    void overlappingTimeForDifferentProviderDoesNotConflict() {
+        Long anotherProviderId = PROVIDER_USER_ID + 1;
+        when(orderRepository.existsProviderTimeConflict(anyLong(), any(), any(), anyCollection()))
+                .thenReturn(false);
+
+        assertDoesNotThrow(() -> orderService.ensureProviderTimeAvailable(
+                anotherProviderId,
+                LocalDateTime.of(2026, 6, 1, 9, 30),
+                LocalDateTime.of(2026, 6, 1, 11, 30)));
+
+        verify(orderRepository).existsProviderTimeConflict(
+                eq(anotherProviderId),
+                eq(LocalDateTime.of(2026, 6, 1, 9, 30)),
+                eq(LocalDateTime.of(2026, 6, 1, 11, 30)),
+                anyCollection());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void providerTimeConflictStatusesExcludeCancelledAndRefundedButIncludePendingPayment() {
+        ArgumentCaptor<Collection<OrderStatus>> statusesCaptor = ArgumentCaptor.forClass(Collection.class);
+        when(orderRepository.existsProviderTimeConflict(anyLong(), any(), any(), statusesCaptor.capture()))
+                .thenReturn(false);
+
+        orderService.ensureProviderTimeAvailable(
+                PROVIDER_USER_ID,
+                LocalDateTime.of(2026, 6, 2, 9, 0),
+                LocalDateTime.of(2026, 6, 2, 12, 0));
+
+        Collection<OrderStatus> statuses = statusesCaptor.getValue();
+        assertTrue(statuses.contains(OrderStatus.PENDING_PAYMENT));
+        assertFalse(statuses.contains(OrderStatus.CANCELLED));
+        assertFalse(statuses.contains(OrderStatus.REFUNDED));
+    }
+
+    @Test
     void mockPayHoldsFundsAndWritesPaymentRecordAndStatusLog() {
         Order order = pendingPaymentOrder();
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
@@ -251,6 +384,8 @@ class QuoteOrderFlowServiceTest {
         OrderStatusLog statusLog = logCaptor.getValue();
         assertEquals(OrderStatus.PENDING_PAYMENT, statusLog.getFromStatus());
         assertEquals(OrderStatus.PAID_PENDING_SHOOT, statusLog.getToStatus());
+        assertEquals(CUSTOMER_ID, statusLog.getOperatorId());
+        assertEquals("CUSTOMER", statusLog.getOperatorRole());
         assertEquals("模拟支付成功，资金进入平台托管", statusLog.getRemark());
     }
 
@@ -278,6 +413,86 @@ class QuoteOrderFlowServiceTest {
 
         assertEquals(OrderStatus.PENDING_PAYMENT, order.getStatus());
         assertEquals(EscrowStatus.NOT_PAID, order.getEscrowStatus());
+        verify(paymentRecordRepository, never()).save(any(PaymentRecord.class));
+        verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
+    }
+
+    @Test
+    void customerCanCancelPendingPaymentOrderWithoutRefund() {
+        Order order = pendingPaymentOrder();
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderStatusLogRepository.save(any(OrderStatusLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Order cancelledOrder = orderService.cancelOrder(
+                ORDER_ID,
+                CUSTOMER_ID,
+                "客户暂不拍摄",
+                LocalDateTime.of(2026, 5, 30, 10, 0));
+
+        assertEquals(OrderStatus.CANCELLED, cancelledOrder.getStatus());
+        assertEquals(EscrowStatus.NOT_PAID, cancelledOrder.getEscrowStatus());
+        assertEquals("NONE", cancelledOrder.getRefundStatus());
+        assertNotNull(cancelledOrder.getCancelTime());
+        verify(paymentRecordRepository, never()).save(any(PaymentRecord.class));
+
+        ArgumentCaptor<OrderStatusLog> logCaptor = ArgumentCaptor.forClass(OrderStatusLog.class);
+        verify(orderStatusLogRepository).save(logCaptor.capture());
+        assertEquals(OrderStatus.PENDING_PAYMENT, logCaptor.getValue().getFromStatus());
+        assertEquals(OrderStatus.CANCELLED, logCaptor.getValue().getToStatus());
+        assertEquals(CUSTOMER_ID, logCaptor.getValue().getOperatorId());
+    }
+
+    @Test
+    void customerCanCancelPaidOrderBeforeShootStartAndReceiveRefund() {
+        Order order = pendingPaymentOrder();
+        order.setStatus(OrderStatus.PAID_PENDING_SHOOT);
+        order.setEscrowStatus(EscrowStatus.HELD);
+        PaymentRecord paymentRecord = paidPaymentRecord();
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        when(paymentRecordRepository.findByOrderId(ORDER_ID)).thenReturn(Optional.of(paymentRecord));
+        when(paymentRecordRepository.save(any(PaymentRecord.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderStatusLogRepository.save(any(OrderStatusLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Order refundedOrder = orderService.cancelOrder(
+                ORDER_ID,
+                CUSTOMER_ID,
+                "拍摄前取消",
+                LocalDateTime.of(2026, 5, 31, 10, 0));
+
+        assertEquals(OrderStatus.REFUNDED, refundedOrder.getStatus());
+        assertEquals(EscrowStatus.REFUNDED, refundedOrder.getEscrowStatus());
+        assertEquals("NOT_SETTLED", refundedOrder.getSettlementStatus());
+        assertEquals("REFUNDED", refundedOrder.getRefundStatus());
+        assertNotNull(refundedOrder.getCancelTime());
+        assertEquals(AMOUNT_CENT, paymentRecord.getRefundAmountCent());
+        assertEquals("REFUNDED", paymentRecord.getStatus());
+        assertNotNull(paymentRecord.getRefundedAt());
+
+        ArgumentCaptor<OrderStatusLog> logCaptor = ArgumentCaptor.forClass(OrderStatusLog.class);
+        verify(orderStatusLogRepository).save(logCaptor.capture());
+        assertEquals(OrderStatus.PAID_PENDING_SHOOT, logCaptor.getValue().getFromStatus());
+        assertEquals(OrderStatus.REFUNDED, logCaptor.getValue().getToStatus());
+    }
+
+    @Test
+    void paidOrderCannotBeCancelledAfterShootStart() {
+        Order order = pendingPaymentOrder();
+        order.setStatus(OrderStatus.PAID_PENDING_SHOOT);
+        order.setEscrowStatus(EscrowStatus.HELD);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+
+        assertThrows(BusinessException.class,
+                () -> orderService.cancelOrder(
+                        ORDER_ID,
+                        CUSTOMER_ID,
+                        "拍摄已开始不能取消",
+                        LocalDateTime.of(2026, 6, 1, 9, 0)));
+
+        assertEquals(OrderStatus.PAID_PENDING_SHOOT, order.getStatus());
+        assertEquals(EscrowStatus.HELD, order.getEscrowStatus());
+        assertNull(order.getCancelTime());
         verify(paymentRecordRepository, never()).save(any(PaymentRecord.class));
         verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
     }
@@ -327,6 +542,26 @@ class QuoteOrderFlowServiceTest {
         return quote;
     }
 
+    private CreateQuoteCommand quoteCommand() {
+        CreateQuoteCommand command = new CreateQuoteCommand();
+        command.setConversationId(9001L);
+        command.setAmountCent(AMOUNT_CENT);
+        command.setShootStartTime(LocalDateTime.of(2026, 6, 1, 9, 0));
+        command.setShootEndTime(LocalDateTime.of(2026, 6, 1, 12, 0));
+        command.setLocation("南京大学鼓楼校区");
+        command.setServiceContent("毕业照半日约拍");
+        command.setOriginalCount(30);
+        command.setRefinedCount(9);
+        command.setDeliveryDeadline(LocalDateTime.of(2026, 6, 8, 12, 0));
+        command.setPhotoUsageScope("PERSONAL_ONLY");
+        command.setTerms("P4 简化报价条款");
+        command.setContractTerms("P4 简化合同条款");
+        command.setSafetyNoticeVersion("P4-DEMO");
+        command.setExpireTime(LocalDateTime.now().plusDays(1));
+        command.setRemark("含基础调色");
+        return command;
+    }
+
     private Order pendingPaymentOrder() {
         Order order = new Order();
         order.setId(ORDER_ID);
@@ -357,6 +592,19 @@ class QuoteOrderFlowServiceTest {
         order.setUpdatedAt(LocalDateTime.now());
         assertNotNull(order.getId());
         return order;
+    }
+
+    private PaymentRecord paidPaymentRecord() {
+        PaymentRecord paymentRecord = new PaymentRecord();
+        paymentRecord.setId(9901L);
+        paymentRecord.setOrderId(ORDER_ID);
+        paymentRecord.setAmountCent(AMOUNT_CENT);
+        paymentRecord.setRefundAmountCent(0L);
+        paymentRecord.setPayMethod(OrderService.MOCK_PAY_METHOD);
+        paymentRecord.setStatus("SUCCESS");
+        paymentRecord.setPaidAt(LocalDateTime.of(2026, 5, 30, 10, 0));
+        paymentRecord.setCreatedAt(LocalDateTime.of(2026, 5, 30, 10, 0));
+        return paymentRecord;
     }
 
     private void assertQuoteHasSqlRequiredFields(Quote quote) {
