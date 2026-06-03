@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { LoginChoicePage, LoginInfoPage, RegisterPage } from './pages/auth/index.js'
-import { HallPage } from './pages/hall/index.js'
+import { DemandDetailPage, HallPage, ServicePackageDetailPage } from './pages/hall/index.js'
 import { PublishPage } from './pages/demand/index.js'
 import { FeedPage, MomentDetailPage } from './pages/feed/index.js'
 import { ConversationDetailPage, MessagesPage } from './pages/messages/index.js'
@@ -12,6 +12,8 @@ export function AppRoutes() {
     <Routes>
       <Route path="/" element={<Navigate to="/hall" replace />} />
       <Route path="/hall" element={<HallPage />} />
+      <Route path="/demands/:demandId" element={<DemandDetailPage />} />
+      <Route path="/service-packages/:serviceId" element={<ServicePackageDetailPage />} />
       <Route path="/publish" element={<PublishPage />} />
       <Route path="/feed" element={<FeedPage />} />
       <Route path="/moments/:momentId" element={<MomentDetailPage />} />

@@ -1,4 +1,4 @@
-import { moneyRange, shortDateTime, splitTags } from './hallUtils.js'
+import { cityName, firstText, moneyRange, shortDateTime, splitTags } from './hallUtils.js'
 
 const tips = [
   '保持自然微笑，眼神放松，不要一直盯镜头。',
@@ -6,14 +6,17 @@ const tips = [
   '拍摄前和摄影师确认精修张数、交付时间和参考风格。'
 ]
 
+function demandTags(demand) {
+  const serviceTypes = splitTags(demand?.serviceTypes)
+  return serviceTypes.length ? serviceTypes : splitTags(demand?.styleTags)
+}
+
 export function DemandAside({ selectedDemand, error }) {
   return (
     <aside className="aside">
       <div className="aside-card">
-        <h3>热拍风格</h3>
-        <div className="aside-item"><strong>毕业照 · 仙林</strong><span>需要后端统计接口后展示真实热度。</span></div>
-        <div className="aside-item"><strong>胶片复古 · 情侣</strong><span>当前仅作为状态说明，不参与筛选。</span></div>
-        <div className="aside-item"><strong>清透写真 · 咖啡店</strong><span>连接后端后需求列表会显示真实数据。</span></div>
+        <h3>热门风格</h3>
+        <div className="aside-item"><strong>暂无统计</strong><span>等待后端大厅统计 / 热门风格接口补充后展示真实热度。</span></div>
       </div>
       <div className="aside-card">
         <h3>上镜Tips</h3>
@@ -21,11 +24,12 @@ export function DemandAside({ selectedDemand, error }) {
       </div>
       {selectedDemand && (
         <div className="aside-card">
-          <h3>{selectedDemand.scene || '需求详情'}</h3>
+          <h3>{firstText(selectedDemand.title, selectedDemand.scene) || '需求详情'}</h3>
           <div className="detail-publish-time">发布 {shortDateTime(selectedDemand.createdAt)}</div>
-          <div className="aside-item"><strong>地点</strong><span>{[selectedDemand.cityCode, selectedDemand.location].filter(Boolean).join(' · ') || '暂无'}</span></div>
+          <div className="aside-item"><strong>发布者</strong><span>{firstText(selectedDemand.customerNickname, selectedDemand.customerName) || '暂无'}</span></div>
+          <div className="aside-item"><strong>地点</strong><span>{[cityName(selectedDemand.cityName || selectedDemand.cityCode), selectedDemand.location].filter(Boolean).join(' · ') || '暂无'}</span></div>
           <div className="aside-item"><strong>预算</strong><span>{moneyRange(selectedDemand.budgetMinCent, selectedDemand.budgetMaxCent)}</span></div>
-          <div className="aside-item"><strong>标签</strong><span>{splitTags(selectedDemand.styleTags).join(' / ') || '暂无'}</span></div>
+          <div className="aside-item"><strong>标签</strong><span>{demandTags(selectedDemand).join(' / ') || '暂无'}</span></div>
         </div>
       )}
     </aside>
@@ -33,17 +37,23 @@ export function DemandAside({ selectedDemand, error }) {
 }
 
 export function ShowcaseAside({ selectedService, currentUser, interests }) {
+  const credit = selectedService?.photographerCreditScore ?? selectedService?.providerCreditScore ?? selectedService?.creditScore
+
   return (
     <aside className="aside">
       {selectedService ? (
         <div className="aside-card photographer-mini-card">
           <h3>摄影师信息</h3>
           <div className="profile-mini detail-provider-link">
-            <div className="mini-avatar" aria-hidden="true" />
+            <div
+              className="mini-avatar"
+              style={{ '--avatar-art': selectedService.photographerAvatarUrl ? `url(${selectedService.photographerAvatarUrl})` : undefined }}
+              aria-hidden="true"
+            />
             <div className="photographer-card-info">
               <strong className="photographer-card-name">{selectedService.photographerNickname || '暂无昵称'}</strong>
-              <div className="photographer-card-location">{selectedService.cityCode || selectedService.serviceArea || '暂无城市'}</div>
-              <div className="photographer-card-credit">信用评分和历史约拍次数需要后端补充。</div>
+              <div className="photographer-card-location">{cityName(selectedService.cityName || selectedService.cityCode) || selectedService.serviceArea || '暂无城市'}</div>
+              <div className="photographer-card-credit">{credit ? `信用 ${credit}` : '暂无信用评分'}</div>
             </div>
           </div>
         </div>

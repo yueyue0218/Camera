@@ -15,8 +15,10 @@ export const TIME_STYLE_OPTIONS = [
 
 export const CITY_OPTIONS = [
   { label: '城市', value: '' },
-  { label: '南京', value: '南京' },
-  { label: '上海', value: '上海' }
+  { label: '南京', value: 'NJ' },
+  { label: '上海', value: 'SH' },
+  { label: '北京', value: 'BJ' },
+  { label: '杭州', value: 'HZ' }
 ]
 
 export const TYPE_OPTIONS = [
@@ -27,7 +29,7 @@ export const TYPE_OPTIONS = [
 
 export const BUDGET_OPTIONS = [
   { label: '预算', value: '' },
-  { label: '¥200-500', value: '200-500', minCent: 20000, maxCent: 50000 }
+  { label: '￥200-500', value: '200-500', minCent: 20000, maxCent: 50000 }
 ]
 
 export const demandStatusText = {
@@ -37,6 +39,29 @@ export const demandStatusText = {
   PENDING_CUSTOMER_ACCEPT: '待接受',
   ACCEPTED: '已接受',
   REJECTED: '已拒绝'
+}
+
+export const cityNameMap = {
+  NJ: '南京',
+  NKG: '南京',
+  NANJING: '南京',
+  nanjing: '南京',
+  南京: '南京',
+  SH: '上海',
+  SHA: '上海',
+  SHANGHAI: '上海',
+  shanghai: '上海',
+  上海: '上海',
+  BJ: '北京',
+  PEK: '北京',
+  BEIJING: '北京',
+  beijing: '北京',
+  北京: '北京',
+  HZ: '杭州',
+  HGH: '杭州',
+  HANGZHOU: '杭州',
+  hangzhou: '杭州',
+  杭州: '杭州'
 }
 
 const gradients = [
@@ -51,7 +76,31 @@ export function gradientFor(id) {
 }
 
 export function splitTags(value) {
-  return Array.isArray(value) ? value.filter(Boolean) : []
+  if (Array.isArray(value)) return value.filter(Boolean)
+  if (typeof value !== 'string') return []
+  const trimmed = value.trim()
+  if (!trimmed) return []
+  try {
+    const parsed = JSON.parse(trimmed)
+    if (Array.isArray(parsed)) return parsed.filter(Boolean)
+  } catch {
+    return trimmed.split(/[,\s/]+/).map(item => item.trim()).filter(Boolean)
+  }
+  return []
+}
+
+export function firstText(...values) {
+  return values.find(value => typeof value === 'string' && value.trim())?.trim() || ''
+}
+
+export function cityName(value) {
+  return cityNameMap[value] || cityNameMap[String(value || '').toUpperCase()] || value || ''
+}
+
+export function countText(value, unit = '') {
+  const number = Number(value)
+  if (!Number.isFinite(number)) return ''
+  return `${number}${unit}`
 }
 
 export function timeTagLabel(value) {
@@ -61,7 +110,7 @@ export function timeTagLabel(value) {
 export function moneyRange(minCent, maxCent, fallback = '暂无') {
   const min = money(minCent, '')
   const max = money(maxCent, '')
-  if (min && max) return `${min}-${max.replace('¥', '')}`
+  if (min && max) return `${min}-${max.replace('￥', '')}`
   return min || max || fallback
 }
 
@@ -69,7 +118,7 @@ export function money(value, fallback = '暂无') {
   if (value === null || value === undefined || value === '') return fallback
   const number = Number(value)
   if (Number.isNaN(number)) return fallback
-  return `¥${Math.round(number / 100)}`
+  return `￥${Math.round(number / 100)}`
 }
 
 export function shortDateTime(value) {

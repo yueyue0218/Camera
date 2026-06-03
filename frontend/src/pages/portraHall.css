@@ -295,6 +295,30 @@
   color: #60646c;
 }
 
+.publisher-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  border: 1px solid rgba(21,19,24,.08);
+  border-radius: 999px;
+  background: #fffaf2;
+  color: #555b64;
+  padding: 4px 10px 4px 5px;
+  font-size: 12px;
+  letter-spacing: .04em;
+}
+
+.publisher-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--avatar-art);
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 0 0 1px rgba(21,19,24,.08);
+}
+
 .ticket-meta {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -613,6 +637,20 @@
   background: #fffaf2;
 }
 
+.package-stats {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 5px;
+  margin: 10px 0 12px;
+  color: #656a72;
+  font-size: 12px;
+  letter-spacing: .04em;
+}
+
+.package-stats span {
+  display: block;
+}
+
 .time-brief,
 .publish-brief {
   display: flex;
@@ -741,6 +779,30 @@
   font-size: 12px;
   letter-spacing: .08em;
   margin: -6px 0 14px;
+}
+
+.detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 18px;
+  align-items: start;
+}
+
+.detail-main-card {
+  min-height: 360px;
+}
+
+.detail-main-card .section-title {
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.detail-main-card .section-title h2 {
+  line-height: 1.35;
+}
+
+.detail-meta {
+  margin-top: 24px;
 }
 
 .crumb {

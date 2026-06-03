@@ -75,6 +75,7 @@ export function HallPage() {
       page: 1,
       size: 20,
       status: 'OPEN',
+      keyword: nextFilters.keyword,
       scene: nextFilters.keyword,
       cityCode: nextFilters.cityCode,
       styleTag: nextFilters.type,
@@ -90,6 +91,7 @@ export function HallPage() {
       page: 1,
       size: 20,
       cityCode: nextFilters.cityCode,
+      keyword: nextFilters.keyword,
       scene: nextFilters.keyword,
       style: nextFilters.type,
       timeTag: nextFilters.timeTag,
@@ -219,6 +221,7 @@ export function HallPage() {
         demand={demand}
         currentUser={currentUser}
         onOpen={() => openDemand(demand)}
+        onDetail={() => navigate(`/demands/${demand.demandId}`)}
         onRespond={() => respondDemand(demand)}
       />
     ))
@@ -235,6 +238,7 @@ export function HallPage() {
         currentUser={currentUser}
         interested={interestedIds.has(service.serviceId)}
         onOpen={() => openService(service)}
+        onDetail={() => navigate(`/service-packages/${service.serviceId}`)}
         onReserve={() => reserveService(service)}
       />
     ))
