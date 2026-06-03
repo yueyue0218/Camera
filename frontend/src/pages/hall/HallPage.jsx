@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { demandApi } from '../../api/demandApi.js'
 import { servicePackageApi } from '../../api/servicePackageApi.js'
 import { useAuth } from '../../AuthContext.jsx'
@@ -33,10 +33,17 @@ function normalizeError(error) {
   return error?.message || '请求失败，启动后端服务后会显示真实数据。'
 }
 
+function panelFromSearch(search) {
+  const params = new URLSearchParams(search)
+  const view = params.get('tab') || params.get('view')
+  return view === 'demand' || view === 'demands' ? 'demands' : 'showcases'
+}
+
 export function HallPage() {
   const { currentUser } = useAuth()
   const navigate = useNavigate()
-  const [activePanel, setActivePanel] = useState('showcases')
+  const location = useLocation()
+  const [activePanel, setActivePanel] = useState(() => panelFromSearch(location.search))
   const [filters, setFilters] = useState(initialFilters)
   const [demands, setDemands] = useState([])
   const [services, setServices] = useState([])
@@ -53,6 +60,10 @@ export function HallPage() {
     loadServices()
     loadInterests()
   }, [currentUser.userId, currentUser.role])
+
+  useEffect(() => {
+    setActivePanel(panelFromSearch(location.search))
+  }, [location.search])
 
   function updateFilters(partial) {
     setFilters(current => ({ ...current, ...partial }))
@@ -132,6 +143,11 @@ export function HallPage() {
       loadServices(filters)
       loadInterests(filters)
     }
+  }
+
+  function changePanel(nextPanel) {
+    setActivePanel(nextPanel)
+    navigate(`/hall?tab=${nextPanel === 'demands' ? 'demand' : 'showcase'}`, { replace: true })
   }
 
   function applyTimeFilter(timeTag) {
@@ -237,7 +253,7 @@ export function HallPage() {
         activePanel={activePanel}
         demandCount={demands.length}
         serviceCount={services.length}
-        onChange={setActivePanel}
+        onChange={changePanel}
       />
 
       {activePanel === 'demands' ? (
