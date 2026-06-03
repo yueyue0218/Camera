@@ -1,4 +1,6 @@
 export {
   ProfilePage,
+} from './ProfilePage.jsx'
+export {
   PublicProfilePage
-} from '../legacy/CameraPages.jsx'
+} from './PublicProfilePage.jsx'
