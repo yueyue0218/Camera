@@ -18,6 +18,8 @@ final class DemandMapper {
                 demand.getStyleTags(),
                 demand.getExpectedDate(),
                 demand.getTimeSlot(),
+                demand.getTimeDescription(),
+                demand.getTimeTags(),
                 demand.getCityCode(),
                 demand.getLocation(),
                 demand.getBudgetMinCent(),

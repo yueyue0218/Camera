@@ -14,8 +14,10 @@ import com.action.camera.demand.service.DemandService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -52,9 +54,10 @@ public class DemandController {
                                                      @RequestParam(required = false) LocalDate expectedDate,
                                                      @RequestParam(required = false) String styleTag,
                                                      @RequestParam(required = false) Integer minBudgetCent,
-                                                     @RequestParam(required = false) Integer maxBudgetCent) {
+                                                     @RequestParam(required = false) Integer maxBudgetCent,
+                                                     @RequestParam(required = false) String timeTag) {
         return Result.success(demandService.listDemands(page, size, cityCode, scene, status,
-                expectedDate, styleTag, minBudgetCent, maxBudgetCent));
+                expectedDate, styleTag, minBudgetCent, maxBudgetCent, timeTag));
     }
 
     @GetMapping("/{demandId}")
@@ -62,6 +65,21 @@ public class DemandController {
                                        HttpServletRequest httpRequest) {
         CurrentUser currentUser = currentUserProvider.getCurrentUser(httpRequest);
         return Result.success(demandService.getDemand(demandId, currentUser));
+    }
+
+    @PutMapping("/{demandId}")
+    public Result<DemandDto> updateDemand(@PathVariable Long demandId,
+                                          @RequestBody CreateDemandRequest request,
+                                          HttpServletRequest httpRequest) {
+        CurrentUser currentUser = currentUserProvider.getCurrentUser(httpRequest);
+        return Result.success(demandService.updateDemand(demandId, currentUser, request));
+    }
+
+    @PatchMapping("/{demandId}/close")
+    public Result<DemandDto> closeDemand(@PathVariable Long demandId,
+                                         HttpServletRequest httpRequest) {
+        CurrentUser currentUser = currentUserProvider.getCurrentUser(httpRequest);
+        return Result.success(demandService.closeDemand(demandId, currentUser));
     }
 
     @DeleteMapping("/{demandId}")

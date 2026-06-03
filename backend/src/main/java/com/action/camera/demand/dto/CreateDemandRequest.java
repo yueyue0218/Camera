@@ -9,6 +9,8 @@ public class CreateDemandRequest {
     private List<String> styleTags;
     private LocalDate expectedDate;
     private String timeSlot;
+    private String timeDescription;
+    private List<String> timeTags;
     private String cityCode;
     private String location;
     private Integer budgetMinCent;
@@ -46,6 +48,22 @@ public class CreateDemandRequest {
 
     public void setTimeSlot(String timeSlot) {
         this.timeSlot = timeSlot;
+    }
+
+    public String getTimeDescription() {
+        return timeDescription;
+    }
+
+    public void setTimeDescription(String timeDescription) {
+        this.timeDescription = timeDescription;
+    }
+
+    public List<String> getTimeTags() {
+        return timeTags;
+    }
+
+    public void setTimeTags(List<String> timeTags) {
+        this.timeTags = timeTags;
     }
 
     public String getCityCode() {

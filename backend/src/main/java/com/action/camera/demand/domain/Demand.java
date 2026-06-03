@@ -53,6 +53,13 @@ public class Demand {
     @Column(name = "time_slot", length = 80)
     private String timeSlot;
 
+    @Column(name = "time_description", nullable = false, columnDefinition = "TEXT")
+    private String timeDescription;
+
+    @Convert(converter = DemandStringListJsonConverter.class)
+    @Column(name = "time_tags", nullable = false, columnDefinition = "TEXT")
+    private List<String> timeTags = List.of();
+
     @Column(name = "city_code", nullable = false, length = 40)
     private String cityCode;
 
@@ -93,6 +100,8 @@ public class Demand {
                   List<String> styleTags,
                   LocalDate expectedDate,
                   String timeSlot,
+                  String timeDescription,
+                  List<String> timeTags,
                   String cityCode,
                   String location,
                   Integer budgetMinCent,
@@ -106,6 +115,8 @@ public class Demand {
         this.styleTags = copyList(styleTags);
         this.expectedDate = expectedDate;
         this.timeSlot = timeSlot;
+        this.timeDescription = timeDescription;
+        this.timeTags = copyList(timeTags);
         this.cityCode = cityCode;
         this.location = location;
         this.budgetMinCent = budgetMinCent;
@@ -169,6 +180,9 @@ public class Demand {
         }
         if (styleTags == null) {
             styleTags = List.of();
+        }
+        if (timeTags == null) {
+            timeTags = List.of();
         }
         if (referenceFileIds == null) {
             referenceFileIds = List.of();

@@ -12,6 +12,8 @@ public class DemandDto {
     private final List<String> styleTags;
     private final LocalDate expectedDate;
     private final String timeSlot;
+    private final String timeDescription;
+    private final List<String> timeTags;
     private final String cityCode;
     private final String location;
     private final Integer budgetMinCent;
@@ -29,6 +31,8 @@ public class DemandDto {
                      List<String> styleTags,
                      LocalDate expectedDate,
                      String timeSlot,
+                     String timeDescription,
+                     List<String> timeTags,
                      String cityCode,
                      String location,
                      Integer budgetMinCent,
@@ -45,6 +49,8 @@ public class DemandDto {
         this.styleTags = styleTags;
         this.expectedDate = expectedDate;
         this.timeSlot = timeSlot;
+        this.timeDescription = timeDescription;
+        this.timeTags = timeTags;
         this.cityCode = cityCode;
         this.location = location;
         this.budgetMinCent = budgetMinCent;
@@ -79,6 +85,14 @@ public class DemandDto {
 
     public String getTimeSlot() {
         return timeSlot;
+    }
+
+    public String getTimeDescription() {
+        return timeDescription;
+    }
+
+    public List<String> getTimeTags() {
+        return timeTags;
     }
 
     public String getCityCode() {

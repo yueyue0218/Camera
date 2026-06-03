@@ -253,6 +253,8 @@ class DemandConversationHandoffTest {
         request.setLocation("NJU campus");
         request.setExpectedDate(LocalDate.of(2026, 7, 1));
         request.setTimeSlot("AFTERNOON");
+        request.setTimeDescription("July afternoons are available");
+        request.setTimeTags(List.of("NEAR_7_DAYS"));
         request.setBudgetMinCent(30000);
         request.setBudgetMaxCent(60000);
         request.setStyleTags(List.of("natural", "campus"));
