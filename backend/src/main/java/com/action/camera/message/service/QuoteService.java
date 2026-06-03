@@ -41,8 +41,49 @@ public class QuoteService {
             throw new BusinessException(ErrorCode.DUPLICATE_OPERATION,
                     "Conversation already has a pending quote: " + command.getConversationId());
         }
+        orderService.ensureProviderTimeAvailable(
+                conversation.getParticipantBId(),
+                command.getShootStartTime(),
+                command.getShootEndTime());
 
         Quote quote = buildPendingQuote(command, conversation);
+        return quoteRepository.save(quote);
+    }
+
+    @Transactional
+    public Quote updatePendingQuote(Long quoteId, CreateQuoteCommand command, Long operatorId) {
+        validateQuoteFields(command);
+        Quote quote = getQuoteOrThrow(quoteId);
+        if (!Objects.equals(quote.getProviderUserId(), operatorId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only the provider can edit this quote");
+        }
+        if (quote.getStatus() != QuoteStatus.PENDING_CONFIRM) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                    "Only pending quotes can be edited: " + quote.getStatus());
+        }
+        orderService.ensureProviderTimeAvailable(
+                quote.getProviderUserId(),
+                command.getShootStartTime(),
+                command.getShootEndTime());
+
+        quote.setAmountCent(command.getAmountCent());
+        quote.setShootStartTime(command.getShootStartTime());
+        quote.setShootEndTime(command.getShootEndTime());
+        quote.setLocation(command.getLocation());
+        quote.setServiceContent(command.getServiceContent());
+        quote.setOriginalCount(defaultNonNegative(command.getOriginalCount()));
+        quote.setRefinedCount(defaultNonNegative(command.getRefinedCount()));
+        quote.setDeliveryDeadline(command.getDeliveryDeadline());
+        quote.setPhotoUsageScope(defaultText(command.getPhotoUsageScope(), "PERSONAL_ONLY"));
+        quote.setTerms(command.getTerms());
+        quote.setContractTerms(command.getContractTerms());
+        quote.setSafetyNoticeVersion(command.getSafetyNoticeVersion());
+        quote.setServiceSnapshotJson(buildServiceSnapshot(command));
+        quote.setRemark(command.getRemark());
+        if (command.getExpireTime() != null) {
+            quote.setExpireTime(command.getExpireTime());
+        }
+        quote.setUpdatedAt(LocalDateTime.now());
         return quoteRepository.save(quote);
     }
 
@@ -126,6 +167,13 @@ public class QuoteService {
     private void validateCreateQuoteCommand(CreateQuoteCommand command) {
         if (command == null || command.getConversationId() == null) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "conversationId must not be null");
+        }
+        validateQuoteFields(command);
+    }
+
+    private void validateQuoteFields(CreateQuoteCommand command) {
+        if (command == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "quote request must not be null");
         }
         if (command.getAmountCent() == null || command.getAmountCent() <= 0) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "quote amount must be positive");

@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -29,6 +30,20 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     boolean existsByServicePackageId(Long servicePackageId);
 
     boolean existsByServicePackageIdAndStatusIn(Long servicePackageId, Collection<OrderStatus> statuses);
+
+    @Query("""
+            select case when count(o) > 0 then true else false end
+            from Order o
+            where o.providerUserId = :providerUserId
+              and o.status in :statuses
+              and o.shootStartTime < :shootEndTime
+              and o.shootEndTime > :shootStartTime
+            """)
+    boolean existsProviderTimeConflict(
+            @Param("providerUserId") Long providerUserId,
+            @Param("shootStartTime") LocalDateTime shootStartTime,
+            @Param("shootEndTime") LocalDateTime shootEndTime,
+            @Param("statuses") Collection<OrderStatus> statuses);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select o from Order o where o.id = :id")

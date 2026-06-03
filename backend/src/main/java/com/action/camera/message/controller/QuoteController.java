@@ -17,6 +17,7 @@ import com.action.camera.order.entity.Order;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -30,6 +31,15 @@ public class QuoteController {
     public Result<QuoteResponse> createQuote(@RequestBody CreateQuoteRequest request) {
         Long operatorId = currentUserId();
         Quote quote = quoteService.createQuoteFromConversation(toCommand(request), operatorId);
+        return Result.success(QuoteResponse.from(quote));
+    }
+
+    @PutMapping("/quotations/{quotationId}")
+    public Result<QuoteResponse> updateQuote(
+            @PathVariable Long quotationId,
+            @RequestBody CreateQuoteRequest request) {
+        Long operatorId = currentUserId();
+        Quote quote = quoteService.updatePendingQuote(quotationId, toCommand(request), operatorId);
         return Result.success(QuoteResponse.from(quote));
     }
 

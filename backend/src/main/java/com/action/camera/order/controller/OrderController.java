@@ -4,6 +4,7 @@ import com.action.camera.common.ErrorCode;
 import com.action.camera.common.Result;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
+import com.action.camera.order.dto.CancelOrderRequest;
 import com.action.camera.order.dto.MockPaymentRequest;
 import com.action.camera.order.dto.OrderResponse;
 import com.action.camera.order.dto.OrderStatusLogResponse;
@@ -87,6 +88,17 @@ public class OrderController {
         return Result.success(StatusTransitionResponse.from(latestLog));
     }
 
+    @PostMapping("/orders/{orderId}/cancel")
+    public Result<StatusTransitionResponse> cancelOrder(
+            @PathVariable Long orderId,
+            @RequestBody(required = false) CancelOrderRequest request) {
+        Long operatorId = currentUserId();
+        String reason = request == null ? null : request.getReason();
+        orderService.cancelOrder(orderId, operatorId, reason);
+        OrderStatusLog latestLog = orderService.getLatestStatusLog(orderId, operatorId);
+        return Result.success(StatusTransitionResponse.from(latestLog));
+    }
+
     @GetMapping("/orders/{orderId}/status-logs")
     public Result<List<OrderStatusLogResponse>> listStatusLogs(@PathVariable Long orderId) {
         Long operatorId = currentUserId();
@@ -123,13 +135,6 @@ public class OrderController {
             ensureCustomer(order, operatorId);
             return;
         }
-        if ((order.getStatus() == OrderStatus.PENDING_PAYMENT
-                || order.getStatus() == OrderStatus.PAID_PENDING_SHOOT)
-                && targetStatus == OrderStatus.CANCELLED) {
-            ensureCustomer(order, operatorId);
-            return;
-        }
-
         throw new BusinessException(ErrorCode.STATUS_CONFLICT,
                 "This status transition is not exposed in P4 order API: "
                         + order.getStatus() + " -> " + targetStatus);
