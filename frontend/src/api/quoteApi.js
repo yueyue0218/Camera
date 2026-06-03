@@ -4,6 +4,12 @@ export const quoteApi = {
   create(body, currentUser) {
     return request('/quotations', { method: 'POST', body: JSON.stringify(body) }, currentUser)
   },
+  update(quotationId, body, currentUser) {
+    return request(`/quotations/${quotationId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body)
+    }, currentUser)
+  },
   confirm(quotationId, confirmRemark, currentUser) {
     return request(`/quotations/${quotationId}/confirm`, {
       method: 'POST',

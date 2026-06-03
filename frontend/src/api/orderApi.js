@@ -35,5 +35,11 @@ export const orderApi = {
       method: 'POST',
       body: JSON.stringify({ reason })
     }, currentUser)
+  },
+  cancel(orderId, body = {}, currentUser) {
+    return request(`/orders/${orderId}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: body.reason })
+    }, currentUser)
   }
 }
