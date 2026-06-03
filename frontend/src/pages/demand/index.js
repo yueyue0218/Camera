@@ -1,1 +1,1 @@
-export { PublishPage } from '../legacy/CameraPages.jsx'
+export { PublishPage } from './PublishPage.jsx'
