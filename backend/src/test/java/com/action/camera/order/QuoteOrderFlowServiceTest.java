@@ -41,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -313,9 +314,9 @@ class QuoteOrderFlowServiceTest {
                 LocalDateTime.of(2026, 6, 1, 14, 0)));
 
         verify(orderRepository).existsProviderTimeConflict(
-                PROVIDER_USER_ID,
-                LocalDateTime.of(2026, 6, 1, 12, 0),
-                LocalDateTime.of(2026, 6, 1, 14, 0),
+                eq(PROVIDER_USER_ID),
+                eq(LocalDateTime.of(2026, 6, 1, 12, 0)),
+                eq(LocalDateTime.of(2026, 6, 1, 14, 0)),
                 anyCollection());
     }
 
@@ -331,9 +332,9 @@ class QuoteOrderFlowServiceTest {
                 LocalDateTime.of(2026, 6, 1, 11, 30)));
 
         verify(orderRepository).existsProviderTimeConflict(
-                anotherProviderId,
-                LocalDateTime.of(2026, 6, 1, 9, 30),
-                LocalDateTime.of(2026, 6, 1, 11, 30),
+                eq(anotherProviderId),
+                eq(LocalDateTime.of(2026, 6, 1, 9, 30)),
+                eq(LocalDateTime.of(2026, 6, 1, 11, 30)),
                 anyCollection());
     }
 
@@ -535,7 +536,7 @@ class QuoteOrderFlowServiceTest {
         quote.setDeliveryDays(7);
         quote.setRemark("含基础调色");
         quote.setStatus(QuoteStatus.PENDING_CONFIRM);
-        quote.setExpireTime(LocalDateTime.of(2026, 5, 30, 23, 59));
+        quote.setExpireTime(LocalDateTime.now().plusDays(1));
         quote.setCreatedAt(LocalDateTime.now());
         quote.setUpdatedAt(LocalDateTime.now());
         return quote;

@@ -99,6 +99,12 @@ public class QuoteService {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT,
                     "Quote status does not allow confirmation: " + quote.getStatus());
         }
+        if (quote.getExpireTime() != null && quote.getExpireTime().isBefore(LocalDateTime.now())) {
+            quote.setStatus(QuoteStatus.EXPIRED);
+            quote.setUpdatedAt(LocalDateTime.now());
+            quoteRepository.save(quote);
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Quote has expired");
+        }
 
         quote.setStatus(QuoteStatus.CONFIRMED);
         quote.setUpdatedAt(LocalDateTime.now());
