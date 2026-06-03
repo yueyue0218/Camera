@@ -1,50 +1,17 @@
-import { AppBar, Box, Button, Chip, Tab, Tabs, Toolbar, Typography, Stack } from '@mui/material'
-import ChatRoundedIcon from '@mui/icons-material/ChatRounded'
-import DynamicFeedRoundedIcon from '@mui/icons-material/DynamicFeedRounded'
-import HomeRoundedIcon from '@mui/icons-material/HomeRounded'
-import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded'
-import PersonRoundedIcon from '@mui/icons-material/PersonRounded'
-import PublishRoundedIcon from '@mui/icons-material/PublishRounded'
 import { useNavigate } from 'react-router-dom'
-import cameraLogoUrl from '../assets/camera-logo-mark.png'
 
 const navItems = [
-  { label: '大厅', path: '/hall', icon: <HomeRoundedIcon /> },
-  { label: '发布', path: '/publish', icon: <PublishRoundedIcon /> },
-  { label: '动态', path: '/feed', icon: <DynamicFeedRoundedIcon /> },
-  { label: '会话', path: '/messages', icon: <ChatRoundedIcon /> },
-  { label: '个人', path: '/profile', icon: <PersonRoundedIcon /> }
+  { label: '\u7ea6\u62cd\u5927\u5385', path: '/hall' },
+  { label: '\u52a8\u6001', path: '/feed' },
+  { label: '\u610f\u5411', path: '/profile', customerOnly: true, passive: true },
+  { label: '\u6d88\u606f', path: '/messages' },
+  { label: '\u4e2a\u4eba', path: '/profile' }
 ]
 
 const roleMap = {
-  CUSTOMER: '需求方',
-  PROVIDER: '服务方',
-  ADMIN: '管理员'
-}
-
-function BrandLockup({ hero = false }) {
-  return (
-    <Stack
-      direction="row"
-      alignItems="center"
-      spacing={hero ? 1.8 : 1.1}
-      className={hero ? 'brand-lockup brand-lockup-hero' : 'brand-lockup'}
-    >
-      <Box
-        component="img"
-        className={hero ? 'brand-logo brand-logo-hero' : 'brand-logo'}
-        src={cameraLogoUrl}
-        alt=""
-        aria-hidden="true"
-      />
-      <Typography
-        className={hero ? 'camera-word camera-hero-word' : 'camera-word camera-hero-word camera-nav-word'}
-        variant={hero ? 'h3' : 'h5'}
-      >
-        Camera
-      </Typography>
-    </Stack>
-  )
+  CUSTOMER: '\u9700\u6c42\u65b9',
+  PROVIDER: '\u670d\u52a1\u65b9',
+  ADMIN: '\u7ba1\u7406\u5458'
 }
 
 export function Navbar({ activePath, currentUser, logout }) {
@@ -54,50 +21,49 @@ export function Navbar({ activePath, currentUser, logout }) {
     : navItems.find(item => activePath.startsWith(item.path))?.path || '/hall'
 
   return (
-    <AppBar position="sticky" color="inherit" elevation={0} sx={{ borderBottom: '1px solid #e2d4fa' }}>
-      <Toolbar sx={{ gap: 2, minHeight: { xs: 64, md: 72 } }}>
-        <Box sx={{ minWidth: { xs: 130, md: 190 } }}>
-          <BrandLockup />
-        </Box>
+    <header className="portra-header">
+      <div className="portra-header-inner">
+        <button className="portra-wordmark" type="button" onClick={() => navigate('/hall')}>
+          <span className="portra-wordmark-text"><span className="t">Portr</span><span className="a">a</span></span>
+          <span className="portra-wordmark-sub">Meet Right Now</span>
+        </button>
 
-        <Tabs
-          value={tabValue}
-          onChange={(_, value) => navigate(value)}
-          variant="scrollable"
-          scrollButtons="auto"
-          sx={{ flex: 1, minHeight: 48 }}
-        >
-          {navItems.map(item => (
-            <Tab
-              key={item.path}
-              value={item.path}
-              icon={item.icon}
-              iconPosition="start"
-              label={item.label}
-              sx={{ minHeight: 48 }}
-            />
+        <nav className="portra-nav" aria-label="\u4e3b\u5bfc\u822a">
+          {navItems.filter(item => !item.customerOnly || currentUser.role === 'CUSTOMER').map(item => (
+            <button
+              className={`portra-nav-item ${!item.passive && tabValue === item.path ? 'active' : ''}`}
+              key={`${item.label}-${item.path}`}
+              type="button"
+              onClick={() => navigate(item.path)}
+            >
+              {item.label}
+            </button>
           ))}
-        </Tabs>
+        </nav>
 
-        <Chip
-          label={`当前：${roleMap[currentUser.role]}`}
-          color={currentUser.role === 'CUSTOMER' ? 'primary' : 'secondary'}
-          variant="outlined"
-          sx={{ display: { xs: 'none', sm: 'inline-flex' } }}
-        />
-        <Button
-          variant="text"
-          color="inherit"
-          startIcon={<LogoutRoundedIcon />}
-          onClick={() => {
-            logout()
-            navigate('/login', { replace: true })
-          }}
-          sx={{ display: { xs: 'none', md: 'inline-flex' } }}
-        >
-          退出
-        </Button>
-      </Toolbar>
-    </AppBar>
+        <div className="portra-header-actions">
+          <div className="portra-role-toggle" aria-label="\u5f53\u524d\u8eab\u4efd">
+            <button className={`portra-role-btn ${currentUser.role === 'CUSTOMER' ? 'active' : ''}`} type="button" disabled={currentUser.role !== 'CUSTOMER'}>
+              {'\u5355\u4e3b'}
+            </button>
+            <button className={`portra-role-btn ${currentUser.role === 'PROVIDER' ? 'active' : ''}`} type="button" disabled={currentUser.role !== 'PROVIDER'}>
+              {'\u6444\u5f71\u5e08'}
+            </button>
+          </div>
+          <button
+            className="portra-icon-btn"
+            title={roleMap[currentUser.role] || '\u7528\u6237'}
+            type="button"
+            onClick={() => {
+              logout()
+              navigate('/login', { replace: true })
+            }}
+          >
+            {'\u9000\u51fa'}
+          </button>
+          <span className="portra-avatar" aria-hidden="true" />
+        </div>
+      </div>
+    </header>
   )
 }

@@ -1,4 +1,3 @@
-import { Box, Container } from '@mui/material'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../AuthContext.jsx'
 import { AppRoutes, LoginRoutes } from '../routes.jsx'
@@ -28,11 +27,11 @@ export default function AppShell() {
           : '/hall'
 
   return (
-    <Box sx={{ minHeight: '100vh', pb: { xs: 4, md: 6 }, bgcolor: 'background.default' }}>
+    <div className="portra-app">
       <Navbar activePath={activePath} currentUser={currentUser} logout={logout} />
-      <Container maxWidth="lg" sx={{ pt: { xs: 2, md: 3 } }}>
+      <div className="portra-main-shell">
         <AppRoutes />
-      </Container>
-    </Box>
+      </div>
+    </div>
   )
 }

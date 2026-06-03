@@ -1,1 +1,1 @@
-export { HallPage } from '../legacy/CameraPages.jsx'
+export { HallPage } from './HallPage.jsx'
