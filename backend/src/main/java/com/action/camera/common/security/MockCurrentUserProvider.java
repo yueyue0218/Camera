@@ -1,6 +1,7 @@
 package com.action.camera.common.security;
 
 import com.action.camera.common.ErrorCode;
+import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Component;
@@ -17,6 +18,14 @@ public class MockCurrentUserProvider {
     private static final long DEFAULT_CUSTOMER_ID = 1001L;
 
     public CurrentUser getCurrentUser(HttpServletRequest request) {
+        Long contextUserId = UserContext.getUserId();
+        if (contextUserId != null) {
+            UserRole contextRole = UserContext.getCurrentRole();
+            UserRole resolvedRole = contextRole == null
+                    ? UserRole.parse(request.getHeader("X-User-Role"), UserRole.CUSTOMER)
+                    : contextRole;
+            return new CurrentUser(contextUserId, resolvedRole);
+        }
         Long userId = readUserId(request.getHeader("X-User-Id"));
         UserRole role = UserRole.parse(request.getHeader("X-User-Role"), UserRole.CUSTOMER);
         return new CurrentUser(userId, role);

@@ -35,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -73,6 +74,9 @@ class ConversationQuoteControllerTest {
     @Mock
     private OrderService orderService;
 
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
     private ConversationController conversationController;
 
     private QuoteController quoteController;
@@ -80,7 +84,8 @@ class ConversationQuoteControllerTest {
     @BeforeEach
     void setUp() {
         MessageService messageService = new MessageService(conversationRepository, messageRepository);
-        ConversationService conversationService = new ConversationService(conversationRepository, messageService);
+        ConversationService conversationService =
+                new ConversationService(conversationRepository, messageService, transactionManager);
         QuoteService quoteService = new QuoteService(quoteRepository, conversationRepository, orderService);
         conversationController = new ConversationController(conversationService, messageService, quoteService);
         quoteController = new QuoteController(quoteService);

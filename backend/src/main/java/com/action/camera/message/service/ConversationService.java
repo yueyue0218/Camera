@@ -8,8 +8,12 @@ import com.action.camera.message.model.CreateConversationCommand;
 import com.action.camera.message.model.CreateConversationResult;
 import com.action.camera.message.repository.ConversationRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Comparator;
 import java.util.List;
@@ -36,6 +40,7 @@ public class ConversationService {
 
     private final ConversationRepository conversationRepository;
     private final MessageService messageService;
+    private final PlatformTransactionManager transactionManager;
 
     @Transactional
     public Conversation createFromAcceptedResponse(AcceptedResponseSnapshot snapshot, Long operatorId) {
@@ -58,17 +63,20 @@ public class ConversationService {
                         SOURCE_TYPE_DEMAND_RESPONSE)));
     }
 
-    @Transactional
     public CreateConversationResult createConversationWithInitialMessage(CreateConversationCommand command) {
         String sourceType = validateCreateCommand(command);
-        return conversationRepository
+        CreateConversationResult result = executeInNewTransaction(status -> conversationRepository
                 .findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBId(
                         sourceType,
                         command.getSourceId(),
                         command.getCustomerId(),
                         command.getProviderId())
                 .map(conversation -> new CreateConversationResult(conversation.getId()))
-                .orElseGet(() -> createConversationAndInitialMessage(command, sourceType));
+                .orElseGet(() -> createConversationOrMarkRollback(command, sourceType, status)));
+        if (result != null) {
+            return result;
+        }
+        return findExistingConversationAfterUniqueConflict(command, sourceType);
     }
 
     @Transactional(readOnly = true)
@@ -133,12 +141,60 @@ public class ConversationService {
 
     private CreateConversationResult createConversationAndInitialMessage(CreateConversationCommand command,
                                                                          String sourceType) {
-        Conversation savedConversation = conversationRepository.save(buildConversation(command, sourceType));
+        Conversation savedConversation = conversationRepository.saveAndFlush(buildConversation(command, sourceType));
         String initialMessage = normalizeMessage(command.getInitialMessage());
         if (initialMessage != null) {
             messageService.sendTextMessage(savedConversation.getId(), command.getInitiatorId(), initialMessage);
         }
         return new CreateConversationResult(savedConversation.getId());
+    }
+
+    private CreateConversationResult createConversationOrMarkRollback(CreateConversationCommand command,
+                                                                      String sourceType,
+                                                                      org.springframework.transaction.TransactionStatus status) {
+        try {
+            return createConversationAndInitialMessage(command, sourceType);
+        } catch (DataIntegrityViolationException ex) {
+            status.setRollbackOnly();
+            return null;
+        }
+    }
+
+    private CreateConversationResult findExistingConversationAfterUniqueConflict(CreateConversationCommand command,
+                                                                                String sourceType) {
+        for (int attempt = 0; attempt < 5; attempt++) {
+            java.util.Optional<Conversation> existing = executeInNewTransaction(status ->
+                    findExistingConversation(command, sourceType));
+            if (existing.isPresent()) {
+                return new CreateConversationResult(existing.get().getId());
+            }
+            waitBeforeRetry();
+        }
+        throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Conversation was created concurrently but cannot be loaded");
+    }
+
+    private <T> T executeInNewTransaction(org.springframework.transaction.support.TransactionCallback<T> callback) {
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return template.execute(callback);
+    }
+
+    private void waitBeforeRetry() {
+        try {
+            Thread.sleep(20);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "Interrupted while loading existing conversation");
+        }
+    }
+
+    private java.util.Optional<Conversation> findExistingConversation(CreateConversationCommand command,
+                                                                      String sourceType) {
+        return conversationRepository.findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBId(
+                sourceType,
+                command.getSourceId(),
+                command.getCustomerId(),
+                command.getProviderId());
     }
 
     private String normalizeMessage(String value) {

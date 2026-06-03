@@ -21,6 +21,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -60,6 +63,9 @@ class ConversationMessageQuoteServiceTest {
     @Mock
     private OrderService orderService;
 
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
     private ConversationService conversationService;
 
     private MessageService messageService;
@@ -69,7 +75,7 @@ class ConversationMessageQuoteServiceTest {
     @BeforeEach
     void setUp() {
         messageService = new MessageService(conversationRepository, messageRepository);
-        conversationService = new ConversationService(conversationRepository, messageService);
+        conversationService = new ConversationService(conversationRepository, messageService, transactionManager);
         quoteService = new QuoteService(quoteRepository, conversationRepository, orderService);
     }
 
@@ -111,10 +117,12 @@ class ConversationMessageQuoteServiceTest {
 
     @Test
     void createConversationWithInitialMessageSavesFirstMessage() {
+        when(transactionManager.getTransaction(any(TransactionDefinition.class)))
+                .thenReturn(new SimpleTransactionStatus());
         when(conversationRepository.findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBId(
                 ConversationService.SOURCE_TYPE_SERVICE_PACKAGE, 9101L, CUSTOMER_ID, PROVIDER_USER_ID))
                 .thenReturn(Optional.empty());
-        when(conversationRepository.save(any(Conversation.class))).thenAnswer(invocation -> {
+        when(conversationRepository.saveAndFlush(any(Conversation.class))).thenAnswer(invocation -> {
             Conversation conversation = invocation.getArgument(0);
             if (conversation.getId() == null) {
                 conversation.setId(CONVERSATION_ID);
