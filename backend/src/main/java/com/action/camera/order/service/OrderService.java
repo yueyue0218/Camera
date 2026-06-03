@@ -44,6 +44,7 @@ public class OrderService {
     private static final String REFUND_NONE = "NONE";
     private static final String REFUND_SUCCESS = "REFUNDED";
     private static final String SOURCE_TYPE_SERVICE_PACKAGE = "SERVICE_PACKAGE";
+    private static final long SYSTEM_OPERATOR_ID = 0L;
     private static final String SYSTEM_OPERATOR_ROLE = "SYSTEM";
     private static final String AUTO_CONFIRM_REASON = "交付后 7 天未操作，系统自动确认完成";
     private static final String AUTO_SHOOTING_START_REASON = "系统根据拍摄开始时间自动进入拍摄中";
@@ -198,7 +199,7 @@ public class OrderService {
                     order,
                     OrderStatus.DELIVERED_PENDING_CONFIRM,
                     OrderStatus.COMPLETED,
-                    null,
+                    SYSTEM_OPERATOR_ID,
                     SYSTEM_OPERATOR_ROLE,
                     AUTO_CONFIRM_REASON
             );
@@ -229,7 +230,7 @@ public class OrderService {
                     order,
                     OrderStatus.PAID_PENDING_SHOOT,
                     OrderStatus.SHOOTING,
-                    null,
+                    SYSTEM_OPERATOR_ID,
                     SYSTEM_OPERATOR_ROLE,
                     AUTO_SHOOTING_START_REASON
             );
@@ -240,7 +241,7 @@ public class OrderService {
                         shootingOrder,
                         OrderStatus.SHOOTING,
                         OrderStatus.PENDING_DELIVERY,
-                        null,
+                        SYSTEM_OPERATOR_ID,
                         SYSTEM_OPERATOR_ROLE,
                         AUTO_SHOOTING_END_REASON
                 );
@@ -263,7 +264,7 @@ public class OrderService {
                     order,
                     OrderStatus.SHOOTING,
                     OrderStatus.PENDING_DELIVERY,
-                    null,
+                    SYSTEM_OPERATOR_ID,
                     SYSTEM_OPERATOR_ROLE,
                     AUTO_SHOOTING_END_REASON
             );
@@ -298,7 +299,7 @@ public class OrderService {
                     order,
                     OrderStatus.PENDING_DELIVERY,
                     OrderStatus.REFUNDED,
-                    null,
+                    SYSTEM_OPERATOR_ID,
                     SYSTEM_OPERATOR_ROLE,
                     AUTO_REFUND_UNDELIVERED_REASON
             );

@@ -35,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -73,14 +74,18 @@ class ConversationQuoteControllerTest {
     @Mock
     private OrderService orderService;
 
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
     private ConversationController conversationController;
 
     private QuoteController quoteController;
 
     @BeforeEach
     void setUp() {
-        ConversationService conversationService = new ConversationService(conversationRepository);
         MessageService messageService = new MessageService(conversationRepository, messageRepository);
+        ConversationService conversationService =
+                new ConversationService(conversationRepository, messageService, transactionManager);
         QuoteService quoteService = new QuoteService(quoteRepository, conversationRepository, orderService);
         conversationController = new ConversationController(conversationService, messageService, quoteService);
         quoteController = new QuoteController(quoteService);
@@ -446,7 +451,7 @@ class ConversationQuoteControllerTest {
         request.setTerms("P4 quote terms");
         request.setContractTerms("P4 contract terms");
         request.setSafetyNoticeVersion("P4-DEMO");
-        request.setExpireTime(LocalDateTime.of(2026, 5, 30, 23, 59));
+        request.setExpireTime(LocalDateTime.now().plusDays(1));
         request.setRemark("Basic retouch included");
         return request;
     }
@@ -493,7 +498,7 @@ class ConversationQuoteControllerTest {
         quote.setPhotoUsageScope("PERSONAL_ONLY");
         quote.setServiceSnapshotJson("{}");
         quote.setStatus(QuoteStatus.PENDING_CONFIRM);
-        quote.setExpireTime(LocalDateTime.of(2026, 5, 30, 23, 59));
+        quote.setExpireTime(LocalDateTime.now().plusDays(1));
         quote.setCreatedAt(LocalDateTime.now());
         quote.setUpdatedAt(LocalDateTime.now());
         return quote;

@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -20,7 +21,10 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "conversations")
+@Table(name = "conversations",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_conversation_source_pair",
+                columnNames = {"source_type", "source_id", "participant_a_id", "participant_b_id"}))
 public class Conversation {
 
     @Id

@@ -1,37 +1,113 @@
 package com.action.camera.demand.domain;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+@Getter
+@Setter
+@NoArgsConstructor
+@Entity
+@Table(name = "demands", indexes = {
+        @Index(name = "idx_demands_hall", columnList = "status,city_code,scene,expected_date"),
+        @Index(name = "idx_demands_budget_cent", columnList = "budget_min_cent,budget_max_cent"),
+        @Index(name = "idx_demands_customer_status", columnList = "customer_id,status,created_at")
+})
 public class Demand {
 
-    private final Long id;
-    private final Long customerId;
-    private final String scene;
-    private final List<String> styleTags;
-    private final LocalDate expectedDate;
-    private final String timeSlot;
-    private final String cityCode;
-    private final String location;
-    private final Integer budgetMinCent;
-    private final Integer budgetMaxCent;
-    private final String description;
-    private final List<Long> referenceFileIds;
-    private DemandStatus status;
-    private int responseCount;
-    private final LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private final LocalDateTime expireTime;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    public Demand(Long id,
-                  Long customerId,
+    @Column(name = "customer_id", nullable = false)
+    private Long customerId;
+
+    @Column(nullable = false, length = 80)
+    private String scene;
+
+    @Convert(converter = DemandStringListJsonConverter.class)
+    @Column(name = "style_tags", nullable = false, columnDefinition = "TEXT")
+    private List<String> styleTags = List.of();
+
+    @Column(name = "expected_date")
+    private LocalDate expectedDate;
+
+    @Column(name = "time_slot", length = 80)
+    private String timeSlot;
+
+    @Column(name = "time_description", nullable = false, columnDefinition = "TEXT")
+    private String timeDescription;
+
+    @Convert(converter = DemandStringListJsonConverter.class)
+    @Column(name = "time_tags", nullable = false, columnDefinition = "TEXT")
+    private List<String> timeTags = List.of();
+
+    @Column(name = "city_code", nullable = false, length = 40)
+    private String cityCode;
+
+    @Column(nullable = false)
+    private String location;
+
+    @Column(name = "budget_min_cent")
+    private Integer budgetMinCent;
+
+    @Column(name = "budget_max_cent")
+    private Integer budgetMaxCent;
+
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
+    @Convert(converter = DemandLongListJsonConverter.class)
+    @Column(name = "reference_file_ids", nullable = false, columnDefinition = "TEXT")
+    private List<Long> referenceFileIds = List.of();
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private DemandStatus status = DemandStatus.OPEN;
+
+    @Column(name = "response_count", nullable = false)
+    private int responseCount;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @Column(name = "expire_time")
+    private LocalDateTime expireTime;
+
+    @Column(name = "hidden_by_customer", nullable = false)
+    private Boolean hiddenByCustomer = false;
+
+    @Column(name = "hidden_at")
+    private LocalDateTime hiddenAt;
+
+    public Demand(Long customerId,
                   String scene,
                   List<String> styleTags,
                   LocalDate expectedDate,
                   String timeSlot,
+                  String timeDescription,
+                  List<String> timeTags,
                   String cityCode,
                   String location,
                   Integer budgetMinCent,
@@ -40,12 +116,13 @@ public class Demand {
                   List<Long> referenceFileIds,
                   LocalDateTime createdAt,
                   LocalDateTime expireTime) {
-        this.id = id;
         this.customerId = customerId;
         this.scene = scene;
         this.styleTags = copyList(styleTags);
         this.expectedDate = expectedDate;
         this.timeSlot = timeSlot;
+        this.timeDescription = timeDescription;
+        this.timeTags = copyList(timeTags);
         this.cityCode = cityCode;
         this.location = location;
         this.budgetMinCent = budgetMinCent;
@@ -71,13 +148,14 @@ public class Demand {
         touch();
     }
 
-    public void markMatched() {
-        status = DemandStatus.MATCHED;
+    public void close() {
+        status = DemandStatus.CLOSED;
         touch();
     }
 
-    public void close() {
-        status = DemandStatus.CLOSED;
+    public void hideForCustomer() {
+        hiddenByCustomer = true;
+        hiddenAt = LocalDateTime.now();
         touch();
     }
 
@@ -85,71 +163,39 @@ public class Demand {
         updatedAt = LocalDateTime.now();
     }
 
-    public Long getId() {
-        return id;
+    @PrePersist
+    void prePersist() {
+        LocalDateTime now = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        if (updatedAt == null) {
+            updatedAt = createdAt;
+        }
+        fillDefaults();
     }
 
-    public Long getCustomerId() {
-        return customerId;
+    @PreUpdate
+    void preUpdate() {
+        updatedAt = LocalDateTime.now();
+        fillDefaults();
     }
 
-    public String getScene() {
-        return scene;
-    }
-
-    public List<String> getStyleTags() {
-        return styleTags;
-    }
-
-    public LocalDate getExpectedDate() {
-        return expectedDate;
-    }
-
-    public String getTimeSlot() {
-        return timeSlot;
-    }
-
-    public String getCityCode() {
-        return cityCode;
-    }
-
-    public String getLocation() {
-        return location;
-    }
-
-    public Integer getBudgetMinCent() {
-        return budgetMinCent;
-    }
-
-    public Integer getBudgetMaxCent() {
-        return budgetMaxCent;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public List<Long> getReferenceFileIds() {
-        return referenceFileIds;
-    }
-
-    public DemandStatus getStatus() {
-        return status;
-    }
-
-    public int getResponseCount() {
-        return responseCount;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public LocalDateTime getExpireTime() {
-        return expireTime;
+    private void fillDefaults() {
+        if (status == null) {
+            status = DemandStatus.OPEN;
+        }
+        if (styleTags == null) {
+            styleTags = List.of();
+        }
+        if (timeTags == null) {
+            timeTags = List.of();
+        }
+        if (referenceFileIds == null) {
+            referenceFileIds = List.of();
+        }
+        if (hiddenByCustomer == null) {
+            hiddenByCustomer = false;
+        }
     }
 }

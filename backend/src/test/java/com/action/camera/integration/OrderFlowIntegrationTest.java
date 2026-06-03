@@ -201,12 +201,16 @@ class OrderFlowIntegrationTest {
     private Order createOrderInStatus(OrderStatus status) {
         LocalDateTime now = LocalDateTime.now();
         String suffix = UUID.randomUUID().toString().substring(0, 8);
+        long sourceId = Math.abs(UUID.randomUUID().getMostSignificantBits());
+        if (sourceId == 0) {
+            sourceId = 1L;
+        }
 
         Conversation conv = new Conversation();
         conv.setParticipantAId(1001L);
         conv.setParticipantBId(2001L);
         conv.setSourceType("DEMAND_RESPONSE");
-        conv.setSourceId(1L);
+        conv.setSourceId(sourceId);
         conversationRepository.save(conv);
 
         Quote quote = new Quote();
@@ -215,7 +219,7 @@ class OrderFlowIntegrationTest {
         quote.setCustomerId(1001L);
         quote.setProviderUserId(2001L);
         quote.setSourceType("DEMAND_RESPONSE");
-        quote.setSourceId(1L);
+        quote.setSourceId(sourceId);
         quote.setAmountCent(50000L);
         quote.setShootStartTime(now.plusDays(7));
         quote.setShootEndTime(now.plusDays(7).plusHours(3));

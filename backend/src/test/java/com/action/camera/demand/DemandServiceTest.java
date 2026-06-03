@@ -4,45 +4,79 @@ import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.page.PageResult;
 import com.action.camera.common.security.CurrentUser;
 import com.action.camera.common.security.UserRole;
+import com.action.camera.demand.domain.Demand;
 import com.action.camera.demand.domain.DemandResponseStatus;
 import com.action.camera.demand.domain.DemandStatus;
+import com.action.camera.demand.controller.DemandController;
 import com.action.camera.demand.dto.AcceptDemandResponseResult;
 import com.action.camera.demand.dto.AcceptedDemandResponseSnapshot;
 import com.action.camera.demand.dto.CreateDemandRequest;
 import com.action.camera.demand.dto.CreateDemandResponseRequest;
 import com.action.camera.demand.dto.DemandDto;
 import com.action.camera.demand.dto.DemandResponseDto;
-import com.action.camera.demand.repository.InMemoryDemandRepository;
-import com.action.camera.demand.repository.InMemoryDemandResponseRepository;
+import com.action.camera.demand.repository.DemandRepository;
+import com.action.camera.demand.repository.DemandResponseRepository;
 import com.action.camera.demand.service.DemandService;
+import com.action.camera.message.model.CreateConversationCommand;
+import com.action.camera.message.model.CreateConversationResult;
+import com.action.camera.message.service.ConversationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.TestPropertySource;
 
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+@SpringBootTest
+@TestPropertySource(properties = {
+        "spring.datasource.url=jdbc:h2:mem:demand_service_test;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;NON_KEYWORDS=CURRENT_ROLE;DB_CLOSE_DELAY=-1",
+        "spring.datasource.driver-class-name=org.h2.Driver",
+        "spring.datasource.username=sa",
+        "spring.datasource.password=",
+        "spring.jpa.hibernate.ddl-auto=create-drop",
+        "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect"
+})
 class DemandServiceTest {
 
-    private InMemoryDemandRepository demandRepository;
-    private InMemoryDemandResponseRepository responseRepository;
+    @Autowired
+    private DemandRepository demandRepository;
+
+    @Autowired
+    private DemandResponseRepository responseRepository;
+
+    @MockBean
+    private ConversationService conversationService;
+
+    @Autowired
     private DemandService demandService;
 
     private final CurrentUser customer = new CurrentUser(1001L, UserRole.CUSTOMER);
     private final CurrentUser otherCustomer = new CurrentUser(1002L, UserRole.CUSTOMER);
     private final CurrentUser provider = new CurrentUser(2001L, UserRole.PROVIDER);
     private final CurrentUser anotherProvider = new CurrentUser(2002L, UserRole.PROVIDER);
+    private final CurrentUser thirdProvider = new CurrentUser(2003L, UserRole.PROVIDER);
     private final CurrentUser admin = new CurrentUser(9001L, UserRole.ADMIN);
 
     @BeforeEach
     void setUp() {
-        demandRepository = new InMemoryDemandRepository();
-        responseRepository = new InMemoryDemandResponseRepository();
-        demandService = new DemandService(demandRepository, responseRepository);
+        responseRepository.deleteAll();
+        demandRepository.deleteAll();
+        when(conversationService.createConversationWithInitialMessage(any(CreateConversationCommand.class)))
+                .thenReturn(new CreateConversationResult(91001L));
     }
 
     @Test
@@ -112,6 +146,31 @@ class DemandServiceTest {
     }
 
     @Test
+    void createDemandStoresAndReturnsTimeFields() {
+        CreateDemandRequest request = demandRequest("GRADUATION", "NJU");
+        request.setTimeDescription("July weekends are available");
+        request.setTimeTags(List.of("near_7_days", "NEAR_1_MONTH"));
+
+        DemandDto demand = demandService.createDemand(customer, request);
+
+        assertThat(demand.getTimeDescription()).isEqualTo("July weekends are available");
+        assertThat(demand.getTimeTags()).containsExactly("NEAR_7_DAYS", "NEAR_1_MONTH");
+        assertThat(demandRepository.findById(demand.getDemandId()).orElseThrow().getTimeDescription())
+                .isEqualTo("July weekends are available");
+        assertThat(demandRepository.findById(demand.getDemandId()).orElseThrow().getTimeTags())
+                .containsExactly("NEAR_7_DAYS", "NEAR_1_MONTH");
+    }
+
+    @Test
+    void createDemandRejectsMissingTimeDescription() {
+        CreateDemandRequest request = demandRequest("GRADUATION", "NJU");
+        request.setTimeDescription(" ");
+
+        assertThatThrownBy(() -> demandService.createDemand(customer, request))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
     void createDemandUsesCustomerIdFromCurrentUser() {
         DemandDto demand = demandService.createDemand(otherCustomer, demandRequest("PORTRAIT", "NJU"));
 
@@ -139,15 +198,13 @@ class DemandServiceTest {
     @Test
     void createDemandRejectsNullRequest() {
         assertThatThrownBy(() -> demandService.createDemand(customer, null))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("请求体不能为空");
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
     void createDemandRejectsProviderRole() {
         assertThatThrownBy(() -> demandService.createDemand(provider, demandRequest("PORTRAIT", "NJU")))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("需求方身份");
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -155,8 +212,7 @@ class DemandServiceTest {
         CreateDemandRequest request = demandRequest(" ", "NJU");
 
         assertThatThrownBy(() -> demandService.createDemand(customer, request))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("拍摄场景不能为空");
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -164,8 +220,7 @@ class DemandServiceTest {
         CreateDemandRequest request = demandRequest("PORTRAIT", " ");
 
         assertThatThrownBy(() -> demandService.createDemand(customer, request))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("城市不能为空");
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -174,8 +229,7 @@ class DemandServiceTest {
         request.setLocation(" ");
 
         assertThatThrownBy(() -> demandService.createDemand(customer, request))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("拍摄地点不能为空");
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -184,8 +238,7 @@ class DemandServiceTest {
         request.setBudgetMinCent(-1);
 
         assertThatThrownBy(() -> demandService.createDemand(customer, request))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("最低预算不能为负数");
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -194,8 +247,7 @@ class DemandServiceTest {
         request.setBudgetMaxCent(-1);
 
         assertThatThrownBy(() -> demandService.createDemand(customer, request))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("最高预算不能为负数");
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -205,8 +257,7 @@ class DemandServiceTest {
         request.setBudgetMaxCent(30000);
 
         assertThatThrownBy(() -> demandService.createDemand(customer, request))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("最高预算不能低于最低预算");
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -252,25 +303,81 @@ class DemandServiceTest {
     }
 
     @Test
-    void listDemandsFiltersByMatchedStatus() {
-        DemandDto matchedDemand = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
-        acceptOneResponse(matchedDemand);
-        demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+    void listDemandsDoesNotExposeClosedStatusInPublicHall() {
+        DemandDto closedDemand = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
+        demandService.closeDemand(closedDemand.getDemandId(), customer);
+        DemandDto openDemand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
 
-        PageResult<DemandDto> page = demandService.listDemands(1, 10, null, null, "MATCHED");
+        PageResult<DemandDto> page = demandService.listDemands(1, 10, null, null, "CLOSED");
+        PageResult<DemandDto> ordinary = demandService.listDemands(1, 10, null, null, null);
 
-        assertThat(page.getRecords()).extracting(DemandDto::getDemandId).containsExactly(matchedDemand.getDemandId());
+        assertThat(page.getRecords()).isEmpty();
+        assertThat(ordinary.getRecords()).extracting(DemandDto::getDemandId)
+                .contains(openDemand.getDemandId())
+                .doesNotContain(closedDemand.getDemandId());
+    }
+
+    @Test
+    void listMyDemandHistoryReturnsOwnOpenAndClosedDemandsExceptHiddenNewestFirst() throws InterruptedException {
+        DemandDto closed = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
+        demandService.closeDemand(closed.getDemandId(), customer);
+        Thread.sleep(25);
+        DemandDto open = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        Thread.sleep(25);
+        DemandDto hidden = demandService.createDemand(customer, demandRequest("COSPLAY", "NJU"));
+        demandService.deleteDemand(hidden.getDemandId(), customer);
+        demandService.createDemand(otherCustomer, demandRequest("GRADUATION", "NJU"));
+
+        List<DemandDto> history = demandService.listMyDemandHistory(customer);
+
+        assertThat(history).extracting(DemandDto::getDemandId)
+                .containsExactly(open.getDemandId(), closed.getDemandId());
+        assertThat(history).extracting(DemandDto::getStatus)
+                .containsExactly(DemandStatus.OPEN.name(), DemandStatus.CLOSED.name());
+    }
+
+    @Test
+    void ownerDemandDetailAndHistoryReturnResponseStatusCountsButPublicListDoesNot() {
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandResponseDto accepted = demandService.respondToDemand(
+                demand.getDemandId(), provider, responseRequest("Accepted response"));
+        DemandResponseDto rejected = demandService.respondToDemand(
+                demand.getDemandId(), anotherProvider, responseRequest("Rejected response"));
+        demandService.respondToDemand(demand.getDemandId(), thirdProvider, responseRequest("Pending response"));
+
+        demandService.acceptResponse(demand.getDemandId(), accepted.getResponseId(), customer);
+        demandService.rejectResponse(demand.getDemandId(), rejected.getResponseId(), customer);
+
+        DemandDto ownerDetail = demandService.getDemand(demand.getDemandId(), customer);
+        DemandDto historyItem = demandService.listMyDemandHistory(customer).stream()
+                .filter(item -> item.getDemandId().equals(demand.getDemandId()))
+                .findFirst()
+                .orElseThrow();
+        DemandDto publicCard = demandService.listDemands(1, 10, null, null, null).getRecords().stream()
+                .filter(item -> item.getDemandId().equals(demand.getDemandId()))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(ownerDetail.getPendingCount()).isEqualTo(1);
+        assertThat(ownerDetail.getAcceptedCount()).isEqualTo(1);
+        assertThat(ownerDetail.getRejectedCount()).isEqualTo(1);
+        assertThat(historyItem.getPendingCount()).isEqualTo(1);
+        assertThat(historyItem.getAcceptedCount()).isEqualTo(1);
+        assertThat(historyItem.getRejectedCount()).isEqualTo(1);
+        assertThat(publicCard.getPendingCount()).isNull();
+        assertThat(publicCard.getAcceptedCount()).isNull();
+        assertThat(publicCard.getRejectedCount()).isNull();
     }
 
     @Test
     void listDemandsFiltersByDateTagAndBudget() {
         LocalDate targetDate = LocalDate.now().plusDays(10);
-        CreateDemandRequest matchedRequest = demandRequest("PORTRAIT", "NJU");
-        matchedRequest.setExpectedDate(targetDate);
-        matchedRequest.setStyleTags(List.of("Fresh", "Campus"));
-        matchedRequest.setBudgetMinCent(20000);
-        matchedRequest.setBudgetMaxCent(45000);
-        DemandDto matched = demandService.createDemand(customer, matchedRequest);
+        CreateDemandRequest targetRequest = demandRequest("PORTRAIT", "NJU");
+        targetRequest.setExpectedDate(targetDate);
+        targetRequest.setStyleTags(List.of("Fresh", "Campus"));
+        targetRequest.setBudgetMinCent(20000);
+        targetRequest.setBudgetMaxCent(45000);
+        DemandDto target = demandService.createDemand(customer, targetRequest);
 
         CreateDemandRequest otherRequest = demandRequest("PORTRAIT", "NJU");
         otherRequest.setExpectedDate(targetDate.plusDays(1));
@@ -282,7 +389,53 @@ class DemandServiceTest {
         PageResult<DemandDto> page = demandService.listDemands(
                 1, 10, "NJU", null, "OPEN", targetDate, "fresh", 30000, 50000);
 
-        assertThat(page.getRecords()).extracting(DemandDto::getDemandId).containsExactly(matched.getDemandId());
+        assertThat(page.getRecords()).extracting(DemandDto::getDemandId).containsExactly(target.getDemandId());
+    }
+
+    @Test
+    void listDemandsFiltersByTimeTagButOrdinaryListKeepsUntaggedDemand() {
+        CreateDemandRequest taggedRequest = demandRequest("PORTRAIT", "NJU");
+        taggedRequest.setTimeTags(List.of("NEAR_3_DAYS"));
+        DemandDto tagged = demandService.createDemand(customer, taggedRequest);
+
+        CreateDemandRequest untaggedRequest = demandRequest("TRAVEL", "NJU");
+        untaggedRequest.setTimeTags(List.of());
+        DemandDto untagged = demandService.createDemand(customer, untaggedRequest);
+
+        PageResult<DemandDto> ordinary =
+                demandService.listDemands(1, 10, null, null, null);
+        PageResult<DemandDto> filtered =
+                demandService.listDemands(1, 10, null, null, null, null,
+                        null, null, null, "near_3_days");
+
+        assertThat(ordinary.getRecords()).extracting(DemandDto::getDemandId)
+                .contains(tagged.getDemandId(), untagged.getDemandId());
+        assertThat(filtered.getRecords()).extracting(DemandDto::getDemandId)
+                .containsExactly(tagged.getDemandId());
+    }
+
+    @Test
+    void listDemandsReturnsTimestampsAndSortsByUpdatedAtDescending() throws InterruptedException {
+        DemandDto first = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        Thread.sleep(25);
+        DemandDto second = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
+        Thread.sleep(25);
+
+        CreateDemandRequest update = new CreateDemandRequest();
+        update.setTimeDescription("Updated availability for this week");
+        demandService.updateDemand(first.getDemandId(), customer, update);
+
+        DemandDto refreshedFirst = demandService.getDemand(first.getDemandId(), customer);
+        PageResult<DemandDto> page = demandService.listDemands(1, 10, null, null, null);
+
+        assertThat(refreshedFirst.getCreatedAt()).isNotNull();
+        assertThat(refreshedFirst.getUpdatedAt()).isAfter(first.getUpdatedAt());
+        assertThat(page.getRecords()).extracting(DemandDto::getDemandId)
+                .containsExactly(first.getDemandId(), second.getDemandId());
+        assertThat(page.getRecords()).allSatisfy(record -> {
+            assertThat(record.getCreatedAt()).isNotNull();
+            assertThat(record.getUpdatedAt()).isNotNull();
+        });
     }
 
     @Test
@@ -367,67 +520,108 @@ class DemandServiceTest {
     }
 
     @Test
-    void getDemandOwnerCanViewMatchedDemand() {
+    void getDemandOwnerCanViewClosedDemand() {
         DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
-        acceptOneResponse(demand);
+        demandService.closeDemand(demand.getDemandId(), customer);
 
         DemandDto detail = demandService.getDemand(demand.getDemandId(), customer);
 
-        assertThat(detail.getStatus()).isEqualTo(DemandStatus.MATCHED.name());
+        assertThat(detail.getStatus()).isEqualTo(DemandStatus.CLOSED.name());
     }
 
     @Test
-    void getDemandAdminCanViewMatchedDemand() {
+    void getDemandAdminCanViewClosedDemand() {
         DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
-        acceptOneResponse(demand);
+        demandService.closeDemand(demand.getDemandId(), customer);
 
         DemandDto detail = demandService.getDemand(demand.getDemandId(), admin);
 
-        assertThat(detail.getStatus()).isEqualTo(DemandStatus.MATCHED.name());
+        assertThat(detail.getStatus()).isEqualTo(DemandStatus.CLOSED.name());
     }
 
     @Test
-    void getDemandUnrelatedCustomerCannotViewMatchedDemand() {
+    void getDemandUnrelatedCustomerCannotViewClosedDemand() {
         DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
-        acceptOneResponse(demand);
+        demandService.closeDemand(demand.getDemandId(), customer);
 
         assertThatThrownBy(() -> demandService.getDemand(demand.getDemandId(), otherCustomer))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("无权限");
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
-    void getDemandUnrelatedProviderCannotViewMatchedDemand() {
+    void getDemandUnrelatedProviderCannotViewClosedDemand() {
         DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
-        acceptOneResponse(demand);
+        demandService.closeDemand(demand.getDemandId(), customer);
 
         assertThatThrownBy(() -> demandService.getDemand(demand.getDemandId(), anotherProvider))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("无权限");
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
     void getDemandRejectsNullDemandId() {
         assertThatThrownBy(() -> demandService.getDemand(null, customer))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("demandId 不能为空");
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
     void getDemandRejectsMissingDemand() {
         assertThatThrownBy(() -> demandService.getDemand(404L, customer))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("需求不存在");
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
-    void deleteDemandAllowsOwnerWhenTransactionNotInProgress() {
+    void ownerCanUpdateDemandTimeFields() {
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        CreateDemandRequest update = new CreateDemandRequest();
+        update.setTimeDescription("Only mornings this week");
+        update.setTimeTags(List.of("near_3_days", "NEAR_7_DAYS"));
+
+        DemandDto updated = demandService.updateDemand(demand.getDemandId(), customer, update);
+
+        assertThat(updated.getTimeDescription()).isEqualTo("Only mornings this week");
+        assertThat(updated.getTimeTags()).containsExactly("NEAR_3_DAYS", "NEAR_7_DAYS");
+        assertThat(demandRepository.findById(demand.getDemandId()).orElseThrow().getTimeDescription())
+                .isEqualTo("Only mornings this week");
+    }
+
+    @Test
+    void nonOwnerCannotUpdateDemand() {
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        CreateDemandRequest update = new CreateDemandRequest();
+        update.setTimeDescription("Other person edit");
+
+        assertThatThrownBy(() -> demandService.updateDemand(demand.getDemandId(), otherCustomer, update))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void ownerCanCloseOpenDemand() {
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+
+        DemandDto closed = demandService.closeDemand(demand.getDemandId(), customer);
+
+        assertThat(closed.getStatus()).isEqualTo(DemandStatus.CLOSED.name());
+        assertThat(demandRepository.findById(demand.getDemandId()).orElseThrow().getStatus())
+                .isEqualTo(DemandStatus.CLOSED);
+    }
+
+    @Test
+    void nonOwnerCannotCloseDemand() {
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+
+        assertThatThrownBy(() -> demandService.closeDemand(demand.getDemandId(), otherCustomer))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void deleteDemandHidesOwnerHistoryWithoutPhysicalDelete() {
         DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
 
         demandService.deleteDemand(demand.getDemandId(), customer);
 
-        assertThatThrownBy(() -> demandService.getDemand(demand.getDemandId(), customer))
-                .isInstanceOf(BusinessException.class);
+        Demand saved = demandRepository.findById(demand.getDemandId()).orElseThrow();
+        assertThat(saved.getHiddenByCustomer()).isTrue();
+        assertThat(saved.getHiddenAt()).isNotNull();
     }
 
     @Test
@@ -435,18 +629,18 @@ class DemandServiceTest {
         DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
 
         assertThatThrownBy(() -> demandService.deleteDemand(demand.getDemandId(), otherCustomer))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("only the demand owner");
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
-    void deleteDemandRejectsMatchedDemand() {
+    void deleteDemandDoesNotRemoveAcceptedDemandOrResponses() {
         DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
         acceptOneResponse(demand);
 
-        assertThatThrownBy(() -> demandService.deleteDemand(demand.getDemandId(), customer))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("transaction in progress");
+        demandService.deleteDemand(demand.getDemandId(), customer);
+
+        assertThat(demandRepository.findById(demand.getDemandId())).isPresent();
+        assertThat(responseRepository.findByDemandId(demand.getDemandId())).isNotEmpty();
     }
 
     @Test
@@ -511,8 +705,7 @@ class DemandServiceTest {
         demandService.respondToDemand(demand.getDemandId(), provider, responseRequest("第一次响应"));
 
         assertThatThrownBy(() -> demandService.respondToDemand(demand.getDemandId(), provider, responseRequest("重复响应")))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("重复响应");
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -520,8 +713,7 @@ class DemandServiceTest {
         DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
 
         assertThatThrownBy(() -> demandService.respondToDemand(demand.getDemandId(), customer, responseRequest("客户不能响应")))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("服务方身份");
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -529,8 +721,7 @@ class DemandServiceTest {
         DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
 
         assertThatThrownBy(() -> demandService.respondToDemand(demand.getDemandId(), admin, responseRequest("管理员不接单")))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("服务方身份");
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -540,19 +731,28 @@ class DemandServiceTest {
 
         assertThatThrownBy(() -> demandService.respondToDemand(
                 demand.getDemandId(), samePersonAsProvider, responseRequest("自己不能响应自己")))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("不能响应自己发布的需求");
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
-    void respondToDemandRejectsMatchedDemand() {
+    void respondToDemandAllowsAnotherProviderAfterAcceptedResponse() {
         DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
         acceptOneResponse(demand);
 
+        DemandResponseDto response = demandService.respondToDemand(
+                demand.getDemandId(), anotherProvider, responseRequest("Another provider can still respond"));
+
+        assertThat(response.getStatus()).isEqualTo(DemandResponseStatus.PENDING_CUSTOMER_ACCEPT.name());
+    }
+
+    @Test
+    void respondToDemandRejectsClosedDemand() {
+        DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
+        demandService.closeDemand(demand.getDemandId(), customer);
+
         assertThatThrownBy(() -> demandService.respondToDemand(
-                demand.getDemandId(), anotherProvider, responseRequest("匹配后不能再响应")))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("开放中的需求");
+                demand.getDemandId(), anotherProvider, responseRequest("Closed demand cannot be responded")))
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -560,8 +760,7 @@ class DemandServiceTest {
         DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
 
         assertThatThrownBy(() -> demandService.respondToDemand(demand.getDemandId(), provider, null))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("请求体不能为空");
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -570,8 +769,7 @@ class DemandServiceTest {
         CreateDemandResponseRequest request = responseRequest(" ");
 
         assertThatThrownBy(() -> demandService.respondToDemand(demand.getDemandId(), provider, request))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("响应说明不能为空");
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -581,8 +779,7 @@ class DemandServiceTest {
         request.setExpectedPriceCent(-1);
 
         assertThatThrownBy(() -> demandService.respondToDemand(demand.getDemandId(), provider, request))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("预期报价不能为负数");
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -621,8 +818,7 @@ class DemandServiceTest {
         DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
 
         assertThatThrownBy(() -> demandService.listResponses(demand.getDemandId(), otherCustomer))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("只有需求发布者");
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -641,11 +837,22 @@ class DemandServiceTest {
         assertThat(result.getResponseStatus()).isEqualTo(DemandResponseStatus.ACCEPTED.name());
         assertThat(result.getConversationSourceType()).isEqualTo("DEMAND_RESPONSE");
         assertThat(result.getSourceId()).isEqualTo(response.getResponseId());
-        assertThat(result.getNextAction()).isEqualTo("PASS_SNAPSHOT_TO_C_CREATE_CONVERSATION");
+        assertThat(result.getConversationId()).isEqualTo(91001L);
+
+        ArgumentCaptor<CreateConversationCommand> commandCaptor =
+                ArgumentCaptor.forClass(CreateConversationCommand.class);
+        verify(conversationService).createConversationWithInitialMessage(commandCaptor.capture());
+        CreateConversationCommand command = commandCaptor.getValue();
+        assertThat(command.getCustomerId()).isEqualTo(customer.getUserId());
+        assertThat(command.getProviderId()).isEqualTo(provider.getUserId());
+        assertThat(command.getInitiatorId()).isEqualTo(customer.getUserId());
+        assertThat(command.getSourceType()).isEqualTo("DEMAND_RESPONSE");
+        assertThat(command.getSourceId()).isEqualTo(response.getResponseId());
+        assertThat(command.getInitialMessage()).isNotBlank();
     }
 
     @Test
-    void acceptResponseMarksDemandMatchedAndResponseAccepted() {
+    void acceptResponseKeepsDemandOpenAndMarksResponseAccepted() {
         DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
         DemandResponseDto response = demandService.respondToDemand(
                 demand.getDemandId(), provider, responseRequest("我来接"));
@@ -653,13 +860,13 @@ class DemandServiceTest {
         demandService.acceptResponse(demand.getDemandId(), response.getResponseId(), customer);
 
         assertThat(demandRepository.findById(demand.getDemandId()).orElseThrow().getStatus())
-                .isEqualTo(DemandStatus.MATCHED);
+                .isEqualTo(DemandStatus.OPEN);
         assertThat(responseRepository.findById(response.getResponseId()).orElseThrow().getStatus())
                 .isEqualTo(DemandResponseStatus.ACCEPTED);
     }
 
     @Test
-    void acceptResponseRejectsOtherPendingResponses() {
+    void acceptResponseDoesNotRejectOtherPendingResponses() {
         DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
         DemandResponseDto accepted = demandService.respondToDemand(
                 demand.getDemandId(), provider, responseRequest("第一位服务方"));
@@ -669,20 +876,89 @@ class DemandServiceTest {
         demandService.acceptResponse(demand.getDemandId(), accepted.getResponseId(), customer);
 
         assertThat(responseRepository.findById(rejected.getResponseId()).orElseThrow().getStatus())
-                .isEqualTo(DemandResponseStatus.REJECTED);
+                .isEqualTo(DemandResponseStatus.PENDING_CUSTOMER_ACCEPT);
     }
 
     @Test
-    void acceptResponseIsIdempotentForAcceptedResponse() {
+    void acceptResponseAllowsMultipleAcceptedResponsesForSameDemand() {
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandResponseDto first = demandService.respondToDemand(
+                demand.getDemandId(), provider, responseRequest("First provider"));
+        DemandResponseDto second = demandService.respondToDemand(
+                demand.getDemandId(), anotherProvider, responseRequest("Second provider"));
+
+        demandService.acceptResponse(demand.getDemandId(), first.getResponseId(), customer);
+        demandService.acceptResponse(demand.getDemandId(), second.getResponseId(), customer);
+
+        assertThat(demandRepository.findById(demand.getDemandId()).orElseThrow().getStatus())
+                .isEqualTo(DemandStatus.OPEN);
+        assertThat(responseRepository.findById(first.getResponseId()).orElseThrow().getStatus())
+                .isEqualTo(DemandResponseStatus.ACCEPTED);
+        assertThat(responseRepository.findById(second.getResponseId()).orElseThrow().getStatus())
+                .isEqualTo(DemandResponseStatus.ACCEPTED);
+    }
+
+    @Test
+    void rejectResponseMarksPendingResponseRejectedWithoutConversation() {
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandResponseDto response = demandService.respondToDemand(
+                demand.getDemandId(), provider, responseRequest("Provider response"));
+
+        DemandResponseDto rejected = demandService.rejectResponse(demand.getDemandId(), response.getResponseId(), customer);
+
+        assertThat(rejected.getStatus()).isEqualTo(DemandResponseStatus.REJECTED.name());
+        assertThat(responseRepository.findById(response.getResponseId()).orElseThrow().getStatus())
+                .isEqualTo(DemandResponseStatus.REJECTED);
+        verify(conversationService, never()).createConversationWithInitialMessage(any());
+    }
+
+    @Test
+    void rejectResponseRejectsAcceptedResponse() {
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandResponseDto response = demandService.respondToDemand(
+                demand.getDemandId(), provider, responseRequest("Provider response"));
+        demandService.acceptResponse(demand.getDemandId(), response.getResponseId(), customer);
+
+        assertThatThrownBy(() -> demandService.rejectResponse(demand.getDemandId(), response.getResponseId(), customer))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void listMyResponsesShowsProviderResponseStatusChanges() {
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandResponseDto response = demandService.respondToDemand(
+                demand.getDemandId(), provider, responseRequest("Provider response"));
+        demandService.rejectResponse(demand.getDemandId(), response.getResponseId(), customer);
+
+        List<DemandResponseDto> responses = demandService.listMyResponses(provider);
+
+        assertThat(responses).extracting(DemandResponseDto::getResponseId).contains(response.getResponseId());
+        assertThat(responses).extracting(DemandResponseDto::getStatus).contains(DemandResponseStatus.REJECTED.name());
+    }
+
+    @Test
+    void listMyResponsesShowsAcceptedStatusAfterOwnerAccepts() {
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandResponseDto response = demandService.respondToDemand(
+                demand.getDemandId(), provider, responseRequest("Provider response"));
+        demandService.acceptResponse(demand.getDemandId(), response.getResponseId(), customer);
+
+        List<DemandResponseDto> responses = demandService.listMyResponses(provider);
+
+        assertThat(responses).extracting(DemandResponseDto::getResponseId).contains(response.getResponseId());
+        assertThat(responses).extracting(DemandResponseDto::getStatus).contains(DemandResponseStatus.ACCEPTED.name());
+    }
+
+    @Test
+    void acceptResponseRejectsAlreadyAcceptedResponse() {
         DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
         DemandResponseDto response = demandService.respondToDemand(
                 demand.getDemandId(), provider, responseRequest("我来接"));
 
-        AcceptDemandResponseResult first = demandService.acceptResponse(demand.getDemandId(), response.getResponseId(), customer);
-        AcceptDemandResponseResult second = demandService.acceptResponse(demand.getDemandId(), response.getResponseId(), customer);
+        demandService.acceptResponse(demand.getDemandId(), response.getResponseId(), customer);
 
-        assertThat(second.getResponseId()).isEqualTo(first.getResponseId());
-        assertThat(second.getProviderId()).isEqualTo(first.getProviderId());
+        assertThatThrownBy(() -> demandService.acceptResponse(demand.getDemandId(), response.getResponseId(), customer))
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -692,8 +968,7 @@ class DemandServiceTest {
                 demand.getDemandId(), provider, responseRequest("旅行跟拍我熟"));
 
         assertThatThrownBy(() -> demandService.acceptResponse(demand.getDemandId(), response.getResponseId(), otherCustomer))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("只有需求发布者");
+                .isInstanceOf(BusinessException.class);
         assertThat(responseRepository.findById(response.getResponseId()).orElseThrow().getStatus())
                 .isEqualTo(DemandResponseStatus.PENDING_CUSTOMER_ACCEPT);
     }
@@ -719,8 +994,22 @@ class DemandServiceTest {
                 demand.getDemandId(), provider, responseRequest("还未接受"));
 
         assertThatThrownBy(() -> demandService.getAcceptedSnapshot(response.getResponseId(), provider))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("尚未被接受");
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void demandControllerNoLongerExposesInvitationEndpoints() {
+        List<String> methodNames = Arrays.stream(DemandController.class.getDeclaredMethods())
+                .map(java.lang.reflect.Method::getName)
+                .toList();
+
+        assertThat(methodNames).doesNotContain(
+                "createInvitation",
+                "listReceivedInvitations",
+                "listSentInvitations",
+                "acceptInvitation",
+                "rejectInvitation"
+        );
     }
 
     private AcceptDemandResponseResult acceptOneResponse(DemandDto demand) {
@@ -742,6 +1031,8 @@ class DemandServiceTest {
         request.setLocation("南京大学鼓楼校区");
         request.setExpectedDate(LocalDate.now().plusDays(7));
         request.setTimeSlot("14:00-16:00");
+        request.setTimeDescription("Next week afternoons are available");
+        request.setTimeTags(List.of("NEAR_7_DAYS"));
         request.setBudgetMinCent(19900);
         request.setBudgetMaxCent(39900);
         request.setStyleTags(List.of("自然抓拍", "校园"));

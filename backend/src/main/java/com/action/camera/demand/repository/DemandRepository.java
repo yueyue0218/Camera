@@ -1,19 +1,23 @@
 package com.action.camera.demand.repository;
 
 import com.action.camera.demand.domain.Demand;
+import com.action.camera.demand.domain.DemandStatus;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 
-public interface DemandRepository {
+public interface DemandRepository extends JpaRepository<Demand, Long> {
 
-    Long nextId();
-
-    Demand save(Demand demand);
-
-    Optional<Demand> findById(Long id);
-
-    List<Demand> findAll();
-
-    void deleteById(Long id);
+    @Query("""
+            select d from Demand d
+            where d.customerId = :customerId
+              and d.status in :statuses
+              and d.hiddenByCustomer = false
+            order by d.updatedAt desc, d.id desc
+            """)
+    List<Demand> findOwnerHistory(@Param("customerId") Long customerId,
+                                  @Param("statuses") Collection<DemandStatus> statuses);
 }

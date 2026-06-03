@@ -3,25 +3,64 @@ package com.action.camera.message.service;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.message.entity.Conversation;
+import com.action.camera.message.entity.ConversationHiddenByUser;
 import com.action.camera.message.model.AcceptedResponseSnapshot;
+import com.action.camera.message.model.CreateConversationCommand;
+import com.action.camera.message.model.CreateConversationResult;
+import com.action.camera.message.repository.ConversationHiddenByUserRepository;
 import com.action.camera.message.repository.ConversationRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Comparator;
 import java.util.List;
 import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class ConversationService {
 
     public static final String SOURCE_TYPE_DEMAND_RESPONSE = "DEMAND_RESPONSE";
+    public static final String SOURCE_TYPE_SERVICE_PACKAGE = "SERVICE_PACKAGE";
+    public static final String SOURCE_TYPE_PORTFOLIO = "PORTFOLIO";
+    public static final String SOURCE_TYPE_DIRECT = "DIRECT";
     public static final String RESPONSE_STATUS_ACCEPTED = "ACCEPTED";
+    private static final Set<String> SUPPORTED_SOURCE_TYPES = Set.of(
+            SOURCE_TYPE_DEMAND_RESPONSE,
+            SOURCE_TYPE_SERVICE_PACKAGE,
+            SOURCE_TYPE_PORTFOLIO,
+            SOURCE_TYPE_DIRECT
+    );
 
     private final ConversationRepository conversationRepository;
+    private final MessageService messageService;
+    private final PlatformTransactionManager transactionManager;
+    private final ConversationHiddenByUserRepository hiddenByUserRepository;
+
+    @Autowired
+    public ConversationService(ConversationRepository conversationRepository,
+                               MessageService messageService,
+                               PlatformTransactionManager transactionManager,
+                               ConversationHiddenByUserRepository hiddenByUserRepository) {
+        this.conversationRepository = conversationRepository;
+        this.messageService = messageService;
+        this.transactionManager = transactionManager;
+        this.hiddenByUserRepository = hiddenByUserRepository;
+    }
+
+    public ConversationService(ConversationRepository conversationRepository,
+                               MessageService messageService,
+                               PlatformTransactionManager transactionManager) {
+        this(conversationRepository, messageService, transactionManager, null);
+    }
 
     @Transactional
     public Conversation createFromAcceptedResponse(AcceptedResponseSnapshot snapshot, Long operatorId) {
@@ -33,7 +72,31 @@ public class ConversationService {
                         snapshot.getResponseId(),
                         snapshot.getCustomerId(),
                         snapshot.getProviderUserId())
-                .orElseGet(() -> conversationRepository.save(buildConversation(snapshot)));
+                .orElseGet(() -> conversationRepository.save(buildConversation(
+                        new CreateConversationCommand(
+                                snapshot.getCustomerId(),
+                                snapshot.getProviderUserId(),
+                                operatorId,
+                                SOURCE_TYPE_DEMAND_RESPONSE,
+                                snapshot.getResponseId(),
+                                null),
+                        SOURCE_TYPE_DEMAND_RESPONSE)));
+    }
+
+    public CreateConversationResult createConversationWithInitialMessage(CreateConversationCommand command) {
+        String sourceType = validateCreateCommand(command);
+        CreateConversationResult result = executeInNewTransaction(status -> conversationRepository
+                .findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBId(
+                        sourceType,
+                        command.getSourceId(),
+                        command.getCustomerId(),
+                        command.getProviderId())
+                .map(conversation -> new CreateConversationResult(conversation.getId()))
+                .orElseGet(() -> createConversationOrMarkRollback(command, sourceType, status)));
+        if (result != null) {
+            return result;
+        }
+        return findExistingConversationAfterUniqueConflict(command, sourceType);
     }
 
     @Transactional(readOnly = true)
@@ -41,13 +104,52 @@ public class ConversationService {
         if (operatorId == null) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "operatorId must not be null");
         }
-        return conversationRepository.findByParticipantAIdOrParticipantBId(operatorId, operatorId)
+        List<Conversation> visibleConversations = conversationRepository
+                .findByParticipantAIdOrParticipantBId(operatorId, operatorId)
                 .stream()
                 .filter(conversation -> conversation.hasParticipant(operatorId))
+                .toList();
+        Set<Long> hiddenIds = hiddenConversationIds(operatorId, visibleConversations);
+        return visibleConversations.stream()
+                .filter(conversation -> !hiddenIds.contains(conversation.getId()))
                 .sorted(Comparator
                         .comparing(this::sortTime, Comparator.nullsLast(Comparator.reverseOrder()))
                         .thenComparing(Conversation::getId, Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
+    }
+
+    @Transactional
+    public void hideConversation(Long conversationId, Long operatorId) {
+        if (operatorId == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "operatorId must not be null");
+        }
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND,
+                        "Conversation not found: " + conversationId));
+        if (!conversation.hasParticipant(operatorId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only conversation participants can hide it");
+        }
+        if (hiddenByUserRepository == null) {
+            return;
+        }
+        hiddenByUserRepository.findByConversationIdAndUserId(conversationId, operatorId)
+                .orElseGet(() -> hiddenByUserRepository.save(
+                        new ConversationHiddenByUser(conversationId, operatorId)));
+    }
+
+    private Set<Long> hiddenConversationIds(Long operatorId, List<Conversation> conversations) {
+        if (hiddenByUserRepository == null || conversations.isEmpty()) {
+            return Set.of();
+        }
+        Set<Long> conversationIds = conversations.stream()
+                .map(Conversation::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (conversationIds.isEmpty()) {
+            return Set.of();
+        }
+        Set<Long> hiddenIds = hiddenByUserRepository.findHiddenConversationIds(operatorId, conversationIds);
+        return hiddenIds == null ? Set.of() : hiddenIds;
     }
 
     private LocalDateTime sortTime(Conversation conversation) {
@@ -74,12 +176,99 @@ public class ConversationService {
         }
     }
 
-    private Conversation buildConversation(AcceptedResponseSnapshot snapshot) {
+    private String validateCreateCommand(CreateConversationCommand command) {
+        if (command == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "conversation command must not be null");
+        }
+        if (command.getCustomerId() == null || command.getProviderId() == null
+                || command.getInitiatorId() == null || command.getSourceId() == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "conversation command is incomplete");
+        }
+        if (!Objects.equals(command.getInitiatorId(), command.getCustomerId())
+                && !Objects.equals(command.getInitiatorId(), command.getProviderId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only conversation participants can initiate it");
+        }
+        if (command.getSourceType() == null || command.getSourceType().isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "sourceType must not be blank");
+        }
+        String sourceType = command.getSourceType().trim().toUpperCase(Locale.ROOT);
+        if (!SUPPORTED_SOURCE_TYPES.contains(sourceType)) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Unsupported conversation sourceType: " + sourceType);
+        }
+        return sourceType;
+    }
+
+    private CreateConversationResult createConversationAndInitialMessage(CreateConversationCommand command,
+                                                                         String sourceType) {
+        Conversation savedConversation = conversationRepository.saveAndFlush(buildConversation(command, sourceType));
+        String initialMessage = normalizeMessage(command.getInitialMessage());
+        if (initialMessage != null) {
+            messageService.sendTextMessage(savedConversation.getId(), command.getInitiatorId(), initialMessage);
+        }
+        return new CreateConversationResult(savedConversation.getId());
+    }
+
+    private CreateConversationResult createConversationOrMarkRollback(CreateConversationCommand command,
+                                                                      String sourceType,
+                                                                      org.springframework.transaction.TransactionStatus status) {
+        try {
+            return createConversationAndInitialMessage(command, sourceType);
+        } catch (DataIntegrityViolationException ex) {
+            status.setRollbackOnly();
+            return null;
+        }
+    }
+
+    private CreateConversationResult findExistingConversationAfterUniqueConflict(CreateConversationCommand command,
+                                                                                String sourceType) {
+        for (int attempt = 0; attempt < 5; attempt++) {
+            java.util.Optional<Conversation> existing = executeInNewTransaction(status ->
+                    findExistingConversation(command, sourceType));
+            if (existing.isPresent()) {
+                return new CreateConversationResult(existing.get().getId());
+            }
+            waitBeforeRetry();
+        }
+        throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Conversation was created concurrently but cannot be loaded");
+    }
+
+    private <T> T executeInNewTransaction(org.springframework.transaction.support.TransactionCallback<T> callback) {
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return template.execute(callback);
+    }
+
+    private void waitBeforeRetry() {
+        try {
+            Thread.sleep(20);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "Interrupted while loading existing conversation");
+        }
+    }
+
+    private java.util.Optional<Conversation> findExistingConversation(CreateConversationCommand command,
+                                                                      String sourceType) {
+        return conversationRepository.findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBId(
+                sourceType,
+                command.getSourceId(),
+                command.getCustomerId(),
+                command.getProviderId());
+    }
+
+    private String normalizeMessage(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private Conversation buildConversation(CreateConversationCommand command, String sourceType) {
         Conversation conversation = new Conversation();
-        conversation.setParticipantAId(snapshot.getCustomerId());
-        conversation.setParticipantBId(snapshot.getProviderUserId());
-        conversation.setSourceType(SOURCE_TYPE_DEMAND_RESPONSE);
-        conversation.setSourceId(snapshot.getResponseId());
+        conversation.setParticipantAId(command.getCustomerId());
+        conversation.setParticipantBId(command.getProviderId());
+        conversation.setSourceType(sourceType);
+        conversation.setSourceId(command.getSourceId());
         conversation.setCreatedAt(LocalDateTime.now());
         return conversation;
     }

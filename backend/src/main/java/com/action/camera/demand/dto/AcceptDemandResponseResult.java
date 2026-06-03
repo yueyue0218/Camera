@@ -9,9 +9,9 @@ public class AcceptDemandResponseResult {
     private final String responseStatus;
     private final String conversationSourceType;
     private final Long sourceId;
-    private final String nextAction;
+    private final Long conversationId;
 
-    public AcceptDemandResponseResult(AcceptedDemandResponseSnapshot snapshot) {
+    public AcceptDemandResponseResult(AcceptedDemandResponseSnapshot snapshot, Long conversationId) {
         this.responseId = snapshot.getResponseId();
         this.demandId = snapshot.getDemandId();
         this.customerId = snapshot.getCustomerId();
@@ -19,7 +19,7 @@ public class AcceptDemandResponseResult {
         this.responseStatus = snapshot.getResponseStatus();
         this.conversationSourceType = "DEMAND_RESPONSE";
         this.sourceId = snapshot.getResponseId();
-        this.nextAction = "PASS_SNAPSHOT_TO_C_CREATE_CONVERSATION";
+        this.conversationId = conversationId;
     }
 
     public Long getResponseId() {
@@ -50,7 +50,7 @@ public class AcceptDemandResponseResult {
         return sourceId;
     }
 
-    public String getNextAction() {
-        return nextAction;
+    public Long getConversationId() {
+        return conversationId;
     }
 }

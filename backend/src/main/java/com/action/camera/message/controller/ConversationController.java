@@ -18,6 +18,7 @@ import com.action.camera.message.service.ConversationService;
 import com.action.camera.message.service.MessageService;
 import com.action.camera.message.service.QuoteService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -43,6 +44,12 @@ public class ConversationController {
                 .map(conversation -> ConversationListItemResponse.from(conversation, operatorId))
                 .toList();
         return Result.success(conversations);
+    }
+
+    @DeleteMapping("/conversations/{conversationId}")
+    public Result<Void> hideConversation(@PathVariable Long conversationId) {
+        conversationService.hideConversation(conversationId, currentUserId());
+        return Result.success(null);
     }
 
     @PostMapping("/conversations/from-response")
