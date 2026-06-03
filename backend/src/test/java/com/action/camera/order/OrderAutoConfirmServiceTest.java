@@ -24,6 +24,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -82,7 +83,7 @@ class OrderAutoConfirmServiceTest {
         OrderStatusLog statusLog = logCaptor.getValue();
         assertEquals(OrderStatus.DELIVERED_PENDING_CONFIRM, statusLog.getFromStatus());
         assertEquals(OrderStatus.COMPLETED, statusLog.getToStatus());
-        assertEquals(0L, statusLog.getOperatorId());
+        assertNull(statusLog.getOperatorId());
         assertEquals("SYSTEM", statusLog.getOperatorRole());
         assertEquals("交付后 7 天未操作，系统自动确认完成", statusLog.getRemark());
     }
@@ -250,6 +251,8 @@ class OrderAutoConfirmServiceTest {
         verify(orderStatusLogRepository).save(logCaptor.capture());
         assertEquals(OrderStatus.PAID_PENDING_SHOOT, logCaptor.getValue().getFromStatus());
         assertEquals(OrderStatus.SHOOTING, logCaptor.getValue().getToStatus());
+        assertNull(logCaptor.getValue().getOperatorId());
+        assertEquals("SYSTEM", logCaptor.getValue().getOperatorRole());
         assertEquals("系统根据拍摄开始时间自动进入拍摄中", logCaptor.getValue().getRemark());
     }
 
@@ -271,8 +274,12 @@ class OrderAutoConfirmServiceTest {
         List<OrderStatusLog> logs = logCaptor.getAllValues();
         assertEquals(OrderStatus.PAID_PENDING_SHOOT, logs.get(0).getFromStatus());
         assertEquals(OrderStatus.SHOOTING, logs.get(0).getToStatus());
+        assertNull(logs.get(0).getOperatorId());
+        assertEquals("SYSTEM", logs.get(0).getOperatorRole());
         assertEquals(OrderStatus.SHOOTING, logs.get(1).getFromStatus());
         assertEquals(OrderStatus.PENDING_DELIVERY, logs.get(1).getToStatus());
+        assertNull(logs.get(1).getOperatorId());
+        assertEquals("SYSTEM", logs.get(1).getOperatorRole());
     }
 
     @Test
@@ -307,6 +314,8 @@ class OrderAutoConfirmServiceTest {
         verify(orderStatusLogRepository).save(logCaptor.capture());
         assertEquals(OrderStatus.SHOOTING, logCaptor.getValue().getFromStatus());
         assertEquals(OrderStatus.PENDING_DELIVERY, logCaptor.getValue().getToStatus());
+        assertNull(logCaptor.getValue().getOperatorId());
+        assertEquals("SYSTEM", logCaptor.getValue().getOperatorRole());
         assertEquals("系统根据拍摄结束时间自动进入待交付", logCaptor.getValue().getRemark());
     }
 
@@ -390,6 +399,8 @@ class OrderAutoConfirmServiceTest {
         verify(orderStatusLogRepository).save(logCaptor.capture());
         assertEquals(OrderStatus.PENDING_DELIVERY, logCaptor.getValue().getFromStatus());
         assertEquals(OrderStatus.REFUNDED, logCaptor.getValue().getToStatus());
+        assertNull(logCaptor.getValue().getOperatorId());
+        assertEquals("SYSTEM", logCaptor.getValue().getOperatorRole());
         assertEquals("超过最晚交付时间仍未上传作品，系统自动退款并结束订单", logCaptor.getValue().getRemark());
     }
 

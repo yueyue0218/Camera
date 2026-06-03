@@ -237,6 +237,8 @@ class QuoteOrderFlowServiceTest {
         OrderStatusLog statusLog = logCaptor.getValue();
         assertEquals(OrderStatus.PENDING_PAYMENT, statusLog.getFromStatus());
         assertEquals(OrderStatus.PAID_PENDING_SHOOT, statusLog.getToStatus());
+        assertEquals(CUSTOMER_ID, statusLog.getOperatorId());
+        assertEquals("CUSTOMER", statusLog.getOperatorRole());
         assertEquals("模拟支付成功，资金进入平台托管", statusLog.getRemark());
     }
 

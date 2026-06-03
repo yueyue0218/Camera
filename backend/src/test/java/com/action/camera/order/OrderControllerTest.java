@@ -224,6 +224,7 @@ class OrderControllerTest {
         UserContext.setUserId(PROVIDER_USER_ID);
         Order order = order(OrderStatus.PAID_PENDING_SHOOT);
         prepareTransitionMocks(order);
+        ArgumentCaptor<OrderStatusLog> logCaptor = ArgumentCaptor.forClass(OrderStatusLog.class);
 
         StatusTransitionResponse shooting =
                 orderController.changeStatus(ORDER_ID, transitionRequest(OrderStatus.SHOOTING)).getData();
@@ -239,7 +240,11 @@ class OrderControllerTest {
                 orderController.changeStatus(ORDER_ID, transitionRequest(OrderStatus.DELIVERED_PENDING_CONFIRM)).getData();
         assertEquals(OrderStatus.PENDING_DELIVERY, delivered.getFromStatus());
         assertEquals(OrderStatus.DELIVERED_PENDING_CONFIRM, delivered.getToStatus());
-        verify(orderStatusLogRepository, times(3)).save(any(OrderStatusLog.class));
+        verify(orderStatusLogRepository, times(3)).save(logCaptor.capture());
+        for (OrderStatusLog statusLog : logCaptor.getAllValues()) {
+            assertEquals(PROVIDER_USER_ID, statusLog.getOperatorId());
+            assertEquals("PROVIDER", statusLog.getOperatorRole());
+        }
     }
 
     @Test
@@ -366,6 +371,8 @@ class OrderControllerTest {
         assertEquals("CUSTOMER", result.getData().getOperatorRole());
         assertTrue(result.getData().getReason().contains("精修肤色与约定不一致"));
         verify(orderStatusLogRepository, times(1)).save(logCaptor.capture());
+        assertEquals(CUSTOMER_ID, logCaptor.getValue().getOperatorId());
+        assertEquals("CUSTOMER", logCaptor.getValue().getOperatorRole());
         assertTrue(logCaptor.getValue().getReason().contains("精修肤色与约定不一致"));
     }
 
