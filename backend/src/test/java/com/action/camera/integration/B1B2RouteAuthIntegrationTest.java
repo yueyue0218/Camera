@@ -73,6 +73,11 @@ class B1B2RouteAuthIntegrationTest {
                 rest.exchange("/demands/" + demandId, HttpMethod.PUT,
                         userEntity("2001", "PROVIDER", demandUpdateBody()), Map.class);
         assertThat(providerUpdate.getBody().get("code")).isEqualTo(40301);
+
+        ResponseEntity<Map> providerClose =
+                rest.exchange("/demands/" + demandId + "/close", HttpMethod.PATCH,
+                        userEntity("2001", "PROVIDER", null), Map.class);
+        assertThat(providerClose.getBody().get("code")).isEqualTo(40301);
     }
 
     @Test

@@ -134,6 +134,9 @@ public class AuthInterceptor implements HandlerInterceptor {
         if (uri.matches("^/demands/\\d+$") && ("PUT".equals(method) || "PATCH".equals(method))) {
             return UserRole.CUSTOMER;
         }
+        if (uri.matches("^/demands/\\d+/close$") && "PATCH".equals(method)) {
+            return UserRole.CUSTOMER;
+        }
         if (uri.matches("^/demands/\\d+$") && "DELETE".equals(method)) {
             return null;
         }
