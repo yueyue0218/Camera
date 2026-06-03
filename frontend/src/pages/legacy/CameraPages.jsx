@@ -1534,6 +1534,7 @@ function ConversationDetailPage() {
   const [imageSending, setImageSending] = useState(false)
   const [quoteForm, setQuoteForm] = useState(() => createDefaultQuoteForm())
   const [showQuoteForm, setShowQuoteForm] = useState(false)
+  const [editingQuotationId, setEditingQuotationId] = useState(null)
   const [quoteValidationErrors, setQuoteValidationErrors] = useState([])
   const [notice, setNotice] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -1568,13 +1569,18 @@ function ConversationDetailPage() {
       return
     }
     await run(async () => {
-      const [nextMessages, nextQuotes] = await Promise.all([
-        conversationApi.messages(record.backendConversationId || record.conversationId, currentUser),
-        conversationApi.quotes(record.backendConversationId || record.conversationId, currentUser)
-      ])
-      setMessages(nextMessages)
-      setQuotes(nextQuotes)
+      await refreshConversationData(record)
     })
+  }
+
+  async function refreshConversationData(record = conversation) {
+    if (!record || record.isLocal) return
+    const [nextMessages, nextQuotes] = await Promise.all([
+      conversationApi.messages(record.backendConversationId || record.conversationId, currentUser),
+      conversationApi.quotes(record.backendConversationId || record.conversationId, currentUser)
+    ])
+    setMessages(nextMessages)
+    setQuotes(nextQuotes)
   }
 
   async function sendMessage() {
@@ -1648,44 +1654,62 @@ function ConversationDetailPage() {
 
   async function createQuote(event) {
     event.preventDefault()
-    const validationErrors = validateQuoteForm(quoteForm, conversation, currentUser, quotes)
+    const validationErrors = validateQuoteForm(quoteForm, conversation, currentUser, quotes, { editingQuotationId })
     setQuoteValidationErrors(validationErrors)
     if (validationErrors.length) {
       setNotice({ type: 'warning', text: validationErrors[0] })
       return
     }
-    const quote = await run(async () => quoteApi.create({
-      conversationId: conversation.backendConversationId || Number(conversation.conversationId),
-      amountCent: yuanToCent(quoteForm.amountYuan),
-      shootStartTime: quoteForm.shootStartTime,
-      shootEndTime: quoteForm.shootEndTime,
-      location: quoteForm.location,
-      serviceContent: quoteForm.serviceContent,
-      originalCount: Number(quoteForm.originalCount || 0),
-      refinedCount: Number(quoteForm.refinedCount || 0),
-      deliveryDeadline: quoteForm.deliveryDeadline,
-      photoUsageScope: quoteForm.photoUsageScope,
-      terms: quoteForm.terms,
-      contractTerms: quoteForm.contractTerms,
-      safetyNoticeVersion: 'P4-DEMO',
-      remark: quoteForm.remark
-    }, currentUser), '报价已发送')
+    const quotePayload = buildQuotePayload(quoteForm, conversation)
+    const quote = await run(async () => editingQuotationId
+      ? quoteApi.update(editingQuotationId, quotePayload, currentUser)
+      : quoteApi.create(quotePayload, currentUser), editingQuotationId ? '报价已更新' : '报价已发送')
     if (quote) {
       setShowQuoteForm(false)
+      setEditingQuotationId(null)
       setQuoteValidationErrors([])
       setQuoteForm(createDefaultQuoteForm())
       await loadConversationData()
     }
   }
 
+  function startQuoteEditing(quote) {
+    setEditingQuotationId(quote.quotationId)
+    setQuoteForm(createQuoteFormFromQuote(quote))
+    setQuoteValidationErrors([])
+    setShowQuoteForm(true)
+    setNotice({ type: 'info', text: '正在编辑待确认报价，保存前客户仍看到原报价。' })
+  }
+
+  function closeQuoteForm() {
+    setShowQuoteForm(false)
+    setEditingQuotationId(null)
+    setQuoteValidationErrors([])
+    setQuoteForm(createDefaultQuoteForm())
+  }
+
   async function confirmQuote(quote) {
-    const result = await run(async () => quoteApi.confirm(quote.quotationId, '需求方确认报价', currentUser), '报价已确认，订单已生成')
-    if (result?.orderId) {
-      await loadConversationData()
-      navigate(`/orders?orderId=${result.orderId}`)
-    } else if (result) {
-      await loadConversationData()
-      setNotice({ type: 'success', text: '报价已确认，可在订单页查看关联订单。' })
+    setLoading(true)
+    setNotice(null)
+    try {
+      const result = await quoteApi.confirm(quote.quotationId, '需求方确认报价', currentUser)
+      setNotice({ type: 'success', text: '报价已确认，订单已生成' })
+      if (result?.orderId) {
+        await refreshConversationData()
+        navigate(`/orders?orderId=${result.orderId}`)
+      } else {
+        await refreshConversationData()
+        setNotice({ type: 'success', text: '报价已确认，可在订单页查看关联订单。' })
+      }
+    } catch (error) {
+      try {
+        await refreshConversationData()
+      } catch {
+        // Keep the original quote confirmation error visible.
+      }
+      setNotice({ type: 'error', text: getQuoteConfirmationErrorText(error) })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -1698,11 +1722,17 @@ function ConversationDetailPage() {
   const isConversationProvider = conversation && currentUser.userId === Number(conversation.participantBId)
   const isConversationCustomer = conversation && currentUser.userId === Number(conversation.participantAId)
   const pendingQuote = hasPendingQuote(quotes)
+  const editingQuote = editingQuotationId
+    ? quotes.find(quote => String(quote.quotationId) === String(editingQuotationId))
+    : null
   const canCreateQuote = conversation
     && currentUser.role === 'PROVIDER'
     && isConversationProvider
     && isBackendConversation
     && !pendingQuote
+  const canEditSelectedQuote = editingQuote
+    && canEditQuote(editingQuote, conversation, currentUser)
+  const canSubmitQuoteForm = editingQuotationId ? canEditSelectedQuote : canCreateQuote
   const canConfirmQuote = conversation
     && currentUser.role === 'CUSTOMER'
     && isConversationCustomer
@@ -1766,7 +1796,16 @@ function ConversationDetailPage() {
               <Button
                 variant={showQuoteForm ? 'contained' : 'outlined'}
                 startIcon={<LocalOfferRoundedIcon />}
-                onClick={() => setShowQuoteForm(value => !value)}
+                onClick={() => {
+                  if (showQuoteForm && !editingQuotationId) {
+                    closeQuoteForm()
+                    return
+                  }
+                  setQuoteForm(createDefaultQuoteForm())
+                  setEditingQuotationId(null)
+                  setQuoteValidationErrors([])
+                  setShowQuoteForm(true)
+                }}
                 disabled={!canCreateQuote}
               >
                 发起报价
@@ -1808,6 +1847,19 @@ function ConversationDetailPage() {
                       <Button size="small" variant="outlined" color="inherit" onClick={() => rejectQuote(quote)}>拒绝报价</Button>
                     </Stack>
                   )}
+                  {canEditQuote(quote, conversation, currentUser) && (
+                    <Stack direction="row" spacing={1} flexWrap="wrap">
+                      <Button
+                        size="small"
+                        variant={String(editingQuotationId) === String(quote.quotationId) ? 'contained' : 'outlined'}
+                        startIcon={<LocalOfferRoundedIcon />}
+                        onClick={() => startQuoteEditing(quote)}
+                        disabled={loading}
+                      >
+                        {String(editingQuotationId) === String(quote.quotationId) ? '正在编辑' : '编辑报价'}
+                      </Button>
+                    </Stack>
+                  )}
                   {quote.status === 'CONFIRMED' && (
                     orderId ? (
                       <Button size="small" variant="outlined" startIcon={<ReceiptLongRoundedIcon />} onClick={() => navigate(`/orders?orderId=${orderId}`)} sx={{ alignSelf: 'flex-start' }}>
@@ -1826,6 +1878,9 @@ function ConversationDetailPage() {
           {showQuoteForm && canSeeQuoteEntry && (
             <Paper component="form" variant="outlined" onSubmit={createQuote} sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
               <Stack spacing={1.5}>
+                {editingQuotationId && (
+                  <Alert severity="info">当前正在编辑报价 {editingQuotationId}。仅待确认报价可编辑；客户确认生成订单后，订单核心条款会冻结。</Alert>
+                )}
                 {!!quoteValidationErrors.length && (
                   <Alert severity="warning">
                     <Stack spacing={0.5}>
@@ -1849,8 +1904,10 @@ function ConversationDetailPage() {
                 </Box>
                 <Alert severity="info">当前会话接口未返回明确档期开始/结束字段，因此本轮无法做档期范围校验，只校验报价时间顺序。</Alert>
                 <Stack direction="row" spacing={1}>
-                  <Button type="submit" variant="contained" disabled={loading || !canCreateQuote}>发送报价</Button>
-                  <Button variant="text" color="inherit" onClick={() => setShowQuoteForm(false)}>收起</Button>
+                  <Button type="submit" variant="contained" disabled={loading || !canSubmitQuoteForm}>
+                    {editingQuotationId ? '保存报价修改' : '发送报价'}
+                  </Button>
+                  <Button variant="text" color="inherit" onClick={closeQuoteForm}>收起</Button>
                 </Stack>
               </Stack>
             </Paper>
@@ -1906,7 +1963,20 @@ function ConversationDetailPage() {
           {canSeeQuoteEntry && (
             <Tooltip title="发起报价">
               <span>
-                <IconButton color={showQuoteForm ? 'primary' : 'default'} onClick={() => setShowQuoteForm(value => !value)} disabled={!canCreateQuote}>
+                <IconButton
+                  color={showQuoteForm ? 'primary' : 'default'}
+                  onClick={() => {
+                    if (showQuoteForm && !editingQuotationId) {
+                      closeQuoteForm()
+                      return
+                    }
+                    setQuoteForm(createDefaultQuoteForm())
+                    setEditingQuotationId(null)
+                    setQuoteValidationErrors([])
+                    setShowQuoteForm(true)
+                  }}
+                  disabled={!canCreateQuote}
+                >
                   <LocalOfferRoundedIcon />
                 </IconButton>
               </span>
@@ -2106,6 +2176,19 @@ function OrdersPage() {
     }
   }
 
+  async function cancelSelectedOrder(cancelAction) {
+    if (!selectedOrder || !cancelAction) return
+    if (!window.confirm(cancelAction.confirmText)) return
+    const result = await run(async () => orderApi.cancel(
+      selectedOrder.orderId,
+      { reason: cancelAction.reason },
+      currentUser
+    ), cancelAction.successText)
+    if (result) {
+      await loadOrders(selectedOrder.orderId)
+    }
+  }
+
   async function submitPhotoAuthorizationRequest(event) {
     event.preventDefault()
     if (!selectedOrder || !photoAuthorizationForm.fileIds.length) return
@@ -2201,6 +2284,9 @@ function OrdersPage() {
   const canUploadDelivery = selectedOrder && canProviderUploadDelivery(selectedOrder, currentUser)
   const canRequestRework = selectedOrder && canCustomerRequestRework(selectedOrder, currentUser)
   const canRequestPhotoAuthorization = selectedOrder && canProviderRequestPhotoAuthorization(selectedOrder, currentUser)
+  const cancelAction = selectedOrder ? getCustomerCancelAction(selectedOrder, currentUser) : null
+  const showShootStartedCancelNotice = selectedOrder
+    && shouldShowShootStartedCancelNotice(selectedOrder, currentUser)
   const deliveryFileOptions = useMemo(() => {
     const map = new Map()
     deliveryRecords
@@ -2369,6 +2455,27 @@ function OrdersPage() {
                   </Button>
                 ) : (
                   <Chip icon={<TaskAltRoundedIcon />} label="当前没有可执行操作" sx={{ alignSelf: 'flex-start' }} />
+                )}
+                {cancelAction && (
+                  <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#fffaf8' }}>
+                    <Stack spacing={1}>
+                      <Typography fontWeight={900}>{cancelAction.title}</Typography>
+                      <Typography color="text.secondary" variant="body2">{cancelAction.description}</Typography>
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        startIcon={<CloseRoundedIcon />}
+                        onClick={() => cancelSelectedOrder(cancelAction)}
+                        disabled={loading}
+                        sx={{ alignSelf: 'flex-start' }}
+                      >
+                        {cancelAction.label}
+                      </Button>
+                    </Stack>
+                  </Paper>
+                )}
+                {showShootStartedCancelNotice && (
+                  <Alert severity="warning">拍摄开始后不可直接取消，如有争议请走申诉或联系平台处理。</Alert>
                 )}
               </Stack>
             </Paper>
@@ -3380,9 +3487,51 @@ function createDefaultQuoteForm() {
   }
 }
 
+function buildQuotePayload(form, conversation) {
+  return {
+    conversationId: conversation.backendConversationId || Number(conversation.conversationId),
+    amountCent: yuanToCent(form.amountYuan),
+    shootStartTime: form.shootStartTime,
+    shootEndTime: form.shootEndTime,
+    location: form.location,
+    serviceContent: form.serviceContent,
+    originalCount: Number(form.originalCount || 0),
+    refinedCount: Number(form.refinedCount || 0),
+    deliveryDeadline: form.deliveryDeadline,
+    photoUsageScope: form.photoUsageScope,
+    terms: form.terms,
+    contractTerms: form.contractTerms,
+    safetyNoticeVersion: 'P4-DEMO',
+    remark: form.remark
+  }
+}
+
+function createQuoteFormFromQuote(quote) {
+  return {
+    amountYuan: quote.amountCent ? Number(quote.amountCent) / 100 : '',
+    shootStartTime: toDateTimeInputValue(quote.shootStartTime),
+    shootEndTime: toDateTimeInputValue(quote.shootEndTime),
+    deliveryDeadline: toDateTimeInputValue(quote.deliveryDeadline),
+    location: quote.location || '',
+    serviceContent: quote.serviceContent || '',
+    originalCount: quote.originalCount ?? 0,
+    refinedCount: quote.refinedCount ?? 0,
+    photoUsageScope: quote.photoUsageScope || 'PERSONAL_ONLY',
+    terms: quote.terms || '',
+    contractTerms: quote.contractTerms || '',
+    remark: quote.remark || ''
+  }
+}
+
 function toDateTimeInput(date) {
   const pad = value => String(value).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function toDateTimeInputValue(value) {
+  if (!value) return ''
+  if (typeof value === 'string') return value.slice(0, 16)
+  return toDateTimeInput(new Date(value))
 }
 
 function parseQuoteSnapshot(raw) {
@@ -3455,6 +3604,15 @@ function getQuoteOrderId(quote) {
   return quote?.orderId || quote?.order?.orderId || quote?.confirmedOrderId || null
 }
 
+function canEditQuote(quote, conversation, currentUser) {
+  return Boolean(quote)
+    && quote.status === 'PENDING_CONFIRM'
+    && !getQuoteOrderId(quote)
+    && currentUser?.role === 'PROVIDER'
+    && Number(currentUser.userId) === Number(conversation?.participantBId)
+    && Number(currentUser.userId) === Number(quote.providerUserId)
+}
+
 function hasPendingQuote(quotes) {
   return quotes.some(quote => quote.status === 'PENDING_CONFIRM')
 }
@@ -3474,15 +3632,20 @@ function getQuoteEntryHint(conversation, currentUser, quotes) {
   return '可以基于本次沟通发起正式报价，顾客确认后会生成订单。'
 }
 
-function validateQuoteForm(form, conversation, currentUser, quotes) {
+function validateQuoteForm(form, conversation, currentUser, quotes, options = {}) {
   const errors = []
+  const editingQuotationId = options.editingQuotationId
   if (!conversation || conversation.isLocal || !getBackendConversationId(conversation)) {
     errors.push('当前会话必须是真实后端会话，才能发起报价。')
   }
   if (currentUser.role !== 'PROVIDER' || currentUser.userId !== Number(conversation?.participantBId)) {
     errors.push('只有该会话的服务方可以发起报价。')
   }
-  if (hasPendingQuote(quotes)) {
+  const hasOtherPendingQuote = quotes.some(quote =>
+    quote.status === 'PENDING_CONFIRM'
+    && (!editingQuotationId || String(quote.quotationId) !== String(editingQuotationId))
+  )
+  if (hasOtherPendingQuote) {
     errors.push('已有待确认报价，需客户确认或拒绝后再发新报价。')
   }
 
@@ -3532,6 +3695,17 @@ function validateQuoteForm(form, conversation, currentUser, quotes) {
     }
   }
   return errors
+}
+
+function getQuoteConfirmationErrorText(error) {
+  const message = error?.message || ''
+  if (message.includes('Quote has expired')) {
+    return '该报价已过期，请摄影师重新发起报价。'
+  }
+  if (message.includes('Provider already has an active order in this shoot time range')) {
+    return '该摄影师在所选拍摄时间已有订单，请重新协商时间。'
+  }
+  return message || '报价确认失败'
 }
 
 function hasAtMostTwoDecimalPlaces(value) {
@@ -3596,6 +3770,48 @@ function getOrderAction(order, currentUser) {
     }
   }
   return null
+}
+
+function getCustomerCancelAction(order, currentUser) {
+  if (!isOrderCustomer(order, currentUser)) return null
+  if (order.status === 'PENDING_PAYMENT') {
+    return {
+      label: '取消待支付订单',
+      title: '取消待支付订单',
+      description: '该订单尚未支付，取消后订单结束，不涉及退款。',
+      confirmText: '确定取消这个待支付订单吗？该操作不涉及退款。',
+      reason: '客户取消未支付订单',
+      successText: '待支付订单已取消'
+    }
+  }
+  if (order.status === 'PAID_PENDING_SHOOT' && isBeforeShootStart(order)) {
+    return {
+      label: '取消并申请退款',
+      title: '拍摄前取消并退款',
+      description: '订单已支付且拍摄尚未开始，取消后平台托管资金将退回客户。',
+      confirmText: '确定取消订单并申请退款吗？平台托管资金将退回客户。',
+      reason: '客户拍摄前取消，申请退回托管款',
+      successText: '订单已取消，退款状态已更新'
+    }
+  }
+  return null
+}
+
+function shouldShowShootStartedCancelNotice(order, currentUser) {
+  return isOrderCustomer(order, currentUser)
+    && order.status === 'PAID_PENDING_SHOOT'
+    && !isBeforeShootStart(order)
+}
+
+function isOrderCustomer(order, currentUser) {
+  return Boolean(order)
+    && Boolean(currentUser)
+    && Number(order.customerId) === Number(currentUser.userId)
+}
+
+function isBeforeShootStart(order) {
+  const shootStartTime = parseInputDate(order?.shootStartTime)
+  return Boolean(shootStartTime) && new Date() < shootStartTime
 }
 
 const CONVERSATION_STORAGE_KEY = 'camera-p4-conversations'
