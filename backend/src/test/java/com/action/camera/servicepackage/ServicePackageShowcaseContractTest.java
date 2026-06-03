@@ -1,5 +1,6 @@
 package com.action.camera.servicepackage;
 
+import com.action.camera.common.JwtUtil;
 import com.action.camera.message.repository.ConversationRepository;
 import com.action.camera.message.repository.MessageRepository;
 import com.action.camera.servicepackage.domain.ServicePackage;
@@ -16,6 +17,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 
 import java.time.LocalDate;
@@ -45,6 +47,12 @@ class ServicePackageShowcaseContractTest {
     private TestRestTemplate rest;
 
     @Autowired
+    private JwtUtil jwtUtil;
+
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    @Autowired
     private ServicePackageRepository servicePackageRepository;
 
     @Autowired
@@ -62,6 +70,15 @@ class ServicePackageShowcaseContractTest {
         conversationRepository.deleteAll();
         interestRepository.deleteAll();
         servicePackageRepository.deleteAll();
+        jdbc.execute("DELETE FROM users WHERE id IN (1001, 1002, 2001, 2002)");
+        jdbc.execute("INSERT INTO users (id, nickname, current_role, status, credit_score, created_at, updated_at) " +
+                "VALUES (1001, 'customer', 'CUSTOMER', 'ACTIVE', 80.00, NOW(), NOW())");
+        jdbc.execute("INSERT INTO users (id, nickname, current_role, status, credit_score, created_at, updated_at) " +
+                "VALUES (1002, 'other customer', 'CUSTOMER', 'ACTIVE', 80.00, NOW(), NOW())");
+        jdbc.execute("INSERT INTO users (id, nickname, current_role, status, credit_score, created_at, updated_at) " +
+                "VALUES (2001, 'provider', 'PROVIDER', 'ACTIVE', 80.00, NOW(), NOW())");
+        jdbc.execute("INSERT INTO users (id, nickname, current_role, status, credit_score, created_at, updated_at) " +
+                "VALUES (2002, 'other provider', 'PROVIDER', 'ACTIVE', 80.00, NOW(), NOW())");
     }
 
     @Test
@@ -224,15 +241,20 @@ class ServicePackageShowcaseContractTest {
         ResponseEntity<Map> nonOwnerDetail = rest.exchange(
                 "/service-packages/" + serviceId,
                 HttpMethod.GET,
-                customerEntity(CUSTOMER_ID, null),
+                bearerEntity(CUSTOMER_ID),
                 Map.class);
         ResponseEntity<Map> ownerDetail = rest.exchange(
                 "/service-packages/" + serviceId,
                 HttpMethod.GET,
-                providerEntity(null),
+                bearerEntity(PROVIDER_ID),
                 Map.class);
         ResponseEntity<Map> legacyOwnerDetail = rest.exchange(
                 "/services/" + serviceId,
+                HttpMethod.GET,
+                bearerEntity(PROVIDER_ID),
+                Map.class);
+        ResponseEntity<Map> forgedHeaderDetail = rest.exchange(
+                "/service-packages/" + serviceId,
                 HttpMethod.GET,
                 providerEntity(null),
                 Map.class);
@@ -241,6 +263,7 @@ class ServicePackageShowcaseContractTest {
         assertThat(ownerDetail.getBody().get("code")).isEqualTo(200);
         assertThat(data(ownerDetail).get("status")).isEqualTo(ServicePackageStatus.OFFLINE.name());
         assertThat(legacyOwnerDetail.getBody().get("code")).isEqualTo(200);
+        assertThat(forgedHeaderDetail.getBody().get("code")).isEqualTo(40401);
     }
 
     @Test
@@ -319,6 +342,13 @@ class ServicePackageShowcaseContractTest {
         headers.set("X-User-Role", "PROVIDER");
         headers.setContentType(MediaType.APPLICATION_JSON);
         return new HttpEntity<>(body, headers);
+    }
+
+    private HttpEntity<String> bearerEntity(Long userId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(jwtUtil.generateToken(userId));
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return new HttpEntity<>(null, headers);
     }
 
     private String createServicePackageBody() {

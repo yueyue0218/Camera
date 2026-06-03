@@ -30,6 +30,7 @@ public class AuthInterceptor implements HandlerInterceptor {
             return true;
         }
         if (isPublicB1B2Get(request)) {
+            authenticateOptionalBearer(request);
             return true;
         }
 
@@ -196,6 +197,27 @@ public class AuthInterceptor implements HandlerInterceptor {
             return UserRole.CUSTOMER;
         }
         return null;
+    }
+
+    private void authenticateOptionalBearer(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || authHeader.isBlank()) {
+            return;
+        }
+        if (!authHeader.startsWith("Bearer ")) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        }
+        try {
+            Long userId = jwtUtil.parseUserId(authHeader.substring(7));
+            UserContext.setUserId(userId);
+            loadAndSetRole(userId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
+        } catch (Exception e) {
+            if (e instanceof BusinessException businessException) {
+                throw businessException;
+            }
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        }
     }
 
     @Override

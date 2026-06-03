@@ -28,17 +28,10 @@ public class MockCurrentUserProvider {
         Long contextUserId = UserContext.getUserId();
         if (contextUserId != null) {
             UserRole contextRole = UserContext.getCurrentRole();
-            UserRole resolvedRole = contextRole == null
-                    ? UserRole.parse(request.getHeader("X-User-Role"), UserRole.CUSTOMER)
-                    : contextRole;
+            UserRole resolvedRole = contextRole == null ? UserRole.CUSTOMER : contextRole;
             return Optional.of(new CurrentUser(contextUserId, resolvedRole));
         }
-        if (request.getHeader("X-User-Id") == null || request.getHeader("X-User-Id").isBlank()) {
-            return Optional.empty();
-        }
-        Long userId = readUserId(request.getHeader("X-User-Id"));
-        UserRole role = UserRole.parse(request.getHeader("X-User-Role"), UserRole.CUSTOMER);
-        return Optional.of(new CurrentUser(userId, role));
+        return Optional.empty();
     }
 
     private Long readUserId(String value) {

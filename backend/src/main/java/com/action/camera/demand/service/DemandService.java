@@ -288,12 +288,13 @@ public class DemandService {
         DemandResponse response = findResponse(responseId);
         Demand demand = findDemand(response.getDemandId());
         if (!response.getStatus().equals(DemandResponseStatus.ACCEPTED)) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "鍝嶅簲灏氭湭琚帴鍙楋紝涓嶈兘浜ょ粰 C 鍒涘缓浼氳瘽");
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                    "response must be accepted before conversation handoff");
         }
         if (!user.isAdmin()
                 && !demand.getCustomerId().equals(user.getUserId())
                 && !response.getProviderId().equals(user.getUserId())) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "鏃犳潈闄愭煡鐪嬪凡鎺ュ彈鍝嶅簲蹇収");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "no permission to view accepted response snapshot");
         }
         return buildSnapshot(demand, response);
     }
@@ -315,7 +316,7 @@ public class DemandService {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT, "only open demands can accept responses");
         }
         if (response.getStatus() != DemandResponseStatus.PENDING_CUSTOMER_ACCEPT) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "鍙湁寰呴渶姹傛柟鎺ュ彈鐨勫搷搴斿彲浠ヨ鎺ュ彈");
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "only pending responses can be accepted");
         }
         response.accept();
         responseRepository.save(response);
@@ -355,15 +356,15 @@ public class DemandService {
 
     private Demand findDemand(Long demandId) {
         if (demandId == null) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "demandId 涓嶈兘涓虹┖");
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "demandId must not be null");
         }
         return demandRepository.findById(demandId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "闇€姹備笉瀛樺湪"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "demand not found"));
     }
 
     private DemandResponse findResponse(Long responseId) {
         if (responseId == null) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "responseId 涓嶈兘涓虹┖");
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "responseId must not be null");
         }
         return responseRepository.findById(responseId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "response not found"));
@@ -371,7 +372,7 @@ public class DemandService {
 
     private void requireCustomer(CurrentUser user) {
         if (!user.isCustomer()) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "褰撳墠鎿嶄綔闇€瑕侀渶姹傛柟韬唤");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "current operation requires customer role");
         }
     }
 
@@ -383,7 +384,7 @@ public class DemandService {
 
     private void requireProvider(CurrentUser user) {
         if (!user.isProvider()) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "褰撳墠鎿嶄綔闇€瑕佹湇鍔℃柟韬唤");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "current operation requires provider role");
         }
     }
 
@@ -391,12 +392,12 @@ public class DemandService {
         if (request == null) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "request must not be null");
         }
-        requireText(request.getScene(), "鎷嶆憚鍦烘櫙涓嶈兘涓虹┖");
-        requireText(request.getCityCode(), "鍩庡競涓嶈兘涓虹┖");
-        requireText(request.getLocation(), "鎷嶆憚鍦扮偣涓嶈兘涓虹┖");
+        requireText(request.getScene(), "scene must not be blank");
+        requireText(request.getCityCode(), "cityCode must not be blank");
+        requireText(request.getLocation(), "location must not be blank");
         requireText(request.getTimeDescription(), "timeDescription must not be blank");
-        validateCent(request.getBudgetMinCent(), "鏈€浣庨绠椾笉鑳戒负璐熸暟");
-        validateCent(request.getBudgetMaxCent(), "鏈€楂橀绠椾笉鑳戒负璐熸暟");
+        validateCent(request.getBudgetMinCent(), "budgetMinCent must not be negative");
+        validateCent(request.getBudgetMaxCent(), "budgetMaxCent must not be negative");
         validateBudgetRange(request.getBudgetMinCent(), request.getBudgetMaxCent());
         normalizeTimeTags(request.getTimeTags());
     }
@@ -450,7 +451,7 @@ public class DemandService {
         if (request == null) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "request must not be null");
         }
-        requireText(request.getMessage(), "鍝嶅簲璇存槑涓嶈兘涓虹┖");
+        requireText(request.getMessage(), "message must not be blank");
         validateCent(request.getExpectedPriceCent(), "expectedPriceCent must not be negative");
     }
 
