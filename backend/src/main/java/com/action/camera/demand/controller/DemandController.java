@@ -63,7 +63,7 @@ public class DemandController {
     @GetMapping("/{demandId}")
     public Result<DemandDto> getDemand(@PathVariable Long demandId,
                                        HttpServletRequest httpRequest) {
-        CurrentUser currentUser = currentUserProvider.getCurrentUser(httpRequest);
+        CurrentUser currentUser = currentUserProvider.getCurrentUserIfPresent(httpRequest).orElse(null);
         return Result.success(demandService.getDemand(demandId, currentUser));
     }
 
@@ -105,12 +105,26 @@ public class DemandController {
         return Result.success(demandService.listResponses(demandId, currentUser));
     }
 
+    @GetMapping("/responses/me")
+    public Result<List<DemandResponseDto>> listMyResponses(HttpServletRequest httpRequest) {
+        CurrentUser currentUser = currentUserProvider.getCurrentUser(httpRequest);
+        return Result.success(demandService.listMyResponses(currentUser));
+    }
+
     @PostMapping("/{demandId}/responses/{responseId}/accept")
     public Result<AcceptDemandResponseResult> acceptResponse(@PathVariable Long demandId,
                                                              @PathVariable Long responseId,
                                                              HttpServletRequest httpRequest) {
         CurrentUser currentUser = currentUserProvider.getCurrentUser(httpRequest);
         return Result.success(demandService.acceptResponse(demandId, responseId, currentUser));
+    }
+
+    @PostMapping("/{demandId}/responses/{responseId}/reject")
+    public Result<DemandResponseDto> rejectResponse(@PathVariable Long demandId,
+                                                    @PathVariable Long responseId,
+                                                    HttpServletRequest httpRequest) {
+        CurrentUser currentUser = currentUserProvider.getCurrentUser(httpRequest);
+        return Result.success(demandService.rejectResponse(demandId, responseId, currentUser));
     }
 
     @GetMapping("/responses/{responseId}/accepted-snapshot")

@@ -143,6 +143,9 @@ public class AuthInterceptor implements HandlerInterceptor {
         if (uri.matches("^/demands/\\d+/responses/\\d+/accept$") && "POST".equals(method)) {
             return UserRole.CUSTOMER;
         }
+        if (uri.matches("^/demands/\\d+/responses/\\d+/reject$") && "POST".equals(method)) {
+            return UserRole.CUSTOMER;
+        }
         if ((uri.equals("/services") || uri.equals("/service-packages")) && "POST".equals(method)) {
             return UserRole.PROVIDER;
         }

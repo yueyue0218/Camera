@@ -132,11 +132,11 @@ class DemandConversationHandoffTest {
         assertThat(result.getConversationSourceType()).isEqualTo(ConversationService.SOURCE_TYPE_DEMAND_RESPONSE);
         assertThat(result.getSourceId()).isEqualTo(accepted.getResponseId());
         assertThat(demandRepository.findById(demand.getDemandId()).orElseThrow().getStatus())
-                .isEqualTo(DemandStatus.MATCHED);
+                .isEqualTo(DemandStatus.OPEN);
         assertThat(responseRepository.findById(accepted.getResponseId()).orElseThrow().getStatus())
                 .isEqualTo(DemandResponseStatus.ACCEPTED);
         assertThat(responseRepository.findById(rejected.getResponseId()).orElseThrow().getStatus())
-                .isEqualTo(DemandResponseStatus.REJECTED);
+                .isEqualTo(DemandResponseStatus.PENDING_CUSTOMER_ACCEPT);
 
         ArgumentCaptor<CreateConversationCommand> commandCaptor =
                 ArgumentCaptor.forClass(CreateConversationCommand.class);
@@ -173,7 +173,7 @@ class DemandConversationHandoffTest {
     }
 
     @Test
-    void matchedDemandCannotAcceptAnotherPendingResponseOrCreateDuplicateConversation() {
+    void openDemandCanAcceptMultipleResponsesAndCreateConversationPerResponse() {
         DemandDto demand = demandService.createDemand(CUSTOMER, demandRequest());
         DemandResponseDto first = demandService.respondToDemand(
                 demand.getDemandId(),
@@ -189,19 +189,20 @@ class DemandConversationHandoffTest {
                 .thenReturn(new CreateConversationResult(9001L));
         demandService.acceptResponse(demand.getDemandId(), first.getResponseId(), CUSTOMER);
 
-        assertThatThrownBy(() -> demandService.acceptResponse(
+        AcceptDemandResponseResult secondResult = demandService.acceptResponse(
                 demand.getDemandId(),
                 second.getResponseId(),
                 CUSTOMER
-        )).isInstanceOf(BusinessException.class);
+        );
 
         assertThat(demandRepository.findById(demand.getDemandId()).orElseThrow().getStatus())
-                .isEqualTo(DemandStatus.MATCHED);
+                .isEqualTo(DemandStatus.OPEN);
         assertThat(responseRepository.findById(first.getResponseId()).orElseThrow().getStatus())
                 .isEqualTo(DemandResponseStatus.ACCEPTED);
         assertThat(responseRepository.findById(second.getResponseId()).orElseThrow().getStatus())
-                .isEqualTo(DemandResponseStatus.REJECTED);
-        verify(conversationService, times(1)).createConversationWithInitialMessage(any());
+                .isEqualTo(DemandResponseStatus.ACCEPTED);
+        assertThat(secondResult.getSourceId()).isEqualTo(second.getResponseId());
+        verify(conversationService, times(2)).createConversationWithInitialMessage(any());
     }
 
     @Test

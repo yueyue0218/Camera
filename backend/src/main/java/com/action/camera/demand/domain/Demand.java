@@ -142,11 +142,6 @@ public class Demand {
         touch();
     }
 
-    public void markMatched() {
-        status = DemandStatus.MATCHED;
-        touch();
-    }
-
     public void close() {
         status = DemandStatus.CLOSED;
         touch();

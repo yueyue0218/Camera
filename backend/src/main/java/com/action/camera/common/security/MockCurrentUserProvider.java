@@ -6,6 +6,8 @@ import com.action.camera.common.exception.BusinessException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
+
 /**
  * Temporary P4 current-user provider.
  *
@@ -18,17 +20,25 @@ public class MockCurrentUserProvider {
     private static final long DEFAULT_CUSTOMER_ID = 1001L;
 
     public CurrentUser getCurrentUser(HttpServletRequest request) {
+        return getCurrentUserIfPresent(request)
+                .orElseGet(() -> new CurrentUser(DEFAULT_CUSTOMER_ID, UserRole.CUSTOMER));
+    }
+
+    public Optional<CurrentUser> getCurrentUserIfPresent(HttpServletRequest request) {
         Long contextUserId = UserContext.getUserId();
         if (contextUserId != null) {
             UserRole contextRole = UserContext.getCurrentRole();
             UserRole resolvedRole = contextRole == null
                     ? UserRole.parse(request.getHeader("X-User-Role"), UserRole.CUSTOMER)
                     : contextRole;
-            return new CurrentUser(contextUserId, resolvedRole);
+            return Optional.of(new CurrentUser(contextUserId, resolvedRole));
+        }
+        if (request.getHeader("X-User-Id") == null || request.getHeader("X-User-Id").isBlank()) {
+            return Optional.empty();
         }
         Long userId = readUserId(request.getHeader("X-User-Id"));
         UserRole role = UserRole.parse(request.getHeader("X-User-Role"), UserRole.CUSTOMER);
-        return new CurrentUser(userId, role);
+        return Optional.of(new CurrentUser(userId, role));
     }
 
     private Long readUserId(String value) {

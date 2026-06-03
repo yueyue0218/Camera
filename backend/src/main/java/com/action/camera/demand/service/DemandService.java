@@ -150,9 +150,6 @@ public class DemandService {
     public DemandDto closeDemand(Long demandId, CurrentUser user) {
         requireCustomer(user);
         Demand demand = findOwnedDemand(demandId, user);
-        if (demand.getStatus() == DemandStatus.MATCHED) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "transaction in progress, demand cannot be closed");
-        }
         demand.close();
         return DemandMapper.toDemandDto(demandRepository.save(demand));
     }
@@ -163,20 +160,17 @@ public class DemandService {
         if (!user.isAdmin() && !demand.getCustomerId().equals(user.getUserId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "only the demand owner can delete this demand");
         }
-        if (demand.getStatus() == DemandStatus.MATCHED) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "transaction in progress, demand cannot be deleted");
-        }
         demandRepository.deleteById(demandId);
     }
 
     @Transactional(readOnly = true)
     public DemandDto getDemand(Long demandId, CurrentUser user) {
         Demand demand = findDemand(demandId);
-        if (user.isAdmin() || demand.getCustomerId().equals(user.getUserId())
-                || demand.getStatus() == DemandStatus.OPEN) {
+        if (demand.getStatus() == DemandStatus.OPEN
+                || (user != null && (user.isAdmin() || demand.getCustomerId().equals(user.getUserId())))) {
             return DemandMapper.toDemandDto(demand);
         }
-        throw new BusinessException(ErrorCode.FORBIDDEN, "无权限查看该需求");
+        throw new BusinessException(ErrorCode.FORBIDDEN, "no permission to view this demand");
     }
 
     @Transactional
@@ -184,13 +178,13 @@ public class DemandService {
         requireProvider(user);
         Demand demand = findDemand(demandId);
         if (!demand.getStatus().equals(DemandStatus.OPEN)) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "只有开放中的需求可以响应");
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "only open demands can be responded");
         }
         if (demand.getCustomerId().equals(user.getUserId())) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "不能响应自己发布的需求");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "provider cannot respond to own demand");
         }
         if (responseRepository.findByDemandIdAndProviderId(demandId, user.getUserId()).isPresent()) {
-            throw new BusinessException(ErrorCode.DUPLICATE_OPERATION, "同一服务方不能重复响应同一需求");
+            throw new BusinessException(ErrorCode.DUPLICATE_OPERATION, "provider cannot respond to the same demand twice");
         }
         validateResponseRequest(request);
         Long providerProfileId = request.getProviderProfileId() == null
@@ -214,9 +208,17 @@ public class DemandService {
     public List<DemandResponseDto> listResponses(Long demandId, CurrentUser user) {
         Demand demand = findDemand(demandId);
         if (!user.isAdmin() && !demand.getCustomerId().equals(user.getUserId())) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "只有需求发布者可以查看响应列表");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "only demand owner can list responses");
         }
         return responseRepository.findByDemandId(demandId).stream()
+                .map(DemandMapper::toResponseDto)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<DemandResponseDto> listMyResponses(CurrentUser user) {
+        requireProvider(user);
+        return responseRepository.findByProviderIdOrderByResponseTimeDesc(user.getUserId()).stream()
                 .map(DemandMapper::toResponseDto)
                 .collect(Collectors.toList());
     }
@@ -237,17 +239,38 @@ public class DemandService {
         return new AcceptDemandResponseResult(snapshot, conversation.getConversationId());
     }
 
+    @Transactional
+    public DemandResponseDto rejectResponse(Long demandId, Long responseId, CurrentUser user) {
+        requireCustomer(user);
+        Demand demand = findOwnedDemand(demandId, user);
+        DemandResponse response = findResponse(responseId);
+        if (!response.getDemandId().equals(demandId)) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "response does not belong to this demand");
+        }
+        if (demand.getStatus() != DemandStatus.OPEN) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "only open demands can reject responses");
+        }
+        if (response.getStatus() == DemandResponseStatus.ACCEPTED) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "accepted response cannot be rejected");
+        }
+        if (response.getStatus() != DemandResponseStatus.PENDING_CUSTOMER_ACCEPT) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "only pending responses can be rejected");
+        }
+        response.reject(null);
+        return DemandMapper.toResponseDto(responseRepository.save(response));
+    }
+
     @Transactional(readOnly = true)
     public AcceptedDemandResponseSnapshot getAcceptedSnapshot(Long responseId, CurrentUser user) {
         DemandResponse response = findResponse(responseId);
         Demand demand = findDemand(response.getDemandId());
         if (!response.getStatus().equals(DemandResponseStatus.ACCEPTED)) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "响应尚未被接受，不能交给 C 创建会话");
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "鍝嶅簲灏氭湭琚帴鍙楋紝涓嶈兘浜ょ粰 C 鍒涘缓浼氳瘽");
         }
         if (!user.isAdmin()
                 && !demand.getCustomerId().equals(user.getUserId())
                 && !response.getProviderId().equals(user.getUserId())) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "无权限查看已接受响应快照");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "鏃犳潈闄愭煡鐪嬪凡鎺ュ彈鍝嶅簲蹇収");
         }
         return buildSnapshot(demand, response);
     }
@@ -256,35 +279,23 @@ public class DemandService {
         requireCustomer(user);
         Demand demand = findDemand(demandId);
         if (!demand.getCustomerId().equals(user.getUserId())) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "只有需求发布者可以接受响应");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "only demand owner can accept responses");
         }
         DemandResponse response = findResponse(responseId);
         if (!response.getDemandId().equals(demandId)) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "响应不属于该需求");
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "response does not belong to this demand");
         }
         if (response.getStatus() == DemandResponseStatus.ACCEPTED) {
-            return buildSnapshot(demand, response);
-        }
-        if (demand.getStatus() == DemandStatus.MATCHED) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "该需求已经接受过其他响应");
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "only pending responses can be accepted");
         }
         if (demand.getStatus() != DemandStatus.OPEN) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "只有开放中的需求可以接受响应");
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "only open demands can accept responses");
         }
         if (response.getStatus() != DemandResponseStatus.PENDING_CUSTOMER_ACCEPT) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "只有待需求方接受的响应可以被接受");
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "鍙湁寰呴渶姹傛柟鎺ュ彈鐨勫搷搴斿彲浠ヨ鎺ュ彈");
         }
         response.accept();
         responseRepository.save(response);
-        responseRepository.findByDemandId(demandId).stream()
-                .filter(other -> !other.getId().equals(responseId))
-                .filter(other -> other.getStatus() == DemandResponseStatus.PENDING_CUSTOMER_ACCEPT)
-                .forEach(other -> {
-                    other.reject("需求方已选择其他服务方");
-                    responseRepository.save(other);
-                });
-        demand.markMatched();
-        demandRepository.save(demand);
         return buildSnapshot(demand, response);
     }
 
@@ -308,42 +319,42 @@ public class DemandService {
 
     private Demand findDemand(Long demandId) {
         if (demandId == null) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "demandId 不能为空");
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "demandId 涓嶈兘涓虹┖");
         }
         return demandRepository.findById(demandId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "需求不存在"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "闇€姹備笉瀛樺湪"));
     }
 
     private DemandResponse findResponse(Long responseId) {
         if (responseId == null) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "responseId 不能为空");
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "responseId 涓嶈兘涓虹┖");
         }
         return responseRepository.findById(responseId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "响应不存在"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "response not found"));
     }
 
     private void requireCustomer(CurrentUser user) {
         if (!user.isCustomer()) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "当前操作需要需求方身份");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "褰撳墠鎿嶄綔闇€瑕侀渶姹傛柟韬唤");
         }
     }
 
     private void requireProvider(CurrentUser user) {
         if (!user.isProvider()) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "当前操作需要服务方身份");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "褰撳墠鎿嶄綔闇€瑕佹湇鍔℃柟韬唤");
         }
     }
 
     private void validateDemandRequest(CreateDemandRequest request) {
         if (request == null) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "请求体不能为空");
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "request must not be null");
         }
-        requireText(request.getScene(), "拍摄场景不能为空");
-        requireText(request.getCityCode(), "城市不能为空");
-        requireText(request.getLocation(), "拍摄地点不能为空");
+        requireText(request.getScene(), "鎷嶆憚鍦烘櫙涓嶈兘涓虹┖");
+        requireText(request.getCityCode(), "鍩庡競涓嶈兘涓虹┖");
+        requireText(request.getLocation(), "鎷嶆憚鍦扮偣涓嶈兘涓虹┖");
         requireText(request.getTimeDescription(), "timeDescription must not be blank");
-        validateCent(request.getBudgetMinCent(), "最低预算不能为负数");
-        validateCent(request.getBudgetMaxCent(), "最高预算不能为负数");
+        validateCent(request.getBudgetMinCent(), "鏈€浣庨绠椾笉鑳戒负璐熸暟");
+        validateCent(request.getBudgetMaxCent(), "鏈€楂橀绠椾笉鑳戒负璐熸暟");
         validateBudgetRange(request.getBudgetMinCent(), request.getBudgetMaxCent());
         normalizeTimeTags(request.getTimeTags());
     }
@@ -395,10 +406,10 @@ public class DemandService {
 
     private void validateResponseRequest(CreateDemandResponseRequest request) {
         if (request == null) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "请求体不能为空");
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "request must not be null");
         }
-        requireText(request.getMessage(), "响应说明不能为空");
-        validateCent(request.getExpectedPriceCent(), "预期报价不能为负数");
+        requireText(request.getMessage(), "鍝嶅簲璇存槑涓嶈兘涓虹┖");
+        validateCent(request.getExpectedPriceCent(), "expectedPriceCent must not be negative");
     }
 
     private void validateCent(Integer value, String message) {
@@ -409,7 +420,7 @@ public class DemandService {
 
     private void validateBudgetRange(Integer minBudgetCent, Integer maxBudgetCent) {
         if (minBudgetCent != null && maxBudgetCent != null && maxBudgetCent < minBudgetCent) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "最高预算不能低于最低预算");
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "budgetMaxCent must not be below budgetMinCent");
         }
     }
 

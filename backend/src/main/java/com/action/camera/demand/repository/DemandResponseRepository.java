@@ -17,5 +17,12 @@ public interface DemandResponseRepository extends JpaRepository<DemandResponse, 
             """)
     List<DemandResponse> findByDemandId(@Param("demandId") Long demandId);
 
+    @Query("""
+            select r from DemandResponse r
+            where r.providerId = :providerId
+            order by r.responseTime desc, r.id desc
+            """)
+    List<DemandResponse> findByProviderIdOrderByResponseTimeDesc(@Param("providerId") Long providerId);
+
     Optional<DemandResponse> findByDemandIdAndProviderId(Long demandId, Long providerId);
 }

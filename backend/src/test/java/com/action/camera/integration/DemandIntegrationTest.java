@@ -30,9 +30,11 @@ class DemandIntegrationTest {
 
     @BeforeEach
     void seedDemoUsers() {
-        jdbc.execute("DELETE FROM users WHERE id IN (1001, 2001)");
+        jdbc.execute("DELETE FROM users WHERE id IN (1001, 1002, 2001)");
         jdbc.execute("INSERT INTO users (id, nickname, current_role, status, credit_score, created_at, updated_at) " +
                 "VALUES (1001, '需求方', 'CUSTOMER', 'ACTIVE', 80.00, NOW(), NOW())");
+        jdbc.execute("INSERT INTO users (id, nickname, current_role, status, credit_score, created_at, updated_at) " +
+                "VALUES (1002, 'other customer', 'CUSTOMER', 'ACTIVE', 80.00, NOW(), NOW())");
         jdbc.execute("INSERT INTO users (id, nickname, current_role, status, credit_score, created_at, updated_at) " +
                 "VALUES (2001, '服务方', 'PROVIDER', 'ACTIVE', 80.00, NOW(), NOW())");
     }
@@ -120,6 +122,34 @@ class DemandIntegrationTest {
         assertThat(((Number) data.get("demandId")).longValue()).isEqualTo(demandId);
         assertThat(data.get("timeDescription")).isEqualTo("Available in mid August afternoons");
         assertThat(data.get("timeTags")).isEqualTo(List.of("NEAR_7_DAYS"));
+    }
+
+    @Test
+    void getDemand_openDemand_noAuthSucceeds() {
+        String createBody = demandBody("PORTRAIT", "nanjing");
+        ResponseEntity<Map> createResp = rest.exchange("/demands", HttpMethod.POST, asCustomer(createBody), Map.class);
+        Long demandId = ((Number) ((Map<String, Object>) createResp.getBody().get("data")).get("demandId")).longValue();
+
+        ResponseEntity<Map> resp = rest.getForEntity("/demands/" + demandId, Map.class);
+
+        assertThat(resp.getBody().get("code")).isEqualTo(200);
+    }
+
+    @Test
+    void getDemand_closedDemand_noAuthDoesNotUseDefaultCustomerAsOwner() {
+        String createBody = demandBody("PORTRAIT", "nanjing");
+        ResponseEntity<Map> createResp = rest.exchange("/demands", HttpMethod.POST, asCustomer(createBody), Map.class);
+        Long demandId = ((Number) ((Map<String, Object>) createResp.getBody().get("data")).get("demandId")).longValue();
+        rest.exchange("/demands/" + demandId + "/close", HttpMethod.PATCH, asCustomer(null), Map.class);
+
+        ResponseEntity<Map> anonymous = rest.getForEntity("/demands/" + demandId, Map.class);
+        ResponseEntity<Map> owner = rest.exchange("/demands/" + demandId, HttpMethod.GET, asCustomer(null), Map.class);
+        ResponseEntity<Map> stranger = rest.exchange("/demands/" + demandId, HttpMethod.GET,
+                userEntity("1002", "CUSTOMER", null), Map.class);
+
+        assertThat(anonymous.getBody().get("code")).isEqualTo(40301);
+        assertThat(owner.getBody().get("code")).isEqualTo(200);
+        assertThat(stranger.getBody().get("code")).isEqualTo(40301);
     }
 
     @Test
