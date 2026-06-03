@@ -14,15 +14,12 @@ import com.action.camera.order.entity.OrderStatusLog;
 import com.action.camera.order.entity.PaymentRecord;
 import com.action.camera.order.enums.EscrowStatus;
 import com.action.camera.order.enums.OrderStatus;
-import com.action.camera.order.event.OrderCancelledEvent;
-import com.action.camera.order.event.OrderPaidEvent;
 import com.action.camera.order.repository.OrderRepository;
 import com.action.camera.order.repository.OrderStatusLogRepository;
 import com.action.camera.order.repository.PaymentRecordRepository;
 import com.action.camera.order.statemachine.OrderStatusMachine;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +44,6 @@ public class OrderService {
     private static final String REFUND_NONE = "NONE";
     private static final String REFUND_SUCCESS = "REFUNDED";
     private static final String SOURCE_TYPE_SERVICE_PACKAGE = "SERVICE_PACKAGE";
-    private static final long SYSTEM_OPERATOR_ID = 0L;
     private static final String SYSTEM_OPERATOR_ROLE = "SYSTEM";
     private static final String AUTO_CONFIRM_REASON = "交付后 7 天未操作，系统自动确认完成";
     private static final String AUTO_SHOOTING_START_REASON = "系统根据拍摄开始时间自动进入拍摄中";
@@ -58,9 +54,6 @@ public class OrderService {
     private final PaymentRecordRepository paymentRecordRepository;
     private final OrderStatusLogRepository orderStatusLogRepository;
     private final DeliveryRepository deliveryRepository;
-
-    @Autowired(required = false)
-    private ApplicationEventPublisher eventPublisher;
 
     @Autowired(required = false)
     private NotificationService notificationService;
@@ -101,7 +94,6 @@ public class OrderService {
         paymentRecordRepository.save(paymentRecord);
 
         Order paidOrder = applyStatusChange(order, fromStatus, targetStatus, payerId, "CUSTOMER", "模拟支付成功，资金进入平台托管");
-        publishEvent(new OrderPaidEvent(paidOrder));
         notifyOrderPaid(paidOrder);
         return paidOrder;
     }
@@ -119,7 +111,6 @@ public class OrderService {
         Order changedOrder = applyStatusChange(order, fromStatus, targetStatus, operatorId,
                 resolveOperatorRole(order, operatorId), reason);
         if (targetStatus == OrderStatus.CANCELLED) {
-            publishEvent(new OrderCancelledEvent(changedOrder));
             notifyOrderCancelled(changedOrder);
         } else if (targetStatus == OrderStatus.COMPLETED) {
             notifyOrderCompleted(changedOrder);
@@ -207,7 +198,7 @@ public class OrderService {
                     order,
                     OrderStatus.DELIVERED_PENDING_CONFIRM,
                     OrderStatus.COMPLETED,
-                    SYSTEM_OPERATOR_ID,
+                    null,
                     SYSTEM_OPERATOR_ROLE,
                     AUTO_CONFIRM_REASON
             );
@@ -238,7 +229,7 @@ public class OrderService {
                     order,
                     OrderStatus.PAID_PENDING_SHOOT,
                     OrderStatus.SHOOTING,
-                    SYSTEM_OPERATOR_ID,
+                    null,
                     SYSTEM_OPERATOR_ROLE,
                     AUTO_SHOOTING_START_REASON
             );
@@ -249,7 +240,7 @@ public class OrderService {
                         shootingOrder,
                         OrderStatus.SHOOTING,
                         OrderStatus.PENDING_DELIVERY,
-                        SYSTEM_OPERATOR_ID,
+                        null,
                         SYSTEM_OPERATOR_ROLE,
                         AUTO_SHOOTING_END_REASON
                 );
@@ -272,7 +263,7 @@ public class OrderService {
                     order,
                     OrderStatus.SHOOTING,
                     OrderStatus.PENDING_DELIVERY,
-                    SYSTEM_OPERATOR_ID,
+                    null,
                     SYSTEM_OPERATOR_ROLE,
                     AUTO_SHOOTING_END_REASON
             );
@@ -307,7 +298,7 @@ public class OrderService {
                     order,
                     OrderStatus.PENDING_DELIVERY,
                     OrderStatus.REFUNDED,
-                    SYSTEM_OPERATOR_ID,
+                    null,
                     SYSTEM_OPERATOR_ROLE,
                     AUTO_REFUND_UNDELIVERED_REASON
             );
@@ -576,12 +567,6 @@ public class OrderService {
             return "";
         }
         return value.replace("\\", "\\\\").replace("\"", "\\\"");
-    }
-
-    private void publishEvent(Object event) {
-        if (eventPublisher != null) {
-            eventPublisher.publishEvent(event);
-        }
     }
 
     private void notifyOrderPaid(Order order) {

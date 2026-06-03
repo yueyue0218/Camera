@@ -108,6 +108,27 @@ class ReviewComplaintServiceTest {
     }
 
     @Test
+    void complaintPartiesCanViewDetailButOutsiderCannot() {
+        ReviewResponse review = createCustomerReview(5);
+        UserContext.setUserId(PROVIDER_ID);
+        ReviewComplaintResponse complaint = complaintService.create(
+                review.reviewId(),
+                new ReviewComplaintCreateRequest("not true", null)
+        );
+
+        UserContext.setUserId(CUSTOMER_ID);
+        assertThat(complaintService.detail(complaint.complaintId()))
+                .extracting("complaintId", "reviewId", "status")
+                .containsExactly(complaint.complaintId(), review.reviewId(), "PENDING");
+
+        UserContext.setUserId(OUTSIDER_ID);
+        assertThatThrownBy(() -> complaintService.detail(complaint.complaintId()))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.FORBIDDEN);
+    }
+
+    @Test
     void adminCanHideReviewAndReverseCreditByArbitration() {
         ReviewResponse review = createCustomerReview(5);
         UserContext.setUserId(PROVIDER_ID);
