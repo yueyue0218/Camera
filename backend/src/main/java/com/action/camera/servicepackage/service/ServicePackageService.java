@@ -475,8 +475,8 @@ public class ServicePackageService {
             return Comparator.comparing(ServicePackage::getCreatedAt,
                     Comparator.nullsLast(Comparator.naturalOrder()));
         }
-        return Comparator.comparing(ServicePackage::getCreatedAt,
-                Comparator.nullsLast(Comparator.naturalOrder())).reversed();
+        return Comparator.comparing(ServicePackage::getUpdatedAt,
+                Comparator.nullsFirst(Comparator.naturalOrder())).reversed();
     }
 
     private List<String> normalizeTags(List<String> tags) {

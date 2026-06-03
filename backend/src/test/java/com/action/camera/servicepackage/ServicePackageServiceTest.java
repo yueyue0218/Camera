@@ -140,6 +140,31 @@ class ServicePackageServiceTest {
     }
 
     @Test
+    void hallReturnsCardTimestampsAndSortsByUpdatedAtDescendingByDefault() {
+        ServicePackage olderUpdate = servicePackage(1L, ServicePackageStatus.ONLINE, true);
+        olderUpdate.setCreatedAt(LocalDateTime.of(2026, 6, 3, 12, 0));
+        olderUpdate.setUpdatedAt(LocalDateTime.of(2026, 6, 3, 12, 5));
+        ServicePackage newerUpdate = servicePackage(2L, ServicePackageStatus.ONLINE, true);
+        newerUpdate.setCreatedAt(LocalDateTime.of(2026, 6, 1, 12, 0));
+        newerUpdate.setUpdatedAt(LocalDateTime.of(2026, 6, 3, 12, 10));
+        when(servicePackageRepository.findByStatus(ServicePackageStatus.ONLINE))
+                .thenReturn(List.of(olderUpdate, newerUpdate));
+        when(userRepository.findById(PROVIDER_ID)).thenReturn(Optional.of(providerUser()));
+
+        PageResult<ServicePackageCardDto> page =
+                servicePackageService.listServices(1, 10, null, null, null, null, null, null, null);
+
+        assertThat(page.getRecords()).extracting(ServicePackageCardDto::getServiceId)
+                .containsExactly(2L, 1L);
+        assertThat(page.getRecords().get(0).getCreatedAt()).isEqualTo(newerUpdate.getCreatedAt());
+        assertThat(page.getRecords().get(0).getUpdatedAt()).isEqualTo(newerUpdate.getUpdatedAt());
+        assertThat(page.getRecords()).allSatisfy(card -> {
+            assertThat(card.getCreatedAt()).isNotNull();
+            assertThat(card.getUpdatedAt()).isNotNull();
+        });
+    }
+
+    @Test
     void photographerUpdatesAndOfflinesOwnPackage() {
         ServicePackage servicePackage = servicePackage(SERVICE_ID, ServicePackageStatus.ONLINE, true);
         when(servicePackageRepository.findByIdAndProviderId(SERVICE_ID, PROVIDER_ID))

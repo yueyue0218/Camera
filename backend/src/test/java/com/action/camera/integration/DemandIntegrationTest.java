@@ -40,14 +40,11 @@ class DemandIntegrationTest {
     // ───────────── Demand tests ─────────────
 
     @Test
-    void createDemand_noAuthHeader_usesDefaultCustomer() {
+    void createDemand_noAuthHeader_returnsUnauthorized() {
         String body = demandBody("PORTRAIT", "nanjing");
         ResponseEntity<Map> resp = rest.exchange("/demands", HttpMethod.POST, jsonEntity(body), Map.class);
 
-        assertThat(resp.getBody().get("code")).isEqualTo(200);
-        Map<String, Object> data = (Map<String, Object>) resp.getBody().get("data");
-        assertThat(data.get("demandId")).isNotNull();
-        assertThat(data.get("status")).isEqualTo("OPEN");
+        assertThat(resp.getBody().get("code")).isEqualTo(40101);
     }
 
     @Test
@@ -88,6 +85,26 @@ class DemandIntegrationTest {
         List<Map<String, Object>> records = (List<Map<String, Object>>) data.get("records");
         assertThat(records).isNotEmpty();
         assertThat(records.get(0).get("scene")).isEqualTo("GRADUATION");
+        assertThat(records.get(0).get("createdAt")).isNotNull();
+        assertThat(records.get(0).get("updatedAt")).isNotNull();
+    }
+
+    @Test
+    void listDemands_withTimeTag_returnsOnlyTaggedDemands() {
+        rest.exchange("/demands", HttpMethod.POST, asCustomer(demandBodyWithScene("GRADUATION", "beijing")), Map.class);
+        String untaggedBody = "{\"scene\":\"PORTRAIT\",\"styleTags\":[\"natural\"],"
+                + "\"expectedDate\":\"2026-08-15\",\"timeSlot\":\"AFTERNOON\","
+                + "\"timeDescription\":\"Flexible summer afternoons\",\"timeTags\":[],"
+                + "\"cityCode\":\"beijing\",\"location\":\"PKU\","
+                + "\"budgetMinCent\":30000,\"budgetMaxCent\":80000,\"description\":\"integration demand\"}";
+        rest.exchange("/demands", HttpMethod.POST, asCustomer(untaggedBody), Map.class);
+
+        ResponseEntity<Map> ordinary = rest.getForEntity("/demands", Map.class);
+        ResponseEntity<Map> filtered = rest.getForEntity("/demands?timeTag=NEAR_7_DAYS", Map.class);
+
+        assertThat(records(ordinary)).hasSizeGreaterThanOrEqualTo(2);
+        assertThat(records(filtered)).allSatisfy(record ->
+                assertThat((List<String>) record.get("timeTags")).contains("NEAR_7_DAYS"));
     }
 
     @Test
@@ -101,6 +118,8 @@ class DemandIntegrationTest {
         assertThat(resp.getBody().get("code")).isEqualTo(200);
         Map<String, Object> data = (Map<String, Object>) resp.getBody().get("data");
         assertThat(((Number) data.get("demandId")).longValue()).isEqualTo(demandId);
+        assertThat(data.get("timeDescription")).isEqualTo("Available in mid August afternoons");
+        assertThat(data.get("timeTags")).isEqualTo(List.of("NEAR_7_DAYS"));
     }
 
     @Test
@@ -165,6 +184,7 @@ class DemandIntegrationTest {
     private String demandBody(String scene, String cityCode) {
         return "{\"scene\":\"" + scene + "\",\"styleTags\":[\"natural\"]," +
                 "\"expectedDate\":\"2026-08-15\",\"timeSlot\":\"AFTERNOON\"," +
+                "\"timeDescription\":\"Available in mid August afternoons\",\"timeTags\":[\"NEAR_7_DAYS\"]," +
                 "\"cityCode\":\"" + cityCode + "\",\"location\":\"南京大学\"," +
                 "\"budgetMinCent\":30000,\"budgetMaxCent\":80000,\"description\":\"集成测试需求\"}";
     }
@@ -172,8 +192,15 @@ class DemandIntegrationTest {
     private String demandBodyWithScene(String scene, String cityCode) {
         return "{\"scene\":\"" + scene + "\",\"styleTags\":[\"natural\"]," +
                 "\"expectedDate\":\"2026-08-15\",\"timeSlot\":\"AFTERNOON\"," +
+                "\"timeDescription\":\"Available in mid August afternoons\",\"timeTags\":[\"NEAR_7_DAYS\"]," +
                 "\"cityCode\":\"" + cityCode + "\",\"location\":\"北京大学\"," +
                 "\"budgetMinCent\":30000,\"budgetMaxCent\":80000,\"description\":\"集成测试需求\"}";
+    }
+
+    private List<Map<String, Object>> records(ResponseEntity<Map> response) {
+        assertThat(response.getBody().get("code")).isEqualTo(200);
+        Map<String, Object> data = (Map<String, Object>) response.getBody().get("data");
+        return (List<Map<String, Object>>) data.get("records");
     }
 
     private HttpEntity<String> asCustomer(String body) {

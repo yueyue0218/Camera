@@ -83,6 +83,16 @@ class ServicePackageShowcaseContractTest {
         assertThat(card.get("priceRange")).isEqualTo("399-599");
         assertThat(card.get("timeDescription")).isEqualTo("七月上旬周末可约");
         assertThat(card.get("timeTags")).isEqualTo(List.of("NEAR_7_DAYS"));
+        assertThat(card.get("createdAt")).isNotNull();
+        assertThat(card.get("updatedAt")).isNotNull();
+
+        ResponseEntity<Map> legacyHallResponse = rest.getForEntity("/services?timeTag=NEAR_7_DAYS", Map.class);
+        Map<String, Object> legacyCard = serviceCards(legacyHallResponse).stream()
+                .filter(item -> numberValue(item, "serviceId").equals(serviceId))
+                .findFirst()
+                .orElseThrow();
+        assertThat(legacyCard.get("createdAt")).isNotNull();
+        assertThat(legacyCard.get("updatedAt")).isNotNull();
 
         ResponseEntity<Map> excludedResponse = rest.getForEntity("/service-packages?timeTag=NEAR_3_DAYS", Map.class);
         assertThat(serviceIds(excludedResponse)).doesNotContain(serviceId);
@@ -173,8 +183,12 @@ class ServicePackageShowcaseContractTest {
     }
 
     @Test
-    void photographerCanEditAndOfflineOwnPackageWithoutOrderOrPayment() {
+    void photographerCanEditAndOfflineOwnPackageWithoutOrderOrPayment() throws InterruptedException {
         Long serviceId = createServicePackage();
+        ServicePackage beforeUpdate = servicePackageRepository.findById(serviceId).orElseThrow();
+        assertThat(beforeUpdate.getCreatedAt()).isNotNull();
+        assertThat(beforeUpdate.getUpdatedAt()).isNotNull();
+        Thread.sleep(25);
 
         ResponseEntity<Map> updateResponse = rest.exchange(
                 "/service-packages/" + serviceId,
@@ -192,6 +206,8 @@ class ServicePackageShowcaseContractTest {
         assertThat(updated.getTitle()).isEqualTo("Updated portrait window");
         assertThat(updated.getTimeDescription()).isEqualTo("近三天可约");
         assertThat(updated.getTimeTags()).containsExactly("NEAR_3_DAYS");
+        assertThat(updated.getCreatedAt()).isEqualTo(beforeUpdate.getCreatedAt());
+        assertThat(updated.getUpdatedAt()).isAfter(beforeUpdate.getUpdatedAt());
 
         ResponseEntity<Map> offlineResponse = rest.exchange(
                 "/service-packages/" + serviceId + "/offline",

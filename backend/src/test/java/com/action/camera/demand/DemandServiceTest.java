@@ -143,6 +143,32 @@ class DemandServiceTest {
     }
 
     @Test
+    void createDemandStoresAndReturnsTimeFields() {
+        CreateDemandRequest request = demandRequest("GRADUATION", "NJU");
+        request.setTimeDescription("July weekends are available");
+        request.setTimeTags(List.of("near_7_days", "NEAR_1_MONTH"));
+
+        DemandDto demand = demandService.createDemand(customer, request);
+
+        assertThat(demand.getTimeDescription()).isEqualTo("July weekends are available");
+        assertThat(demand.getTimeTags()).containsExactly("NEAR_7_DAYS", "NEAR_1_MONTH");
+        assertThat(demandRepository.findById(demand.getDemandId()).orElseThrow().getTimeDescription())
+                .isEqualTo("July weekends are available");
+        assertThat(demandRepository.findById(demand.getDemandId()).orElseThrow().getTimeTags())
+                .containsExactly("NEAR_7_DAYS", "NEAR_1_MONTH");
+    }
+
+    @Test
+    void createDemandRejectsMissingTimeDescription() {
+        CreateDemandRequest request = demandRequest("GRADUATION", "NJU");
+        request.setTimeDescription(" ");
+
+        assertThatThrownBy(() -> demandService.createDemand(customer, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("timeDescription");
+    }
+
+    @Test
     void createDemandUsesCustomerIdFromCurrentUser() {
         DemandDto demand = demandService.createDemand(otherCustomer, demandRequest("PORTRAIT", "NJU"));
 
@@ -317,6 +343,52 @@ class DemandServiceTest {
     }
 
     @Test
+    void listDemandsFiltersByTimeTagButOrdinaryListKeepsUntaggedDemand() {
+        CreateDemandRequest taggedRequest = demandRequest("PORTRAIT", "NJU");
+        taggedRequest.setTimeTags(List.of("NEAR_3_DAYS"));
+        DemandDto tagged = demandService.createDemand(customer, taggedRequest);
+
+        CreateDemandRequest untaggedRequest = demandRequest("TRAVEL", "NJU");
+        untaggedRequest.setTimeTags(List.of());
+        DemandDto untagged = demandService.createDemand(customer, untaggedRequest);
+
+        PageResult<DemandDto> ordinary =
+                demandService.listDemands(1, 10, null, null, null);
+        PageResult<DemandDto> filtered =
+                demandService.listDemands(1, 10, null, null, null, null,
+                        null, null, null, "near_3_days");
+
+        assertThat(ordinary.getRecords()).extracting(DemandDto::getDemandId)
+                .contains(tagged.getDemandId(), untagged.getDemandId());
+        assertThat(filtered.getRecords()).extracting(DemandDto::getDemandId)
+                .containsExactly(tagged.getDemandId());
+    }
+
+    @Test
+    void listDemandsReturnsTimestampsAndSortsByUpdatedAtDescending() throws InterruptedException {
+        DemandDto first = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        Thread.sleep(25);
+        DemandDto second = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
+        Thread.sleep(25);
+
+        CreateDemandRequest update = new CreateDemandRequest();
+        update.setTimeDescription("Updated availability for this week");
+        demandService.updateDemand(first.getDemandId(), customer, update);
+
+        DemandDto refreshedFirst = demandService.getDemand(first.getDemandId(), customer);
+        PageResult<DemandDto> page = demandService.listDemands(1, 10, null, null, null);
+
+        assertThat(refreshedFirst.getCreatedAt()).isNotNull();
+        assertThat(refreshedFirst.getUpdatedAt()).isAfter(first.getUpdatedAt());
+        assertThat(page.getRecords()).extracting(DemandDto::getDemandId)
+                .containsExactly(first.getDemandId(), second.getDemandId());
+        assertThat(page.getRecords()).allSatisfy(record -> {
+            assertThat(record.getCreatedAt()).isNotNull();
+            assertThat(record.getUpdatedAt()).isNotNull();
+        });
+    }
+
+    @Test
     void listDemandsPaginatesFirstPage() {
         createManyDemands(5);
 
@@ -449,6 +521,52 @@ class DemandServiceTest {
         assertThatThrownBy(() -> demandService.getDemand(404L, customer))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("需求不存在");
+    }
+
+    @Test
+    void ownerCanUpdateDemandTimeFields() {
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        CreateDemandRequest update = new CreateDemandRequest();
+        update.setTimeDescription("Only mornings this week");
+        update.setTimeTags(List.of("near_3_days", "NEAR_7_DAYS"));
+
+        DemandDto updated = demandService.updateDemand(demand.getDemandId(), customer, update);
+
+        assertThat(updated.getTimeDescription()).isEqualTo("Only mornings this week");
+        assertThat(updated.getTimeTags()).containsExactly("NEAR_3_DAYS", "NEAR_7_DAYS");
+        assertThat(demandRepository.findById(demand.getDemandId()).orElseThrow().getTimeDescription())
+                .isEqualTo("Only mornings this week");
+    }
+
+    @Test
+    void nonOwnerCannotUpdateDemand() {
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        CreateDemandRequest update = new CreateDemandRequest();
+        update.setTimeDescription("Other person edit");
+
+        assertThatThrownBy(() -> demandService.updateDemand(demand.getDemandId(), otherCustomer, update))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("only the demand owner");
+    }
+
+    @Test
+    void ownerCanCloseOpenDemand() {
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+
+        DemandDto closed = demandService.closeDemand(demand.getDemandId(), customer);
+
+        assertThat(closed.getStatus()).isEqualTo(DemandStatus.CLOSED.name());
+        assertThat(demandRepository.findById(demand.getDemandId()).orElseThrow().getStatus())
+                .isEqualTo(DemandStatus.CLOSED);
+    }
+
+    @Test
+    void nonOwnerCannotCloseDemand() {
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+
+        assertThatThrownBy(() -> demandService.closeDemand(demand.getDemandId(), otherCustomer))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("only the demand owner");
     }
 
     @Test
@@ -799,6 +917,8 @@ class DemandServiceTest {
         request.setLocation("南京大学鼓楼校区");
         request.setExpectedDate(LocalDate.now().plusDays(7));
         request.setTimeSlot("14:00-16:00");
+        request.setTimeDescription("Next week afternoons are available");
+        request.setTimeTags(List.of("NEAR_7_DAYS"));
         request.setBudgetMinCent(19900);
         request.setBudgetMaxCent(39900);
         request.setStyleTags(List.of("自然抓拍", "校园"));

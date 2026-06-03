@@ -51,7 +51,9 @@ public final class ServicePackageMapper {
                 servicePackage.getIsAvailable(),
                 servicePackage.getAvailableDates(),
                 servicePackage.getTimeDescription(),
-                servicePackage.getTimeTags()
+                servicePackage.getTimeTags(),
+                servicePackage.getCreatedAt(),
+                servicePackage.getUpdatedAt()
         );
     }
 

@@ -28,6 +28,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,6 +36,11 @@ public class DemandService {
 
     private static final int DEFAULT_EXPIRE_DAYS = 30;
     private static final String DEFAULT_ACCEPT_INITIAL_MESSAGE = "Demand response accepted; conversation opened.";
+    private static final Set<String> SUPPORTED_TIME_TAGS = Set.of(
+            "NEAR_3_DAYS",
+            "NEAR_7_DAYS",
+            "NEAR_1_MONTH"
+    );
 
     private final DemandRepository demandRepository;
     private final DemandResponseRepository responseRepository;
@@ -59,6 +65,8 @@ public class DemandService {
                 normalizeTags(request.getStyleTags()),
                 request.getExpectedDate(),
                 trim(request.getTimeSlot()),
+                trim(request.getTimeDescription()),
+                normalizeTimeTags(request.getTimeTags()),
                 trim(request.getCityCode()),
                 trim(request.getLocation()),
                 request.getBudgetMinCent(),
@@ -87,22 +95,66 @@ public class DemandService {
                                              String styleTag,
                                              Integer minBudgetCent,
                                              Integer maxBudgetCent) {
+        return listDemands(page, size, cityCode, scene, status, expectedDate, styleTag,
+                minBudgetCent, maxBudgetCent, null);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<DemandDto> listDemands(int page,
+                                             int size,
+                                             String cityCode,
+                                             String scene,
+                                             String status,
+                                             LocalDate expectedDate,
+                                             String styleTag,
+                                             Integer minBudgetCent,
+                                             Integer maxBudgetCent,
+                                             String timeTag) {
         int safePage = Math.max(page, 1);
         int safeSize = Math.max(1, Math.min(size, 50));
         String normalizedTag = isBlank(styleTag) ? null : styleTag.trim().toLowerCase(Locale.ROOT);
+        String normalizedTimeTag = normalizeTimeTagFilter(timeTag);
         List<DemandDto> filtered = demandRepository.findAll().stream()
                 .filter(demand -> isBlank(cityCode) || demand.getCityCode().equalsIgnoreCase(cityCode.trim()))
                 .filter(demand -> isBlank(scene) || demand.getScene().equalsIgnoreCase(scene.trim()))
                 .filter(demand -> isBlank(status) || demand.getStatus().name().equalsIgnoreCase(status.trim()))
                 .filter(demand -> expectedDate == null || expectedDate.equals(demand.getExpectedDate()))
                 .filter(demand -> normalizedTag == null || demand.getStyleTags().contains(normalizedTag))
+                .filter(demand -> normalizedTimeTag == null || demand.getTimeTags().contains(normalizedTimeTag))
                 .filter(demand -> matchesBudget(demand, minBudgetCent, maxBudgetCent))
-                .sorted(Comparator.comparing(Demand::getCreatedAt).reversed())
+                .sorted(Comparator.comparing(Demand::getUpdatedAt,
+                        Comparator.nullsFirst(Comparator.naturalOrder())).reversed())
                 .map(DemandMapper::toDemandDto)
                 .collect(Collectors.toList());
         int fromIndex = Math.min((safePage - 1) * safeSize, filtered.size());
         int toIndex = Math.min(fromIndex + safeSize, filtered.size());
         return new PageResult<>(filtered.subList(fromIndex, toIndex), safePage, safeSize, filtered.size());
+    }
+
+    @Transactional
+    public DemandDto updateDemand(Long demandId, CurrentUser user, CreateDemandRequest request) {
+        requireCustomer(user);
+        if (request == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "request must not be null");
+        }
+        Demand demand = findOwnedDemand(demandId, user);
+        if (demand.getStatus() != DemandStatus.OPEN) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "only open demands can be updated");
+        }
+        applyUpdate(demand, request);
+        validateBudgetRange(demand.getBudgetMinCent(), demand.getBudgetMaxCent());
+        return DemandMapper.toDemandDto(demandRepository.save(demand));
+    }
+
+    @Transactional
+    public DemandDto closeDemand(Long demandId, CurrentUser user) {
+        requireCustomer(user);
+        Demand demand = findOwnedDemand(demandId, user);
+        if (demand.getStatus() == DemandStatus.MATCHED) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "transaction in progress, demand cannot be closed");
+        }
+        demand.close();
+        return DemandMapper.toDemandDto(demandRepository.save(demand));
     }
 
     @Transactional
@@ -246,6 +298,14 @@ public class DemandService {
         );
     }
 
+    private Demand findOwnedDemand(Long demandId, CurrentUser user) {
+        Demand demand = findDemand(demandId);
+        if (!demand.getCustomerId().equals(user.getUserId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "only the demand owner can operate this demand");
+        }
+        return demand;
+    }
+
     private Demand findDemand(Long demandId) {
         if (demandId == null) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "demandId 不能为空");
@@ -281,11 +341,55 @@ public class DemandService {
         requireText(request.getScene(), "拍摄场景不能为空");
         requireText(request.getCityCode(), "城市不能为空");
         requireText(request.getLocation(), "拍摄地点不能为空");
+        requireText(request.getTimeDescription(), "timeDescription must not be blank");
         validateCent(request.getBudgetMinCent(), "最低预算不能为负数");
         validateCent(request.getBudgetMaxCent(), "最高预算不能为负数");
-        if (request.getBudgetMinCent() != null && request.getBudgetMaxCent() != null
-                && request.getBudgetMaxCent() < request.getBudgetMinCent()) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "最高预算不能低于最低预算");
+        validateBudgetRange(request.getBudgetMinCent(), request.getBudgetMaxCent());
+        normalizeTimeTags(request.getTimeTags());
+    }
+
+    private void applyUpdate(Demand demand, CreateDemandRequest request) {
+        if (request.getScene() != null) {
+            requireText(request.getScene(), "scene must not be blank");
+            demand.setScene(trim(request.getScene()));
+        }
+        if (request.getStyleTags() != null) {
+            demand.setStyleTags(normalizeTags(request.getStyleTags()));
+        }
+        if (request.getExpectedDate() != null) {
+            demand.setExpectedDate(request.getExpectedDate());
+        }
+        if (request.getTimeSlot() != null) {
+            demand.setTimeSlot(trim(request.getTimeSlot()));
+        }
+        if (request.getTimeDescription() != null) {
+            requireText(request.getTimeDescription(), "timeDescription must not be blank");
+            demand.setTimeDescription(trim(request.getTimeDescription()));
+        }
+        if (request.getTimeTags() != null) {
+            demand.setTimeTags(normalizeTimeTags(request.getTimeTags()));
+        }
+        if (request.getCityCode() != null) {
+            requireText(request.getCityCode(), "cityCode must not be blank");
+            demand.setCityCode(trim(request.getCityCode()));
+        }
+        if (request.getLocation() != null) {
+            requireText(request.getLocation(), "location must not be blank");
+            demand.setLocation(trim(request.getLocation()));
+        }
+        if (request.getBudgetMinCent() != null) {
+            validateCent(request.getBudgetMinCent(), "budgetMinCent must not be negative");
+            demand.setBudgetMinCent(request.getBudgetMinCent());
+        }
+        if (request.getBudgetMaxCent() != null) {
+            validateCent(request.getBudgetMaxCent(), "budgetMaxCent must not be negative");
+            demand.setBudgetMaxCent(request.getBudgetMaxCent());
+        }
+        if (request.getDescription() != null) {
+            demand.setDescription(trim(request.getDescription()));
+        }
+        if (request.getReferenceFileIds() != null) {
+            demand.setReferenceFileIds(request.getReferenceFileIds());
         }
     }
 
@@ -300,6 +404,12 @@ public class DemandService {
     private void validateCent(Integer value, String message) {
         if (value != null && value < 0) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, message);
+        }
+    }
+
+    private void validateBudgetRange(Integer minBudgetCent, Integer maxBudgetCent) {
+        if (minBudgetCent != null && maxBudgetCent != null && maxBudgetCent < minBudgetCent) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "最高预算不能低于最低预算");
         }
     }
 
@@ -337,6 +447,36 @@ public class DemandService {
                 .map(tag -> tag.toLowerCase(Locale.ROOT))
                 .distinct()
                 .collect(Collectors.toList());
+    }
+
+    private List<String> normalizeTimeTags(List<String> tags) {
+        if (tags == null) {
+            return List.of();
+        }
+        List<String> normalized = tags.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(tag -> !tag.isBlank())
+                .map(tag -> tag.toUpperCase(Locale.ROOT))
+                .distinct()
+                .toList();
+        for (String tag : normalized) {
+            if (!SUPPORTED_TIME_TAGS.contains(tag)) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Unsupported timeTag: " + tag);
+            }
+        }
+        return normalized;
+    }
+
+    private String normalizeTimeTagFilter(String value) {
+        if (isBlank(value)) {
+            return null;
+        }
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        if (!SUPPORTED_TIME_TAGS.contains(normalized)) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Unsupported timeTag: " + value);
+        }
+        return normalized;
     }
 
     private String trim(String value) {
