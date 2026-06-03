@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS demands (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     expire_time DATETIME NULL,
+    hidden_by_customer BOOLEAN NOT NULL DEFAULT FALSE,
+    hidden_at DATETIME NULL,
     KEY idx_demands_hall (status, city_code, scene, expected_date),
     KEY idx_demands_budget_cent (budget_min_cent, budget_max_cent),
     KEY idx_demands_customer_status (customer_id, status, created_at)
@@ -275,6 +277,8 @@ CALL b1b2_add_column_if_missing('demands', 'time_tags', 'time_tags TEXT NULL');
 CALL b1b2_add_column_if_missing('demands', 'budget_min_cent', 'budget_min_cent INT NULL');
 CALL b1b2_add_column_if_missing('demands', 'budget_max_cent', 'budget_max_cent INT NULL');
 CALL b1b2_add_column_if_missing('demands', 'reference_file_ids', 'reference_file_ids TEXT NULL');
+CALL b1b2_add_column_if_missing('demands', 'hidden_by_customer', 'hidden_by_customer BOOLEAN NULL');
+CALL b1b2_add_column_if_missing('demands', 'hidden_at', 'hidden_at DATETIME NULL');
 
 CALL b1b2_exec_if_columns_exist(
     'demands', 'budget_min_cent', 'budget_min', '',
@@ -299,11 +303,13 @@ SET time_description = COALESCE(NULLIF(time_description, ''), NULLIF(time_slot, 
 WHERE time_description IS NULL OR time_description = '';
 UPDATE demands SET time_tags = '[]' WHERE time_tags IS NULL;
 UPDATE demands SET reference_file_ids = '[]' WHERE reference_file_ids IS NULL;
+UPDATE demands SET hidden_by_customer = FALSE WHERE hidden_by_customer IS NULL;
 
 CALL b1b2_modify_column_if_exists('demands', 'style_tags', 'style_tags TEXT NOT NULL');
 CALL b1b2_modify_column_if_exists('demands', 'time_description', 'time_description TEXT NOT NULL');
 CALL b1b2_modify_column_if_exists('demands', 'time_tags', 'time_tags TEXT NOT NULL');
 CALL b1b2_modify_column_if_exists('demands', 'reference_file_ids', 'reference_file_ids TEXT NOT NULL');
+CALL b1b2_modify_column_if_exists('demands', 'hidden_by_customer', 'hidden_by_customer BOOLEAN NOT NULL DEFAULT FALSE');
 CALL b1b2_modify_column_if_exists('demands', 'scene', 'scene VARCHAR(80) NOT NULL');
 CALL b1b2_modify_column_if_exists('demands', 'city_code', 'city_code VARCHAR(40) NOT NULL');
 CALL b1b2_add_index_if_missing('demands', 'idx_demands_budget_cent', 'INDEX idx_demands_budget_cent (budget_min_cent, budget_max_cent)');

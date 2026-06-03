@@ -95,6 +95,12 @@ public class Demand {
     @Column(name = "expire_time")
     private LocalDateTime expireTime;
 
+    @Column(name = "hidden_by_customer", nullable = false)
+    private Boolean hiddenByCustomer = false;
+
+    @Column(name = "hidden_at")
+    private LocalDateTime hiddenAt;
+
     public Demand(Long customerId,
                   String scene,
                   List<String> styleTags,
@@ -147,6 +153,12 @@ public class Demand {
         touch();
     }
 
+    public void hideForCustomer() {
+        hiddenByCustomer = true;
+        hiddenAt = LocalDateTime.now();
+        touch();
+    }
+
     private void touch() {
         updatedAt = LocalDateTime.now();
     }
@@ -181,6 +193,9 @@ public class Demand {
         }
         if (referenceFileIds == null) {
             referenceFileIds = List.of();
+        }
+        if (hiddenByCustomer == null) {
+            hiddenByCustomer = false;
         }
     }
 }

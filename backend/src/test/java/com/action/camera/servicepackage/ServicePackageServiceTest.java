@@ -16,6 +16,7 @@ import com.action.camera.servicepackage.domain.ServicePackageStatus;
 import com.action.camera.servicepackage.dto.CreateServicePackageRequest;
 import com.action.camera.servicepackage.dto.CreateServicePackageResult;
 import com.action.camera.servicepackage.dto.ServicePackageCardDto;
+import com.action.camera.servicepackage.dto.ServicePackageDetailDto;
 import com.action.camera.servicepackage.dto.ServicePackageInterestDto;
 import com.action.camera.servicepackage.dto.StartServicePackageChatRequest;
 import com.action.camera.servicepackage.dto.StartServicePackageChatResult;
@@ -181,6 +182,22 @@ class ServicePackageServiceTest {
         assertThat(servicePackage.getTitle()).isEqualTo("Updated showcase");
         assertThat(servicePackage.getTimeTags()).containsExactly("NEAR_3_DAYS", "NEAR_1_MONTH");
         assertThat(servicePackage.getStatus()).isEqualTo(ServicePackageStatus.OFFLINE);
+    }
+
+    @Test
+    void offlinePackageDetailIsVisibleOnlyToOwner() {
+        ServicePackage servicePackage = servicePackage(SERVICE_ID, ServicePackageStatus.OFFLINE, false);
+        when(servicePackageRepository.findById(SERVICE_ID)).thenReturn(Optional.of(servicePackage));
+        when(userRepository.findById(PROVIDER_ID)).thenReturn(Optional.of(providerUser()));
+
+        ServicePackageDetailDto detail = servicePackageService.getServiceDetail(SERVICE_ID, provider());
+
+        assertThat(detail.getServiceId()).isEqualTo(SERVICE_ID);
+        assertThat(detail.getStatus()).isEqualTo(ServicePackageStatus.OFFLINE.name());
+        assertThatThrownBy(() -> servicePackageService.getServiceDetail(SERVICE_ID, customer()))
+                .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> servicePackageService.getServiceDetail(SERVICE_ID, null))
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test

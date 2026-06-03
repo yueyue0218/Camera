@@ -162,8 +162,14 @@ public class ServicePackageService {
 
     @Transactional(readOnly = true)
     public ServicePackageDetailDto getServiceDetail(Long serviceId) {
+        return getServiceDetail(serviceId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public ServicePackageDetailDto getServiceDetail(Long serviceId, CurrentUser currentUser) {
         ServicePackage servicePackage = getServicePackage(serviceId);
-        if (servicePackage.getStatus() == ServicePackageStatus.OFFLINE) {
+        if (servicePackage.getStatus() == ServicePackageStatus.OFFLINE
+                && !canViewOfflineServicePackage(servicePackage, currentUser)) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "Service package is offline");
         }
         return ServicePackageMapper.toDetail(servicePackage, photographerInfo(servicePackage.getProviderId()));
@@ -477,6 +483,12 @@ public class ServicePackageService {
         }
         return Comparator.comparing(ServicePackage::getUpdatedAt,
                 Comparator.nullsFirst(Comparator.naturalOrder())).reversed();
+    }
+
+    private boolean canViewOfflineServicePackage(ServicePackage servicePackage, CurrentUser currentUser) {
+        return currentUser != null
+                && currentUser.getUserId() != null
+                && (currentUser.isAdmin() || Objects.equals(servicePackage.getProviderId(), currentUser.getUserId()));
     }
 
     private List<String> normalizeTags(List<String> tags) {

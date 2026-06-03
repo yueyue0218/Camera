@@ -218,6 +218,28 @@ class ServicePackageShowcaseContractTest {
         assertThat(servicePackageRepository.findById(serviceId).orElseThrow().getStatus())
                 .isEqualTo(ServicePackageStatus.OFFLINE);
         assertThat(serviceIds(rest.getForEntity("/service-packages", Map.class))).doesNotContain(serviceId);
+
+        ResponseEntity<Map> anonymousDetail = rest.getForEntity("/service-packages/" + serviceId, Map.class);
+        ResponseEntity<Map> nonOwnerDetail = rest.exchange(
+                "/service-packages/" + serviceId,
+                HttpMethod.GET,
+                customerEntity(CUSTOMER_ID, null),
+                Map.class);
+        ResponseEntity<Map> ownerDetail = rest.exchange(
+                "/service-packages/" + serviceId,
+                HttpMethod.GET,
+                providerEntity(null),
+                Map.class);
+        ResponseEntity<Map> legacyOwnerDetail = rest.exchange(
+                "/services/" + serviceId,
+                HttpMethod.GET,
+                providerEntity(null),
+                Map.class);
+        assertThat(anonymousDetail.getBody().get("code")).isEqualTo(40401);
+        assertThat(nonOwnerDetail.getBody().get("code")).isEqualTo(40401);
+        assertThat(ownerDetail.getBody().get("code")).isEqualTo(200);
+        assertThat(data(ownerDetail).get("status")).isEqualTo(ServicePackageStatus.OFFLINE.name());
+        assertThat(legacyOwnerDetail.getBody().get("code")).isEqualTo(200);
     }
 
     private Long createServicePackage() {

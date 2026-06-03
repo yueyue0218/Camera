@@ -146,10 +146,13 @@ class DemandIntegrationTest {
         ResponseEntity<Map> owner = rest.exchange("/demands/" + demandId, HttpMethod.GET, asCustomer(null), Map.class);
         ResponseEntity<Map> stranger = rest.exchange("/demands/" + demandId, HttpMethod.GET,
                 userEntity("1002", "CUSTOMER", null), Map.class);
+        ResponseEntity<Map> publicList = rest.getForEntity("/demands", Map.class);
 
         assertThat(anonymous.getBody().get("code")).isEqualTo(40301);
         assertThat(owner.getBody().get("code")).isEqualTo(200);
         assertThat(stranger.getBody().get("code")).isEqualTo(40301);
+        assertThat(records(publicList)).extracting(record -> ((Number) record.get("demandId")).longValue())
+                .doesNotContain(demandId);
     }
 
     @Test
@@ -159,13 +162,18 @@ class DemandIntegrationTest {
     }
 
     @Test
-    void deleteDemand_byOwner_succeeds() {
+    void deleteDemand_byOwner_hidesWithoutPhysicalDelete() {
         String createBody = demandBody("PORTRAIT", "nanjing");
         ResponseEntity<Map> createResp = rest.exchange("/demands", HttpMethod.POST, asCustomer(createBody), Map.class);
         Long demandId = ((Number) ((Map<String, Object>) createResp.getBody().get("data")).get("demandId")).longValue();
 
         ResponseEntity<Map> resp = rest.exchange("/demands/" + demandId, HttpMethod.DELETE, asCustomer(null), Map.class);
+
         assertThat(resp.getBody().get("code")).isEqualTo(200);
+        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM demands WHERE id = ?", Integer.class, demandId);
+        Boolean hidden = jdbc.queryForObject("SELECT hidden_by_customer FROM demands WHERE id = ?", Boolean.class, demandId);
+        assertThat(count).isEqualTo(1);
+        assertThat(hidden).isTrue();
     }
 
     @Test

@@ -4,6 +4,7 @@ import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.page.PageResult;
 import com.action.camera.common.security.CurrentUser;
 import com.action.camera.common.security.UserRole;
+import com.action.camera.demand.domain.Demand;
 import com.action.camera.demand.domain.DemandResponseStatus;
 import com.action.camera.demand.domain.DemandStatus;
 import com.action.camera.demand.controller.DemandController;
@@ -301,14 +302,18 @@ class DemandServiceTest {
     }
 
     @Test
-    void listDemandsFiltersByClosedStatus() {
+    void listDemandsDoesNotExposeClosedStatusInPublicHall() {
         DemandDto closedDemand = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
         demandService.closeDemand(closedDemand.getDemandId(), customer);
-        demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto openDemand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
 
         PageResult<DemandDto> page = demandService.listDemands(1, 10, null, null, "CLOSED");
+        PageResult<DemandDto> ordinary = demandService.listDemands(1, 10, null, null, null);
 
-        assertThat(page.getRecords()).extracting(DemandDto::getDemandId).containsExactly(closedDemand.getDemandId());
+        assertThat(page.getRecords()).isEmpty();
+        assertThat(ordinary.getRecords()).extracting(DemandDto::getDemandId)
+                .contains(openDemand.getDemandId())
+                .doesNotContain(closedDemand.getDemandId());
     }
 
     @Test
@@ -556,13 +561,14 @@ class DemandServiceTest {
     }
 
     @Test
-    void deleteDemandAllowsOwnerWhenTransactionNotInProgress() {
+    void deleteDemandHidesOwnerHistoryWithoutPhysicalDelete() {
         DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
 
         demandService.deleteDemand(demand.getDemandId(), customer);
 
-        assertThatThrownBy(() -> demandService.getDemand(demand.getDemandId(), customer))
-                .isInstanceOf(BusinessException.class);
+        Demand saved = demandRepository.findById(demand.getDemandId()).orElseThrow();
+        assertThat(saved.getHiddenByCustomer()).isTrue();
+        assertThat(saved.getHiddenAt()).isNotNull();
     }
 
     @Test
@@ -574,13 +580,14 @@ class DemandServiceTest {
     }
 
     @Test
-    void deleteDemandAllowsAcceptedDemandBecauseDemandRemainsOpen() {
+    void deleteDemandDoesNotRemoveAcceptedDemandOrResponses() {
         DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
         acceptOneResponse(demand);
 
         demandService.deleteDemand(demand.getDemandId(), customer);
 
-        assertThat(demandRepository.findById(demand.getDemandId())).isEmpty();
+        assertThat(demandRepository.findById(demand.getDemandId())).isPresent();
+        assertThat(responseRepository.findByDemandId(demand.getDemandId())).isNotEmpty();
     }
 
     @Test

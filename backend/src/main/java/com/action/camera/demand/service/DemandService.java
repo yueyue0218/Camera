@@ -114,10 +114,14 @@ public class DemandService {
         int safeSize = Math.max(1, Math.min(size, 50));
         String normalizedTag = isBlank(styleTag) ? null : styleTag.trim().toLowerCase(Locale.ROOT);
         String normalizedTimeTag = normalizeTimeTagFilter(timeTag);
+        DemandStatus publicStatus = resolvePublicStatusFilter(status);
+        if (publicStatus == null) {
+            return new PageResult<>(List.of(), safePage, safeSize, 0);
+        }
         List<DemandDto> filtered = demandRepository.findAll().stream()
                 .filter(demand -> isBlank(cityCode) || demand.getCityCode().equalsIgnoreCase(cityCode.trim()))
                 .filter(demand -> isBlank(scene) || demand.getScene().equalsIgnoreCase(scene.trim()))
-                .filter(demand -> isBlank(status) || demand.getStatus().name().equalsIgnoreCase(status.trim()))
+                .filter(demand -> demand.getStatus() == publicStatus)
                 .filter(demand -> expectedDate == null || expectedDate.equals(demand.getExpectedDate()))
                 .filter(demand -> normalizedTag == null || demand.getStyleTags().contains(normalizedTag))
                 .filter(demand -> normalizedTimeTag == null || demand.getTimeTags().contains(normalizedTimeTag))
@@ -156,11 +160,10 @@ public class DemandService {
 
     @Transactional
     public void deleteDemand(Long demandId, CurrentUser user) {
-        Demand demand = findDemand(demandId);
-        if (!user.isAdmin() && !demand.getCustomerId().equals(user.getUserId())) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "only the demand owner can delete this demand");
-        }
-        demandRepository.deleteById(demandId);
+        requireCustomer(user);
+        Demand demand = findOwnedDemand(demandId, user);
+        demand.hideForCustomer();
+        demandRepository.save(demand);
     }
 
     @Transactional(readOnly = true)
@@ -488,6 +491,13 @@ public class DemandService {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Unsupported timeTag: " + value);
         }
         return normalized;
+    }
+
+    private DemandStatus resolvePublicStatusFilter(String status) {
+        if (isBlank(status) || DemandStatus.OPEN.name().equalsIgnoreCase(status.trim())) {
+            return DemandStatus.OPEN;
+        }
+        return null;
     }
 
     private String trim(String value) {

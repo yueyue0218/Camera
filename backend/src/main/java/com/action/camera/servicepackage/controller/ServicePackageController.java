@@ -77,8 +77,10 @@ public class ServicePackageController {
     }
 
     @GetMapping("/{serviceId}")
-    public Result<ServicePackageDetailDto> getServiceDetail(@PathVariable Long serviceId) {
-        return Result.success(servicePackageService.getServiceDetail(serviceId));
+    public Result<ServicePackageDetailDto> getServiceDetail(@PathVariable Long serviceId,
+                                                            HttpServletRequest httpRequest) {
+        CurrentUser currentUser = currentUserProvider.getCurrentUserIfPresent(httpRequest).orElse(null);
+        return Result.success(servicePackageService.getServiceDetail(serviceId, currentUser));
     }
 
     @PutMapping("/{serviceId}")
