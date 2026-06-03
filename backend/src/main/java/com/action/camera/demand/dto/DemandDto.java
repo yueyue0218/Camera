@@ -21,6 +21,9 @@ public class DemandDto {
     private final String description;
     private final String status;
     private final int responseCount;
+    private final Integer pendingCount;
+    private final Integer acceptedCount;
+    private final Integer rejectedCount;
     private final List<Long> referenceFileIds;
     private final LocalDateTime createdAt;
     private final LocalDateTime updatedAt;
@@ -43,6 +46,32 @@ public class DemandDto {
                      List<Long> referenceFileIds,
                      LocalDateTime createdAt,
                      LocalDateTime updatedAt) {
+        this(demandId, customerId, scene, styleTags, expectedDate, timeSlot, timeDescription, timeTags,
+                cityCode, location, budgetMinCent, budgetMaxCent, description, status, responseCount,
+                null, null, null, referenceFileIds, createdAt, updatedAt);
+    }
+
+    public DemandDto(Long demandId,
+                     Long customerId,
+                     String scene,
+                     List<String> styleTags,
+                     LocalDate expectedDate,
+                     String timeSlot,
+                     String timeDescription,
+                     List<String> timeTags,
+                     String cityCode,
+                     String location,
+                     Integer budgetMinCent,
+                     Integer budgetMaxCent,
+                     String description,
+                     String status,
+                     int responseCount,
+                     Integer pendingCount,
+                     Integer acceptedCount,
+                     Integer rejectedCount,
+                     List<Long> referenceFileIds,
+                     LocalDateTime createdAt,
+                     LocalDateTime updatedAt) {
         this.demandId = demandId;
         this.customerId = customerId;
         this.scene = scene;
@@ -58,6 +87,9 @@ public class DemandDto {
         this.description = description;
         this.status = status;
         this.responseCount = responseCount;
+        this.pendingCount = pendingCount;
+        this.acceptedCount = acceptedCount;
+        this.rejectedCount = rejectedCount;
         this.referenceFileIds = referenceFileIds;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -121,6 +153,18 @@ public class DemandDto {
 
     public int getResponseCount() {
         return responseCount;
+    }
+
+    public Integer getPendingCount() {
+        return pendingCount;
+    }
+
+    public Integer getAcceptedCount() {
+        return acceptedCount;
+    }
+
+    public Integer getRejectedCount() {
+        return rejectedCount;
     }
 
     public List<Long> getReferenceFileIds() {

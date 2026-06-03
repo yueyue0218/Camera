@@ -1,6 +1,8 @@
 package com.action.camera.message;
 
 import com.action.camera.message.model.CreateConversationCommand;
+import com.action.camera.message.entity.Message;
+import com.action.camera.message.repository.ConversationHiddenByUserRepository;
 import com.action.camera.message.repository.ConversationRepository;
 import com.action.camera.message.repository.MessageRepository;
 import com.action.camera.message.service.ConversationService;
@@ -45,8 +47,12 @@ class ConversationConcurrencyTest {
     @Autowired
     private MessageRepository messageRepository;
 
+    @Autowired
+    private ConversationHiddenByUserRepository hiddenByUserRepository;
+
     @BeforeEach
     void cleanDatabase() {
+        hiddenByUserRepository.deleteAll();
         messageRepository.deleteAll();
         conversationRepository.deleteAll();
     }
@@ -91,5 +97,62 @@ class ConversationConcurrencyTest {
         Long conversationId = conversationIds.iterator().next();
         assertThat(conversationRepository.count()).isEqualTo(1);
         assertThat(messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId)).hasSize(1);
+    }
+
+    @Test
+    void participantHideConversationOnlyRemovesItFromOwnListWithoutDeletingRecords() {
+        Long conversationId = conversationService.createConversationWithInitialMessage(new CreateConversationCommand(
+                CUSTOMER_ID,
+                PROVIDER_ID,
+                CUSTOMER_ID,
+                ConversationService.SOURCE_TYPE_DEMAND_RESPONSE,
+                SOURCE_ID + 1,
+                "Initial demand response conversation."
+        )).getConversationId();
+        Message followUp = messageRepository.save(message(conversationId, PROVIDER_ID, "Follow up message"));
+
+        conversationService.hideConversation(conversationId, CUSTOMER_ID);
+
+        assertThat(conversationService.listMyConversations(CUSTOMER_ID))
+                .extracting("id")
+                .doesNotContain(conversationId);
+        assertThat(conversationService.listMyConversations(PROVIDER_ID))
+                .extracting("id")
+                .contains(conversationId);
+        assertThat(conversationRepository.findById(conversationId)).isPresent();
+        assertThat(messageRepository.findById(followUp.getId())).isPresent();
+        assertThat(messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId)).hasSize(2);
+        assertThat(conversationRepository.findById(conversationId).orElseThrow().getSourceType())
+                .isEqualTo(ConversationService.SOURCE_TYPE_DEMAND_RESPONSE);
+    }
+
+    @Test
+    void nonParticipantCannotHideConversation() {
+        Long conversationId = conversationService.createConversationWithInitialMessage(new CreateConversationCommand(
+                CUSTOMER_ID,
+                PROVIDER_ID,
+                CUSTOMER_ID,
+                ConversationService.SOURCE_TYPE_SERVICE_PACKAGE,
+                SOURCE_ID + 2,
+                "Initial service package conversation."
+        )).getConversationId();
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> conversationService.hideConversation(conversationId, 3001L))
+                .isInstanceOf(com.action.camera.common.exception.BusinessException.class);
+
+        assertThat(hiddenByUserRepository.count()).isZero();
+        assertThat(conversationRepository.findById(conversationId)).isPresent();
+    }
+
+    private Message message(Long conversationId, Long senderId, String content) {
+        Message message = new Message();
+        message.setConversationId(conversationId);
+        message.setSenderId(senderId);
+        message.setMessageType("TEXT");
+        message.setContent(content);
+        message.setIsRead(false);
+        message.setCreatedAt(java.time.LocalDateTime.now());
+        return message;
     }
 }

@@ -60,6 +60,12 @@ public class DemandController {
                 expectedDate, styleTag, minBudgetCent, maxBudgetCent, timeTag));
     }
 
+    @GetMapping("/me/history")
+    public Result<List<DemandDto>> listMyDemandHistory(HttpServletRequest httpRequest) {
+        CurrentUser currentUser = currentUserProvider.getCurrentUser(httpRequest);
+        return Result.success(demandService.listMyDemandHistory(currentUser));
+    }
+
     @GetMapping("/{demandId}")
     public Result<DemandDto> getDemand(@PathVariable Long demandId,
                                        HttpServletRequest httpRequest) {

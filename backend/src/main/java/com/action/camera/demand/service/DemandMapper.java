@@ -11,6 +11,13 @@ final class DemandMapper {
     }
 
     static DemandDto toDemandDto(Demand demand) {
+        return toDemandDto(demand, null, null, null);
+    }
+
+    static DemandDto toDemandDto(Demand demand,
+                                 Integer pendingCount,
+                                 Integer acceptedCount,
+                                 Integer rejectedCount) {
         return new DemandDto(
                 demand.getId(),
                 demand.getCustomerId(),
@@ -27,6 +34,9 @@ final class DemandMapper {
                 demand.getDescription(),
                 demand.getStatus().name(),
                 demand.getResponseCount(),
+                pendingCount,
+                acceptedCount,
+                rejectedCount,
                 demand.getReferenceFileIds(),
                 demand.getCreatedAt(),
                 demand.getUpdatedAt()

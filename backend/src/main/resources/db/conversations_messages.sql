@@ -35,6 +35,18 @@ CREATE TABLE IF NOT EXISTS messages (
     CONSTRAINT fk_message_file FOREIGN KEY (file_id) REFERENCES files(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Text/image messages';
 
+CREATE TABLE IF NOT EXISTS conversation_hidden_by_user (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    conversation_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    hidden_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_conversation_hidden_user (conversation_id, user_id),
+    KEY idx_conversation_hidden_user (user_id, hidden_at),
+    KEY idx_conversation_hidden_conversation (conversation_id),
+    CONSTRAINT fk_conversation_hidden_conversation FOREIGN KEY (conversation_id) REFERENCES conversations(id),
+    CONSTRAINT fk_conversation_hidden_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='User-scoped hidden conversations';
+
 DELIMITER //
 
 DROP PROCEDURE IF EXISTS c_add_index_if_missing//
@@ -89,6 +101,21 @@ CALL c_add_index_if_missing(
     'messages',
     'idx_message_reference',
     'INDEX idx_message_reference (reference_type, reference_id)'
+);
+CALL c_add_index_if_missing(
+    'conversation_hidden_by_user',
+    'uk_conversation_hidden_user',
+    'UNIQUE KEY uk_conversation_hidden_user (conversation_id, user_id)'
+);
+CALL c_add_index_if_missing(
+    'conversation_hidden_by_user',
+    'idx_conversation_hidden_user',
+    'INDEX idx_conversation_hidden_user (user_id, hidden_at)'
+);
+CALL c_add_index_if_missing(
+    'conversation_hidden_by_user',
+    'idx_conversation_hidden_conversation',
+    'INDEX idx_conversation_hidden_conversation (conversation_id)'
 );
 
 DROP PROCEDURE IF EXISTS c_add_index_if_missing;

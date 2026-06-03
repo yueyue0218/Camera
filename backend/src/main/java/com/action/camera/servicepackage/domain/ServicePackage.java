@@ -104,6 +104,12 @@ public class ServicePackage {
     @Column(name = "temporary_schedule_hold_id")
     private Long temporaryScheduleHoldId;
 
+    @Column(name = "hidden_by_provider", nullable = false)
+    private Boolean hiddenByProvider = false;
+
+    @Column(name = "hidden_at")
+    private LocalDateTime hiddenAt;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -122,6 +128,12 @@ public class ServicePackage {
         this.updatedAt = LocalDateTime.now();
     }
 
+    public void hideForProvider() {
+        this.hiddenByProvider = true;
+        this.hiddenAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
     @PrePersist
     void prePersist() {
         LocalDateTime now = LocalDateTime.now();
@@ -136,6 +148,9 @@ public class ServicePackage {
         }
         if (isAvailable == null) {
             isAvailable = true;
+        }
+        if (hiddenByProvider == null) {
+            hiddenByProvider = false;
         }
         if (styleTags == null) {
             styleTags = List.of();
@@ -157,5 +172,8 @@ public class ServicePackage {
     @PreUpdate
     void preUpdate() {
         updatedAt = LocalDateTime.now();
+        if (hiddenByProvider == null) {
+            hiddenByProvider = false;
+        }
     }
 }

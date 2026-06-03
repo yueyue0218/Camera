@@ -3,11 +3,13 @@ package com.action.camera.message.service;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.message.entity.Conversation;
+import com.action.camera.message.entity.ConversationHiddenByUser;
 import com.action.camera.message.model.AcceptedResponseSnapshot;
 import com.action.camera.message.model.CreateConversationCommand;
 import com.action.camera.message.model.CreateConversationResult;
+import com.action.camera.message.repository.ConversationHiddenByUserRepository;
 import com.action.camera.message.repository.ConversationRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -21,9 +23,9 @@ import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class ConversationService {
 
     public static final String SOURCE_TYPE_DEMAND_RESPONSE = "DEMAND_RESPONSE";
@@ -41,6 +43,24 @@ public class ConversationService {
     private final ConversationRepository conversationRepository;
     private final MessageService messageService;
     private final PlatformTransactionManager transactionManager;
+    private final ConversationHiddenByUserRepository hiddenByUserRepository;
+
+    @Autowired
+    public ConversationService(ConversationRepository conversationRepository,
+                               MessageService messageService,
+                               PlatformTransactionManager transactionManager,
+                               ConversationHiddenByUserRepository hiddenByUserRepository) {
+        this.conversationRepository = conversationRepository;
+        this.messageService = messageService;
+        this.transactionManager = transactionManager;
+        this.hiddenByUserRepository = hiddenByUserRepository;
+    }
+
+    public ConversationService(ConversationRepository conversationRepository,
+                               MessageService messageService,
+                               PlatformTransactionManager transactionManager) {
+        this(conversationRepository, messageService, transactionManager, null);
+    }
 
     @Transactional
     public Conversation createFromAcceptedResponse(AcceptedResponseSnapshot snapshot, Long operatorId) {
@@ -84,13 +104,52 @@ public class ConversationService {
         if (operatorId == null) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "operatorId must not be null");
         }
-        return conversationRepository.findByParticipantAIdOrParticipantBId(operatorId, operatorId)
+        List<Conversation> visibleConversations = conversationRepository
+                .findByParticipantAIdOrParticipantBId(operatorId, operatorId)
                 .stream()
                 .filter(conversation -> conversation.hasParticipant(operatorId))
+                .toList();
+        Set<Long> hiddenIds = hiddenConversationIds(operatorId, visibleConversations);
+        return visibleConversations.stream()
+                .filter(conversation -> !hiddenIds.contains(conversation.getId()))
                 .sorted(Comparator
                         .comparing(this::sortTime, Comparator.nullsLast(Comparator.reverseOrder()))
                         .thenComparing(Conversation::getId, Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
+    }
+
+    @Transactional
+    public void hideConversation(Long conversationId, Long operatorId) {
+        if (operatorId == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "operatorId must not be null");
+        }
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND,
+                        "Conversation not found: " + conversationId));
+        if (!conversation.hasParticipant(operatorId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only conversation participants can hide it");
+        }
+        if (hiddenByUserRepository == null) {
+            return;
+        }
+        hiddenByUserRepository.findByConversationIdAndUserId(conversationId, operatorId)
+                .orElseGet(() -> hiddenByUserRepository.save(
+                        new ConversationHiddenByUser(conversationId, operatorId)));
+    }
+
+    private Set<Long> hiddenConversationIds(Long operatorId, List<Conversation> conversations) {
+        if (hiddenByUserRepository == null || conversations.isEmpty()) {
+            return Set.of();
+        }
+        Set<Long> conversationIds = conversations.stream()
+                .map(Conversation::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (conversationIds.isEmpty()) {
+            return Set.of();
+        }
+        Set<Long> hiddenIds = hiddenByUserRepository.findHiddenConversationIds(operatorId, conversationIds);
+        return hiddenIds == null ? Set.of() : hiddenIds;
     }
 
     private LocalDateTime sortTime(Conversation conversation) {

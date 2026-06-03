@@ -199,6 +199,26 @@ public class ServicePackageService {
         return ServicePackageMapper.toDetail(saved, photographerInfo(saved.getProviderId()));
     }
 
+    @Transactional(readOnly = true)
+    public List<ServicePackageCardDto> listMyServicePackageHistory(CurrentUser currentUser) {
+        ensureProviderOrAdmin(currentUser);
+        List<ServicePackage> packages = servicePackageRepository.findOwnerHistory(currentUser.getUserId());
+        Map<Long, PhotographerInfo> photographerInfos = photographerInfos(packages);
+        return packages.stream()
+                .map(servicePackage -> ServicePackageMapper.toCard(
+                        servicePackage,
+                        photographerInfos.get(servicePackage.getProviderId())))
+                .toList();
+    }
+
+    @Transactional
+    public void hideServicePackage(Long serviceId, CurrentUser currentUser) {
+        ensureProvider(currentUser);
+        ServicePackage servicePackage = getOwnedServicePackage(serviceId, currentUser.getUserId());
+        servicePackage.hideForProvider();
+        servicePackageRepository.save(servicePackage);
+    }
+
     @Transactional
     public ReserveServicePackageResult reserveServicePackage(Long serviceId,
                                                              CurrentUser currentUser,
@@ -344,6 +364,15 @@ public class ServicePackageService {
         }
         if (!currentUser.isProvider()) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Only provider can publish service packages");
+        }
+    }
+
+    private void ensureProviderOrAdmin(CurrentUser currentUser) {
+        if (currentUser == null || currentUser.getUserId() == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Current user is required");
+        }
+        if (!currentUser.isProvider() && !currentUser.isAdmin()) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only provider can list own service package history");
         }
     }
 

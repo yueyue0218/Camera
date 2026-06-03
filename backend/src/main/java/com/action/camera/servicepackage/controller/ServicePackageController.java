@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @RestController
 @RequestMapping({"/services", "/service-packages"})
@@ -76,6 +77,12 @@ public class ServicePackageController {
         ));
     }
 
+    @GetMapping("/me/history")
+    public Result<List<ServicePackageCardDto>> listMyServicePackageHistory(HttpServletRequest httpRequest) {
+        CurrentUser currentUser = currentUserProvider.getCurrentUser(httpRequest);
+        return Result.success(servicePackageService.listMyServicePackageHistory(currentUser));
+    }
+
     @GetMapping("/{serviceId}")
     public Result<ServicePackageDetailDto> getServiceDetail(@PathVariable Long serviceId,
                                                             HttpServletRequest httpRequest) {
@@ -96,6 +103,14 @@ public class ServicePackageController {
                                                                  HttpServletRequest httpRequest) {
         CurrentUser currentUser = currentUserProvider.getCurrentUser(httpRequest);
         return Result.success(servicePackageService.offlineServicePackage(serviceId, currentUser));
+    }
+
+    @DeleteMapping("/{serviceId}")
+    public Result<Void> hideServicePackage(@PathVariable Long serviceId,
+                                           HttpServletRequest httpRequest) {
+        CurrentUser currentUser = currentUserProvider.getCurrentUser(httpRequest);
+        servicePackageService.hideServicePackage(serviceId, currentUser);
+        return Result.success(null);
     }
 
     @PostMapping("/{serviceId}/reserve")

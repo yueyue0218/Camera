@@ -38,6 +38,7 @@ class ServicePackageShowcaseContractTest {
     private static final Long CUSTOMER_ID = 1001L;
     private static final Long OTHER_CUSTOMER_ID = 1002L;
     private static final Long PROVIDER_ID = 2001L;
+    private static final Long OTHER_PROVIDER_ID = 2002L;
     private static final LocalDate AVAILABLE_DATE = LocalDate.of(2026, 7, 1);
 
     @Autowired
@@ -242,11 +243,58 @@ class ServicePackageShowcaseContractTest {
         assertThat(legacyOwnerDetail.getBody().get("code")).isEqualTo(200);
     }
 
+    @Test
+    void providerHistoryReturnsOwnOnlineAndOfflinePackagesExceptHidden() throws Exception {
+        Long offlineServiceId = createServicePackage();
+        rest.exchange(
+                "/service-packages/" + offlineServiceId + "/offline",
+                HttpMethod.PATCH,
+                providerEntity(null),
+                Map.class);
+        Thread.sleep(25);
+        Long onlineServiceId = createServicePackage();
+        Thread.sleep(25);
+        Long hiddenServiceId = createServicePackage();
+        rest.exchange(
+                "/service-packages/" + hiddenServiceId,
+                HttpMethod.DELETE,
+                providerEntity(null),
+                Map.class);
+        createServicePackageFor(OTHER_PROVIDER_ID);
+
+        ResponseEntity<Map> historyResponse = rest.exchange(
+                "/service-packages/me/history",
+                HttpMethod.GET,
+                providerEntity(null),
+                Map.class);
+        ResponseEntity<Map> legacyHistoryResponse = rest.exchange(
+                "/services/me/history",
+                HttpMethod.GET,
+                providerEntity(null),
+                Map.class);
+
+        List<Map<String, Object>> history = (List<Map<String, Object>>) historyResponse.getBody().get("data");
+        assertThat(historyResponse.getBody().get("code")).isEqualTo(200);
+        assertThat(history).extracting(item -> numberValue(item, "serviceId"))
+                .containsExactly(onlineServiceId, offlineServiceId);
+        assertThat(history).extracting(item -> item.get("status"))
+                .containsExactly(ServicePackageStatus.ONLINE.name(), ServicePackageStatus.OFFLINE.name());
+        assertThat(((List<Map<String, Object>>) legacyHistoryResponse.getBody().get("data")))
+                .extracting(item -> numberValue(item, "serviceId"))
+                .containsExactly(onlineServiceId, offlineServiceId);
+        assertThat(servicePackageRepository.findById(hiddenServiceId).orElseThrow().getHiddenByProvider()).isTrue();
+        assertThat(serviceIds(rest.getForEntity("/service-packages", Map.class))).doesNotContain(offlineServiceId);
+    }
+
     private Long createServicePackage() {
+        return createServicePackageFor(PROVIDER_ID);
+    }
+
+    private Long createServicePackageFor(Long providerId) {
         ResponseEntity<Map> createResponse = rest.exchange(
                 "/service-packages",
                 HttpMethod.POST,
-                providerEntity(createServicePackageBody()),
+                providerEntity(providerId, createServicePackageBody()),
                 Map.class);
         assertThat(createResponse.getBody()).isNotNull();
         assertThat(createResponse.getBody().get("code")).isEqualTo(200);
@@ -262,8 +310,12 @@ class ServicePackageShowcaseContractTest {
     }
 
     private HttpEntity<String> providerEntity(String body) {
+        return providerEntity(PROVIDER_ID, body);
+    }
+
+    private HttpEntity<String> providerEntity(Long providerId, String body) {
         HttpHeaders headers = new HttpHeaders();
-        headers.set("X-User-Id", PROVIDER_ID.toString());
+        headers.set("X-User-Id", providerId.toString());
         headers.set("X-User-Role", "PROVIDER");
         headers.setContentType(MediaType.APPLICATION_JSON);
         return new HttpEntity<>(body, headers);

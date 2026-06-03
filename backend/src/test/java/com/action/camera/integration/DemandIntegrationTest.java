@@ -30,6 +30,8 @@ class DemandIntegrationTest {
 
     @BeforeEach
     void seedDemoUsers() {
+        jdbc.execute("DELETE FROM demand_responses");
+        jdbc.execute("DELETE FROM demands");
         jdbc.execute("DELETE FROM users WHERE id IN (1001, 1002, 2001)");
         jdbc.execute("INSERT INTO users (id, nickname, current_role, status, credit_score, created_at, updated_at) " +
                 "VALUES (1001, '需求方', 'CUSTOMER', 'ACTIVE', 80.00, NOW(), NOW())");
@@ -188,6 +190,31 @@ class DemandIntegrationTest {
     }
 
     @Test
+    void myDemandHistory_returnsOwnOpenAndClosedDemandsExceptHidden() throws Exception {
+        Long closedDemandId = createDemandId(asCustomer(demandBody("TRAVEL", "nanjing")));
+        rest.exchange("/demands/" + closedDemandId + "/close", HttpMethod.PATCH, asCustomer(null), Map.class);
+        Thread.sleep(25);
+        Long openDemandId = createDemandId(asCustomer(demandBody("PORTRAIT", "nanjing")));
+        Thread.sleep(25);
+        Long hiddenDemandId = createDemandId(asCustomer(demandBody("COSPLAY", "nanjing")));
+        rest.exchange("/demands/" + hiddenDemandId, HttpMethod.DELETE, asCustomer(null), Map.class);
+        createDemandId(userEntity("1002", "CUSTOMER", demandBody("GRADUATION", "nanjing")));
+
+        ResponseEntity<Map> historyResponse =
+                rest.exchange("/demands/me/history", HttpMethod.GET, asCustomer(null), Map.class);
+        ResponseEntity<Map> publicResponse = rest.getForEntity("/demands", Map.class);
+
+        List<Map<String, Object>> history = (List<Map<String, Object>>) historyResponse.getBody().get("data");
+        assertThat(historyResponse.getBody().get("code")).isEqualTo(200);
+        assertThat(history).extracting(item -> ((Number) item.get("demandId")).longValue())
+                .containsExactly(openDemandId, closedDemandId);
+        assertThat(history).extracting(item -> item.get("status"))
+                .containsExactly("OPEN", "CLOSED");
+        assertThat(records(publicResponse)).extracting(item -> ((Number) item.get("demandId")).longValue())
+                .doesNotContain(closedDemandId);
+    }
+
+    @Test
     void respondToDemand_asProvider_succeeds() {
         String createBody = demandBody("PORTRAIT", "nanjing");
         ResponseEntity<Map> createResp = rest.exchange("/demands", HttpMethod.POST, asCustomer(createBody), Map.class);
@@ -239,6 +266,12 @@ class DemandIntegrationTest {
         assertThat(response.getBody().get("code")).isEqualTo(200);
         Map<String, Object> data = (Map<String, Object>) response.getBody().get("data");
         return (List<Map<String, Object>>) data.get("records");
+    }
+
+    private Long createDemandId(HttpEntity<?> entity) {
+        ResponseEntity<Map> createResp = rest.exchange("/demands", HttpMethod.POST, entity, Map.class);
+        assertThat(createResp.getBody().get("code")).isEqualTo(200);
+        return ((Number) ((Map<String, Object>) createResp.getBody().get("data")).get("demandId")).longValue();
     }
 
     private HttpEntity<String> asCustomer(String body) {

@@ -24,10 +24,13 @@ CREATE TABLE IF NOT EXISTS service_packages (
     status VARCHAR(30) NOT NULL DEFAULT 'ONLINE',
     is_available BOOLEAN NOT NULL DEFAULT TRUE,
     temporary_schedule_hold_id BIGINT NULL,
+    hidden_by_provider BOOLEAN NOT NULL DEFAULT FALSE,
+    hidden_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     KEY idx_service_package_status (status),
     KEY idx_service_package_provider (provider_id, status),
+    KEY idx_service_package_provider_hidden (provider_id, hidden_by_provider, updated_at),
     KEY idx_service_package_hall (status, city_code, scene, base_price_cent)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Provider service showcase packages';
 
@@ -217,6 +220,8 @@ CALL b1b2_add_column_if_missing('service_packages', 'time_description', 'time_de
 CALL b1b2_add_column_if_missing('service_packages', 'time_tags', 'time_tags TEXT NULL');
 CALL b1b2_add_column_if_missing('service_packages', 'is_available', 'is_available BOOLEAN NULL');
 CALL b1b2_add_column_if_missing('service_packages', 'temporary_schedule_hold_id', 'temporary_schedule_hold_id BIGINT NULL');
+CALL b1b2_add_column_if_missing('service_packages', 'hidden_by_provider', 'hidden_by_provider BOOLEAN NULL');
+CALL b1b2_add_column_if_missing('service_packages', 'hidden_at', 'hidden_at DATETIME NULL');
 
 CALL b1b2_exec_if_columns_exist(
     'service_packages', 'provider_id', 'provider_user_id', '',
@@ -249,6 +254,7 @@ SET time_description = COALESCE(NULLIF(time_description, ''), NULLIF(available_d
 WHERE time_description IS NULL OR time_description = '';
 UPDATE service_packages SET time_tags = '[]' WHERE time_tags IS NULL;
 UPDATE service_packages SET is_available = (status = 'ONLINE') WHERE is_available IS NULL;
+UPDATE service_packages SET hidden_by_provider = FALSE WHERE hidden_by_provider IS NULL;
 
 CALL b1b2_modify_column_if_exists('service_packages', 'provider_profile_id', 'provider_profile_id BIGINT NULL');
 CALL b1b2_modify_column_if_exists('service_packages', 'provider_user_id', 'provider_user_id BIGINT NULL');
@@ -266,9 +272,11 @@ CALL b1b2_modify_column_if_exists('service_packages', 'portfolio_ids', 'portfoli
 CALL b1b2_modify_column_if_exists('service_packages', 'time_description', 'time_description TEXT NOT NULL');
 CALL b1b2_modify_column_if_exists('service_packages', 'time_tags', 'time_tags TEXT NOT NULL');
 CALL b1b2_modify_column_if_exists('service_packages', 'is_available', 'is_available BOOLEAN NOT NULL DEFAULT TRUE');
+CALL b1b2_modify_column_if_exists('service_packages', 'hidden_by_provider', 'hidden_by_provider BOOLEAN NOT NULL DEFAULT FALSE');
 
 CALL b1b2_add_index_if_missing('service_packages', 'idx_service_package_status', 'INDEX idx_service_package_status (status)');
 CALL b1b2_add_index_if_missing('service_packages', 'idx_service_package_provider', 'INDEX idx_service_package_provider (provider_id, status)');
+CALL b1b2_add_index_if_missing('service_packages', 'idx_service_package_provider_hidden', 'INDEX idx_service_package_provider_hidden (provider_id, hidden_by_provider, updated_at)');
 CALL b1b2_add_index_if_missing('service_packages', 'idx_service_package_hall', 'INDEX idx_service_package_hall (status, city_code, scene, base_price_cent)');
 
 CALL b1b2_add_column_if_missing('demands', 'style_tags', 'style_tags TEXT NULL');

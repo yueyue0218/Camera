@@ -33,14 +33,14 @@ public class AuthInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        boolean protectedB1B2Write = isProtectedB1B2Write(request);
+        boolean protectedB1B2Route = isProtectedB1B2RoleRoute(request);
         String demoUserId = request.getHeader("X-User-Id");
         if (demoUserId != null && !demoUserId.isBlank()) {
             try {
                 Long userId = parseUserId(demoUserId);
                 UserContext.setUserId(userId);
-                UserRole role = resolveDemoRole(request, userId, protectedB1B2Write);
-                enforceB1B2WriteRole(request, role);
+                UserRole role = resolveDemoRole(request, userId, protectedB1B2Route);
+                enforceProtectedRouteRole(request, role);
                 return true;
             } catch (NumberFormatException e) {
                 throw new BusinessException(ErrorCode.UNAUTHORIZED);
@@ -57,7 +57,7 @@ public class AuthInterceptor implements HandlerInterceptor {
             UserContext.setUserId(userId);
             UserRole role = loadAndSetRole(userId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
-            enforceB1B2WriteRole(request, role);
+            enforceProtectedRouteRole(request, role);
         } catch (Exception e) {
             if (e instanceof BusinessException businessException) {
                 throw businessException;
@@ -112,8 +112,29 @@ public class AuthInterceptor implements HandlerInterceptor {
                 || uri.startsWith("/service-packages/");
     }
 
-    private void enforceB1B2WriteRole(HttpServletRequest request, UserRole role) {
-        if (!isProtectedB1B2Write(request)) {
+    private boolean isProtectedB1B2RoleRoute(HttpServletRequest request) {
+        return isProtectedB1B2Write(request)
+                || isOwnerHistoryGet(request)
+                || isConversationHide(request);
+    }
+
+    private boolean isOwnerHistoryGet(HttpServletRequest request) {
+        if (!"GET".equalsIgnoreCase(request.getMethod())) {
+            return false;
+        }
+        String uri = request.getRequestURI();
+        return uri.equals("/demands/me/history")
+                || uri.equals("/services/me/history")
+                || uri.equals("/service-packages/me/history");
+    }
+
+    private boolean isConversationHide(HttpServletRequest request) {
+        return "DELETE".equalsIgnoreCase(request.getMethod())
+                && request.getRequestURI().matches("^/conversations/\\d+$");
+    }
+
+    private void enforceProtectedRouteRole(HttpServletRequest request, UserRole role) {
+        if (!isProtectedB1B2RoleRoute(request)) {
             return;
         }
         if (role == null) {
@@ -140,6 +161,9 @@ public class AuthInterceptor implements HandlerInterceptor {
         if (uri.matches("^/demands/\\d+$") && "DELETE".equals(method)) {
             return null;
         }
+        if (uri.equals("/demands/me/history") && "GET".equals(method)) {
+            return UserRole.CUSTOMER;
+        }
         if (uri.matches("^/demands/\\d+/responses$") && "POST".equals(method)) {
             return UserRole.PROVIDER;
         }
@@ -153,6 +177,12 @@ public class AuthInterceptor implements HandlerInterceptor {
             return UserRole.PROVIDER;
         }
         if (uri.matches("^/(services|service-packages)/\\d+$") && "PUT".equals(method)) {
+            return UserRole.PROVIDER;
+        }
+        if (uri.matches("^/(services|service-packages)/\\d+$") && "DELETE".equals(method)) {
+            return UserRole.PROVIDER;
+        }
+        if (uri.matches("^/(services|service-packages)/me/history$") && "GET".equals(method)) {
             return UserRole.PROVIDER;
         }
         if (uri.matches("^/(services|service-packages)/\\d+/offline$") && "PATCH".equals(method)) {

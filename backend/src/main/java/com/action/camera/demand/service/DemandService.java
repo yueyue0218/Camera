@@ -19,6 +19,8 @@ import com.action.camera.demand.repository.DemandResponseRepository;
 import com.action.camera.message.model.CreateConversationCommand;
 import com.action.camera.message.model.CreateConversationResult;
 import com.action.camera.message.service.ConversationService;
+import com.action.camera.notification.dto.NotificationCreateRequest;
+import com.action.camera.notification.service.NotificationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,13 +47,16 @@ public class DemandService {
     private final DemandRepository demandRepository;
     private final DemandResponseRepository responseRepository;
     private final ConversationService conversationService;
+    private final NotificationService notificationService;
 
     public DemandService(DemandRepository demandRepository,
                          DemandResponseRepository responseRepository,
-                         ConversationService conversationService) {
+                         ConversationService conversationService,
+                         NotificationService notificationService) {
         this.demandRepository = demandRepository;
         this.responseRepository = responseRepository;
         this.conversationService = conversationService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -135,6 +140,15 @@ public class DemandService {
         return new PageResult<>(filtered.subList(fromIndex, toIndex), safePage, safeSize, filtered.size());
     }
 
+    @Transactional(readOnly = true)
+    public List<DemandDto> listMyDemandHistory(CurrentUser user) {
+        requireCustomerOrAdmin(user);
+        return demandRepository.findOwnerHistory(user.getUserId(), List.of(DemandStatus.OPEN, DemandStatus.CLOSED))
+                .stream()
+                .map(this::toOwnerDemandDto)
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public DemandDto updateDemand(Long demandId, CurrentUser user, CreateDemandRequest request) {
         requireCustomer(user);
@@ -169,8 +183,10 @@ public class DemandService {
     @Transactional(readOnly = true)
     public DemandDto getDemand(Long demandId, CurrentUser user) {
         Demand demand = findDemand(demandId);
-        if (demand.getStatus() == DemandStatus.OPEN
-                || (user != null && (user.isAdmin() || demand.getCustomerId().equals(user.getUserId())))) {
+        if (user != null && (user.isAdmin() || demand.getCustomerId().equals(user.getUserId()))) {
+            return toOwnerDemandDto(demand);
+        }
+        if (demand.getStatus() == DemandStatus.OPEN) {
             return DemandMapper.toDemandDto(demand);
         }
         throw new BusinessException(ErrorCode.FORBIDDEN, "no permission to view this demand");
@@ -239,6 +255,8 @@ public class DemandService {
                         DEFAULT_ACCEPT_INITIAL_MESSAGE
                 )
         );
+        notifyResponseAccepted(snapshot);
+        notifyConversationStarted(snapshot, conversation.getConversationId());
         return new AcceptDemandResponseResult(snapshot, conversation.getConversationId());
     }
 
@@ -260,7 +278,9 @@ public class DemandService {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT, "only pending responses can be rejected");
         }
         response.reject(null);
-        return DemandMapper.toResponseDto(responseRepository.save(response));
+        DemandResponse saved = responseRepository.save(response);
+        notifyResponseRejected(saved);
+        return DemandMapper.toResponseDto(saved);
     }
 
     @Transactional(readOnly = true)
@@ -312,6 +332,19 @@ public class DemandService {
         );
     }
 
+    private DemandDto toOwnerDemandDto(Demand demand) {
+        return DemandMapper.toDemandDto(
+                demand,
+                countResponses(demand.getId(), DemandResponseStatus.PENDING_CUSTOMER_ACCEPT),
+                countResponses(demand.getId(), DemandResponseStatus.ACCEPTED),
+                countResponses(demand.getId(), DemandResponseStatus.REJECTED)
+        );
+    }
+
+    private int countResponses(Long demandId, DemandResponseStatus status) {
+        return Math.toIntExact(responseRepository.countByDemandIdAndStatus(demandId, status));
+    }
+
     private Demand findOwnedDemand(Long demandId, CurrentUser user) {
         Demand demand = findDemand(demandId);
         if (!demand.getCustomerId().equals(user.getUserId())) {
@@ -339,6 +372,12 @@ public class DemandService {
     private void requireCustomer(CurrentUser user) {
         if (!user.isCustomer()) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "褰撳墠鎿嶄綔闇€瑕侀渶姹傛柟韬唤");
+        }
+    }
+
+    private void requireCustomerOrAdmin(CurrentUser user) {
+        if (user == null || (!user.isCustomer() && !user.isAdmin())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "only customer can list own demand history");
         }
     }
 
@@ -506,5 +545,38 @@ public class DemandService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private void notifyResponseAccepted(AcceptedDemandResponseSnapshot snapshot) {
+        notificationService.createNotification(new NotificationCreateRequest(
+                snapshot.getProviderId(),
+                "Demand response accepted",
+                "Your demand response was accepted.",
+                "DEMAND_RESPONSE_ACCEPTED",
+                "DEMAND_RESPONSE",
+                snapshot.getResponseId()
+        ));
+    }
+
+    private void notifyResponseRejected(DemandResponse response) {
+        notificationService.createNotification(new NotificationCreateRequest(
+                response.getProviderId(),
+                "Demand response rejected",
+                "Your demand response was rejected.",
+                "DEMAND_RESPONSE_REJECTED",
+                "DEMAND_RESPONSE",
+                response.getId()
+        ));
+    }
+
+    private void notifyConversationStarted(AcceptedDemandResponseSnapshot snapshot, Long conversationId) {
+        notificationService.createNotification(new NotificationCreateRequest(
+                snapshot.getProviderId(),
+                "Conversation started",
+                "A conversation was opened for your accepted demand response.",
+                "CONVERSATION_STARTED",
+                "CONVERSATION",
+                conversationId
+        ));
     }
 }

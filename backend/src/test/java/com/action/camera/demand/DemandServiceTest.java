@@ -68,6 +68,7 @@ class DemandServiceTest {
     private final CurrentUser otherCustomer = new CurrentUser(1002L, UserRole.CUSTOMER);
     private final CurrentUser provider = new CurrentUser(2001L, UserRole.PROVIDER);
     private final CurrentUser anotherProvider = new CurrentUser(2002L, UserRole.PROVIDER);
+    private final CurrentUser thirdProvider = new CurrentUser(2003L, UserRole.PROVIDER);
     private final CurrentUser admin = new CurrentUser(9001L, UserRole.ADMIN);
 
     @BeforeEach
@@ -314,6 +315,58 @@ class DemandServiceTest {
         assertThat(ordinary.getRecords()).extracting(DemandDto::getDemandId)
                 .contains(openDemand.getDemandId())
                 .doesNotContain(closedDemand.getDemandId());
+    }
+
+    @Test
+    void listMyDemandHistoryReturnsOwnOpenAndClosedDemandsExceptHiddenNewestFirst() throws InterruptedException {
+        DemandDto closed = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
+        demandService.closeDemand(closed.getDemandId(), customer);
+        Thread.sleep(25);
+        DemandDto open = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        Thread.sleep(25);
+        DemandDto hidden = demandService.createDemand(customer, demandRequest("COSPLAY", "NJU"));
+        demandService.deleteDemand(hidden.getDemandId(), customer);
+        demandService.createDemand(otherCustomer, demandRequest("GRADUATION", "NJU"));
+
+        List<DemandDto> history = demandService.listMyDemandHistory(customer);
+
+        assertThat(history).extracting(DemandDto::getDemandId)
+                .containsExactly(open.getDemandId(), closed.getDemandId());
+        assertThat(history).extracting(DemandDto::getStatus)
+                .containsExactly(DemandStatus.OPEN.name(), DemandStatus.CLOSED.name());
+    }
+
+    @Test
+    void ownerDemandDetailAndHistoryReturnResponseStatusCountsButPublicListDoesNot() {
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandResponseDto accepted = demandService.respondToDemand(
+                demand.getDemandId(), provider, responseRequest("Accepted response"));
+        DemandResponseDto rejected = demandService.respondToDemand(
+                demand.getDemandId(), anotherProvider, responseRequest("Rejected response"));
+        demandService.respondToDemand(demand.getDemandId(), thirdProvider, responseRequest("Pending response"));
+
+        demandService.acceptResponse(demand.getDemandId(), accepted.getResponseId(), customer);
+        demandService.rejectResponse(demand.getDemandId(), rejected.getResponseId(), customer);
+
+        DemandDto ownerDetail = demandService.getDemand(demand.getDemandId(), customer);
+        DemandDto historyItem = demandService.listMyDemandHistory(customer).stream()
+                .filter(item -> item.getDemandId().equals(demand.getDemandId()))
+                .findFirst()
+                .orElseThrow();
+        DemandDto publicCard = demandService.listDemands(1, 10, null, null, null).getRecords().stream()
+                .filter(item -> item.getDemandId().equals(demand.getDemandId()))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(ownerDetail.getPendingCount()).isEqualTo(1);
+        assertThat(ownerDetail.getAcceptedCount()).isEqualTo(1);
+        assertThat(ownerDetail.getRejectedCount()).isEqualTo(1);
+        assertThat(historyItem.getPendingCount()).isEqualTo(1);
+        assertThat(historyItem.getAcceptedCount()).isEqualTo(1);
+        assertThat(historyItem.getRejectedCount()).isEqualTo(1);
+        assertThat(publicCard.getPendingCount()).isNull();
+        assertThat(publicCard.getAcceptedCount()).isNull();
+        assertThat(publicCard.getRejectedCount()).isNull();
     }
 
     @Test
@@ -881,6 +934,19 @@ class DemandServiceTest {
 
         assertThat(responses).extracting(DemandResponseDto::getResponseId).contains(response.getResponseId());
         assertThat(responses).extracting(DemandResponseDto::getStatus).contains(DemandResponseStatus.REJECTED.name());
+    }
+
+    @Test
+    void listMyResponsesShowsAcceptedStatusAfterOwnerAccepts() {
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandResponseDto response = demandService.respondToDemand(
+                demand.getDemandId(), provider, responseRequest("Provider response"));
+        demandService.acceptResponse(demand.getDemandId(), response.getResponseId(), customer);
+
+        List<DemandResponseDto> responses = demandService.listMyResponses(provider);
+
+        assertThat(responses).extracting(DemandResponseDto::getResponseId).contains(response.getResponseId());
+        assertThat(responses).extracting(DemandResponseDto::getStatus).contains(DemandResponseStatus.ACCEPTED.name());
     }
 
     @Test

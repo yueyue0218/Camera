@@ -1,6 +1,7 @@
 package com.action.camera.demand.repository;
 
 import com.action.camera.demand.domain.DemandResponse;
+import com.action.camera.demand.domain.DemandResponseStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -25,4 +26,6 @@ public interface DemandResponseRepository extends JpaRepository<DemandResponse, 
     List<DemandResponse> findByProviderIdOrderByResponseTimeDesc(@Param("providerId") Long providerId);
 
     Optional<DemandResponse> findByDemandIdAndProviderId(Long demandId, Long providerId);
+
+    long countByDemandIdAndStatus(Long demandId, DemandResponseStatus status);
 }

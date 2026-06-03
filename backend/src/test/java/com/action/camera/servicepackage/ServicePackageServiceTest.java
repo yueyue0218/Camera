@@ -201,6 +201,37 @@ class ServicePackageServiceTest {
     }
 
     @Test
+    void providerHistoryReturnsOwnOnlineAndOfflinePackagesFromRepositoryOrder() {
+        ServicePackage online = servicePackage(SERVICE_ID, ServicePackageStatus.ONLINE, true);
+        ServicePackage offline = servicePackage(9202L, ServicePackageStatus.OFFLINE, false);
+        when(servicePackageRepository.findOwnerHistory(PROVIDER_ID)).thenReturn(List.of(online, offline));
+        when(userRepository.findById(PROVIDER_ID)).thenReturn(Optional.of(providerUser()));
+
+        List<ServicePackageCardDto> history = servicePackageService.listMyServicePackageHistory(provider());
+
+        assertThat(history).extracting(ServicePackageCardDto::getServiceId)
+                .containsExactly(SERVICE_ID, 9202L);
+        assertThat(history).extracting(ServicePackageCardDto::getStatus)
+                .containsExactly(ServicePackageStatus.ONLINE.name(), ServicePackageStatus.OFFLINE.name());
+        verify(servicePackageRepository).findOwnerHistory(PROVIDER_ID);
+    }
+
+    @Test
+    void hideServicePackageMarksProviderHiddenWithoutChangingStatusOrDeleting() {
+        ServicePackage servicePackage = servicePackage(SERVICE_ID, ServicePackageStatus.ONLINE, true);
+        when(servicePackageRepository.findByIdAndProviderId(SERVICE_ID, PROVIDER_ID))
+                .thenReturn(Optional.of(servicePackage));
+        when(servicePackageRepository.save(any(ServicePackage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        servicePackageService.hideServicePackage(SERVICE_ID, provider());
+
+        assertThat(servicePackage.getHiddenByProvider()).isTrue();
+        assertThat(servicePackage.getHiddenAt()).isNotNull();
+        assertThat(servicePackage.getStatus()).isEqualTo(ServicePackageStatus.ONLINE);
+        verify(servicePackageRepository).save(servicePackage);
+    }
+
+    @Test
     void customerInterestIsIdempotentAndCannotTargetOwnPackage() {
         ServicePackage servicePackage = servicePackage(SERVICE_ID, ServicePackageStatus.ONLINE, true);
         ServicePackageInterest existing = interest(CUSTOMER_ID, SERVICE_ID);

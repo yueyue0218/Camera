@@ -113,6 +113,53 @@ class B1B2RouteAuthIntegrationTest {
         assertThat(customerOffline.getBody().get("code")).isEqualTo(40301);
     }
 
+    @Test
+    void ownerHistoryRoutesRequireExpectedRoles() {
+        ResponseEntity<Map> customerCreate =
+                rest.exchange("/demands", HttpMethod.POST, userEntity("1001", "CUSTOMER", demandBody()), Map.class);
+        assertThat(customerCreate.getBody().get("code")).isEqualTo(200);
+
+        ResponseEntity<Map> demandHistoryNoAuth =
+                rest.exchange("/demands/me/history", HttpMethod.GET, jsonEntity(null), Map.class);
+        ResponseEntity<Map> demandHistoryProvider =
+                rest.exchange("/demands/me/history", HttpMethod.GET,
+                        userEntity("2001", "PROVIDER", null), Map.class);
+        ResponseEntity<Map> demandHistoryCustomer =
+                rest.exchange("/demands/me/history", HttpMethod.GET,
+                        userEntity("1001", "CUSTOMER", null), Map.class);
+
+        assertThat(demandHistoryNoAuth.getBody().get("code")).isEqualTo(40101);
+        assertThat(demandHistoryProvider.getBody().get("code")).isEqualTo(40301);
+        assertThat(demandHistoryCustomer.getBody().get("code")).isEqualTo(200);
+
+        ResponseEntity<Map> providerCreate =
+                rest.exchange("/service-packages", HttpMethod.POST,
+                        userEntity("2001", "PROVIDER", servicePackageBody()), Map.class);
+        assertThat(providerCreate.getBody().get("code")).isEqualTo(200);
+        Long serviceId = numberValue(data(providerCreate), "serviceId");
+
+        ResponseEntity<Map> serviceHistoryNoAuth =
+                rest.exchange("/service-packages/me/history", HttpMethod.GET, jsonEntity(null), Map.class);
+        ResponseEntity<Map> serviceHistoryCustomer =
+                rest.exchange("/service-packages/me/history", HttpMethod.GET,
+                        userEntity("1001", "CUSTOMER", null), Map.class);
+        ResponseEntity<Map> serviceHistoryProvider =
+                rest.exchange("/service-packages/me/history", HttpMethod.GET,
+                        userEntity("2001", "PROVIDER", null), Map.class);
+        ResponseEntity<Map> hideByCustomer =
+                rest.exchange("/service-packages/" + serviceId, HttpMethod.DELETE,
+                        userEntity("1001", "CUSTOMER", null), Map.class);
+        ResponseEntity<Map> hideByProvider =
+                rest.exchange("/service-packages/" + serviceId, HttpMethod.DELETE,
+                        userEntity("2001", "PROVIDER", null), Map.class);
+
+        assertThat(serviceHistoryNoAuth.getBody().get("code")).isEqualTo(40101);
+        assertThat(serviceHistoryCustomer.getBody().get("code")).isEqualTo(40301);
+        assertThat(serviceHistoryProvider.getBody().get("code")).isEqualTo(200);
+        assertThat(hideByCustomer.getBody().get("code")).isEqualTo(40301);
+        assertThat(hideByProvider.getBody().get("code")).isEqualTo(200);
+    }
+
     private HttpEntity<String> jsonEntity(String body) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
