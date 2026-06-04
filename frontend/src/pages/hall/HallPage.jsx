@@ -17,7 +17,8 @@ const initialFilters = {
   keyword: '',
   cityCode: '',
   type: '',
-  budget: '',
+  minBudgetYuan: '',
+  maxBudgetYuan: '',
   timeTag: ''
 }
 
@@ -27,14 +28,6 @@ function createStatus() {
 
 function normalizeError(error) {
   return error?.message || '请求失败，启动后端服务后会显示真实数据。'
-}
-
-function sceneForDemand(value) {
-  return value === 'GRADUATION' ? '毕业照' : value
-}
-
-function sceneForService(value) {
-  return value === '毕业照' ? 'GRADUATION' : value
 }
 
 function panelFromSearch(search) {
@@ -66,6 +59,12 @@ export function HallPage() {
   }, [currentUser.userId, currentUser.role])
 
   useEffect(() => {
+    const role = currentUser.role === 'CUSTOMER' ? 'owner' : 'photographer'
+    document.body.setAttribute('data-role', role)
+    return () => document.body.removeAttribute('data-role')
+  }, [currentUser.role])
+
+  useEffect(() => {
     setActivePanel(panelFromSearch(location.search))
   }, [location.search])
 
@@ -74,13 +73,15 @@ export function HallPage() {
   }
 
   function demandParams(nextFilters = filters) {
-    const price = priceParamsFromBudget(nextFilters.budget)
-    const scene = sceneForDemand(nextFilters.keyword?.trim() || nextFilters.type)
+    const price = priceParamsFromBudget({
+      minYuan: nextFilters.minBudgetYuan,
+      maxYuan: nextFilters.maxBudgetYuan
+    })
     return {
       page: 1,
       size: 20,
       status: 'OPEN',
-      scene,
+      styleTag: nextFilters.type,
       cityCode: nextFilters.cityCode,
       timeTag: nextFilters.timeTag,
       minBudgetCent: price.minCent,
@@ -89,13 +90,15 @@ export function HallPage() {
   }
 
   function serviceParams(nextFilters = filters) {
-    const price = priceParamsFromBudget(nextFilters.budget)
-    const scene = sceneForService(nextFilters.keyword?.trim() || nextFilters.type)
+    const price = priceParamsFromBudget({
+      minYuan: nextFilters.minBudgetYuan,
+      maxYuan: nextFilters.maxBudgetYuan
+    })
     return {
       page: 1,
       size: 20,
       cityCode: nextFilters.cityCode,
-      scene,
+      style: nextFilters.type,
       timeTag: nextFilters.timeTag,
       minPriceCent: price.minCent,
       maxPriceCent: price.maxCent,
@@ -103,11 +106,30 @@ export function HallPage() {
     }
   }
 
+  function matchesKeyword(record, keyword) {
+    const normalized = keyword?.trim().toLowerCase()
+    if (!normalized) return true
+    const haystack = [
+      record.title,
+      record.scene,
+      record.description,
+      record.remark,
+      record.location,
+      record.serviceArea,
+      record.customerNickname,
+      record.customerName,
+      record.photographerNickname,
+      ...(Array.isArray(record.styleTags) ? record.styleTags : []),
+      ...(Array.isArray(record.timeTags) ? record.timeTags : [])
+    ].filter(Boolean).join(' ').toLowerCase()
+    return haystack.includes(normalized)
+  }
+
   async function loadDemands(nextFilters = filters) {
     setDemandStatus({ loading: true, error: '' })
     try {
       const page = await demandApi.list(demandParams(nextFilters), currentUser)
-      setDemands(page?.records || [])
+      setDemands((page?.records || []).filter(record => matchesKeyword(record, nextFilters.keyword)))
       setDemandStatus({ loading: false, error: '' })
     } catch (error) {
       setDemands([])
@@ -119,7 +141,7 @@ export function HallPage() {
     setServiceStatus({ loading: true, error: '' })
     try {
       const page = await servicePackageApi.list(serviceParams(nextFilters), currentUser)
-      setServices(page?.records || [])
+      setServices((page?.records || []).filter(record => matchesKeyword(record, nextFilters.keyword)))
       setServiceStatus({ loading: false, error: '' })
     } catch (error) {
       setServices([])
@@ -141,7 +163,10 @@ export function HallPage() {
   }
 
   function applyFilters(nextFilters = filters) {
-    loadDemands(nextFilters)
+    if (activePanel === 'demands') {
+      loadDemands(nextFilters)
+      return
+    }
     loadServices(nextFilters)
     loadInterests(nextFilters)
   }
@@ -156,7 +181,14 @@ export function HallPage() {
 
   function changePanel(nextPanel) {
     setActivePanel(nextPanel)
+    setFilters(initialFilters)
     navigate(`/hall?tab=${nextPanel === 'demands' ? 'demand' : 'showcase'}`, { replace: true })
+    if (nextPanel === 'demands') {
+      loadDemands(initialFilters)
+    } else {
+      loadServices(initialFilters)
+      loadInterests(initialFilters)
+    }
   }
 
   function applyTimeFilter(timeTag) {
@@ -201,15 +233,10 @@ export function HallPage() {
     })
   }
 
-  async function reserveService(service) {
-    const selectedDate = window.prompt('预约日期（YYYY-MM-DD，可留空先沟通）', '')
-    if (selectedDate === null) return
-    const initialMessage = window.prompt('预约留言', '')
-    if (initialMessage === null) return
+  async function startServiceChat(service) {
     try {
-      const result = await servicePackageApi.reserve(service.serviceId, {
-        selectedDate: selectedDate || null,
-        initialMessage
+      const result = await servicePackageApi.startChat(service.serviceId, {
+        initialMessage: `我想预约「${service.title || '这个橱窗'}」，想进一步确认时间与服务内容。`
       }, currentUser)
       if (result?.conversationId) navigate(`/messages/${result.conversationId}`)
     } catch (error) {
@@ -245,7 +272,7 @@ export function HallPage() {
         interested={interestedIds.has(service.serviceId)}
         onOpen={() => openService(service)}
         onDetail={() => navigate(`/service-packages/${service.serviceId}`)}
-        onReserve={() => reserveService(service)}
+        onReserve={() => startServiceChat(service)}
       />
     ))
   }

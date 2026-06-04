@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Alert } from '@mui/material'
 import { useAuth } from '../../AuthContext.jsx'
+import { fileApi } from '../../api/fileApi.js'
 import { servicePackageApi } from '../../api/servicePackageApi.js'
 import { ServicePackageForm } from './components/ServicePackageForm.jsx'
 import {
@@ -16,6 +17,7 @@ export function PublishServicePackagePage() {
   const { currentUser } = useAuth()
   const [notice, setNotice] = useState(null)
   const [errors, setErrors] = useState([])
+  const [uploading, setUploading] = useState(false)
   const [form, setForm] = useState(createDefaultServicePackageForm)
 
   function updateFormField(field, value) {
@@ -43,6 +45,35 @@ export function PublishServicePackagePage() {
     setNotice({ type: 'success', text: '草稿已保存到本地' })
   }
 
+  async function uploadPortfolioFiles(files) {
+    const selectedFiles = Array.from(files || []).filter(Boolean)
+    if (!selectedFiles.length) return
+    setUploading(true)
+    setNotice(null)
+    try {
+      const uploaded = await Promise.all(selectedFiles.map(file => fileApi.upload(file, {
+        bizType: 'SERVICE_PORTFOLIO',
+        visibility: 'PUBLIC'
+      }, currentUser)))
+      setForm(current => ({
+        ...current,
+        portfolioIds: [
+          ...(Array.isArray(current.portfolioIds) ? current.portfolioIds : []),
+          ...uploaded.map(item => item.fileId).filter(Boolean)
+        ],
+        portfolioFileNames: [
+          ...(Array.isArray(current.portfolioFileNames) ? current.portfolioFileNames : []),
+          ...uploaded.map(item => item.originalName).filter(Boolean)
+        ]
+      }))
+      setNotice({ type: 'success', text: '作品图已上传' })
+    } catch (error) {
+      setNotice({ type: 'error', text: error.message })
+    } finally {
+      setUploading(false)
+    }
+  }
+
   if (currentUser.role !== 'PROVIDER') {
     return (
       <main className="portra-page">
@@ -58,7 +89,15 @@ export function PublishServicePackagePage() {
         <span>把作品、价格和档期整理成可预约的服务橱窗</span>
       </div>
       {notice && <Alert severity={notice.type} className="form-alert">{notice.text}</Alert>}
-      <ServicePackageForm form={form} errors={errors} onChange={updateFormField} onSubmit={submit} onSaveDraft={saveDraft} />
+      <ServicePackageForm
+        form={form}
+        errors={errors}
+        uploading={uploading}
+        onChange={updateFormField}
+        onSubmit={submit}
+        onSaveDraft={saveDraft}
+        onFilesSelected={uploadPortfolioFiles}
+      />
     </main>
   )
 }

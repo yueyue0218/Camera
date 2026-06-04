@@ -7,9 +7,6 @@ export function DemandCard({ demand, currentUser, onOpen, onDetail, onRespond })
   const customerName = firstText(demand.customerNickname, demand.customerName)
   const customerAvatar = firstText(demand.customerAvatar, demand.customerAvatarUrl)
   const place = [cityName(demand.cityName || demand.cityCode), demand.location].filter(Boolean).join(' · ')
-  const canRespond = currentUser.role === 'PROVIDER'
-    && demand.status === 'OPEN'
-    && Number(demand.customerId) !== Number(currentUser.userId)
 
   return (
     <article className="ticket-card" onClick={onOpen}>
@@ -41,11 +38,9 @@ export function DemandCard({ demand, currentUser, onOpen, onDetail, onRespond })
       </div>
       <div className="card-actions">
         <button className="ghost-btn" type="button" onClick={(event) => { event.stopPropagation(); onDetail() }}>查看详情</button>
-        {canRespond && (
-          <button className="solid-btn photographer-only" type="button" onClick={(event) => { event.stopPropagation(); onRespond() }}>
-            我来响应
-          </button>
-        )}
+        <button className="solid-btn photographer-only" type="button" onClick={(event) => { event.stopPropagation(); onRespond() }}>
+          我来响应
+        </button>
       </div>
     </article>
   )

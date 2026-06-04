@@ -12,11 +12,6 @@ function demandTags(demand) {
 }
 
 export function DemandAside({ selectedDemand, error, currentUser, onRespond }) {
-  const canRespond = selectedDemand &&
-    currentUser?.role === 'PROVIDER' &&
-    selectedDemand.status === 'OPEN' &&
-    Number(selectedDemand.customerId) !== Number(currentUser.userId)
-
   return (
     <aside className="aside">
       <div className="aside-card">
@@ -37,7 +32,7 @@ export function DemandAside({ selectedDemand, error, currentUser, onRespond }) {
           <div className="aside-item"><strong>标签</strong><span>{demandTags(selectedDemand).join(' / ') || '暂无'}</span></div>
         </div>
       )}
-      {canRespond && (
+      {selectedDemand && (
         <div className="photographer-only aside-card">
           <h3>操作</h3>
           <div className="side-actions">

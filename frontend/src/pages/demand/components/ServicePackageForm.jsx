@@ -1,16 +1,5 @@
 import { Alert } from '@mui/material'
-
-const CITY_OPTIONS = [
-  { label: '南京大学', value: 'NJU' },
-  { label: '南京', value: 'NJ' },
-  { label: '上海', value: 'SH' }
-]
-
-const SCENE_OPTIONS = [
-  { label: '毕业照', value: 'GRADUATION' },
-  { label: '个人写真', value: 'PORTRAIT' },
-  { label: '情侣纪念', value: 'COUPLE' }
-]
+import { CITY_OPTIONS, TYPE_OPTIONS } from '../../hall/components/hallUtils.js'
 
 const TIME_TAGS = [
   { label: '近三天', value: 'NEAR_3_DAYS' },
@@ -31,7 +20,7 @@ function timeTagText(value) {
   return TIME_TAGS.filter(tag => tags.includes(tag.value)).map(tag => tag.label).join(' / ') || '未选择'
 }
 
-export function ServicePackageForm({ form, errors, onChange, onSubmit, onSaveDraft }) {
+export function ServicePackageForm({ form, errors, uploading, onChange, onSubmit, onSaveDraft, onFilesSelected }) {
   const selectedTimeTags = splitTags(form.timeTagsText)
 
   function toggleTimeTag(value) {
@@ -51,19 +40,11 @@ export function ServicePackageForm({ form, errors, onChange, onSubmit, onSaveDra
           </Alert>
         )}
         <div className="form-section">
-          <h3>基础身份</h3>
+          <h3>基础信息</h3>
           <div className="field-grid">
             <div className="field">
               <label>橱窗标题</label>
               <input value={form.title} onChange={event => onChange('title', event.target.value)} placeholder="例如：清透校园写真 / 南京可约" />
-            </div>
-            <div className="field">
-              <label>身份角色</label>
-              <select value="摄影师" onChange={() => {}}>
-                <option>摄影师</option>
-                <option>化妆师</option>
-                <option>妆造 + 摄影团队</option>
-              </select>
             </div>
             <div className="field">
               <label>城市</label>
@@ -79,18 +60,12 @@ export function ServicePackageForm({ form, errors, onChange, onSubmit, onSaveDra
         </div>
 
         <div className="form-section">
-          <h3>服务风格</h3>
-          <div className="tag-row">
-            <span className="tag blue">清透日常</span>
-            <span className="tag gray">胶片复古</span>
-            <span className="tag gray">校园毕业</span>
-            <span className="tag gray">情侣纪念</span>
-          </div>
+          <h3>服务类型</h3>
           <div className="field-grid">
             <div className="field">
               <label>拍摄类型</label>
               <select value={form.scene} onChange={event => onChange('scene', event.target.value)}>
-                {SCENE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                {TYPE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </div>
             <div className="field">
@@ -108,12 +83,12 @@ export function ServicePackageForm({ form, errors, onChange, onSubmit, onSaveDra
           <h3>价格与时间</h3>
           <div className="field-grid">
             <div className="field">
-              <label>基础套餐价格</label>
+              <label>价格下限（元）</label>
               <input type="number" value={form.basePriceYuan} onChange={event => onChange('basePriceYuan', event.target.value)} placeholder="299" />
             </div>
             <div className="field">
-              <label>标准套餐价格</label>
-              <input value={form.priceRange} onChange={event => onChange('priceRange', event.target.value)} placeholder="499-699" />
+              <label>价格上限（元）</label>
+              <input type="number" value={form.maxPriceYuan} onChange={event => onChange('maxPriceYuan', event.target.value)} placeholder="699" />
             </div>
             <div className="field">
               <label>时间描述（必填）</label>
@@ -135,10 +110,14 @@ export function ServicePackageForm({ form, errors, onChange, onSubmit, onSaveDra
         <div className="form-section">
           <h3>作品上传</h3>
           <div className="upload-grid">
-            <div className="upload">+ 封面作品</div>
-            <div className="upload">+ 作品集</div>
-            <div className="upload">+ 作品集</div>
+            <label className="upload">
+              {uploading ? '上传中...' : '+ 封面 / 作品集'}
+              <input type="file" accept="image/*" multiple hidden onChange={event => onFilesSelected?.(event.target.files)} />
+            </label>
+            <div className="upload upload-summary">{form.portfolioFileNames?.[0] || '作品 01'}</div>
+            <div className="upload upload-summary">{form.portfolioFileNames?.[1] || '作品 02'}</div>
           </div>
+          {!!form.portfolioIds?.length && <p className="micro">已上传 {form.portfolioIds.length} 张，发布时写入 portfolioIds。</p>}
         </div>
       </article>
 
@@ -146,8 +125,8 @@ export function ServicePackageForm({ form, errors, onChange, onSubmit, onSaveDra
         <div className="placeholder-cover"></div>
         <div className="preview-title">橱窗预览</div>
         <div className="preview-line"><span>标题</span><b>{form.title || '清透校园写真'}</b></div>
-        <div className="preview-line"><span>身份</span><b>摄影师</b></div>
-        <div className="preview-line"><span>价格</span><b>¥{form.basePriceYuan || 0} 起</b></div>
+        <div className="preview-line"><span>类型</span><b>{TYPE_OPTIONS.find(option => option.value === form.scene)?.label || form.scene}</b></div>
+        <div className="preview-line"><span>价格</span><b>¥{form.basePriceYuan || 0}-{form.maxPriceYuan || 0}</b></div>
         <div className="preview-line"><span>时间描述</span><b>{form.timeDescription || '近三天可约'}</b></div>
         <div className="preview-line"><span>时间标签</span><b>{timeTagText(form.timeTagsText)}</b></div>
         <button className="primary-btn" type="submit">发布橱窗</button>

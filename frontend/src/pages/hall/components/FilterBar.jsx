@@ -1,4 +1,4 @@
-import { BUDGET_OPTIONS, CITY_OPTIONS, TIME_TAG_OPTIONS, TYPE_OPTIONS } from './hallUtils.js'
+import { CITY_OPTIONS, TIME_TAG_OPTIONS, TYPE_OPTIONS } from './hallUtils.js'
 
 export function FilterBar({ filters, onChange, onApplyFilters, onPublishClick, currentUserRole }) {
   const updateAndApply = partial => {
@@ -22,24 +22,50 @@ export function FilterBar({ filters, onChange, onApplyFilters, onPublishClick, c
           value={filters.keyword}
           onChange={event => onChange({ keyword: event.target.value })}
           onKeyDown={handleSearchKeyDown}
-          onBlur={event => onApplyFilters({ ...filters, keyword: event.currentTarget.value })}
           placeholder="搜索摄影师、约拍需求、地点或风格"
         />
       </label>
-      <select className="filter-select" value={filters.cityCode} onChange={event => updateAndApply({ cityCode: event.target.value })}>
-        <option value="NJU">南京大学</option>
-        {CITY_OPTIONS.map(option => <option key={`${option.label}-${option.value}`} value={option.value}>{option.label}</option>)}
-      </select>
-      <select className="filter-select" value={filters.type} onChange={event => updateAndApply({ type: event.target.value })}>
-        <option value="GRADUATION">毕业照橱窗</option>
-        {TYPE_OPTIONS.map(option => <option key={option.label} value={option.value}>{option.label}</option>)}
-      </select>
-      <select className="filter-select" value={filters.budget} onChange={event => updateAndApply({ budget: event.target.value })}>
-        {BUDGET_OPTIONS.map(option => <option key={option.label} value={option.value}>{option.label}</option>)}
-      </select>
-      <select className="filter-select" value={filters.timeTag} onChange={event => updateAndApply({ timeTag: event.target.value })}>
-        {TIME_TAG_OPTIONS.map((option, index) => <option key={`${option.label}-${index}`} value={option.value}>{option.label}</option>)}
-      </select>
+      <button className="secondary-btn filter-search-btn" type="button" onClick={() => onApplyFilters(filters)}>搜索</button>
+      <label className="filter-control">
+        <select className="filter-select" value={filters.cityCode} onChange={event => updateAndApply({ cityCode: event.target.value })}>
+          <option value="">城市</option>
+          {CITY_OPTIONS.map(option => <option key={`${option.label}-${option.value}`} value={option.value}>{option.label}</option>)}
+        </select>
+        {filters.cityCode && <button className="filter-clear" type="button" onClick={() => updateAndApply({ cityCode: '' })}>清空</button>}
+      </label>
+      <label className="filter-control">
+        <select className="filter-select" value={filters.type} onChange={event => updateAndApply({ type: event.target.value })}>
+          <option value="">类型</option>
+          {TYPE_OPTIONS.map(option => <option key={option.label} value={option.value}>{option.label}</option>)}
+        </select>
+        {filters.type && <button className="filter-clear" type="button" onClick={() => updateAndApply({ type: '' })}>清空</button>}
+      </label>
+      <div className="budget-range" aria-label="预算范围">
+        <input
+          inputMode="numeric"
+          min="0"
+          type="number"
+          value={filters.minBudgetYuan}
+          onChange={event => updateAndApply({ minBudgetYuan: event.target.value })}
+          placeholder="最低价"
+        />
+        <span>-</span>
+        <input
+          inputMode="numeric"
+          min="0"
+          type="number"
+          value={filters.maxBudgetYuan}
+          onChange={event => updateAndApply({ maxBudgetYuan: event.target.value })}
+          placeholder="最高价"
+        />
+        {(filters.minBudgetYuan || filters.maxBudgetYuan) && <button className="filter-clear" type="button" onClick={() => updateAndApply({ minBudgetYuan: '', maxBudgetYuan: '' })}>清空</button>}
+      </div>
+      <label className="filter-control">
+        <select className="filter-select" value={filters.timeTag} onChange={event => updateAndApply({ timeTag: event.target.value })}>
+          {TIME_TAG_OPTIONS.map((option, index) => <option key={`${option.label}-${index}`} value={option.value}>{option.label}</option>)}
+        </select>
+        {filters.timeTag && <button className="filter-clear" type="button" onClick={() => updateAndApply({ timeTag: '' })}>清空</button>}
+      </label>
       <button className="primary-btn" type="button" onClick={onPublishClick}>
         {currentUserRole === 'PROVIDER' ? '发布橱窗' : '发布需求'}
       </button>

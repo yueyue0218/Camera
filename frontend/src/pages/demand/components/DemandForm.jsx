@@ -1,20 +1,4 @@
-const CITY_OPTIONS = [
-  { label: '南京大学', value: 'NJU' },
-  { label: '南京', value: 'NJ' },
-  { label: '上海', value: 'SH' }
-]
-
-const SCENE_OPTIONS = [
-  { label: '毕业照', value: '毕业照' },
-  { label: '个人写真', value: '写真' },
-  { label: '情侣纪念', value: '情侣纪念' }
-]
-
-const BUDGET_OPTIONS = [
-  { label: '¥300-500', min: 300, max: 500 },
-  { label: '互勉', min: 0, max: 0 },
-  { label: '¥500-1000', min: 500, max: 1000 }
-]
+import { CITY_OPTIONS, TYPE_OPTIONS } from '../../hall/components/hallUtils.js'
 
 const TIME_TAGS = [
   { label: '近三天', value: 'NEAR_3_DAYS' },
@@ -22,23 +6,12 @@ const TIME_TAGS = [
   { label: '近一个月', value: 'NEAR_1_MONTH' }
 ]
 
-function budgetValue(form) {
-  return `${form.budgetMinYuan || 0}-${form.budgetMaxYuan || 0}`
-}
-
 function timeTagText(tags = []) {
   return TIME_TAGS.filter(tag => tags.includes(tag.value)).map(tag => tag.label).join(' / ') || '未选择'
 }
 
-export function DemandForm({ form, onChange, onSubmit, onSaveDraft }) {
+export function DemandForm({ form, uploading, onChange, onSubmit, onSaveDraft, onFilesSelected }) {
   const timeTags = Array.isArray(form.timeTags) ? form.timeTags : []
-
-  function changeBudget(value) {
-    const option = BUDGET_OPTIONS.find(item => `${item.min}-${item.max}` === value)
-    if (!option) return
-    onChange('budgetMinYuan', option.min)
-    onChange('budgetMaxYuan', option.max)
-  }
 
   function toggleTimeTag(value) {
     const next = timeTags.includes(value)
@@ -61,7 +34,7 @@ export function DemandForm({ form, onChange, onSubmit, onSaveDraft }) {
             <div className="field">
               <label>拍摄类型</label>
               <select value={form.scene} onChange={event => onChange('scene', event.target.value)}>
-                {SCENE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                {TYPE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </div>
             <div className="field">
@@ -78,13 +51,7 @@ export function DemandForm({ form, onChange, onSubmit, onSaveDraft }) {
         </div>
 
         <div className="form-section">
-          <h3>拍摄需求</h3>
-          <div className="tag-row">
-            <span className="tag blue">摄影师</span>
-            <span className="tag gray">化妆师</span>
-            <span className="tag gray">造型师</span>
-            <span className="tag gray">后期修图</span>
-          </div>
+          <h3>补充说明</h3>
           <div className="field">
             <label>补充说明</label>
             <textarea value={form.description} onChange={event => onChange('description', event.target.value)} placeholder="可以写你想要的氛围、服装、人数、是否需要动作引导等。" />
@@ -95,10 +62,12 @@ export function DemandForm({ form, onChange, onSubmit, onSaveDraft }) {
           <h3>预算与时间</h3>
           <div className="field-grid">
             <div className="field">
-              <label>预算范围</label>
-              <select value={budgetValue(form)} onChange={event => changeBudget(event.target.value)}>
-                {BUDGET_OPTIONS.map(option => <option key={option.label} value={`${option.min}-${option.max}`}>{option.label}</option>)}
-              </select>
+              <label>预算下限（元）</label>
+              <input type="number" min="0" value={form.budgetMinYuan} onChange={event => onChange('budgetMinYuan', event.target.value)} placeholder="300" />
+            </div>
+            <div className="field">
+              <label>预算上限（元）</label>
+              <input type="number" min="0" value={form.budgetMaxYuan} onChange={event => onChange('budgetMaxYuan', event.target.value)} placeholder="500" />
             </div>
             <div className="field">
               <label>时间描述（必填）</label>
@@ -120,10 +89,14 @@ export function DemandForm({ form, onChange, onSubmit, onSaveDraft }) {
         <div className="form-section">
           <h3>参考风格</h3>
           <div className="upload-grid">
-            <div className="upload">+ 添加参考图</div>
-            <div className="upload">+ 添加参考图</div>
-            <div className="upload">+ 添加参考图</div>
+            <label className="upload">
+              {uploading ? '上传中...' : '+ 添加参考图'}
+              <input type="file" accept="image/*" multiple hidden onChange={event => onFilesSelected?.(event.target.files)} />
+            </label>
+            <div className="upload upload-summary">{form.referenceFileNames?.[0] || '参考图 01'}</div>
+            <div className="upload upload-summary">{form.referenceFileNames?.[1] || '参考图 02'}</div>
           </div>
+          {!!form.referenceFileIds?.length && <p className="micro">已上传 {form.referenceFileIds.length} 张，发布时写入 referenceFileIds。</p>}
         </div>
       </article>
 
@@ -131,6 +104,7 @@ export function DemandForm({ form, onChange, onSubmit, onSaveDraft }) {
         <div className="preview-title">订单预览</div>
         <div className="preview-line"><span>标题</span><b>{form.title || form.scene || '想拍一组毕业照'}</b></div>
         <div className="preview-line"><span>城市</span><b>{CITY_OPTIONS.find(option => option.value === form.cityCode)?.label || form.cityCode}</b></div>
+        <div className="preview-line"><span>类型</span><b>{TYPE_OPTIONS.find(option => option.value === form.scene)?.label || form.scene}</b></div>
         <div className="preview-line"><span>预算</span><b>{Number(form.budgetMinYuan) === 0 && Number(form.budgetMaxYuan) === 0 ? '互勉' : `¥${form.budgetMinYuan}-${form.budgetMaxYuan}`}</b></div>
         <div className="preview-line"><span>时间描述</span><b>{form.timeDescription || form.timeSlot || '待沟通'}</b></div>
         <div className="preview-line"><span>时间标签</span><b>{timeTagText(timeTags)}</b></div>

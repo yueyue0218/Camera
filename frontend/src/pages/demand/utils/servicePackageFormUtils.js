@@ -1,4 +1,11 @@
 import { yuanToCent } from '../../../utils/index.js'
+import { API_BASE } from '../../../api/client.js'
+import {
+  DEFAULT_BUDGET_MAX_YUAN,
+  DEFAULT_BUDGET_MIN_YUAN,
+  DEFAULT_CITY_CODE,
+  DEFAULT_TYPE
+} from '../../hall/components/hallUtils.js'
 
 function splitList(value) {
   return String(value || '')
@@ -16,19 +23,22 @@ function splitIds(value) {
 export function createDefaultServicePackageForm() {
   return {
     title: '校园写真橱窗',
-    cityCode: 'NJU',
-    serviceArea: '南京大学校园',
-    scene: 'GRADUATION',
-    styleTagsText: '自然,校园,写真',
+    cityCode: DEFAULT_CITY_CODE,
+    serviceArea: '',
+    scene: DEFAULT_TYPE,
+    styleTagsText: DEFAULT_TYPE,
     imagesText: '',
-    basePriceYuan: 399,
-    priceRange: '399-599',
+    basePriceYuan: DEFAULT_BUDGET_MIN_YUAN,
+    maxPriceYuan: DEFAULT_BUDGET_MAX_YUAN,
+    priceRange: `${DEFAULT_BUDGET_MIN_YUAN}-${DEFAULT_BUDGET_MAX_YUAN}`,
     durationMinutes: 120,
     originalCount: 30,
     refinedCount: 9,
     deliveryDays: 7,
     availableDatesText: '',
     portfolioIdsText: '',
+    portfolioIds: [],
+    portfolioFileNames: [],
     description: '适合毕业照、校园写真和轻量约拍。',
     timeDescription: '近一周周末可约',
     timeTagsText: 'NEAR_7_DAYS'
@@ -50,21 +60,30 @@ export function validateServicePackageForm(form) {
 }
 
 export function buildServicePackagePayload(form) {
+  const styleTags = new Set([
+    form.scene,
+    ...splitList(form.styleTagsText)
+  ].filter(Boolean))
+  const portfolioIds = [
+    ...(Array.isArray(form.portfolioIds) ? form.portfolioIds : []),
+    ...splitIds(form.portfolioIdsText)
+  ]
+  const imagePaths = portfolioIds.map(fileId => `${API_BASE}/files/${fileId}/download`)
   return {
     title: form.title.trim(),
     cityCode: form.cityCode.trim(),
     serviceArea: form.serviceArea.trim() || null,
     scene: form.scene.trim(),
-    styleTags: splitList(form.styleTagsText),
-    images: splitList(form.imagesText),
+    styleTags: Array.from(styleTags),
+    images: [...splitList(form.imagesText), ...imagePaths],
     basePriceCent: yuanToCent(form.basePriceYuan),
-    priceRange: form.priceRange.trim() || null,
+    priceRange: form.priceRange?.trim() || `${form.basePriceYuan}-${form.maxPriceYuan}`,
     durationMinutes: Number(form.durationMinutes),
     originalCount: Number(form.originalCount),
     refinedCount: Number(form.refinedCount),
     deliveryDays: Number(form.deliveryDays),
     availableDates: splitList(form.availableDatesText),
-    portfolioIds: splitIds(form.portfolioIdsText),
+    portfolioIds,
     description: form.description.trim() || null,
     timeDescription: form.timeDescription.trim(),
     timeTags: splitList(form.timeTagsText)
