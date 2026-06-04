@@ -8,7 +8,11 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "credit_records")
+@Table(
+        name = "credit_records",
+        uniqueConstraints = @UniqueConstraint(name = "uk_credit_records_source", columnNames = {"source_type", "source_id"}),
+        indexes = @Index(name = "idx_credit_records_user_created", columnList = "user_id, created_at")
+)
 @Getter
 @Setter
 public class CreditRecord {
@@ -29,8 +33,23 @@ public class CreditRecord {
     @Column(name = "score_change", nullable = false)
     private Integer scoreChange;
 
+    @Column(name = "before_score", precision = 5, scale = 2)
+    private BigDecimal beforeScore;
+
     @Column(name = "score_after", nullable = false, precision = 5, scale = 2)
     private BigDecimal scoreAfter;
+
+    @Column(name = "after_score", precision = 5, scale = 2)
+    private BigDecimal afterScore;
+
+    @Column(name = "applied_score_change")
+    private Integer appliedScoreChange;
+
+    @Column(name = "source_type", length = 40)
+    private String sourceType;
+
+    @Column(name = "source_id")
+    private Long sourceId;
 
     @Column(name = "reason", length = 1000)
     private String reason;

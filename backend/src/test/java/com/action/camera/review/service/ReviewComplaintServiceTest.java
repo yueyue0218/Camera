@@ -4,6 +4,7 @@ import com.action.camera.common.ErrorCode;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.repository.CreditRecordRepository;
+import com.action.camera.repository.UserRepository;
 import com.action.camera.review.dto.ReviewComplaintArbitrateRequest;
 import com.action.camera.review.dto.ReviewComplaintCreateRequest;
 import com.action.camera.review.dto.ReviewComplaintResponse;
@@ -18,6 +19,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -48,6 +51,9 @@ class ReviewComplaintServiceTest {
 
     @Autowired
     private CreditRecordRepository creditRecordRepository;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -153,6 +159,35 @@ class ReviewComplaintServiceTest {
                 .contains(
                         org.assertj.core.groups.Tuple.tuple("REVIEW", 2),
                         org.assertj.core.groups.Tuple.tuple("REVIEW_ARBITRATION", -2)
+                );
+    }
+
+    @Test
+    void hideReviewReversesActualAppliedCreditChangeAtUpperBound() {
+        jdbcTemplate.update("UPDATE users SET credit_score = 99.00 WHERE id = ?", PROVIDER_ID);
+        ReviewResponse review = createCustomerReview(5);
+        BigDecimal afterReview = userRepository.findById(PROVIDER_ID).orElseThrow().getCreditScore();
+        assertThat(afterReview).isEqualByComparingTo("100.00");
+
+        UserContext.setUserId(PROVIDER_ID);
+        ReviewComplaintResponse complaint = complaintService.create(
+                review.reviewId(),
+                new ReviewComplaintCreateRequest("fake review", null)
+        );
+
+        UserContext.setUserId(ADMIN_ID);
+        complaintService.arbitrate(
+                complaint.complaintId(),
+                new ReviewComplaintArbitrateRequest("REVIEW_HIDDEN", "complaint accepted")
+        );
+
+        BigDecimal afterArbitration = userRepository.findById(PROVIDER_ID).orElseThrow().getCreditScore();
+        assertThat(afterArbitration).isEqualByComparingTo("99.00");
+        assertThat(creditRecordRepository.findByUserIdOrderByCreatedAtDesc(PROVIDER_ID))
+                .extracting("eventType", "appliedScoreChange")
+                .contains(
+                        org.assertj.core.groups.Tuple.tuple("REVIEW", 1),
+                        org.assertj.core.groups.Tuple.tuple("REVIEW_ARBITRATION", -1)
                 );
     }
 
