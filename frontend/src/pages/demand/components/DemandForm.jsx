@@ -10,8 +10,13 @@ function timeTagText(tags = []) {
   return TIME_TAGS.filter(tag => tags.includes(tag.value)).map(tag => tag.label).join(' / ') || '未选择'
 }
 
-export function DemandForm({ form, uploading, onChange, onSubmit, onSaveDraft, onFilesSelected }) {
+export function DemandForm({ form, uploading, onChange, onSubmit, onSaveDraft, onFilesSelected, onRemoveFile }) {
   const timeTags = Array.isArray(form.timeTags) ? form.timeTags : []
+  const referenceItems = (form.referenceFileIds || []).map((fileId, index) => ({
+    fileId,
+    name: form.referenceFileNames?.[index] || `参考图 ${index + 1}`,
+    previewUrl: form.referencePreviewUrls?.[index] || ''
+  }))
 
   function toggleTimeTag(value) {
     const next = timeTags.includes(value)
@@ -90,13 +95,17 @@ export function DemandForm({ form, uploading, onChange, onSubmit, onSaveDraft, o
           <h3>参考风格</h3>
           <div className="upload-grid">
             <label className="upload">
-              {uploading ? '上传中...' : '+ 添加参考图'}
-              <input type="file" accept="image/*" multiple hidden onChange={event => onFilesSelected?.(event.target.files)} />
+              {uploading ? '上传中...' : `+ 添加参考图 (${referenceItems.length}/9)`}
+              <input type="file" accept="image/*" multiple hidden onChange={event => { onFilesSelected?.(event.target.files); event.target.value = '' }} />
             </label>
-            <div className="upload upload-summary">{form.referenceFileNames?.[0] || '参考图 01'}</div>
-            <div className="upload upload-summary">{form.referenceFileNames?.[1] || '参考图 02'}</div>
+            {referenceItems.map((item, index) => (
+              <div className="upload-thumb" key={`${item.fileId}-${index}`}>
+                {item.previewUrl ? <img src={item.previewUrl} alt={item.name} /> : <span>{item.name}</span>}
+                <button type="button" onClick={() => onRemoveFile?.(index)}>删除</button>
+              </div>
+            ))}
           </div>
-          {!!form.referenceFileIds?.length && <p className="micro">已上传 {form.referenceFileIds.length} 张，发布时写入 referenceFileIds。</p>}
+          {!!referenceItems.length && <p className="micro">已上传 {referenceItems.length} 张，发布时写入 referenceFileIds。</p>}
         </div>
       </article>
 

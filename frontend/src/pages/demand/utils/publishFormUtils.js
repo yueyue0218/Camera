@@ -21,6 +21,7 @@ export function createDefaultDemandForm() {
     styleTagsText: DEFAULT_TYPE,
     referenceFileIds: [],
     referenceFileNames: [],
+    referencePreviewUrls: [],
     description: '想拍一组自然、不模板化的校园毕业照，偏生活感。'
   }
 }

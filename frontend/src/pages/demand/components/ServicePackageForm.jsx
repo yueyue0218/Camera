@@ -20,8 +20,13 @@ function timeTagText(value) {
   return TIME_TAGS.filter(tag => tags.includes(tag.value)).map(tag => tag.label).join(' / ') || '未选择'
 }
 
-export function ServicePackageForm({ form, errors, uploading, onChange, onSubmit, onSaveDraft, onFilesSelected }) {
+export function ServicePackageForm({ form, errors, uploading, onChange, onSubmit, onSaveDraft, onFilesSelected, onRemoveFile }) {
   const selectedTimeTags = splitTags(form.timeTagsText)
+  const portfolioItems = (form.portfolioIds || []).map((fileId, index) => ({
+    fileId,
+    name: form.portfolioFileNames?.[index] || `作品 ${index + 1}`,
+    previewUrl: form.portfolioPreviewUrls?.[index] || ''
+  }))
 
   function toggleTimeTag(value) {
     const next = selectedTimeTags.includes(value)
@@ -111,13 +116,17 @@ export function ServicePackageForm({ form, errors, uploading, onChange, onSubmit
           <h3>作品上传</h3>
           <div className="upload-grid">
             <label className="upload">
-              {uploading ? '上传中...' : '+ 封面 / 作品集'}
-              <input type="file" accept="image/*" multiple hidden onChange={event => onFilesSelected?.(event.target.files)} />
+              {uploading ? '上传中...' : `+ 封面 / 作品集 (${portfolioItems.length}/9)`}
+              <input type="file" accept="image/*" multiple hidden onChange={event => { onFilesSelected?.(event.target.files); event.target.value = '' }} />
             </label>
-            <div className="upload upload-summary">{form.portfolioFileNames?.[0] || '作品 01'}</div>
-            <div className="upload upload-summary">{form.portfolioFileNames?.[1] || '作品 02'}</div>
+            {portfolioItems.map((item, index) => (
+              <div className="upload-thumb" key={`${item.fileId}-${index}`}>
+                {item.previewUrl ? <img src={item.previewUrl} alt={item.name} /> : <span>{item.name}</span>}
+                <button type="button" onClick={() => onRemoveFile?.(index)}>删除</button>
+              </div>
+            ))}
           </div>
-          {!!form.portfolioIds?.length && <p className="micro">已上传 {form.portfolioIds.length} 张，发布时写入 portfolioIds。</p>}
+          {!!portfolioItems.length && <p className="micro">已上传 {portfolioItems.length} 张，发布时写入 portfolioIds。</p>}
         </div>
       </article>
 

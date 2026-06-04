@@ -197,6 +197,12 @@ export function HallPage() {
     applyFilters(nextFilters)
   }
 
+  function applyHotStyle(type) {
+    const nextFilters = { ...filters, type }
+    setFilters(nextFilters)
+    applyFilters(nextFilters)
+  }
+
   async function openDemand(demand) {
     setSelectedDemand(demand)
     try {
@@ -307,6 +313,7 @@ export function HallPage() {
               error={demandStatus.error}
               currentUser={currentUser}
               onRespond={respondDemand}
+              onHotStyleClick={applyHotStyle}
             />
           </div>
         </section>

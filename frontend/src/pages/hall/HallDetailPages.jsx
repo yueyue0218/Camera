@@ -160,19 +160,6 @@ export function DemandDetailPage() {
   )
 }
 
-function packageCards(service) {
-  const base = Number(service.basePriceCent || 0)
-  const basePrice = service.priceRange || `${money(service.basePriceCent)} 起`
-  const standard = base ? `${money(base + Math.max(20000, Math.round(base * 0.6)))} 起` : '协商'
-  const duration = service.durationMinutes ? `${Math.round(service.durationMinutes / 60) || 1} 小时` : '1 小时'
-  const refined = service.refinedCount ? `${service.refinedCount} 张精修` : '精修张数沟通'
-  return [
-    { title: '基础拍摄', price: basePrice, desc: `${duration} / ${refined} / 适合个人写真`, action: '选择套餐' },
-    { title: '标准拍摄', price: standard, desc: '2 小时 / 路线建议 / 会话确认细节', action: '选择套餐' },
-    { title: '定制拍摄', price: '协商', desc: '妆造 / 棚拍 / 商拍 / 复杂需求', action: '咨询' }
-  ]
-}
-
 function galleryItems(service) {
   const images = splitTags(service.images)
   const items = images.length ? images.slice(0, 5).map(image => `url(${image})`) : []
@@ -277,17 +264,15 @@ export function ServicePackageDetailPage() {
             ))}
           </div>
           <div className="text-block">
-            <h3>服务内容与价格区间</h3>
-            <div className="package-grid">
-              {packageCards(service).map(item => (
-                <div className="package" key={item.title}>
-                  <h4>{item.title}</h4>
-                  <div className="price">{item.price}</div>
-                  <p className="micro">{item.desc}</p>
-                  <button className="mini-btn owner-only" type="button" onClick={() => startChat(`我想咨询「${service.title || '橱窗'}」的${item.title}。`)}>{item.action}</button>
-                </div>
-              ))}
+            <h3>价格区间</h3>
+            <div className="price-range-panel">
+              <strong>{price}</strong>
+              <span>{service.durationMinutes ? `${service.durationMinutes} 分钟` : '时长沟通确认'} · {service.refinedCount ? `${service.refinedCount} 张精修` : '精修张数沟通'} · {service.deliveryDays ? `${service.deliveryDays} 天交付` : '交付时间沟通'}</span>
             </div>
+          </div>
+          <div className="text-block">
+            <h3>服务说明</h3>
+            <p>{service.description || '暂无服务说明。'}</p>
           </div>
           <div className="text-block">
             <h3>拍摄流程</h3>
@@ -297,12 +282,6 @@ export function ServicePackageDetailPage() {
               ))}
             </div>
           </div>
-          {service.description && (
-            <div className="text-block">
-              <h3>服务说明</h3>
-              <p>{service.description}</p>
-            </div>
-          )}
         </article>
         <aside className="aside">
           <div className="aside-card">

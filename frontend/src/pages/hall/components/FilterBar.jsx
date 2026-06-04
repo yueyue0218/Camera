@@ -14,10 +14,12 @@ export function FilterBar({ filters, onChange, onApplyFilters, onPublishClick, c
   return (
     <section className="toolbar" aria-label="大厅筛选">
       <label className="search">
-        <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="11" cy="11" r="7" />
-          <path d="M20 20l-3.2-3.2" />
-        </svg>
+        <button className="search-icon-btn" type="button" aria-label="搜索" onClick={() => onApplyFilters(filters)}>
+          <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M20 20l-3.2-3.2" />
+          </svg>
+        </button>
         <input
           value={filters.keyword}
           onChange={event => onChange({ keyword: event.target.value })}
@@ -25,7 +27,6 @@ export function FilterBar({ filters, onChange, onApplyFilters, onPublishClick, c
           placeholder="搜索摄影师、约拍需求、地点或风格"
         />
       </label>
-      <button className="secondary-btn filter-search-btn" type="button" onClick={() => onApplyFilters(filters)}>搜索</button>
       <label className="filter-control">
         <select className="filter-select" value={filters.cityCode} onChange={event => updateAndApply({ cityCode: event.target.value })}>
           <option value="">城市</option>

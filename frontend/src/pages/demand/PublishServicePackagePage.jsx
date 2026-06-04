@@ -12,6 +12,8 @@ import {
 } from './utils/servicePackageFormUtils.js'
 import '../portraHall.css'
 
+const MAX_UPLOAD_IMAGES = 9
+
 export function PublishServicePackagePage() {
   const navigate = useNavigate()
   const { currentUser } = useAuth()
@@ -48,10 +50,18 @@ export function PublishServicePackagePage() {
   async function uploadPortfolioFiles(files) {
     const selectedFiles = Array.from(files || []).filter(Boolean)
     if (!selectedFiles.length) return
+    const currentCount = Array.isArray(form.portfolioIds) ? form.portfolioIds.length : 0
+    const remaining = MAX_UPLOAD_IMAGES - currentCount
+    if (remaining <= 0) {
+      setNotice({ type: 'error', text: `最多上传 ${MAX_UPLOAD_IMAGES} 张照片` })
+      return
+    }
+    const filesToUpload = selectedFiles.slice(0, remaining)
     setUploading(true)
     setNotice(null)
     try {
-      const uploaded = await Promise.all(selectedFiles.map(file => fileApi.upload(file, {
+      const previewUrls = filesToUpload.map(file => URL.createObjectURL(file))
+      const uploaded = await Promise.all(filesToUpload.map(file => fileApi.upload(file, {
         bizType: 'SERVICE_PORTFOLIO',
         visibility: 'PUBLIC'
       }, currentUser)))
@@ -64,14 +74,27 @@ export function PublishServicePackagePage() {
         portfolioFileNames: [
           ...(Array.isArray(current.portfolioFileNames) ? current.portfolioFileNames : []),
           ...uploaded.map(item => item.originalName).filter(Boolean)
+        ],
+        portfolioPreviewUrls: [
+          ...(Array.isArray(current.portfolioPreviewUrls) ? current.portfolioPreviewUrls : []),
+          ...previewUrls
         ]
       }))
-      setNotice({ type: 'success', text: '作品图已上传' })
+      setNotice({ type: 'success', text: selectedFiles.length > remaining ? `已上传前 ${remaining} 张，最多支持 ${MAX_UPLOAD_IMAGES} 张` : '作品图已上传' })
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     } finally {
       setUploading(false)
     }
+  }
+
+  function removePortfolioFile(index) {
+    setForm(current => ({
+      ...current,
+      portfolioIds: (current.portfolioIds || []).filter((_, itemIndex) => itemIndex !== index),
+      portfolioFileNames: (current.portfolioFileNames || []).filter((_, itemIndex) => itemIndex !== index),
+      portfolioPreviewUrls: (current.portfolioPreviewUrls || []).filter((_, itemIndex) => itemIndex !== index)
+    }))
   }
 
   if (currentUser.role !== 'PROVIDER') {
@@ -97,6 +120,7 @@ export function PublishServicePackagePage() {
         onSubmit={submit}
         onSaveDraft={saveDraft}
         onFilesSelected={uploadPortfolioFiles}
+        onRemoveFile={removePortfolioFile}
       />
     </main>
   )

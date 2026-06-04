@@ -39,6 +39,7 @@ export function createDefaultServicePackageForm() {
     portfolioIdsText: '',
     portfolioIds: [],
     portfolioFileNames: [],
+    portfolioPreviewUrls: [],
     description: '适合毕业照、校园写真和轻量约拍。',
     timeDescription: '近一周周末可约',
     timeTagsText: 'NEAR_7_DAYS'

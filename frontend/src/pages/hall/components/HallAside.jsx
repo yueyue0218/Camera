@@ -1,9 +1,33 @@
+import { useEffect, useState } from 'react'
 import { cityName, firstText, moneyRange, shortDateTime, splitTags } from './hallUtils.js'
 
-const tips = [
-  '保持自然微笑，眼神放松，不要一直盯镜头。',
-  '衣服尽量选择低饱和色，和场景留出呼吸感。',
-  '拍摄前和摄影师确认精修张数、交付时间和参考风格。'
+export const PORTRA_TIPS = [
+  '拍摄前先确定主光方向，让脸微微转向光源，肤色会更干净。',
+  '下巴轻轻向前再微收，比单纯低头更容易让脸部线条清晰。',
+  '肩膀不要平端着，一高一低或微微侧身会更自然。',
+  '手不知道放哪时，可以整理头发、扶包带、摸袖口或轻触衣领。',
+  '眼神先看远处再回到镜头，表情会比一直盯镜头更松弛。',
+  '选择低饱和、少大 Logo 的衣服，人物会更耐看。',
+  '拍毕业照时保留校园建筑和路牌信息，照片更有纪念点。',
+  '拍摄前和摄影师确认精修张数、交付时间、调色倾向和使用授权。',
+  '自然光人像优先选清晨、傍晚或阴天，正午强光尽量进阴影里拍。',
+  '站姿可以把重心放在后脚，前脚轻点地，身体不会僵。',
+  '坐姿不要完全塌腰，腰背微微离开椅背会更有精神。',
+  '多人合照用三角构图和高低错落，比排成直线更有层次。',
+  '拍摄时多走动、回头、转身，动态连拍更容易抓到自然瞬间。',
+  '近景人像避免广角贴脸，稍微拉开距离会减少面部变形。',
+  '妆面在镜头里会被吃掉一点，底妆干净和眼神重点比浓妆更重要。',
+  '道具保持少而具体，比如书、花、相机、毕业证，别让道具抢人。',
+  '参考图最好带上喜欢和不喜欢的例子，沟通效率会高很多。',
+  '拍摄前一天少熬夜，服装提前熨平，现场状态会稳定很多。',
+  '如果紧张，可以先拍背影、侧脸、走路，再逐步面对镜头。',
+  '每组场景至少保留远景、半身、特写三种景别，成片更完整。'
+]
+
+const HOT_STYLES = [
+  { label: '清透毕业照', filter: '毕业照', note: '毕业季稳定高频，校园场景和自然光最容易出片。' },
+  { label: '自然光写真', filter: '写真', note: '低饱和穿搭、松弛动作和生活化场景更受欢迎。' },
+  { label: '二次元 Cosplay', filter: '二次元', note: '角色妆造、棚拍布光和后期氛围需求增长明显。' }
 ]
 
 function demandTags(demand) {
@@ -11,17 +35,35 @@ function demandTags(demand) {
   return serviceTypes.length ? serviceTypes : splitTags(demand?.styleTags)
 }
 
-export function DemandAside({ selectedDemand, error, currentUser, onRespond }) {
+export function DemandAside({ selectedDemand, error, currentUser, onRespond, onHotStyleClick }) {
+  const [tipIndex, setTipIndex] = useState(0)
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setTipIndex(current => (current + 1) % PORTRA_TIPS.length)
+    }, 30000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  function nextTip() {
+    setTipIndex(current => (current + 1) % PORTRA_TIPS.length)
+  }
+
   return (
     <aside className="aside">
       <div className="aside-card">
         <h3>热门风格</h3>
-        <div className="aside-item"><strong>暂无统计</strong><span>等待后端大厅统计 / 热门风格接口补充后展示真实热度。</span></div>
+        {HOT_STYLES.map(style => (
+          <button className="aside-item hot-style-item" key={style.label} type="button" onClick={() => onHotStyleClick?.(style.filter)}>
+            <strong>{style.label}</strong>
+            <span>{style.note}</span>
+          </button>
+        ))}
       </div>
-      <div className="aside-card">
+      <button className="aside-card tips-card" type="button" onClick={nextTip}>
         <h3>上镜Tips</h3>
-        <p className="note-strip">{error ? '后端启动后，这里会保留大厅布局并加载真实需求。' : tips[0]}</p>
-      </div>
+        <p className="note-strip">{error ? '后端启动后，这里会保留大厅布局并加载真实需求。' : PORTRA_TIPS[tipIndex]}</p>
+      </button>
       {selectedDemand && (
         <div className="aside-card">
           <h3>{firstText(selectedDemand.title, selectedDemand.scene) || '需求详情'}</h3>
