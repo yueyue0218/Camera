@@ -1,1 +1,1 @@
-export { OrdersPage } from '../legacy/CameraPages.jsx'
+export { OrdersPage } from './OrdersPage.jsx'
