@@ -57,11 +57,30 @@ function tagList(...groups) {
 }
 
 function sameId(a, b) {
-  return a !== undefined && a !== null && b !== undefined && b !== null && Number(a) === Number(b)
+  if (a === undefined || a === null || b === undefined || b === null) return false
+  const left = String(a)
+  const right = String(b)
+  if (left === right) return true
+  const leftNumber = Number(a)
+  const rightNumber = Number(b)
+  return Number.isFinite(leftNumber) && Number.isFinite(rightNumber) && leftNumber === rightNumber
 }
 
-function currentUserId(currentUser) {
-  return currentUser?.userId ?? currentUser?.id
+function currentUserIds(currentUser) {
+  return [
+    currentUser?.userId,
+    currentUser?.id,
+    currentUser?.customerId,
+    currentUser?.providerId,
+    currentUser?.photographerId
+  ].filter(value => value !== undefined && value !== null && value !== '')
+}
+
+function isCurrentUserOwner(ownerIds, currentUser) {
+  const userIds = currentUserIds(currentUser)
+  return ownerIds
+    .filter(value => value !== undefined && value !== null && value !== '')
+    .some(ownerId => userIds.some(userId => sameId(ownerId, userId)))
 }
 
 function referenceSlots(referenceFileIds) {
@@ -159,8 +178,12 @@ export function DemandDetailPage() {
   const title = firstText(demand.title, demand.scene) || '暂无标题'
   const place = [cityName(demand.cityName || demand.cityCode), demand.location].filter(Boolean).join(' · ') || '暂无地点'
   const timeText = demand.timeDescription || demand.timeSlot || readableDate(demand.expectedDate) || '暂无'
-  const demandOwnerId = demand.customerId ?? demand.publisherId ?? demand.ownerId
-  const isDemandOwner = sameId(demandOwnerId, currentUserId(currentUser))
+  const isDemandOwner = isCurrentUserOwner([
+    demand.customerId,
+    demand.publisherId,
+    demand.ownerId,
+    demand.userId
+  ], currentUser)
   const canRespond = currentUser.role === 'PROVIDER' && demand.status === 'OPEN'
 
   async function respondDemand() {
@@ -315,8 +338,13 @@ export function ServicePackageDetailPage() {
   const credit = service.photographerCreditScore ?? service.providerCreditScore ?? service.creditScore
   const city = cityName(service.cityName || service.cityCode) || service.serviceArea || '暂无城市'
   const price = service.priceRange || `${money(service.basePriceCent)} 起`
-  const serviceOwnerId = service.providerId ?? service.photographerId ?? service.creatorId
-  const isServiceOwner = sameId(serviceOwnerId, currentUserId(currentUser))
+  const isServiceOwner = isCurrentUserOwner([
+    service.providerId,
+    service.photographerId,
+    service.creatorId,
+    service.ownerId,
+    service.userId
+  ], currentUser)
   const isCustomerViewer = currentUser.role === 'CUSTOMER'
 
   async function startChat(message = `我想预约「${service.title || '这个橱窗'}」，想进一步确认时间与服务内容。`) {
