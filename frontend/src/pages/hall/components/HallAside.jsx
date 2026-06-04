@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { cityName, firstText, moneyRange, shortDateTime, splitTags } from './hallUtils.js'
+import { cityName, firstText, latestTimeText, moneyRange, splitTags } from './hallUtils.js'
 
 export const PORTRA_TIPS = [
   '拍摄前先确定主光方向，让脸微微转向光源，肤色会更干净。',
@@ -35,8 +35,13 @@ function demandTags(demand) {
   return serviceTypes.length ? serviceTypes : splitTags(demand?.styleTags)
 }
 
-export function DemandAside({ selectedDemand, error, currentUser, onRespond, onHotStyleClick }) {
+function sameId(a, b) {
+  return a !== undefined && a !== null && b !== undefined && b !== null && Number(a) === Number(b)
+}
+
+export function DemandAside({ selectedDemand, error, currentUser, onRespond, onHotStyleClick, onEditDemand, onCloseDemand }) {
   const [tipIndex, setTipIndex] = useState(0)
+  const isDemandOwner = selectedDemand && currentUser.role === 'CUSTOMER' && sameId(selectedDemand.customerId, currentUser.userId)
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -67,11 +72,20 @@ export function DemandAside({ selectedDemand, error, currentUser, onRespond, onH
       {selectedDemand && (
         <div className="aside-card">
           <h3>{firstText(selectedDemand.title, selectedDemand.scene) || '需求详情'}</h3>
-          <div className="detail-publish-time">发布 {shortDateTime(selectedDemand.createdAt)}</div>
+          <div className="detail-publish-time">{latestTimeText(selectedDemand)}</div>
           <div className="aside-item"><strong>发布者</strong><span>{firstText(selectedDemand.customerNickname, selectedDemand.customerName) || '暂无'}</span></div>
           <div className="aside-item"><strong>地点</strong><span>{[cityName(selectedDemand.cityName || selectedDemand.cityCode), selectedDemand.location].filter(Boolean).join(' · ') || '暂无'}</span></div>
           <div className="aside-item"><strong>预算</strong><span>{moneyRange(selectedDemand.budgetMinCent, selectedDemand.budgetMaxCent)}</span></div>
           <div className="aside-item"><strong>标签</strong><span>{demandTags(selectedDemand).join(' / ') || '暂无'}</span></div>
+        </div>
+      )}
+      {isDemandOwner && (
+        <div className="aside-card">
+          <h3>管理需求</h3>
+          <div className="side-actions">
+            <button className="secondary-btn" type="button" onClick={() => onEditDemand?.(selectedDemand)}>编辑需求</button>
+            <button className="secondary-btn danger-action-btn" type="button" onClick={() => onCloseDemand?.(selectedDemand)}>下架需求</button>
+          </div>
         </div>
       )}
       {selectedDemand && (

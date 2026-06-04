@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fileApi } from '../../../api/fileApi.js'
-import { cityName, demandStatusText, firstText, moneyRange, readableDate, shortDateTime, splitTags, timeTagLabel } from './hallUtils.js'
+import { cityName, demandStatusText, firstText, latestTimeText, moneyRange, readableDate, splitTags, timeTagLabel } from './hallUtils.js'
 
 export function DemandCard({ demand, currentUser, onOpen, onDetail, onRespond }) {
   const tags = splitTags(demand.serviceTypes).length ? splitTags(demand.serviceTypes) : splitTags(demand.styleTags)
@@ -56,13 +56,9 @@ export function DemandCard({ demand, currentUser, onOpen, onDetail, onRespond })
         <div className="meta-item"><span>预算</span><b>{moneyRange(demand.budgetMinCent, demand.budgetMaxCent)}</b></div>
         <div className="meta-item"><span>时间</span><b>{demand.timeDescription || demand.timeSlot || readableDate(demand.expectedDate) || '暂无'}</b></div>
         <div className="meta-item"><span>需求</span><b>{tags.slice(0, 2).join(' / ') || '暂无'}</b></div>
-        <div className="meta-item"><span>发布时间</span><b>{shortDateTime(demand.createdAt)}</b></div>
+        <div className="meta-item"><span>时间更新</span><b>{latestTimeText(demand)}</b></div>
       </div>
       <p className="ticket-desc">{demand.description || '暂无说明'}</p>
-      <div className="publish-brief">
-        <b>响应</b>
-        <span>{Number.isFinite(Number(demand.responseCount)) ? `${demand.responseCount} 人` : '暂无'}</span>
-      </div>
       <div className="card-actions">
         <button className="ghost-btn" type="button" onClick={(event) => { event.stopPropagation(); onDetail() }}>查看详情</button>
         <button className="solid-btn photographer-only" type="button" onClick={(event) => { event.stopPropagation(); onRespond() }}>

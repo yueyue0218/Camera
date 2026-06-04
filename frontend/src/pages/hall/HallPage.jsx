@@ -239,6 +239,39 @@ export function HallPage() {
     })
   }
 
+  function editDemand(demand) {
+    navigate(`/demands/${demand.demandId}/edit`)
+  }
+
+  async function closeDemand(demand) {
+    if (!window.confirm('确认下架这个需求吗？下架后不会继续作为开放需求展示。')) return
+    try {
+      await demandApi.close(demand.demandId, currentUser)
+      await loadDemands(filters)
+      setSelectedDemand(null)
+      window.alert('需求已下架')
+    } catch (error) {
+      window.alert(normalizeError(error))
+    }
+  }
+
+  function editService(service) {
+    navigate(`/service-packages/${service.serviceId}/edit`)
+  }
+
+  async function offlineService(service) {
+    if (!window.confirm('确认下架这个橱窗吗？下架后不会继续作为在线橱窗展示。')) return
+    try {
+      await servicePackageApi.offline(service.serviceId, currentUser)
+      await loadServices(filters)
+      await loadInterests(filters)
+      setSelectedService(null)
+      window.alert('橱窗已下架')
+    } catch (error) {
+      window.alert(normalizeError(error))
+    }
+  }
+
   async function startServiceChat(service) {
     try {
       const result = await servicePackageApi.startChat(service.serviceId, {
@@ -279,6 +312,8 @@ export function HallPage() {
         onOpen={() => openService(service)}
         onDetail={() => navigate(`/service-packages/${service.serviceId}`)}
         onReserve={() => startServiceChat(service)}
+        onEdit={() => editService(service)}
+        onOffline={() => offlineService(service)}
       />
     ))
   }
@@ -314,6 +349,8 @@ export function HallPage() {
               currentUser={currentUser}
               onRespond={respondDemand}
               onHotStyleClick={applyHotStyle}
+              onEditDemand={editDemand}
+              onCloseDemand={closeDemand}
             />
           </div>
         </section>

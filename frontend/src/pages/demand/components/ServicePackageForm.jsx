@@ -20,7 +20,7 @@ function timeTagText(value) {
   return TIME_TAGS.filter(tag => tags.includes(tag.value)).map(tag => tag.label).join(' / ') || '未选择'
 }
 
-export function ServicePackageForm({ form, errors, uploading, onChange, onSubmit, onSaveDraft, onFilesSelected, onRemoveFile }) {
+export function ServicePackageForm({ form, errors, uploading, onChange, onSubmit, onSaveDraft, onFilesSelected, onRemoveFile, mode = 'create' }) {
   const selectedTimeTags = splitTags(form.timeTagsText)
   const portfolioItems = (form.portfolioIds || []).map((fileId, index) => ({
     fileId,
@@ -38,7 +38,7 @@ export function ServicePackageForm({ form, errors, uploading, onChange, onSubmit
   return (
     <form className="form-grid" onSubmit={onSubmit}>
       <article className="panel-card">
-        <h1 className="detail-title">发布橱窗</h1>
+        <h1 className="detail-title">{mode === 'edit' ? '编辑橱窗' : '发布橱窗'}</h1>
         {!!errors.length && (
           <Alert severity="warning" className="form-alert">
             {errors.map(error => <div key={error}>{error}</div>)}
@@ -138,8 +138,8 @@ export function ServicePackageForm({ form, errors, uploading, onChange, onSubmit
         <div className="preview-line"><span>价格</span><b>¥{form.basePriceYuan || 0}-{form.maxPriceYuan || 0}</b></div>
         <div className="preview-line"><span>时间描述</span><b>{form.timeDescription || '近三天可约'}</b></div>
         <div className="preview-line"><span>时间标签</span><b>{timeTagText(form.timeTagsText)}</b></div>
-        <button className="primary-btn" type="submit">发布橱窗</button>
-        <button className="secondary-btn draft-btn" type="button" onClick={onSaveDraft}>保存草稿</button>
+        <button className="primary-btn" type="submit">{mode === 'edit' ? '保存橱窗' : '发布橱窗'}</button>
+        {mode !== 'edit' && <button className="secondary-btn draft-btn" type="button" onClick={onSaveDraft}>保存草稿</button>}
       </aside>
     </form>
   )

@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
 import { fileApi } from '../../../api/fileApi.js'
-import { cityName, countText, gradientFor, money, shortDateTime, splitTags, timeTagLabel } from './hallUtils.js'
+import { cityName, countText, gradientFor, latestTimeText, money, splitTags, timeTagLabel } from './hallUtils.js'
 
-export function ServicePackageCard({ service, currentUser, onOpen, onDetail, onReserve }) {
+function sameId(a, b) {
+  return a !== undefined && a !== null && b !== undefined && b !== null && Number(a) === Number(b)
+}
+
+export function ServicePackageCard({ service, currentUser, onOpen, onDetail, onReserve, onEdit, onOffline }) {
   const styleTags = splitTags(service.styleTags)
   const timeTags = splitTags(service.timeTags)
   const firstPortfolioId = Array.isArray(service.portfolioIds) ? service.portfolioIds[0] : null
@@ -10,6 +14,10 @@ export function ServicePackageCard({ service, currentUser, onOpen, onDetail, onR
   const [uploadedCoverUrl, setUploadedCoverUrl] = useState('')
   const cover = uploadedCoverUrl || fallbackCover
   const isCustomer = currentUser.role === 'CUSTOMER'
+  const isProviderOwner = currentUser.role === 'PROVIDER' && (
+    sameId(service.providerId, currentUser.userId) ||
+    sameId(service.photographerId, currentUser.userId)
+  )
   const usage = [
     countText(service.bookingCount, ' 次预约'),
     countText(service.orderCount, ' 单成交')
@@ -67,13 +75,19 @@ export function ServicePackageCard({ service, currentUser, onOpen, onDetail, onR
         <div className="time-tag-row">
           {timeTags.length ? timeTags.map(tag => <span className="time-chip" key={tag}>{timeTagLabel(tag)}</span>) : <span className="chip">未选择时间标签</span>}
         </div>
-        <div className="publish-brief"><b>发布</b><span>{shortDateTime(service.createdAt)}</span></div>
-        <div className="show-actions two-actions">
+        <div className="publish-brief"><b>时间</b><span>{latestTimeText(service)}</span></div>
+        <div className={`show-actions ${isProviderOwner ? 'three-actions' : 'two-actions'}`}>
           <button className="ghost-btn" type="button" onClick={(event) => { event.stopPropagation(); onDetail() }}>查看橱窗</button>
           {isCustomer && (
             <button className="solid-btn owner-only" type="button" onClick={(event) => { event.stopPropagation(); onReserve() }}>
               现在预订
             </button>
+          )}
+          {isProviderOwner && (
+            <>
+              <button className="ghost-btn provider-action-btn" type="button" onClick={(event) => { event.stopPropagation(); onEdit?.() }}>编辑</button>
+              <button className="ghost-btn danger-action-btn" type="button" onClick={(event) => { event.stopPropagation(); onOffline?.() }}>下架</button>
+            </>
           )}
         </div>
       </div>

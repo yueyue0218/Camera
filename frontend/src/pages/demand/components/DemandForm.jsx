@@ -10,7 +10,7 @@ function timeTagText(tags = []) {
   return TIME_TAGS.filter(tag => tags.includes(tag.value)).map(tag => tag.label).join(' / ') || '未选择'
 }
 
-export function DemandForm({ form, uploading, onChange, onSubmit, onSaveDraft, onFilesSelected, onRemoveFile }) {
+export function DemandForm({ form, uploading, onChange, onSubmit, onSaveDraft, onFilesSelected, onRemoveFile, mode = 'create' }) {
   const timeTags = Array.isArray(form.timeTags) ? form.timeTags : []
   const referenceItems = (form.referenceFileIds || []).map((fileId, index) => ({
     fileId,
@@ -28,7 +28,7 @@ export function DemandForm({ form, uploading, onChange, onSubmit, onSaveDraft, o
   return (
     <form className="form-grid" onSubmit={onSubmit}>
       <article className="panel-card">
-        <h1 className="detail-title">发布需求</h1>
+        <h1 className="detail-title">{mode === 'edit' ? '编辑需求' : '发布需求'}</h1>
         <div className="form-section">
           <h3>基础信息</h3>
           <div className="field-grid">
@@ -117,8 +117,8 @@ export function DemandForm({ form, uploading, onChange, onSubmit, onSaveDraft, o
         <div className="preview-line"><span>预算</span><b>{Number(form.budgetMinYuan) === 0 && Number(form.budgetMaxYuan) === 0 ? '互勉' : `¥${form.budgetMinYuan}-${form.budgetMaxYuan}`}</b></div>
         <div className="preview-line"><span>时间描述</span><b>{form.timeDescription || form.timeSlot || '待沟通'}</b></div>
         <div className="preview-line"><span>时间标签</span><b>{timeTagText(timeTags)}</b></div>
-        <button className="primary-btn" type="submit">发布需求</button>
-        <button className="secondary-btn draft-btn" type="button" onClick={onSaveDraft}>保存草稿</button>
+        <button className="primary-btn" type="submit">{mode === 'edit' ? '保存需求' : '发布需求'}</button>
+        {mode !== 'edit' && <button className="secondary-btn draft-btn" type="button" onClick={onSaveDraft}>保存草稿</button>}
       </aside>
     </form>
   )

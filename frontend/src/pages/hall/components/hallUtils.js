@@ -174,6 +174,36 @@ export function shortDateTime(value) {
   return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
 }
 
+export function fullDateTime(value) {
+  if (!value) return '暂无'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).replace(/\//g, '-')
+}
+
+export function isUpdatedRecord(record) {
+  if (!record?.updatedAt || !record?.createdAt) return Boolean(record?.updatedAt)
+  const updated = new Date(record.updatedAt).getTime()
+  const created = new Date(record.createdAt).getTime()
+  if (!Number.isFinite(updated) || !Number.isFinite(created)) return true
+  return updated > created + 1000
+}
+
+export function latestTimeText(record, detail = false) {
+  const value = record?.updatedAt || record?.createdAt
+  const updated = isUpdatedRecord(record)
+  const prefix = detail ? (updated ? '更新时间' : '发布时间') : (updated ? '更新' : '发布')
+  const separator = detail ? '：' : ' '
+  return `${prefix}${separator}${fullDateTime(value)}`
+}
+
 export function readableDate(value) {
   if (!value) return ''
   const date = new Date(value)

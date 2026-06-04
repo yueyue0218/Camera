@@ -6,6 +6,11 @@ import {
   DEFAULT_TYPE
 } from '../../hall/components/hallUtils.js'
 
+function centToYuan(value, fallback = '') {
+  const number = Number(value)
+  return Number.isFinite(number) ? Math.round(number / 100) : fallback
+}
+
 export function createDefaultDemandForm() {
   return {
     title: '想拍一组毕业照',
@@ -54,5 +59,27 @@ export function buildDemandPayload(form) {
     styleTags: Array.from(styleTags),
     referenceFileIds: Array.isArray(form.referenceFileIds) ? form.referenceFileIds : [],
     description: [form.title, form.description].filter(value => String(value || '').trim()).join('\n')
+  }
+}
+
+export function demandDetailToForm(demand = {}) {
+  const descriptionLines = String(demand.description || '').split(/\r?\n/)
+  const hasGeneratedTitle = !demand.title && descriptionLines.length > 1
+  return {
+    title: demand.title || demand.scene || descriptionLines[0] || '想拍一组毕业照',
+    scene: demand.scene || DEFAULT_TYPE,
+    cityCode: demand.cityCode || DEFAULT_CITY_CODE,
+    location: demand.location || '',
+    expectedDate: demand.expectedDate || '',
+    timeSlot: demand.timeSlot || '',
+    timeDescription: demand.timeDescription || demand.timeSlot || '',
+    timeTags: Array.isArray(demand.timeTags) ? demand.timeTags : [],
+    budgetMinYuan: centToYuan(demand.budgetMinCent, DEFAULT_BUDGET_MIN_YUAN),
+    budgetMaxYuan: centToYuan(demand.budgetMaxCent, DEFAULT_BUDGET_MAX_YUAN),
+    styleTagsText: Array.isArray(demand.styleTags) ? demand.styleTags.join(',') : '',
+    referenceFileIds: Array.isArray(demand.referenceFileIds) ? demand.referenceFileIds : [],
+    referenceFileNames: [],
+    referencePreviewUrls: [],
+    description: hasGeneratedTitle ? descriptionLines.slice(1).join('\n') : (demand.description || '')
   }
 }

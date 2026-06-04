@@ -5,7 +5,7 @@ import { fileApi } from '../../api/fileApi.js'
 import { servicePackageApi } from '../../api/servicePackageApi.js'
 import { useAuth } from '../../AuthContext.jsx'
 import { EmptyState, ErrorState, LoadingState } from './components/HallState.jsx'
-import { cityName, firstText, gradientFor, money, moneyRange, readableDate, shortDateTime, splitTags, timeTagLabel } from './components/hallUtils.js'
+import { cityName, firstText, gradientFor, latestTimeText, money, moneyRange, readableDate, splitTags, timeTagLabel } from './components/hallUtils.js'
 import { promptAndRespondDemand } from './utils/respondDemand.js'
 import '../portraHall.css'
 
@@ -15,6 +15,21 @@ function createStatus() {
 
 function normalizeError(error) {
   return error?.message || '请求失败，启动后端服务后会显示真实数据。'
+}
+
+const demandStatusLabel = {
+  OPEN: '开放中',
+  MATCHED: '已匹配',
+  CLOSED: '已下架',
+  PENDING_CUSTOMER_ACCEPT: '待接单主确认',
+  ACCEPTED: '已接受',
+  REJECTED: '已拒绝'
+}
+
+const serviceStatusLabel = {
+  ONLINE: '在线',
+  OFFLINE: '已下架',
+  HIDDEN: '已隐藏'
 }
 
 function useBodyRole(role) {
@@ -39,6 +54,10 @@ function DetailShell({ backTo = '/hall', backLabel, children }) {
 
 function tagList(...groups) {
   return groups.flatMap(group => splitTags(group)).filter(Boolean)
+}
+
+function sameId(a, b) {
+  return a !== undefined && a !== null && b !== undefined && b !== null && Number(a) === Number(b)
 }
 
 function referenceSlots(referenceFileIds) {
@@ -99,6 +118,7 @@ function UploadedGallery({ urls, emptyLabels }) {
 
 export function DemandDetailPage() {
   const { demandId } = useParams()
+  const navigate = useNavigate()
   const { currentUser } = useAuth()
   const [demand, setDemand] = useState(null)
   const [status, setStatus] = useState(createStatus)
@@ -135,6 +155,8 @@ export function DemandDetailPage() {
   const title = firstText(demand.title, demand.scene) || '暂无标题'
   const place = [cityName(demand.cityName || demand.cityCode), demand.location].filter(Boolean).join(' · ') || '暂无地点'
   const timeText = demand.timeDescription || demand.timeSlot || readableDate(demand.expectedDate) || '暂无'
+  const isDemandOwner = currentUser.role === 'CUSTOMER' && sameId(demand.customerId, currentUser.userId)
+  const canRespond = currentUser.role === 'PROVIDER' && demand.status === 'OPEN'
 
   async function respondDemand() {
     await promptAndRespondDemand({
@@ -149,6 +171,18 @@ export function DemandDetailPage() {
     })
   }
 
+  async function closeDemand() {
+    if (!window.confirm('确认下架这个需求吗？下架后不会继续作为开放需求展示。')) return
+    try {
+      const result = await demandApi.close(demand.demandId, currentUser)
+      const detail = await demandApi.detail(demand.demandId, currentUser).catch(() => result)
+      setDemand(detail || result || demand)
+      window.alert('需求已下架')
+    } catch (error) {
+      window.alert(normalizeError(error))
+    }
+  }
+
   return (
     <DetailShell backLabel="← 返回订单大厅">
       <div className="detail-grid">
@@ -158,7 +192,9 @@ export function DemandDetailPage() {
             <span className="tag">{timeTags[0] ? timeTagLabel(timeTags[0]) : '周末'}</span>
             {(styles.length ? styles : ['校园', '清透']).slice(0, 3).map(tag => <span className="tag gray" key={tag}>{tag}</span>)}
             <span className="tag blue">已实名</span>
+            <span className={`tag ${demand.status !== 'OPEN' ? 'blue' : 'gray'}`}>{demandStatusLabel[demand.status] || demand.status || '开放中'}</span>
           </div>
+          <div className="detail-publish-time">{latestTimeText(demand, true)}</div>
           <div className="info-grid">
             <div className="info-cell"><span>预算</span><b>{moneyRange(demand.budgetMinCent, demand.budgetMaxCent)}</b></div>
             <div className="info-cell"><span>拍摄时间</span><b>{timeText}</b></div>
@@ -188,17 +224,28 @@ export function DemandDetailPage() {
               <div className="mini-avatar" aria-hidden="true" />
               <div>
                 <strong>{firstText(demand.customerNickname, demand.customerName) || '单主'}</strong><br />
-                <span className="micro">响应 {demand.responseCount ?? 0} 次 · 发布 {shortDateTime(demand.createdAt)}</span>
+                <span className="micro">响应 {demand.responseCount ?? 0} 次 · {latestTimeText(demand)}</span>
               </div>
             </div>
             <div className="aside-item"><strong>完成约拍</strong><span>后端暂无发布者历史统计接口，当前展示需求响应数据。</span></div>
           </div>
+          {isDemandOwner && (
+            <div className="aside-card">
+              <h3>管理需求</h3>
+              <div className="detail-op-actions side-actions">
+                <button className="primary-btn" type="button" onClick={() => navigate(`/demands/${demand.demandId}/edit`)}>编辑需求</button>
+                <button className="secondary-btn danger-action-btn" type="button" onClick={closeDemand}>下架需求</button>
+              </div>
+            </div>
+          )}
+          {canRespond && (
           <div className="photographer-only aside-card">
             <h3>操作</h3>
             <div className="side-actions">
               <button className="primary-btn photographer-only" type="button" onClick={respondDemand}>我要响应</button>
             </div>
           </div>
+          )}
           <div className="photographer-only aside-card">
             <h3>安全提示</h3>
             <p className="note-strip">响应前建议确认地点、精修张数、交付时间和是否需要妆造。</p>
@@ -264,6 +311,11 @@ export function ServicePackageDetailPage() {
   const credit = service.photographerCreditScore ?? service.providerCreditScore ?? service.creditScore
   const city = cityName(service.cityName || service.cityCode) || service.serviceArea || '暂无城市'
   const price = service.priceRange || `${money(service.basePriceCent)} 起`
+  const isServiceOwner = currentUser.role === 'PROVIDER' && (
+    sameId(service.providerId, currentUser.userId) ||
+    sameId(service.photographerId, currentUser.userId)
+  )
+  const isCustomerViewer = currentUser.role === 'CUSTOMER'
 
   async function startChat(message = `我想预约「${service.title || '这个橱窗'}」，想进一步确认时间与服务内容。`) {
     try {
@@ -298,6 +350,18 @@ export function ServicePackageDetailPage() {
     window.alert('后端暂无关注摄影师接口，当前按钮只能按 HTML 复刻展示。')
   }
 
+  async function offlineService() {
+    if (!window.confirm('确认下架这个橱窗吗？下架后不会继续作为在线橱窗展示。')) return
+    try {
+      const result = await servicePackageApi.offline(service.serviceId, currentUser)
+      const detail = await servicePackageApi.detail(service.serviceId, currentUser).catch(() => result)
+      setService(detail || result || service)
+      window.alert('橱窗已下架')
+    } catch (error) {
+      window.alert(normalizeError(error))
+    }
+  }
+
   return (
     <DetailShell backLabel="← 返回橱窗大厅">
       <div className="detail-grid">
@@ -308,8 +372,9 @@ export function ServicePackageDetailPage() {
             <span className="tag gray">{city}</span>
             {(styleTags.length ? styleTags : ['清透日常', '校园毕业']).slice(0, 3).map(tag => <span className="tag gray" key={tag}>{tag}</span>)}
             <span className="tag">{timeTags[0] ? timeTagLabel(timeTags[0]) : '时间可协商'}</span>
+            <span className={`tag ${service.status !== 'ONLINE' ? 'blue' : 'gray'}`}>{serviceStatusLabel[service.status] || service.status || '在线'}</span>
           </div>
-          <div className="detail-publish-time">发布时间：{shortDateTime(service.createdAt)}</div>
+          <div className="detail-publish-time">{latestTimeText(service, true)}</div>
           <div className={`gallery ${uploadedPortfolioUrls.length > 5 ? 'is-scrollable' : ''}`}>
             {galleryItems(service, uploadedPortfolioUrls).map((art, index) => (
               <div className="photo" data-no={String(index + 1).padStart(2, '0')} style={{ '--art': art }} key={`${art}-${index}`} />
@@ -355,13 +420,24 @@ export function ServicePackageDetailPage() {
             </div>
             <button className="secondary-btn" style={{ width: '100%' }} type="button" onClick={followProvider}>关注摄影师</button>
           </div>
-          <div className="aside-card">
-            <h3>操作</h3>
-            <div className="detail-op-actions side-actions">
-              <button className="secondary-btn owner-only" type="button" onClick={toggleInterest}>{interested ? '取消意向' : '加入意向'}</button>
-              <button className="primary-btn owner-only" type="button" onClick={() => startChat()}>现在预定</button>
+          {isServiceOwner && (
+            <div className="aside-card">
+              <h3>管理橱窗</h3>
+              <div className="detail-op-actions side-actions">
+                <button className="primary-btn" type="button" onClick={() => navigate(`/service-packages/${service.serviceId}/edit`)}>编辑橱窗</button>
+                <button className="secondary-btn danger-action-btn" type="button" onClick={offlineService}>下架橱窗</button>
+              </div>
             </div>
-          </div>
+          )}
+          {isCustomerViewer && (
+            <div className="aside-card">
+              <h3>操作</h3>
+              <div className="detail-op-actions side-actions">
+                <button className="secondary-btn owner-only" type="button" onClick={toggleInterest}>{interested ? '取消意向' : '加入意向'}</button>
+                <button className="primary-btn owner-only" type="button" onClick={() => startChat()}>现在预定</button>
+              </div>
+            </div>
+          )}
         </aside>
       </div>
     </DetailShell>

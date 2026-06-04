@@ -13,7 +13,9 @@ export function AppRoutes() {
       <Route path="/" element={<Navigate to="/hall" replace />} />
       <Route path="/hall" element={<HallPage />} />
       <Route path="/demands/:demandId" element={<DemandDetailPage />} />
+      <Route path="/demands/:demandId/edit" element={<PublishPage />} />
       <Route path="/service-packages/:serviceId" element={<ServicePackageDetailPage />} />
+      <Route path="/service-packages/:serviceId/edit" element={<PublishServicePackagePage />} />
       <Route path="/publish" element={<PublishPage />} />
       <Route path="/publish/service-package" element={<PublishServicePackagePage />} />
       <Route path="/feed" element={<FeedPage />} />
