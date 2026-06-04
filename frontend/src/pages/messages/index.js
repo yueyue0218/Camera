@@ -1,4 +1,6 @@
 export {
   ConversationDetailPage,
+} from './ConversationDetailPage.jsx'
+export {
   MessagesPage
-} from '../legacy/CameraPages.jsx'
+} from './MessagesPage.jsx'
