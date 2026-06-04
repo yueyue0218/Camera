@@ -97,6 +97,7 @@ export function ConversationSystemCards({
   onDecidePhotoAuthorization
 }) {
   const orderedQuotes = [...quotes].sort((left, right) => new Date(left.createdAt || 0) - new Date(right.createdAt || 0))
+  const canReviewDelivery = order && canCustomerRequestRework(order, currentUser)
   return (
     <>
       {orderedQuotes.map(quote => (
@@ -123,16 +124,18 @@ export function ConversationSystemCards({
           onConfirmOrder={onConfirmOrder}
         />
       )}
-      {!!deliveryRecords.length && (
-        <DeliverySystemCard
-          order={order}
-          currentUser={currentUser}
+      {canReviewDelivery ? (
+        <DeliveryReviewCard
           deliveryRecords={deliveryRecords}
           reworkRequirement={reworkRequirement}
           loading={loading}
           onSubmitRework={onSubmitRework}
           onReworkRequirementChange={onReworkRequirementChange}
           onConfirmOrder={onConfirmOrder}
+        />
+      ) : !!deliveryRecords.length && (
+        <DeliverySystemCard
+          deliveryRecords={deliveryRecords}
         />
       )}
       {order && canProviderUploadDelivery(order, currentUser) && (
@@ -243,9 +246,41 @@ function OrderSystemCard({ order, currentUser, cancelAction, loading, onPayOrder
   )
 }
 
-function DeliverySystemCard({ order, currentUser, deliveryRecords, reworkRequirement, loading, onSubmitRework, onReworkRequirementChange, onConfirmOrder }) {
+function DeliveryReviewCard({ deliveryRecords, reworkRequirement, loading, onSubmitRework, onReworkRequirementChange, onConfirmOrder }) {
   const latestDelivery = getLatestDelivery(deliveryRecords)
-  const canRework = order && canCustomerRequestRework(order, currentUser)
+  return (
+    <Paper id="conversation-rework-action" variant="outlined" sx={systemCardSx('#0d2fb2')}>
+      <Stack spacing={1.1}>
+        <Typography fontWeight={900}>摄影师上传了作品</Typography>
+        <Typography color="text.secondary" variant="body2">
+          请查看交付内容，确认是否接收。{latestDelivery ? `最近交付：${formatTime(latestDelivery.uploadTime)}` : ''}
+        </Typography>
+        {latestDelivery?.remark && <Typography variant="body2">{latestDelivery.remark}</Typography>}
+        <Paper component="form" variant="outlined" onSubmit={onSubmitRework} sx={{ p: 1, bgcolor: '#f8f3eb', borderColor: '#d4ccc2' }}>
+          <Stack spacing={1}>
+            <TextField
+              label="返修要求"
+              value={reworkRequirement}
+              onChange={event => onReworkRequirementChange(event.target.value)}
+              multiline
+              minRows={2}
+              placeholder="请说明需要调整的照片和修改方向"
+              required
+            />
+            <Typography color="text.secondary" variant="body2">摄影师会根据你的返修要求重新交付。</Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap">
+              <Button type="button" size="small" variant="contained" startIcon={<CheckCircleRoundedIcon />} onClick={onConfirmOrder} disabled={loading}>确认接收</Button>
+              <Button type="submit" size="small" variant="outlined" color="inherit" startIcon={<RefreshRoundedIcon />} disabled={loading}>提交返修</Button>
+            </Stack>
+          </Stack>
+        </Paper>
+      </Stack>
+    </Paper>
+  )
+}
+
+function DeliverySystemCard({ deliveryRecords }) {
+  const latestDelivery = getLatestDelivery(deliveryRecords)
   return (
     <Paper variant="outlined" sx={systemCardSx('#0d2fb2')}>
       <Stack spacing={1.1}>
@@ -254,25 +289,6 @@ function DeliverySystemCard({ order, currentUser, deliveryRecords, reworkRequire
           共 {deliveryRecords.length} 次交付{latestDelivery ? ` · 最近交付：${formatTime(latestDelivery.uploadTime)}` : ''}
         </Typography>
         {latestDelivery?.remark && <Typography variant="body2">{latestDelivery.remark}</Typography>}
-        {canRework && (
-          <Paper id="conversation-rework-action" component="form" variant="outlined" onSubmit={onSubmitRework} sx={{ p: 1.2, bgcolor: '#f8f3eb', borderColor: '#d4ccc2' }}>
-            <Stack spacing={1}>
-              <TextField
-                label="返修要求"
-                value={reworkRequirement}
-                onChange={event => onReworkRequirementChange(event.target.value)}
-                multiline
-                minRows={2}
-                placeholder="说明需要返修的照片和修改方向"
-                required
-              />
-              <Stack direction="row" spacing={1}>
-                <Button type="submit" size="small" variant="outlined" color="inherit" startIcon={<RefreshRoundedIcon />} disabled={loading}>提交返修</Button>
-                <Button size="small" variant="contained" startIcon={<CheckCircleRoundedIcon />} onClick={onConfirmOrder} disabled={loading}>确认接收</Button>
-              </Stack>
-            </Stack>
-          </Paper>
-        )}
       </Stack>
     </Paper>
   )

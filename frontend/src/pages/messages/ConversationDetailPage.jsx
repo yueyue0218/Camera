@@ -312,6 +312,7 @@ export function ConversationDetailPage() {
 
   async function confirmCurrentOrder() {
     if (!currentOrder) return
+    if (!window.confirm('确认接收后，订单将完成，平台托管资金会结算给摄影师。是否确认？')) return
     const result = await run(async () => orderApi.transition(currentOrder.orderId, 'COMPLETED', '客户确认接收作品', currentUser), '订单已完成')
     if (result) await refreshConversationData(conversation, currentOrder.orderId)
   }

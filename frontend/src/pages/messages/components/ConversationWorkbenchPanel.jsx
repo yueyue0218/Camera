@@ -1,7 +1,9 @@
 import { Box, Button, Chip, Divider, Paper, Stack, TextField, Typography } from '@mui/material'
 import AddPhotoAlternateRoundedIcon from '@mui/icons-material/AddPhotoAlternateRounded'
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
+import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
 import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded'
 import { centToYuan } from '../../../utils/index.js'
 import { formatTime } from '../utils/conversationUtils.js'
@@ -70,8 +72,12 @@ export function ConversationWorkbenchPanel({
   deliveryRecords,
   photoAuthorizations,
   deliveryForm,
+  reworkRequirement,
   loading,
   onOpenOrderArchive,
+  onConfirmOrder,
+  onSubmitRework,
+  onReworkRequirementChange,
   onDeliveryFileChange,
   onDeliveryRemarkChange,
   onSubmitDelivery
@@ -82,6 +88,9 @@ export function ConversationWorkbenchPanel({
   const canUploadDelivery = order
     && Number(order.providerUserId) === Number(currentUser.userId)
     && (order.status === 'PENDING_DELIVERY' || order.status === 'REWORK_REQUIRED')
+  const canReviewDelivery = order
+    && Number(order.customerId) === Number(currentUser.userId)
+    && order.status === 'DELIVERED_PENDING_CONFIRM'
   const uploadLabel = order?.status === 'REWORK_REQUIRED' ? '重新上传作品' : '上传作品'
   return (
     <Paper
@@ -105,7 +114,27 @@ export function ConversationWorkbenchPanel({
         <Paper variant="outlined" sx={{ p: 1.2, bgcolor: '#ebe6dd', borderColor: '#d4ccc2', borderLeft: '4px solid #0d2fb2' }}>
           <Stack spacing={0.8}>
             <Typography fontWeight={800}>下一步动作</Typography>
-            {canUploadDelivery ? (
+            {canReviewDelivery ? (
+              <Paper component="form" variant="outlined" onSubmit={onSubmitRework} sx={{ p: 1, bgcolor: '#f8f3eb', borderColor: '#d4ccc2' }}>
+                <Stack spacing={0.8}>
+                  <Typography variant="body2" fontWeight={800}>请确认是否接收本次交付。</Typography>
+                  <TextField
+                    size="small"
+                    label="返修要求"
+                    value={reworkRequirement}
+                    onChange={event => onReworkRequirementChange(event.target.value)}
+                    multiline
+                    minRows={2}
+                    placeholder="请说明需要调整的照片和修改方向"
+                    required
+                  />
+                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                    <Button type="button" size="small" variant="contained" startIcon={<CheckCircleRoundedIcon />} onClick={onConfirmOrder} disabled={loading}>确认接收</Button>
+                    <Button type="submit" size="small" variant="outlined" color="inherit" startIcon={<RefreshRoundedIcon />} disabled={loading}>提交返修</Button>
+                  </Stack>
+                </Stack>
+              </Paper>
+            ) : canUploadDelivery ? (
               <Paper component="form" variant="outlined" onSubmit={onSubmitDelivery} sx={{ p: 1, bgcolor: '#f8f3eb', borderColor: '#d4ccc2' }}>
                 <Stack spacing={0.8}>
                   <Typography variant="body2" fontWeight={800}>
