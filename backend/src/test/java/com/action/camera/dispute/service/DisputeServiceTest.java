@@ -8,6 +8,8 @@ import com.action.camera.dispute.dto.DisputeCreateRequest;
 import com.action.camera.dispute.dto.DisputeReplyRequest;
 import com.action.camera.dispute.dto.DisputeResponse;
 import com.action.camera.dispute.repository.DisputeRepository;
+import com.action.camera.notification.entity.Notification;
+import com.action.camera.notification.repository.NotificationRepository;
 import com.action.camera.order.enums.OrderStatus;
 import com.action.camera.order.repository.OrderRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -48,10 +50,15 @@ class DisputeServiceTest {
     private OrderRepository orderRepository;
 
     @Autowired
+    private NotificationRepository notificationRepository;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void setUp() {
+        jdbcTemplate.update("DELETE FROM notifications WHERE user_id IN (?, ?, ?, ?)",
+                CUSTOMER_ID, PROVIDER_ID, OUTSIDER_ID, ADMIN_ID);
         insertUser(CUSTOMER_ID, "dispute-customer", "CUSTOMER");
         insertUser(PROVIDER_ID, "dispute-provider", "PROVIDER");
         insertUser(OUTSIDER_ID, "dispute-outsider", "CUSTOMER");
@@ -82,6 +89,17 @@ class DisputeServiceTest {
         assertThat(response.id()).isNotNull();
         assertThat(orderRepository.findById(DISPUTE_ORDER_ID))
                 .get().extracting(o -> o.getStatus()).isEqualTo(OrderStatus.APPEALING);
+
+        Notification notification = notificationRepository.findByUserIdOrderByCreatedAtDesc(PROVIDER_ID)
+                .get(0);
+        assertThat(notification.getType()).isEqualTo("DISPUTE_CREATED");
+        assertThat(notification.getRelatedType()).isEqualTo("DISPUTE");
+        assertThat(notification.getRelatedId()).isEqualTo(response.id());
+        assertThat(notification.getTargetType()).isEqualTo("DISPUTE");
+        assertThat(notification.getTargetId()).isEqualTo(response.id());
+        assertThat(notification.getSourceType()).isEqualTo("DISPUTE");
+        assertThat(notification.getSourceId()).isEqualTo(response.id());
+        assertThat(notification.getMetadataJson()).isEqualTo("{\"orderId\":" + DISPUTE_ORDER_ID + "}");
     }
 
     // ────────────────────────────────────────────────
@@ -146,6 +164,13 @@ class DisputeServiceTest {
         assertThat(replied.replies()).hasSize(1);
         assertThat(replied.replies().get(0).replierId()).isEqualTo(PROVIDER_ID);
         assertThat(replied.replies().get(0).content()).isEqualTo("我已尽力，请谅解");
+
+        Notification notification = notificationRepository.findByUserIdOrderByCreatedAtDesc(CUSTOMER_ID)
+                .get(0);
+        assertThat(notification.getType()).isEqualTo("DISPUTE_REPLIED");
+        assertThat(notification.getTargetType()).isEqualTo("DISPUTE");
+        assertThat(notification.getTargetId()).isEqualTo(created.id());
+        assertThat(notification.getMetadataJson()).isEqualTo("{\"orderId\":" + DISPUTE_ORDER_ID + "}");
     }
 
     // ────────────────────────────────────────────────
@@ -176,16 +201,79 @@ class DisputeServiceTest {
 
         DisputeResponse resolved = disputeService.arbitrate(
                 created.id(), ADMIN_ID,
-                new DisputeArbitrateRequest("FULL_REFUND", "核实属实，全额退款"));
+                new DisputeArbitrateRequest("FULL_REFUND", "PROVIDER_FAULT", null, "核实属实，全额退款"));
 
         assertThat(resolved.status()).isEqualTo("RESOLVED");
         assertThat(resolved.resolution()).isEqualTo("FULL_REFUND");
+        assertThat(resolved.responsibility()).isEqualTo("PROVIDER_FAULT");
+        assertThat(resolved.refundAmount()).isNull();
         assertThat(resolved.adminId()).isEqualTo(ADMIN_ID);
         assertThat(resolved.adminComment()).isEqualTo("核实属实，全额退款");
         assertThat(resolved.resolvedAt()).isNotNull();
 
         assertThat(orderRepository.findById(DISPUTE_ORDER_ID))
                 .get().extracting(o -> o.getStatus()).isEqualTo(OrderStatus.REFUNDED);
+
+        assertThat(notificationRepository.findByUserIdOrderByCreatedAtDesc(CUSTOMER_ID))
+                .extracting(Notification::getType)
+                .contains("DISPUTE_RESOLVED");
+        assertThat(notificationRepository.findByUserIdOrderByCreatedAtDesc(PROVIDER_ID))
+                .extracting(Notification::getMetadataJson)
+                .contains("{\"orderId\":" + DISPUTE_ORDER_ID + "}");
+    }
+
+    @Test
+    void partialRefundRequiresAndRecordsRefundAmountAndResponsibility() {
+        DisputeResponse created = disputeService.createDispute(
+                DISPUTE_ORDER_ID, CUSTOMER_ID, new DisputeCreateRequest("要求部分退款"));
+
+        DisputeResponse resolved = disputeService.arbitrate(
+                created.id(), ADMIN_ID,
+                new DisputeArbitrateRequest("PARTIAL_REFUND", "BOTH_FAULT", 3000L, "部分退款 30 元"));
+
+        assertThat(resolved.status()).isEqualTo("RESOLVED");
+        assertThat(resolved.resolution()).isEqualTo("PARTIAL_REFUND");
+        assertThat(resolved.responsibility()).isEqualTo("BOTH_FAULT");
+        assertThat(resolved.refundAmount()).isEqualTo(3000L);
+
+        assertThat(disputeRepository.findById(created.id())).get()
+                .satisfies(dispute -> {
+                    assertThat(dispute.getResponsibility()).isEqualTo("BOTH_FAULT");
+                    assertThat(dispute.getRefundAmount()).isEqualTo(3000L);
+                });
+        assertThat(orderRepository.findById(DISPUTE_ORDER_ID)).get()
+                .satisfies(order -> {
+                    assertThat(order.getStatus()).isEqualTo(OrderStatus.REFUNDED);
+                    assertThat(order.getRefundStatus()).isEqualTo("PARTIAL");
+                });
+    }
+
+    @Test
+    void refundArbitrationRequiresResponsibility() {
+        DisputeResponse created = disputeService.createDispute(
+                DISPUTE_ORDER_ID, CUSTOMER_ID, new DisputeCreateRequest("要求退款"));
+
+        assertThatThrownBy(() -> disputeService.arbitrate(
+                created.id(), ADMIN_ID,
+                new DisputeArbitrateRequest("FULL_REFUND", null, null, "缺少责任归属")
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.VALIDATION_ERROR);
+    }
+
+    @Test
+    void partialRefundRequiresPositiveRefundAmount() {
+        DisputeResponse created = disputeService.createDispute(
+                DISPUTE_ORDER_ID, CUSTOMER_ID, new DisputeCreateRequest("要求部分退款"));
+
+        assertThatThrownBy(() -> disputeService.arbitrate(
+                created.id(), ADMIN_ID,
+                new DisputeArbitrateRequest("PARTIAL_REFUND", "PROVIDER_FAULT", 0L, "金额非法")
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.VALIDATION_ERROR);
     }
 
     // ────────────────────────────────────────────────
@@ -199,10 +287,12 @@ class DisputeServiceTest {
 
         DisputeResponse resolved = disputeService.arbitrate(
                 created.id(), ADMIN_ID,
-                new DisputeArbitrateRequest("REWORK", "要求服务方重新交付"));
+                new DisputeArbitrateRequest("REWORK", "PROVIDER_FAULT", 3000L, "要求服务方重新交付"));
 
         assertThat(resolved.status()).isEqualTo("RESOLVED");
         assertThat(resolved.resolution()).isEqualTo("REWORK");
+        assertThat(resolved.responsibility()).isNull();
+        assertThat(resolved.refundAmount()).isNull();
 
         assertThat(orderRepository.findById(DISPUTE_ORDER_ID))
                 .get().extracting(o -> o.getStatus()).isEqualTo(OrderStatus.REWORK_REQUIRED);
@@ -238,7 +328,7 @@ class DisputeServiceTest {
 
         assertThatThrownBy(() ->
                 disputeService.arbitrate(created.id(), ADMIN_ID,
-                        new DisputeArbitrateRequest("FULL_REFUND", "再次裁定")))
+                        new DisputeArbitrateRequest("FULL_REFUND", "PROVIDER_FAULT", null, "再次裁定")))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.STATUS_CONFLICT);

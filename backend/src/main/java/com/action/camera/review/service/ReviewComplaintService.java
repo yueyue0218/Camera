@@ -15,11 +15,15 @@ import com.action.camera.review.entity.Review;
 import com.action.camera.review.entity.ReviewComplaint;
 import com.action.camera.review.repository.ReviewComplaintRepository;
 import com.action.camera.review.repository.ReviewRepository;
+import com.action.camera.review.port.EvidenceFileMetadata;
+import com.action.camera.review.port.EvidenceFileQueryPort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class ReviewComplaintService {
@@ -32,29 +36,32 @@ public class ReviewComplaintService {
     private static final String REVIEW_HIDDEN = "REVIEW_HIDDEN";
 
     private static final String ADMIN = "ADMIN";
-    private static final String ARBITRATOR = "ARBITRATOR";
 
     private static final String TYPE_COMPLAINT_CREATED = "REVIEW_COMPLAINT_CREATED";
     private static final String TYPE_COMPLAINT_RESOLVED = "REVIEW_COMPLAINT_RESOLVED";
     private static final String RELATED_REVIEW_COMPLAINT = "REVIEW_COMPLAINT";
     private static final String CREDIT_EVENT_REVIEW_ARBITRATION = "REVIEW_ARBITRATION";
+    private static final int MAX_EVIDENCE_FILE_COUNT = 5;
 
     private final ReviewComplaintRepository complaintRepository;
     private final ReviewRepository reviewRepository;
     private final UserRepository userRepository;
     private final CreditService creditService;
     private final NotificationService notificationService;
+    private final EvidenceFileQueryPort evidenceFileQueryPort;
 
     public ReviewComplaintService(ReviewComplaintRepository complaintRepository,
                                   ReviewRepository reviewRepository,
                                   UserRepository userRepository,
                                   CreditService creditService,
-                                  NotificationService notificationService) {
+                                  NotificationService notificationService,
+                                  EvidenceFileQueryPort evidenceFileQueryPort) {
         this.complaintRepository = complaintRepository;
         this.reviewRepository = reviewRepository;
         this.userRepository = userRepository;
         this.creditService = creditService;
         this.notificationService = notificationService;
+        this.evidenceFileQueryPort = evidenceFileQueryPort;
     }
 
     @Transactional
@@ -76,13 +83,14 @@ public class ReviewComplaintService {
         }
 
         LocalDateTime now = LocalDateTime.now();
+        String evidenceFileIds = normalizeEvidenceFileIds(request.evidenceFileIds(), currentUserId);
         ReviewComplaint complaint = new ReviewComplaint();
         complaint.setReviewId(review.getId());
         complaint.setOrderId(review.getOrderId());
         complaint.setComplainantId(currentUserId);
         complaint.setRespondentId(review.getReviewerId());
         complaint.setReason(request.reason().trim());
-        complaint.setEvidenceFileIds(trimToNull(request.evidenceFileIds()));
+        complaint.setEvidenceFileIds(evidenceFileIds);
         complaint.setStatus(PENDING);
         complaint.setCreatedAt(now);
         complaint.setUpdatedAt(now);
@@ -123,7 +131,7 @@ public class ReviewComplaintService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Complaint not found"));
         if (!currentUserId.equals(complaint.getComplainantId())
                 && !currentUserId.equals(complaint.getRespondentId())
-                && !isArbitrator(currentUserId)) {
+                && !isAdmin(currentUserId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "No permission to view complaint");
         }
         return toResponse(complaint);
@@ -136,7 +144,7 @@ public class ReviewComplaintService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Review not found"));
         if (!currentUserId.equals(review.getReviewerId())
                 && !currentUserId.equals(review.getTargetUserId())
-                && !isArbitrator(currentUserId)) {
+                && !isAdmin(currentUserId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "No permission to view complaints");
         }
         return complaintRepository.findByReviewIdOrderByCreatedAtDesc(reviewId).stream()
@@ -146,7 +154,7 @@ public class ReviewComplaintService {
 
     @Transactional(readOnly = true)
     public List<ReviewComplaintResponse> listForArbitration(String status) {
-        requireArbitrator(requireCurrentUserId());
+        requireAdmin(requireCurrentUserId());
         if (isBlank(status)) {
             return complaintRepository.findAllByOrderByCreatedAtDesc().stream()
                     .map(this::toResponse)
@@ -176,7 +184,7 @@ public class ReviewComplaintService {
     @Transactional
     public ReviewComplaintResponse arbitrate(Long complaintId, ReviewComplaintArbitrateRequest request) {
         Long currentUserId = requireCurrentUserId();
-        requireArbitrator(currentUserId);
+        requireAdmin(currentUserId);
         validateArbitrateRequest(request);
 
         ReviewComplaint complaint = complaintRepository.findById(complaintId)
@@ -226,6 +234,64 @@ public class ReviewComplaintService {
         }
     }
 
+    private String normalizeEvidenceFileIds(String evidenceFileIds, Long currentUserId) {
+        if (isBlank(evidenceFileIds)) {
+            return null;
+        }
+        Set<Long> parsedIds = new LinkedHashSet<>();
+        for (String rawId : evidenceFileIds.split(",")) {
+            String value = rawId.trim();
+            if (value.isEmpty()) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Evidence file id is required");
+            }
+            Long fileId = parseEvidenceFileId(value);
+            if (!parsedIds.add(fileId)) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Duplicate evidence file id is not allowed");
+            }
+            if (parsedIds.size() > MAX_EVIDENCE_FILE_COUNT) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "At most 5 evidence files are allowed");
+            }
+        }
+        for (Long fileId : parsedIds) {
+            validateEvidenceFile(fileId, currentUserId);
+        }
+        return String.join(",", parsedIds.stream().map(String::valueOf).toList());
+    }
+
+    private Long parseEvidenceFileId(String value) {
+        try {
+            long fileId = Long.parseLong(value);
+            if (fileId <= 0) {
+                throw new NumberFormatException("file id must be positive");
+            }
+            return fileId;
+        } catch (NumberFormatException e) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Evidence file id must be a positive number");
+        }
+    }
+
+    private void validateEvidenceFile(Long fileId, Long currentUserId) {
+        EvidenceFileMetadata file = evidenceFileQueryPort.findById(fileId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_ERROR, "Evidence file not found"));
+        if (file.deleted()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Deleted evidence file cannot be used");
+        }
+        if (!currentUserId.equals(file.uploaderId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only files uploaded by current user can be used as evidence");
+        }
+        if (!isAllowedEvidenceMimeType(file.mimeType())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Evidence file must be an image or PDF");
+        }
+    }
+
+    private boolean isAllowedEvidenceMimeType(String mimeType) {
+        if (mimeType == null || mimeType.isBlank()) {
+            return false;
+        }
+        String normalized = mimeType.trim().toLowerCase();
+        return normalized.startsWith("image/") || "application/pdf".equals(normalized);
+    }
+
     private void validateArbitrateRequest(ReviewComplaintArbitrateRequest request) {
         if (request == null || isBlank(request.result())) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Arbitration result is required");
@@ -239,16 +305,16 @@ public class ReviewComplaintService {
         }
     }
 
-    private void requireArbitrator(Long userId) {
-        if (!isArbitrator(userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "Arbitrator permission required");
+    private void requireAdmin(Long userId) {
+        if (!isAdmin(userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Admin permission required");
         }
     }
 
-    private boolean isArbitrator(Long userId) {
+    private boolean isAdmin(Long userId) {
         return userRepository.findById(userId)
                 .map(User::getCurrentRole)
-                .map(role -> ADMIN.equals(role) || ARBITRATOR.equals(role))
+                .map(ADMIN::equals)
                 .orElse(false);
     }
 
