@@ -453,15 +453,7 @@ export function LoginChoicePage() {
                 key={label}
                 onClick={e => { e.preventDefault(); setNavActive(label); scrollToId(id) }}
                 href={`#${id}`}
-                style={{
-                  position: 'relative', height: 72, display: 'flex', alignItems: 'center',
-                  color: navActive === label ? BLUE : '#333842',
-                  fontWeight: navActive === label ? 700 : 400,
-                  fontSize: 15, letterSpacing: '.12em', cursor: 'pointer',
-                  textDecoration: 'none', transition: '.2s',
-                  borderBottom: navActive === label ? `3px solid ${BLUE}` : '3px solid transparent',
-                  whiteSpace: 'nowrap'
-                }}
+                className={`op-nav-item${navActive === label ? ' active' : ''}`}
               >{label}</a>
             ))}
           </nav>
@@ -489,12 +481,14 @@ export function LoginChoicePage() {
               ))}
             </div>
             {/* Search */}
-            <button style={{
-              width: 38, height: 38, border: '1px solid rgba(21,19,24,.12)',
-              borderRadius: 999, background: '#f9f5ee',
-              display: 'grid', placeItems: 'center', cursor: 'pointer', fontSize: 18,
-              fontFamily: SANS
-            }}>⌕</button>
+            <button
+              onClick={() => navigate('/login/sign-in')}
+              style={{
+                width: 38, height: 38, border: '1px solid rgba(21,19,24,.12)',
+                borderRadius: 999, background: '#f9f5ee',
+                display: 'grid', placeItems: 'center', cursor: 'pointer', fontSize: 18,
+                fontFamily: SANS
+              }}>⌕</button>
             {/* Avatar → sign in */}
             <div
               onClick={() => navigate('/login/sign-in')}
@@ -519,7 +513,7 @@ export function LoginChoicePage() {
           {/* WANT background word — exact inline params from v30 HTML */}
           <div
             className="op-bg-word"
-            style={{ right: '-3vw', top: '2vh', fontSize: '15.6vw', transform: 'translate3d(-12.4vw, 0px, 0px)' }}
+            style={{ right: '-3vw', top: '2vh', fontSize: '15.6vw', opacity: .30, transform: 'translate3d(-12.4vw, 0px, 0px)' }}
           >WANT</div>
 
           <div className="op-yellow-field" />
@@ -684,7 +678,7 @@ export function LoginChoicePage() {
           {/* MEET background word — exact inline params from v30 HTML */}
           <div
             className="op-bg-word"
-            style={{ left: '67.4vw', top: '2vh', fontSize: '18vw', opacity: .22, letterSpacing: '.02em', transform: 'translate3d(3.3vw, 0px, 0px)' }}
+            style={{ right: '-2vw', top: '2vh', fontSize: '18vw', opacity: .22, letterSpacing: '.02em', transform: 'translate3d(3.3vw, 0px, 0px)' }}
           >MEET</div>
 
           <div className="op-p3-blue-cut" />
@@ -693,7 +687,7 @@ export function LoginChoicePage() {
           <h1 className="op-p3-title op-reveal">现在，就开始一次<br />属于你的 Portra</h1>
 
           {/* Ticket */}
-          <div className="op-ticket-main op-reveal" ref={ticketRef}>
+          <div className="op-ticket-main" ref={ticketRef}>
             <div className="op-ticket-inner">
               <div className="op-ticket-spine">PORTRA · MEET YOU</div>
               <div className="op-ticket-body">
@@ -711,7 +705,7 @@ export function LoginChoicePage() {
           </div>
 
           {/* Invite cards */}
-          <div className="op-invite-cards op-reveal">
+          <div className="op-invite-cards">
             <article className="op-invite-card" ref={card1Ref}>
               <div className="num">01</div>
               <div className="tiny">I WANT TO BE<br />PHOTOGRAPHED</div>

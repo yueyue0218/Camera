@@ -1,7 +1,11 @@
 package com.action.camera.credit.controller;
 
 import com.action.camera.application.CreditService;
+import com.action.camera.common.ErrorCode;
 import com.action.camera.common.Result;
+import com.action.camera.common.UserContext;
+import com.action.camera.common.exception.BusinessException;
+import com.action.camera.common.security.UserRole;
 import com.action.camera.credit.dto.CreditRecordResponse;
 import com.action.camera.credit.dto.CreditSummaryResponse;
 import com.action.camera.domain.CreditRecord;
@@ -26,10 +30,12 @@ public class CreditController {
 
     @GetMapping("/users/{userId}/credit")
     public Result<CreditSummaryResponse> getCreditSummary(@PathVariable Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
         List<CreditRecord> records = creditService.getCreditHistory(userId);
         return Result.success(new CreditSummaryResponse(
                 userId,
-                userRepository.findById(userId).map(User::getCreditScore).orElse(null),
+                user.getCreditScore(),
                 (long) records.size(),
                 records.isEmpty() ? null : records.get(0).getCreatedAt()
         ));
@@ -37,6 +43,7 @@ public class CreditController {
 
     @GetMapping("/users/{userId}/credit-records")
     public Result<List<CreditRecordResponse>> listCreditRecords(@PathVariable Long userId) {
+        requireSelfOrAdmin(userId);
         return Result.success(creditService.getCreditHistory(userId).stream()
                 .map(this::toResponse)
                 .toList());
@@ -49,9 +56,25 @@ public class CreditController {
                 record.getRelatedOrderId(),
                 record.getEventType(),
                 record.getScoreChange(),
+                record.getBeforeScore(),
                 record.getScoreAfter(),
+                record.getAfterScore(),
+                record.getAppliedScoreChange(),
+                record.getSourceType(),
+                record.getSourceId(),
                 record.getReason(),
                 record.getCreatedAt()
         );
+    }
+
+    private void requireSelfOrAdmin(Long userId) {
+        Long currentUserId = UserContext.getUserId();
+        if (currentUserId == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        }
+        if (currentUserId.equals(userId) || UserRole.ADMIN.equals(UserContext.getCurrentRole())) {
+            return;
+        }
+        throw new BusinessException(ErrorCode.FORBIDDEN, "只能查看自己的信用流水");
     }
 }

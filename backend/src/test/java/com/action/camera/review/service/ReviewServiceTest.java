@@ -97,16 +97,44 @@ class ReviewServiceTest {
                     assertThat(record.getRelatedOrderId()).isEqualTo(COMPLETED_ORDER_ID);
                     assertThat(record.getEventType()).isEqualTo("REVIEW");
                     assertThat(record.getScoreChange()).isEqualTo(2);
+                    assertThat(record.getAppliedScoreChange()).isEqualTo(2);
+                    assertThat(record.getSourceType()).isEqualTo("REVIEW");
                 });
         assertThat(notificationRepository.findByUserIdOrderByCreatedAtDesc(PROVIDER_ID))
                 .hasSize(1)
                 .first()
                 .satisfies(notification -> {
                     assertThat(notification.getType()).isEqualTo("REVIEW_RECEIVED");
-                    assertThat(notification.getRelatedType()).isEqualTo("ORDER");
-                    assertThat(notification.getRelatedId()).isEqualTo(COMPLETED_ORDER_ID);
+                    assertThat(notification.getRelatedType()).isEqualTo("REVIEW");
                     assertThat(notification.getIsRead()).isFalse();
                 });
+    }
+
+    @Test
+    void createReviewRejectsOverlongContent() {
+        UserContext.setUserId(CUSTOMER_ID);
+        String content = "x".repeat(1001);
+
+        assertThatThrownBy(() -> reviewService.create(COMPLETED_ORDER_ID, new ReviewCreateRequest(5, content)))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.VALIDATION_ERROR);
+    }
+
+    @Test
+    void hiddenReviewDetailRequiresParticipant() {
+        UserContext.setUserId(CUSTOMER_ID);
+        ReviewResponse review = reviewService.create(COMPLETED_ORDER_ID, new ReviewCreateRequest(5, "服务很好"));
+        reviewRepository.findById(review.reviewId()).ifPresent(item -> item.setIsVisible(false));
+
+        UserContext.setUserId(PROVIDER_ID);
+        assertThat(reviewService.detail(review.reviewId()).reviewId()).isEqualTo(review.reviewId());
+
+        UserContext.setUserId(OUTSIDER_ID);
+        assertThatThrownBy(() -> reviewService.detail(review.reviewId()))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.FORBIDDEN);
     }
 
     @Test

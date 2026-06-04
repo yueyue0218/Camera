@@ -7,6 +7,7 @@ public class CreateMomentRequest {
     private String title;
     private String content;
     private String imageData;
+    private List<String> imageDataList;
     private List<String> mentions;
 
     public String getTitle() {
@@ -31,6 +32,14 @@ public class CreateMomentRequest {
 
     public void setImageData(String imageData) {
         this.imageData = imageData;
+    }
+
+    public List<String> getImageDataList() {
+        return imageDataList;
+    }
+
+    public void setImageDataList(List<String> imageDataList) {
+        this.imageDataList = imageDataList;
     }
 
     public List<String> getMentions() {

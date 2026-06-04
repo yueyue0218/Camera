@@ -35,6 +35,11 @@ public class ReviewController {
         return Result.success(reviewService.followUp(reviewId, request));
     }
 
+    @GetMapping("/reviews/{reviewId}")
+    public Result<ReviewResponse> detail(@PathVariable Long reviewId) {
+        return Result.success(reviewService.detail(reviewId));
+    }
+
     @GetMapping("/orders/{orderId}/reviews")
     public Result<List<ReviewResponse>> listByOrder(@PathVariable Long orderId) {
         return Result.success(reviewService.listByOrder(orderId));
