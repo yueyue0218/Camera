@@ -489,12 +489,14 @@ export function LoginChoicePage() {
               ))}
             </div>
             {/* Search */}
-            <button style={{
-              width: 38, height: 38, border: '1px solid rgba(21,19,24,.12)',
-              borderRadius: 999, background: '#f9f5ee',
-              display: 'grid', placeItems: 'center', cursor: 'pointer', fontSize: 18,
-              fontFamily: SANS
-            }}>⌕</button>
+            <button
+              onClick={() => navigate('/login/sign-in')}
+              style={{
+                width: 38, height: 38, border: '1px solid rgba(21,19,24,.12)',
+                borderRadius: 999, background: '#f9f5ee',
+                display: 'grid', placeItems: 'center', cursor: 'pointer', fontSize: 18,
+                fontFamily: SANS
+              }}>⌕</button>
             {/* Avatar → sign in */}
             <div
               onClick={() => navigate('/login/sign-in')}
