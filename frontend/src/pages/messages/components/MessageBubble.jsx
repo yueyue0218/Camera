@@ -1,10 +1,12 @@
-import { Box, Button, Paper, Stack, Typography } from '@mui/material'
+import { Avatar, Box, Button, Paper, Stack, Typography } from '@mui/material'
 import { formatTime } from '../utils/conversationUtils.js'
 
-export function MessageBubble({ message, mine, canSaveSubmittedPhoto, onSaveSubmittedPhoto }) {
+export function MessageBubble({ message, mine, avatar, avatarText, canSaveSubmittedPhoto, onSaveSubmittedPhoto }) {
+  if (!message) return null
   const isImage = message.messageType === 'IMAGE'
   return (
-    <Box sx={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start' }}>
+    <Box sx={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: 1 }}>
+      {!mine && <Avatar src={avatar || undefined} sx={{ width: 30, height: 30, bgcolor: '#0d2fb2', fontSize: 14 }}>{avatarText || '对'}</Avatar>}
       <Paper
         elevation={0}
         sx={{
@@ -34,6 +36,7 @@ export function MessageBubble({ message, mine, canSaveSubmittedPhoto, onSaveSubm
         )}
         <Typography variant="caption" sx={{ opacity: 0.75 }}>{formatTime(message.createdAt)}</Typography>
       </Paper>
+      {mine && <Avatar src={avatar || undefined} sx={{ width: 30, height: 30, bgcolor: '#151318', fontSize: 14 }}>{avatarText || '我'}</Avatar>}
     </Box>
   )
 }

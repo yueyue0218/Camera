@@ -1,4 +1,5 @@
 import { yuanToCent } from '../../../utils/index.js'
+import { getCurrentUserId } from './workbenchState.js'
 
 export const quoteStatusMap = {
   PENDING_CONFIRM: '待确认',
@@ -116,12 +117,13 @@ export function getQuoteOrderId(quote) {
 }
 
 export function canEditQuote(quote, conversation, currentUser) {
+  const currentUserId = getCurrentUserId(currentUser)
   return Boolean(quote)
     && quote.status === 'PENDING_CONFIRM'
     && !getQuoteOrderId(quote)
     && currentUser?.role === 'PROVIDER'
-    && Number(currentUser.userId) === Number(conversation?.participantBId)
-    && Number(currentUser.userId) === Number(quote.providerUserId)
+    && currentUserId === Number(conversation?.participantBId)
+    && currentUserId === Number(quote.providerUserId)
 }
 
 export function hasPendingQuote(quotes) {
@@ -131,7 +133,7 @@ export function hasPendingQuote(quotes) {
 export function getQuoteEntryHint(conversation, currentUser, quotes) {
   if (!conversation) return ''
   if (currentUser.role !== 'PROVIDER') return ''
-  if (currentUser.userId !== Number(conversation.participantBId)) {
+  if (getCurrentUserId(currentUser) !== Number(conversation.participantBId)) {
     return '只有这次沟通中的摄影师可以发送正式报价。'
   }
   if (conversation.isLocal || !getBackendConversationId(conversation)) {
@@ -149,7 +151,7 @@ export function validateQuoteForm(form, conversation, currentUser, quotes, optio
   if (!conversation || conversation.isLocal || !getBackendConversationId(conversation)) {
     errors.push('这段沟通暂时不能生成正式报价，请先进入正式会话。')
   }
-  if (currentUser.role !== 'PROVIDER' || currentUser.userId !== Number(conversation?.participantBId)) {
+  if (currentUser.role !== 'PROVIDER' || getCurrentUserId(currentUser) !== Number(conversation?.participantBId)) {
     errors.push('只有这次沟通中的摄影师可以发送报价。')
   }
   const hasOtherPendingQuote = quotes.some(quote =>

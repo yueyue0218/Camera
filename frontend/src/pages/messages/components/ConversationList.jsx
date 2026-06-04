@@ -1,5 +1,6 @@
 import { Avatar, Box, Chip, Paper, Stack, Typography } from '@mui/material'
-import { formatShortTime, getOppositeUserId, roleMap } from '../utils/conversationUtils.js'
+import { formatShortTime, getCounterpartyProfile, getConversationSourceLabel } from '../utils/conversationUtils.js'
+import { deriveConversationActions } from '../utils/workbenchState.js'
 import { EmptyMessageCard } from './EmptyMessageCard.jsx'
 
 export function ConversationList({ conversations, currentUser, onOpenConversation }) {
@@ -7,7 +8,16 @@ export function ConversationList({ conversations, currentUser, onOpenConversatio
     <Paper variant="outlined" sx={{ p: { xs: 1, md: 1.5 } }}>
       <Stack spacing={0.5}>
         {conversations.map(conversation => {
-          const oppositeId = getOppositeUserId(conversation, currentUser.userId)
+          const counterparty = getCounterpartyProfile(conversation, currentUser)
+          const actions = deriveConversationActions({
+            conversation,
+            order: conversation.activeOrder,
+            activeRole: currentUser.role,
+            currentUser
+          })
+          const topic = getConversationListTopic(conversation)
+          const needsMyAction = actions.primaryActions.some(action => ['CONFIRM_QUOTE', 'PAY', 'UPLOAD_DELIVERY', 'REUPLOAD_DELIVERY', 'CONFIRM_DELIVERY', 'REQUEST_REWORK', 'REVIEW_AUTHORIZATION'].includes(action))
+          const activity = getConversationListActivity(conversation, actions)
           return (
             <Box
               key={conversation.conversationId}
@@ -20,31 +30,44 @@ export function ConversationList({ conversations, currentUser, onOpenConversatio
                 p: 1.4,
                 borderRadius: 1,
                 cursor: 'pointer',
-                '&:hover': { bgcolor: 'rgba(118, 81, 212, 0.08)' }
+                '&:hover': { bgcolor: 'rgba(13, 47, 178, 0.06)' }
               }}
             >
-              <Avatar sx={{ bgcolor: conversation.isLocal ? 'secondary.main' : 'primary.main' }}>
-                {conversation.scene?.slice(0, 1) || '会'}
+              <Avatar src={counterparty.avatarData || undefined} sx={{ bgcolor: '#0d2fb2' }}>
+                {counterparty.initial}
               </Avatar>
               <Box sx={{ minWidth: 0 }}>
                 <Typography fontWeight={800} noWrap>
-                  {conversation.scene || `会话 ${conversation.conversationId}`}
+                  {counterparty.nickname !== '对方用户' ? counterparty.nickname : `${actions.stage.title} · ${topic}`}
                 </Typography>
                 <Typography color="text.secondary" noWrap>
-                  {conversation.lastMessage || `${roleMap[currentUser.role]}与用户 ${oppositeId} 的对话`}
+                  {topic} · {activity} · {getConversationSourceLabel(conversation)}
                 </Typography>
               </Box>
               <Stack spacing={0.5} alignItems="flex-end">
                 <Typography variant="caption" color="text.secondary">{formatShortTime(conversation.updatedAt)}</Typography>
-                <Chip size="small" label={conversation.isLocal ? '待接后端' : 'C接口'} />
+                <Chip size="small" color={needsMyAction ? 'primary' : 'default'} label={needsMyAction ? '轮到我处理' : actions.stage.title} />
               </Stack>
             </Box>
           )
         })}
         {!conversations.length && (
-          <EmptyMessageCard text={currentUser.role === 'PROVIDER' ? '暂无会话。到需求大厅选择具体需求后发起邀请，接受后会出现在这里。' : '暂无会话。接受服务方邀请后会出现在这里。'} />
+          <EmptyMessageCard text={currentUser.role === 'PROVIDER' ? '暂无会话。到需求大厅选择具体需求后发起邀请，接受后会出现在这里。' : '暂无会话。接受摄影师邀请后会出现在这里。'} />
         )}
       </Stack>
     </Paper>
   )
+}
+
+function getConversationListTopic(conversation) {
+  const scene = String(conversation?.scene || '').trim()
+  if (scene && scene !== '约拍沟通' && scene !== '约拍需求沟通') return scene
+  if (conversation?.location) return conversation.location
+  return '校园约拍'
+}
+
+function getConversationListActivity(conversation, actions) {
+  const lastMessage = String(conversation?.lastMessage || '').trim()
+  if (lastMessage && !['最近有新消息', '点击进入对话'].includes(lastMessage)) return lastMessage
+  return actions.stage.description
 }

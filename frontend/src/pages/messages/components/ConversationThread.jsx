@@ -1,38 +1,11 @@
+import { useEffect, useMemo, useRef } from 'react'
 import { Alert, Box, Divider, Paper, Stack, Typography } from '@mui/material'
-import { canEditQuote } from '../utils/quoteUtils.js'
-import { canCustomerConfirm, canCustomerPay, canCustomerRequestRework, canCustomerReviewPhotoAuthorization, canProviderRequestPhotoAuthorization, canProviderUploadDelivery } from '../../orders/orderActions.js'
 import { ConversationComposer } from './ConversationComposer.jsx'
-import { ConversationSystemCards } from './ConversationSystemCard.jsx'
+import { ConversationSystemItem } from './ConversationSystemCard.jsx'
 import { MessageBubble } from './MessageBubble.jsx'
 import { QuoteForm } from './QuoteForm.jsx'
-
-function isBeforeShootStart(order) {
-  const shootStartTime = order?.shootStartTime ? new Date(order.shootStartTime) : null
-  return Boolean(shootStartTime) && !Number.isNaN(shootStartTime.getTime()) && new Date() < shootStartTime
-}
-
-function getCancelAction(order, currentUser) {
-  if (!order || Number(order.customerId) !== Number(currentUser?.userId)) return null
-  if (order.status === 'PENDING_PAYMENT') {
-    return {
-      label: '取消订单',
-      confirmText: '确定取消这个待支付订单吗？该订单尚未支付，不涉及退款。',
-      reason: '客户取消未支付订单'
-    }
-  }
-  if (order.status === 'PAID_PENDING_SHOOT' && isBeforeShootStart(order)) {
-    return {
-      label: '取消并申请退款',
-      confirmText: '确定取消订单并申请退款吗？平台托管资金将退回客户。',
-      reason: '客户拍摄前取消，申请退回托管款'
-    }
-  }
-  return null
-}
-
-function getPendingQuote(quotes) {
-  return quotes.find(quote => quote.status === 'PENDING_CONFIRM')
-}
+import { getCounterpartyProfile } from '../utils/conversationUtils.js'
+import { buildConversationTimeline, getCurrentUserId } from '../utils/workbenchState.js'
 
 export function ConversationThread({
   messages,
@@ -40,6 +13,7 @@ export function ConversationThread({
   currentUser,
   quotes,
   order,
+  actions,
   statusLogs,
   deliveryRecords,
   photoAuthorizations,
@@ -54,16 +28,11 @@ export function ConversationThread({
   quoteForm,
   quoteValidationErrors,
   canSubmitQuoteForm,
-  deliveryForm,
-  reworkRequirement,
-  photoAuthorizationForm,
-  authorizationRemarks,
   onOpenQuoteForm,
   onCloseQuoteForm,
   onStartQuoteEditing,
   onConfirmQuote,
   onRejectQuote,
-  onOpenOrder,
   onOpenOrderArchive,
   onQuoteFormChange,
   onSubmitQuote,
@@ -74,36 +43,30 @@ export function ConversationThread({
   onPayOrder,
   onCancelOrder,
   onConfirmOrder,
-  onSubmitRework,
-  onReworkRequirementChange,
-  onDeliveryFileChange,
-  onDeliveryRemarkChange,
-  onSubmitDelivery,
-  onPhotoAuthorizationFileIdsChange,
-  onPhotoAuthorizationRemarkChange,
-  onSubmitPhotoAuthorization,
-  onAuthorizationRemarkChange,
-  onDecidePhotoAuthorization
+  onDecidePhotoAuthorization,
+  onUnavailableTool,
+  onOpenAction
 }) {
-  const pendingQuote = getPendingQuote(quotes)
-  const cancelAction = getCancelAction(order, currentUser)
-  const quickActions = {
-    pendingQuote,
-    canEditPendingQuote: pendingQuote && canEditQuote(pendingQuote, conversation, currentUser),
-    canConfirmPendingQuote: pendingQuote
-      && pendingQuote.status === 'PENDING_CONFIRM'
-      && Number(currentUser.userId) === Number(conversation?.participantAId),
-    canPay: order && canCustomerPay(order, currentUser),
-    canCancel: Boolean(cancelAction),
-    cancelAction,
-    canUploadDelivery: order && canProviderUploadDelivery(order, currentUser),
-    uploadDeliveryLabel: order?.status === 'REWORK_REQUIRED' ? '重新上传作品' : '上传作品',
-    canRequestRework: order && canCustomerRequestRework(order, currentUser),
-    canConfirmOrder: order && canCustomerConfirm(order, currentUser),
-    canRequestPhotoAuthorization: order && canProviderRequestPhotoAuthorization(order, currentUser),
-    hasPendingAuthorization: photoAuthorizations.some(authorization => canCustomerReviewPhotoAuthorization(order, currentUser, authorization)),
-    canOpenOrder: Boolean(order)
-  }
+  const scrollRef = useRef(null)
+  const currentUserId = getCurrentUserId(currentUser)
+  const counterparty = getCounterpartyProfile(conversation, currentUser)
+  const timeline = useMemo(() => buildConversationTimeline({
+    messages,
+    quotes,
+    order,
+    statusLogs,
+    deliveries: deliveryRecords,
+    authorizations: photoAuthorizations,
+    actions,
+    conversation,
+    currentUser
+  }), [messages, quotes, order, statusLogs, deliveryRecords, photoAuthorizations, actions, conversation, currentUser])
+
+  useEffect(() => {
+    const node = scrollRef.current
+    if (!node) return
+    node.scrollTop = node.scrollHeight
+  }, [conversation?.conversationId, timeline.length, timeline[timeline.length - 1]?.key])
 
   return (
     <Paper
@@ -118,10 +81,31 @@ export function ConversationThread({
         overflow: 'hidden'
       }}
     >
-      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: { xs: 1.4, md: 2 }, py: { xs: 1.4, md: 2 } }}>
+      <Box ref={scrollRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: { xs: 1.4, md: 2 }, py: { xs: 1.4, md: 2 } }}>
         <Stack spacing={1.2}>
-          {messages.map(message => {
-            const mine = message.senderId === currentUser.userId
+          {timeline.map(item => {
+            if (item.type !== 'MESSAGE') {
+              return (
+                <ConversationSystemItem
+                  key={item.key}
+                  event={item}
+                  actions={actions}
+                  loading={loading}
+                  onStartQuoteEditing={onStartQuoteEditing}
+                  onConfirmQuote={onConfirmQuote}
+                  onRejectQuote={onRejectQuote}
+                  onPayOrder={onPayOrder}
+                  onCancelOrder={onCancelOrder}
+                  onConfirmOrder={onConfirmOrder}
+                  onDecidePhotoAuthorization={onDecidePhotoAuthorization}
+                  onUnavailableTool={onUnavailableTool}
+                  onOpenAction={onOpenAction}
+                  onOpenOrderArchive={onOpenOrderArchive}
+                />
+              )
+            }
+            const message = item.meta.message
+            const mine = Number(message.senderId) === currentUserId
             const isImage = message.messageType === 'IMAGE'
             const canSaveSubmittedPhoto = isImage && Number(message.senderId) === Number(conversation?.participantBId)
             return (
@@ -129,45 +113,14 @@ export function ConversationThread({
                 key={message.messageId}
                 message={message}
                 mine={mine}
+                avatar={mine ? currentUser?.avatarData : counterparty.avatarData}
+                avatarText={mine ? (currentUser?.nickname || '我').slice(0, 1) : counterparty.initial}
                 canSaveSubmittedPhoto={canSaveSubmittedPhoto}
                 onSaveSubmittedPhoto={() => onSaveSubmittedPhoto(message)}
               />
             )
           })}
-          {!messages.length && <Typography color="text.secondary">还没有消息，可以先和对方确认拍摄时间、地点和交付要求。</Typography>}
-
-          <ConversationSystemCards
-            conversation={conversation}
-            currentUser={currentUser}
-            quotes={quotes}
-            order={order}
-            statusLogs={statusLogs}
-            deliveryRecords={deliveryRecords}
-            photoAuthorizations={photoAuthorizations}
-            deliveryForm={deliveryForm}
-            reworkRequirement={reworkRequirement}
-            photoAuthorizationForm={photoAuthorizationForm}
-            authorizationRemarks={authorizationRemarks}
-            loading={loading}
-            cancelAction={cancelAction}
-            onStartQuoteEditing={onStartQuoteEditing}
-            onConfirmQuote={onConfirmQuote}
-            onRejectQuote={onRejectQuote}
-            onOpenOrder={onOpenOrder}
-            onPayOrder={onPayOrder}
-            onCancelOrder={onCancelOrder}
-            onConfirmOrder={onConfirmOrder}
-            onSubmitRework={onSubmitRework}
-            onReworkRequirementChange={onReworkRequirementChange}
-            onDeliveryFileChange={onDeliveryFileChange}
-            onDeliveryRemarkChange={onDeliveryRemarkChange}
-            onSubmitDelivery={onSubmitDelivery}
-            onPhotoAuthorizationFileIdsChange={onPhotoAuthorizationFileIdsChange}
-            onPhotoAuthorizationRemarkChange={onPhotoAuthorizationRemarkChange}
-            onSubmitPhotoAuthorization={onSubmitPhotoAuthorization}
-            onAuthorizationRemarkChange={onAuthorizationRemarkChange}
-            onDecidePhotoAuthorization={onDecidePhotoAuthorization}
-          />
+          {!timeline.length && <Typography color="text.secondary">还没有消息，可以先和对方确认拍摄时间、地点和交付要求。</Typography>}
         </Stack>
       </Box>
 
@@ -200,7 +153,7 @@ export function ConversationThread({
         canSeeQuoteEntry={canSeeQuoteEntry}
         canCreateQuote={canCreateQuote}
         showQuoteForm={showQuoteForm}
-        quickActions={quickActions}
+        actions={actions}
         onOpenQuoteForm={onOpenQuoteForm}
         onStartQuoteEditing={onStartQuoteEditing}
         onConfirmQuote={onConfirmQuote}
@@ -212,6 +165,8 @@ export function ConversationThread({
         onContentChange={onContentChange}
         onSendMessage={onSendMessage}
         onChooseMessageImage={onChooseMessageImage}
+        onUnavailableTool={onUnavailableTool}
+        onOpenAction={onOpenAction}
       />
     </Paper>
   )

@@ -1,8 +1,10 @@
 import { USERS } from '../../../AuthContext.jsx'
+import { filterConversationsByActiveRole, getCurrentUserId } from './workbenchState.js'
 
 const CONVERSATION_STORAGE_KEY = 'camera-p4-conversations'
 const LOCAL_MESSAGE_STORAGE_KEY = 'camera-p4-local-messages'
 const SAVED_PHOTO_STORAGE_KEY = 'camera-p4-saved-photos'
+const USER_PROFILE_STORAGE_KEY = 'camera-p4-user-profiles'
 
 export const roleMap = {
   CUSTOMER: '客户',
@@ -68,14 +70,15 @@ export function findConversationRecord(conversationId) {
   return readConversationRecords().find(record => String(record.conversationId) === String(conversationId)) || null
 }
 
-export function getConversationRecordsForUser(currentUser) {
-  return readConversationRecords()
-    .filter(record => Number(record.participantAId) === currentUser.userId || Number(record.participantBId) === currentUser.userId)
-    .sort((left, right) => new Date(right.updatedAt || 0) - new Date(left.updatedAt || 0))
+export function getConversationRecordsForUser(currentUser, activeRole = currentUser?.role) {
+  const currentUserId = getCurrentUserId(currentUser)
+  return filterConversationsByActiveRole(readConversationRecords()
+    .filter(record => Number(record.participantAId) === currentUserId || Number(record.participantBId) === currentUserId)
+    .sort((left, right) => new Date(right.updatedAt || 0) - new Date(left.updatedAt || 0)), currentUser, activeRole)
 }
 
-export function mergeConversationRecords(remoteConversations, currentUser) {
-  const localRecords = getConversationRecordsForUser(currentUser)
+export function mergeConversationRecords(remoteConversations, currentUser, activeRole = currentUser?.role) {
+  const localRecords = getConversationRecordsForUser(currentUser, activeRole)
   const merged = new Map(localRecords.map(record => [String(record.conversationId), record]))
 
   remoteConversations.forEach(conversation => {
@@ -90,9 +93,9 @@ export function mergeConversationRecords(remoteConversations, currentUser) {
     merged.set(conversationId, record)
   })
 
-  return Array.from(merged.values())
-    .filter(record => Number(record.participantAId) === currentUser.userId || Number(record.participantBId) === currentUser.userId)
-    .sort((left, right) => new Date(right.updatedAt || 0) - new Date(left.updatedAt || 0))
+  return filterConversationsByActiveRole(Array.from(merged.values())
+    .filter(record => Number(record.participantAId) === getCurrentUserId(currentUser) || Number(record.participantBId) === getCurrentUserId(currentUser))
+    .sort((left, right) => new Date(right.updatedAt || 0) - new Date(left.updatedAt || 0)), currentUser, activeRole)
 }
 
 export function updateConversationLastMessage(conversationId, content) {
@@ -117,9 +120,32 @@ export function buildConversationFallback(conversationId) {
 }
 
 export function getOppositeUserId(conversation, currentUserId) {
-  return Number(conversation.participantAId) === currentUserId
+  if (!conversation) return null
+  return Number(conversation.participantAId) === Number(currentUserId)
     ? conversation.participantBId
     : conversation.participantAId
+}
+
+export function getCounterpartyProfile(conversation, currentUser) {
+  if (!conversation) return { userId: null, nickname: '对方用户', avatarData: '', initial: '对' }
+  const oppositeId = Number(getOppositeUserId(conversation, getCurrentUserId(currentUser)))
+  const profiles = readJsonStorage(USER_PROFILE_STORAGE_KEY, {})
+  const storedProfile = profiles[String(oppositeId)] || {}
+  const demoProfile = Object.values(USERS).find(user => Number(user.userId) === oppositeId) || {}
+  const nickname =
+    conversation.counterpartyNickname ||
+    conversation.otherUserNickname ||
+    conversation.providerNickname ||
+    conversation.customerNickname ||
+    storedProfile.nickname ||
+    demoProfile.nickname ||
+    '对方用户'
+  return {
+    userId: oppositeId || null,
+    nickname,
+    avatarData: storedProfile.avatarData || demoProfile.avatarData || '',
+    initial: String(nickname).slice(0, 1) || '对'
+  }
 }
 
 function getLocalMessageStore() {

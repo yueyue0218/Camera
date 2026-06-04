@@ -1,9 +1,8 @@
-import { Box, Button, Chip, Divider, Paper, Stack, TextField, Typography } from '@mui/material'
+import { Box, Button, Chip, Divider, Paper, Stack, Typography } from '@mui/material'
 import AddPhotoAlternateRoundedIcon from '@mui/icons-material/AddPhotoAlternateRounded'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
-import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
 import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded'
 import { centToYuan } from '../../../utils/index.js'
 import { formatTime } from '../utils/conversationUtils.js'
@@ -13,85 +12,21 @@ function getLatestQuote(quotes) {
   return [...quotes].sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0))[0] || null
 }
 
-function getUserOrderRole(order, currentUser) {
-  if (!order || !currentUser) return ''
-  if (Number(order.customerId) === Number(currentUser.userId)) return 'CUSTOMER'
-  if (Number(order.providerUserId) === Number(currentUser.userId)) return 'PROVIDER'
-  return ''
-}
-
-function isBeforeShootStart(order) {
-  const shootStartTime = order?.shootStartTime ? new Date(order.shootStartTime) : null
-  return Boolean(shootStartTime) && !Number.isNaN(shootStartTime.getTime()) && new Date() < shootStartTime
-}
-
-function getOrderStage(order, currentUser) {
-  const role = getUserOrderRole(order, currentUser)
-  if (role === 'CUSTOMER') {
-    if (order.status === 'PENDING_PAYMENT') return ['等待你支付', '支付后资金进入平台托管。']
-    if (order.status === 'PAID_PENDING_SHOOT') return ['等待拍摄', isBeforeShootStart(order) ? '按约定时间准备拍摄，拍摄前仍可申请退款。' : '拍摄时间已开始，请继续在会话里沟通。']
-    if (order.status === 'PENDING_DELIVERY') return ['等待摄影师交付', '拍摄完成后，摄影师会在这里上传作品。']
-    if (order.status === 'DELIVERED_PENDING_CONFIRM') return ['等待你确认作品', '可以在聊天流里确认接收或提交返修。']
-    if (order.status === 'REWORK_REQUIRED') return ['返修中', '等待摄影师重新交付作品。']
-  }
-  if (role === 'PROVIDER') {
-    if (order.status === 'PENDING_PAYMENT') return ['等待客户付款', '客户付款后资金进入平台托管。']
-    if (order.status === 'PAID_PENDING_SHOOT') return ['等待拍摄', '请按约定时间准备拍摄。']
-    if (order.status === 'PENDING_DELIVERY') return ['等待你交付', '请在聊天流中上传作品给客户。']
-    if (order.status === 'DELIVERED_PENDING_CONFIRM') return ['等待客户确认', '客户会确认接收或提交返修要求。']
-    if (order.status === 'REWORK_REQUIRED') return ['返修待交付', '请根据客户要求重新上传作品。']
-  }
-  if (order.status === 'SHOOTING') return ['拍摄履约中', '双方正在按约定完成拍摄。']
-  if (order.status === 'APPEALING') return ['争议处理中', '等待平台处理结果。']
-  if (order.status === 'COMPLETED') return ['订单已完成', '可以查看作品、授权和订单档案。']
-  if (order.status === 'CANCELLED') return ['订单已取消', '本次订单已经结束。']
-  if (order.status === 'REFUNDED') return ['订单已退款', '本次订单已退款结束。']
-  return ['合作进展', '可以继续在会话中沟通拍摄细节。']
-}
-
-function getQuoteStage(latestQuote, currentUser, conversation) {
-  if (latestQuote?.status === 'PENDING_CONFIRM') {
-    return currentUser.role === 'CUSTOMER'
-      ? ['等待你确认报价', '确认后会生成平台托管订单。']
-      : ['等待客户确认报价', '如果方案有变化，可以继续编辑报价。']
-  }
-  if (latestQuote?.status === 'REJECTED') return ['报价已拒绝', '可以继续沟通新的方案。']
-  if (latestQuote?.status === 'EXPIRED') return ['报价已过期', '需要摄影师重新发送报价。']
-  if (latestQuote?.status === 'CONFIRMED') return ['报价已确认', '订单信息会在会话里继续同步。']
-  return currentUser.role === 'PROVIDER' && conversation && Number(currentUser.userId) === Number(conversation.participantBId)
-    ? ['沟通拍摄需求', '确认方案后可以发送报价。']
-    : ['沟通拍摄需求', '可以先确认时间、地点和交付要求。']
-}
-
 export function ConversationWorkbenchPanel({
-  conversation,
-  currentUser,
   quotes,
   order,
+  actions,
   statusLogs,
   deliveryRecords,
   photoAuthorizations,
-  deliveryForm,
-  reworkRequirement,
-  loading,
   onOpenOrderArchive,
   onConfirmOrder,
-  onSubmitRework,
-  onReworkRequirementChange,
-  onDeliveryFileChange,
-  onDeliveryRemarkChange,
-  onSubmitDelivery
+  onUnavailableTool,
+  onOpenAction
 }) {
   const latestQuote = getLatestQuote(quotes)
-  const [stageTitle, nextStep] = order ? getOrderStage(order, currentUser) : getQuoteStage(latestQuote, currentUser, conversation)
   const latestLog = statusLogs[statusLogs.length - 1]
-  const canUploadDelivery = order
-    && Number(order.providerUserId) === Number(currentUser.userId)
-    && (order.status === 'PENDING_DELIVERY' || order.status === 'REWORK_REQUIRED')
-  const canReviewDelivery = order
-    && Number(order.customerId) === Number(currentUser.userId)
-    && order.status === 'DELIVERED_PENDING_CONFIRM'
-  const uploadLabel = order?.status === 'REWORK_REQUIRED' ? '重新上传作品' : '上传作品'
+  const uploadLabel = actions.canReuploadDelivery ? '重新上传作品' : '上传作品'
   return (
     <Paper
       variant="outlined"
@@ -107,61 +42,49 @@ export function ConversationWorkbenchPanel({
       <Stack spacing={1.6}>
         <Box>
           <Typography variant="overline" color="text.secondary">本次合作</Typography>
-          <Typography variant="h6" fontWeight={900}>{stageTitle}</Typography>
-          <Typography color="text.secondary" variant="body2">{nextStep}</Typography>
+          <Typography variant="h6" fontWeight={900}>{actions.stage.title}</Typography>
+          <Typography color="text.secondary" variant="body2">{actions.stage.description}</Typography>
         </Box>
 
         <Paper variant="outlined" sx={{ p: 1.2, bgcolor: '#ebe6dd', borderColor: '#d4ccc2', borderLeft: '4px solid #0d2fb2' }}>
           <Stack spacing={0.8}>
             <Typography fontWeight={800}>下一步动作</Typography>
-            {canReviewDelivery ? (
-              <Paper component="form" variant="outlined" onSubmit={onSubmitRework} sx={{ p: 1, bgcolor: '#f8f3eb', borderColor: '#d4ccc2' }}>
-                <Stack spacing={0.8}>
-                  <Typography variant="body2" fontWeight={800}>请确认是否接收本次交付。</Typography>
-                  <TextField
-                    size="small"
-                    label="返修要求"
-                    value={reworkRequirement}
-                    onChange={event => onReworkRequirementChange(event.target.value)}
-                    multiline
-                    minRows={2}
-                    placeholder="请说明需要调整的照片和修改方向"
-                    required
-                  />
-                  <Stack direction="row" spacing={1} flexWrap="wrap">
-                    <Button type="button" size="small" variant="contained" startIcon={<CheckCircleRoundedIcon />} onClick={onConfirmOrder} disabled={loading}>确认接收</Button>
-                    <Button type="submit" size="small" variant="outlined" color="inherit" startIcon={<RefreshRoundedIcon />} disabled={loading}>提交返修</Button>
-                  </Stack>
-                </Stack>
-              </Paper>
-            ) : canUploadDelivery ? (
-              <Paper component="form" variant="outlined" onSubmit={onSubmitDelivery} sx={{ p: 1, bgcolor: '#f8f3eb', borderColor: '#d4ccc2' }}>
-                <Stack spacing={0.8}>
-                  <Typography variant="body2" fontWeight={800}>
-                    {order.status === 'REWORK_REQUIRED' ? '客户提出返修，请重新上传作品。' : '请上传本次交付作品。'}
-                  </Typography>
-                  <Button component="label" size="small" variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />} sx={{ alignSelf: 'flex-start' }}>
-                    选择文件
-                    <input hidden type="file" onChange={event => onDeliveryFileChange(event.target.files?.[0] || null)} />
-                  </Button>
-                  <Typography color="text.secondary" variant="body2">{deliveryForm.file ? deliveryForm.file.name : '尚未选择文件'}</Typography>
-                  <TextField
-                    size="small"
-                    label="交付说明"
-                    value={deliveryForm.remark}
-                    onChange={event => onDeliveryRemarkChange(event.target.value)}
-                    multiline
-                    minRows={2}
-                  />
-                  <Button type="submit" size="small" variant="contained" disabled={loading || !deliveryForm.file}>
-                    {uploadLabel}
-                  </Button>
-                </Stack>
-              </Paper>
+            {actions.canConfirmDelivery ? (
+              <Stack direction="row" spacing={0.8} flexWrap="wrap">
+                <Typography variant="body2" color="text.secondary" sx={{ width: '100%' }}>请查看交付作品，确认接收或说明返修要求。</Typography>
+                <Button size="small" variant="contained" startIcon={<CheckCircleRoundedIcon />} onClick={onConfirmOrder}>确认接收</Button>
+                <Button size="small" variant="outlined" onClick={() => onOpenAction('REQUEST_REWORK')}>提交返修</Button>
+              </Stack>
+            ) : actions.canUploadDelivery || actions.canReuploadDelivery ? (
+              <Stack spacing={0.8}>
+                <Typography variant="body2" color="text.secondary">
+                  {actions.canReuploadDelivery ? '客户提出返修，请根据要求重新上传作品。' : '请上传本次拍摄作品。'}
+                </Typography>
+                <Button size="small" variant="contained" startIcon={<AddPhotoAlternateRoundedIcon />} onClick={() => onOpenAction(actions.canReuploadDelivery ? 'REUPLOAD_DELIVERY' : 'UPLOAD_DELIVERY')} sx={{ alignSelf: 'flex-start' }}>
+                  {uploadLabel}
+                </Button>
+              </Stack>
+            ) : actions.canRequestPhotoAuthorization ? (
+              <Stack spacing={0.8}>
+                <Typography variant="body2" color="text.secondary">订单已完成，可以选择已交付作品申请展示授权。</Typography>
+                <Button size="small" variant="outlined" startIcon={<ImageRoundedIcon />} onClick={() => onOpenAction('REQUEST_AUTHORIZATION')} sx={{ alignSelf: 'flex-start' }}>
+                  申请照片授权
+                </Button>
+              </Stack>
             ) : (
               <Typography variant="body2" color="text.secondary">
                 主要操作已经放在聊天流和底部快捷入口中，可以边沟通边处理。
               </Typography>
+            )}
+            {actions.canAppeal && (
+              <Button size="small" variant="text" color="inherit" onClick={() => onUnavailableTool('平台协助')} sx={{ alignSelf: 'flex-start' }}>
+                申请平台协助
+              </Button>
+            )}
+            {actions.canViewDispute && (
+              <Button size="small" variant="outlined" color="inherit" onClick={onOpenOrderArchive} sx={{ alignSelf: 'flex-start' }}>
+                查看争议进展
+              </Button>
             )}
           </Stack>
         </Paper>

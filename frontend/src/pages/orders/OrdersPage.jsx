@@ -205,7 +205,7 @@ export function OrdersPage() {
 
   useEffect(() => {
     loadOrders(queryOrderId)
-  }, [currentUser.userId, statusFilter, queryOrderId])
+  }, [currentUser.userId, currentUser.role, statusFilter, queryOrderId])
 
   async function run(action, successText) {
     setLoading(true)
@@ -231,13 +231,16 @@ export function OrdersPage() {
         }, currentUser),
         currentUser.role === 'PROVIDER' ? demandApi.sentInvitations(currentUser) : Promise.resolve([])
       ])
-      setOrders(nextOrders)
-      saveOrderSnapshots(nextOrders)
+      const roleOrders = (nextOrders || []).filter(order => currentUser.role === 'PROVIDER'
+        ? Number(order.providerUserId) === Number(currentUser.userId)
+        : Number(order.customerId) === Number(currentUser.userId))
+      setOrders(roleOrders)
+      saveOrderSnapshots(roleOrders)
       setSentInvitations(nextInvitations)
-      if (focusOrderId) {
+      if (focusOrderId && roleOrders.some(order => Number(order.orderId) === Number(focusOrderId))) {
         await openOrder(focusOrderId, false)
-      } else if (nextOrders.length) {
-        await openOrder(nextOrders[0].orderId, false)
+      } else if (roleOrders.length) {
+        await openOrder(roleOrders[0].orderId, false)
       } else {
         setSelectedOrder(null)
         setStatusLogs([])
