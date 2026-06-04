@@ -75,7 +75,7 @@ export function ServicePackageCard({ service, currentUser, onOpen, onDetail, onR
         <div className="time-tag-row">
           {timeTags.length ? timeTags.map(tag => <span className="time-chip" key={tag}>{timeTagLabel(tag)}</span>) : <span className="chip">未选择时间标签</span>}
         </div>
-        <div className="publish-brief"><b>时间</b><span>{latestTimeText(service)}</span></div>
+        <div className="publish-brief"><span>{latestTimeText(service)}</span></div>
         <div className={`show-actions ${isProviderOwner ? 'three-actions' : 'two-actions'}`}>
           <button className="ghost-btn" type="button" onClick={(event) => { event.stopPropagation(); onDetail() }}>查看橱窗</button>
           {isCustomer && (

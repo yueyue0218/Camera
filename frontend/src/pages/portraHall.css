@@ -1246,7 +1246,7 @@ body[data-role="photographer"] .aside-card.photographer-only {
 .detail-heading {
   position: relative;
   min-height: 40px;
-  padding-right: 148px;
+  padding-right: 128px;
 }
 
 .detail-heading .detail-title {
@@ -1264,13 +1264,13 @@ body[data-role="photographer"] .aside-card.photographer-only {
 }
 
 .detail-mini-action {
-  min-width: 58px;
-  height: 32px;
+  min-width: 50px;
+  height: 28px;
   border: 1px solid rgba(13,47,178,.24);
   border-radius: 999px;
   background: rgba(255,255,255,.58);
   color: var(--blue);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 760;
   letter-spacing: .08em;
   cursor: pointer;

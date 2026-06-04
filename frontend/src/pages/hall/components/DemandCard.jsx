@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fileApi } from '../../../api/fileApi.js'
-import { cityName, demandStatusText, firstText, latestTimeText, moneyRange, readableDate, splitTags, timeTagLabel } from './hallUtils.js'
+import { cityName, demandStatusText, firstText, fullDateTime, moneyRange, readableDate, splitTags, timeTagLabel } from './hallUtils.js'
 
 export function DemandCard({ demand, currentUser, onOpen, onDetail, onRespond }) {
   const tags = splitTags(demand.serviceTypes).length ? splitTags(demand.serviceTypes) : splitTags(demand.styleTags)
@@ -56,7 +56,7 @@ export function DemandCard({ demand, currentUser, onOpen, onDetail, onRespond })
         <div className="meta-item"><span>预算</span><b>{moneyRange(demand.budgetMinCent, demand.budgetMaxCent)}</b></div>
         <div className="meta-item"><span>时间</span><b>{demand.timeDescription || demand.timeSlot || readableDate(demand.expectedDate) || '暂无'}</b></div>
         <div className="meta-item"><span>需求</span><b>{tags.slice(0, 2).join(' / ') || '暂无'}</b></div>
-        <div className="meta-item"><span>时间更新</span><b>{latestTimeText(demand)}</b></div>
+        <div className="meta-item"><span>发布</span><b>{fullDateTime(demand.updatedAt || demand.createdAt)}</b></div>
       </div>
       <p className="ticket-desc">{demand.description || '暂无说明'}</p>
       <div className="card-actions">
