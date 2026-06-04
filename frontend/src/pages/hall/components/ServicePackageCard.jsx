@@ -1,15 +1,42 @@
+import { useEffect, useState } from 'react'
+import { fileApi } from '../../../api/fileApi.js'
 import { cityName, countText, gradientFor, money, shortDateTime, splitTags, timeTagLabel } from './hallUtils.js'
 
 export function ServicePackageCard({ service, currentUser, onOpen, onDetail, onReserve }) {
   const styleTags = splitTags(service.styleTags)
   const timeTags = splitTags(service.timeTags)
-  const cover = service.coverImage || splitTags(service.images)[0]
+  const firstPortfolioId = Array.isArray(service.portfolioIds) ? service.portfolioIds[0] : null
+  const fallbackCover = service.coverImage || splitTags(service.images)[0]
+  const [uploadedCoverUrl, setUploadedCoverUrl] = useState('')
+  const cover = uploadedCoverUrl || fallbackCover
   const isCustomer = currentUser.role === 'CUSTOMER'
   const usage = [
     countText(service.bookingCount, ' 次预约'),
     countText(service.orderCount, ' 单成交')
   ].filter(Boolean).join(' · ')
   const credit = service.photographerCreditScore ?? service.providerCreditScore ?? service.creditScore
+
+  useEffect(() => {
+    let objectUrl = ''
+    let ignored = false
+    async function loadCover() {
+      if (!firstPortfolioId) {
+        setUploadedCoverUrl('')
+        return
+      }
+      try {
+        objectUrl = await fileApi.downloadObjectUrl(firstPortfolioId, currentUser)
+        if (!ignored) setUploadedCoverUrl(objectUrl)
+      } catch {
+        if (!ignored) setUploadedCoverUrl('')
+      }
+    }
+    loadCover()
+    return () => {
+      ignored = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [currentUser, firstPortfolioId])
 
   return (
     <article className="showcase-card" data-time={timeTags.join(',')} onClick={onOpen}>

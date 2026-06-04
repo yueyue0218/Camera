@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+import { fileApi } from '../../../api/fileApi.js'
 import { cityName, demandStatusText, firstText, moneyRange, readableDate, shortDateTime, splitTags, timeTagLabel } from './hallUtils.js'
 
 export function DemandCard({ demand, currentUser, onOpen, onDetail, onRespond }) {
@@ -7,9 +9,34 @@ export function DemandCard({ demand, currentUser, onOpen, onDetail, onRespond })
   const customerName = firstText(demand.customerNickname, demand.customerName)
   const customerAvatar = firstText(demand.customerAvatar, demand.customerAvatarUrl)
   const place = [cityName(demand.cityName || demand.cityCode), demand.location].filter(Boolean).join(' · ')
+  const firstReferenceFileId = Array.isArray(demand.referenceFileIds) ? demand.referenceFileIds[0] : null
+  const [coverUrl, setCoverUrl] = useState('')
+
+  useEffect(() => {
+    let objectUrl = ''
+    let ignored = false
+    async function loadCover() {
+      if (!firstReferenceFileId) {
+        setCoverUrl('')
+        return
+      }
+      try {
+        objectUrl = await fileApi.downloadObjectUrl(firstReferenceFileId, currentUser)
+        if (!ignored) setCoverUrl(objectUrl)
+      } catch {
+        if (!ignored) setCoverUrl('')
+      }
+    }
+    loadCover()
+    return () => {
+      ignored = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [currentUser, firstReferenceFileId])
 
   return (
     <article className="ticket-card" onClick={onOpen}>
+      {coverUrl && <div className="ticket-cover" style={{ '--art': `url(${coverUrl})` }} aria-hidden="true" />}
       <div className="ticket-top">
         <div>
           <h3 className="ticket-title">{title || '暂无标题'}</h3>

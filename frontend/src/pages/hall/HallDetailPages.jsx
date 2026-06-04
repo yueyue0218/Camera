@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { demandApi } from '../../api/demandApi.js'
+import { fileApi } from '../../api/fileApi.js'
 import { servicePackageApi } from '../../api/servicePackageApi.js'
 import { useAuth } from '../../AuthContext.jsx'
 import { EmptyState, ErrorState, LoadingState } from './components/HallState.jsx'
@@ -47,11 +48,61 @@ function referenceSlots(referenceFileIds) {
   return slots.slice(0, 4)
 }
 
+function useFileObjectUrls(fileIds, currentUser) {
+  const [urls, setUrls] = useState([])
+
+  useEffect(() => {
+    let ignored = false
+    let objectUrls = []
+    async function loadUrls() {
+      const ids = Array.isArray(fileIds) ? fileIds.filter(Boolean) : []
+      if (!ids.length) {
+        setUrls([])
+        return
+      }
+      try {
+        objectUrls = await Promise.all(ids.map(fileId => fileApi.downloadObjectUrl(fileId, currentUser)))
+        if (!ignored) setUrls(objectUrls)
+      } catch {
+        if (!ignored) setUrls([])
+      }
+    }
+    loadUrls()
+    return () => {
+      ignored = true
+      objectUrls.forEach(url => URL.revokeObjectURL(url))
+    }
+  }, [currentUser, fileIds])
+
+  return urls
+}
+
+function UploadedGallery({ urls, emptyLabels }) {
+  if (!urls.length) {
+    return (
+      <div className="ref-grid">
+        {emptyLabels.map((label, index) => <div className="ref-img" key={`${label}-${index}`}>{label}</div>)}
+      </div>
+    )
+  }
+  return (
+    <div className={`uploaded-gallery ${urls.length > 5 ? 'is-scrollable' : ''}`}>
+      {urls.map((url, index) => (
+        <figure className="uploaded-photo" key={`${url}-${index}`}>
+          <img src={url} alt={`上传照片 ${index + 1}`} />
+          <figcaption>{String(index + 1).padStart(2, '0')}</figcaption>
+        </figure>
+      ))}
+    </div>
+  )
+}
+
 export function DemandDetailPage() {
   const { demandId } = useParams()
   const { currentUser } = useAuth()
   const [demand, setDemand] = useState(null)
   const [status, setStatus] = useState(createStatus)
+  const referenceUrls = useFileObjectUrls(demand?.referenceFileIds, currentUser)
   useBodyRole(currentUser.role)
 
   useEffect(() => {
@@ -127,9 +178,7 @@ export function DemandDetailPage() {
           </div>
           <div className="text-block">
             <h3>参考风格</h3>
-            <div className="ref-grid">
-              {referenceSlots(demand.referenceFileIds).map((label, index) => <div className="ref-img" key={`${label}-${index}`}>{label}</div>)}
-            </div>
+            <UploadedGallery urls={referenceUrls} emptyLabels={referenceSlots(demand.referenceFileIds)} />
           </div>
         </article>
         <aside className="aside">
@@ -160,9 +209,11 @@ export function DemandDetailPage() {
   )
 }
 
-function galleryItems(service) {
+function galleryItems(service, uploadedUrls = []) {
   const images = splitTags(service.images)
-  const items = images.length ? images.slice(0, 5).map(image => `url(${image})`) : []
+  const items = uploadedUrls.length
+    ? uploadedUrls.map(image => `url(${image})`)
+    : (images.length ? images.slice(0, 5).map(image => `url(${image})`) : [])
   while (items.length < 5) items.push(gradientFor((service.serviceId || 0) + items.length))
   return items
 }
@@ -174,6 +225,7 @@ export function ServicePackageDetailPage() {
   const [service, setService] = useState(null)
   const [interested, setInterested] = useState(false)
   const [status, setStatus] = useState(createStatus)
+  const uploadedPortfolioUrls = useFileObjectUrls(service?.portfolioIds, currentUser)
   useBodyRole(currentUser.role)
 
   useEffect(() => {
@@ -258,8 +310,8 @@ export function ServicePackageDetailPage() {
             <span className="tag">{timeTags[0] ? timeTagLabel(timeTags[0]) : '时间可协商'}</span>
           </div>
           <div className="detail-publish-time">发布时间：{shortDateTime(service.createdAt)}</div>
-          <div className="gallery">
-            {galleryItems(service).map((art, index) => (
+          <div className={`gallery ${uploadedPortfolioUrls.length > 5 ? 'is-scrollable' : ''}`}>
+            {galleryItems(service, uploadedPortfolioUrls).map((art, index) => (
               <div className="photo" data-no={String(index + 1).padStart(2, '0')} style={{ '--art': art }} key={`${art}-${index}`} />
             ))}
           </div>
@@ -267,7 +319,6 @@ export function ServicePackageDetailPage() {
             <h3>价格区间</h3>
             <div className="price-range-panel">
               <strong>{price}</strong>
-              <span>{service.durationMinutes ? `${service.durationMinutes} 分钟` : '时长沟通确认'} · {service.refinedCount ? `${service.refinedCount} 张精修` : '精修张数沟通'} · {service.deliveryDays ? `${service.deliveryDays} 天交付` : '交付时间沟通'}</span>
             </div>
           </div>
           <div className="text-block">
