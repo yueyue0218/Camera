@@ -25,7 +25,6 @@ import java.util.List;
 public class ReviewComplaintService {
 
     private static final String PENDING = "PENDING";
-    private static final String PROCESSING = "PROCESSING";
     private static final String RESOLVED = "RESOLVED";
     private static final String CANCELED = "CANCELED";
 
@@ -72,7 +71,7 @@ public class ReviewComplaintService {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Review is already hidden");
         }
         if (complaintRepository.existsByReviewIdAndComplainantIdAndStatusIn(
-                reviewId, currentUserId, List.of(PENDING, PROCESSING))) {
+                reviewId, currentUserId, List.of(PENDING))) {
             throw new BusinessException(ErrorCode.DUPLICATE_OPERATION, "Complaint already exists");
         }
 
@@ -91,11 +90,19 @@ public class ReviewComplaintService {
         ReviewComplaint savedComplaint = complaintRepository.save(complaint);
         notificationService.createNotification(new NotificationCreateRequest(
                 review.getReviewerId(),
+                currentUserId,
                 "Review complaint submitted",
                 "A complaint has been submitted for your review.",
                 TYPE_COMPLAINT_CREATED,
+                TYPE_COMPLAINT_CREATED,
                 RELATED_REVIEW_COMPLAINT,
-                savedComplaint.getId()
+                savedComplaint.getId(),
+                RELATED_REVIEW_COMPLAINT,
+                savedComplaint.getId(),
+                RELATED_REVIEW_COMPLAINT,
+                savedComplaint.getId(),
+                "review-complaint:created:" + savedComplaint.getId(),
+                null
         ));
 
         return toResponse(savedComplaint);
@@ -112,7 +119,7 @@ public class ReviewComplaintService {
     @Transactional(readOnly = true)
     public ReviewComplaintResponse detail(Long complaintId) {
         Long currentUserId = requireCurrentUserId();
-        ReviewComplaint complaint = complaintRepository.findById(complaintId)
+        ReviewComplaint complaint = complaintRepository.findByIdForUpdate(complaintId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Complaint not found"));
         if (!currentUserId.equals(complaint.getComplainantId())
                 && !currentUserId.equals(complaint.getRespondentId())
@@ -174,7 +181,7 @@ public class ReviewComplaintService {
 
         ReviewComplaint complaint = complaintRepository.findById(complaintId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Complaint not found"));
-        if (!PENDING.equals(complaint.getStatus()) && !PROCESSING.equals(complaint.getStatus())) {
+        if (!PENDING.equals(complaint.getStatus())) {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Complaint has been handled");
         }
 
@@ -192,12 +199,16 @@ public class ReviewComplaintService {
 
         if (REVIEW_HIDDEN.equals(result) && Boolean.TRUE.equals(review.getIsVisible())) {
             review.setIsVisible(false);
-            creditService.updateCreditScore(
+            creditService.reverseCreditAdjustment(
                     review.getTargetUserId(),
-                    -calculateReviewScoreChange(review.getRating()),
+                    "REVIEW",
+                    review.getId(),
                     CREDIT_EVENT_REVIEW_ARBITRATION,
                     review.getOrderId(),
-                    "Review arbitration adjusted credit"
+                    "Review arbitration adjusted credit",
+                    CREDIT_EVENT_REVIEW_ARBITRATION,
+                    complaint.getId(),
+                    calculateReviewScoreChange(review.getRating())
             );
         }
 
@@ -244,19 +255,35 @@ public class ReviewComplaintService {
     private void notifyResolved(ReviewComplaint complaint) {
         notificationService.createNotification(new NotificationCreateRequest(
                 complaint.getComplainantId(),
+                complaint.getHandledBy(),
                 "Review complaint resolved",
                 "Your review complaint has been resolved.",
                 TYPE_COMPLAINT_RESOLVED,
+                TYPE_COMPLAINT_RESOLVED,
                 RELATED_REVIEW_COMPLAINT,
-                complaint.getId()
+                complaint.getId(),
+                RELATED_REVIEW_COMPLAINT,
+                complaint.getId(),
+                RELATED_REVIEW_COMPLAINT,
+                complaint.getId(),
+                "review-complaint:resolved:complainant:" + complaint.getId(),
+                null
         ));
         notificationService.createNotification(new NotificationCreateRequest(
                 complaint.getRespondentId(),
+                complaint.getHandledBy(),
                 "Review complaint resolved",
                 "A complaint related to your review has been resolved.",
                 TYPE_COMPLAINT_RESOLVED,
+                TYPE_COMPLAINT_RESOLVED,
                 RELATED_REVIEW_COMPLAINT,
-                complaint.getId()
+                complaint.getId(),
+                RELATED_REVIEW_COMPLAINT,
+                complaint.getId(),
+                RELATED_REVIEW_COMPLAINT,
+                complaint.getId(),
+                "review-complaint:resolved:respondent:" + complaint.getId(),
+                null
         ));
     }
 

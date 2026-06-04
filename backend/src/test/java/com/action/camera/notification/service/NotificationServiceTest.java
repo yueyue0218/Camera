@@ -111,6 +111,48 @@ class NotificationServiceTest {
         assertThat(notificationRepository.findById(other.notificationId()).orElseThrow().getIsRead()).isFalse();
     }
 
+    @Test
+    void dedupeKeyMakesCreateIdempotent() {
+        NotificationCreateRequest request = new NotificationCreateRequest(
+                USER_ID,
+                OTHER_USER_ID,
+                "收到评价",
+                "你收到了一条评价",
+                "REVIEW_RECEIVED",
+                "REVIEW_RECEIVED",
+                "REVIEW",
+                100L,
+                "REVIEW",
+                100L,
+                "REVIEW",
+                100L,
+                "review:received:100",
+                null
+        );
+
+        NotificationResponse first = notificationService.createNotification(request);
+        NotificationResponse second = notificationService.createNotification(request);
+
+        assertThat(second.notificationId()).isEqualTo(first.notificationId());
+        assertThat(notificationRepository.findByUserIdOrderByCreatedAtDesc(USER_ID)).hasSize(1);
+    }
+
+    @Test
+    void paginationUnreadFilterAndUnreadCountWorkForCurrentUser() {
+        notificationService.createNotification(requestFor(USER_ID, "第一条"));
+        NotificationResponse second = notificationService.createNotification(requestFor(USER_ID, "第二条"));
+        notificationService.createNotification(requestFor(OTHER_USER_ID, "别人的通知"));
+        UserContext.setUserId(USER_ID);
+        notificationService.markRead(second.notificationId());
+
+        assertThat(notificationService.unreadCount()).isEqualTo(1);
+        assertThat(notificationService.listMine(0, 10, false).getRecords())
+                .extracting(NotificationResponse::title)
+                .containsExactly("第一条");
+        assertThat(notificationService.listMine(0, 1, null).getSize()).isEqualTo(1);
+        assertThat(notificationService.listMine(0, 1, null).getTotal()).isEqualTo(2);
+    }
+
     private NotificationCreateRequest requestFor(Long userId, String title) {
         return new NotificationCreateRequest(
                 userId,
