@@ -1,21 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Alert, Avatar, Box, Button, Chip, Paper, Stack, Typography } from '@mui/material'
+import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { conversationApi, deliveryApi, orderApi, photoAuthorizationApi, quoteApi, readFileAsDataUrl } from '../../api.js'
-import { ConversationSourceCard } from './components/ConversationSourceCard.jsx'
 import { ConversationThread } from './components/ConversationThread.jsx'
 import { ConversationWorkbenchPanel } from './components/ConversationWorkbenchPanel.jsx'
-import { QuotePanel } from './components/QuotePanel.jsx'
 import {
   addLocalMessage,
   addSavedPhoto,
   buildConversationFallback,
-  buildConversationSourceRows,
   findConversationRecord,
-  formatTime,
   getCounterpartyLabel,
-  getConversationSourceHint,
   getConversationSourceLabel,
   getLocalMessages,
   getOppositeUserId,
@@ -377,18 +373,17 @@ export function ConversationDetailPage() {
   const canSeeQuoteEntry = conversation && currentUser.role === 'PROVIDER' && isConversationProvider
   const quoteEntryHint = getQuoteEntryHint(conversation, currentUser, quotes)
   const sourceLabel = getConversationSourceLabel(conversation)
-  const sourceHint = getConversationSourceHint(conversation)
-  const sourceRows = buildConversationSourceRows(conversation, currentUser, sourceLabel, getBackendConversationId(conversation))
+  const progressLabel = getConversationProgressLabel(currentOrder, quotes, currentUser)
 
   return (
-    <Stack spacing={2}>
-      <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 } }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1.5}>
+    <Stack spacing={1.5}>
+      <Paper variant="outlined" sx={{ p: { xs: 1.4, md: 1.8 }, bgcolor: '#f8f3eb', borderColor: '#d4ccc2' }}>
+        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} spacing={1.5}>
           <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 0 }}>
             <Button color="inherit" onClick={() => navigate('/messages')}>返回</Button>
             <Avatar
               onClick={() => conversation && openUserProfile(getOppositeUserId(conversation, currentUser.userId))}
-              sx={{ bgcolor: conversation?.isLocal ? 'secondary.main' : 'primary.main', cursor: conversation ? 'pointer' : 'default' }}
+              sx={{ bgcolor: '#0d2fb2', cursor: conversation ? 'pointer' : 'default' }}
             >
               {conversation?.scene?.slice(0, 1) || '会'}
             </Avatar>
@@ -399,48 +394,37 @@ export function ConversationDetailPage() {
               </Typography>
             </Box>
           </Stack>
-          <Chip size="small" color={isBackendConversation ? 'primary' : 'default'} label={isBackendConversation ? '可协作成单' : '先沟通'} />
+          <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent={{ xs: 'flex-start', md: 'flex-end' }}>
+            <Chip size="small" label={currentUser.role === 'PROVIDER' ? '你是摄影师' : '你是客户'} />
+            <Chip size="small" label={`来自：${sourceLabel}`} />
+            <Chip size="small" color={isBackendConversation ? 'primary' : 'default'} label={`当前：${progressLabel}`} />
+            <Button
+              size="small"
+              variant="outlined"
+              color="inherit"
+              startIcon={<ReceiptLongRoundedIcon />}
+              onClick={() => currentOrder && navigate(`/orders?orderId=${currentOrder.orderId}`)}
+              disabled={!currentOrder}
+            >
+              订单档案
+            </Button>
+          </Stack>
         </Stack>
       </Paper>
 
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
 
-      <ConversationSourceCard
-        isBackendConversation={isBackendConversation}
-        currentUser={currentUser}
-        sourceRows={sourceRows}
-        sourceHint={sourceHint}
-      />
-
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) 390px' }, gap: 2, alignItems: 'start' }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 2.2fr) minmax(300px, 0.95fr)' }, gap: 2, alignItems: 'start' }}>
         <Stack spacing={2}>
-          <QuotePanel
-            quotes={quotes}
-            conversation={conversation}
-            currentUser={currentUser}
-            canSeeQuoteEntry={canSeeQuoteEntry}
-            canCreateQuote={canCreateQuote}
-            showQuoteForm={showQuoteForm}
-            editingQuotationId={editingQuotationId}
-            quoteEntryHint={quoteEntryHint}
-            quoteForm={quoteForm}
-            quoteValidationErrors={quoteValidationErrors}
-            loading={loading}
-            canSubmitQuoteForm={canSubmitQuoteForm}
-            onOpenQuoteForm={openQuoteForm}
-            onCloseQuoteForm={closeQuoteForm}
-            onStartQuoteEditing={startQuoteEditing}
-            onConfirmQuote={confirmQuote}
-            onRejectQuote={rejectQuote}
-            onOpenOrder={orderId => navigate(`/orders?orderId=${orderId}`)}
-            onQuoteFormChange={setQuoteForm}
-            onSubmitQuote={createQuote}
-          />
-
           <ConversationThread
             messages={messages}
             conversation={conversation}
             currentUser={currentUser}
+            quotes={quotes}
+            order={currentOrder}
+            statusLogs={statusLogs}
+            deliveryRecords={deliveryRecords}
+            photoAuthorizations={photoAuthorizations}
             content={content}
             loading={loading}
             imageSending={imageSending}
@@ -448,11 +432,40 @@ export function ConversationDetailPage() {
             canCreateQuote={canCreateQuote}
             showQuoteForm={showQuoteForm}
             editingQuotationId={editingQuotationId}
+            quoteEntryHint={quoteEntryHint}
+            quoteForm={quoteForm}
+            quoteValidationErrors={quoteValidationErrors}
+            canSubmitQuoteForm={canSubmitQuoteForm}
+            deliveryForm={deliveryForm}
+            reworkRequirement={reworkRequirement}
+            photoAuthorizationForm={photoAuthorizationForm}
+            authorizationRemarks={authorizationRemarks}
             onOpenQuoteForm={openQuoteForm}
+            onCloseQuoteForm={closeQuoteForm}
+            onStartQuoteEditing={startQuoteEditing}
+            onConfirmQuote={confirmQuote}
+            onRejectQuote={rejectQuote}
+            onOpenOrder={orderId => navigate(`/orders?orderId=${orderId}`)}
+            onOpenOrderArchive={() => currentOrder && navigate(`/orders?orderId=${currentOrder.orderId}`)}
+            onQuoteFormChange={setQuoteForm}
+            onSubmitQuote={createQuote}
             onContentChange={setContent}
             onSendMessage={sendMessage}
             onChooseMessageImage={chooseMessageImage}
             onSaveSubmittedPhoto={saveSubmittedPhoto}
+            onPayOrder={payCurrentOrder}
+            onCancelOrder={cancelCurrentOrder}
+            onConfirmOrder={confirmCurrentOrder}
+            onSubmitRework={submitRework}
+            onReworkRequirementChange={setReworkRequirement}
+            onDeliveryFileChange={file => setDeliveryForm({ ...deliveryForm, file })}
+            onDeliveryRemarkChange={remark => setDeliveryForm({ ...deliveryForm, remark })}
+            onSubmitDelivery={submitDelivery}
+            onPhotoAuthorizationFileIdsChange={fileIds => setPhotoAuthorizationForm({ ...photoAuthorizationForm, fileIds })}
+            onPhotoAuthorizationRemarkChange={remark => setPhotoAuthorizationForm({ ...photoAuthorizationForm, remark })}
+            onSubmitPhotoAuthorization={submitPhotoAuthorizationRequest}
+            onAuthorizationRemarkChange={(authorizationId, remark) => setAuthorizationRemarks({ ...authorizationRemarks, [authorizationId]: remark })}
+            onDecidePhotoAuthorization={handlePhotoAuthorizationDecision}
           />
         </Stack>
 
@@ -488,6 +501,31 @@ export function ConversationDetailPage() {
       </Box>
     </Stack>
   )
+}
+
+function getConversationProgressLabel(order, quotes, currentUser) {
+  if (order) {
+    const statusLabel = {
+      PENDING_PAYMENT: currentUser.role === 'CUSTOMER' ? '等待你支付' : '等待客户付款',
+      PAID_PENDING_SHOOT: '等待拍摄',
+      SHOOTING: '拍摄履约中',
+      PENDING_DELIVERY: currentUser.role === 'PROVIDER' ? '等待你交付' : '等待摄影师交付',
+      DELIVERED_PENDING_CONFIRM: currentUser.role === 'CUSTOMER' ? '等待你确认作品' : '等待客户确认作品',
+      REWORK_REQUIRED: currentUser.role === 'PROVIDER' ? '返修待交付' : '返修中',
+      APPEALING: '争议处理中',
+      COMPLETED: '已完成',
+      CANCELLED: '已取消',
+      REFUNDED: '已退款'
+    }
+    return statusLabel[order.status] || '订单进展已更新'
+  }
+  const pendingQuote = quotes.find(quote => quote.status === 'PENDING_CONFIRM')
+  if (pendingQuote) return currentUser.role === 'CUSTOMER' ? '等待你确认报价' : '等待客户确认报价'
+  const latestQuote = [...quotes].sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0))[0]
+  if (latestQuote?.status === 'REJECTED') return '报价已拒绝'
+  if (latestQuote?.status === 'EXPIRED') return '报价已过期'
+  if (latestQuote?.status === 'CONFIRMED') return '报价已确认'
+  return '沟通拍摄细节'
 }
 
 function selectConversationOrder(orders, conversation, quotes) {
