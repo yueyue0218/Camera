@@ -60,6 +60,10 @@ function sameId(a, b) {
   return a !== undefined && a !== null && b !== undefined && b !== null && Number(a) === Number(b)
 }
 
+function currentUserId(currentUser) {
+  return currentUser?.userId ?? currentUser?.id
+}
+
 function referenceSlots(referenceFileIds) {
   const count = Math.max(3, Math.min(4, Number(referenceFileIds?.length) || 0))
   const slots = Array.from({ length: count }, (_, index) => `参考图 ${String(index + 1).padStart(2, '0')}`)
@@ -155,7 +159,8 @@ export function DemandDetailPage() {
   const title = firstText(demand.title, demand.scene) || '暂无标题'
   const place = [cityName(demand.cityName || demand.cityCode), demand.location].filter(Boolean).join(' · ') || '暂无地点'
   const timeText = demand.timeDescription || demand.timeSlot || readableDate(demand.expectedDate) || '暂无'
-  const isDemandOwner = currentUser.role === 'CUSTOMER' && sameId(demand.customerId, currentUser.userId)
+  const demandOwnerId = demand.customerId ?? demand.publisherId ?? demand.ownerId
+  const isDemandOwner = sameId(demandOwnerId, currentUserId(currentUser))
   const canRespond = currentUser.role === 'PROVIDER' && demand.status === 'OPEN'
 
   async function respondDemand() {
@@ -187,7 +192,15 @@ export function DemandDetailPage() {
     <DetailShell backLabel="← 返回订单大厅">
       <div className="detail-grid">
         <article className="panel-card">
-          <h1 className="detail-title">{title}</h1>
+          <div className="detail-heading">
+            <h1 className="detail-title">{title}</h1>
+            {isDemandOwner && (
+              <div className="detail-top-actions" aria-label="需求管理">
+                <button className="detail-mini-action" type="button" onClick={() => navigate(`/demands/${demand.demandId}/edit`)}>编辑</button>
+                <button className="detail-mini-action danger" type="button" onClick={closeDemand}>下架</button>
+              </div>
+            )}
+          </div>
           <div className="tag-row">
             <span className="tag">{timeTags[0] ? timeTagLabel(timeTags[0]) : '周末'}</span>
             {(styles.length ? styles : ['校园', '清透']).slice(0, 3).map(tag => <span className="tag gray" key={tag}>{tag}</span>)}
@@ -229,15 +242,6 @@ export function DemandDetailPage() {
             </div>
             <div className="aside-item"><strong>完成约拍</strong><span>后端暂无发布者历史统计接口，当前展示需求响应数据。</span></div>
           </div>
-          {isDemandOwner && (
-            <div className="aside-card">
-              <h3>管理需求</h3>
-              <div className="detail-op-actions side-actions">
-                <button className="primary-btn" type="button" onClick={() => navigate(`/demands/${demand.demandId}/edit`)}>编辑需求</button>
-                <button className="secondary-btn danger-action-btn" type="button" onClick={closeDemand}>下架需求</button>
-              </div>
-            </div>
-          )}
           {canRespond && (
           <div className="photographer-only aside-card">
             <h3>操作</h3>
@@ -311,10 +315,8 @@ export function ServicePackageDetailPage() {
   const credit = service.photographerCreditScore ?? service.providerCreditScore ?? service.creditScore
   const city = cityName(service.cityName || service.cityCode) || service.serviceArea || '暂无城市'
   const price = service.priceRange || `${money(service.basePriceCent)} 起`
-  const isServiceOwner = currentUser.role === 'PROVIDER' && (
-    sameId(service.providerId, currentUser.userId) ||
-    sameId(service.photographerId, currentUser.userId)
-  )
+  const serviceOwnerId = service.providerId ?? service.photographerId ?? service.creatorId
+  const isServiceOwner = sameId(serviceOwnerId, currentUserId(currentUser))
   const isCustomerViewer = currentUser.role === 'CUSTOMER'
 
   async function startChat(message = `我想预约「${service.title || '这个橱窗'}」，想进一步确认时间与服务内容。`) {
@@ -366,7 +368,15 @@ export function ServicePackageDetailPage() {
     <DetailShell backLabel="← 返回橱窗大厅">
       <div className="detail-grid">
         <article className="panel-card">
-          <h1 className="detail-title">{service.title || '暂无标题'}</h1>
+          <div className="detail-heading">
+            <h1 className="detail-title">{service.title || '暂无标题'}</h1>
+            {isServiceOwner && (
+              <div className="detail-top-actions" aria-label="橱窗管理">
+                <button className="detail-mini-action" type="button" onClick={() => navigate(`/service-packages/${service.serviceId}/edit`)}>编辑</button>
+                <button className="detail-mini-action danger" type="button" onClick={offlineService}>下架</button>
+              </div>
+            )}
+          </div>
           <div className="tag-row">
             <span className="tag blue">摄影师</span>
             <span className="tag gray">{city}</span>
@@ -420,15 +430,6 @@ export function ServicePackageDetailPage() {
             </div>
             <button className="secondary-btn" style={{ width: '100%' }} type="button" onClick={followProvider}>关注摄影师</button>
           </div>
-          {isServiceOwner && (
-            <div className="aside-card">
-              <h3>管理橱窗</h3>
-              <div className="detail-op-actions side-actions">
-                <button className="primary-btn" type="button" onClick={() => navigate(`/service-packages/${service.serviceId}/edit`)}>编辑橱窗</button>
-                <button className="secondary-btn danger-action-btn" type="button" onClick={offlineService}>下架橱窗</button>
-              </div>
-            </div>
-          )}
           {isCustomerViewer && (
             <div className="aside-card">
               <h3>操作</h3>
