@@ -26,7 +26,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/sessions/**",
                         "/users/register",
                         "/users/login",
-                        "/moments/**",
                         "/messages/**",
                         "/api/v1/providers/*/profile"
                 );

@@ -1,12 +1,14 @@
 package com.action.camera.notification.controller;
 
 import com.action.camera.common.Result;
+import com.action.camera.common.page.PageResult;
 import com.action.camera.notification.dto.NotificationResponse;
 import com.action.camera.notification.service.NotificationService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -22,8 +24,15 @@ public class NotificationController {
     }
 
     @GetMapping
-    public Result<List<NotificationResponse>> listMine() {
-        return Result.success(notificationService.listMine());
+    public Result<PageResult<NotificationResponse>> listMine(@RequestParam(required = false, defaultValue = "0") Integer page,
+                                                             @RequestParam(required = false, defaultValue = "20") Integer size,
+                                                             @RequestParam(required = false) Boolean isRead) {
+        return Result.success(notificationService.listMine(page, size, isRead));
+    }
+
+    @GetMapping("/unread-count")
+    public Result<Long> unreadCount() {
+        return Result.success(notificationService.unreadCount());
     }
 
     @PatchMapping("/{notificationId}/read")
