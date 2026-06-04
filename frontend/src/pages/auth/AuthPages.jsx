@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { authApi } from '../../api.js'
 import filmSpringUrl from '../../assets/film-spring.png'
@@ -8,6 +8,11 @@ import filmSummerUrl from '../../assets/film-summer.png'
 import filmPhotoClubUrl from '../../assets/film-photo-club.png'
 import filmAutumnUrl from '../../assets/film-autumn.png'
 import filmWinterUrl from '../../assets/film-winter.png'
+import searchImgUrl from '../../assets/opening-search.png'
+import lensUrl from '../../assets/opening-lens.png'
+import polaroidsUrl from '../../assets/opening-polaroids.png'
+import polaroidsP3Url from '../../assets/opening-polaroids-p3.png'
+import './opening.css'
 
 /* ── Design tokens ─────────────────────────────────────────── */
 const BLUE   = '#0d2fb2'
@@ -275,68 +280,557 @@ function Filmstrip() {
   )
 }
 
+/* ── v30 Opening – pointer parallax helpers ─────────────────── */
+
+function enhanceTilt(el, { maxRot = 5, maxMove = 10, perspective = 900 }) {
+  if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return () => {}
+  let base = ''
+  let raf = 0
+  const clamp = (n, mn, mx) => Math.max(mn, Math.min(mx, n))
+  function captureBase() {
+    const t = getComputedStyle(el).transform
+    base = t && t !== 'none' ? t : ''
+  }
+  function apply(e) {
+    const r = el.getBoundingClientRect()
+    const nx = clamp(((e.clientX - r.left) / r.width - .5) * 2, -1, 1)
+    const ny = clamp(((e.clientY - r.top) / r.height - .5) * 2, -1, 1)
+    cancelAnimationFrame(raf)
+    raf = requestAnimationFrame(() => {
+      el.style.setProperty('transform',
+        `${base} translate3d(${(nx * maxMove).toFixed(2)}px,${(ny * maxMove).toFixed(2)}px,0) perspective(${perspective}px) rotateX(${(-ny * maxRot).toFixed(2)}deg) rotateY(${(nx * maxRot).toFixed(2)}deg)`,
+        'important')
+    })
+  }
+  function reset() {
+    cancelAnimationFrame(raf)
+    el.style.setProperty('transform', base || '', 'important')
+  }
+  el.addEventListener('pointerenter', captureBase)
+  el.addEventListener('pointermove', apply)
+  el.addEventListener('pointerleave', reset)
+  return () => {
+    el.removeEventListener('pointerenter', captureBase)
+    el.removeEventListener('pointermove', apply)
+    el.removeEventListener('pointerleave', reset)
+  }
+}
+
 /* ── Pages ─────────────────────────────────────────────────── */
 
 export function LoginChoicePage() {
-  usePortraStyles()
-  const navigate = useNavigate()
+  const navigate  = useNavigate()
+  const location  = useLocation()
   const { isAuthenticated } = useAuth()
+  const hasModal  = location.pathname !== '/login' && location.pathname !== '/login/'
+
+  const [navActive,  setNavActive]  = useState('约拍大厅')
+  const [navRole,    setNavRole]    = useState('owner')
+  const [roleActive, setRoleActive] = useState('我想拍')
+
+  const scrollRef  = useRef(null)
+  const p2Ref      = useRef(null)
+  const p3Ref      = useRef(null)
+  const lensRef    = useRef(null)
+  const ticketRef  = useRef(null)
+  const card1Ref   = useRef(null)
+  const card2Ref   = useRef(null)
+  const card3Ref   = useRef(null)
 
   useEffect(() => {
     if (isAuthenticated) navigate('/hall', { replace: true })
   }, [isAuthenticated, navigate])
 
+  /* IntersectionObserver — mirrors v18-scroll-interactions */
+  useEffect(() => {
+    const scroller = scrollRef.current
+    const sections = [p2Ref.current, p3Ref.current].filter(Boolean)
+    if (!('IntersectionObserver' in window)) {
+      sections.forEach(s => s.classList.add('op-in-view'))
+      return
+    }
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => e.target.classList.toggle('op-in-view', e.isIntersecting))
+    }, { root: scroller, threshold: .28 })
+    sections.forEach(s => io.observe(s))
+    return () => io.disconnect()
+  }, [])
+
+  /* 3D-tilt — mirrors v19-pointer-depth-interactions */
+  useEffect(() => {
+    const cleanups = [
+      enhanceTilt(lensRef.current,   { maxRot: 3.5, maxMove: 13, perspective: 820 }),
+      enhanceTilt(ticketRef.current, { maxRot: 3.2, maxMove: 8,  perspective: 900 }),
+      enhanceTilt(card1Ref.current,  { maxRot: 5.5, maxMove: 11, perspective: 900 }),
+      enhanceTilt(card2Ref.current,  { maxRot: 5.5, maxMove: 11, perspective: 900 }),
+      enhanceTilt(card3Ref.current,  { maxRot: 5.5, maxMove: 11, perspective: 900 }),
+    ]
+    return () => cleanups.forEach(c => c())
+  }, [])
+
+  function scrollToId(id) {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  function onSectionPointerMove(e, ref) {
+    const el = ref.current; if (!el) return
+    const r = el.getBoundingClientRect()
+    el.style.setProperty('--v18px', (((e.clientX - r.left) / r.width - .5) * 36).toFixed(2))
+    el.style.setProperty('--v18py', (((e.clientY - r.top) / r.height - .5) * 36).toFixed(2))
+  }
+  function onSectionPointerLeave(ref) {
+    const el = ref.current; if (!el) return
+    el.style.setProperty('--v18px', '0')
+    el.style.setProperty('--v18py', '0')
+  }
+
   return (
-    <div style={{
-      minHeight: '100vh', background: BG, position: 'relative',
-      overflow: 'hidden', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center', fontFamily: SANS,
-      paddingBottom: 'clamp(130px, 18vh, 200px)'
-    }}>
-      {/* decorative vertical line */}
+    <div className="op-wrapper">
+
+      {/* ── Side nav dots ──────────────────────────────────────── */}
       <div style={{
-        position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1,
-        background: 'linear-gradient(180deg, transparent, rgba(13,47,178,.26) 22%, rgba(13,47,178,.12) 82%, transparent)',
-        transform: 'translateX(-50%) rotate(-12deg)', transformOrigin: 'center',
-        pointerEvents: 'none'
-      }} />
-      {/* side text */}
-      <div style={{
-        position: 'absolute', right: '2.4vw', top: '12vh', writingMode: 'vertical-rl',
-        letterSpacing: '.38em', fontSize: 'clamp(10px,.86vw,13px)',
-        color: 'rgba(17,16,21,.18)', pointerEvents: 'none', fontFamily: SANS
+        position: 'fixed', left: 18, top: '50%', transform: 'translateY(-50%)',
+        zIndex: 150, display: 'flex', flexDirection: 'column', gap: 10, opacity: .6
       }}>
-        PORTRA / MEET / MATCH / START
+        {[
+          { label: '第一页', id: 'op-page1' },
+          { label: '第二页', id: 'op-page2' },
+          { label: '第三页', id: 'op-page3' },
+          { label: '关于我们', id: 'op-about' },
+        ].map(({ label, id }) => (
+          <a
+            key={id} aria-label={label}
+            onClick={e => { e.preventDefault(); scrollToId(id) }}
+            href={`#${id}`}
+            style={{
+              width: 9, height: 9, borderRadius: 99,
+              border: `1px solid ${BLUE}`, background: 'rgba(242,237,230,.55)',
+              display: 'block', cursor: 'pointer'
+            }}
+          />
+        ))}
       </div>
 
-      {/* center content */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, animation: 'portraIn .5s ease both' }}>
-        <Wordmark size='clamp(56px, 9.5vw, 102px)' />
+      {/* ── Fixed header ───────────────────────────────────────── */}
+      <header style={{
+        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 220,
+        height: 72, background: '#f2ede6',
+        borderBottom: '1px solid rgba(21,19,24,.12)',
+        boxShadow: '0 1px 0 rgba(255,255,255,.55) inset',
+        fontFamily: SANS
+      }}>
         <div style={{
-          fontSize: 'clamp(10px,.76vw,13px)', letterSpacing: '.28em',
-          color: MUTED, textTransform: 'uppercase', marginBottom: 28, fontFamily: SANS
+          width: 'min(1180px, calc(100vw - 48px))', height: 72,
+          margin: '0 auto', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', gap: 24
         }}>
-          MEET RIGHT NOW
+          {/* Wordmark */}
+          <a
+            onClick={e => { e.preventDefault(); scrollToId('op-page1') }}
+            href="#op-page1"
+            style={{
+              display: 'flex', alignItems: 'flex-end', gap: 12,
+              minWidth: 168, textDecoration: 'none', color: 'inherit', cursor: 'pointer'
+            }}
+          >
+            <div style={{ fontFamily: SERIF, fontSize: 32, lineHeight: .9, letterSpacing: '-.04em', fontWeight: 500 }}>
+              Por<span style={{ color: BLUE }}>t</span>r<span style={{ color: ORANGE }}>a</span>
+            </div>
+            <div style={{ fontSize: 10, letterSpacing: '.22em', color: MUTED, textTransform: 'uppercase', marginBottom: 2 }}>
+              Meet Right Now
+            </div>
+          </a>
+
+          {/* Nav */}
+          <nav style={{ display: 'flex', alignItems: 'center', gap: 34, height: '100%' }}>
+            {[
+              { label: '约拍大厅', id: 'op-page1' },
+              { label: '动态',    id: 'op-page2' },
+              { label: '消息',    id: 'op-page3' },
+              { label: '个人',    id: 'op-about' },
+            ].map(({ label, id }) => (
+              <a
+                key={label}
+                onClick={e => { e.preventDefault(); setNavActive(label); scrollToId(id) }}
+                href={`#${id}`}
+                style={{
+                  position: 'relative', height: 72, display: 'flex', alignItems: 'center',
+                  color: navActive === label ? BLUE : '#333842',
+                  fontWeight: navActive === label ? 700 : 400,
+                  fontSize: 15, letterSpacing: '.12em', cursor: 'pointer',
+                  textDecoration: 'none', transition: '.2s',
+                  borderBottom: navActive === label ? `3px solid ${BLUE}` : '3px solid transparent',
+                  whiteSpace: 'nowrap'
+                }}
+              >{label}</a>
+            ))}
+          </nav>
+
+          {/* Header actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 220, justifyContent: 'flex-end' }}>
+            {/* Role toggle */}
+            <div style={{
+              display: 'flex', background: '#fffaf2',
+              border: '1px solid rgba(21,19,24,.12)', borderRadius: 999, padding: 4
+            }}>
+              {[{ key: 'owner', label: '单主' }, { key: 'photographer', label: '摄影师' }].map(r => (
+                <button
+                  key={r.key}
+                  onClick={() => setNavRole(r.key)}
+                  style={{
+                    border: 0,
+                    background: navRole === r.key ? BLUE : 'transparent',
+                    color: navRole === r.key ? '#fff' : '#3d4148',
+                    borderRadius: 999, padding: '8px 13px',
+                    fontSize: 13, letterSpacing: '.08em', cursor: 'pointer',
+                    fontFamily: SANS
+                  }}
+                >{r.label}</button>
+              ))}
+            </div>
+            {/* Search */}
+            <button style={{
+              width: 38, height: 38, border: '1px solid rgba(21,19,24,.12)',
+              borderRadius: 999, background: '#f9f5ee',
+              display: 'grid', placeItems: 'center', cursor: 'pointer', fontSize: 18,
+              fontFamily: SANS
+            }}>⌕</button>
+            {/* Avatar → sign in */}
+            <div
+              onClick={() => navigate('/login/sign-in')}
+              title="登录"
+              style={{
+                width: 38, height: 38, borderRadius: '50%',
+                background: `linear-gradient(135deg, ${BLUE}, #3857c8 45%, ${ORANGE})`,
+                border: '3px solid #f4efe8', boxShadow: '0 0 0 1px rgba(21,19,24,.12)',
+                cursor: 'pointer', flexShrink: 0
+              }}
+            />
+          </div>
         </div>
+      </header>
 
-        {/* primary CTA */}
-        <NavBtn onClick={() => navigate('/login/sign-in')} primary>
-          进入 Portra
-        </NavBtn>
-        {/* secondary CTA */}
-        <NavBtn onClick={() => navigate('/login/register')}>
-          创建账号
-        </NavBtn>
+      {/* ── Scroll container ───────────────────────────────────── */}
+      <div className="op-scroll" ref={scrollRef} id="op-scroller">
 
+        {/* ── PAGE 1 ─────────────────────────────────────────── */}
+        <section className="op-section op-p1" id="op-page1">
+
+          {/* WANT background word — exact inline params from v30 HTML */}
+          <div
+            className="op-bg-word"
+            style={{ right: '-3vw', top: '2vh', fontSize: '15.6vw', transform: 'translate3d(-12.4vw, 0px, 0px)' }}
+          >WANT</div>
+
+          <div className="op-yellow-field" />
+          <div className="op-blue-cut" />
+
+          {/* Top ribbon */}
+          <div className="op-top-ribbon op-reveal">寻找如此简单</div>
+
+          {/* Search frame asset */}
+          <img
+            alt="search frame asset high resolution"
+            className="op-asset op-search-img op-reveal"
+            decoding="async"
+            src={searchImgUrl}
+          />
+
+          {/* Lens asset */}
+          <img
+            ref={lensRef}
+            alt="lens asset high resolution"
+            className="op-asset op-lens op-reveal"
+            decoding="async"
+            src={lensUrl}
+            style={{ marginLeft: '-1.36667px', marginTop: '-1.60364px' }}
+          />
+
+          {/* Shutter flash & blink */}
+          <div className="op-lens-flash" aria-hidden="true" />
+          <div className="op-shutter-blink" aria-hidden="true" />
+
+          {/* Polaroids asset */}
+          <img
+            alt="polaroid top row collage asset high resolution"
+            className="op-asset op-polaroids op-reveal"
+            decoding="async"
+            src={polaroidsUrl}
+            style={{ marginLeft: '1.025px', marginTop: '1.06909px' }}
+          />
+
+          {/* PORTRA MEET YOU */}
+          <div className="op-portra-meet op-reveal">PORTRA MEET<br />YOU</div>
+
+          {/* Brand wordmark: P + o(blue) + r + t + r + a(orange) — exact from v30 HTML body */}
+          <div className="op-brand op-reveal" style={{ fontFamily: SERIF }}>
+            <span>P</span><span className="blue">o</span><span>r</span>
+            <span>t</span><span>r</span><span className="orange">a</span>
+          </div>
+
+          {/* Product positioning pill */}
+          <div className="op-product-positioning op-reveal">约拍一步到位</div>
+
+          {/* NOW / right now / PHOTO */}
+          <div className="op-now-word op-reveal">NOW</div>
+          <div className="op-right-now op-reveal">right now</div>
+          <div className="op-photo-word op-reveal">PHOTO</div>
+
+          {/* START pill — scrolls to page 3 */}
+          <button className="op-start-pill" onClick={() => navigate('/login/sign-in')}>
+            <span>开始</span>
+          </button>
+
+          {/* GO ON vertical — scrolls to page 2 */}
+          <button className="op-go-on" onClick={() => scrollToId('op-page2')}>
+            <span>继续</span>
+          </button>
+        </section>
+
+        {/* ── PAGE 2 ─────────────────────────────────────────── */}
+        <section
+          className="op-section op-p2"
+          id="op-page2"
+          ref={p2Ref}
+          onPointerMove={e => onSectionPointerMove(e, p2Ref)}
+          onPointerLeave={() => onSectionPointerLeave(p2Ref)}
+        >
+          {/* MATCH background word — exact inline params from v30 HTML */}
+          <div
+            className="op-bg-word"
+            style={{ left: '46.1vw', top: '-1.7vh', fontSize: '17vw', opacity: .20, transform: 'translate3d(-13.8vw, 0px, 0px)' }}
+          >MATCH</div>
+
+          <div className="op-p2-left-blue" />
+          <div className="op-p2-yellow-note" />
+
+          <div className="op-p2-kicker op-reveal">PORTRA MATCH SYSTEM / FILM EDGE</div>
+
+          <h1 className="op-p2-title op-reveal">你想拍的，<br />在等一个合适的快门</h1>
+
+          <p className="op-p2-copy op-reveal">
+            不是把人塞进模板，<br />
+            而是让 <b>风格、地点、预算、时间</b> 慢慢对齐。
+          </p>
+
+          <div className="op-match-line op-reveal">
+            <span className="dot d1" /><span className="dot d2" /><span className="dot d3" />
+          </div>
+
+          {/* Sticker A — vertical white text on left blue bar */}
+          <div className="op-p2-sticker a op-reveal">I WANT TO BE PHOTOGRAPHED →</div>
+
+          {/* Sticker B — yellow note */}
+          <div className="op-p2-sticker b op-reveal">02<br /><small>MATCH LINE</small></div>
+
+          {/* Request strip */}
+          <div className="op-request-strip op-reveal">
+            <h4>REQUEST NOTE / WANT</h4>
+            <p><span>想拍</span><b>毕业照 / 胶片感</b></p>
+            <p><span>地点</span><b>南京大学附近</b></p>
+            <p><span>预算</span><b>¥120–300</b></p>
+            <p><span>时间</span><b>本周末下午</b></p>
+            <p><span>状态</span><b>可先沟通</b></p>
+          </div>
+
+          {/* Contact sheet */}
+          <div className="op-contact-sheet op-reveal" aria-label="contact sheet">
+            {[1,2,3,4,5,6].map(n => (
+              <div key={n} className={`op-frame brand-tile f${n}`} />
+            ))}
+          </div>
+
+          {/* Film edge card */}
+          <div className="op-film-edge-card op-reveal">
+            <h4>FILM EDGE / RESPONSE</h4>
+            <p><span>可响应</span><b>3 位摄影师</b></p>
+            <p><span>距离</span><b>2km 内</b></p>
+            <p><span>评分</span><b>★ 4.9</b></p>
+            <p><span>完成</span><b>18 次拍摄</b></p>
+            <p><span>沟通</span><b>先聊再定</b></p>
+          </div>
+
+          <div className="op-material-caption op-reveal">CONTACT SHEET / STYLE SAMPLE / RESPONSE SLIP</div>
+
+          {/* Role switch */}
+          <div className="op-role-switch op-reveal">
+            {[
+              { label: '我想拍',   to: '/login/sign-in'   },
+              { label: '我来拍',   to: '/login/sign-in'   },
+              { label: '先看作品', to: '/login/sign-in'   },
+            ].map(({ label, to }) => (
+              <button
+                key={label}
+                className={roleActive === label ? 'active' : ''}
+                onClick={() => { setRoleActive(label); navigate(to) }}
+              >{label}</button>
+            ))}
+          </div>
+
+          <div className="op-edge-text">WAITING FOR THE RIGHT SHUTTER</div>
+
+          {/* Sticker C — black/yellow */}
+          <div className="op-p2-sticker c op-reveal">MEET YOU RIGHT NOW</div>
+        </section>
+
+        {/* ── PAGE 3 ─────────────────────────────────────────── */}
+        <section
+          className="op-section op-p3"
+          id="op-page3"
+          ref={p3Ref}
+          onPointerMove={e => onSectionPointerMove(e, p3Ref)}
+          onPointerLeave={() => onSectionPointerLeave(p3Ref)}
+        >
+          {/* MEET background word — exact inline params from v30 HTML */}
+          <div
+            className="op-bg-word"
+            style={{ left: '67.4vw', top: '2vh', fontSize: '18vw', opacity: .22, letterSpacing: '.02em', transform: 'translate3d(3.3vw, 0px, 0px)' }}
+          >MEET</div>
+
+          <div className="op-p3-blue-cut" />
+          <div className="op-p3-yellow-floor" />
+
+          <h1 className="op-p3-title op-reveal">现在，就开始一次<br />属于你的 Portra</h1>
+
+          {/* Ticket */}
+          <div className="op-ticket-main op-reveal" ref={ticketRef}>
+            <div className="op-ticket-inner">
+              <div className="op-ticket-spine">PORTRA · MEET YOU</div>
+              <div className="op-ticket-body">
+                <small>INVITATION / START POINT</small>
+                <h2>从一张邀请开始，<br />让快门和你相遇。</h2>
+                <div className="op-ticket-meta">
+                  <span>PLACE</span><b>NJU / nearby</b>
+                  <span>STYLE</span><b>film / portrait</b>
+                  <span>FIRST STEP</span><b>message first</b>
+                  <span>FLOW</span><b>hall · post · order</b>
+                </div>
+                <div className="op-barcode" />
+              </div>
+            </div>
+          </div>
+
+          {/* Invite cards */}
+          <div className="op-invite-cards op-reveal">
+            <article className="op-invite-card" ref={card1Ref}>
+              <div className="num">01</div>
+              <div className="tiny">I WANT TO BE<br />PHOTOGRAPHED</div>
+              <h3>找摄影师</h3>
+              <div className="line" />
+              <p>浏览风格、地点与作品，找到合适的快门。</p>
+              <ul>
+                <li>看作品片段</li>
+                <li>先沟通再确认</li>
+                <li>收藏喜欢的风格</li>
+              </ul>
+              <button onClick={() => navigate('/login/sign-in')}>我去看看</button>
+            </article>
+
+            <article className="op-invite-card" ref={card2Ref}>
+              <div className="num">02</div>
+              <div className="tiny">SEND A<br />REQUEST</div>
+              <h3>发布需求</h3>
+              <div className="line" />
+              <p>写下想拍的时间和样子，等待合适的人来回应。</p>
+              <ul>
+                <li>填写地点预算</li>
+                <li>选择拍摄风格</li>
+                <li>收到邀请提醒</li>
+              </ul>
+              <button onClick={() => navigate('/login/sign-in')}>我想拍照</button>
+            </article>
+
+            <article className="op-invite-card" ref={card3Ref}>
+              <div className="num">03</div>
+              <div className="tiny">I CAN TAKE<br />THIS SHOOT</div>
+              <h3>成为摄影师</h3>
+              <div className="line" />
+              <p>展示作品与风格，回应新的拍摄邀请。</p>
+              <ul>
+                <li>上传作品集</li>
+                <li>响应附近需求</li>
+                <li>管理订单评价</li>
+              </ul>
+              <button onClick={() => navigate('/login/sign-in')}>我来拍照</button>
+            </article>
+          </div>
+
+          {/* Polaroids — p3 version */}
+          <img
+            alt="polaroid top row collage asset high resolution"
+            className="op-asset op-p3-polaroids"
+            decoding="async"
+            src={polaroidsP3Url}
+          />
+
+          {/* Mini path indicator */}
+          <div className="op-p3-mini-path">
+            <span>大厅</span><i /><span>消息</span><i /><span>订单</span>
+          </div>
+        </section>
+
+        {/* ── FOOTER ─────────────────────────────────────────── */}
+        <section className="op-footer" id="op-about">
+          <div className="op-footer-inner">
+            <div className="op-footer-top">
+              <div className="op-footer-brand" style={{ fontFamily: SERIF }}>
+                <span>P</span><span className="blue">o</span><span>r</span>
+                <span>t</span><span>r</span><span className="orange">a</span>
+              </div>
+              <p className="op-footer-tagline">
+                让"我想拍"的人和"我来拍"的人，在同一个页面里顺利相遇。
+                浏览风格、发布需求、沟通确认，再把一次拍摄认真落地。
+              </p>
+            </div>
+            <div className="op-footer-grid">
+              <div className="op-footer-col">
+                <h4>About Portra</h4>
+                <p>一个更轻松、更直接的约拍入口。</p>
+                <p>从灵感到拍摄，一步一步把匹配变简单。</p>
+              </div>
+              <div className="op-footer-col">
+                <h4>产品</h4>
+                <ul>
+                  <li>找摄影师</li><li>发布需求</li>
+                  <li>即时沟通</li><li>订单管理</li>
+                </ul>
+              </div>
+              <div className="op-footer-col">
+                <h4>关于我们</h4>
+                <ul>
+                  <li>平台理念</li><li>使用帮助</li>
+                  <li>校园合作</li><li>更新日志</li>
+                </ul>
+              </div>
+              <div className="op-footer-col">
+                <h4>支持</h4>
+                <ul>
+                  <li>用户协议</li><li>隐私说明</li>
+                  <li>常见问题</li><li>联系团队</li>
+                </ul>
+              </div>
+            </div>
+            <div className="op-footer-mini">
+              <span>© 2026 Portra. All rights reserved.</span>
+              <span>想拍 / 来拍 / 看看</span>
+            </div>
+          </div>
+        </section>
+
+      </div>{/* end op-scroll */}
+
+      {/* ── Modal overlay for sign-in / register child routes ── */}
+      {hasModal && (
         <div style={{
-          fontSize: 11, color: 'rgba(17,16,21,.34)',
-          letterSpacing: '.22em', marginTop: 16, textTransform: 'uppercase', fontFamily: SANS
+          position: 'fixed', inset: 0, zIndex: 9900,
+          background: 'rgba(17,16,21,.75)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '24px 16px', overflowY: 'auto'
         }}>
-          SCROLL TO DEVELOP
+          <Outlet />
         </div>
-      </div>
-
-      <Filmstrip />
+      )}
     </div>
   )
 }
@@ -382,7 +876,6 @@ export function LoginInfoPage() {
   const navigate   = useNavigate()
   const location   = useLocation()
   const { isAuthenticated, completeLogin, loginWithDemo } = useAuth()
-  const [role, setRole]       = useState('CUSTOMER')
   const [email, setEmail]     = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]     = useState('')
@@ -399,16 +892,15 @@ export function LoginInfoPage() {
     if (!password)      { setError('请输入密码'); return }
     setLoading(true)
     try {
-      const data = await authApi.login({ loginType: 'EMAIL', email: email.trim(), password, role })
+      const data = await authApi.login({ email: email.trim(), password })
       completeLogin({
-        token: data?.token || data?.accessToken,
-        refreshToken: data?.refreshToken,
-        user: { ...data?.user, role, email: email.trim() }
+        token: data?.token,
+        user: { userId: data?.userId, nickname: data?.nickname, role: data?.role, email: email.trim() }
       })
       navigate('/hall', { replace: true })
     } catch (err) {
       if (err.canUseDemoLogin) {
-        loginWithDemo({ role })
+        loginWithDemo({})
         navigate('/hall', { replace: true })
         return
       }
@@ -421,52 +913,45 @@ export function LoginInfoPage() {
   const handleKey = e => { if (e.key === 'Enter') submit() }
 
   return (
-    <div style={{
-      minHeight: '100vh', background: BG, display: 'flex',
-      alignItems: 'center', justifyContent: 'center', padding: '24px 16px', fontFamily: SANS
-    }}>
-      <AuthCard>
-        <Wordmark size={26} />
-        <div style={{ fontSize: 10, letterSpacing: '.22em', color: MUTED, textTransform: 'uppercase', marginTop: 5, marginBottom: 26, fontFamily: SANS }}>
-          MEET RIGHT NOW
-        </div>
+    <AuthCard>
+      <Wordmark size={26} />
+      <div style={{ fontSize: 10, letterSpacing: '.22em', color: MUTED, textTransform: 'uppercase', marginTop: 5, marginBottom: 26, fontFamily: SANS }}>
+        MEET RIGHT NOW
+      </div>
 
-        <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '.04em', marginBottom: 4, color: INK }}>欢迎回来</div>
-        <div style={{ fontSize: 13, color: MUTED, marginBottom: 22, lineHeight: 1.65 }}>输入邮箱和密码，进入你的 Portra</div>
+      <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '.04em', marginBottom: 4, color: INK }}>欢迎回来</div>
+      <div style={{ fontSize: 13, color: MUTED, marginBottom: 22, lineHeight: 1.65 }}>输入邮箱和密码，进入你的 Portra</div>
 
-        <RoleToggle value={role} onChange={setRole} />
+      <SuccessBanner text={notice} />
+      <ErrorBanner text={error} />
 
-        <SuccessBanner text={notice} />
-        <ErrorBanner text={error} />
+      <div style={{ marginBottom: 14 }}>
+        <FieldLabel label="学校邮箱" htmlFor="li-email" />
+        <FocusInput
+          id="li-email" type="email"
+          placeholder="yourname@smail.nju.edu.cn"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          onKeyDown={handleKey}
+          autoComplete="email"
+        />
+      </div>
+      <div style={{ marginBottom: 22 }}>
+        <FieldLabel label="密码" htmlFor="li-pwd" />
+        <FocusInput
+          id="li-pwd" type="password"
+          placeholder="请输入密码"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          onKeyDown={handleKey}
+          autoComplete="current-password"
+        />
+      </div>
 
-        <div style={{ marginBottom: 14 }}>
-          <FieldLabel label="学校邮箱" htmlFor="li-email" />
-          <FocusInput
-            id="li-email" type="email"
-            placeholder="yourname@smail.nju.edu.cn"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            onKeyDown={handleKey}
-            autoComplete="email"
-          />
-        </div>
-        <div style={{ marginBottom: 22 }}>
-          <FieldLabel label="密码" htmlFor="li-pwd" />
-          <FocusInput
-            id="li-pwd" type="password"
-            placeholder="请输入密码"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            onKeyDown={handleKey}
-            autoComplete="current-password"
-          />
-        </div>
-
-        <PrimaryBtn onClick={submit} loading={loading}>进入 Portra</PrimaryBtn>
-        <SwitchLine prompt="还没有账号？" linkText="立即注册" onClick={() => navigate('/login/register')} />
-        <BackLink label="返回" onClick={() => navigate('/login')} />
-      </AuthCard>
-    </div>
+      <PrimaryBtn onClick={submit} loading={loading}>进入 Portra</PrimaryBtn>
+      <SwitchLine prompt="还没有账号？" linkText="立即注册" onClick={() => navigate('/login/register')} />
+      <BackLink label="返回" onClick={() => navigate('/login')} />
+    </AuthCard>
   )
 }
 
@@ -477,13 +962,10 @@ export function RegisterPage() {
   const navigate = useNavigate()
   const { isAuthenticated } = useAuth()
   const [step, setStep] = useState(1)
-  const [role, setRole] = useState('CUSTOMER')
   const [email, setEmail]       = useState('')
   const [code, setCode]         = useState('')
   const [password, setPassword] = useState('')
   const [password2, setPassword2] = useState('')
-  const [nickname, setNickname] = useState('')
-  const [demoCode, setDemoCode] = useState(null)
   const [codeSent, setCodeSent] = useState(false)
   const [codeHint, setCodeHint] = useState('')
   const [cooldown, setCooldown] = useState(0)
@@ -505,29 +987,26 @@ export function RegisterPage() {
     try {
       await authApi.sendCode(email.trim())
       setCodeHint('验证码已发送，请查收邮箱。')
-      setDemoCode(null)
-    } catch {
-      const code = String(100000 + Math.floor(Math.random() * 900000))
-      setDemoCode(code)
-      setCodeHint(`演示模式，验证码：${code}`)
+      setCodeSent(true)
+      setCooldown(60)
+      timerRef.current = setInterval(() => {
+        setCooldown(c => {
+          if (c <= 1) { clearInterval(timerRef.current); return 0 }
+          return c - 1
+        })
+      }, 1000)
+    } catch (err) {
+      setError(err.message || '发送失败，请稍后重试')
+    } finally {
+      setLoading(false)
     }
-    setCodeSent(true)
-    setCooldown(60)
-    timerRef.current = setInterval(() => {
-      setCooldown(c => {
-        if (c <= 1) { clearInterval(timerRef.current); return 0 }
-        return c - 1
-      })
-    }, 1000)
-    setLoading(false)
   }
 
   function toStep2() {
     setError('')
-    if (!email.trim())     { setError('请输入学校邮箱'); return }
-    if (!codeSent)         { setError('请先点击「获取验证码」'); return }
-    if (!code.trim())      { setError('请输入验证码'); return }
-    if (demoCode && code.trim() !== demoCode) { setError('验证码不正确'); return }
+    if (!email.trim())  { setError('请输入学校邮箱'); return }
+    if (!codeSent)      { setError('请先点击「获取验证码」'); return }
+    if (!code.trim())   { setError('请输入验证码'); return }
     setStep(2)
   }
 
@@ -538,18 +1017,14 @@ export function RegisterPage() {
     setLoading(true)
     try {
       await authApi.register({
-        nickname: nickname.trim() || email.split('@')[0] || '南大同学',
+        nickname: email.split('@')[0] || '南大同学',
         email: email.trim(),
         code: code.trim(),
         password,
-        role
+        role: 'CUSTOMER'
       })
       navigate('/login/sign-in', { replace: true, state: { notice: '注册成功，请登录' } })
     } catch (err) {
-      if (err.canUseDemoRegister) {
-        navigate('/login/sign-in', { replace: true, state: { notice: '演示注册成功，请登录' } })
-        return
-      }
       setError(err.message || '注册失败，请重试')
     } finally {
       setLoading(false)
@@ -557,15 +1032,11 @@ export function RegisterPage() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh', background: BG, display: 'flex',
-      alignItems: 'center', justifyContent: 'center', padding: '24px 16px', fontFamily: SANS
-    }}>
-      <AuthCard>
-        <Wordmark size={26} />
-        <div style={{ fontSize: 10, letterSpacing: '.22em', color: MUTED, textTransform: 'uppercase', marginTop: 5, marginBottom: 24, fontFamily: SANS }}>
-          MEET RIGHT NOW
-        </div>
+    <AuthCard>
+      <Wordmark size={26} />
+      <div style={{ fontSize: 10, letterSpacing: '.22em', color: MUTED, textTransform: 'uppercase', marginTop: 5, marginBottom: 24, fontFamily: SANS }}>
+        MEET RIGHT NOW
+      </div>
 
         {/* step dots */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
@@ -636,22 +1107,10 @@ export function RegisterPage() {
           </>
         ) : (
           <>
-            <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '.04em', marginBottom: 4, color: INK }}>设置密码和身份</div>
-            <div style={{ fontSize: 13, color: MUTED, marginBottom: 22, lineHeight: 1.65 }}>密码至少 8 位，选择你在 Portra 的身份</div>
+            <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '.04em', marginBottom: 4, color: INK }}>设置你的密码</div>
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 22, lineHeight: 1.65 }}>密码至少 8 位，注册成功后直接进入 Portra</div>
 
-            <RoleToggle value={role} onChange={setRole} />
             <ErrorBanner text={error} />
-
-            {/* nickname (optional) */}
-            <div style={{ marginBottom: 14 }}>
-              <FieldLabel label="昵称（选填）" htmlFor="reg-nick" />
-              <FocusInput
-                id="reg-nick" type="text"
-                placeholder={`默认：${email.split('@')[0] || '南大同学'}`}
-                value={nickname}
-                onChange={e => setNickname(e.target.value)}
-              />
-            </div>
 
             {/* password */}
             <div style={{ marginBottom: 14 }}>
@@ -682,7 +1141,6 @@ export function RegisterPage() {
             <BackLink label="返回上一步" onClick={() => { setStep(1); setError('') }} />
           </>
         )}
-      </AuthCard>
-    </div>
+    </AuthCard>
   )
 }

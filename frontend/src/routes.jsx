@@ -31,9 +31,10 @@ export function AppRoutes() {
 export function LoginRoutes() {
   return (
     <Routes>
-      <Route path="/login" element={<LoginChoicePage />} />
-      <Route path="/login/sign-in" element={<LoginInfoPage />} />
-      <Route path="/login/register" element={<RegisterPage />} />
+      <Route path="/login" element={<LoginChoicePage />}>
+        <Route path="sign-in" element={<LoginInfoPage />} />
+        <Route path="register" element={<RegisterPage />} />
+      </Route>
       <Route path="/login/customer" element={<Navigate to="/login/sign-in" replace />} />
       <Route path="/login/provider" element={<Navigate to="/login/sign-in" replace />} />
       <Route path="*" element={<Navigate to="/login" replace />} />

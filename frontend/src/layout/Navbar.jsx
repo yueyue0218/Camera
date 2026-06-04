@@ -14,7 +14,7 @@ const roleMap = {
   ADMIN: '\u7ba1\u7406\u5458'
 }
 
-export function Navbar({ activePath, currentUser, logout }) {
+export function Navbar({ activePath, currentUser, logout, switchRole }) {
   const navigate = useNavigate()
   const tabValue = activePath === '/'
     ? '/hall'
@@ -43,12 +43,16 @@ export function Navbar({ activePath, currentUser, logout }) {
 
         <div className="portra-header-actions">
           <div className="portra-role-toggle" aria-label="\u5f53\u524d\u8eab\u4efd">
-            <button className={`portra-role-btn ${currentUser.role === 'CUSTOMER' ? 'active' : ''}`} type="button" disabled={currentUser.role !== 'CUSTOMER'}>
-              {'\u5355\u4e3b'}
-            </button>
-            <button className={`portra-role-btn ${currentUser.role === 'PROVIDER' ? 'active' : ''}`} type="button" disabled={currentUser.role !== 'PROVIDER'}>
-              {'\u6444\u5f71\u5e08'}
-            </button>
+            <button
+              className={`portra-role-btn ${currentUser.role === 'CUSTOMER' ? 'active' : ''}`}
+              type="button"
+              onClick={() => switchRole?.('CUSTOMER')}
+            >{'\u5355\u4e3b'}</button>
+            <button
+              className={`portra-role-btn ${currentUser.role === 'PROVIDER' ? 'active' : ''}`}
+              type="button"
+              onClick={() => switchRole?.('PROVIDER')}
+            >{'\u6444\u5f71\u5e08'}</button>
           </div>
           <button
             className="portra-icon-btn"

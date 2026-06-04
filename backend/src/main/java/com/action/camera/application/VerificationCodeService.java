@@ -2,11 +2,13 @@ package com.action.camera.application;
 
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
+import jakarta.mail.internet.InternetAddress;
+import jakarta.mail.internet.MimeMessage;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailAuthenticationException;
 import org.springframework.mail.MailException;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
@@ -58,17 +60,20 @@ public class VerificationCodeService {
     }
 
     private void sendEmail(String to, String code) {
-        SimpleMailMessage msg = new SimpleMailMessage();
-        msg.setFrom(fromEmail);
-        msg.setTo(to);
-        msg.setSubject("【Camera 约拍】注册验证码");
-        msg.setText("你的验证码是：" + code + "，5 分钟内有效。如非本人操作请忽略。");
         try {
-            mailSender.send(msg);
+            MimeMessage mime = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mime, false, "UTF-8");
+            helper.setFrom(new InternetAddress(fromEmail, "Portra约拍", "UTF-8"));
+            helper.setTo(to);
+            helper.setSubject("【Portra约拍】注册验证码");
+            helper.setText("你的验证码是：" + code + "，5 分钟内有效。如非本人操作请忽略。");
+            mailSender.send(mime);
         } catch (MailAuthenticationException e) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR,
                     "邮箱 SMTP 认证失败：请确认 application-local.yml 中 password 为 QQ 邮箱「授权码」（非登录密码），且已开启 SMTP 服务");
         } catch (MailException e) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "邮件发送失败: " + e.getMessage());
+        } catch (Exception e) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "邮件发送失败: " + e.getMessage());
         }
     }

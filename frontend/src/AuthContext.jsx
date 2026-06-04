@@ -139,6 +139,16 @@ export function AuthProvider({ children }) {
     persistSession(null)
   }
 
+  function switchRole(newRole) {
+    if (!session) return
+    const nextSession = normalizeSession({
+      ...session,
+      user: { ...session.user, role: newRole }
+    })
+    setSession(nextSession)
+    persistSession(nextSession)
+  }
+
   const value = useMemo(() => ({
     session,
     token: session?.token || '',
@@ -149,6 +159,7 @@ export function AuthProvider({ children }) {
     loginWithDemo,
     logout,
     setUserKey,
+    switchRole,
     updateProfile
   }), [session, userKey, currentUser])
 

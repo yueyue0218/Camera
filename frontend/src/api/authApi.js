@@ -27,27 +27,20 @@ export const authApi = {
       }
     }
 
-    fallbackError = fallbackError || new Error('注册接口暂不可用')
-    fallbackError.canUseDemoRegister = true
-    throw fallbackError
+    throw fallbackError || new Error('注册接口暂不可用')
   },
-  async login(body) {
-    if (body.loginType === 'MOBILE' || body.loginType === 'EMAIL') {
-      try {
-        return await request('/sessions', { method: 'POST', body: JSON.stringify(body) })
-      } catch (error) {
-        const endpointMissing = error.status === 404
-          || (error.code === 50001 && /No static resource|No endpoint|not found/i.test(error.message || ''))
-        const sessionsStillProtected = error.code === 40101
-        if (endpointMissing || sessionsStillProtected || error.isNetworkError) {
-          error.canUseDemoLogin = true
-        }
-        throw error
+  async login({ email, password }) {
+    const studentNo = email.trim().split('@')[0]
+    try {
+      return await request('/users/login', {
+        method: 'POST',
+        body: JSON.stringify({ studentNo, password, role: 'CUSTOMER' })
+      })
+    } catch (error) {
+      if (error.isNetworkError || error.status === 404) {
+        error.canUseDemoLogin = true
       }
+      throw error
     }
-
-    const error = new Error('当前登录页仅支持邮箱密码登录')
-    error.canUseDemoLogin = true
-    throw error
   }
 }

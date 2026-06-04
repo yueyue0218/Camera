@@ -5,7 +5,7 @@ import { Navbar } from './Navbar.jsx'
 
 export default function AppShell() {
   const location = useLocation()
-  const { currentUser, isAuthenticated, logout } = useAuth()
+  const { currentUser, isAuthenticated, logout, switchRole } = useAuth()
   const isLoginRoute = location.pathname === '/login' || location.pathname.startsWith('/login/')
 
   if (isLoginRoute) {
@@ -28,7 +28,7 @@ export default function AppShell() {
 
   return (
     <div className="portra-app">
-      <Navbar activePath={activePath} currentUser={currentUser} logout={logout} />
+      <Navbar activePath={activePath} currentUser={currentUser} logout={logout} switchRole={switchRole} />
       <div className="portra-main-shell">
         <AppRoutes />
       </div>
