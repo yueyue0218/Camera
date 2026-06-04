@@ -12,6 +12,7 @@ import com.action.camera.review.dto.ReviewCreateRequest;
 import com.action.camera.review.dto.ReviewFollowUpRequest;
 import com.action.camera.review.dto.ReviewResponse;
 import com.action.camera.review.entity.Review;
+import com.action.camera.review.repository.ReviewComplaintRepository;
 import com.action.camera.review.repository.ReviewRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -33,15 +34,18 @@ public class ReviewService {
     private static final String CREDIT_EVENT_REVIEW = "REVIEW";
 
     private final ReviewRepository reviewRepository;
+    private final ReviewComplaintRepository complaintRepository;
     private final OrderQueryPort orderQueryPort;
     private final CreditService creditService;
     private final NotificationService notificationService;
 
     public ReviewService(ReviewRepository reviewRepository,
+                         ReviewComplaintRepository complaintRepository,
                          OrderQueryPort orderQueryPort,
                          CreditService creditService,
                          NotificationService notificationService) {
         this.reviewRepository = reviewRepository;
+        this.complaintRepository = complaintRepository;
         this.orderQueryPort = orderQueryPort;
         this.creditService = creditService;
         this.notificationService = notificationService;
@@ -150,10 +154,12 @@ public class ReviewService {
         if (Boolean.TRUE.equals(review.getIsVisible())) {
             return toResponse(review);
         }
+        if (isAdmin()) {
+            return toResponse(review);
+        }
         OrderSnapshot order = orderQueryPort.getOrderSnapshot(review.getOrderId());
         if (currentUserId.equals(order.getCustomerId())
-                || currentUserId.equals(order.getProviderId())
-                || isAdmin()) {
+                || currentUserId.equals(order.getProviderId())) {
             return toResponse(review);
         }
         throw new BusinessException(ErrorCode.FORBIDDEN, "No permission to view hidden review");
@@ -287,8 +293,25 @@ public class ReviewService {
                 review.getIsVisible(),
                 review.getCreatedAt(),
                 review.getReplyContent(),
-                review.getReplyTime()
+                review.getReplyTime(),
+                resolveComplaintStatusForCurrentUser(review)
         );
+    }
+
+    private String resolveComplaintStatusForCurrentUser(Review review) {
+        Long currentUserId = UserContext.getUserId();
+        if (currentUserId == null) {
+            return null;
+        }
+        if (!currentUserId.equals(review.getReviewerId())
+                && !currentUserId.equals(review.getTargetUserId())
+                && !isAdmin()) {
+            return null;
+        }
+        return complaintRepository.findByReviewIdOrderByCreatedAtDesc(review.getId()).stream()
+                .findFirst()
+                .map(complaint -> complaint.getStatus())
+                .orElse(null);
     }
 
     private boolean isBlank(String value) {

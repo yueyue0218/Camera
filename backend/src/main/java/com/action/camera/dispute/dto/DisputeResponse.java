@@ -10,6 +10,8 @@ public record DisputeResponse(
         String reason,
         String status,
         String resolution,
+        String responsibility,
+        Long refundAmount,
         Long adminId,
         String adminComment,
         LocalDateTime createdAt,

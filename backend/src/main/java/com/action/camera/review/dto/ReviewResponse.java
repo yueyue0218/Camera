@@ -13,6 +13,7 @@ public record ReviewResponse(
         Boolean isVisible,
         LocalDateTime createdAt,
         String replyContent,
-        LocalDateTime replyTime
+        LocalDateTime replyTime,
+        String complaintStatus
 ) {
 }
