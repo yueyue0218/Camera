@@ -36,12 +36,12 @@ const STATUS_LABELS = {
 
 function systemCardSx(accent = '#0d2fb2') {
   return {
-    width: 'min(100%, 620px)',
+    width: 'min(100%, 540px)',
     mx: 'auto',
-    p: { xs: 1.5, md: 1.8 },
+    p: { xs: 1.15, md: 1.3 },
     bgcolor: '#ebe6dd',
     borderColor: '#d4ccc2',
-    borderLeft: `5px solid ${accent}`,
+    borderLeft: `4px solid ${accent}`,
     boxShadow: 'none'
   }
 }
@@ -181,19 +181,18 @@ function QuoteSystemCard({ quote, conversation, currentUser, loading, onStartQuo
       <Stack spacing={1.1}>
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
           <Box>
-            <Typography variant="overline" color="text.secondary">系统消息</Typography>
             <Typography fontWeight={900}>摄影师发送了报价</Typography>
-            <Typography variant="h5" fontWeight={900}>{centToYuan(quote.amountCent)}</Typography>
+            <Typography color="text.secondary" variant="body2">
+              {centToYuan(quote.amountCent)} · {formatTime(quote.shootStartTime)} · {quote.location || '拍摄地点待确认'}
+            </Typography>
           </Box>
           <Chip size="small" label={getQuoteStatusLabel(quote.status)} />
         </Stack>
-        <Typography color="text.secondary" variant="body2">
-          {formatTime(quote.shootStartTime)} - {formatTime(quote.shootEndTime)} · {quote.location || '拍摄地点待确认'}
+        <Typography variant="body2" sx={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          {quote.serviceContent || '服务内容待补充'}
         </Typography>
-        <Typography variant="body2">{quote.serviceContent || '服务内容待补充'}</Typography>
         <Stack direction="row" spacing={1} flexWrap="wrap" rowGap={0.8}>
           <Chip size="small" label={`最晚交付：${formatTime(quote.deliveryDeadline)}`} />
-          <Chip size="small" label={`原片/精修：${quote.originalCount ?? 0}/${quote.refinedCount ?? 0}`} />
           <Chip size="small" label={getPhotoUsageScopeLabel(quote.photoUsageScope)} />
         </Stack>
         {quote.status === 'PENDING_CONFIRM' && isCustomer(conversation, currentUser) && (
@@ -221,7 +220,6 @@ function OrderSystemCard({ order, currentUser, cancelAction, loading, onPayOrder
   return (
     <Paper variant="outlined" sx={systemCardSx('#f7ce3a')}>
       <Stack spacing={1.1}>
-        <Typography variant="overline" color="text.secondary">订单进展</Typography>
         <Typography fontWeight={900}>{STATUS_LABELS[order.status] || '订单进展已更新'}</Typography>
         <Typography color="text.secondary" variant="body2">
           {centToYuan(order.amountCent)} · {formatTime(order.shootStartTime)} - {formatTime(order.shootEndTime)}
@@ -251,7 +249,6 @@ function DeliverySystemCard({ order, currentUser, deliveryRecords, reworkRequire
   return (
     <Paper variant="outlined" sx={systemCardSx('#0d2fb2')}>
       <Stack spacing={1.1}>
-        <Typography variant="overline" color="text.secondary">交付作品</Typography>
         <Typography fontWeight={900}>摄影师上传了作品</Typography>
         <Typography color="text.secondary" variant="body2">
           共 {deliveryRecords.length} 次交付{latestDelivery ? ` · 最近交付：${formatTime(latestDelivery.uploadTime)}` : ''}
@@ -285,8 +282,7 @@ function DeliveryUploadCard({ order, deliveryForm, loading, onSubmitDelivery, on
   return (
     <Paper id="conversation-delivery-action" component="form" variant="outlined" onSubmit={onSubmitDelivery} sx={systemCardSx('#0d2fb2')}>
       <Stack spacing={1.1}>
-        <Typography variant="overline" color="text.secondary">交付动作</Typography>
-        <Typography fontWeight={900}>{order.status === 'REWORK_REQUIRED' ? '重新上传返修作品' : '上传作品给客户'}</Typography>
+        <Typography fontWeight={900}>{order.status === 'REWORK_REQUIRED' ? '客户提出返修，请重新上传作品' : '上传作品给客户'}</Typography>
         <Button component="label" variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />} sx={{ alignSelf: 'flex-start' }}>
           选择作品文件
           <input hidden type="file" onChange={event => onDeliveryFileChange(event.target.files?.[0] || null)} />
@@ -314,7 +310,6 @@ function AuthorizationSystemCard({ order, currentUser, photoAuthorizations, deli
   return (
     <Paper id="conversation-authorization-action" variant="outlined" sx={systemCardSx('#f85104')}>
       <Stack spacing={1.1}>
-        <Typography variant="overline" color="text.secondary">照片展示授权</Typography>
         <Typography fontWeight={900}>摄影师申请将部分作品用于展示</Typography>
         {photoAuthorizations.slice(0, 3).map(authorization => {
           const canReview = canCustomerReviewPhotoAuthorization(order, currentUser, authorization)
@@ -357,7 +352,6 @@ function AuthorizationRequestCard({ deliveryRecords, photoAuthorizationForm, loa
   return (
     <Paper id="conversation-authorization-action" component="form" variant="outlined" onSubmit={onSubmitPhotoAuthorization} sx={systemCardSx('#f85104')}>
       <Stack spacing={1.1}>
-        <Typography variant="overline" color="text.secondary">授权动作</Typography>
         <Typography fontWeight={900}>申请照片展示授权</Typography>
         {deliveryFileOptions.length ? (
           <>
@@ -401,7 +395,7 @@ function OrderProgressCard({ statusLogs }) {
   return (
     <Paper variant="outlined" sx={systemCardSx('#0d2fb2')}>
       <Stack spacing={1}>
-        <Typography variant="overline" color="text.secondary">订单动态</Typography>
+        <Typography fontWeight={900}>订单动态</Typography>
         {latest.map(log => (
           <Box key={log.logId || `${log.orderId}-${log.createdAt}`}>
             <Typography fontWeight={800}>{STATUS_LABELS[log.toStatus] || '订单进展已更新'}</Typography>
@@ -418,4 +412,3 @@ function normalizeReason(reason) {
     .replaceAll('需求方', '客户')
     .replaceAll('服务方', '摄影师')
 }
-

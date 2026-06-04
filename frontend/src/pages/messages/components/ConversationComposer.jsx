@@ -1,7 +1,6 @@
 import { Box, Button, IconButton, Stack, TextField, Tooltip } from '@mui/material'
 import AddPhotoAlternateRoundedIcon from '@mui/icons-material/AddPhotoAlternateRounded'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
-import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
 import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded'
 import PaidRoundedIcon from '@mui/icons-material/PaidRounded'
@@ -71,8 +70,13 @@ export function ConversationComposer({
             </Button>
           )}
           {quickActions.canUploadDelivery && (
-            <Button size="small" variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />} href="#conversation-delivery-action">
-              上传作品
+            <Button
+              size="small"
+              variant={quickActions.uploadDeliveryLabel === '重新上传作品' ? 'contained' : 'outlined'}
+              startIcon={<AddPhotoAlternateRoundedIcon />}
+              href="#conversation-delivery-action"
+            >
+              {quickActions.uploadDeliveryLabel}
             </Button>
           )}
           {quickActions.canRequestRework && (
@@ -107,8 +111,8 @@ export function ConversationComposer({
             <span>
               <IconButton component="label" disabled={loading || imageSending}>
                 <ImageRoundedIcon />
-              <input hidden type="file" accept="image/*" onChange={onChooseMessageImage} />
-            </IconButton>
+                <input hidden type="file" accept="image/*" onChange={onChooseMessageImage} />
+              </IconButton>
             </span>
           </Tooltip>
           <TextField

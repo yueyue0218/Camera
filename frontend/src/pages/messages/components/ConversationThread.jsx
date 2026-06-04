@@ -97,6 +97,7 @@ export function ConversationThread({
     canCancel: Boolean(cancelAction),
     cancelAction,
     canUploadDelivery: order && canProviderUploadDelivery(order, currentUser),
+    uploadDeliveryLabel: order?.status === 'REWORK_REQUIRED' ? '重新上传作品' : '上传作品',
     canRequestRework: order && canCustomerRequestRework(order, currentUser),
     canConfirmOrder: order && canCustomerConfirm(order, currentUser),
     canRequestPhotoAuthorization: order && canProviderRequestPhotoAuthorization(order, currentUser),
@@ -108,7 +109,8 @@ export function ConversationThread({
     <Paper
       variant="outlined"
       sx={{
-        minHeight: { xs: 'auto', lg: 'calc(100vh - 170px)' },
+        height: { xs: 'calc(100vh - 150px)', lg: 'calc(100vh - 158px)' },
+        minHeight: 560,
         display: 'flex',
         flexDirection: 'column',
         bgcolor: '#f8f3eb',
@@ -116,7 +118,7 @@ export function ConversationThread({
         overflow: 'hidden'
       }}
     >
-      <Box sx={{ flex: 1, overflowY: 'auto', px: { xs: 1.4, md: 2 }, py: { xs: 1.4, md: 2 } }}>
+      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: { xs: 1.4, md: 2 }, py: { xs: 1.4, md: 2 } }}>
         <Stack spacing={1.2}>
           {messages.map(message => {
             const mine = message.senderId === currentUser.userId

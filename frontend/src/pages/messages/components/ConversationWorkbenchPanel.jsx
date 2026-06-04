@@ -1,4 +1,5 @@
-import { Box, Button, Chip, Divider, Paper, Stack, Typography } from '@mui/material'
+import { Box, Button, Chip, Divider, Paper, Stack, TextField, Typography } from '@mui/material'
+import AddPhotoAlternateRoundedIcon from '@mui/icons-material/AddPhotoAlternateRounded'
 import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded'
@@ -68,11 +69,20 @@ export function ConversationWorkbenchPanel({
   statusLogs,
   deliveryRecords,
   photoAuthorizations,
-  onOpenOrderArchive
+  deliveryForm,
+  loading,
+  onOpenOrderArchive,
+  onDeliveryFileChange,
+  onDeliveryRemarkChange,
+  onSubmitDelivery
 }) {
   const latestQuote = getLatestQuote(quotes)
   const [stageTitle, nextStep] = order ? getOrderStage(order, currentUser) : getQuoteStage(latestQuote, currentUser, conversation)
   const latestLog = statusLogs[statusLogs.length - 1]
+  const canUploadDelivery = order
+    && Number(order.providerUserId) === Number(currentUser.userId)
+    && (order.status === 'PENDING_DELIVERY' || order.status === 'REWORK_REQUIRED')
+  const uploadLabel = order?.status === 'REWORK_REQUIRED' ? '重新上传作品' : '上传作品'
   return (
     <Paper
       variant="outlined"
@@ -95,9 +105,35 @@ export function ConversationWorkbenchPanel({
         <Paper variant="outlined" sx={{ p: 1.2, bgcolor: '#ebe6dd', borderColor: '#d4ccc2', borderLeft: '4px solid #0d2fb2' }}>
           <Stack spacing={0.8}>
             <Typography fontWeight={800}>下一步动作</Typography>
-            <Typography variant="body2" color="text.secondary">
-              主要操作已经放在聊天流和底部快捷入口中，可以边沟通边处理。
-            </Typography>
+            {canUploadDelivery ? (
+              <Paper component="form" variant="outlined" onSubmit={onSubmitDelivery} sx={{ p: 1, bgcolor: '#f8f3eb', borderColor: '#d4ccc2' }}>
+                <Stack spacing={0.8}>
+                  <Typography variant="body2" fontWeight={800}>
+                    {order.status === 'REWORK_REQUIRED' ? '客户提出返修，请重新上传作品。' : '请上传本次交付作品。'}
+                  </Typography>
+                  <Button component="label" size="small" variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />} sx={{ alignSelf: 'flex-start' }}>
+                    选择文件
+                    <input hidden type="file" onChange={event => onDeliveryFileChange(event.target.files?.[0] || null)} />
+                  </Button>
+                  <Typography color="text.secondary" variant="body2">{deliveryForm.file ? deliveryForm.file.name : '尚未选择文件'}</Typography>
+                  <TextField
+                    size="small"
+                    label="交付说明"
+                    value={deliveryForm.remark}
+                    onChange={event => onDeliveryRemarkChange(event.target.value)}
+                    multiline
+                    minRows={2}
+                  />
+                  <Button type="submit" size="small" variant="contained" disabled={loading || !deliveryForm.file}>
+                    {uploadLabel}
+                  </Button>
+                </Stack>
+              </Paper>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                主要操作已经放在聊天流和底部快捷入口中，可以边沟通边处理。
+              </Typography>
+            )}
           </Stack>
         </Paper>
 
