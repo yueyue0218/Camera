@@ -245,7 +245,7 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
         ['拍摄结束', formatTimeOrMissing(order.shootEndTime)],
         ...baseRows
       ],
-      note: '当前状态推进由后端状态接口完成；按拍摄时间自动推进仍待后端定时任务或接口接入。'
+      note: '系统会根据约定拍摄开始/结束时间自动推进订单状态；页面刷新后可查看最新状态。'
     }
   }
 
@@ -260,7 +260,7 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
         ['拍摄结束', formatTimeOrMissing(order.shootEndTime)],
         ...baseRows
       ],
-      note: '当前状态推进由后端状态接口完成；按拍摄时间自动推进仍待后端定时任务或接口接入。'
+      note: '系统会根据约定拍摄开始/结束时间自动推进订单状态；页面刷新后可查看最新状态。'
     }
   }
 
@@ -275,7 +275,7 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
         ['已有交付记录', `${deliveryRecords.length} 条`],
         ...baseRows
       ],
-      note: '超时未交付退款规则待后端接口确认/接入；前端本轮不会触发退款。'
+      note: '若超过最晚交付时间且服务方未上传任何作品，系统将自动退款并结束订单。'
     }
   }
 

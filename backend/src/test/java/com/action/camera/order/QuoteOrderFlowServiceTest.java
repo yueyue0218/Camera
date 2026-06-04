@@ -474,6 +474,8 @@ class QuoteOrderFlowServiceTest {
         verify(orderStatusLogRepository).save(logCaptor.capture());
         assertEquals(OrderStatus.PAID_PENDING_SHOOT, logCaptor.getValue().getFromStatus());
         assertEquals(OrderStatus.REFUNDED, logCaptor.getValue().getToStatus());
+        assertEquals(CUSTOMER_ID, logCaptor.getValue().getOperatorId());
+        assertEquals("CUSTOMER", logCaptor.getValue().getOperatorRole());
     }
 
     @Test
