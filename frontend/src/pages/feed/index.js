@@ -1,4 +1,6 @@
 export {
   FeedPage,
+} from './FeedPage.jsx'
+export {
   MomentDetailPage
-} from '../legacy/CameraPages.jsx'
+} from './MomentDetailPage.jsx'
