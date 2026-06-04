@@ -3,7 +3,13 @@ import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import { centToYuan } from '../../../utils/index.js'
 import { formatTime } from '../utils/conversationUtils.js'
-import { canEditQuote, getQuoteOrderId, quoteStatusMap } from '../utils/quoteUtils.js'
+import {
+  canEditQuote,
+  getPhotoUsageScopeLabel,
+  getQuoteNextStepText,
+  getQuoteOrderId,
+  getQuoteStatusLabel
+} from '../utils/quoteUtils.js'
 import { InfoRows } from './InfoRows.jsx'
 import { QuoteForm } from './QuoteForm.jsx'
 
@@ -30,12 +36,12 @@ export function QuotePanel({
   onSubmitQuote
 }) {
   return (
-    <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, bgcolor: '#fffaf8' }}>
+    <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, bgcolor: '#f8f3eb', borderColor: '#d4ccc2' }}>
       <Stack spacing={1.5}>
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
           <Box>
-            <Typography variant="h6">报价 / 订单协作区</Typography>
-            <Typography color="text.secondary">服务方发正式报价，顾客确认后生成订单，再进入托管和交付流程。</Typography>
+            <Typography variant="h6">报价与订单</Typography>
+            <Typography color="text.secondary">摄影师发送正式报价，客户确认后生成平台托管订单。</Typography>
           </Box>
           {canSeeQuoteEntry && (
             <Button
@@ -54,16 +60,28 @@ export function QuotePanel({
         {quotes.map(quote => {
           const orderId = getQuoteOrderId(quote)
           return (
-            <Paper key={quote.quotationId} variant="outlined" sx={{ p: 1.6, bgcolor: '#fbfdff' }}>
+            <Paper
+              key={quote.quotationId}
+              variant="outlined"
+              sx={{
+                p: { xs: 1.6, md: 2 },
+                pl: { xs: 2.4, md: 3 },
+                bgcolor: '#f8f3eb',
+                borderColor: '#d4ccc2',
+                borderLeft: '6px solid #0d2fb2',
+                boxShadow: 'none'
+              }}
+            >
               <Stack spacing={1.2}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
                   <Box>
-                    <Typography fontWeight={900}>{centToYuan(quote.amountCent)}</Typography>
+                    <Typography variant="overline" color="text.secondary">正式报价单</Typography>
+                    <Typography variant="h5" fontWeight={900}>{centToYuan(quote.amountCent)}</Typography>
                     <Typography color="text.secondary" variant="body2">
-                      报价 ID {quote.quotationId} · {quote.quoteNo || '当前接口未返回报价编号'}
+                      {quote.quoteNo ? `报价编号 ${quote.quoteNo}` : '确认前可继续沟通调整'}
                     </Typography>
                   </Box>
-                  <Chip size="small" color={quote.status === 'PENDING_CONFIRM' ? 'warning' : quote.status === 'CONFIRMED' ? 'success' : 'default'} label={quoteStatusMap[quote.status] || quote.status} />
+                  <Chip size="small" color={quote.status === 'PENDING_CONFIRM' ? 'warning' : quote.status === 'CONFIRMED' ? 'success' : 'default'} label={getQuoteStatusLabel(quote.status)} />
                 </Stack>
                 <InfoRows rows={[
                   ['拍摄地点', quote.location || '未填写'],
@@ -72,10 +90,8 @@ export function QuotePanel({
                   ['最晚交付', formatTime(quote.deliveryDeadline)],
                   ['服务内容', quote.serviceContent || '未填写'],
                   ['原片/精修', `${quote.originalCount ?? 0} / ${quote.refinedCount ?? 0}`],
-                  ['照片使用范围', quote.photoUsageScope || '未填写'],
-                  ['条款', quote.terms || '当前报价接口未返回该字段'],
-                  ['合同条款', quote.contractTerms || '当前报价接口未返回该字段'],
-                  ['备注', quote.remark || '当前报价接口未返回该字段']
+                  ['照片使用范围', getPhotoUsageScopeLabel(quote.photoUsageScope)],
+                  ['下一步', getQuoteNextStepText(quote, currentUser)]
                 ]} />
                 {quote.status === 'PENDING_CONFIRM' && currentUser.role === 'CUSTOMER' && currentUser.userId === Number(conversation?.participantAId) && (
                   <Stack direction="row" spacing={1} flexWrap="wrap">
@@ -102,7 +118,7 @@ export function QuotePanel({
                       查看订单
                     </Button>
                   ) : (
-                    <Alert severity="info">报价已确认，可在订单页查看关联订单；当前报价列表接口未返回 orderId。</Alert>
+                    <Alert severity="info">报价已确认，订单信息会在本次合作面板中同步。</Alert>
                   )
                 )}
               </Stack>

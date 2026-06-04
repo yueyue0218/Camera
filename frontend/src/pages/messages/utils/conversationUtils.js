@@ -5,8 +5,8 @@ const LOCAL_MESSAGE_STORAGE_KEY = 'camera-p4-local-messages'
 const SAVED_PHOTO_STORAGE_KEY = 'camera-p4-saved-photos'
 
 export const roleMap = {
-  CUSTOMER: '需求方',
-  PROVIDER: '服务方'
+  CUSTOMER: '客户',
+  PROVIDER: '摄影师'
 }
 
 export function readJsonStorage(key, fallback) {
@@ -52,7 +52,7 @@ export function saveConversationRecord(conversation, meta = {}) {
     sourceType: conversation.sourceType || previous?.sourceType || 'DEMAND_RESPONSE',
     sourceId: conversation.sourceId ?? previous?.sourceId ?? meta.demandId,
     demandId: meta.demandId ?? previous?.demandId ?? conversation.sourceId,
-    scene: meta.scene || previous?.scene || `需求 ${meta.demandId || conversation.sourceId || ''}`,
+    scene: meta.scene || previous?.scene || '约拍需求沟通',
     location: meta.location || previous?.location || '',
     lastMessage: meta.lastMessage || previous?.lastMessage || '点击进入对话',
     interfaceNote: meta.interfaceNote || previous?.interfaceNote || '',
@@ -83,7 +83,7 @@ export function mergeConversationRecords(remoteConversations, currentUser) {
     const previous = merged.get(conversationId)
     const record = saveConversationRecord(conversation, {
       demandId: previous?.demandId,
-      scene: previous?.scene || `会话 ${conversationId}`,
+      scene: previous?.scene || '约拍沟通',
       location: previous?.location || '',
       lastMessage: previous?.lastMessage || (conversation.lastMessageTime ? '最近有新消息' : '点击进入对话')
     })
@@ -111,7 +111,7 @@ export function buildConversationFallback(conversationId) {
     participantBId: USERS.provider.userId,
     sourceType: isLocal ? 'DEMAND_CONTACT' : 'DEMAND_RESPONSE',
     sourceId: null,
-    scene: `会话 ${conversationId}`,
+    scene: '约拍沟通',
     lastMessage: ''
   }
 }
@@ -173,51 +173,54 @@ export function addSavedPhoto(photo) {
 
 export function getConversationSourceLabel(conversation) {
   const sourceType = conversation?.sourceType
-  if (!sourceType) return '当前接口未返回该字段'
+  if (!sourceType) return '约拍沟通'
   if (sourceType === 'DEMAND_RESPONSE') return '需求大厅沟通'
-  if (sourceType === 'SERVICE_PACKAGE') return '服务橱窗预订沟通'
-  if (sourceType.includes('SCHEDULE')) return '档期预约沟通'
-  return sourceType
+  if (sourceType === 'SERVICE_PACKAGE') return '摄影服务橱窗'
+  if (sourceType.includes('SCHEDULE')) return '拍摄时间沟通'
+  return '约拍沟通'
 }
 
 export function buildConversationSourceRows(conversation, currentUser, sourceLabel, backendConversationId) {
+  const canQuote = currentUser.role === 'PROVIDER'
   const rows = [
-    ['会话 ID', conversation?.conversationId || '未加载'],
-    ['后端 conversationId', backendConversationId || '当前接口未返回该字段'],
-    ['对方用户 ID', conversation ? getOppositeUserId(conversation, currentUser.userId) : '未加载'],
-    ['来源类型', conversation?.sourceType || '当前接口未返回该字段'],
-    ['业务来源', sourceLabel]
+    ['沟通来源', sourceLabel],
+    ['对方', getCounterpartyLabel(conversation, currentUser)],
+    ['下一步', backendConversationId
+      ? canQuote ? '根据沟通结果向客户发送正式报价' : '查看摄影师报价并决定是否确认'
+      : '可以继续聊天，生成订单前需要进入正式沟通']
   ]
 
   if (conversation?.sourceType === 'DEMAND_RESPONSE') {
-    rows.push(['响应 ID', conversation.sourceId || '当前接口未返回该字段'])
-    rows.push(['需求 ID', conversation.demandId || '当前接口未返回'])
+    rows.push(['说明', '这次沟通来自一个约拍需求。'])
     return rows
   }
 
   if (conversation?.sourceType === 'SERVICE_PACKAGE') {
-    rows.push(['服务橱窗 ID', conversation.sourceId || '当前接口未返回该字段'])
-    rows.push(['档期 ID', conversation.scheduleId || '当前接口未返回'])
+    rows.push(['说明', '这次沟通来自一个摄影服务橱窗。'])
     return rows
   }
 
-  rows.push(['来源 ID', conversation?.sourceId || '当前接口未返回该字段'])
-  rows.push(['需求 ID', conversation?.demandId || '当前接口未返回该字段'])
-  rows.push(['服务橱窗 ID', conversation?.servicePackageId || '当前接口未返回该字段'])
-  rows.push(['档期 ID', conversation?.scheduleId || '当前接口未返回该字段'])
+  rows.push(['说明', '这次沟通用于确认拍摄方案、报价和后续订单。'])
   return rows
 }
 
 export function getConversationSourceHint(conversation) {
   if (!conversation) return '会话仍在加载。'
   if (conversation.isLocal) {
-    return '当前是本地 fallback 会话，只能聊天演示，不能创建真实报价或订单。'
+    return '这段沟通还没有进入正式成单流程，可以先继续沟通。'
   }
   if (conversation.sourceType === 'DEMAND_RESPONSE') {
-    return '该会话来自需求大厅响应接受，后续应在这里沟通、报价并生成托管订单。'
+    return '这次沟通来自客户发布的约拍需求，确认方案后可由摄影师发送报价。'
   }
   if (conversation.sourceType === 'SERVICE_PACKAGE') {
-    return '该会话来自服务橱窗咨询或预约意向；当前前端只展示来源，不实现橱窗预订、锁档期或付款。'
+    return '这次沟通来自摄影服务橱窗，确认拍摄时间和内容后再进入报价。'
   }
-  return '当前来源类型不属于已明确的需求大厅或服务橱窗流程，本轮只做展示，不新增业务动作。'
+  return '可以在这里继续沟通拍摄内容、时间和交付要求。'
+}
+
+export function getCounterpartyLabel(conversation, currentUser) {
+  if (!conversation || !currentUser) return '对方'
+  if (currentUser.role === 'PROVIDER') return '这位客户'
+  if (currentUser.role === 'CUSTOMER') return '摄影师'
+  return '对方'
 }
