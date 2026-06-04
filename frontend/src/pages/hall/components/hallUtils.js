@@ -42,6 +42,7 @@ export const demandStatusText = {
 }
 
 export const cityNameMap = {
+  NJU: '南京大学',
   NJ: '南京',
   NKG: '南京',
   NANJING: '南京',

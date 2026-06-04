@@ -11,7 +11,12 @@ function demandTags(demand) {
   return serviceTypes.length ? serviceTypes : splitTags(demand?.styleTags)
 }
 
-export function DemandAside({ selectedDemand, error }) {
+export function DemandAside({ selectedDemand, error, currentUser, onRespond }) {
+  const canRespond = selectedDemand &&
+    currentUser?.role === 'PROVIDER' &&
+    selectedDemand.status === 'OPEN' &&
+    Number(selectedDemand.customerId) !== Number(currentUser.userId)
+
   return (
     <aside className="aside">
       <div className="aside-card">
@@ -30,6 +35,14 @@ export function DemandAside({ selectedDemand, error }) {
           <div className="aside-item"><strong>地点</strong><span>{[cityName(selectedDemand.cityName || selectedDemand.cityCode), selectedDemand.location].filter(Boolean).join(' · ') || '暂无'}</span></div>
           <div className="aside-item"><strong>预算</strong><span>{moneyRange(selectedDemand.budgetMinCent, selectedDemand.budgetMaxCent)}</span></div>
           <div className="aside-item"><strong>标签</strong><span>{demandTags(selectedDemand).join(' / ') || '暂无'}</span></div>
+        </div>
+      )}
+      {canRespond && (
+        <div className="photographer-only aside-card">
+          <h3>操作</h3>
+          <div className="side-actions">
+            <button className="primary-btn photographer-only" type="button" onClick={() => onRespond(selectedDemand)}>我要响应</button>
+          </div>
         </div>
       )}
     </aside>

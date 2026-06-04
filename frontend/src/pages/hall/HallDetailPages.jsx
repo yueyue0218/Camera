@@ -5,6 +5,7 @@ import { servicePackageApi } from '../../api/servicePackageApi.js'
 import { useAuth } from '../../AuthContext.jsx'
 import { EmptyState, ErrorState, LoadingState } from './components/HallState.jsx'
 import { cityName, firstText, money, moneyRange, readableDate, shortDateTime, splitTags, timeTagLabel } from './components/hallUtils.js'
+import { promptAndRespondDemand } from './utils/respondDemand.js'
 import '../portraHall.css'
 
 function createStatus() {
@@ -59,6 +60,22 @@ export function DemandDetailPage() {
   if (!demand) return <DetailShell><EmptyState text="暂无需求详情" /></DetailShell>
 
   const tags = splitTags(demand.serviceTypes).length ? splitTags(demand.serviceTypes) : splitTags(demand.styleTags)
+  const canRespond = currentUser.role === 'PROVIDER' &&
+    demand.status === 'OPEN' &&
+    Number(demand.customerId) !== Number(currentUser.userId)
+
+  async function respondDemand() {
+    await promptAndRespondDemand({
+      demand,
+      currentUser,
+      demandApi,
+      normalizeError,
+      onSuccess: async () => {
+        const detail = await demandApi.detail(demandId, currentUser)
+        setDemand(detail || demand)
+      }
+    })
+  }
   const title = firstText(demand.title, demand.scene) || '暂无标题'
 
   return (
@@ -90,6 +107,14 @@ export function DemandDetailPage() {
             <h3>发布信息</h3>
             <div className="detail-publish-time">发布 {shortDateTime(demand.createdAt)}</div>
           </div>
+          {canRespond && (
+            <div className="photographer-only aside-card">
+              <h3>操作</h3>
+              <div className="side-actions">
+                <button className="primary-btn photographer-only" type="button" onClick={respondDemand}>我要响应</button>
+              </div>
+            </div>
+          )}
         </aside>
       </section>
     </DetailShell>
@@ -133,6 +158,28 @@ export function ServicePackageDetailPage() {
     Number.isFinite(Number(service.orderCount)) ? `${service.orderCount} 单成交` : ''
   ].filter(Boolean).join(' · ')
   const credit = service.photographerCreditScore ?? service.providerCreditScore ?? service.creditScore
+  const canReserve = currentUser.role === 'CUSTOMER' &&
+    Number(service.photographerId ?? service.providerId) !== Number(currentUser.userId)
+
+  async function reserveService() {
+    const selectedDate = window.prompt('预约日期（YYYY-MM-DD，可留空先沟通）', '')
+    if (selectedDate === null) return
+    const initialMessage = window.prompt('预约留言', '')
+    if (initialMessage === null) return
+    try {
+      const result = await servicePackageApi.reserve(service.serviceId, {
+        selectedDate: selectedDate || null,
+        initialMessage
+      }, currentUser)
+      if (result?.conversationId) {
+        window.location.href = `/messages/${result.conversationId}`
+      } else {
+        window.alert('预约已提交')
+      }
+    } catch (error) {
+      window.alert(normalizeError(error))
+    }
+  }
 
   return (
     <DetailShell>
@@ -174,6 +221,14 @@ export function ServicePackageDetailPage() {
               <span className="time-chip" key={tag || 'empty'}>{tag ? timeTagLabel(tag) : '暂无时间标签'}</span>
             ))}
           </div>
+          {canReserve && (
+            <div className="aside-card">
+              <h3>操作</h3>
+              <div className="side-actions">
+                <button className="primary-btn owner-only" type="button" onClick={reserveService}>现在预定</button>
+              </div>
+            </div>
+          )}
         </aside>
       </section>
     </DetailShell>

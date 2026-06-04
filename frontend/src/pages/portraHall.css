@@ -36,7 +36,7 @@
 
 .toolbar {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) 120px 120px 130px 120px auto;
+  grid-template-columns: minmax(260px, 1fr) 120px 120px 130px 120px auto auto;
   gap: 12px;
   align-items: center;
   background: rgba(248,243,235,.86);
@@ -122,6 +122,17 @@
   border-radius: 999px;
   padding: 0 16px;
   letter-spacing: .08em;
+}
+
+.filter-apply-btn {
+  height: 48px;
+  background: #fffaf2;
+  white-space: nowrap;
+}
+
+.side-actions {
+  display: grid;
+  gap: 10px;
 }
 
 .mini-btn {
