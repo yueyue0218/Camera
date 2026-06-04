@@ -640,8 +640,9 @@ public class ServicePackageService {
                         user.getId(),
                         user.getNickname(),
                         user.getAvatarFileId(),
-                        avatarUrl(user)))
-                .orElse(new PhotographerInfo(photographerId, null, null, null));
+                        avatarUrl(user),
+                        user.getCreditScore()))
+                .orElse(new PhotographerInfo(photographerId, null, null, null, null));
     }
 
     private String avatarUrl(User user) {

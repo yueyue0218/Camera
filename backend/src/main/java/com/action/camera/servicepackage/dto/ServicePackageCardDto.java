@@ -3,6 +3,7 @@ package com.action.camera.servicepackage.dto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,6 +23,8 @@ public class ServicePackageCardDto {
     private Long photographerAvatarFileId;
 
     private String photographerAvatarUrl;
+
+    private BigDecimal creditScore;
 
     private String title;
 

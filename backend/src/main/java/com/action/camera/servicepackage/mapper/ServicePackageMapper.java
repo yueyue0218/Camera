@@ -36,6 +36,7 @@ public final class ServicePackageMapper {
                 nickname(photographerInfo),
                 avatarFileId(photographerInfo),
                 avatarUrl(photographerInfo),
+                creditScore(photographerInfo),
                 servicePackage.getTitle(),
                 servicePackage.getCityCode(),
                 servicePackage.getScene(),
@@ -69,6 +70,7 @@ public final class ServicePackageMapper {
                 nickname(photographerInfo),
                 avatarFileId(photographerInfo),
                 avatarUrl(photographerInfo),
+                creditScore(photographerInfo),
                 servicePackage.getTitle(),
                 servicePackage.getCityCode(),
                 servicePackage.getServiceArea(),
@@ -107,5 +109,9 @@ public final class ServicePackageMapper {
 
     private static String avatarUrl(PhotographerInfo photographerInfo) {
         return photographerInfo == null ? null : photographerInfo.avatarUrl();
+    }
+
+    private static java.math.BigDecimal creditScore(PhotographerInfo photographerInfo) {
+        return photographerInfo == null ? null : photographerInfo.creditScore();
     }
 }

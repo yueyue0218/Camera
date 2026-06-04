@@ -31,6 +31,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -138,6 +139,7 @@ class ServicePackageServiceTest {
                 .containsExactly(1L);
         assertThat(filtered.getRecords().get(0).getCoverImage()).isEqualTo("https://cdn.example/cover.jpg");
         assertThat(filtered.getRecords().get(0).getPhotographerNickname()).isEqualTo("Photographer Lin");
+        assertThat(filtered.getRecords().get(0).getCreditScore()).isEqualByComparingTo("88.50");
     }
 
     @Test
@@ -194,6 +196,7 @@ class ServicePackageServiceTest {
 
         assertThat(detail.getServiceId()).isEqualTo(SERVICE_ID);
         assertThat(detail.getStatus()).isEqualTo(ServicePackageStatus.OFFLINE.name());
+        assertThat(detail.getCreditScore()).isEqualByComparingTo("88.50");
         assertThatThrownBy(() -> servicePackageService.getServiceDetail(SERVICE_ID, customer()))
                 .isInstanceOf(BusinessException.class);
         assertThatThrownBy(() -> servicePackageService.getServiceDetail(SERVICE_ID, null))
@@ -362,6 +365,7 @@ class ServicePackageServiceTest {
         user.setId(PROVIDER_ID);
         user.setNickname("Photographer Lin");
         user.setCurrentRole("PROVIDER");
+        user.setCreditScore(new BigDecimal("88.50"));
         return user;
     }
 }
