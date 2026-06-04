@@ -893,9 +893,17 @@ export function LoginInfoPage() {
     setLoading(true)
     try {
       const data = await authApi.login({ email: email.trim(), password })
+      const loginUser = data?.user || data || {}
       completeLogin({
         token: data?.token,
-        user: { userId: data?.userId, nickname: data?.nickname, role: data?.role, email: email.trim() }
+        refreshToken: data?.refreshToken,
+        user: {
+          ...loginUser,
+          userId: loginUser.userId ?? data?.userId ?? loginUser.id ?? data?.id,
+          nickname: loginUser.nickname ?? data?.nickname,
+          role: loginUser.role ?? data?.role,
+          email: email.trim()
+        }
       })
       navigate('/hall', { replace: true })
     } catch (err) {

@@ -56,31 +56,52 @@ function tagList(...groups) {
   return groups.flatMap(group => splitTags(group)).filter(Boolean)
 }
 
-function sameId(a, b) {
-  if (a === undefined || a === null || b === undefined || b === null) return false
-  const left = String(a)
-  const right = String(b)
-  if (left === right) return true
-  const leftNumber = Number(a)
-  const rightNumber = Number(b)
-  return Number.isFinite(leftNumber) && Number.isFinite(rightNumber) && leftNumber === rightNumber
+function normalizeId(value) {
+  if (value === null || value === undefined || value === '') return null
+  return String(value)
 }
 
-function currentUserIds(currentUser) {
+function collectUserIds(currentUser) {
   return [
     currentUser?.userId,
     currentUser?.id,
     currentUser?.customerId,
     currentUser?.providerId,
     currentUser?.photographerId
-  ].filter(value => value !== undefined && value !== null && value !== '')
+  ].map(normalizeId).filter(Boolean)
 }
 
-function isCurrentUserOwner(ownerIds, currentUser) {
-  const userIds = currentUserIds(currentUser)
-  return ownerIds
-    .filter(value => value !== undefined && value !== null && value !== '')
-    .some(ownerId => userIds.some(userId => sameId(ownerId, userId)))
+function collectDemandOwnerIds(demand) {
+  return [
+    demand?.customerId,
+    demand?.publisherId,
+    demand?.ownerId,
+    demand?.userId,
+    demand?.customer?.id,
+    demand?.publisher?.id,
+    demand?.owner?.id,
+    demand?.user?.id
+  ].map(normalizeId).filter(Boolean)
+}
+
+function collectServiceOwnerIds(service) {
+  return [
+    service?.providerId,
+    service?.photographerId,
+    service?.creatorId,
+    service?.ownerId,
+    service?.userId,
+    service?.provider?.id,
+    service?.photographer?.id,
+    service?.creator?.id,
+    service?.owner?.id,
+    service?.user?.id
+  ].map(normalizeId).filter(Boolean)
+}
+
+function isSameOwner(currentUser, ownerIds) {
+  const userIds = collectUserIds(currentUser)
+  return userIds.some(userId => ownerIds.includes(userId))
 }
 
 function referenceSlots(referenceFileIds) {
@@ -178,12 +199,7 @@ export function DemandDetailPage() {
   const title = firstText(demand.title, demand.scene) || '暂无标题'
   const place = [cityName(demand.cityName || demand.cityCode), demand.location].filter(Boolean).join(' · ') || '暂无地点'
   const timeText = demand.timeDescription || demand.timeSlot || readableDate(demand.expectedDate) || '暂无'
-  const isDemandOwner = isCurrentUserOwner([
-    demand.customerId,
-    demand.publisherId,
-    demand.ownerId,
-    demand.userId
-  ], currentUser)
+  const isDemandOwner = isSameOwner(currentUser, collectDemandOwnerIds(demand))
   const canRespond = currentUser.role === 'PROVIDER' && demand.status === 'OPEN'
 
   async function respondDemand() {
@@ -338,13 +354,7 @@ export function ServicePackageDetailPage() {
   const credit = service.photographerCreditScore ?? service.providerCreditScore ?? service.creditScore
   const city = cityName(service.cityName || service.cityCode) || service.serviceArea || '暂无城市'
   const price = service.priceRange || `${money(service.basePriceCent)} 起`
-  const isServiceOwner = isCurrentUserOwner([
-    service.providerId,
-    service.photographerId,
-    service.creatorId,
-    service.ownerId,
-    service.userId
-  ], currentUser)
+  const isServiceOwner = isSameOwner(currentUser, collectServiceOwnerIds(service))
   const isCustomerViewer = currentUser.role === 'CUSTOMER'
 
   async function startChat(message = `我想预约「${service.title || '这个橱窗'}」，想进一步确认时间与服务内容。`) {
