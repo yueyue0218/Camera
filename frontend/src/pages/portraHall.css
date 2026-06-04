@@ -36,7 +36,7 @@
 
 .toolbar {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) 120px 120px 130px 120px auto auto;
+  grid-template-columns: minmax(260px, 1fr) 120px 120px 130px 120px auto;
   gap: 12px;
   align-items: center;
   background: rgba(248,243,235,.86);
@@ -122,12 +122,6 @@
   border-radius: 999px;
   padding: 0 16px;
   letter-spacing: .08em;
-}
-
-.filter-apply-btn {
-  height: 48px;
-  background: #fffaf2;
-  white-space: nowrap;
 }
 
 .side-actions {
@@ -850,6 +844,13 @@
   letter-spacing: .12em;
 }
 
+.detail-title {
+  margin: 0 0 18px;
+  font-size: 30px;
+  line-height: 1.25;
+  letter-spacing: .04em;
+}
+
 .field-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -883,6 +884,54 @@
 .field textarea {
   min-height: 110px;
   resize: vertical;
+}
+
+.tag-row,
+.form-tag-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.form-tag-choice {
+  margin: 0;
+}
+
+.form-tag-choice .tag {
+  border: 1px solid rgba(21,19,24,.1);
+}
+
+.upload-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.upload {
+  min-height: 108px;
+  border: 1px dashed rgba(13,47,178,.28);
+  border-radius: 18px;
+  background: #fffaf2;
+  color: var(--blue);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  letter-spacing: .08em;
+}
+
+.draft-btn {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.preview-ticket .primary-btn {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.form-alert {
+  margin-bottom: 14px;
 }
 
 .preview-ticket {
@@ -961,7 +1010,8 @@
   }
 
   .order-grid,
-  .field-grid {
+  .field-grid,
+  .upload-grid {
     grid-template-columns: 1fr;
   }
 

@@ -255,7 +255,7 @@ export function HallPage() {
       <FilterBar
         filters={filters}
         onChange={updateFilters}
-        onApplyFilters={() => applyFilters(filters)}
+        onApplyFilters={applyFilters}
         onPublishClick={handlePublishClick}
         currentUserRole={currentUser.role}
       />
