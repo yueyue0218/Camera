@@ -53,7 +53,12 @@ import { OrdersSectionHeader } from './components/OrdersSectionHeader.jsx'
 import { ReviewList } from './components/ReviewList.jsx'
 import {
   addDays,
-  escrowStatusMap,
+  complaintStatusMap,
+  formatEscrowStatus,
+  formatOrderStatus,
+  formatOrderTitle,
+  formatRefundStatus,
+  formatSettlementStatus,
   formatTime,
   getArbitrationsByOrder,
   getLatestDeliveryUploadTime,
@@ -69,6 +74,7 @@ import {
   parseQuoteSnapshot,
   saveLocalArbitration,
   saveLocalReview,
+  sanitizeSeedText,
   saveOrderSnapshots
 } from './utils/orderStatusUtils.js'
 function parseInputDate(value) {
@@ -179,24 +185,13 @@ function getCounterpartyLabel(order, currentUser) {
   return `客户 ${order.customerId || '-'} / 摄影师 ${order.providerUserId || '-'}`
 }
 
-const settlementStatusLabelMap = {
-  NOT_SETTLED: '未结算',
-  SETTLED: '已结算'
-}
-
-const refundStatusLabelMap = {
-  NONE: '无退款',
-  REQUESTED: '退款处理中',
-  REFUNDED: '已退款'
-}
-
 const deliveryStatusLabelMap = {
   DELIVERED: '已交付',
   REWORKED: '返修交付'
 }
 
 function getSettlementRefundLabel(order) {
-  return `${settlementStatusLabelMap[order?.settlementStatus] || '未结算'} / ${refundStatusLabelMap[order?.refundStatus] || '无退款'}`
+  return `${formatSettlementStatus(order?.settlementStatus)} / ${formatRefundStatus(order?.refundStatus)}`
 }
 
 function formatOrderTimeRange(order) {
@@ -548,7 +543,8 @@ export function OrdersPage() {
   const selectedOrderPerspective = selectedOrder ? getOrderPerspective(selectedOrder, currentUser) : ''
   const selectedCounterpartyLabel = selectedOrder ? getCounterpartyLabel(selectedOrder, currentUser) : ''
   const selectedOrderLocation = quoteSnapshot?.location || selectedOrder?.shootLocation || '未填写'
-  const selectedOrderServiceContent = quoteSnapshot?.serviceContent || selectedOrder?.serviceContent || '未填写'
+  const selectedOrderServiceContent = sanitizeSeedText(quoteSnapshot?.serviceContent || selectedOrder?.serviceContent, '校园约拍服务')
+  const selectedOrderTitle = selectedOrder ? formatOrderTitle(selectedOrder, quoteSnapshot) : ''
 
   return (
     <Stack spacing={2.5}>
@@ -574,27 +570,30 @@ export function OrdersPage() {
               </Select>
             </FormControl>
             <Stack spacing={1.2}>
-              {orders.map(order => (
-                <Card
-                  key={order.orderId}
-                  variant="outlined"
-                  onClick={() => openOrder(order)}
-                  sx={{ cursor: 'pointer', borderColor: selectedOrder?.orderId === order.orderId ? 'primary.main' : 'divider' }}
-                >
-                  <CardContent>
-                    <Stack spacing={1}>
-                      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography fontWeight={800}>{order.orderNo || `订单 ${order.orderId}`}</Typography>
-                        <Chip size="small" label={orderStatusMap[order.status] || order.status} />
+              {orders.map(order => {
+                const orderQuoteSnapshot = parseQuoteSnapshot(order.quoteSnapshotJson)
+                return (
+                  <Card
+                    key={order.orderId}
+                    variant="outlined"
+                    onClick={() => openOrder(order)}
+                    sx={{ cursor: 'pointer', borderColor: selectedOrder?.orderId === order.orderId ? 'primary.main' : 'divider' }}
+                  >
+                    <CardContent>
+                      <Stack spacing={1}>
+                        <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography fontWeight={800}>{formatOrderTitle(order, orderQuoteSnapshot)}</Typography>
+                          <Chip size="small" label={formatOrderStatus(order.status)} />
+                        </Stack>
+                        <Typography color="text.secondary">{centToYuan(order.amountCent)} · {getCounterpartyLabel(order, currentUser)}</Typography>
+                        <Typography color="text.secondary" variant="body2">
+                          {formatOrderTimeRange(order)} · 更新 {formatTime(order.updatedAt)}
+                        </Typography>
                       </Stack>
-                      <Typography color="text.secondary">{centToYuan(order.amountCent)} · {getCounterpartyLabel(order, currentUser)}</Typography>
-                      <Typography color="text.secondary" variant="body2">
-                        {formatOrderTimeRange(order)} · 更新 {formatTime(order.updatedAt)}
-                      </Typography>
-                    </Stack>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                )
+              })}
               {!orders.length && <EmptyOrderCard text="暂无订单" />}
             </Stack>
             {currentUser.role === 'PROVIDER' && (
@@ -636,15 +635,15 @@ export function OrdersPage() {
               <Stack spacing={2}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between' }}>
                   <Box>
-                    <Typography variant="h6">{selectedOrder.orderNo || `订单 ${selectedOrder.orderId}`}</Typography>
+                    <Typography variant="h6">{selectedOrderTitle}</Typography>
                     <Typography color="text.secondary">
-                      归档订单 · 报价 {selectedOrder.quoteId} · 会话 {selectedOrder.conversationId}
+                      订单档案 · {selectedCounterpartyLabel}
                     </Typography>
                   </Box>
                   <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                     <Chip variant="outlined" label={selectedOrderPerspective} />
-                    <Chip color="primary" label={orderStatusMap[selectedOrder.status] || selectedOrder.status} />
-                    <Chip color={selectedOrder.escrowStatus === 'HELD' ? 'success' : 'default'} label={escrowStatusMap[selectedOrder.escrowStatus] || selectedOrder.escrowStatus} />
+                    <Chip color="primary" label={formatOrderStatus(selectedOrder.status)} />
+                    <Chip color={selectedOrder.escrowStatus === 'HELD' ? 'success' : 'default'} label={formatEscrowStatus(selectedOrder.escrowStatus)} />
                   </Stack>
                 </Stack>
                 <Divider />
@@ -669,7 +668,7 @@ export function OrdersPage() {
                           <Typography fontWeight={900}>{fulfillmentNotice.title}</Typography>
                           <Typography color="text.secondary" variant="body2">{fulfillmentNotice.description}</Typography>
                         </Box>
-                        <Chip size="small" color={fulfillmentNotice.color} label={orderStatusMap[selectedOrder.status] || selectedOrder.status} />
+                        <Chip size="small" color={fulfillmentNotice.color} label={formatOrderStatus(selectedOrder.status)} />
                       </Stack>
                       <InfoRows rows={fulfillmentNotice.rows} />
                       {fulfillmentNotice.note && <Alert severity={fulfillmentNotice.severity}>{fulfillmentNotice.note}</Alert>}
@@ -683,7 +682,7 @@ export function OrdersPage() {
                     <InfoRows rows={[
                       ['服务内容', selectedOrderServiceContent],
                       ['原片/精修', formatQuoteCount(quoteSnapshot)],
-                      ['照片用途', quoteSnapshot.photoUsageScope || '未填写']
+                      ['照片用途', sanitizeSeedText(quoteSnapshot.photoUsageScope, '未填写')]
                     ]} />
                   </>
                 )}
@@ -888,7 +887,7 @@ export function OrdersPage() {
                             <Box>
                               <Typography fontWeight={800}>授权申请 {authorization.id}</Typography>
                               <Typography color="text.secondary" variant="body2">
-                                服务方 {authorization.providerUserId} · 客户 {authorization.customerId}
+                                摄影师 · 客户
                               </Typography>
                             </Box>
                             <Chip
@@ -1062,7 +1061,7 @@ export function OrdersPage() {
                         <Stack spacing={0.6}>
                           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
                             <Typography fontWeight={800}>{record.reason}</Typography>
-                            <Chip size="small" color="warning" label={record.status === 'PENDING' ? '待处理' : record.status} />
+                            <Chip size="small" color="warning" label={complaintStatusMap[record.status] || '处理记录'} />
                           </Stack>
                           <Typography>{record.description}</Typography>
                           <Typography color="text.secondary" variant="body2">
@@ -1084,7 +1083,7 @@ export function OrdersPage() {
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
                       <Box>
                         <Typography fontWeight={800}>
-                          {orderStatusMap[log.fromStatus] || log.fromStatus || '创建'} → {orderStatusMap[log.toStatus] || log.toStatus}
+                          {log.fromStatus ? formatOrderStatus(log.fromStatus) : '创建'} → {formatOrderStatus(log.toStatus)}
                         </Typography>
                         <Typography color="text.secondary">{log.reason || '状态流转'}</Typography>
                       </Box>

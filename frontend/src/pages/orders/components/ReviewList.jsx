@@ -9,7 +9,7 @@ export function ReviewList({ reviews, emptyText = '暂无历史评价' }) {
         <Paper key={review.reviewId || `${review.orderId}-${review.direction}-${review.createdAt}`} variant="outlined" sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
           <Stack spacing={0.8}>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
-              <Typography fontWeight={800}>{directionLabel(review.direction)} · 订单 {review.orderId}</Typography>
+              <Typography fontWeight={800}>{directionLabel(review.direction)} · 本次订单</Typography>
               <Typography color="text.secondary" variant="body2">{formatTime(review.createdAt)}</Typography>
             </Stack>
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
