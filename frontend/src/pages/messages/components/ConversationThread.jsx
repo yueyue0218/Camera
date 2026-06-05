@@ -6,6 +6,7 @@ import { MessageBubble } from './MessageBubble.jsx'
 import { QuoteForm } from './QuoteForm.jsx'
 import { getCounterpartyProfile } from '../utils/conversationUtils.js'
 import { buildConversationTimeline, getCurrentUserId } from '../utils/workbenchState.js'
+import { PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
 
 export function ConversationThread({
   messages,
@@ -33,6 +34,7 @@ export function ConversationThread({
   onStartQuoteEditing,
   onConfirmQuote,
   onRejectQuote,
+  onOpenQuoteDetail,
   onOpenOrderArchive,
   onQuoteFormChange,
   onSubmitQuote,
@@ -72,17 +74,19 @@ export function ConversationThread({
     <Paper
       variant="outlined"
       sx={{
-        height: { xs: 'calc(100vh - 150px)', lg: 'calc(100vh - 158px)' },
+        height: { xs: 'calc(100vh - 150px)', lg: 'calc(100vh - 148px)' },
         minHeight: 560,
         display: 'flex',
         flexDirection: 'column',
-        bgcolor: '#f8f3eb',
-        borderColor: '#d4ccc2',
-        overflow: 'hidden'
+        bgcolor: PORTRA_COLORS.page,
+        borderColor: PORTRA_COLORS.borderMuted,
+        borderRadius: PORTRA_RADII.panel,
+        overflow: 'hidden',
+        boxShadow: PORTRA_SHADOWS.subtle
       }}
     >
-      <Box ref={scrollRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: { xs: 1.4, md: 2 }, py: { xs: 1.4, md: 2 } }}>
-        <Stack spacing={1.2}>
+      <Box ref={scrollRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: { xs: 1.4, md: 2.2 }, py: { xs: 1.8, md: 2.4 }, scrollbarColor: `${PORTRA_COLORS.border} transparent` }}>
+        <Stack spacing={1.5}>
           {timeline.map(item => {
             if (item.type !== 'MESSAGE') {
               return (
@@ -94,6 +98,7 @@ export function ConversationThread({
                   onStartQuoteEditing={onStartQuoteEditing}
                   onConfirmQuote={onConfirmQuote}
                   onRejectQuote={onRejectQuote}
+                  onOpenQuoteDetail={onOpenQuoteDetail}
                   onPayOrder={onPayOrder}
                   onCancelOrder={onCancelOrder}
                   onConfirmOrder={onConfirmOrder}
@@ -120,7 +125,12 @@ export function ConversationThread({
               />
             )
           })}
-          {!timeline.length && <Typography color="text.secondary">还没有消息，可以先和对方确认拍摄时间、地点和交付要求。</Typography>}
+          {!timeline.length && (
+            <Box sx={{ py: 8, textAlign: 'center' }}>
+              <Typography fontWeight={900} color={PORTRA_COLORS.subInk}>从一句问候开始本次合作</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>可以先确认拍摄时间、地点和交付要求</Typography>
+            </Box>
+          )}
         </Stack>
       </Box>
 
@@ -145,7 +155,7 @@ export function ConversationThread({
         </Box>
       )}
 
-      <Divider />
+      <Divider sx={{ borderColor: PORTRA_COLORS.borderMuted }} />
       <ConversationComposer
         content={content}
         loading={loading}
@@ -158,6 +168,7 @@ export function ConversationThread({
         onStartQuoteEditing={onStartQuoteEditing}
         onConfirmQuote={onConfirmQuote}
         onRejectQuote={onRejectQuote}
+        onOpenQuoteDetail={onOpenQuoteDetail}
         onPayOrder={onPayOrder}
         onCancelOrder={onCancelOrder}
         onConfirmOrder={onConfirmOrder}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Alert, Avatar, Box, Button, Chip, Paper, Stack, Typography } from '@mui/material'
+import { Alert, Avatar, Box, Button, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material'
+import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
@@ -7,6 +8,8 @@ import { conversationApi, deliveryApi, orderApi, photoAuthorizationApi, quoteApi
 import { ConversationThread } from './components/ConversationThread.jsx'
 import { ConversationWorkbenchPanel } from './components/ConversationWorkbenchPanel.jsx'
 import { ConversationActionDialogs } from './components/ConversationActionDialogs.jsx'
+import { StatusChip } from './components/StatusChip.jsx'
+import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from './MessageVisualTokens.js'
 import {
   addLocalMessage,
   addSavedPhoto,
@@ -29,7 +32,6 @@ import {
   createDefaultQuoteForm,
   createQuoteFormFromQuote,
   getCWorkbenchErrorText,
-  getBackendConversationId,
   getQuoteConfirmationErrorText,
   getQuoteEntryHint,
   validateQuoteForm
@@ -65,6 +67,8 @@ export function ConversationDetailPage() {
   const [notice, setNotice] = useState(null)
   const [loading, setLoading] = useState(false)
   const [activeAction, setActiveAction] = useState(null)
+  const [activeQuote, setActiveQuote] = useState(null)
+  const [paymentMethod, setPaymentMethod] = useState('WECHAT')
 
   useEffect(() => {
     const stored = findConversationRecord(conversationId)
@@ -264,6 +268,16 @@ export function ConversationDetailPage() {
     setShowQuoteForm(true)
   }
 
+  function resendQuote(quote) {
+    setQuoteForm(createQuoteFormFromQuote(quote))
+    setEditingQuotationId(null)
+    setQuoteValidationErrors([])
+    setShowQuoteForm(true)
+    setActiveAction(null)
+    setActiveQuote(null)
+    setNotice({ type: 'info', text: '已带入上次报价内容，请确认后重新发送给客户。' })
+  }
+
   async function confirmQuote(quote) {
     setLoading(true)
     setNotice(null)
@@ -276,6 +290,7 @@ export function ConversationDetailPage() {
         await refreshConversationData()
         setNotice({ type: 'error', text: '报价已确认，但暂时没有拿到订单信息，请刷新后再查看。' })
       }
+      return true
     } catch (error) {
       try {
         await refreshConversationData()
@@ -283,6 +298,7 @@ export function ConversationDetailPage() {
         // Keep the original quote confirmation error visible.
       }
       setNotice({ type: 'error', text: getQuoteConfirmationErrorText(error) })
+      return false
     } finally {
       setLoading(false)
     }
@@ -290,13 +306,37 @@ export function ConversationDetailPage() {
 
   async function rejectQuote(quote) {
     const result = await run(async () => quoteApi.reject(quote.quotationId, '本次暂不采用该报价', currentUser), '报价已拒绝')
-    if (result) await loadConversationData()
+    if (result) {
+      await loadConversationData()
+      return true
+    }
+    return false
+  }
+
+  async function confirmQuoteFromDialog(quote) {
+    const succeeded = await confirmQuote(quote)
+    if (succeeded) {
+      setActiveAction(null)
+      setActiveQuote(null)
+    }
+  }
+
+  async function rejectQuoteFromDialog(quote) {
+    const succeeded = await rejectQuote(quote)
+    if (succeeded) {
+      setActiveAction(null)
+      setActiveQuote(null)
+    }
   }
 
   async function payCurrentOrder() {
-    if (!currentOrder) return
+    if (!currentOrder) return false
     const result = await run(async () => orderApi.mockPay(currentOrder.orderId, currentOrder.amountCent, currentUser), '支付成功，资金已进入平台托管')
-    if (result) await refreshConversationData(conversation, currentOrder.orderId)
+    if (result) {
+      await refreshConversationData(conversation, currentOrder.orderId)
+      return true
+    }
+    return false
   }
 
   async function cancelCurrentOrder(cancelAction) {
@@ -364,6 +404,17 @@ export function ConversationDetailPage() {
     if (result) await refreshConversationData(conversation, currentOrder.orderId)
   }
 
+  function openPaymentDialog() {
+    if (!currentOrder) return
+    setPaymentMethod('WECHAT')
+    setActiveAction('PAYMENT')
+  }
+
+  async function confirmPaymentFromDialog() {
+    const succeeded = await payCurrentOrder()
+    if (succeeded) setActiveAction(null)
+  }
+
   function showUnavailableTool(name) {
     const messages = {
       附件: '附件发送能力暂未接入，可以先发送图片或在会话中说明文件内容。',
@@ -391,7 +442,6 @@ export function ConversationDetailPage() {
       navigate('/messages', { replace: true, state: { roleMismatch: true } })
     }
   }, [actions.roleMismatch, conversation, currentUser.role, navigate])
-  const isBackendConversation = Boolean(conversation && !conversation.isLocal && getBackendConversationId(conversation))
   const editingQuote = editingQuotationId
     ? quotes.find(quote => String(quote.quotationId) === String(editingQuotationId))
     : null
@@ -401,33 +451,42 @@ export function ConversationDetailPage() {
   const canSubmitQuoteForm = editingQuotationId ? canEditSelectedQuote : canCreateQuote
   const canSeeQuoteEntry = !currentOrder && (actions.canSendQuote || actions.canEditQuote || showQuoteForm)
   const quoteEntryHint = currentOrder ? '' : getQuoteEntryHint(conversation, currentUser, quotes)
-  const sourceLabel = getConversationSourceLabel(conversation)
+  const sourceLabel = getSafeDisplayText(getConversationSourceLabel(conversation), '本次合作')
   const topic = getConversationTopic(conversation, sourceLabel)
+  const activeQuoteIsPending = activeQuote?.status === 'PENDING_CONFIRM' && String(activeQuote.quotationId) === String(actions.pendingQuote?.quotationId)
+  const activeQuoteCanConfirm = activeQuoteIsPending && actions.canConfirmQuote
+  const activeQuoteCanReject = activeQuoteIsPending && actions.canRejectQuote
+  const activeQuoteCanResend = activeQuote?.status === 'REJECTED' && actions.canSendQuote
 
   return (
-    <Stack spacing={1.5}>
-      <Paper variant="outlined" sx={{ p: { xs: 1.4, md: 1.8 }, bgcolor: '#f8f3eb', borderColor: '#d4ccc2' }}>
-        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} spacing={1.5}>
+    <Stack spacing={1.2}>
+      <Paper variant="outlined" sx={{ px: { xs: 1.2, md: 1.6 }, py: 1, bgcolor: PORTRA_COLORS.paper, borderColor: PORTRA_COLORS.borderMuted, borderRadius: PORTRA_RADII.panel, boxShadow: PORTRA_SHADOWS.subtle }}>
+        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} spacing={1}>
           <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 0 }}>
-            <Button color="inherit" onClick={() => navigate('/messages')}>返回</Button>
+            <Tooltip title="返回消息">
+              <IconButton onClick={() => navigate('/messages')} sx={{ border: `1px solid ${PORTRA_COLORS.border}`, borderRadius: PORTRA_RADII.control }}>
+                <ArrowBackRoundedIcon />
+              </IconButton>
+            </Tooltip>
             <Avatar
               src={counterparty.avatarData || undefined}
               onClick={() => conversation && openUserProfile(getOppositeUserId(conversation, currentUserId))}
-              sx={{ bgcolor: '#0d2fb2', cursor: conversation ? 'pointer' : 'default' }}
+              sx={{ width: 42, height: 42, bgcolor: PORTRA_COLORS.blue, color: PORTRA_COLORS.paper, cursor: conversation ? 'pointer' : 'default', fontWeight: 900 }}
             >
-              {counterparty.initial}
+              {getSafeDisplayText(counterparty.initial, '对').slice(0, 1)}
             </Avatar>
             <Box sx={{ minWidth: 0 }}>
-              <Typography variant="h6" noWrap>{counterparty.nickname}</Typography>
-              <Typography color="text.secondary" noWrap>
-                本次合作：{topic}
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Typography variant="h6" sx={{ color: PORTRA_COLORS.ink, fontSize: 17, fontWeight: 950 }} noWrap>{getSafeDisplayText(counterparty.nickname, '对方用户')}</Typography>
+                <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk }}>{actions.role === 'PROVIDER' ? '摄影师视角' : '客户视角'}</Typography>
+              </Stack>
+              <Typography sx={{ color: PORTRA_COLORS.mutedInk }} variant="body2" noWrap>
+                {topic} · {sourceLabel}
               </Typography>
             </Box>
           </Stack>
-          <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent={{ xs: 'flex-start', md: 'flex-end' }}>
-            <Chip size="small" label={actions.role === 'PROVIDER' ? '你是摄影师' : '你是客户'} />
-            <Chip size="small" label={`来自：${sourceLabel}`} />
-            <Chip size="small" color={isBackendConversation ? 'primary' : 'default'} label={`当前：${actions.stage.title}`} />
+          <Stack direction="row" spacing={0.8} alignItems="center" justifyContent={{ xs: 'flex-start', md: 'flex-end' }}>
+            <StatusChip label={actions.stage.title} emphasis />
             <Button
               size="small"
               variant="outlined"
@@ -442,10 +501,10 @@ export function ConversationDetailPage() {
         </Stack>
       </Paper>
 
-      {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
+      {notice && <Alert severity={notice.type} sx={noticeSx}>{notice.text}</Alert>}
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 2.2fr) minmax(300px, 0.95fr)' }, gap: 2, alignItems: 'start' }}>
-        <Stack spacing={2}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 2.7fr) minmax(250px, 0.68fr)' }, gap: 1.25, alignItems: 'start' }}>
+        <Stack spacing={1.5}>
           <ConversationThread
             messages={messages}
             conversation={conversation}
@@ -472,6 +531,10 @@ export function ConversationDetailPage() {
             onStartQuoteEditing={startQuoteEditing}
             onConfirmQuote={confirmQuote}
             onRejectQuote={rejectQuote}
+            onOpenQuoteDetail={quote => {
+              setActiveQuote(quote)
+              setActiveAction('QUOTE_DETAIL')
+            }}
             onOpenOrderArchive={() => currentOrder && navigate(`/orders?orderId=${currentOrder.orderId}`)}
             onQuoteFormChange={setQuoteForm}
             onSubmitQuote={createQuote}
@@ -479,7 +542,7 @@ export function ConversationDetailPage() {
             onSendMessage={sendMessage}
             onChooseMessageImage={chooseMessageImage}
             onSaveSubmittedPhoto={saveSubmittedPhoto}
-            onPayOrder={payCurrentOrder}
+            onPayOrder={openPaymentDialog}
             onCancelOrder={cancelCurrentOrder}
             onConfirmOrder={confirmCurrentOrder}
             onDecidePhotoAuthorization={handlePhotoAuthorizationDecision}
@@ -504,11 +567,25 @@ export function ConversationDetailPage() {
       <ConversationActionDialogs
         activeAction={activeAction}
         loading={loading}
+        quote={activeQuote}
+        order={currentOrder}
+        paymentMethod={paymentMethod}
+        canConfirmQuote={activeQuoteCanConfirm}
+        canRejectQuote={activeQuoteCanReject}
+        canResendQuote={activeQuoteCanResend}
         deliveryRecords={deliveryRecords}
         deliveryForm={deliveryForm}
         reworkRequirement={reworkRequirement}
         photoAuthorizationForm={photoAuthorizationForm}
-        onClose={() => setActiveAction(null)}
+        onClose={() => {
+          setActiveAction(null)
+          setActiveQuote(null)
+        }}
+        onPaymentMethodChange={setPaymentMethod}
+        onConfirmQuote={confirmQuoteFromDialog}
+        onRejectQuote={rejectQuoteFromDialog}
+        onResendQuote={resendQuote}
+        onConfirmPayment={confirmPaymentFromDialog}
         onDeliveryFileChange={file => setDeliveryForm({ ...deliveryForm, file })}
         onDeliveryRemarkChange={remark => setDeliveryForm({ ...deliveryForm, remark })}
         onReworkRequirementChange={setReworkRequirement}
@@ -524,7 +601,15 @@ export function ConversationDetailPage() {
 
 function getConversationTopic(conversation, sourceLabel) {
   const scene = String(conversation?.scene || '').trim()
-  if (scene && scene !== '约拍沟通' && scene !== '约拍需求沟通') return scene
-  if (conversation?.location) return `${conversation.location}约拍`
-  return sourceLabel || '校园约拍'
+  if (scene && scene !== '约拍沟通' && scene !== '约拍需求沟通') return getSafeDisplayText(scene, '校园约拍')
+  if (conversation?.location) return `${getSafeDisplayText(conversation.location, '校园')}约拍`
+  return getSafeDisplayText(sourceLabel, '校园约拍')
+}
+
+const noticeSx = {
+  py: 0.25,
+  borderRadius: PORTRA_RADII.control,
+  border: `1px solid ${PORTRA_COLORS.borderMuted}`,
+  bgcolor: PORTRA_COLORS.paper,
+  '& .MuiAlert-message': { py: 0.45 }
 }

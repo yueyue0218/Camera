@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Alert, Stack } from '@mui/material'
+import { Alert, Box, Stack } from '@mui/material'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { conversationApi, orderApi } from '../../api.js'
@@ -16,6 +16,7 @@ import {
   getCurrentUserId,
   selectConversationOrder
 } from './utils/workbenchState.js'
+import { PORTRA_COLORS, PORTRA_RADII } from './MessageVisualTokens.js'
 
 export function MessagesPage() {
   const location = useLocation()
@@ -63,10 +64,12 @@ export function MessagesPage() {
   }, [getCurrentUserId(currentUser), currentUser.role, currentUser.token, location.search, navigate])
 
   return (
-    <Stack spacing={2.5}>
-      <MessagesSectionHeader title="会话" subtitle="查看正在沟通的拍摄邀约、报价和订单进展。" />
-      {location.state?.roleMismatch && <Alert severity="info">这条会话属于另一身份视角，请切换身份后查看。</Alert>}
-      {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
+    <Stack spacing={2} sx={{ maxWidth: 1120, mx: 'auto', color: PORTRA_COLORS.ink }}>
+      <MessagesSectionHeader title="消息" subtitle="管理正在沟通的约拍、报价和交付进展" />
+      <Box>
+        {location.state?.roleMismatch && <Alert severity="info" sx={noticeSx}>这条会话属于另一身份视角，请切换身份后查看。</Alert>}
+        {notice && <Alert severity={notice.type} sx={noticeSx}>{notice.text}</Alert>}
+      </Box>
       <ConversationList
         conversations={conversations}
         currentUser={currentUser}
@@ -74,4 +77,12 @@ export function MessagesPage() {
       />
     </Stack>
   )
+}
+
+const noticeSx = {
+  py: 0.4,
+  borderRadius: PORTRA_RADII.control,
+  border: `1px solid ${PORTRA_COLORS.borderMuted}`,
+  bgcolor: PORTRA_COLORS.paper,
+  '& .MuiAlert-message': { py: 0.4 }
 }

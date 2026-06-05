@@ -1,4 +1,5 @@
 import { Alert, Box, Button, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material'
+import { PORTRA_COLORS, PORTRA_RADII } from '../MessageVisualTokens.js'
 
 export function QuoteForm({
   quoteForm,
@@ -18,9 +19,14 @@ export function QuoteForm({
       sx={{
         p: { xs: 1.5, md: 2 },
         pl: { xs: 2.4, md: 3 },
-        bgcolor: '#f8f3eb',
-        borderColor: '#d4ccc2',
-        borderLeft: '6px solid #0d2fb2'
+        bgcolor: PORTRA_COLORS.paper,
+        borderColor: PORTRA_COLORS.borderMuted,
+        borderLeft: `4px solid ${PORTRA_COLORS.blue}`,
+        borderRadius: PORTRA_RADII.panel,
+        '& .MuiOutlinedInput-root': {
+          bgcolor: PORTRA_COLORS.white,
+          borderRadius: PORTRA_RADII.control
+        }
       }}
     >
       <Stack spacing={1.5}>

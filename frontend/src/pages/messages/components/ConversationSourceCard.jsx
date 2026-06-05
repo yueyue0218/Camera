@@ -1,9 +1,10 @@
 import { Alert, Box, Chip, Paper, Stack, Typography } from '@mui/material'
 import { InfoRows } from './InfoRows.jsx'
+import { PORTRA_COLORS, PORTRA_RADII } from '../MessageVisualTokens.js'
 
 export function ConversationSourceCard({ isBackendConversation, currentUser, sourceRows, sourceHint }) {
   return (
-    <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, bgcolor: '#ebe6dd', borderColor: '#d4ccc2' }}>
+    <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, bgcolor: PORTRA_COLORS.paperMuted, borderColor: PORTRA_COLORS.borderMuted, borderRadius: PORTRA_RADII.panel }}>
       <Stack spacing={1.5}>
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
           <Box>

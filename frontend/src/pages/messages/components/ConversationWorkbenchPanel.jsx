@@ -1,4 +1,4 @@
-import { Box, Button, Chip, Divider, Paper, Stack, Typography } from '@mui/material'
+import { Box, Button, Paper, Stack, Typography } from '@mui/material'
 import AddPhotoAlternateRoundedIcon from '@mui/icons-material/AddPhotoAlternateRounded'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
@@ -7,11 +7,13 @@ import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded'
 import { centToYuan } from '../../../utils/index.js'
 import { formatTime } from '../utils/conversationUtils.js'
 import { getPhotoUsageScopeLabel, getQuoteStatusLabel } from '../utils/quoteUtils.js'
+import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII } from '../MessageVisualTokens.js'
+import { StatusChip } from './StatusChip.jsx'
+import { WorkbenchSection } from './WorkbenchSection.jsx'
 
 function getLatestQuote(quotes) {
   return [...quotes].sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0))[0] || null
 }
-
 export function ConversationWorkbenchPanel({
   quotes,
   order,
@@ -25,30 +27,31 @@ export function ConversationWorkbenchPanel({
   onOpenAction
 }) {
   const latestQuote = getLatestQuote(quotes)
-  const latestLog = statusLogs[statusLogs.length - 1]
   const uploadLabel = actions.canReuploadDelivery ? '重新上传作品' : '上传作品'
   return (
     <Paper
       variant="outlined"
       sx={{
-        p: { xs: 1.5, md: 1.8 },
-        bgcolor: '#f8f3eb',
-        borderColor: '#d4ccc2',
+        p: { xs: 1.25, md: 1.4 },
+        bgcolor: PORTRA_COLORS.paperMuted,
+        borderColor: PORTRA_COLORS.borderMuted,
+        borderRadius: PORTRA_RADII.panel,
+        boxShadow: 'none',
         position: { lg: 'sticky' },
         top: { lg: 16 },
         alignSelf: 'start'
       }}
     >
-      <Stack spacing={1.6}>
+      <Stack spacing={1.25}>
         <Box>
-          <Typography variant="overline" color="text.secondary">本次合作</Typography>
-          <Typography variant="h6" fontWeight={900}>{actions.stage.title}</Typography>
-          <Typography color="text.secondary" variant="body2">{actions.stage.description}</Typography>
+          <Typography variant="overline" sx={{ color: PORTRA_COLORS.faintInk, fontWeight: 900 }}>当前进展</Typography>
+          <Typography sx={{ color: PORTRA_COLORS.ink, fontSize: 17, fontWeight: 900 }}>{actions.stage.title}</Typography>
+          <Typography variant="body2" sx={{ mt: 0.35, color: PORTRA_COLORS.mutedInk, lineHeight: 1.55 }}>{actions.stage.description}</Typography>
         </Box>
 
-        <Paper variant="outlined" sx={{ p: 1.2, bgcolor: '#ebe6dd', borderColor: '#d4ccc2', borderLeft: '4px solid #0d2fb2' }}>
-          <Stack spacing={0.8}>
-            <Typography fontWeight={800}>下一步动作</Typography>
+        <WorkbenchSection title="下一步">
+          <Box sx={{ p: 1, bgcolor: PORTRA_COLORS.paper, borderRadius: PORTRA_RADII.control, borderLeft: `3px solid ${PORTRA_COLORS.blue}` }}>
+            <Stack spacing={0.8}>
             {actions.canConfirmDelivery ? (
               <Stack direction="row" spacing={0.8} flexWrap="wrap">
                 <Typography variant="body2" color="text.secondary" sx={{ width: '100%' }}>请查看交付作品，确认接收或说明返修要求。</Typography>
@@ -73,7 +76,7 @@ export function ConversationWorkbenchPanel({
               </Stack>
             ) : (
               <Typography variant="body2" color="text.secondary">
-                主要操作已经放在聊天流和底部快捷入口中，可以边沟通边处理。
+                {actions.stage.description || '等待对方处理后，合作进展会在会话中同步。'}
               </Typography>
             )}
             {actions.canAppeal && (
@@ -86,61 +89,46 @@ export function ConversationWorkbenchPanel({
                 查看争议进展
               </Button>
             )}
-          </Stack>
-        </Paper>
+            </Stack>
+          </Box>
+        </WorkbenchSection>
 
         {latestQuote && (
-          <Stack spacing={0.8}>
-            <Typography fontWeight={800}>当前报价</Typography>
+          <WorkbenchSection title="当前报价">
             <Stack direction="row" spacing={1} flexWrap="wrap">
-              <Chip size="small" label={getQuoteStatusLabel(latestQuote.status)} />
-              <Chip size="small" label={centToYuan(latestQuote.amountCent)} />
+              <StatusChip label={getQuoteStatusLabel(latestQuote.status)} />
+              <Typography sx={{ color: PORTRA_COLORS.blue, fontSize: 18, fontWeight: 900 }}>{centToYuan(latestQuote.amountCent)}</Typography>
             </Stack>
             <Typography color="text.secondary" variant="body2">
-              {latestQuote.location || '拍摄地点待确认'} · {getPhotoUsageScopeLabel(latestQuote.photoUsageScope)}
+              {getSafeDisplayText(latestQuote.location, '拍摄地点待确认')} · {getPhotoUsageScopeLabel(latestQuote.photoUsageScope)}
             </Typography>
-          </Stack>
+          </WorkbenchSection>
         )}
 
         {order && (
-          <Stack spacing={0.8}>
-            <Typography fontWeight={800}>订单摘要</Typography>
+          <WorkbenchSection title="订单档案">
             <Typography color="text.secondary" variant="body2">
               {centToYuan(order.amountCent)} · {formatTime(order.shootStartTime)}
             </Typography>
-            <Button variant="outlined" color="inherit" size="small" startIcon={<ReceiptLongRoundedIcon />} onClick={onOpenOrderArchive}>
+            <Button variant="text" color="inherit" size="small" startIcon={<ReceiptLongRoundedIcon />} onClick={onOpenOrderArchive} sx={{ alignSelf: 'flex-start', px: 0 }}>
               查看订单档案
             </Button>
-          </Stack>
+          </WorkbenchSection>
         )}
 
-        <Divider />
-
-        <Stack spacing={1}>
-          <Typography fontWeight={800}>交付与授权</Typography>
-          <Stack direction="row" spacing={1} flexWrap="wrap">
-            <Chip size="small" icon={<TaskAltRoundedIcon />} label={`交付 ${deliveryRecords.length}`} />
-            <Chip size="small" icon={<ImageRoundedIcon />} label={`授权 ${photoAuthorizations.length}`} />
+        <WorkbenchSection title="交付与授权">
+          <Stack direction="row" spacing={1.5} flexWrap="wrap">
+            <Stack direction="row" spacing={0.5} alignItems="center">
+              <TaskAltRoundedIcon sx={{ fontSize: 17, color: PORTRA_COLORS.blue }} />
+              <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk }}>交付 {deliveryRecords.length}</Typography>
+            </Stack>
+            <Stack direction="row" spacing={0.5} alignItems="center">
+              <ImageRoundedIcon sx={{ fontSize: 17, color: PORTRA_COLORS.orange }} />
+              <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk }}>授权 {photoAuthorizations.length}</Typography>
+            </Stack>
           </Stack>
-        </Stack>
-
-        <Stack spacing={1}>
-          <Typography fontWeight={800}>订单动态</Typography>
-          {latestLog ? (
-            <Typography color="text.secondary" variant="body2">
-              {normalizeReason(latestLog.reason) || '合作进展已更新'} · {formatTime(latestLog.createdAt)}
-            </Typography>
-          ) : (
-            <Typography color="text.secondary" variant="body2">报价确认后会持续同步订单进展。</Typography>
-          )}
-        </Stack>
+        </WorkbenchSection>
       </Stack>
     </Paper>
   )
-}
-
-function normalizeReason(reason) {
-  return String(reason || '')
-    .replaceAll('需求方', '客户')
-    .replaceAll('服务方', '摄影师')
 }

@@ -1,4 +1,4 @@
-import { Alert, Box, Button, Chip, Paper, Stack, Typography } from '@mui/material'
+import { Alert, Box, Button, Paper, Stack, Typography } from '@mui/material'
 import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import { centToYuan } from '../../../utils/index.js'
@@ -12,6 +12,8 @@ import {
 } from '../utils/quoteUtils.js'
 import { InfoRows } from './InfoRows.jsx'
 import { QuoteForm } from './QuoteForm.jsx'
+import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII } from '../MessageVisualTokens.js'
+import { StatusChip } from './StatusChip.jsx'
 
 export function QuotePanel({
   quotes,
@@ -36,7 +38,7 @@ export function QuotePanel({
   onSubmitQuote
 }) {
   return (
-    <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, bgcolor: '#f8f3eb', borderColor: '#d4ccc2' }}>
+    <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, bgcolor: PORTRA_COLORS.paper, borderColor: PORTRA_COLORS.borderMuted, borderRadius: PORTRA_RADII.panel }}>
       <Stack spacing={1.5}>
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
           <Box>
@@ -66,9 +68,10 @@ export function QuotePanel({
               sx={{
                 p: { xs: 1.6, md: 2 },
                 pl: { xs: 2.4, md: 3 },
-                bgcolor: '#f8f3eb',
-                borderColor: '#d4ccc2',
-                borderLeft: '6px solid #0d2fb2',
+                bgcolor: PORTRA_COLORS.paper,
+                borderColor: PORTRA_COLORS.borderMuted,
+                borderLeft: `4px solid ${PORTRA_COLORS.blue}`,
+                borderRadius: PORTRA_RADII.panel,
                 boxShadow: 'none'
               }}
             >
@@ -78,13 +81,13 @@ export function QuotePanel({
                     <Typography variant="overline" color="text.secondary">正式报价单</Typography>
                     <Typography variant="h5" fontWeight={900}>{centToYuan(quote.amountCent)}</Typography>
                     <Typography color="text.secondary" variant="body2">
-                      {quote.quoteNo ? `报价编号 ${quote.quoteNo}` : '确认前可继续沟通调整'}
+                      {quote.quoteNo ? `报价编号 ${getSafeDisplayText(quote.quoteNo, '本次报价')}` : '确认前可继续沟通调整'}
                     </Typography>
                   </Box>
-                  <Chip size="small" color={quote.status === 'PENDING_CONFIRM' ? 'warning' : quote.status === 'CONFIRMED' ? 'success' : 'default'} label={getQuoteStatusLabel(quote.status)} />
+                  <StatusChip label={getQuoteStatusLabel(quote.status)} />
                 </Stack>
                 <InfoRows rows={[
-                  ['拍摄地点', quote.location || '未填写'],
+                  ['拍摄地点', getSafeDisplayText(quote.location, '拍摄地点待确认')],
                   ['拍摄开始', formatTime(quote.shootStartTime)],
                   ['拍摄结束', formatTime(quote.shootEndTime)],
                   ['最晚交付', formatTime(quote.deliveryDeadline)],
