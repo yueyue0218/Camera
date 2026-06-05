@@ -26,6 +26,8 @@ import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import SendRoundedIcon from '@mui/icons-material/SendRounded'
 import WorkRoundedIcon from '@mui/icons-material/WorkRounded'
+import MaleIcon from '@mui/icons-material/Male'
+import FemaleIcon from '@mui/icons-material/Female'
 import { useAuth } from '../../AuthContext.jsx'
 import {
   centToYuan,
@@ -412,6 +414,13 @@ export function ProfilePage() {
               >
                 {(profileForm.nickname || currentUser.label).slice(0, 1)}
               </Avatar>
+              <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+                <Typography variant="subtitle1" fontWeight={800}>
+                  {profileForm.nickname || currentUser.label}
+                </Typography>
+                {currentUser.gender === 'MALE' && <MaleIcon sx={{ color: '#1976d2', fontSize: 18 }} />}
+                {currentUser.gender === 'FEMALE' && <FemaleIcon sx={{ color: '#e91e63', fontSize: 18 }} />}
+              </Stack>
               <ProfileMetrics stats={profileStats} compact />
             </Stack>
             <Stack spacing={1} sx={{ flex: 1, width: '100%' }}>

@@ -34,12 +34,6 @@ function readUserProfiles() {
   return readJsonStorage(USER_PROFILE_STORAGE_KEY, {})
 }
 
-function openUserProfile(userId) {
-  const id = Number(userId)
-  if (!id) return
-  window.open(new URL(`/users/${id}`, window.location.origin).toString(), '_blank', 'noopener,noreferrer')
-}
-
 function resolveMentionUserId(mention) {
   const value = String(mention || '').replace(/^@+/, '').trim()
   if (!value) return null
@@ -69,6 +63,13 @@ function toggleFollow(authorId) {
 export function FeedPage() {
   const navigate = useNavigate()
   const { currentUser } = useAuth()
+
+  function openUserProfile(userId) {
+    const id = Number(userId)
+    if (!id) return
+    if (id === currentUser.userId) navigate('/profile')
+    else navigate(`/users/${id}`)
+  }
   const [moments, setMoments] = useState([])
   const [query, setQuery] = useState('')
   const [showComposer, setShowComposer] = useState(false)
@@ -182,21 +183,34 @@ export function FeedPage() {
       )}
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-        {moments.map(moment => (
-          <MomentCard
-            key={moment.momentId}
-            moment={moment}
-            currentUser={currentUser}
-            isFollowing={isFollowing}
-            onOpenMoment={momentId => navigate(`/moments/${momentId}`)}
-            onOpenProfile={openUserProfile}
-            onOpenMention={openMention}
-            onLike={likeMoment}
-            onFavorite={favoriteMoment}
-            onFollow={followAuthor}
-            onDelete={deleteMoment}
-          />
-        ))}
+        {moments.map(moment => {
+          const isSelf = Number(moment.authorId) === currentUser.userId
+          const stored = readUserProfiles()[String(moment.authorId)] || {}
+          const authorProfile = {
+            nickname: isSelf
+              ? (currentUser.nickname || currentUser.label)
+              : (stored.nickname || moment.authorNickname),
+            avatarData: isSelf
+              ? currentUser.avatarData
+              : (stored.avatarData || moment.authorAvatarData)
+          }
+          return (
+            <MomentCard
+              key={moment.momentId}
+              moment={moment}
+              currentUser={currentUser}
+              authorProfile={authorProfile}
+              isFollowing={isFollowing}
+              onOpenMoment={momentId => navigate(`/moments/${momentId}`)}
+              onOpenProfile={openUserProfile}
+              onOpenMention={openMention}
+              onLike={likeMoment}
+              onFavorite={favoriteMoment}
+              onFollow={followAuthor}
+              onDelete={deleteMoment}
+            />
+          )
+        })}
       </Box>
       {!moments.length && <EmptyFeedCard text="暂无动态" />}
     </Stack>
