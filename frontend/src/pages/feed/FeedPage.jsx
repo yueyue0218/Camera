@@ -75,7 +75,7 @@ export function FeedPage() {
   const [showComposer, setShowComposer] = useState(false)
   const [draft, setDraft] = useState({ title: '', content: '' })
   const [mentionsText, setMentionsText] = useState('')
-  const [imageData, setImageData] = useState('')
+  const [imageDataList, setImageDataList] = useState([])
   const [notice, setNotice] = useState(null)
 
   useEffect(() => {
@@ -90,14 +90,22 @@ export function FeedPage() {
     }
   }
 
-  async function chooseImage(event) {
-    const file = event.target.files?.[0]
-    if (!file) return
+  async function chooseImages(event) {
+    const files = Array.from(event.target.files || [])
+    if (!files.length) return
+    const slots = 9 - imageDataList.length
+    if (slots <= 0) return
     try {
-      setImageData(await compressImageToDataUrl(file))
+      const compressed = await Promise.all(files.slice(0, slots).map(f => compressImageToDataUrl(f)))
+      setImageDataList(prev => [...prev, ...compressed].slice(0, 9))
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }
+    event.target.value = ''
+  }
+
+  function removeImage(index) {
+    setImageDataList(prev => prev.filter((_, i) => i !== index))
   }
 
   async function publishMoment() {
@@ -106,12 +114,12 @@ export function FeedPage() {
       await momentApi.create({
         title: draft.title,
         content: draft.content,
-        imageData,
+        imageDataList,
         mentions: parseMentions(mentionsText)
       }, currentUser)
       setDraft({ title: '', content: '' })
       setMentionsText('')
-      setImageData('')
+      setImageDataList([])
       setShowComposer(false)
       setNotice({ type: 'success', text: '动态已发布' })
       await loadMoments()
@@ -183,10 +191,11 @@ export function FeedPage() {
         <MomentComposer
           draft={draft}
           mentionsText={mentionsText}
-          imageData={imageData}
+          imageDataList={imageDataList}
           onDraftChange={setDraft}
           onMentionsChange={setMentionsText}
-          onChooseImage={chooseImage}
+          onChooseImages={chooseImages}
+          onRemoveImage={removeImage}
           onCancel={() => setShowComposer(false)}
           onPublish={publishMoment}
         />
