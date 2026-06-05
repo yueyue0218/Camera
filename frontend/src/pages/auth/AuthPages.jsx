@@ -451,7 +451,6 @@ export function LoginChoicePage() {
                 >{role.label}</button>
               ))}
             </div>
-            <button type="button" className="op-icon-btn" onClick={() => navigate('/login/sign-in')}>⌕</button>
             <button type="button" className="op-avatar" title="登录" onClick={() => navigate('/login/sign-in')} />
           </div>
         </div>
