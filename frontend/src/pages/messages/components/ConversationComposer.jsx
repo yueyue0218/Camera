@@ -61,15 +61,15 @@ export function ConversationComposer({
     || actions.canViewDispute
   )
   return (
-    <Box sx={{ px: { xs: 1.1, md: 1.35 }, py: 1, bgcolor: PORTRA_COLORS.paper, borderTop: `1px solid ${PORTRA_COLORS.borderMuted}` }}>
-      <Stack spacing={0.75}>
+    <Box sx={{ px: { xs: 1.1, md: 1.35 }, pt: 0.85, pb: 0.65, bgcolor: PORTRA_COLORS.paper, borderTop: `1px solid ${PORTRA_COLORS.borderMuted}` }}>
+      <Stack spacing={0.65}>
         {hasQuickActions && (
           <Stack
             direction={{ xs: 'column', md: 'row' }}
             spacing={0.75}
             sx={{
               alignItems: { xs: 'stretch', md: 'center' },
-              py: 0.55,
+              py: 0.5,
               px: 0.75,
               bgcolor: 'rgba(255, 253, 249, 0.42)',
               borderRadius: PORTRA_RADII.control,
@@ -160,7 +160,7 @@ export function ConversationComposer({
           </Stack>
         )}
 
-        <Stack direction="row" spacing={0.3} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+        <Stack direction="row" spacing={0.3} sx={{ alignItems: 'center', flexWrap: 'wrap', minHeight: 34 }}>
           <Typography variant="caption" sx={{ mr: 0.5, color: PORTRA_COLORS.faintInk, fontWeight: 800 }}>会话工具</Typography>
           <MessageToolbarButton title="发送图片" component="label" disabled={loading || imageSending}>
             <ImageRoundedIcon fontSize="small" />
@@ -177,7 +177,7 @@ export function ConversationComposer({
           )}
         </Stack>
 
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-end' }}>
+        <Stack data-message-composer-input-row="true" direction="row" spacing={1} sx={{ alignItems: 'flex-end' }}>
           <TextField
             fullWidth
             size="small"
