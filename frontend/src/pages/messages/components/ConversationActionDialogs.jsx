@@ -50,7 +50,7 @@ export function ConversationActionDialogs({
   onSubmitRework,
   onSubmitPhotoAuthorization
 }) {
-  const deliveryFiles = deliveryRecords
+  const deliveryFiles = (Array.isArray(deliveryRecords) ? deliveryRecords : [])
     .filter(record => record.fileId)
     .map(record => ({
       fileId: Number(record.fileId),
@@ -68,7 +68,7 @@ export function ConversationActionDialogs({
       <Dialog open={activeAction === 'QUOTE_DETAIL'} onClose={onClose} fullWidth maxWidth="sm" PaperProps={dialogPaperProps}>
         <DialogTitle sx={dialogTitleSx}>报价详情</DialogTitle>
         <DialogContent sx={dialogContentSx}>
-          {quote && (
+          {quote ? (
             <Stack spacing={1.4} sx={{ pt: 1 }}>
               <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
                 <Typography sx={{ color: PORTRA_COLORS.blue, fontSize: 24, fontWeight: 950 }}>{centToYuan(quote.amountCent)}</Typography>
@@ -87,17 +87,21 @@ export function ConversationActionDialogs({
                 客户确认报价后将生成平台托管订单；付款后资金先进入平台托管，订单完成后再结算给摄影师。
               </Box>
             </Stack>
+          ) : (
+            <DialogContentText sx={{ pt: 1 }}>
+              报价详情暂时无法打开，请刷新后重试。
+            </DialogContentText>
           )}
         </DialogContent>
         <DialogActions sx={dialogActionsSx}>
           <Button color="inherit" variant="text" onClick={onClose}>关闭</Button>
-          {(canConfirmQuote || canRejectQuote) && (
+          {quote && (canConfirmQuote || canRejectQuote) && (
             <>
               {canRejectQuote && <Button variant="outlined" color="inherit" disabled={loading} onClick={() => onRejectQuote(quote)}>拒绝报价</Button>}
               {canConfirmQuote && <Button variant="contained" disabled={loading} onClick={() => onConfirmQuote(quote)}>确认报价</Button>}
             </>
           )}
-          {canResendQuote && (
+          {quote && canResendQuote && (
             <Button variant="contained" disabled={loading} onClick={() => onResendQuote(quote)}>重新发送报价</Button>
           )}
         </DialogActions>
@@ -106,7 +110,7 @@ export function ConversationActionDialogs({
       <Dialog open={activeAction === 'PAYMENT'} onClose={onClose} fullWidth maxWidth="sm" PaperProps={dialogPaperProps}>
         <DialogTitle sx={dialogTitleSx}>确认支付</DialogTitle>
         <DialogContent sx={dialogContentSx}>
-          {order && (
+          {order ? (
             <Stack spacing={1.5} sx={{ pt: 1 }}>
               <Typography sx={{ color: PORTRA_COLORS.blue, fontSize: 24, fontWeight: 950 }}>{centToYuan(order.amountCent)}</Typography>
               <DetailRows rows={[
@@ -124,6 +128,10 @@ export function ConversationActionDialogs({
                 </RadioGroup>
               </FormControl>
             </Stack>
+          ) : (
+            <DialogContentText sx={{ pt: 1 }}>
+              支付信息暂时无法打开，请刷新后重试。
+            </DialogContentText>
           )}
         </DialogContent>
         <DialogActions sx={dialogActionsSx}>
@@ -143,10 +151,10 @@ export function ConversationActionDialogs({
               选择作品文件
               <input hidden type="file" onChange={event => onDeliveryFileChange(event.target.files?.[0] || null)} />
             </Button>
-            <Typography color="text.secondary" variant="body2">{deliveryForm.file ? getSafeDisplayText(deliveryForm.file.name, '已选择作品文件') : '尚未选择文件'}</Typography>
+            <Typography color="text.secondary" variant="body2">{deliveryForm?.file ? getSafeDisplayText(deliveryForm.file.name, '已选择作品文件') : '尚未选择文件'}</Typography>
             <TextField
               label="交付说明"
-              value={deliveryForm.remark}
+              value={deliveryForm?.remark || ''}
               onChange={event => onDeliveryRemarkChange(event.target.value)}
               multiline
               minRows={3}
@@ -156,7 +164,7 @@ export function ConversationActionDialogs({
         </DialogContent>
         <DialogActions sx={dialogActionsSx}>
           <Button color="inherit" variant="text" onClick={onClose}>取消</Button>
-          <Button type="submit" form="delivery-dialog-form" variant="contained" disabled={loading || !deliveryForm.file}>
+          <Button type="submit" form="delivery-dialog-form" variant="contained" disabled={loading || !deliveryForm?.file}>
             {activeAction === 'REUPLOAD_DELIVERY' ? '上传返修作品' : '上传作品'}
           </Button>
         </DialogActions>
@@ -170,7 +178,7 @@ export function ConversationActionDialogs({
             <TextField
               autoFocus
               label="返修要求"
-              value={reworkRequirement}
+              value={reworkRequirement || ''}
               onChange={event => onReworkRequirementChange(event.target.value)}
               multiline
               minRows={4}
@@ -180,7 +188,7 @@ export function ConversationActionDialogs({
         </DialogContent>
         <DialogActions sx={dialogActionsSx}>
           <Button color="inherit" variant="text" onClick={onClose}>取消</Button>
-          <Button type="submit" form="rework-dialog-form" variant="contained" disabled={loading || !reworkRequirement.trim()}>提交返修</Button>
+          <Button type="submit" form="rework-dialog-form" variant="contained" disabled={loading || !String(reworkRequirement || '').trim()}>提交返修</Button>
         </DialogActions>
       </Dialog>
 
@@ -194,7 +202,7 @@ export function ConversationActionDialogs({
               <Select
                 multiple
                 label="选择已交付作品"
-                value={photoAuthorizationForm.fileIds}
+                value={photoAuthorizationForm?.fileIds || []}
                 onChange={event => {
                   const value = event.target.value
                   onPhotoAuthorizationFileIdsChange((typeof value === 'string' ? value.split(',') : value).map(Number))
@@ -206,7 +214,7 @@ export function ConversationActionDialogs({
             </FormControl>
             <TextField
               label="申请说明"
-              value={photoAuthorizationForm.remark}
+              value={photoAuthorizationForm?.remark || ''}
               onChange={event => onPhotoAuthorizationRemarkChange(event.target.value)}
               multiline
               minRows={3}
@@ -216,7 +224,7 @@ export function ConversationActionDialogs({
         </DialogContent>
         <DialogActions sx={dialogActionsSx}>
           <Button color="inherit" variant="text" onClick={onClose}>取消</Button>
-          <Button type="submit" form="authorization-dialog-form" variant="contained" disabled={loading || !photoAuthorizationForm.fileIds.length}>提交申请</Button>
+          <Button type="submit" form="authorization-dialog-form" variant="contained" disabled={loading || !(photoAuthorizationForm?.fileIds || []).length}>提交申请</Button>
         </DialogActions>
       </Dialog>
     </>

@@ -4,6 +4,7 @@ import { ConversationComposer } from './ConversationComposer.jsx'
 import { ConversationSystemItem } from './ConversationSystemCard.jsx'
 import { MessageBubble } from './MessageBubble.jsx'
 import { QuoteForm } from './QuoteForm.jsx'
+import { MessageWorkbenchErrorBoundary } from './MessageWorkbenchErrorBoundary.jsx'
 import { getCounterpartyProfile } from '../utils/conversationUtils.js'
 import { buildConversationTimeline, getCurrentUserId } from '../utils/workbenchState.js'
 import { PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
@@ -71,6 +72,7 @@ export function ConversationThread({
   }, [conversation?.conversationId, timeline.length, timeline[timeline.length - 1]?.key])
 
   return (
+    <MessageWorkbenchErrorBoundary resetKey={`${conversation?.conversationId || 'none'}-${currentUser?.role || 'role'}`}>
     <Paper
       variant="outlined"
       sx={{
@@ -87,7 +89,7 @@ export function ConversationThread({
     >
       <Box ref={scrollRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: { xs: 1.4, md: 2.2 }, py: { xs: 1.8, md: 2.4 }, scrollbarColor: `${PORTRA_COLORS.border} transparent` }}>
         <Stack spacing={1.5}>
-          {timeline.map(item => {
+          {(Array.isArray(timeline) ? timeline : []).filter(Boolean).map(item => {
             if (item.type !== 'MESSAGE') {
               return (
                 <ConversationSystemItem
@@ -109,7 +111,8 @@ export function ConversationThread({
                 />
               )
             }
-            const message = item.meta.message
+            const message = item.meta?.message
+            if (!message) return null
             const mine = Number(message.senderId) === currentUserId
             const isImage = message.messageType === 'IMAGE'
             const canSaveSubmittedPhoto = isImage && Number(message.senderId) === Number(conversation?.participantBId)
@@ -180,5 +183,6 @@ export function ConversationThread({
         onOpenAction={onOpenAction}
       />
     </Paper>
+    </MessageWorkbenchErrorBoundary>
   )
 }

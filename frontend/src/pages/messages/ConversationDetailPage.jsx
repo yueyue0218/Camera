@@ -8,6 +8,7 @@ import { conversationApi, deliveryApi, orderApi, photoAuthorizationApi, quoteApi
 import { ConversationThread } from './components/ConversationThread.jsx'
 import { ConversationWorkbenchPanel } from './components/ConversationWorkbenchPanel.jsx'
 import { ConversationActionDialogs } from './components/ConversationActionDialogs.jsx'
+import { MessageWorkbenchErrorBoundary } from './components/MessageWorkbenchErrorBoundary.jsx'
 import { StatusChip } from './components/StatusChip.jsx'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from './MessageVisualTokens.js'
 import {
@@ -243,6 +244,10 @@ export function ConversationDetailPage() {
   }
 
   function startQuoteEditing(quote) {
+    if (!quote) {
+      setNotice({ type: 'error', text: '报价详情暂时无法打开，请刷新后重试。' })
+      return
+    }
     setEditingQuotationId(quote.quotationId)
     setQuoteForm(createQuoteFormFromQuote(quote))
     setQuoteValidationErrors([])
@@ -269,6 +274,10 @@ export function ConversationDetailPage() {
   }
 
   function resendQuote(quote) {
+    if (!quote) {
+      setNotice({ type: 'error', text: '报价详情暂时无法打开，请刷新后重试。' })
+      return
+    }
     setQuoteForm(createQuoteFormFromQuote(quote))
     setEditingQuotationId(null)
     setQuoteValidationErrors([])
@@ -279,6 +288,10 @@ export function ConversationDetailPage() {
   }
 
   async function confirmQuote(quote) {
+    if (!quote?.quotationId) {
+      setNotice({ type: 'error', text: '报价详情暂时无法打开，请刷新后重试。' })
+      return false
+    }
     setLoading(true)
     setNotice(null)
     try {
@@ -305,6 +318,10 @@ export function ConversationDetailPage() {
   }
 
   async function rejectQuote(quote) {
+    if (!quote?.quotationId) {
+      setNotice({ type: 'error', text: '报价详情暂时无法打开，请刷新后重试。' })
+      return false
+    }
     const result = await run(async () => quoteApi.reject(quote.quotationId, '本次暂不采用该报价', currentUser), '报价已拒绝')
     if (result) {
       await loadConversationData()
@@ -459,6 +476,7 @@ export function ConversationDetailPage() {
   const activeQuoteCanResend = activeQuote?.status === 'REJECTED' && actions.canSendQuote
 
   return (
+    <MessageWorkbenchErrorBoundary resetKey={`${conversationId}-${currentUser.role}`}>
     <Stack spacing={1.2}>
       <Paper variant="outlined" sx={{ px: { xs: 1.2, md: 1.6 }, py: 1, bgcolor: PORTRA_COLORS.paper, borderColor: PORTRA_COLORS.borderMuted, borderRadius: PORTRA_RADII.panel, boxShadow: PORTRA_SHADOWS.subtle }}>
         <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} spacing={1}>
@@ -532,6 +550,10 @@ export function ConversationDetailPage() {
             onConfirmQuote={confirmQuote}
             onRejectQuote={rejectQuote}
             onOpenQuoteDetail={quote => {
+              if (!quote) {
+                setNotice({ type: 'error', text: '报价详情暂时无法打开，请刷新后重试。' })
+                return
+              }
               setActiveQuote(quote)
               setActiveAction('QUOTE_DETAIL')
             }}
@@ -596,6 +618,7 @@ export function ConversationDetailPage() {
         onSubmitPhotoAuthorization={submitPhotoAuthorizationRequest}
       />
     </Stack>
+    </MessageWorkbenchErrorBoundary>
   )
 }
 

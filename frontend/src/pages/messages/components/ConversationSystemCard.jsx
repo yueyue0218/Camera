@@ -31,8 +31,10 @@ export function ConversationSystemItem({
   onUnavailableTool
 }) {
   if (!event) return null
-  const quote = event.meta?.quote
-  const authorization = event.meta?.authorization
+  const eventActions = Array.isArray(event.actions) ? event.actions : []
+  const eventMeta = event.meta || {}
+  const quote = eventMeta.quote
+  const authorization = eventMeta.authorization
   const renderActionButton = action => (
     <EventActionButton
       key={action}
@@ -53,9 +55,9 @@ export function ConversationSystemItem({
       onUnavailableTool={onUnavailableTool}
     />
   )
-  const actionButtons = !!event.actions.length && (
+  const actionButtons = !!eventActions.length && (
     <Stack direction="row" spacing={0.7} flexWrap="wrap" rowGap={0.7}>
-      {event.actions.map(renderActionButton)}
+      {eventActions.map(renderActionButton)}
     </Stack>
   )
   const quoteAction = quote && (
@@ -65,7 +67,7 @@ export function ConversationSystemItem({
   )
 
   if (event.actorRole === 'PLATFORM') {
-    const order = event.meta?.order
+    const order = eventMeta.order
     return (
       <Box id={event.type === 'AUTHORIZATION' ? 'conversation-authorization-action' : undefined} sx={{ display: 'flex', justifyContent: 'center', px: 2 }}>
         <Paper
@@ -90,7 +92,7 @@ export function ConversationSystemItem({
             </Typography>
             <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk, flexShrink: 0, fontSize: 11 }}>{formatTime(event.timestamp)}</Typography>
             {order && <Button size="small" variant="text" color="inherit" startIcon={<ReceiptLongRoundedIcon />} onClick={onOpenOrderArchive}>查看订单</Button>}
-            {event.actions.includes('PAY') && renderActionButton('PAY')}
+            {eventActions.includes('PAY') && renderActionButton('PAY')}
           </Stack>
         </Paper>
       </Box>
@@ -109,8 +111,8 @@ export function ConversationSystemItem({
         actions={quote ? quoteAction : actionButtons}
       >
         {quote && <QuoteMeta quote={quote} />}
-        {event.type === 'ORDER_CREATED' && event.meta?.order && <OrderMeta order={event.meta.order} />}
-        {event.type === 'DELIVERY' && <DeliveryMeta event={event} />}
+        {event.type === 'ORDER_CREATED' && eventMeta.order && <OrderMeta order={eventMeta.order} />}
+        {event.type === 'DELIVERY' && eventMeta.delivery && <DeliveryMeta event={event} />}
         {authorization && <AuthorizationMeta authorization={authorization} />}
       </EventAttachmentCard>
     </Box>
@@ -172,16 +174,18 @@ function OrderMeta({ order }) {
 }
 
 function DeliveryMeta({ event }) {
-  const delivery = event.meta.delivery
+  const delivery = event?.meta?.delivery
+  if (!delivery) return null
   return (
     <Stack spacing={0.4} sx={attachmentMetaSx}>
-      <Typography variant="body2">共 {event.meta.deliveryCount} 次交付 · 最近交付：{formatTime(delivery.uploadTime)}</Typography>
+      <Typography variant="body2">共 {event.meta?.deliveryCount || 1} 次交付 · 最近交付：{formatTime(delivery.uploadTime)}</Typography>
       {delivery.fileName && <Chip size="small" label={getSafeDisplayText(delivery.fileName, '已交付作品')} sx={{ ...metaChipSx, alignSelf: 'flex-start' }} />}
     </Stack>
   )
 }
 
 function AuthorizationMeta({ authorization }) {
+  if (!authorization) return null
   return (
     <Stack direction="row" spacing={0.8} flexWrap="wrap">
       <StatusChip label={PHOTO_AUTHORIZATION_STATUS_LABELS[authorization.status] || '授权状态已更新'} />
