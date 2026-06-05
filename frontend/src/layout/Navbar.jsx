@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 
 const navItems = [
-  { label: '\u7ea6\u62cd\u5927\u5385', path: '/hall' },
+  { label: '\u5927\u5385', path: '/hall' },
   { label: '\u52a8\u6001', path: '/feed' },
   { label: '\u6d88\u606f', path: '/messages' },
   { label: '\u4e2a\u4eba', path: '/profile' }

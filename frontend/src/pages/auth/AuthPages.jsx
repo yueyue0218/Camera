@@ -426,7 +426,7 @@ export function LoginChoicePage() {
 
           <nav className="op-nav">
             {[
-              { label: '约拍大厅', id: 'op-page1' },
+              { label: '大厅', id: 'op-page1' },
               { label: '动态', id: 'op-page2' },
               { label: '消息', id: 'op-page3' },
               { label: '个人', id: 'op-about' },
