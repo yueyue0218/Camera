@@ -224,13 +224,18 @@ export function OrdersPage() {
 
   async function loadOrders(focusOrderId = selectedOrder?.orderId) {
     await run(async () => {
-      const [nextOrders, nextInvitations] = await Promise.all([
-        orderApi.list({
-          role: currentUser.role === 'PROVIDER' ? 'provider' : 'customer',
-          status: statusFilter
-        }, currentUser),
-        currentUser.role === 'PROVIDER' ? demandApi.sentInvitations(currentUser).catch(() => []) : Promise.resolve([])
-      ])
+      const nextOrders = await orderApi.list({
+        role: currentUser.role === 'PROVIDER' ? 'provider' : 'customer',
+        status: statusFilter
+      }, currentUser)
+      let nextInvitations = []
+      if (currentUser.role === 'PROVIDER') {
+        try {
+          nextInvitations = await demandApi.sentInvitations(currentUser)
+        } catch {
+          nextInvitations = []
+        }
+      }
       const roleOrders = (nextOrders || []).filter(order => currentUser.role === 'PROVIDER'
         ? Number(order.providerUserId) === Number(currentUser.userId)
         : Number(order.customerId) === Number(currentUser.userId))
