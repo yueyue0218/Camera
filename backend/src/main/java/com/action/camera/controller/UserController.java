@@ -8,10 +8,12 @@ import com.action.camera.dto.LoginResponse;
 import com.action.camera.dto.RegisterRequest;
 import com.action.camera.dto.SwitchRoleRequest;
 import com.action.camera.dto.SwitchRoleResponse;
+import com.action.camera.dto.UpdateProfileRequest;
 import com.action.camera.dto.UserBriefResponse;
 import com.action.camera.dto.UserProfileResponse;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -49,6 +51,13 @@ public class UserController {
     @GetMapping("/{id}/brief")
     public Result<UserBriefResponse> getUserBrief(@PathVariable Long id) {
         return Result.success(userService.getUserBrief(id));
+    }
+
+    @PatchMapping("/me")
+    public Result<Void> updateMyProfile(@RequestBody UpdateProfileRequest req) {
+        Long userId = UserContext.getUserId();
+        userService.updateMyProfile(userId, req);
+        return Result.success(null);
     }
 
     @PostMapping("/me/role")

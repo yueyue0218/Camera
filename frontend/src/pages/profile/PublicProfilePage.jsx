@@ -21,6 +21,7 @@ import {
   mergeReviewLists,
   readUserProfiles,
   roleMap,
+  toggleFollow as toggleFollowLocal,
 } from './utils/profileUtils.js'
 
 function StatItem({ label, value }) {
@@ -99,9 +100,11 @@ export function PublicProfilePage() {
       if (followedByMe) {
         await userApi.unfollow(profileUserId, currentUser)
         setFollowedByMe(false)
+        toggleFollowLocal(profileUserId)
       } else {
         await userApi.follow(profileUserId, currentUser)
         setFollowedByMe(true)
+        toggleFollowLocal(profileUserId)
       }
       setNotice(null)
     } catch (error) {

@@ -37,7 +37,8 @@ import {
   momentApi,
   orderApi,
   readFileAsDataUrl,
-  reviewApi
+  reviewApi,
+  userApi
 } from '../../api.js'
 import { EmptyCard } from './components/EmptyCard.jsx'
 import { PortfolioGrid } from './components/PortfolioGrid.jsx'
@@ -178,7 +179,7 @@ export function ProfilePage() {
     }
   }
 
-  function saveProfile() {
+  async function saveProfile() {
     const nextProfile = {
       nickname: profileForm.nickname.trim() || currentUser.nickname || currentUser.label,
       avatarData: profileForm.avatarData,
@@ -189,6 +190,11 @@ export function ProfilePage() {
     }
     saveUserProfile(currentUser.userId, nextProfile)
     updateProfile(nextProfile)
+    try {
+      await userApi.updateMe({ nickname: nextProfile.nickname, bio: nextProfile.bio }, currentUser)
+    } catch {
+      // 后端不可用时仅本地保存，不阻断流程
+    }
     setNotice({ type: 'success', text: '个人资料已更新' })
   }
 

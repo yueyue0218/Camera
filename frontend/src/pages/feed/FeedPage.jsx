@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Box, Alert, Stack } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
 import { USERS, useAuth } from '../../AuthContext.jsx'
-import { momentApi, readFileAsDataUrl } from '../../api.js'
+import { momentApi, readFileAsDataUrl, userApi } from '../../api.js'
 import { EmptyFeedCard } from './components/EmptyFeedCard.jsx'
 import { FeedSectionHeader } from './components/FeedSectionHeader.jsx'
 import { FeedToolbar } from './components/FeedToolbar.jsx'
@@ -148,9 +148,19 @@ export function FeedPage() {
     }
   }
 
-  function followAuthor(authorId) {
-    toggleFollow(authorId)
-    setNotice({ type: 'success', text: '关注列表已更新' })
+  async function followAuthor(authorId) {
+    const id = Number(authorId)
+    const wasFollowing = isFollowing(id)
+    toggleFollow(id)
+    setNotice({ type: 'success', text: wasFollowing ? '已取消关注' : '已关注' })
+    try {
+      if (wasFollowing) await userApi.unfollow(id, currentUser)
+      else await userApi.follow(id, currentUser)
+    } catch {
+      toggleFollow(id)
+      setNotice({ type: 'warning', text: '网络异常，关注状态仅本地保存' })
+    }
+    setMoments(prev => [...prev])
   }
 
   function openMention(mention) {
