@@ -60,6 +60,23 @@ import {
   saveUserProfile
 } from './utils/profileUtils.js'
 
+function imageFileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width
+      canvas.height = img.height
+      canvas.getContext('2d').drawImage(img, 0, 0)
+      resolve(canvas.toDataURL('image/jpeg', 0.9))
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片加载失败')) }
+    img.src = url
+  })
+}
+
 export function ProfilePage() {
   const navigate = useNavigate()
   const { userKey, currentUser, setUserKey, logout, updateProfile } = useAuth()
@@ -150,7 +167,10 @@ export function ProfilePage() {
     const file = event.target.files?.[0]
     if (!file) return
     try {
-      setProfileForm({ ...profileForm, avatarData: await readFileAsDataUrl(file) })
+      const avatarData = await imageFileToDataUrl(file)
+      setProfileForm(prev => ({ ...prev, avatarData }))
+      updateProfile({ avatarData })
+      setNotice({ type: 'success', text: '头像已更新' })
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }
