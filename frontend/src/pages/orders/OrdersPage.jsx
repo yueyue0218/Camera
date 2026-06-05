@@ -160,6 +160,35 @@ function isOrderCustomer(order, currentUser) {
     && Number(order.customerId) === Number(currentUser.userId)
 }
 
+function getOrderPerspective(order, currentUser) {
+  if (!order || !currentUser) return ''
+  if (Number(order.customerId) === Number(currentUser.userId)) return '客户视角'
+  if (Number(order.providerUserId) === Number(currentUser.userId)) return '摄影师视角'
+  return '协作视角'
+}
+
+function getCounterpartyLabel(order, currentUser) {
+  if (!order || !currentUser) return '对方未确认'
+  if (Number(order.customerId) === Number(currentUser.userId)) {
+    return `摄影师 ${order.providerUserId || '-'}`
+  }
+  if (Number(order.providerUserId) === Number(currentUser.userId)) {
+    return `客户 ${order.customerId || '-'}`
+  }
+  return `客户 ${order.customerId || '-'} / 摄影师 ${order.providerUserId || '-'}`
+}
+
+function formatOrderTimeRange(order) {
+  return `${formatTime(order?.shootStartTime)} 至 ${formatTime(order?.shootEndTime)}`
+}
+
+function formatQuoteCount(quoteSnapshot) {
+  const originalCount = quoteSnapshot?.originalCount
+  const refinedCount = quoteSnapshot?.refinedCount
+  if (originalCount === undefined && refinedCount === undefined) return '未填写'
+  return `${originalCount ?? 0} / ${refinedCount ?? 0}`
+}
+
 function isBeforeShootStart(order) {
   const shootStartTime = parseInputDate(order?.shootStartTime)
   return Boolean(shootStartTime) && new Date() < shootStartTime
@@ -483,6 +512,10 @@ export function OrdersPage() {
   const currentReviewDirection = selectedOrder ? getOrderReviewDirection(selectedOrder, currentUser.userId) : ''
   const myReview = orderReviews.find(review => Number(review.reviewerId) === currentUser.userId || review.direction === currentReviewDirection)
   const reviewToComplain = orderReviews.find(review => Number(review.targetUserId) === currentUser.userId && review.isVisible !== false)
+  const selectedOrderPerspective = selectedOrder ? getOrderPerspective(selectedOrder, currentUser) : ''
+  const selectedCounterpartyLabel = selectedOrder ? getCounterpartyLabel(selectedOrder, currentUser) : ''
+  const selectedOrderLocation = quoteSnapshot?.location || selectedOrder?.shootLocation || '未填写'
+  const selectedOrderServiceContent = quoteSnapshot?.serviceContent || selectedOrder?.serviceContent || '未填写'
 
   return (
     <Stack spacing={2.5}>
@@ -521,8 +554,10 @@ export function OrdersPage() {
                         <Typography fontWeight={800}>{order.orderNo || `订单 ${order.orderId}`}</Typography>
                         <Chip size="small" label={orderStatusMap[order.status] || order.status} />
                       </Stack>
-                      <Typography color="text.secondary">{centToYuan(order.amountCent)} · 对方 {currentUser.role === 'CUSTOMER' ? order.providerUserId : order.customerId}</Typography>
-                      <Typography color="text.secondary" variant="body2">{formatTime(order.updatedAt)}</Typography>
+                      <Typography color="text.secondary">{centToYuan(order.amountCent)} · {getCounterpartyLabel(order, currentUser)}</Typography>
+                      <Typography color="text.secondary" variant="body2">
+                        {formatOrderTimeRange(order)} · 更新 {formatTime(order.updatedAt)}
+                      </Typography>
                     </Stack>
                   </CardContent>
                 </Card>
@@ -553,7 +588,7 @@ export function OrdersPage() {
                       </Paper>
                     )
                   })}
-                  {!sentInvitations.length && <Typography color="text.secondary">还没有发起过邀请</Typography>}
+                  {!sentInvitations.length && <Typography color="text.secondary">暂无邀请记录</Typography>}
                 </Stack>
               </>
             )}
@@ -569,21 +604,29 @@ export function OrdersPage() {
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
                   <Box>
                     <Typography variant="h6">{selectedOrder.orderNo || `订单 ${selectedOrder.orderId}`}</Typography>
-                    <Typography color="text.secondary">报价 {selectedOrder.quoteId} · 会话 {selectedOrder.conversationId}</Typography>
+                    <Typography color="text.secondary">
+                      归档订单 · 报价 {selectedOrder.quoteId} · 会话 {selectedOrder.conversationId}
+                    </Typography>
                   </Box>
                   <Stack direction="row" spacing={1} flexWrap="wrap">
+                    <Chip variant="outlined" label={selectedOrderPerspective} />
                     <Chip color="primary" label={orderStatusMap[selectedOrder.status] || selectedOrder.status} />
                     <Chip color={selectedOrder.escrowStatus === 'HELD' ? 'success' : 'default'} label={escrowStatusMap[selectedOrder.escrowStatus] || selectedOrder.escrowStatus} />
                   </Stack>
                 </Stack>
                 <Divider />
+                <Typography variant="overline" color="text.secondary">交易概览</Typography>
                 <InfoRows rows={[
                   ['金额', centToYuan(selectedOrder.amountCent)],
-                  ['需求方', selectedOrder.customerId],
-                  ['服务方', selectedOrder.providerUserId],
-                  ['拍摄时间', `${formatTime(selectedOrder.shootStartTime)} 至 ${formatTime(selectedOrder.shootEndTime)}`],
-                  ['交付截止', formatTime(selectedOrder.deliveryDeadline)],
+                  ['当前身份', selectedOrderPerspective || '未确认'],
+                  ['对方', selectedCounterpartyLabel],
                   ['结算/退款', `${selectedOrder.settlementStatus || 'NOT_SETTLED'} / ${selectedOrder.refundStatus || 'NONE'}`]
+                ]} />
+                <Typography variant="overline" color="text.secondary">履约安排</Typography>
+                <InfoRows rows={[
+                  ['拍摄时间', formatOrderTimeRange(selectedOrder)],
+                  ['拍摄地点', selectedOrderLocation],
+                  ['交付截止', formatTime(selectedOrder.deliveryDeadline)]
                 ]} />
                 {fulfillmentNotice && (
                   <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
@@ -603,10 +646,10 @@ export function OrdersPage() {
                 {quoteSnapshot && (
                   <>
                     <Divider />
+                    <Typography variant="overline" color="text.secondary">报价快照</Typography>
                     <InfoRows rows={[
-                      ['拍摄地点', quoteSnapshot.location || '未填写'],
-                      ['服务内容', quoteSnapshot.serviceContent || '未填写'],
-                      ['原片/精修', `${quoteSnapshot.originalCount || 0} / ${quoteSnapshot.refinedCount || 0}`],
+                      ['服务内容', selectedOrderServiceContent],
+                      ['原片/精修', formatQuoteCount(quoteSnapshot)],
                       ['照片用途', quoteSnapshot.photoUsageScope || '未填写']
                     ]} />
                   </>
