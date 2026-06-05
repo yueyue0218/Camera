@@ -554,12 +554,14 @@ function attachTimelineActor(item, conversation, currentUser, order) {
     actor: userId ? {
       userId,
       role: item.actorRole,
+      isCurrentUser: Number(userId) === getCurrentUserId(currentUser),
       displayName,
       avatarText: getTimelineActorAvatarText(userId, displayName, currentUser),
-      profilePath: `/users/${userId}`
+      profilePath: Number(userId) === getCurrentUserId(currentUser) ? '/profile' : `/users/${userId}`
     } : {
       userId: null,
       role: item.actorRole,
+      isCurrentUser: false,
       displayName: item.actorLabel,
       avatarText: item.actorLabel.slice(0, 1),
       profilePath: ''

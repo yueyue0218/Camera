@@ -1,26 +1,22 @@
-import { Avatar, Box, Button, Paper, Stack, Typography } from '@mui/material'
+import { Box, Button, Paper, Stack, Typography } from '@mui/material'
 import { formatTime } from '../utils/conversationUtils.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
+import { MessageActorAvatar } from './MessageActorAvatar.jsx'
 
-export function MessageBubble({ message, mine, avatar, avatarText, avatarUserId, canSaveSubmittedPhoto, onSaveSubmittedPhoto, onOpenUserProfile }) {
+export function MessageBubble({ message, mine, actor, canSaveSubmittedPhoto, onSaveSubmittedPhoto }) {
   if (!message) return null
   const isImage = message.messageType === 'IMAGE'
-  const openProfile = event => {
-    event.stopPropagation()
-    if (avatarUserId && typeof onOpenUserProfile === 'function') onOpenUserProfile(avatarUserId)
-  }
-  const avatarSx = {
-    width: 32,
-    height: 32,
-    bgcolor: mine ? PORTRA_COLORS.blue : PORTRA_COLORS.subInk,
-    color: PORTRA_COLORS.paper,
-    fontSize: 13,
-    fontWeight: 900,
-    cursor: avatarUserId ? 'pointer' : 'default'
-  }
+  const avatarAccent = mine ? PORTRA_COLORS.blue : PORTRA_COLORS.subInk
   return (
     <Box sx={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: 1 }}>
-      {!mine && <Avatar data-message-avatar="bubble" data-avatar-user-id={avatarUserId || ''} src={avatar || undefined} onClick={openProfile} sx={avatarSx}>{avatarText || '对'}</Avatar>}
+      {!mine && (
+        <MessageActorAvatar
+          actor={actor}
+          dataKind="bubble"
+          accent={avatarAccent}
+          fallbackText="对"
+        />
+      )}
       <Stack spacing={0.35} sx={{ maxWidth: { xs: '82%', md: '68%' }, alignItems: mine ? 'flex-end' : 'flex-start' }}>
         <Paper
           elevation={0}
@@ -54,7 +50,14 @@ export function MessageBubble({ message, mine, avatar, avatarText, avatarUserId,
         </Paper>
         <Typography variant="caption" sx={{ px: 0.4, color: PORTRA_COLORS.faintInk, fontSize: 11 }}>{formatTime(message.createdAt)}</Typography>
       </Stack>
-      {mine && <Avatar data-message-avatar="bubble" data-avatar-user-id={avatarUserId || ''} src={avatar || undefined} onClick={openProfile} sx={avatarSx}>{avatarText || '我'}</Avatar>}
+      {mine && (
+        <MessageActorAvatar
+          actor={actor}
+          dataKind="bubble"
+          accent={avatarAccent}
+          fallbackText="我"
+        />
+      )}
     </Box>
   )
 }

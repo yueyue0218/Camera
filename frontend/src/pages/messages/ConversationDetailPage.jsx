@@ -444,7 +444,7 @@ export function ConversationDetailPage() {
     event?.stopPropagation()
     const id = Number(userId)
     if (!id) return
-    navigate(`/users/${id}`, { state: { fromMessageAvatar: true } })
+    navigate(id === currentUserId ? '/profile' : `/users/${id}`)
   }
 
   function openOrderArchive(orderId = currentOrder?.orderId) {
@@ -597,7 +597,6 @@ export function ConversationDetailPage() {
               setActiveAction('QUOTE_DETAIL')
             }}
             onOpenOrderArchive={openOrderArchive}
-            onOpenUserProfile={userId => openUserProfile(userId)}
             onQuoteFormChange={setQuoteForm}
             onSubmitQuote={createQuote}
             onContentChange={setContent}

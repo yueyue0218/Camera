@@ -28,7 +28,6 @@ export function ConversationSystemItem({
   onCancelOrder,
   onConfirmOrder,
   onOpenAction,
-  onOpenUserProfile,
   onDecidePhotoAuthorization,
   onUnavailableTool
 }) {
@@ -121,7 +120,6 @@ export function ConversationSystemItem({
         title={getSafeDisplayText(event.title, '合作进展已更新')}
         summary={getSafeDisplayText(event.summary, '')}
         timestamp={formatTime(event.timestamp)}
-        onOpenUserProfile={onOpenUserProfile}
         actions={quote ? quoteAction : actionButtons}
       >
         {quote && <QuoteMeta quote={quote} />}

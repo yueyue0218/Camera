@@ -1,30 +1,11 @@
-import { Avatar, Box, Paper, Stack, Typography } from '@mui/material'
+import { Box, Paper, Stack, Typography } from '@mui/material'
 import { PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
+import { MessageActorAvatar } from './MessageActorAvatar.jsx'
 
-export function EventAttachmentCard({ side, actor, title, summary, timestamp, children, actions, onOpenUserProfile }) {
+export function EventAttachmentCard({ side, actor, title, summary, timestamp, children, actions }) {
   const provider = actor?.role === 'PROVIDER'
   const self = side === 'self'
   const accent = provider ? PORTRA_COLORS.blue : PORTRA_COLORS.orange
-  const canOpenProfile = Boolean(actor?.userId && typeof onOpenUserProfile === 'function')
-  const openProfile = event => {
-    event.stopPropagation()
-    if (canOpenProfile) {
-      onOpenUserProfile(actor.userId, event)
-      return
-    }
-    console.debug('[messages] event actor missing userId', { title, actor })
-  }
-  const avatarSx = {
-    width: 32,
-    height: 32,
-    mt: 0.25,
-    flexShrink: 0,
-    bgcolor: accent,
-    color: PORTRA_COLORS.paper,
-    fontSize: 13,
-    fontWeight: 950,
-    cursor: canOpenProfile ? 'pointer' : 'default'
-  }
 
   return (
     <Box sx={{ display: 'flex', justifyContent: self ? 'flex-end' : 'flex-start' }}>
@@ -37,15 +18,13 @@ export function EventAttachmentCard({ side, actor, title, summary, timestamp, ch
           flexDirection: self ? 'row-reverse' : 'row'
         }}
       >
-        <Avatar
-          data-message-avatar="event"
-          data-avatar-user-id={actor?.userId || ''}
-          src={actor?.avatarData || undefined}
-          onClick={openProfile}
-          sx={avatarSx}
-        >
-          {actor?.avatarText || '对'}
-        </Avatar>
+        <MessageActorAvatar
+          actor={actor}
+          dataKind="event"
+          accent={accent}
+          fallbackText="对"
+          sx={{ mt: 0.25, fontWeight: 950 }}
+        />
         <Paper
           variant="outlined"
           sx={{

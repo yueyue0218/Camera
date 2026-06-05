@@ -39,7 +39,6 @@ export function ConversationThread({
   onRejectQuote,
   onOpenQuoteDetail,
   onOpenOrderArchive,
-  onOpenUserProfile,
   onQuoteFormChange,
   onSubmitQuote,
   onContentChange,
@@ -57,18 +56,18 @@ export function ConversationThread({
   const currentUserId = getCurrentUserId(currentUser)
   const counterparty = getCounterpartyProfile(conversation, currentUser)
   const safeTimeline = Array.isArray(timeline) ? timeline : []
-  const resolveEventActor = event => {
-    if (!event?.actor) return null
-    const actorUserId = Number(event.actor.userId)
+  const resolveActorDisplay = actor => {
+    if (!actor) return null
+    const actorUserId = Number(actor.userId)
     const mine = actorUserId && actorUserId === currentUserId
     const other = actorUserId && Number(counterparty.userId) === actorUserId
     return {
-      ...event.actor,
+      ...actor,
       avatarData: mine ? currentUser?.avatarData : other ? counterparty.avatarData : '',
       avatarText: mine
         ? String(currentUser?.nickname || '我').slice(0, 1)
-        : other ? counterparty.initial : event.actor.avatarText,
-      displayName: mine ? currentUser?.nickname || event.actor.displayName : other ? counterparty.nickname : event.actor.displayName
+        : other ? counterparty.initial : actor.avatarText,
+      displayName: mine ? currentUser?.nickname || actor.displayName : other ? counterparty.nickname : actor.displayName
     }
   }
 
@@ -116,7 +115,7 @@ export function ConversationThread({
                 <ConversationSystemItem
                   key={item.key}
                   event={item}
-                  actor={resolveEventActor(item)}
+                  actor={resolveActorDisplay(item.actor)}
                   actions={actions}
                   loading={loading}
                   onStartQuoteEditing={onStartQuoteEditing}
@@ -129,7 +128,6 @@ export function ConversationThread({
                   onDecidePhotoAuthorization={onDecidePhotoAuthorization}
                   onUnavailableTool={onUnavailableTool}
                   onOpenAction={onOpenAction}
-                  onOpenUserProfile={onOpenUserProfile}
                   onOpenOrderArchive={onOpenOrderArchive}
                 />
               )
@@ -144,12 +142,9 @@ export function ConversationThread({
                 key={message.messageId || item.key}
                 message={message}
                 mine={mine}
-                avatar={mine ? currentUser?.avatarData : counterparty.avatarData}
-                avatarText={mine ? (currentUser?.nickname || '我').slice(0, 1) : counterparty.initial}
-                avatarUserId={mine ? currentUserId : counterparty.userId}
+                actor={resolveActorDisplay(item.actor)}
                 canSaveSubmittedPhoto={canSaveSubmittedPhoto}
                 onSaveSubmittedPhoto={() => onSaveSubmittedPhoto(message)}
-                onOpenUserProfile={onOpenUserProfile}
               />
             )
           })}

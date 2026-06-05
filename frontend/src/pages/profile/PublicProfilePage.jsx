@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   Alert, Avatar, Box, Button, Chip, CircularProgress,
   Divider, LinearProgress, Paper, Rating, Stack, Typography
@@ -42,10 +42,8 @@ function GenderIcon({ gender }) {
 export function PublicProfilePage() {
   const { userId } = useParams()
   const navigate = useNavigate()
-  const location = useLocation()
   const { currentUser } = useAuth()
   const profileUserId = Number(userId)
-  const fromMessageAvatar = location.state?.fromMessageAvatar === true
 
   const [publicProfile, setPublicProfile] = useState(null)
   const [moments, setMoments] = useState([])
@@ -115,7 +113,7 @@ export function PublicProfilePage() {
     setFollowLoading(false)
   }
 
-  if (profileUserId === currentUser.userId && !fromMessageAvatar) return <Navigate to="/profile" replace />
+  if (profileUserId === currentUser.userId) return <Navigate to="/profile" replace />
 
   if (loading) {
     return (
