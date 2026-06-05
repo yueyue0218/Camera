@@ -36,6 +36,12 @@ public class Dispute {
     @Column(name = "resolution", length = 30)
     private String resolution;
 
+    @Column(name = "responsibility", length = 30)
+    private String responsibility;
+
+    @Column(name = "refund_amount")
+    private Long refundAmount;
+
     @Column(name = "admin_id")
     private Long adminId;
 

@@ -42,6 +42,12 @@ public class DisputeService {
     private static final String RES_REJECTED = "REJECTED";
     private static final String RES_REWORK = "REWORK";
 
+    private static final String RESPONSIBILITY_NONE = "NONE";
+    private static final String RESPONSIBILITY_PROVIDER_FAULT = "PROVIDER_FAULT";
+    private static final String RESPONSIBILITY_CUSTOMER_FAULT = "CUSTOMER_FAULT";
+    private static final String RESPONSIBILITY_BOTH_FAULT = "BOTH_FAULT";
+    private static final String RESPONSIBILITY_NO_FAULT = "NO_FAULT";
+
     private static final String RELATED_TYPE = "DISPUTE";
 
     private final DisputeRepository disputeRepository;
@@ -84,7 +90,7 @@ public class DisputeService {
         Long otherPartyId = initiatorId.equals(order.getCustomerId())
                 ? order.getProviderUserId() : order.getCustomerId();
         notify(otherPartyId, "订单申诉通知", "对方已对订单发起申诉，请及时回复。",
-                "DISPUTE_CREATED", dispute.getId());
+                "DISPUTE_CREATED", dispute.getId(), orderId);
 
         return toResponse(dispute, List.of());
     }
@@ -116,7 +122,7 @@ public class DisputeService {
         disputeRepository.save(dispute);
 
         notify(dispute.getInitiatorId(), "申诉回复通知", "对方已回复您的申诉，请查看。",
-                "DISPUTE_REPLIED", disputeId);
+                "DISPUTE_REPLIED", disputeId, dispute.getOrderId());
 
         List<DisputeReply> replies = disputeReplyRepository.findByDisputeIdOrderByCreatedAtAsc(disputeId);
         return toResponse(dispute, replies);
@@ -124,7 +130,7 @@ public class DisputeService {
 
     public DisputeResponse arbitrate(Long disputeId, Long adminId, DisputeArbitrateRequest request) {
         requireAdmin(adminId);
-        validateResolution(request.resolution());
+        validateArbitrateRequest(request);
 
         Dispute dispute = getDisputeOrThrow(disputeId);
 
@@ -134,6 +140,8 @@ public class DisputeService {
 
         Order order = getOrderOrThrow(dispute.getOrderId());
         String resolution = request.resolution().trim();
+        String responsibility = isRefundResolution(resolution) ? normalizeResponsibility(request.responsibility()) : null;
+        Long refundAmount = normalizeRefundAmount(request.refundAmount(), resolution);
         OrderStatus targetOrderStatus = resolveTargetStatus(resolution);
 
         orderService.changeStatus(dispute.getOrderId(), adminId, targetOrderStatus,
@@ -149,6 +157,8 @@ public class DisputeService {
         LocalDateTime now = LocalDateTime.now();
         dispute.setStatus(STATUS_RESOLVED);
         dispute.setResolution(resolution);
+        dispute.setResponsibility(responsibility);
+        dispute.setRefundAmount(refundAmount);
         dispute.setAdminId(adminId);
         dispute.setAdminComment(trimToNull(request.comment()));
         dispute.setResolvedAt(now);
@@ -159,10 +169,12 @@ public class DisputeService {
                 new DisputeResolvedEvent(this, disputeId, dispute.getOrderId(), resolution));
 
         String notifyContent = "您的订单申诉裁定结果：" + resolution;
-        notify(dispute.getInitiatorId(), "申诉裁定通知", notifyContent, "DISPUTE_RESOLVED", disputeId);
+        notify(dispute.getInitiatorId(), "申诉裁定通知", notifyContent, "DISPUTE_RESOLVED",
+                disputeId, dispute.getOrderId());
         Long otherPartyId = dispute.getInitiatorId().equals(order.getCustomerId())
                 ? order.getProviderUserId() : order.getCustomerId();
-        notify(otherPartyId, "申诉裁定通知", notifyContent, "DISPUTE_RESOLVED", disputeId);
+        notify(otherPartyId, "申诉裁定通知", notifyContent, "DISPUTE_RESOLVED",
+                disputeId, dispute.getOrderId());
 
         List<DisputeReply> replies = disputeReplyRepository.findByDisputeIdOrderByCreatedAtAsc(disputeId);
         return toResponse(dispute, replies);
@@ -219,9 +231,23 @@ public class DisputeService {
         };
     }
 
-    private void notify(Long userId, String title, String content, String type, Long relatedId) {
-        notificationService.createNotification(
-                new NotificationCreateRequest(userId, title, content, type, RELATED_TYPE, relatedId));
+    private void notify(Long userId, String title, String content, String type, Long disputeId, Long orderId) {
+        notificationService.createNotification(new NotificationCreateRequest(
+                userId,
+                null,
+                title,
+                content,
+                type,
+                type,
+                RELATED_TYPE,
+                disputeId,
+                RELATED_TYPE,
+                disputeId,
+                RELATED_TYPE,
+                disputeId,
+                "dispute:" + type + ":" + disputeId + ":" + userId,
+                "{\"orderId\":" + orderId + "}"
+        ));
     }
 
     private Order getOrderOrThrow(Long orderId) {
@@ -252,14 +278,56 @@ public class DisputeService {
         }
     }
 
-    private void validateResolution(String resolution) {
-        if (resolution == null || resolution.isBlank()) {
+    private void validateArbitrateRequest(DisputeArbitrateRequest request) {
+        if (request == null || request.resolution() == null || request.resolution().isBlank()) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "裁定结果不能为空");
         }
+        String resolution = request.resolution().trim();
         if (!List.of(RES_FULL_REFUND, RES_PARTIAL_REFUND, RES_REJECTED, RES_REWORK)
-                .contains(resolution.trim())) {
+                .contains(resolution)) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "不支持的裁定结果: " + resolution);
         }
+        if (isRefundResolution(resolution)) {
+            String responsibility = normalizeResponsibility(request.responsibility());
+            if (responsibility == null || RESPONSIBILITY_NONE.equals(responsibility)) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "退款裁定必须指定责任归属");
+            }
+        }
+        if (RES_PARTIAL_REFUND.equals(resolution)
+                && (request.refundAmount() == null || request.refundAmount() <= 0)) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "部分退款金额必须大于 0");
+        }
+        if (request.comment() != null && request.comment().trim().length() > 1000) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "裁定说明不能超过 1000 字");
+        }
+    }
+
+    private boolean isRefundResolution(String resolution) {
+        return RES_FULL_REFUND.equals(resolution) || RES_PARTIAL_REFUND.equals(resolution);
+    }
+
+    private String normalizeResponsibility(String responsibility) {
+        if (responsibility == null || responsibility.isBlank()) {
+            return null;
+        }
+        String normalized = responsibility.trim().toUpperCase();
+        if (!List.of(
+                RESPONSIBILITY_NONE,
+                RESPONSIBILITY_PROVIDER_FAULT,
+                RESPONSIBILITY_CUSTOMER_FAULT,
+                RESPONSIBILITY_BOTH_FAULT,
+                RESPONSIBILITY_NO_FAULT
+        ).contains(normalized)) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "不支持的责任归属: " + responsibility);
+        }
+        return normalized;
+    }
+
+    private Long normalizeRefundAmount(Long refundAmount, String resolution) {
+        if (!RES_PARTIAL_REFUND.equals(resolution)) {
+            return null;
+        }
+        return refundAmount;
     }
 
     private String trimToNull(String value) {
@@ -278,6 +346,8 @@ public class DisputeService {
                 dispute.getReason(),
                 dispute.getStatus(),
                 dispute.getResolution(),
+                dispute.getResponsibility(),
+                dispute.getRefundAmount(),
                 dispute.getAdminId(),
                 dispute.getAdminComment(),
                 dispute.getCreatedAt(),

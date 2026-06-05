@@ -37,12 +37,33 @@ function saveStoredProfile(user) {
   localStorage.setItem(USER_PROFILE_STORAGE_KEY, JSON.stringify(profiles))
 }
 
+function tokenSubject(token) {
+  if (!token || typeof token !== 'string' || token.split('.').length < 2) return null
+  try {
+    const payload = JSON.parse(window.atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    return payload.sub || payload.userId || payload.id || null
+  } catch {
+    return null
+  }
+}
+
+function normalizedUserId(session, demoUser) {
+  const value = tokenSubject(session.token || session.accessToken)
+    || session.user.userId
+    || session.user.id
+    || session.user.user?.userId
+    || session.user.user?.id
+    || demoUser.userId
+  const number = Number(value)
+  return Number.isFinite(number) ? number : Number(demoUser.userId)
+}
+
 function normalizeSession(session) {
   if (!session?.user) return null
   if (session.user.role === 'ADMIN') return null
   const role = session.user.role === 'PROVIDER' ? 'PROVIDER' : 'CUSTOMER'
   const demoUser = USERS[roleToUserKey(role)]
-  const userId = Number(session.user.userId || demoUser.userId)
+  const userId = normalizedUserId(session, demoUser)
   const storedProfile = readUserProfiles()[String(userId)] || {}
   const bio = session.user.bio || session.user.description || storedProfile.bio || storedProfile.description || demoUser.bio || demoUser.description || ''
   const availability = session.user.availability || storedProfile.availability || demoUser.availability || ''
@@ -54,6 +75,7 @@ function normalizeSession(session) {
       ...storedProfile,
       ...session.user,
       userId,
+      id: userId,
       role,
       label: role === 'PROVIDER' ? '服务方' : '需求方',
       nickname: session.user.nickname || storedProfile.nickname || demoUser.nickname,
