@@ -43,6 +43,11 @@ function openUserProfile(userId) {
   window.open(new URL(`/users/${id}`, window.location.origin).toString(), '_blank', 'noopener,noreferrer')
 }
 
+const DETAIL_SHELL_HEIGHT = {
+  xs: 'calc(100dvh - 132px)',
+  md: 'calc(100dvh - 98px)'
+}
+
 export function ConversationDetailPage() {
   const { conversationId } = useParams()
   const navigate = useNavigate()
@@ -476,8 +481,8 @@ export function ConversationDetailPage() {
 
   return (
     <MessageWorkbenchErrorBoundary resetKey={`${conversationId}-${currentUser.role}`}>
-    <Stack spacing={1.2}>
-      <Paper variant="outlined" sx={{ px: { xs: 1.2, md: 1.6 }, py: 1, bgcolor: PORTRA_COLORS.paper, borderColor: PORTRA_COLORS.borderMuted, borderRadius: PORTRA_RADII.panel, boxShadow: PORTRA_SHADOWS.subtle }}>
+    <Stack spacing={1.2} sx={{ height: DETAIL_SHELL_HEIGHT, minHeight: { xs: 520, md: 620 }, overflow: 'hidden' }}>
+      <Paper variant="outlined" sx={{ flexShrink: 0, px: { xs: 1.2, md: 1.6 }, py: 1, bgcolor: PORTRA_COLORS.paper, borderColor: PORTRA_COLORS.borderMuted, borderRadius: PORTRA_RADII.panel, boxShadow: PORTRA_SHADOWS.subtle }}>
         <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} spacing={1}>
           <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 0 }}>
             <Tooltip title="返回消息">
@@ -520,8 +525,16 @@ export function ConversationDetailPage() {
 
       {notice && <Alert severity={notice.type} sx={noticeSx}>{notice.text}</Alert>}
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 2.7fr) minmax(250px, 0.68fr)' }, gap: 1.25, alignItems: 'start' }}>
-        <Stack spacing={1.5}>
+      <Box sx={{
+        flex: 1,
+        minHeight: 0,
+        display: 'grid',
+        gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 2.7fr) minmax(250px, 0.68fr)' },
+        gap: 1.25,
+        alignItems: 'stretch',
+        overflow: 'hidden'
+      }}>
+        <Box sx={{ minHeight: 0, minWidth: 0 }}>
           <ConversationThread
             messages={messages}
             conversation={conversation}
@@ -571,7 +584,7 @@ export function ConversationDetailPage() {
             onUnavailableTool={showUnavailableTool}
             onOpenAction={setActiveAction}
           />
-        </Stack>
+        </Box>
 
         <ConversationWorkbenchPanel
           quotes={quotes}

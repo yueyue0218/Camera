@@ -67,8 +67,8 @@ export function ConversationThread({
     <Paper
       variant="outlined"
       sx={{
-        height: { xs: 'calc(100vh - 150px)', lg: 'calc(100vh - 148px)' },
-        minHeight: 560,
+        height: '100%',
+        minHeight: 0,
         display: 'flex',
         flexDirection: 'column',
         bgcolor: PORTRA_COLORS.page,
@@ -128,51 +128,53 @@ export function ConversationThread({
         </Stack>
       </Box>
 
-      {showQuoteForm && canSeeQuoteEntry && (
-        <Box sx={{ px: { xs: 1.4, md: 2 }, pb: 1.5 }}>
-          <QuoteForm
-            quoteForm={quoteForm}
-            onQuoteFormChange={onQuoteFormChange}
-            onSubmit={onSubmitQuote}
-            onClose={onCloseQuoteForm}
-            editingQuotationId={editingQuotationId}
-            quoteValidationErrors={quoteValidationErrors}
-            loading={loading}
-            canSubmitQuoteForm={canSubmitQuoteForm}
-          />
-        </Box>
-      )}
+      <Box sx={{ flexShrink: 0, bgcolor: PORTRA_COLORS.paper }}>
+        {showQuoteForm && canSeeQuoteEntry && (
+          <Box sx={{ px: { xs: 1.4, md: 2 }, pt: 1.2, pb: 1.5, maxHeight: 260, overflowY: 'auto' }}>
+            <QuoteForm
+              quoteForm={quoteForm}
+              onQuoteFormChange={onQuoteFormChange}
+              onSubmit={onSubmitQuote}
+              onClose={onCloseQuoteForm}
+              editingQuotationId={editingQuotationId}
+              quoteValidationErrors={quoteValidationErrors}
+              loading={loading}
+              canSubmitQuoteForm={canSubmitQuoteForm}
+            />
+          </Box>
+        )}
 
-      {quoteEntryHint && canSeeQuoteEntry && !showQuoteForm && (
-        <Box sx={{ px: { xs: 1.4, md: 2 }, pb: 1 }}>
-          <Alert severity={canCreateQuote ? 'info' : 'warning'}>{quoteEntryHint}</Alert>
-        </Box>
-      )}
+        {quoteEntryHint && canSeeQuoteEntry && !showQuoteForm && (
+          <Box sx={{ px: { xs: 1.4, md: 2 }, pt: 1, pb: 1 }}>
+            <Alert severity={canCreateQuote ? 'info' : 'warning'}>{quoteEntryHint}</Alert>
+          </Box>
+        )}
 
-      <Divider sx={{ borderColor: PORTRA_COLORS.borderMuted }} />
-      <ConversationComposer
-        content={content}
-        loading={loading}
-        imageSending={imageSending}
-        canSeeQuoteEntry={canSeeQuoteEntry}
-        canCreateQuote={canCreateQuote}
-        showQuoteForm={showQuoteForm}
-        actions={actions}
-        onOpenQuoteForm={onOpenQuoteForm}
-        onStartQuoteEditing={onStartQuoteEditing}
-        onConfirmQuote={onConfirmQuote}
-        onRejectQuote={onRejectQuote}
-        onOpenQuoteDetail={onOpenQuoteDetail}
-        onPayOrder={onPayOrder}
-        onCancelOrder={onCancelOrder}
-        onConfirmOrder={onConfirmOrder}
-        onOpenOrderArchive={onOpenOrderArchive}
-        onContentChange={onContentChange}
-        onSendMessage={onSendMessage}
-        onChooseMessageImage={onChooseMessageImage}
-        onUnavailableTool={onUnavailableTool}
-        onOpenAction={onOpenAction}
-      />
+        <Divider sx={{ borderColor: PORTRA_COLORS.borderMuted }} />
+        <ConversationComposer
+          content={content}
+          loading={loading}
+          imageSending={imageSending}
+          canSeeQuoteEntry={canSeeQuoteEntry}
+          canCreateQuote={canCreateQuote}
+          showQuoteForm={showQuoteForm}
+          actions={actions}
+          onOpenQuoteForm={onOpenQuoteForm}
+          onStartQuoteEditing={onStartQuoteEditing}
+          onConfirmQuote={onConfirmQuote}
+          onRejectQuote={onRejectQuote}
+          onOpenQuoteDetail={onOpenQuoteDetail}
+          onPayOrder={onPayOrder}
+          onCancelOrder={onCancelOrder}
+          onConfirmOrder={onConfirmOrder}
+          onOpenOrderArchive={onOpenOrderArchive}
+          onContentChange={onContentChange}
+          onSendMessage={onSendMessage}
+          onChooseMessageImage={onChooseMessageImage}
+          onUnavailableTool={onUnavailableTool}
+          onOpenAction={onOpenAction}
+        />
+      </Box>
     </Paper>
     </MessageWorkbenchErrorBoundary>
   )

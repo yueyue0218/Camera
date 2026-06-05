@@ -39,9 +39,11 @@ export function ConversationWorkbenchPanel({
         borderColor: PORTRA_COLORS.borderMuted,
         borderRadius: PORTRA_RADII.panel,
         boxShadow: 'none',
-        position: { lg: 'sticky' },
-        top: { lg: 16 },
-        alignSelf: 'start'
+        display: { xs: 'none', lg: 'block' },
+        height: '100%',
+        minHeight: 0,
+        overflowY: 'auto',
+        alignSelf: 'stretch'
       }}
     >
       <Stack spacing={1.25}>
