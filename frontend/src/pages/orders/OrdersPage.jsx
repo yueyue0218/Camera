@@ -227,6 +227,10 @@ async function optionalOrderData(action, fallback = []) {
   }
 }
 
+function asArray(value) {
+  return Array.isArray(value) ? value : []
+}
+
 export function OrdersPage() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -291,16 +295,17 @@ export function OrdersPage() {
           nextInvitations = []
         }
       }
-      const roleOrders = (nextOrders || []).filter(order => currentUser.role === 'PROVIDER'
+      const roleOrders = asArray(nextOrders).filter(order => currentUser.role === 'PROVIDER'
         ? Number(order.providerUserId) === Number(currentUser.userId)
         : Number(order.customerId) === Number(currentUser.userId))
       setOrders(roleOrders)
       saveOrderSnapshots(roleOrders)
-      setSentInvitations(nextInvitations)
+      setSentInvitations(asArray(nextInvitations))
       if (focusOrderId && roleOrders.some(order => Number(order.orderId) === Number(focusOrderId))) {
-        await openOrder(focusOrderId, false)
+        const focusedOrder = roleOrders.find(order => Number(order.orderId) === Number(focusOrderId))
+        await openOrder(focusedOrder || focusOrderId, false)
       } else if (roleOrders.length) {
-        await openOrder(roleOrders[0].orderId, false)
+        await openOrder(roleOrders[0], false)
       } else {
         setSelectedOrder(null)
         setStatusLogs([])
@@ -314,44 +319,64 @@ export function OrdersPage() {
 
   async function openOrder(orderOrId, updateUrl = true) {
     const orderId = normalizeOrderId(typeof orderOrId === 'object' ? orderOrId.orderId : orderOrId)
+    const fallbackOrder = typeof orderOrId === 'object' ? orderOrId : orders.find(order => Number(order.orderId) === Number(orderId))
     if (!orderId) {
       setNotice({ type: 'warning', text: '订单信息暂时不可用，请刷新后重试。' })
       return false
     }
-    const detail = await orderApi.detail(orderId, currentUser)
-    const logs = await optionalOrderData(() => orderApi.statusLogs(orderId, currentUser))
-    const deliveries = await optionalOrderData(() => deliveryApi.listByOrder(orderId, currentUser))
-    const authorizations = await optionalOrderData(() => photoAuthorizationApi.listByOrder(orderId, currentUser))
-    let reviews = getLocalReviewsByOrder(orderId)
-    const remoteReviews = await optionalOrderData(() => reviewApi.listByOrder(orderId, currentUser), [])
-    reviews = mergeReviewLists(remoteReviews, reviews)
-    let complaints = getArbitrationsByOrder(orderId)
-    const complaintReviewIds = reviews
-      .map(review => review.reviewId)
-      .filter(reviewId => reviewId && !String(reviewId).startsWith('local'))
-    if (complaintReviewIds.length) {
+    setLoading(true)
+    setNotice(null)
+    try {
+      let detail = fallbackOrder || null
       try {
-        const remoteComplaints = await Promise.all(complaintReviewIds.map(reviewId => complaintApiSafeList(reviewId, currentUser)))
-        complaints = mergeComplaints(complaints, remoteComplaints.flat())
-      } catch {
-        complaints = mergeComplaints(complaints)
+        detail = await orderApi.detail(orderId, currentUser) || detail
+      } catch (error) {
+        if (!detail || (!isApiUnavailable(error) && error.status !== 403 && error.status !== 404)) throw error
+        setNotice({ type: 'warning', text: '订单详情接口暂时不可用，已先展示订单列表中的档案信息。' })
       }
+      if (!detail) {
+        setNotice({ type: 'warning', text: '订单信息暂时不可用，请刷新后重试。' })
+        return false
+      }
+      const logs = asArray(await optionalOrderData(() => orderApi.statusLogs(orderId, currentUser)))
+      const deliveries = asArray(await optionalOrderData(() => deliveryApi.listByOrder(orderId, currentUser)))
+      const authorizations = asArray(await optionalOrderData(() => photoAuthorizationApi.listByOrder(orderId, currentUser)))
+      let reviews = asArray(getLocalReviewsByOrder(orderId))
+      const remoteReviews = asArray(await optionalOrderData(() => reviewApi.listByOrder(orderId, currentUser), []))
+      reviews = mergeReviewLists(remoteReviews, reviews)
+      let complaints = asArray(getArbitrationsByOrder(orderId))
+      const complaintReviewIds = reviews
+        .map(review => review.reviewId)
+        .filter(reviewId => reviewId && !String(reviewId).startsWith('local'))
+      if (complaintReviewIds.length) {
+        try {
+          const remoteComplaints = await Promise.all(complaintReviewIds.map(reviewId => complaintApiSafeList(reviewId, currentUser)))
+          complaints = mergeComplaints(complaints, remoteComplaints.flat())
+        } catch {
+          complaints = mergeComplaints(complaints)
+        }
+      }
+      setSelectedOrder(detail)
+      saveOrderSnapshots([detail])
+      setStatusLogs(logs)
+      setDeliveryRecords(deliveries)
+      setDeliveryForm({ file: null, remark: '' })
+      setReworkRequirement('')
+      setPhotoAuthorizations(authorizations)
+      setPhotoAuthorizationForm({ fileIds: [], remark: '' })
+      setAuthorizationRemarks({})
+      setOrderReviews(reviews)
+      setArbitrations(complaints)
+      setShowReviewForm(false)
+      setShowArbitrationForm(false)
+      if (updateUrl) navigate(`/orders?orderId=${orderId}`, { replace: true, state: { orderId } })
+      return true
+    } catch (error) {
+      setNotice({ type: 'error', text: error.message || '订单详情暂时无法打开，请刷新后重试。' })
+      return false
+    } finally {
+      setLoading(false)
     }
-    setSelectedOrder(detail)
-    saveOrderSnapshots([detail])
-    setStatusLogs(logs)
-    setDeliveryRecords(deliveries)
-    setDeliveryForm({ file: null, remark: '' })
-    setReworkRequirement('')
-    setPhotoAuthorizations(authorizations)
-    setPhotoAuthorizationForm({ fileIds: [], remark: '' })
-    setAuthorizationRemarks({})
-    setOrderReviews(reviews)
-    setArbitrations(complaints)
-    setShowReviewForm(false)
-    setShowArbitrationForm(false)
-    if (updateUrl) navigate(`/orders?orderId=${orderId}`, { replace: true, state: { orderId } })
-    return true
   }
 
   async function operateOrder(action) {
