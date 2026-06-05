@@ -77,7 +77,7 @@ export function ConversationActionDialogs({
         <DialogContent sx={dialogContentSx}>
           {quote ? (
             <Stack spacing={1.4} sx={{ pt: 1 }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+              <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography sx={{ color: PORTRA_COLORS.blue, fontSize: 24, fontWeight: 950 }}>{centToYuan(quote.amountCent)}</Typography>
                 <StatusChip label={getQuoteStatusLabel(quote.status)} />
               </Stack>
@@ -242,7 +242,7 @@ function DetailRows({ rows = [] }) {
   return (
     <Stack spacing={0.7}>
       {(Array.isArray(rows) ? rows : []).map(([label, value]) => (
-        <Stack key={label} direction="row" spacing={1.2} alignItems="flex-start">
+        <Stack key={label} direction="row" spacing={1.2} sx={{ alignItems: 'flex-start' }}>
           <Typography variant="caption" sx={{ width: 76, flexShrink: 0, color: PORTRA_COLORS.faintInk, fontWeight: 900 }}>{label}</Typography>
           <Typography variant="body2" sx={{ color: PORTRA_COLORS.subInk, lineHeight: 1.65 }}>{value}</Typography>
         </Stack>

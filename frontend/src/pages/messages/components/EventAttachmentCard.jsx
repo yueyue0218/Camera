@@ -1,36 +1,59 @@
-import { Box, Paper, Stack, Typography } from '@mui/material'
+import { Avatar, Box, Paper, Stack, Typography } from '@mui/material'
 import { PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
 
-export function EventAttachmentCard({ side, actorRole, label, title, summary, timestamp, children, actions }) {
+export function EventAttachmentCard({ side, actorRole, title, summary, timestamp, children, actions }) {
   const provider = actorRole === 'PROVIDER'
+  const self = side === 'self'
   const accent = provider ? PORTRA_COLORS.blue : PORTRA_COLORS.orange
+  const avatarText = provider ? '摄' : '客'
+  const avatarSx = {
+    width: 32,
+    height: 32,
+    mt: 0.25,
+    flexShrink: 0,
+    bgcolor: accent,
+    color: PORTRA_COLORS.paper,
+    fontSize: 13,
+    fontWeight: 950
+  }
 
   return (
-    <Box sx={{ display: 'flex', justifyContent: side === 'self' ? 'flex-end' : 'flex-start' }}>
-      <Paper
-        variant="outlined"
+    <Box sx={{ display: 'flex', justifyContent: self ? 'flex-end' : 'flex-start' }}>
+      <Stack
+        direction="row"
+        spacing={1}
         sx={{
-          width: 'min(78%, 500px)',
-          px: 1.4,
-          py: 1.2,
-          bgcolor: PORTRA_COLORS.paper,
-          borderColor: PORTRA_COLORS.border,
-          borderLeft: `3px solid ${accent}`,
-          borderRadius: PORTRA_RADII.panel,
-          boxShadow: PORTRA_SHADOWS.subtle
+          alignItems: 'flex-start',
+          maxWidth: { xs: '100%', md: 'min(72%, 608px)' },
+          flexDirection: self ? 'row-reverse' : 'row'
         }}
       >
-        <Stack spacing={0.8}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
-            <Typography variant="caption" sx={{ color: accent, fontWeight: 900 }}>{label}</Typography>
-            <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk, fontSize: 11 }}>{timestamp}</Typography>
+        <Avatar sx={avatarSx}>{avatarText}</Avatar>
+        <Paper
+          variant="outlined"
+          sx={{
+            width: { xs: 'min(100%, 520px)', md: 'clamp(460px, 58vw, 560px)' },
+            maxWidth: '100%',
+            px: 1.45,
+            py: 1.2,
+            bgcolor: PORTRA_COLORS.paper,
+            borderColor: PORTRA_COLORS.border,
+            borderTop: `3px solid ${accent}`,
+            borderRadius: self ? '8px 8px 2px 8px' : '8px 8px 8px 2px',
+            boxShadow: PORTRA_SHADOWS.subtle
+          }}
+        >
+          <Stack spacing={0.8}>
+            <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography sx={{ color: PORTRA_COLORS.ink, fontWeight: 900, lineHeight: 1.4 }}>{title}</Typography>
+              <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk, fontSize: 11 }}>{timestamp}</Typography>
+            </Stack>
+            {summary && <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk, lineHeight: 1.55 }}>{summary}</Typography>}
+            {children}
+            {actions}
           </Stack>
-          <Typography sx={{ color: PORTRA_COLORS.ink, fontWeight: 900, lineHeight: 1.4 }}>{title}</Typography>
-          {summary && <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk, lineHeight: 1.55 }}>{summary}</Typography>}
-          {children}
-          {actions}
-        </Stack>
-      </Paper>
+        </Paper>
+      </Stack>
     </Box>
   )
 }

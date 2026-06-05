@@ -69,7 +69,7 @@ export function ConversationList({ conversations, currentUser, onOpenConversatio
                 </Typography>
                 <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk }} noWrap>{topic} · {getSafeDisplayText(getConversationSourceLabel(conversation), '本次合作')}</Typography>
               </Stack>
-              <Stack spacing={0.7} alignItems="flex-end" sx={{ minWidth: 96 }}>
+              <Stack spacing={0.7} sx={{ minWidth: 96, alignItems: 'flex-end' }}>
                 <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk }}>{formatShortTime(conversation.updatedAt)}</Typography>
                 <StatusChip label={needsMyAction ? '待我处理' : actions.stage.title} emphasis={needsMyAction} />
               </Stack>

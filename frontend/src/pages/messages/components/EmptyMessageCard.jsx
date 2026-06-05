@@ -8,7 +8,7 @@ export function EmptyMessageCard() {
   const navigate = useNavigate()
   return (
     <Paper variant="outlined" sx={{ py: 7, px: 3, textAlign: 'center', bgcolor: PORTRA_COLORS.paper, borderColor: PORTRA_COLORS.borderMuted, boxShadow: 'none' }}>
-      <Stack spacing={1.5} alignItems="center">
+      <Stack spacing={1.5} sx={{ alignItems: 'center' }}>
         <Box sx={{ width: 52, height: 52, display: 'grid', placeItems: 'center', bgcolor: PORTRA_COLORS.yellow, borderRadius: PORTRA_RADII.control, color: PORTRA_COLORS.ink }}>
           <ForumRoundedIcon />
         </Box>

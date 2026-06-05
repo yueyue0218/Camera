@@ -3,7 +3,7 @@ import { PORTRA_COLORS } from '../MessageVisualTokens.js'
 
 export function MessagesSectionHeader({ title, subtitle }) {
   return (
-    <Stack direction="row" justifyContent="space-between" alignItems="flex-end" spacing={2} sx={{ pt: 0.5, pb: 1 }}>
+    <Stack direction="row" spacing={2} sx={{ pt: 0.5, pb: 1, justifyContent: 'space-between', alignItems: 'flex-end' }}>
       <Box>
         <Typography variant="h4" sx={{ fontSize: 28, fontWeight: 950, color: PORTRA_COLORS.ink }}>{title}</Typography>
         <Typography sx={{ mt: 0.4, color: PORTRA_COLORS.mutedInk, fontSize: 14 }}>{subtitle}</Typography>

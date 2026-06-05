@@ -32,6 +32,7 @@ export function ConversationWorkbenchPanel({
   const uploadLabel = actions.canReuploadDelivery ? '重新上传作品' : '上传作品'
   return (
     <Paper
+      data-message-panel="true"
       variant="outlined"
       sx={{
         p: { xs: 1.25, md: 1.4 },
@@ -43,6 +44,7 @@ export function ConversationWorkbenchPanel({
         height: '100%',
         minHeight: 0,
         overflowY: 'auto',
+        overscrollBehavior: 'contain',
         alignSelf: 'stretch'
       }}
     >
@@ -57,7 +59,7 @@ export function ConversationWorkbenchPanel({
           <Box sx={{ p: 1, bgcolor: PORTRA_COLORS.paper, borderRadius: PORTRA_RADII.control, borderLeft: `3px solid ${PORTRA_COLORS.blue}` }}>
             <Stack spacing={0.8}>
             {actions.canConfirmDelivery ? (
-              <Stack direction="row" spacing={0.8} flexWrap="wrap">
+              <Stack direction="row" spacing={0.8} sx={{ flexWrap: 'wrap' }}>
                 <Typography variant="body2" color="text.secondary" sx={{ width: '100%' }}>请查看交付作品，确认接收或说明返修要求。</Typography>
                 <Button size="small" variant="contained" startIcon={<CheckCircleRoundedIcon />} onClick={onConfirmOrder}>确认接收</Button>
                 <Button size="small" variant="outlined" onClick={() => onOpenAction('REQUEST_REWORK')}>提交返修</Button>
@@ -99,7 +101,7 @@ export function ConversationWorkbenchPanel({
 
         {latestQuote && (
           <WorkbenchSection title="当前报价">
-            <Stack direction="row" spacing={1} flexWrap="wrap">
+            <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
               <StatusChip label={getQuoteStatusLabel(latestQuote.status)} />
               <Typography sx={{ color: PORTRA_COLORS.blue, fontSize: 18, fontWeight: 900 }}>{centToYuan(latestQuote.amountCent)}</Typography>
             </Stack>
@@ -121,12 +123,12 @@ export function ConversationWorkbenchPanel({
         )}
 
         <WorkbenchSection title="交付与授权">
-          <Stack direction="row" spacing={1.5} flexWrap="wrap">
-            <Stack direction="row" spacing={0.5} alignItems="center">
+          <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap' }}>
+            <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
               <TaskAltRoundedIcon sx={{ fontSize: 17, color: PORTRA_COLORS.blue }} />
               <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk }}>交付 {summary.deliveryCount ?? deliveryRecords.length}</Typography>
             </Stack>
-            <Stack direction="row" spacing={0.5} alignItems="center">
+            <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
               <ImageRoundedIcon sx={{ fontSize: 17, color: PORTRA_COLORS.orange }} />
               <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk }}>授权 {summary.authorizationCount ?? photoAuthorizations.length}</Typography>
             </Stack>

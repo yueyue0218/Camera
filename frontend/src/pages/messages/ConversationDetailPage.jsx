@@ -38,8 +38,8 @@ import {
 } from './utils/quoteUtils.js'
 
 const DETAIL_SHELL_HEIGHT = {
-  xs: 'calc(100dvh - 132px)',
-  md: 'calc(100dvh - 98px)'
+  xs: 'calc(100dvh - 212px)',
+  md: 'calc(100dvh - 154px)'
 }
 
 export function ConversationDetailPage() {
@@ -482,10 +482,25 @@ export function ConversationDetailPage() {
 
   return (
     <MessageWorkbenchErrorBoundary resetKey={`${conversationId}-${currentUser.role}`}>
-    <Stack spacing={1.2} sx={{ height: DETAIL_SHELL_HEIGHT, minHeight: { xs: 520, md: 620 }, overflow: 'hidden' }}>
+    <Stack
+      data-message-detail-shell="true"
+      spacing={1.2}
+      sx={{
+        width: { xs: '100%', lg: 'min(1360px, calc(100vw - 48px))' },
+        maxWidth: { lg: 1360 },
+        mx: { xs: 0, lg: 'auto' },
+        position: { lg: 'relative' },
+        left: { lg: '50%' },
+        transform: { lg: 'translateX(-50%)' },
+        height: DETAIL_SHELL_HEIGHT,
+        maxHeight: DETAIL_SHELL_HEIGHT,
+        minHeight: 0,
+        overflow: 'hidden'
+      }}
+    >
       <Paper variant="outlined" sx={{ flexShrink: 0, px: { xs: 1.2, md: 1.6 }, py: 1, bgcolor: PORTRA_COLORS.paper, borderColor: PORTRA_COLORS.borderMuted, borderRadius: PORTRA_RADII.panel, boxShadow: PORTRA_SHADOWS.subtle }}>
-        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} spacing={1}>
-          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 0 }}>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} sx={{ justifyContent: 'space-between', alignItems: { xs: 'stretch', md: 'center' } }}>
+          <Stack direction="row" spacing={1.5} sx={{ minWidth: 0, alignItems: 'center' }}>
             <Tooltip title="返回消息">
               <IconButton onClick={() => navigate('/messages')} sx={{ border: `1px solid ${PORTRA_COLORS.border}`, borderRadius: PORTRA_RADII.control }}>
                 <ArrowBackRoundedIcon />
@@ -499,7 +514,7 @@ export function ConversationDetailPage() {
               {getSafeDisplayText(counterparty.initial, '对').slice(0, 1)}
             </Avatar>
             <Box sx={{ minWidth: 0 }}>
-              <Stack direction="row" spacing={1} alignItems="center">
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                 <Typography variant="h6" sx={{ color: PORTRA_COLORS.ink, fontSize: 17, fontWeight: 950 }} noWrap>{getSafeDisplayText(counterparty.nickname, '对方用户')}</Typography>
                 <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk }}>{actions.role === 'PROVIDER' ? '摄影师视角' : '客户视角'}</Typography>
               </Stack>
@@ -508,7 +523,7 @@ export function ConversationDetailPage() {
               </Typography>
             </Box>
           </Stack>
-          <Stack direction="row" spacing={0.8} alignItems="center" justifyContent={{ xs: 'flex-start', md: 'flex-end' }}>
+          <Stack direction="row" spacing={0.8} sx={{ alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
             <StatusChip label={actions.stage.title} emphasis />
             <Button
               size="small"
@@ -530,12 +545,12 @@ export function ConversationDetailPage() {
         flex: 1,
         minHeight: 0,
         display: 'grid',
-        gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 2.7fr) minmax(250px, 0.68fr)' },
-        gap: 1.25,
+        gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(720px, 1fr) 300px', xl: 'minmax(760px, 1fr) 312px' },
+        gap: { xs: 1.25, lg: 2, xl: 2.5 },
         alignItems: 'stretch',
         overflow: 'hidden'
-      }}>
-        <Box sx={{ minHeight: 0, minWidth: 0 }}>
+      }} data-message-workbench-grid="true">
+        <Box sx={{ minHeight: 0, minWidth: 0, height: '100%', display: 'flex', overflow: 'hidden' }}>
           <ConversationThread
             messages={messages}
             conversation={conversation}
@@ -555,6 +570,7 @@ export function ConversationDetailPage() {
             showQuoteForm={showQuoteForm}
             editingQuotationId={editingQuotationId}
             quoteEntryHint={quoteEntryHint}
+            quoteActionLabel={quotes.some(quote => quote.status === 'REJECTED') ? '重新发送报价' : '发送报价'}
             quoteForm={quoteForm}
             quoteValidationErrors={quoteValidationErrors}
             canSubmitQuoteForm={canSubmitQuoteForm}

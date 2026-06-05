@@ -28,6 +28,7 @@ export function ConversationThread({
   showQuoteForm,
   editingQuotationId,
   quoteEntryHint,
+  quoteActionLabel,
   quoteForm,
   quoteValidationErrors,
   canSubmitQuoteForm,
@@ -66,9 +67,11 @@ export function ConversationThread({
   return (
     <MessageWorkbenchErrorBoundary resetKey={`${conversation?.conversationId || 'none'}-${currentUser?.role || 'role'}`}>
     <Paper
+      data-message-thread="true"
       variant="outlined"
       sx={{
         height: '100%',
+        width: '100%',
         minHeight: 0,
         display: 'flex',
         flexDirection: 'column',
@@ -79,7 +82,19 @@ export function ConversationThread({
         boxShadow: PORTRA_SHADOWS.subtle
       }}
     >
-      <Box ref={scrollRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: { xs: 1.4, md: 2.2 }, py: { xs: 1.8, md: 2.4 }, scrollbarColor: `${PORTRA_COLORS.border} transparent` }}>
+      <Box
+        data-message-scroll="true"
+        ref={scrollRef}
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          overscrollBehavior: 'contain',
+          px: { xs: 1.4, md: 2.2 },
+          py: { xs: 1.8, md: 2.4 },
+          scrollbarColor: `${PORTRA_COLORS.border} transparent`
+        }}
+      >
         <Stack spacing={1.5}>
           {safeTimeline.filter(Boolean).map(item => {
             if (item.type !== 'MESSAGE') {
@@ -131,9 +146,9 @@ export function ConversationThread({
         </Stack>
       </Box>
 
-      <Box sx={{ flexShrink: 0, bgcolor: PORTRA_COLORS.paper }}>
+      <Box data-message-composer="true" sx={{ flexShrink: 0, bgcolor: PORTRA_COLORS.paper }}>
         {showQuoteForm && canSeeQuoteEntry && (
-          <Box sx={{ px: { xs: 1.4, md: 2 }, pt: 1.2, pb: 1.5, maxHeight: 260, overflowY: 'auto' }}>
+          <Box sx={{ px: { xs: 1.4, md: 2 }, pt: 1.2, pb: 1.5, maxHeight: 260, overflowY: 'auto', overscrollBehavior: 'contain' }}>
             <QuoteForm
               quoteForm={quoteForm}
               onQuoteFormChange={onQuoteFormChange}
@@ -161,6 +176,7 @@ export function ConversationThread({
           canSeeQuoteEntry={canSeeQuoteEntry}
           canCreateQuote={canCreateQuote}
           showQuoteForm={showQuoteForm}
+          quoteActionLabel={quoteActionLabel}
           actions={actions}
           onOpenQuoteForm={onOpenQuoteForm}
           onStartQuoteEditing={onStartQuoteEditing}

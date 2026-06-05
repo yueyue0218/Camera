@@ -1,4 +1,4 @@
-import { Box, Button, Chip, Paper, Stack, Typography } from '@mui/material'
+import { Box, Button, Chip, Stack, Typography } from '@mui/material'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded'
@@ -57,7 +57,7 @@ export function ConversationSystemItem({
     />
   )
   const actionButtons = !!eventActions.length && (
-    <Stack direction="row" spacing={0.7} flexWrap="wrap" rowGap={0.7}>
+    <Stack direction="row" spacing={0.7} sx={{ flexWrap: 'wrap', rowGap: 0.7 }}>
       {eventActions.map(renderActionButton)}
     </Stack>
   )
@@ -69,33 +69,43 @@ export function ConversationSystemItem({
 
   if (event.actorRole === 'PLATFORM') {
     const order = eventMeta.order
+    const noticeText = getSafeDisplayText(event.summary || event.title, '合作进展已更新')
     return (
       <Box id={event.type === 'AUTHORIZATION' ? 'conversation-authorization-action' : undefined} sx={{ display: 'flex', justifyContent: 'center', px: 2 }}>
-        <Paper
-          variant="outlined"
+        <Box
+          data-message-system-strip="true"
           sx={{
-            width: 'min(60%, 520px)',
-            minHeight: 40,
-            px: 1.25,
-            py: 0.7,
+            maxWidth: 'min(78%, 680px)',
+            minHeight: 32,
+            px: 1.3,
+            py: 0.45,
             display: 'flex',
             alignItems: 'center',
-            bgcolor: PORTRA_COLORS.paper,
+            justifyContent: 'center',
+            bgcolor: 'rgba(248, 243, 235, 0.72)',
             borderColor: PORTRA_COLORS.borderMuted,
-            borderLeft: `3px solid ${PORTRA_COLORS.yellow}`,
-            borderRadius: PORTRA_RADII.control,
+            border: `1px solid ${PORTRA_COLORS.borderMuted}`,
+            borderRadius: 999,
             boxShadow: 'none'
           }}
         >
-          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1} sx={{ width: '100%', minWidth: 0 }}>
-            <Typography variant="body2" noWrap sx={{ minWidth: 0, color: PORTRA_COLORS.subInk, fontWeight: 800 }}>
-              平台通知 · {getSafeDisplayText(event.title, '合作进展已更新')}
+          <Stack direction="row" spacing={0.9} sx={{ minWidth: 0, alignItems: 'center', justifyContent: 'center' }}>
+            <Typography variant="body2" noWrap sx={{ minWidth: 0, color: PORTRA_COLORS.mutedInk, fontSize: 12.5, fontWeight: 800 }}>
+              {noticeText}
             </Typography>
             <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk, flexShrink: 0, fontSize: 11 }}>{formatTime(event.timestamp)}</Typography>
-            {order && <Button size="small" variant="text" color="inherit" startIcon={<ReceiptLongRoundedIcon />} onClick={onOpenOrderArchive}>查看订单</Button>}
-            {eventActions.includes('PAY') && renderActionButton('PAY')}
+            {order && (
+              <Button size="small" variant="text" color="inherit" onClick={onOpenOrderArchive} sx={stripActionSx}>
+                查看订单
+              </Button>
+            )}
+            {eventActions.includes('PAY') && (
+              <Button size="small" variant="text" color="inherit" onClick={onPayOrder} disabled={loading} sx={stripActionSx}>
+                去支付
+              </Button>
+            )}
           </Stack>
-        </Paper>
+        </Box>
       </Box>
     )
   }
@@ -105,7 +115,6 @@ export function ConversationSystemItem({
       <EventAttachmentCard
         side={event.side}
         actorRole={event.actorRole}
-        label={eventBadgeLabel(event)}
         title={getSafeDisplayText(event.title, '合作进展已更新')}
         summary={getSafeDisplayText(event.summary, '')}
         timestamp={formatTime(event.timestamp)}
@@ -164,7 +173,7 @@ function QuoteMeta({ quote }) {
       <Typography variant="body2" sx={{ color: PORTRA_COLORS.subInk, fontWeight: 800 }}>
         {centToYuan(quote.amountCent)} · {formatTime(quote.shootStartTime)} · {getSafeDisplayText(quote.location, '拍摄地点待确认')}
       </Typography>
-      <Stack direction="row" spacing={0.6} flexWrap="wrap">
+      <Stack direction="row" spacing={0.6} sx={{ flexWrap: 'wrap' }}>
         <StatusChip label={getQuoteStatusLabel(quote.status)} />
       </Stack>
     </Stack>
@@ -189,23 +198,11 @@ function DeliveryMeta({ event }) {
 function AuthorizationMeta({ authorization }) {
   if (!authorization) return null
   return (
-    <Stack direction="row" spacing={0.8} flexWrap="wrap">
+    <Stack direction="row" spacing={0.8} sx={{ flexWrap: 'wrap' }}>
       <StatusChip label={PHOTO_AUTHORIZATION_STATUS_LABELS[authorization.status] || '授权状态已更新'} />
       {(authorization.files || []).map(file => <Chip key={file.id || file.fileId} size="small" label="已选交付作品" sx={metaChipSx} />)}
     </Stack>
   )
-}
-
-function eventBadgeLabel(event) {
-  return `${event.actorLabel}动作 · ${actorEventLabel(event.type)}`
-}
-
-function actorEventLabel(type) {
-  if (type === 'QUOTE_SENT' || type === 'QUOTE_DECISION') return '报价'
-  if (type === 'DELIVERY') return '上传作品'
-  if (type === 'AUTHORIZATION') return '照片授权'
-  if (type === 'REWORK') return '提交返修'
-  return '订单动作'
 }
 
 const metaChipSx = {
@@ -223,4 +220,13 @@ const attachmentMetaSx = {
   color: PORTRA_COLORS.subInk,
   bgcolor: PORTRA_COLORS.paperMuted,
   borderRadius: PORTRA_RADII.control
+}
+
+const stripActionSx = {
+  minWidth: 0,
+  px: 0.35,
+  py: 0,
+  fontSize: 12,
+  fontWeight: 900,
+  color: PORTRA_COLORS.blue
 }

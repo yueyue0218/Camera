@@ -40,7 +40,7 @@ export function QuotePanel({
   return (
     <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, bgcolor: PORTRA_COLORS.paper, borderColor: PORTRA_COLORS.borderMuted, borderRadius: PORTRA_RADII.panel }}>
       <Stack spacing={1.5}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between' }}>
           <Box>
             <Typography variant="h6">报价与订单</Typography>
             <Typography color="text.secondary">摄影师发送正式报价，客户确认后生成平台托管订单。</Typography>
@@ -76,7 +76,7 @@ export function QuotePanel({
               }}
             >
               <Stack spacing={1.2}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
                   <Box>
                     <Typography variant="overline" color="text.secondary">正式报价单</Typography>
                     <Typography variant="h5" fontWeight={900}>{centToYuan(quote.amountCent)}</Typography>
@@ -97,13 +97,13 @@ export function QuotePanel({
                   ['下一步', getQuoteNextStepText(quote, currentUser)]
                 ]} />
                 {quote.status === 'PENDING_CONFIRM' && currentUser.role === 'CUSTOMER' && currentUser.userId === Number(conversation?.participantAId) && (
-                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                  <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                     <Button size="small" variant="contained" onClick={() => onConfirmQuote(quote)}>确认报价</Button>
                     <Button size="small" variant="outlined" color="inherit" onClick={() => onRejectQuote(quote)}>拒绝报价</Button>
                   </Stack>
                 )}
                 {canEditQuote(quote, conversation, currentUser) && (
-                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                  <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                     <Button
                       size="small"
                       variant={String(editingQuotationId) === String(quote.quotationId) ? 'contained' : 'outlined'}

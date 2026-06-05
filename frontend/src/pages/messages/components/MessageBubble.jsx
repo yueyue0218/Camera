@@ -21,7 +21,7 @@ export function MessageBubble({ message, mine, avatar, avatarText, avatarUserId,
   return (
     <Box sx={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: 1 }}>
       {!mine && <Avatar src={avatar || undefined} onClick={openProfile} sx={avatarSx}>{avatarText || '对'}</Avatar>}
-      <Stack spacing={0.35} alignItems={mine ? 'flex-end' : 'flex-start'} sx={{ maxWidth: { xs: '82%', md: '68%' } }}>
+      <Stack spacing={0.35} sx={{ maxWidth: { xs: '82%', md: '68%' }, alignItems: mine ? 'flex-end' : 'flex-start' }}>
         <Paper
           elevation={0}
           sx={{

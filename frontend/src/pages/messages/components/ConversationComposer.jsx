@@ -21,6 +21,7 @@ export function ConversationComposer({
   canSeeQuoteEntry,
   canCreateQuote,
   showQuoteForm,
+  quoteActionLabel = '发送报价',
   actions,
   onOpenQuoteForm,
   onStartQuoteEditing,
@@ -56,9 +57,20 @@ export function ConversationComposer({
     <Box sx={{ px: { xs: 1.2, md: 1.5 }, py: 1.2, bgcolor: PORTRA_COLORS.paper, borderTop: `1px solid ${PORTRA_COLORS.borderMuted}` }}>
       <Stack spacing={0.9}>
         {hasQuickActions && (
-          <Stack spacing={0.6} sx={{ py: 0.8, px: 1, bgcolor: PORTRA_COLORS.paperMuted, borderRadius: PORTRA_RADII.control, borderLeft: `3px solid ${PORTRA_COLORS.yellow}` }}>
-            <Typography variant="caption" sx={{ color: PORTRA_COLORS.mutedInk, fontWeight: 900 }}>当前可处理</Typography>
-            <Stack direction="row" spacing={0.7} flexWrap="wrap" rowGap={0.7}>
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={0.8}
+            sx={{
+              alignItems: { xs: 'stretch', md: 'center' },
+              py: 0.7,
+              px: 0.9,
+              bgcolor: 'rgba(255, 253, 249, 0.56)',
+              borderRadius: PORTRA_RADII.control,
+              border: `1px solid ${PORTRA_COLORS.borderMuted}`
+            }}
+          >
+            <Typography variant="caption" sx={{ color: PORTRA_COLORS.mutedInk, fontWeight: 950, flexShrink: 0 }}>下一步</Typography>
+            <Stack direction="row" spacing={0.65} sx={{ flexWrap: 'wrap', rowGap: 0.65 }}>
               {actions.canSendQuote && canSeeQuoteEntry && (
                 <Button
                   size="small"
@@ -67,7 +79,7 @@ export function ConversationComposer({
                   onClick={onOpenQuoteForm}
                   disabled={!canCreateQuote && !showQuoteForm}
                 >
-                  {showQuoteForm ? '收起报价单' : '发送报价'}
+                  {showQuoteForm ? '收起报价单' : quoteActionLabel}
                 </Button>
               )}
               {actions.canEditQuote && (
@@ -134,7 +146,7 @@ export function ConversationComposer({
           </Stack>
         )}
 
-        <Stack direction="row" spacing={0.3} alignItems="center" flexWrap="wrap">
+        <Stack direction="row" spacing={0.3} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
           <Typography variant="caption" sx={{ mr: 0.5, color: PORTRA_COLORS.faintInk, fontWeight: 800 }}>会话工具</Typography>
           <MessageToolbarButton title="发送图片" component="label" disabled={loading || imageSending}>
             <ImageRoundedIcon fontSize="small" />
@@ -151,7 +163,7 @@ export function ConversationComposer({
           )}
         </Stack>
 
-        <Stack direction="row" alignItems="flex-end" spacing={1}>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-end' }}>
           <TextField
             fullWidth
             size="small"
