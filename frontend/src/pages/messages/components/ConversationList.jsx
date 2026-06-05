@@ -6,7 +6,7 @@ import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from 
 import { EmptyMessageCard } from './EmptyMessageCard.jsx'
 import { StatusChip } from './StatusChip.jsx'
 
-export function ConversationList({ conversations, currentUser, onOpenConversation }) {
+export function ConversationList({ conversations, currentUser, onOpenConversation, onOpenUserProfile }) {
   return (
     <Paper variant="outlined" sx={{ overflow: 'hidden', bgcolor: PORTRA_COLORS.paper, borderColor: PORTRA_COLORS.borderMuted, borderRadius: PORTRA_RADII.panel, boxShadow: PORTRA_SHADOWS.subtle }}>
       <Stack spacing={0}>
@@ -21,6 +21,10 @@ export function ConversationList({ conversations, currentUser, onOpenConversatio
           const topic = getConversationListTopic(conversation)
           const needsMyAction = actions.primaryActions.some(action => ['CONFIRM_QUOTE', 'PAY', 'UPLOAD_DELIVERY', 'REUPLOAD_DELIVERY', 'CONFIRM_DELIVERY', 'REQUEST_REWORK', 'REVIEW_AUTHORIZATION'].includes(action))
           const activity = getConversationListActivity(conversation, actions)
+          const openCounterpartyProfile = event => {
+            event.stopPropagation()
+            if (counterparty.userId && typeof onOpenUserProfile === 'function') onOpenUserProfile(counterparty.userId)
+          }
           return (
             <Box
               key={conversation.conversationId}
@@ -43,7 +47,7 @@ export function ConversationList({ conversations, currentUser, onOpenConversatio
                 '&:hover .conversation-chevron': { opacity: 1, transform: 'translateX(0)' }
               }}
             >
-              <Box sx={{ position: 'relative', width: 46, height: 46 }}>
+              <Box onClick={openCounterpartyProfile} sx={{ position: 'relative', width: 46, height: 46 }}>
                 <Avatar
                   src={counterparty.avatarData || undefined}
                   sx={{
@@ -53,14 +57,15 @@ export function ConversationList({ conversations, currentUser, onOpenConversatio
                     color: PORTRA_COLORS.paper,
                     border: `2px solid ${PORTRA_COLORS.paper}`,
                     boxShadow: `0 0 0 1px ${PORTRA_COLORS.border}`,
-                    fontWeight: 900
+                    fontWeight: 900,
+                    cursor: counterparty.userId ? 'pointer' : 'default'
                   }}
                 >
                   {getSafeDisplayText(counterparty.initial, '对').slice(0, 1)}
                 </Avatar>
                 {needsMyAction && <Box sx={{ position: 'absolute', right: -1, top: -1, width: 10, height: 10, bgcolor: PORTRA_COLORS.orange, border: `2px solid ${PORTRA_COLORS.paper}`, borderRadius: '50%' }} />}
               </Box>
-              <Stack spacing={0.5} sx={{ minWidth: 0 }}>
+              <Stack spacing={0.5} onClick={openCounterpartyProfile} sx={{ minWidth: 0, cursor: counterparty.userId ? 'pointer' : 'default' }}>
                 <Typography fontWeight={900} color={PORTRA_COLORS.ink} noWrap>
                   {getSafeDisplayText(counterparty.nickname, '对方用户')}
                 </Typography>

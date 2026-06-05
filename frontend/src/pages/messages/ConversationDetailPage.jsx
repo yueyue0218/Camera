@@ -37,12 +37,6 @@ import {
   validateQuoteForm
 } from './utils/quoteUtils.js'
 
-function openUserProfile(userId) {
-  const id = Number(userId)
-  if (!id) return
-  window.open(new URL(`/users/${id}`, window.location.origin).toString(), '_blank', 'noopener,noreferrer')
-}
-
 const DETAIL_SHELL_HEIGHT = {
   xs: 'calc(100dvh - 132px)',
   md: 'calc(100dvh - 98px)'
@@ -446,6 +440,13 @@ export function ConversationDetailPage() {
     setNotice({ type: 'info', text: messages[name] || '该能力暂未接入。' })
   }
 
+  function openUserProfile(userId, event) {
+    event?.stopPropagation()
+    const id = Number(userId)
+    if (!id) return
+    navigate(`/users/${id}`)
+  }
+
   const currentUserId = getCurrentUserId(currentUser)
   const counterparty = getCounterpartyProfile(conversation, currentUser)
   const viewModel = buildConversationWorkbenchViewModel({
@@ -492,7 +493,7 @@ export function ConversationDetailPage() {
             </Tooltip>
             <Avatar
               src={counterparty.avatarData || undefined}
-              onClick={() => conversation && openUserProfile(getOppositeUserId(conversation, currentUserId))}
+              onClick={event => conversation && openUserProfile(getOppositeUserId(conversation, currentUserId), event)}
               sx={{ width: 42, height: 42, bgcolor: PORTRA_COLORS.blue, color: PORTRA_COLORS.paper, cursor: conversation ? 'pointer' : 'default', fontWeight: 900 }}
             >
               {getSafeDisplayText(counterparty.initial, '对').slice(0, 1)}
@@ -571,6 +572,7 @@ export function ConversationDetailPage() {
               setActiveAction('QUOTE_DETAIL')
             }}
             onOpenOrderArchive={() => currentOrder && navigate(`/orders?orderId=${currentOrder.orderId}`)}
+            onOpenUserProfile={userId => openUserProfile(userId)}
             onQuoteFormChange={setQuoteForm}
             onSubmitQuote={createQuote}
             onContentChange={setContent}

@@ -32,7 +32,27 @@ export function formatShortTime(value) {
 
 export function formatTime(value) {
   if (!value) return '刚刚'
-  return new Date(value).toLocaleString('zh-CN', { hour12: false })
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '刚刚'
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  })
+}
+
+export function formatDate(value) {
+  if (!value) return '待确认'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '待确认'
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  })
 }
 
 export function readConversationRecords() {

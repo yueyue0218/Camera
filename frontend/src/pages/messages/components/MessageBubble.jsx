@@ -2,12 +2,25 @@ import { Avatar, Box, Button, Paper, Stack, Typography } from '@mui/material'
 import { formatTime } from '../utils/conversationUtils.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
 
-export function MessageBubble({ message, mine, avatar, avatarText, canSaveSubmittedPhoto, onSaveSubmittedPhoto }) {
+export function MessageBubble({ message, mine, avatar, avatarText, avatarUserId, canSaveSubmittedPhoto, onSaveSubmittedPhoto, onOpenUserProfile }) {
   if (!message) return null
   const isImage = message.messageType === 'IMAGE'
+  const openProfile = event => {
+    event.stopPropagation()
+    if (avatarUserId && typeof onOpenUserProfile === 'function') onOpenUserProfile(avatarUserId)
+  }
+  const avatarSx = {
+    width: 32,
+    height: 32,
+    bgcolor: mine ? PORTRA_COLORS.blue : PORTRA_COLORS.subInk,
+    color: PORTRA_COLORS.paper,
+    fontSize: 13,
+    fontWeight: 900,
+    cursor: avatarUserId ? 'pointer' : 'default'
+  }
   return (
     <Box sx={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: 1 }}>
-      {!mine && <Avatar src={avatar || undefined} sx={{ width: 32, height: 32, bgcolor: PORTRA_COLORS.subInk, color: PORTRA_COLORS.paper, fontSize: 13, fontWeight: 900 }}>{avatarText || '对'}</Avatar>}
+      {!mine && <Avatar src={avatar || undefined} onClick={openProfile} sx={avatarSx}>{avatarText || '对'}</Avatar>}
       <Stack spacing={0.35} alignItems={mine ? 'flex-end' : 'flex-start'} sx={{ maxWidth: { xs: '82%', md: '68%' } }}>
         <Paper
           elevation={0}
@@ -41,7 +54,7 @@ export function MessageBubble({ message, mine, avatar, avatarText, canSaveSubmit
         </Paper>
         <Typography variant="caption" sx={{ px: 0.4, color: PORTRA_COLORS.faintInk, fontSize: 11 }}>{formatTime(message.createdAt)}</Typography>
       </Stack>
-      {mine && <Avatar src={avatar || undefined} sx={{ width: 32, height: 32, bgcolor: PORTRA_COLORS.blue, color: PORTRA_COLORS.paper, fontSize: 13, fontWeight: 900 }}>{avatarText || '我'}</Avatar>}
+      {mine && <Avatar src={avatar || undefined} onClick={openProfile} sx={avatarSx}>{avatarText || '我'}</Avatar>}
     </Box>
   )
 }

@@ -74,6 +74,7 @@ export function MessagesPage() {
         conversations={conversations}
         currentUser={currentUser}
         onOpenConversation={conversationId => navigate(`/messages/${conversationId}`)}
+        onOpenUserProfile={userId => navigate(`/users/${userId}`)}
       />
     </Stack>
   )

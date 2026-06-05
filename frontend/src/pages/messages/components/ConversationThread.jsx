@@ -38,6 +38,7 @@ export function ConversationThread({
   onRejectQuote,
   onOpenQuoteDetail,
   onOpenOrderArchive,
+  onOpenUserProfile,
   onQuoteFormChange,
   onSubmitQuote,
   onContentChange,
@@ -114,8 +115,10 @@ export function ConversationThread({
                 mine={mine}
                 avatar={mine ? currentUser?.avatarData : counterparty.avatarData}
                 avatarText={mine ? (currentUser?.nickname || '我').slice(0, 1) : counterparty.initial}
+                avatarUserId={mine ? currentUserId : counterparty.userId}
                 canSaveSubmittedPhoto={canSaveSubmittedPhoto}
                 onSaveSubmittedPhoto={() => onSaveSubmittedPhoto(message)}
+                onOpenUserProfile={onOpenUserProfile}
               />
             )
           })}

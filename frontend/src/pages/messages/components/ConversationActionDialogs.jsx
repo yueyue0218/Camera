@@ -19,7 +19,7 @@ import {
 } from '@mui/material'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
 import { centToYuan } from '../../../utils/index.js'
-import { formatTime } from '../utils/conversationUtils.js'
+import { formatDate, formatTime } from '../utils/conversationUtils.js'
 import { getPhotoUsageScopeLabel, getQuoteStatusLabel } from '../utils/quoteUtils.js'
 import { StatusChip } from './StatusChip.jsx'
 
@@ -87,7 +87,7 @@ export function ConversationActionDialogs({
                 ['服务内容', getSafeDisplayText(quote.serviceContent, '按双方沟通内容执行')],
                 ['原片/精修', `${quote.originalCount ?? 0} / ${quote.refinedCount ?? 0}`],
                 ['照片用途', getPhotoUsageScopeLabel(quote.photoUsageScope)],
-                ['最晚交付', formatTime(quote.deliveryDeadline)],
+                ['最晚交付', formatDate(quote.deliveryDeadline)],
                 ['备注', getSafeDisplayText(quote.remark, '无额外备注')]
               ]} />
               <Box sx={{ p: 1, bgcolor: PORTRA_COLORS.paperMuted, borderRadius: PORTRA_RADII.control, color: PORTRA_COLORS.mutedInk, fontSize: 14, lineHeight: 1.7 }}>
