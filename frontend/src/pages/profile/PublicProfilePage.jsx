@@ -284,7 +284,7 @@ export function PublicProfilePage() {
         {/* ─── 作品集 / 照片网格 ─── */}
         {userMomentImages.length > 0 && (
           <Box>
-            <Typography fontWeight={700} sx={{ mb: 1 }}>{isProvider ? '作品集' : 'TA 的照片'}</Typography>
+            <Typography fontWeight={700} sx={{ mb: 1 }}>{'TA 的动态'}</Typography>
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 0.5 }}>
               {userMomentImages.map(({ imageData, momentId }) => (
                 <Box

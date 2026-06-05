@@ -512,8 +512,8 @@ export function LoginChoicePage() {
               { label: '我想拍', to: '/login/sign-in' },
               { label: '我来拍', to: '/login/sign-in' },
               { label: '先去看看', to: '/login/sign-in' },
-            ].map(({ label }) => (
-              <button key={label} className={roleActive === label ? 'active' : ''} onClick={() => setRoleActive(label)}>{label}</button>
+            ].map(({ label, to }) => (
+              <button key={label} className={roleActive === label ? 'active' : ''} onClick={() => { setRoleActive(label); navigate(to) }}>{label}</button>
             ))}
           </div>
           <div className="op-edge-text">WAITING FOR THE RIGHT SHUTTER</div>
