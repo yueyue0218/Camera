@@ -26,6 +26,8 @@ import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import SendRoundedIcon from '@mui/icons-material/SendRounded'
 import WorkRoundedIcon from '@mui/icons-material/WorkRounded'
+import MaleIcon from '@mui/icons-material/Male'
+import FemaleIcon from '@mui/icons-material/Female'
 import { useAuth } from '../../AuthContext.jsx'
 import {
   centToYuan,
@@ -35,7 +37,8 @@ import {
   momentApi,
   orderApi,
   readFileAsDataUrl,
-  reviewApi
+  reviewApi,
+  userApi
 } from '../../api.js'
 import { EmptyCard } from './components/EmptyCard.jsx'
 import { PortfolioGrid } from './components/PortfolioGrid.jsx'
@@ -59,6 +62,23 @@ import {
   saveOrderSnapshots,
   saveUserProfile
 } from './utils/profileUtils.js'
+
+function imageFileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width
+      canvas.height = img.height
+      canvas.getContext('2d').drawImage(img, 0, 0)
+      resolve(canvas.toDataURL('image/jpeg', 0.9))
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片加载失败')) }
+    img.src = url
+  })
+}
 
 export function ProfilePage() {
   const navigate = useNavigate()
@@ -150,13 +170,16 @@ export function ProfilePage() {
     const file = event.target.files?.[0]
     if (!file) return
     try {
-      setProfileForm({ ...profileForm, avatarData: await readFileAsDataUrl(file) })
+      const avatarData = await imageFileToDataUrl(file)
+      setProfileForm(prev => ({ ...prev, avatarData }))
+      updateProfile({ avatarData })
+      setNotice({ type: 'success', text: '头像已更新' })
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }
   }
 
-  function saveProfile() {
+  async function saveProfile() {
     const nextProfile = {
       nickname: profileForm.nickname.trim() || currentUser.nickname || currentUser.label,
       avatarData: profileForm.avatarData,
@@ -167,6 +190,11 @@ export function ProfilePage() {
     }
     saveUserProfile(currentUser.userId, nextProfile)
     updateProfile(nextProfile)
+    try {
+      await userApi.updateMe({ nickname: nextProfile.nickname, bio: nextProfile.bio }, currentUser)
+    } catch {
+      // 后端不可用时仅本地保存，不阻断流程
+    }
     setNotice({ type: 'success', text: '个人资料已更新' })
   }
 
@@ -392,6 +420,13 @@ export function ProfilePage() {
               >
                 {(profileForm.nickname || currentUser.label).slice(0, 1)}
               </Avatar>
+              <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+                <Typography variant="subtitle1" fontWeight={800}>
+                  {profileForm.nickname || currentUser.label}
+                </Typography>
+                {currentUser.gender === 'MALE' && <MaleIcon sx={{ color: '#1976d2', fontSize: 18 }} />}
+                {currentUser.gender === 'FEMALE' && <FemaleIcon sx={{ color: '#e91e63', fontSize: 18 }} />}
+              </Stack>
               <ProfileMetrics stats={profileStats} compact />
             </Stack>
             <Stack spacing={1} sx={{ flex: 1, width: '100%' }}>

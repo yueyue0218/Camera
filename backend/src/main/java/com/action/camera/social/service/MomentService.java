@@ -340,9 +340,6 @@ public class MomentService {
     }
 
     private String validateImageData(String imageData) {
-        if (imageData.length() > 2048) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "动态图片数据不能超过2048个字符");
-        }
         return imageData;
     }
 

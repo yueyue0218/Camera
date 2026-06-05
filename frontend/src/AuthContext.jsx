@@ -78,7 +78,7 @@ function normalizeSession(session) {
       role,
       label: role === 'PROVIDER' ? '服务方' : '需求方',
       nickname: session.user.nickname || storedProfile.nickname || demoUser.nickname,
-      avatarData: session.user.avatarData || storedProfile.avatarData || demoUser.avatarData,
+      avatarData: storedProfile.avatarData || session.user.avatarData || demoUser.avatarData,
       bio,
       description: bio,
       availability

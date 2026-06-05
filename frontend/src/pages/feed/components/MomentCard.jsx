@@ -8,6 +8,7 @@ import { MentionChip } from './MentionChip.jsx'
 export function MomentCard({
   moment,
   currentUser,
+  authorProfile,
   isFollowing,
   onOpenMoment,
   onOpenProfile,
@@ -17,6 +18,9 @@ export function MomentCard({
   onFollow,
   onDelete
 }) {
+  const displayName = authorProfile?.nickname || `${roleMap[moment.authorRole] || '用户'} ${moment.authorId}`
+  const avatarSrc = authorProfile?.avatarData || undefined
+
   return (
     <Card variant="outlined">
       {moment.imageData && (
@@ -33,13 +37,14 @@ export function MomentCard({
         <Stack spacing={1.2}>
           <Stack direction="row" alignItems="center" spacing={1}>
             <Avatar
+              src={avatarSrc}
               onClick={() => onOpenProfile(moment.authorId)}
               sx={{ cursor: 'pointer' }}
             >
-              {roleMap[moment.authorRole]?.slice(0, 1) || '用'}
+              {displayName.slice(0, 1)}
             </Avatar>
             <Box sx={{ cursor: 'pointer' }} onClick={() => onOpenProfile(moment.authorId)}>
-              <Typography fontWeight={800}>{roleMap[moment.authorRole] || '用户'} {moment.authorId}</Typography>
+              <Typography fontWeight={800}>{displayName}</Typography>
               <Typography color="text.secondary" variant="body2">{formatTime(moment.createdAt)}</Typography>
             </Box>
           </Stack>
@@ -68,9 +73,11 @@ export function MomentCard({
         <Button size="small" onClick={() => onFavorite(moment.momentId)}>
           {moment.favoritedByCurrentUser ? '已收藏' : '收藏'} {moment.favoriteCount || 0}
         </Button>
-        <Button size="small" onClick={() => onFollow(moment.authorId)}>
-          {isFollowing(moment.authorId) ? '已关注' : '关注作者'}
-        </Button>
+        {Number(moment.authorId) !== currentUser.userId && (
+          <Button size="small" onClick={() => onFollow(moment.authorId)}>
+            {isFollowing(moment.authorId) ? '已关注' : '关注作者'}
+          </Button>
+        )}
         <Button size="small" onClick={() => onOpenMoment(moment.momentId)}>详情</Button>
         {Number(moment.authorId) === currentUser.userId && (
           <Button size="small" color="error" startIcon={<DeleteRoundedIcon />} onClick={() => onDelete(moment.momentId)}>

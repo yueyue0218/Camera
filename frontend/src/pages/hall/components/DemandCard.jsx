@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { fileApi } from '../../../api/fileApi.js'
 import { cityName, demandStatusText, firstText, fullDateTime, moneyRange, readableDate, splitTags, timeTagLabel } from './hallUtils.js'
 
-export function DemandCard({ demand, currentUser, onOpen, onDetail, onRespond }) {
+export function DemandCard({ demand, currentUser, onOpen, onDetail, onRespond, onOpenPublisher }) {
   const tags = splitTags(demand.serviceTypes).length ? splitTags(demand.serviceTypes) : splitTags(demand.styleTags)
   const timeTags = splitTags(demand.timeTags)
   const title = firstText(demand.title, demand.scene)
@@ -48,7 +48,11 @@ export function DemandCard({ demand, currentUser, onOpen, onDetail, onRespond })
           {timeTags[0] ? timeTagLabel(timeTags[0]) : (demandStatusText[demand.status] || demand.status || '暂无')}
         </span>
       </div>
-      <div className="publisher-row">
+      <div
+        className="publisher-row"
+        onClick={onOpenPublisher ? e => { e.stopPropagation(); onOpenPublisher() } : undefined}
+        style={onOpenPublisher ? { cursor: 'pointer' } : undefined}
+      >
         {customerAvatar && <span className="publisher-avatar" style={{ '--avatar-art': `url(${customerAvatar})` }} aria-hidden="true" />}
         <span>{customerName || '暂无发布者'}</span>
       </div>

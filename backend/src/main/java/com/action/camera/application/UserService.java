@@ -7,6 +7,7 @@ import com.action.camera.common.security.UserRole;
 import com.action.camera.domain.User;
 import com.action.camera.dto.LoginResponse;
 import com.action.camera.dto.SwitchRoleResponse;
+import com.action.camera.dto.UpdateProfileRequest;
 import com.action.camera.dto.UserBriefResponse;
 import com.action.camera.dto.UserProfileResponse;
 import com.action.camera.provider.entity.ProviderProfile;
@@ -146,5 +147,18 @@ public class UserService {
         user.setCurrentRole(targetRole.name());
         userRepository.save(user);
         return new SwitchRoleResponse(user.getId(), user.getCurrentRole(), user.getNickname());
+    }
+
+    @Transactional
+    public void updateMyProfile(Long userId, UpdateProfileRequest req) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
+        if (req.getNickname() != null && !req.getNickname().isBlank()) {
+            user.setNickname(req.getNickname().trim());
+        }
+        if (req.getBio() != null) {
+            user.setBio(req.getBio().trim());
+        }
+        userRepository.save(user);
     }
 }
