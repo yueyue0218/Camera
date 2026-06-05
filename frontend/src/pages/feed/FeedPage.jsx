@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Box, Alert, Stack } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
 import { USERS, useAuth } from '../../AuthContext.jsx'
-import { momentApi, readFileAsDataUrl, userApi } from '../../api.js'
+import { momentApi, compressImageToDataUrl, userApi } from '../../api.js'
 import { EmptyFeedCard } from './components/EmptyFeedCard.jsx'
 import { FeedSectionHeader } from './components/FeedSectionHeader.jsx'
 import { FeedToolbar } from './components/FeedToolbar.jsx'
@@ -94,7 +94,7 @@ export function FeedPage() {
     const file = event.target.files?.[0]
     if (!file) return
     try {
-      setImageData(await readFileAsDataUrl(file))
+      setImageData(await compressImageToDataUrl(file))
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }
