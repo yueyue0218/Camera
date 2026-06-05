@@ -167,6 +167,7 @@ export function deriveConversationActions({
   const hasConfirmedQuote = quotes.some(quote => quote.status === 'CONFIRMED' || getQuoteOrderId(quote))
   const beforeShootStart = isBeforeShootStart(order)
   const canUseFormalQuote = Boolean(conversation && !conversation.isLocal && getBackendConversationId(conversation))
+  const hasOrderId = Boolean(normalizeActorId(order?.orderId))
   const cancelAction = role === 'CUSTOMER' && order?.status === 'PENDING_PAYMENT'
     ? {
         label: '取消订单',
@@ -208,8 +209,8 @@ export function deriveConversationActions({
       && authorizations.some(authorization => authorization?.status === 'PENDING'),
     canViewDispute: !stage.roleMismatch && order?.status === 'APPEALING',
     canAppeal: !stage.roleMismatch && Boolean(order) && !['CANCELLED', 'REFUNDED', 'APPEALING'].includes(order.status),
-    canOpenOrder: !stage.roleMismatch && Boolean(order),
-    canOpenOrderArchive: !stage.roleMismatch && Boolean(order),
+    canOpenOrder: !stage.roleMismatch && hasOrderId,
+    canOpenOrderArchive: !stage.roleMismatch && hasOrderId,
     deliveries,
     statusLogs
   }

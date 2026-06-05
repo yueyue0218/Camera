@@ -90,8 +90,8 @@ export function ConversationWorkbenchPanel({
                 申请平台协助
               </Button>
             )}
-            {actions.canViewDispute && (
-              <Button size="small" variant="outlined" color="inherit" onClick={onOpenOrderArchive} sx={{ alignSelf: 'flex-start' }}>
+            {actions.canViewDispute && order?.orderId && (
+              <Button size="small" variant="outlined" color="inherit" onClick={() => onOpenOrderArchive(order.orderId)} sx={{ alignSelf: 'flex-start' }}>
                 查看争议进展
               </Button>
             )}
@@ -116,9 +116,11 @@ export function ConversationWorkbenchPanel({
             <Typography color="text.secondary" variant="body2">
               {centToYuan(order.amountCent)} · {formatTime(order.shootStartTime)}
             </Typography>
-            <Button variant="text" color="inherit" size="small" startIcon={<ReceiptLongRoundedIcon />} onClick={onOpenOrderArchive} sx={{ alignSelf: 'flex-start', px: 0 }}>
-              查看订单档案
-            </Button>
+            {order.orderId && (
+              <Button variant="text" color="inherit" size="small" startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenOrderArchive(order.orderId)} sx={{ alignSelf: 'flex-start', px: 0 }}>
+                查看订单档案
+              </Button>
+            )}
           </WorkbenchSection>
         )}
 

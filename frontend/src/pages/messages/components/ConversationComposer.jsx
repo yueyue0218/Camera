@@ -24,6 +24,7 @@ export function ConversationComposer({
   quoteActionLabel = '发送报价',
   quoteEntryHint = '',
   actions,
+  orderId,
   onOpenQuoteForm,
   onStartQuoteEditing,
   onConfirmQuote,
@@ -40,6 +41,11 @@ export function ConversationComposer({
   onOpenAction
 }) {
   const pendingQuote = actions.pendingQuote
+  const canOpenOrderArchive = Boolean(orderId && typeof onOpenOrderArchive === 'function')
+  const openOrderArchive = event => {
+    event?.stopPropagation()
+    if (canOpenOrderArchive) onOpenOrderArchive(orderId)
+  }
   const hasQuickActions = Boolean(
     actions.canSendQuote
     || actions.canEditQuote
@@ -140,13 +146,13 @@ export function ConversationComposer({
                   处理授权
                 </Button>
               )}
-              {actions.canViewDispute && (
-                <Button size="small" variant="outlined" color="inherit" onClick={onOpenOrderArchive}>
+              {actions.canViewDispute && canOpenOrderArchive && (
+                <Button size="small" variant="outlined" color="inherit" onClick={openOrderArchive}>
                   查看争议进展
                 </Button>
               )}
-              {actions.canOpenOrder && (
-                <Button size="small" variant="text" color="inherit" startIcon={<ReceiptLongRoundedIcon />} onClick={onOpenOrderArchive}>
+              {actions.canOpenOrder && canOpenOrderArchive && (
+                <Button data-message-order-entry="composer-primary" size="small" variant="text" color="inherit" startIcon={<ReceiptLongRoundedIcon />} onClick={openOrderArchive}>
                   查看订单
                 </Button>
               )}
@@ -163,8 +169,8 @@ export function ConversationComposer({
           <MessageToolbarButton title="附件" onClick={() => onUnavailableTool('附件')}><AttachFileRoundedIcon fontSize="small" /></MessageToolbarButton>
           <MessageToolbarButton title="表情" onClick={() => onUnavailableTool('表情')}><EmojiEmotionsRoundedIcon fontSize="small" /></MessageToolbarButton>
           <MessageToolbarButton title="补款" onClick={() => onUnavailableTool('补款')}><AccountBalanceWalletRoundedIcon fontSize="small" /></MessageToolbarButton>
-          {actions.canOpenOrder && (
-            <MessageToolbarButton title="订单档案" onClick={onOpenOrderArchive}><ReceiptLongRoundedIcon fontSize="small" /></MessageToolbarButton>
+          {actions.canOpenOrder && canOpenOrderArchive && (
+            <MessageToolbarButton title="订单档案" data-message-order-entry="composer-toolbar" onClick={openOrderArchive}><ReceiptLongRoundedIcon fontSize="small" /></MessageToolbarButton>
           )}
           {actions.canAppeal && (
             <MessageToolbarButton title="平台协助" onClick={() => onUnavailableTool('平台协助')}><SupportAgentRoundedIcon fontSize="small" /></MessageToolbarButton>

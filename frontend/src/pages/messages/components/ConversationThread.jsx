@@ -184,6 +184,7 @@ export function ConversationThread({
           quoteActionLabel={quoteActionLabel}
           quoteEntryHint={quoteEntryHint && canSeeQuoteEntry && !showQuoteForm ? quoteEntryHint : ''}
           actions={actions}
+          orderId={order?.orderId}
           onOpenQuoteForm={onOpenQuoteForm}
           onStartQuoteEditing={onStartQuoteEditing}
           onConfirmQuote={onConfirmQuote}

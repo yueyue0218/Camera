@@ -5,6 +5,7 @@ import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { conversationApi, deliveryApi, orderApi, photoAuthorizationApi, quoteApi, readFileAsDataUrl } from '../../api.js'
+import { buildOrderNavigationTarget } from '../../utils/orderNavigation.js'
 import { ConversationThread } from './components/ConversationThread.jsx'
 import { ConversationWorkbenchPanel } from './components/ConversationWorkbenchPanel.jsx'
 import { ConversationActionDialogs } from './components/ConversationActionDialogs.jsx'
@@ -448,12 +449,13 @@ export function ConversationDetailPage() {
   }
 
   function openOrderArchive(orderId = currentOrder?.orderId) {
-    const id = Number(orderId)
-    if (!id) {
+    const target = buildOrderNavigationTarget(orderId || currentOrder?.orderId)
+    if (!target) {
       setNotice({ type: 'warning', text: '订单信息暂时不可用，请稍后刷新后再查看。' })
-      return
+      return false
     }
-    navigate(`/orders?orderId=${id}`)
+    navigate(target.to, { state: target.state })
+    return true
   }
 
   const currentUserId = getCurrentUserId(currentUser)
@@ -540,7 +542,7 @@ export function ConversationDetailPage() {
               color="inherit"
               startIcon={<ReceiptLongRoundedIcon />}
               onClick={() => openOrderArchive(currentOrder?.orderId)}
-              disabled={!currentOrder}
+              disabled={!currentOrder?.orderId}
             >
               订单档案
             </Button>

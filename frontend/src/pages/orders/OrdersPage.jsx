@@ -35,6 +35,7 @@ import {
   reviewApi,
   reviewComplaintApi
 } from '../../api.js'
+import { normalizeOrderId } from '../../utils/orderNavigation.js'
 import { centToYuan } from '../../utils/index.js'
 import {
   canCustomerConfirm,
@@ -235,11 +236,10 @@ export function OrdersPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { currentUser } = useAuth()
-  const queryOrderId = useMemo(() => {
+  const focusOrderId = useMemo(() => {
     const value = new URLSearchParams(location.search).get('orderId')
-    const id = Number(value)
-    return Number.isFinite(id) && id > 0 ? id : null
-  }, [location.search])
+    return normalizeOrderId(location.state?.orderId) || normalizeOrderId(value)
+  }, [location.search, location.state])
   const [orders, setOrders] = useState([])
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [statusLogs, setStatusLogs] = useState([])
@@ -264,8 +264,8 @@ export function OrdersPage() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    loadOrders(queryOrderId)
-  }, [currentUser.userId, currentUser.role, statusFilter, queryOrderId])
+    loadOrders(focusOrderId)
+  }, [currentUser.userId, currentUser.role, statusFilter, focusOrderId])
 
   async function run(action, successText) {
     setLoading(true)
@@ -318,8 +318,8 @@ export function OrdersPage() {
   }
 
   async function openOrder(orderOrId, updateUrl = true) {
-    const orderId = Number(typeof orderOrId === 'object' ? orderOrId.orderId : orderOrId)
-    if (!Number.isFinite(orderId) || orderId <= 0) {
+    const orderId = normalizeOrderId(typeof orderOrId === 'object' ? orderOrId.orderId : orderOrId)
+    if (!orderId) {
       setNotice({ type: 'warning', text: '订单信息暂时不可用，请刷新后重试。' })
       return false
     }
@@ -355,7 +355,7 @@ export function OrdersPage() {
     setArbitrations(complaints)
     setShowReviewForm(false)
     setShowArbitrationForm(false)
-    if (updateUrl) navigate(`/orders?orderId=${orderId}`, { replace: true })
+    if (updateUrl) navigate(`/orders?orderId=${orderId}`, { replace: true, state: { orderId } })
     return true
   }
 
