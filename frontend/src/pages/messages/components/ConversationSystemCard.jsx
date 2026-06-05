@@ -138,22 +138,23 @@ function EventActionButton({
   onUnavailableTool
 }) {
   const common = { size: 'small', disabled: loading }
-  if (action === 'EDIT_QUOTE') return <Button {...common} variant="outlined" startIcon={<LocalOfferRoundedIcon />} onClick={() => onStartQuoteEditing(quote)}>编辑报价</Button>
-  if (action === 'CONFIRM_QUOTE') return <Button {...common} variant="contained" onClick={() => onConfirmQuote(quote)}>确认报价</Button>
-  if (action === 'REJECT_QUOTE') return <Button {...common} variant="outlined" color="inherit" onClick={() => onRejectQuote(quote)}>拒绝报价</Button>
-  if (action === 'PAY') return <Button {...common} variant="contained" startIcon={<PaidRoundedIcon />} onClick={onPayOrder}>去支付</Button>
-  if (action === 'CANCEL') return <Button {...common} variant="outlined" onClick={() => onCancelOrder(cancelAction)} sx={{ color: PORTRA_COLORS.orange, borderColor: PORTRA_COLORS.orange }}>{cancelAction?.label || '取消订单'}</Button>
-  if (action === 'CONFIRM_DELIVERY') return <Button {...common} variant="contained" startIcon={<CheckCircleRoundedIcon />} onClick={onConfirmOrder}>确认接收</Button>
-  if (action === 'REQUEST_REWORK') return <Button {...common} variant="outlined" color="inherit" startIcon={<RefreshRoundedIcon />} onClick={() => onOpenAction('REQUEST_REWORK')}>提交返修</Button>
+  if (action === 'EDIT_QUOTE' && quote && typeof onStartQuoteEditing === 'function') return <Button {...common} variant="outlined" startIcon={<LocalOfferRoundedIcon />} onClick={() => onStartQuoteEditing(quote)}>编辑报价</Button>
+  if (action === 'CONFIRM_QUOTE' && quote && typeof onConfirmQuote === 'function') return <Button {...common} variant="contained" onClick={() => onConfirmQuote(quote)}>确认报价</Button>
+  if (action === 'REJECT_QUOTE' && quote && typeof onRejectQuote === 'function') return <Button {...common} variant="outlined" color="inherit" onClick={() => onRejectQuote(quote)}>拒绝报价</Button>
+  if (action === 'PAY' && typeof onPayOrder === 'function') return <Button {...common} variant="contained" startIcon={<PaidRoundedIcon />} onClick={onPayOrder}>去支付</Button>
+  if (action === 'CANCEL' && cancelAction && typeof onCancelOrder === 'function') return <Button {...common} variant="outlined" onClick={() => onCancelOrder(cancelAction)} sx={{ color: PORTRA_COLORS.orange, borderColor: PORTRA_COLORS.orange }}>{cancelAction?.label || '取消订单'}</Button>
+  if (action === 'CONFIRM_DELIVERY' && typeof onConfirmOrder === 'function') return <Button {...common} variant="contained" startIcon={<CheckCircleRoundedIcon />} onClick={onConfirmOrder}>确认接收</Button>
+  if (action === 'REQUEST_REWORK' && typeof onOpenAction === 'function') return <Button {...common} variant="outlined" color="inherit" startIcon={<RefreshRoundedIcon />} onClick={() => onOpenAction('REQUEST_REWORK')}>提交返修</Button>
   if (action === 'UPLOAD_DELIVERY' || action === 'REUPLOAD_DELIVERY') {
+    if (typeof onOpenAction !== 'function') return null
     return <Button {...common} variant="contained" startIcon={<UploadRoundedIcon />} onClick={() => onOpenAction(action)}>{action === 'REUPLOAD_DELIVERY' ? '重新上传作品' : '上传作品'}</Button>
   }
-  if (action === 'REQUEST_AUTHORIZATION') return <Button {...common} variant="outlined" onClick={() => onOpenAction('REQUEST_AUTHORIZATION')}>申请照片授权</Button>
-  if (action === 'APPROVE_AUTHORIZATION') return <Button {...common} variant="contained" startIcon={<CheckCircleRoundedIcon />} onClick={() => onDecidePhotoAuthorization(authorization, 'approve')}>同意展示</Button>
-  if (action === 'REJECT_AUTHORIZATION') return <Button {...common} variant="outlined" color="inherit" startIcon={<CloseRoundedIcon />} onClick={() => onDecidePhotoAuthorization(authorization, 'reject')}>拒绝展示</Button>
-  if (action === 'PLATFORM_ASSISTANCE') return <Button {...common} variant="text" color="inherit" onClick={() => onUnavailableTool('平台协助')}>申请平台协助</Button>
-  if (action === 'VIEW_DISPUTE') return <Button {...common} variant="outlined" color="inherit" startIcon={<ReceiptLongRoundedIcon />} onClick={onOpenOrderArchive}>查看订单档案</Button>
-  if (action === 'OPEN_ORDER') return <Button {...common} variant="outlined" color="inherit" startIcon={<ReceiptLongRoundedIcon />} onClick={onOpenOrderArchive}>查看订单档案</Button>
+  if (action === 'REQUEST_AUTHORIZATION' && typeof onOpenAction === 'function') return <Button {...common} variant="outlined" onClick={() => onOpenAction('REQUEST_AUTHORIZATION')}>申请照片授权</Button>
+  if (action === 'APPROVE_AUTHORIZATION' && authorization && typeof onDecidePhotoAuthorization === 'function') return <Button {...common} variant="contained" startIcon={<CheckCircleRoundedIcon />} onClick={() => onDecidePhotoAuthorization(authorization, 'approve')}>同意展示</Button>
+  if (action === 'REJECT_AUTHORIZATION' && authorization && typeof onDecidePhotoAuthorization === 'function') return <Button {...common} variant="outlined" color="inherit" startIcon={<CloseRoundedIcon />} onClick={() => onDecidePhotoAuthorization(authorization, 'reject')}>拒绝展示</Button>
+  if (action === 'PLATFORM_ASSISTANCE' && typeof onUnavailableTool === 'function') return <Button {...common} variant="text" color="inherit" onClick={() => onUnavailableTool('平台协助')}>申请平台协助</Button>
+  if (action === 'VIEW_DISPUTE' && typeof onOpenOrderArchive === 'function') return <Button {...common} variant="outlined" color="inherit" startIcon={<ReceiptLongRoundedIcon />} onClick={onOpenOrderArchive}>查看订单档案</Button>
+  if (action === 'OPEN_ORDER' && typeof onOpenOrderArchive === 'function') return <Button {...common} variant="outlined" color="inherit" startIcon={<ReceiptLongRoundedIcon />} onClick={onOpenOrderArchive}>查看订单档案</Button>
   return null
 }
 

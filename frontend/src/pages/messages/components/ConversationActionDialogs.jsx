@@ -51,6 +51,11 @@ export function ConversationActionDialogs({
   onSubmitRework,
   onSubmitPhotoAuthorization
 }) {
+  const safeDeliveryForm = deliveryForm || { file: null, remark: '' }
+  const safePhotoAuthorizationForm = {
+    fileIds: Array.isArray(photoAuthorizationForm?.fileIds) ? photoAuthorizationForm.fileIds : [],
+    remark: photoAuthorizationForm?.remark || ''
+  }
   const deliveryFiles = (Array.isArray(deliveryRecords) ? deliveryRecords : [])
     .filter(record => record.fileId)
     .map(record => ({
@@ -60,6 +65,7 @@ export function ConversationActionDialogs({
 
   async function submitAndClose(handler, event) {
     event.preventDefault()
+    if (typeof handler !== 'function') return
     const succeeded = await handler(event)
     if (succeeded) onClose()
   }
@@ -152,10 +158,10 @@ export function ConversationActionDialogs({
               选择作品文件
               <input hidden type="file" onChange={event => onDeliveryFileChange(event.target.files?.[0] || null)} />
             </Button>
-            <Typography color="text.secondary" variant="body2">{deliveryForm?.file ? getSafeDisplayText(deliveryForm.file.name, '已选择作品文件') : '尚未选择文件'}</Typography>
+            <Typography color="text.secondary" variant="body2">{safeDeliveryForm.file ? getSafeDisplayText(safeDeliveryForm.file.name, '已选择作品文件') : '尚未选择文件'}</Typography>
             <TextField
               label="交付说明"
-              value={deliveryForm?.remark || ''}
+              value={safeDeliveryForm.remark}
               onChange={event => onDeliveryRemarkChange(event.target.value)}
               multiline
               minRows={3}
@@ -165,7 +171,7 @@ export function ConversationActionDialogs({
         </DialogContent>
         <DialogActions sx={dialogActionsSx}>
           <Button color="inherit" variant="text" onClick={onClose}>取消</Button>
-          <Button type="submit" form="delivery-dialog-form" variant="contained" disabled={loading || !deliveryForm?.file}>
+          <Button type="submit" form="delivery-dialog-form" variant="contained" disabled={loading || !safeDeliveryForm.file}>
             {activeAction === 'REUPLOAD_DELIVERY' ? '上传返修作品' : '上传作品'}
           </Button>
         </DialogActions>
@@ -203,7 +209,7 @@ export function ConversationActionDialogs({
               <Select
                 multiple
                 label="选择已交付作品"
-                value={photoAuthorizationForm?.fileIds || []}
+                value={safePhotoAuthorizationForm.fileIds}
                 onChange={event => {
                   const value = event.target.value
                   onPhotoAuthorizationFileIdsChange((typeof value === 'string' ? value.split(',') : value).map(Number))
@@ -215,7 +221,7 @@ export function ConversationActionDialogs({
             </FormControl>
             <TextField
               label="申请说明"
-              value={photoAuthorizationForm?.remark || ''}
+              value={safePhotoAuthorizationForm.remark}
               onChange={event => onPhotoAuthorizationRemarkChange(event.target.value)}
               multiline
               minRows={3}
@@ -225,17 +231,17 @@ export function ConversationActionDialogs({
         </DialogContent>
         <DialogActions sx={dialogActionsSx}>
           <Button color="inherit" variant="text" onClick={onClose}>取消</Button>
-          <Button type="submit" form="authorization-dialog-form" variant="contained" disabled={loading || !(photoAuthorizationForm?.fileIds || []).length}>提交申请</Button>
+          <Button type="submit" form="authorization-dialog-form" variant="contained" disabled={loading || !safePhotoAuthorizationForm.fileIds.length}>提交申请</Button>
         </DialogActions>
       </Dialog>
     </>
   )
 }
 
-function DetailRows({ rows }) {
+function DetailRows({ rows = [] }) {
   return (
     <Stack spacing={0.7}>
-      {rows.map(([label, value]) => (
+      {(Array.isArray(rows) ? rows : []).map(([label, value]) => (
         <Stack key={label} direction="row" spacing={1.2} alignItems="flex-start">
           <Typography variant="caption" sx={{ width: 76, flexShrink: 0, color: PORTRA_COLORS.faintInk, fontWeight: 900 }}>{label}</Typography>
           <Typography variant="body2" sx={{ color: PORTRA_COLORS.subInk, lineHeight: 1.65 }}>{value}</Typography>

@@ -118,7 +118,7 @@ export function ConversationThread({
             const canSaveSubmittedPhoto = isImage && Number(message.senderId) === Number(conversation?.participantBId)
             return (
               <MessageBubble
-                key={message.messageId}
+                key={message.messageId || item.key}
                 message={message}
                 mine={mine}
                 avatar={mine ? currentUser?.avatarData : counterparty.avatarData}
