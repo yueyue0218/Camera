@@ -15,17 +15,20 @@ import com.action.camera.review.entity.Review;
 import com.action.camera.review.entity.ReviewComplaint;
 import com.action.camera.review.repository.ReviewComplaintRepository;
 import com.action.camera.review.repository.ReviewRepository;
+import com.action.camera.review.port.EvidenceFileMetadata;
+import com.action.camera.review.port.EvidenceFileQueryPort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class ReviewComplaintService {
 
     private static final String PENDING = "PENDING";
-    private static final String PROCESSING = "PROCESSING";
     private static final String RESOLVED = "RESOLVED";
     private static final String CANCELED = "CANCELED";
 
@@ -33,29 +36,32 @@ public class ReviewComplaintService {
     private static final String REVIEW_HIDDEN = "REVIEW_HIDDEN";
 
     private static final String ADMIN = "ADMIN";
-    private static final String ARBITRATOR = "ARBITRATOR";
 
     private static final String TYPE_COMPLAINT_CREATED = "REVIEW_COMPLAINT_CREATED";
     private static final String TYPE_COMPLAINT_RESOLVED = "REVIEW_COMPLAINT_RESOLVED";
     private static final String RELATED_REVIEW_COMPLAINT = "REVIEW_COMPLAINT";
     private static final String CREDIT_EVENT_REVIEW_ARBITRATION = "REVIEW_ARBITRATION";
+    private static final int MAX_EVIDENCE_FILE_COUNT = 5;
 
     private final ReviewComplaintRepository complaintRepository;
     private final ReviewRepository reviewRepository;
     private final UserRepository userRepository;
     private final CreditService creditService;
     private final NotificationService notificationService;
+    private final EvidenceFileQueryPort evidenceFileQueryPort;
 
     public ReviewComplaintService(ReviewComplaintRepository complaintRepository,
                                   ReviewRepository reviewRepository,
                                   UserRepository userRepository,
                                   CreditService creditService,
-                                  NotificationService notificationService) {
+                                  NotificationService notificationService,
+                                  EvidenceFileQueryPort evidenceFileQueryPort) {
         this.complaintRepository = complaintRepository;
         this.reviewRepository = reviewRepository;
         this.userRepository = userRepository;
         this.creditService = creditService;
         this.notificationService = notificationService;
+        this.evidenceFileQueryPort = evidenceFileQueryPort;
     }
 
     @Transactional
@@ -72,18 +78,19 @@ public class ReviewComplaintService {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Review is already hidden");
         }
         if (complaintRepository.existsByReviewIdAndComplainantIdAndStatusIn(
-                reviewId, currentUserId, List.of(PENDING, PROCESSING))) {
+                reviewId, currentUserId, List.of(PENDING))) {
             throw new BusinessException(ErrorCode.DUPLICATE_OPERATION, "Complaint already exists");
         }
 
         LocalDateTime now = LocalDateTime.now();
+        String evidenceFileIds = normalizeEvidenceFileIds(request.evidenceFileIds(), currentUserId);
         ReviewComplaint complaint = new ReviewComplaint();
         complaint.setReviewId(review.getId());
         complaint.setOrderId(review.getOrderId());
         complaint.setComplainantId(currentUserId);
         complaint.setRespondentId(review.getReviewerId());
         complaint.setReason(request.reason().trim());
-        complaint.setEvidenceFileIds(trimToNull(request.evidenceFileIds()));
+        complaint.setEvidenceFileIds(evidenceFileIds);
         complaint.setStatus(PENDING);
         complaint.setCreatedAt(now);
         complaint.setUpdatedAt(now);
@@ -91,11 +98,19 @@ public class ReviewComplaintService {
         ReviewComplaint savedComplaint = complaintRepository.save(complaint);
         notificationService.createNotification(new NotificationCreateRequest(
                 review.getReviewerId(),
+                currentUserId,
                 "Review complaint submitted",
                 "A complaint has been submitted for your review.",
                 TYPE_COMPLAINT_CREATED,
+                TYPE_COMPLAINT_CREATED,
                 RELATED_REVIEW_COMPLAINT,
-                savedComplaint.getId()
+                savedComplaint.getId(),
+                RELATED_REVIEW_COMPLAINT,
+                savedComplaint.getId(),
+                RELATED_REVIEW_COMPLAINT,
+                savedComplaint.getId(),
+                "review-complaint:created:" + savedComplaint.getId(),
+                null
         ));
 
         return toResponse(savedComplaint);
@@ -112,11 +127,11 @@ public class ReviewComplaintService {
     @Transactional(readOnly = true)
     public ReviewComplaintResponse detail(Long complaintId) {
         Long currentUserId = requireCurrentUserId();
-        ReviewComplaint complaint = complaintRepository.findById(complaintId)
+        ReviewComplaint complaint = complaintRepository.findByIdForUpdate(complaintId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Complaint not found"));
         if (!currentUserId.equals(complaint.getComplainantId())
                 && !currentUserId.equals(complaint.getRespondentId())
-                && !isArbitrator(currentUserId)) {
+                && !isAdmin(currentUserId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "No permission to view complaint");
         }
         return toResponse(complaint);
@@ -129,7 +144,7 @@ public class ReviewComplaintService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Review not found"));
         if (!currentUserId.equals(review.getReviewerId())
                 && !currentUserId.equals(review.getTargetUserId())
-                && !isArbitrator(currentUserId)) {
+                && !isAdmin(currentUserId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "No permission to view complaints");
         }
         return complaintRepository.findByReviewIdOrderByCreatedAtDesc(reviewId).stream()
@@ -139,7 +154,7 @@ public class ReviewComplaintService {
 
     @Transactional(readOnly = true)
     public List<ReviewComplaintResponse> listForArbitration(String status) {
-        requireArbitrator(requireCurrentUserId());
+        requireAdmin(requireCurrentUserId());
         if (isBlank(status)) {
             return complaintRepository.findAllByOrderByCreatedAtDesc().stream()
                     .map(this::toResponse)
@@ -169,12 +184,12 @@ public class ReviewComplaintService {
     @Transactional
     public ReviewComplaintResponse arbitrate(Long complaintId, ReviewComplaintArbitrateRequest request) {
         Long currentUserId = requireCurrentUserId();
-        requireArbitrator(currentUserId);
+        requireAdmin(currentUserId);
         validateArbitrateRequest(request);
 
         ReviewComplaint complaint = complaintRepository.findById(complaintId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Complaint not found"));
-        if (!PENDING.equals(complaint.getStatus()) && !PROCESSING.equals(complaint.getStatus())) {
+        if (!PENDING.equals(complaint.getStatus())) {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Complaint has been handled");
         }
 
@@ -192,12 +207,16 @@ public class ReviewComplaintService {
 
         if (REVIEW_HIDDEN.equals(result) && Boolean.TRUE.equals(review.getIsVisible())) {
             review.setIsVisible(false);
-            creditService.updateCreditScore(
+            creditService.reverseCreditAdjustment(
                     review.getTargetUserId(),
-                    -calculateReviewScoreChange(review.getRating()),
+                    "REVIEW",
+                    review.getId(),
                     CREDIT_EVENT_REVIEW_ARBITRATION,
                     review.getOrderId(),
-                    "Review arbitration adjusted credit"
+                    "Review arbitration adjusted credit",
+                    CREDIT_EVENT_REVIEW_ARBITRATION,
+                    complaint.getId(),
+                    calculateReviewScoreChange(review.getRating())
             );
         }
 
@@ -215,6 +234,64 @@ public class ReviewComplaintService {
         }
     }
 
+    private String normalizeEvidenceFileIds(String evidenceFileIds, Long currentUserId) {
+        if (isBlank(evidenceFileIds)) {
+            return null;
+        }
+        Set<Long> parsedIds = new LinkedHashSet<>();
+        for (String rawId : evidenceFileIds.split(",")) {
+            String value = rawId.trim();
+            if (value.isEmpty()) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Evidence file id is required");
+            }
+            Long fileId = parseEvidenceFileId(value);
+            if (!parsedIds.add(fileId)) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Duplicate evidence file id is not allowed");
+            }
+            if (parsedIds.size() > MAX_EVIDENCE_FILE_COUNT) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "At most 5 evidence files are allowed");
+            }
+        }
+        for (Long fileId : parsedIds) {
+            validateEvidenceFile(fileId, currentUserId);
+        }
+        return String.join(",", parsedIds.stream().map(String::valueOf).toList());
+    }
+
+    private Long parseEvidenceFileId(String value) {
+        try {
+            long fileId = Long.parseLong(value);
+            if (fileId <= 0) {
+                throw new NumberFormatException("file id must be positive");
+            }
+            return fileId;
+        } catch (NumberFormatException e) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Evidence file id must be a positive number");
+        }
+    }
+
+    private void validateEvidenceFile(Long fileId, Long currentUserId) {
+        EvidenceFileMetadata file = evidenceFileQueryPort.findById(fileId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_ERROR, "Evidence file not found"));
+        if (file.deleted()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Deleted evidence file cannot be used");
+        }
+        if (!currentUserId.equals(file.uploaderId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only files uploaded by current user can be used as evidence");
+        }
+        if (!isAllowedEvidenceMimeType(file.mimeType())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Evidence file must be an image or PDF");
+        }
+    }
+
+    private boolean isAllowedEvidenceMimeType(String mimeType) {
+        if (mimeType == null || mimeType.isBlank()) {
+            return false;
+        }
+        String normalized = mimeType.trim().toLowerCase();
+        return normalized.startsWith("image/") || "application/pdf".equals(normalized);
+    }
+
     private void validateArbitrateRequest(ReviewComplaintArbitrateRequest request) {
         if (request == null || isBlank(request.result())) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Arbitration result is required");
@@ -228,35 +305,51 @@ public class ReviewComplaintService {
         }
     }
 
-    private void requireArbitrator(Long userId) {
-        if (!isArbitrator(userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "Arbitrator permission required");
+    private void requireAdmin(Long userId) {
+        if (!isAdmin(userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Admin permission required");
         }
     }
 
-    private boolean isArbitrator(Long userId) {
+    private boolean isAdmin(Long userId) {
         return userRepository.findById(userId)
                 .map(User::getCurrentRole)
-                .map(role -> ADMIN.equals(role) || ARBITRATOR.equals(role))
+                .map(ADMIN::equals)
                 .orElse(false);
     }
 
     private void notifyResolved(ReviewComplaint complaint) {
         notificationService.createNotification(new NotificationCreateRequest(
                 complaint.getComplainantId(),
+                complaint.getHandledBy(),
                 "Review complaint resolved",
                 "Your review complaint has been resolved.",
                 TYPE_COMPLAINT_RESOLVED,
+                TYPE_COMPLAINT_RESOLVED,
                 RELATED_REVIEW_COMPLAINT,
-                complaint.getId()
+                complaint.getId(),
+                RELATED_REVIEW_COMPLAINT,
+                complaint.getId(),
+                RELATED_REVIEW_COMPLAINT,
+                complaint.getId(),
+                "review-complaint:resolved:complainant:" + complaint.getId(),
+                null
         ));
         notificationService.createNotification(new NotificationCreateRequest(
                 complaint.getRespondentId(),
+                complaint.getHandledBy(),
                 "Review complaint resolved",
                 "A complaint related to your review has been resolved.",
                 TYPE_COMPLAINT_RESOLVED,
+                TYPE_COMPLAINT_RESOLVED,
                 RELATED_REVIEW_COMPLAINT,
-                complaint.getId()
+                complaint.getId(),
+                RELATED_REVIEW_COMPLAINT,
+                complaint.getId(),
+                RELATED_REVIEW_COMPLAINT,
+                complaint.getId(),
+                "review-complaint:resolved:respondent:" + complaint.getId(),
+                null
         ));
     }
 

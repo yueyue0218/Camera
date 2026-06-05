@@ -58,7 +58,6 @@ function Wordmark({ size = 28 }) {
     </div>
   )
 }
-
 function AuthCard({ children }) {
   return (
     <div style={{
@@ -319,79 +318,89 @@ function enhanceTilt(el, { maxRot = 5, maxMove = 10, perspective = 900 }) {
 /* ── Pages ─────────────────────────────────────────────────── */
 
 export function LoginChoicePage() {
-  const navigate  = useNavigate()
-  const location  = useLocation()
+  const navigate = useNavigate()
+  const location = useLocation()
   const { isAuthenticated } = useAuth()
-  const hasModal  = location.pathname !== '/login' && location.pathname !== '/login/'
+  const hasModal = location.pathname !== '/login' && location.pathname !== '/login/'
 
-  const [navActive,  setNavActive]  = useState('约拍大厅')
-  const [navRole,    setNavRole]    = useState('owner')
+  const [activeSection, setActiveSection] = useState('op-page1')
+  const [navRole, setNavRole] = useState('owner')
   const [roleActive, setRoleActive] = useState('我想拍')
 
-  const scrollRef  = useRef(null)
-  const p2Ref      = useRef(null)
-  const p3Ref      = useRef(null)
-  const lensRef    = useRef(null)
-  const ticketRef  = useRef(null)
-  const card1Ref   = useRef(null)
-  const card2Ref   = useRef(null)
-  const card3Ref   = useRef(null)
+  const scrollRef = useRef(null)
+  const p1Ref = useRef(null)
+  const p2Ref = useRef(null)
+  const p3Ref = useRef(null)
+  const footerRef = useRef(null)
+  const lensRef = useRef(null)
+  const ticketRef = useRef(null)
+  const card1Ref = useRef(null)
+  const card2Ref = useRef(null)
+  const card3Ref = useRef(null)
 
   useEffect(() => {
     if (isAuthenticated) navigate('/hall', { replace: true })
   }, [isAuthenticated, navigate])
 
-  /* IntersectionObserver — mirrors v18-scroll-interactions */
   useEffect(() => {
     const scroller = scrollRef.current
-    const sections = [p2Ref.current, p3Ref.current].filter(Boolean)
+    const revealSections = [p2Ref.current, p3Ref.current].filter(Boolean)
+    const trackedSections = [p1Ref.current, p2Ref.current, p3Ref.current, footerRef.current].filter(Boolean)
     if (!('IntersectionObserver' in window)) {
-      sections.forEach(s => s.classList.add('op-in-view'))
+      revealSections.forEach(section => section.classList.add('op-in-view'))
       return
     }
+    const ratios = new Map()
     const io = new IntersectionObserver(entries => {
-      entries.forEach(e => e.target.classList.toggle('op-in-view', e.isIntersecting))
-    }, { root: scroller, threshold: .28 })
-    sections.forEach(s => io.observe(s))
+      entries.forEach(entry => {
+        if (entry.target === p2Ref.current || entry.target === p3Ref.current) {
+          entry.target.classList.toggle('op-in-view', entry.intersectionRatio >= .28)
+        }
+        ratios.set(entry.target.id, entry.isIntersecting ? entry.intersectionRatio : 0)
+      })
+      const next = Array.from(ratios.entries()).sort((a, b) => b[1] - a[1])[0]
+      if (next?.[0] && next[1] > 0) setActiveSection(next[0])
+    }, { root: scroller, threshold: [0, .12, .28, .5, .72] })
+    trackedSections.forEach(section => {
+      ratios.set(section.id, section.id === 'op-page1' ? 1 : 0)
+      io.observe(section)
+    })
     return () => io.disconnect()
   }, [])
 
-  /* 3D-tilt — mirrors v19-pointer-depth-interactions */
   useEffect(() => {
     const cleanups = [
-      enhanceTilt(lensRef.current,   { maxRot: 3.5, maxMove: 13, perspective: 820 }),
-      enhanceTilt(ticketRef.current, { maxRot: 3.2, maxMove: 8,  perspective: 900 }),
-      enhanceTilt(card1Ref.current,  { maxRot: 5.5, maxMove: 11, perspective: 900 }),
-      enhanceTilt(card2Ref.current,  { maxRot: 5.5, maxMove: 11, perspective: 900 }),
-      enhanceTilt(card3Ref.current,  { maxRot: 5.5, maxMove: 11, perspective: 900 }),
+      enhanceTilt(lensRef.current, { maxRot: 3.5, maxMove: 13, perspective: 820 }),
+      enhanceTilt(ticketRef.current, { maxRot: 3.2, maxMove: 8, perspective: 900 }),
+      enhanceTilt(card1Ref.current, { maxRot: 5.5, maxMove: 11, perspective: 900 }),
+      enhanceTilt(card2Ref.current, { maxRot: 5.5, maxMove: 11, perspective: 900 }),
+      enhanceTilt(card3Ref.current, { maxRot: 5.5, maxMove: 11, perspective: 900 }),
     ]
-    return () => cleanups.forEach(c => c())
+    return () => cleanups.forEach(cleanup => cleanup())
   }, [])
 
   function scrollToId(id) {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  function onSectionPointerMove(e, ref) {
-    const el = ref.current; if (!el) return
-    const r = el.getBoundingClientRect()
-    el.style.setProperty('--v18px', (((e.clientX - r.left) / r.width - .5) * 36).toFixed(2))
-    el.style.setProperty('--v18py', (((e.clientY - r.top) / r.height - .5) * 36).toFixed(2))
+  function onSectionPointerMove(event, ref) {
+    const el = ref.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    el.style.setProperty('--v18px', (((event.clientX - rect.left) / rect.width - .5) * 36).toFixed(2))
+    el.style.setProperty('--v18py', (((event.clientY - rect.top) / rect.height - .5) * 36).toFixed(2))
   }
+
   function onSectionPointerLeave(ref) {
-    const el = ref.current; if (!el) return
+    const el = ref.current
+    if (!el) return
     el.style.setProperty('--v18px', '0')
     el.style.setProperty('--v18py', '0')
   }
 
   return (
     <div className="op-wrapper">
-
-      {/* ── Side nav dots ──────────────────────────────────────── */}
-      <div style={{
-        position: 'fixed', left: 18, top: '50%', transform: 'translateY(-50%)',
-        zIndex: 150, display: 'flex', flexDirection: 'column', gap: 10, opacity: .6
-      }}>
+      <div className="op-nav-dots">
         {[
           { label: '第一页', id: 'op-page1' },
           { label: '第二页', id: 'op-page2' },
@@ -399,225 +408,86 @@ export function LoginChoicePage() {
           { label: '关于我们', id: 'op-about' },
         ].map(({ label, id }) => (
           <a
-            key={id} aria-label={label}
-            onClick={e => { e.preventDefault(); scrollToId(id) }}
+            key={id}
+            aria-label={label}
+            className={activeSection === id ? 'active' : ''}
             href={`#${id}`}
-            style={{
-              width: 9, height: 9, borderRadius: 99,
-              border: `1px solid ${BLUE}`, background: 'rgba(242,237,230,.55)',
-              display: 'block', cursor: 'pointer'
-            }}
+            onClick={event => { event.preventDefault(); setActiveSection(id); scrollToId(id) }}
           />
         ))}
       </div>
 
-      {/* ── Fixed header ───────────────────────────────────────── */}
-      <header style={{
-        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 220,
-        height: 72, background: '#f2ede6',
-        borderBottom: '1px solid rgba(21,19,24,.12)',
-        boxShadow: '0 1px 0 rgba(255,255,255,.55) inset',
-        fontFamily: SANS
-      }}>
-        <div style={{
-          width: 'min(1180px, calc(100vw - 48px))', height: 72,
-          margin: '0 auto', display: 'flex', alignItems: 'center',
-          justifyContent: 'space-between', gap: 24
-        }}>
-          {/* Wordmark */}
-          <a
-            onClick={e => { e.preventDefault(); scrollToId('op-page1') }}
-            href="#op-page1"
-            style={{
-              display: 'flex', alignItems: 'flex-end', gap: 12,
-              minWidth: 168, textDecoration: 'none', color: 'inherit', cursor: 'pointer'
-            }}
-          >
-            <div style={{ fontFamily: SERIF, fontSize: 32, lineHeight: .9, letterSpacing: '-.04em', fontWeight: 500 }}>
-              Por<span style={{ color: BLUE }}>t</span>r<span style={{ color: ORANGE }}>a</span>
-            </div>
-            <div style={{ fontSize: 10, letterSpacing: '.22em', color: MUTED, textTransform: 'uppercase', marginBottom: 2 }}>
-              Meet Right Now
-            </div>
+      <header className="op-header">
+        <div className="op-header-inner">
+          <a className="op-wordmark" href="#op-page1" onClick={event => { event.preventDefault(); scrollToId('op-page1') }}>
+            <div className="op-wordmark-text">Por<span className="t">t</span>r<span className="a">a</span></div>
+            <div className="op-wordmark-sub">Meet Right Now</div>
           </a>
 
-          {/* Nav */}
-          <nav style={{ display: 'flex', alignItems: 'center', gap: 34, height: '100%' }}>
+          <nav className="op-nav">
             {[
               { label: '约拍大厅', id: 'op-page1' },
-              { label: '动态',    id: 'op-page2' },
-              { label: '消息',    id: 'op-page3' },
-              { label: '个人',    id: 'op-about' },
+              { label: '动态', id: 'op-page2' },
+              { label: '消息', id: 'op-page3' },
+              { label: '个人', id: 'op-about' },
             ].map(({ label, id }) => (
               <a
                 key={label}
-                onClick={e => { e.preventDefault(); setNavActive(label); scrollToId(id) }}
+                className={`op-nav-item${activeSection === id ? ' active' : ''}`}
                 href={`#${id}`}
-                className={`op-nav-item${navActive === label ? ' active' : ''}`}
+                onClick={event => { event.preventDefault(); setActiveSection(id); scrollToId(id) }}
               >{label}</a>
             ))}
           </nav>
 
-          {/* Header actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 220, justifyContent: 'flex-end' }}>
-            {/* Role toggle */}
-            <div style={{
-              display: 'flex', background: '#fffaf2',
-              border: '1px solid rgba(21,19,24,.12)', borderRadius: 999, padding: 4
-            }}>
-              {[{ key: 'owner', label: '单主' }, { key: 'photographer', label: '摄影师' }].map(r => (
+          <div className="op-header-actions">
+            <div className="op-role-toggle">
+              {[{ key: 'owner', label: '单主' }, { key: 'photographer', label: '摄影师' }].map(role => (
                 <button
-                  key={r.key}
-                  onClick={() => setNavRole(r.key)}
-                  style={{
-                    border: 0,
-                    background: navRole === r.key ? BLUE : 'transparent',
-                    color: navRole === r.key ? '#fff' : '#3d4148',
-                    borderRadius: 999, padding: '8px 13px',
-                    fontSize: 13, letterSpacing: '.08em', cursor: 'pointer',
-                    fontFamily: SANS
-                  }}
-                >{r.label}</button>
+                  type="button"
+                  key={role.key}
+                  className={`op-role-btn${navRole === role.key ? ' active' : ''}`}
+                  onClick={() => setNavRole(role.key)}
+                >{role.label}</button>
               ))}
             </div>
-            {/* Search */}
-            <button
-              onClick={() => navigate('/login/sign-in')}
-              style={{
-                width: 38, height: 38, border: '1px solid rgba(21,19,24,.12)',
-                borderRadius: 999, background: '#f9f5ee',
-                display: 'grid', placeItems: 'center', cursor: 'pointer', fontSize: 18,
-                fontFamily: SANS
-              }}>⌕</button>
-            {/* Avatar → sign in */}
-            <div
-              onClick={() => navigate('/login/sign-in')}
-              title="登录"
-              style={{
-                width: 38, height: 38, borderRadius: '50%',
-                background: `linear-gradient(135deg, ${BLUE}, #3857c8 45%, ${ORANGE})`,
-                border: '3px solid #f4efe8', boxShadow: '0 0 0 1px rgba(21,19,24,.12)',
-                cursor: 'pointer', flexShrink: 0
-              }}
-            />
+            <button type="button" className="op-icon-btn" onClick={() => navigate('/login/sign-in')}>⌕</button>
+            <button type="button" className="op-avatar" title="登录" onClick={() => navigate('/login/sign-in')} />
           </div>
         </div>
       </header>
 
-      {/* ── Scroll container ───────────────────────────────────── */}
-      <div className="op-scroll" ref={scrollRef} id="op-scroller">
-
-        {/* ── PAGE 1 ─────────────────────────────────────────── */}
-        <section className="op-section op-p1" id="op-page1">
-
-          {/* WANT background word — exact inline params from v30 HTML */}
-          <div
-            className="op-bg-word"
-            style={{ right: '-3vw', top: '2vh', fontSize: '15.6vw', opacity: .30, transform: 'translate3d(-12.4vw, 0px, 0px)' }}
-          >WANT</div>
-
+      <div className="op-scroll" ref={scrollRef} id="op-scroller" data-mode="continuous-story">
+        <section className="op-section op-p1 op-in-view" id="op-page1" ref={p1Ref}>
+          <div className="op-bg-word" style={{ right: '-3vw', top: '2vh', fontSize: '15.6vw', opacity: .30, transform: 'translate3d(-12.4vw, 0px, 0px)' }}>WANT</div>
           <div className="op-yellow-field" />
           <div className="op-blue-cut" />
-
-          {/* Top ribbon */}
-          <div className="op-top-ribbon op-reveal">寻找如此简单</div>
-
-          {/* Search frame asset */}
-          <img
-            alt="search frame asset high resolution"
-            className="op-asset op-search-img op-reveal"
-            decoding="async"
-            src={searchImgUrl}
-          />
-
-          {/* Lens asset */}
-          <img
-            ref={lensRef}
-            alt="lens asset high resolution"
-            className="op-asset op-lens op-reveal"
-            decoding="async"
-            src={lensUrl}
-            style={{ marginLeft: '-1.36667px', marginTop: '-1.60364px' }}
-          />
-
-          {/* Shutter flash & blink */}
+          <div className="op-top-ribbon op-reveal"><span className="op-p1-adjust-text">寻找如此简单</span></div>
+          <img alt="search frame asset high resolution" className="op-asset op-search-img op-reveal" decoding="async" src={searchImgUrl} />
+          <img ref={lensRef} alt="lens asset high resolution" className="op-asset op-lens op-reveal" decoding="async" src={lensUrl} style={{ marginLeft: '-1.36667px', marginTop: '-1.60364px' }} />
           <div className="op-lens-flash" aria-hidden="true" />
           <div className="op-shutter-blink" aria-hidden="true" />
-
-          {/* Polaroids asset */}
-          <img
-            alt="polaroid top row collage asset high resolution"
-            className="op-asset op-polaroids op-reveal"
-            decoding="async"
-            src={polaroidsUrl}
-            style={{ marginLeft: '1.025px', marginTop: '1.06909px' }}
-          />
-
-          {/* PORTRA MEET YOU */}
+          <img alt="polaroid top row collage asset high resolution" className="op-asset op-polaroids op-reveal" decoding="async" src={polaroidsUrl} style={{ marginLeft: '1.025px', marginTop: '1.06909px' }} />
           <div className="op-portra-meet op-reveal">PORTRA MEET<br />YOU</div>
-
-          {/* Brand wordmark: P + o(blue) + r + t + r + a(orange) — exact from v30 HTML body */}
-          <div className="op-brand op-reveal" style={{ fontFamily: SERIF }}>
-            <span>P</span><span className="blue">o</span><span>r</span>
-            <span>t</span><span>r</span><span className="orange">a</span>
-          </div>
-
-          {/* Product positioning pill */}
+          <div className="op-brand op-reveal"><span>P</span><span className="blue">o</span><span>r</span><span>t</span><span>r</span><span className="orange">a</span></div>
           <div className="op-product-positioning op-reveal">约拍一步到位</div>
-
-          {/* NOW / right now / PHOTO */}
           <div className="op-now-word op-reveal">NOW</div>
           <div className="op-right-now op-reveal">right now</div>
           <div className="op-photo-word op-reveal">PHOTO</div>
-
-          {/* START pill — scrolls to page 3 */}
-          <button className="op-start-pill" onClick={() => navigate('/login/sign-in')}>
-            <span>开始</span>
-          </button>
-
-          {/* GO ON vertical — scrolls to page 2 */}
-          <button className="op-go-on" onClick={() => scrollToId('op-page2')}>
-            <span>继续</span>
-          </button>
+          <button className="op-start-pill" onClick={() => scrollToId('op-page3')}><span className="op-p1-adjust-text op-p1-start-adjust">开始</span></button>
+          <button className="op-go-on" onClick={() => scrollToId('op-page2')}><span className="op-p1-adjust-text op-p1-go-adjust">继续</span></button>
         </section>
 
-        {/* ── PAGE 2 ─────────────────────────────────────────── */}
-        <section
-          className="op-section op-p2"
-          id="op-page2"
-          ref={p2Ref}
-          onPointerMove={e => onSectionPointerMove(e, p2Ref)}
-          onPointerLeave={() => onSectionPointerLeave(p2Ref)}
-        >
-          {/* MATCH background word — exact inline params from v30 HTML */}
-          <div
-            className="op-bg-word"
-            style={{ left: '46.1vw', top: '-1.7vh', fontSize: '17vw', opacity: .20, transform: 'translate3d(-13.8vw, 0px, 0px)' }}
-          >MATCH</div>
-
+        <section className="op-section op-p2" id="op-page2" ref={p2Ref} onPointerMove={event => onSectionPointerMove(event, p2Ref)} onPointerLeave={() => onSectionPointerLeave(p2Ref)}>
+          <div className="op-bg-word" style={{ left: '46.1vw', top: '-1.7vh', fontSize: '17vw', opacity: .20, transform: 'translate3d(-13.8vw, 0px, 0px)' }}>MATCH</div>
           <div className="op-p2-left-blue" />
           <div className="op-p2-yellow-note" />
-
           <div className="op-p2-kicker op-reveal">PORTRA MATCH SYSTEM / FILM EDGE</div>
-
           <h1 className="op-p2-title op-reveal">你想拍的，<br />在等一个合适的快门</h1>
-
-          <p className="op-p2-copy op-reveal">
-            不是把人塞进模板，<br />
-            而是让 <b>风格、地点、预算、时间</b> 慢慢对齐。
-          </p>
-
-          <div className="op-match-line op-reveal">
-            <span className="dot d1" /><span className="dot d2" /><span className="dot d3" />
-          </div>
-
-          {/* Sticker A — vertical white text on left blue bar */}
+          <p className="op-p2-copy op-reveal">不是把人塞进模板，<br />而是让 <b>风格、地点、预算、时间</b> 慢慢对齐。</p>
+          <div className="op-match-line op-reveal"><span className="dot d1" /><span className="dot d2" /><span className="dot d3" /></div>
           <div className="op-p2-sticker a op-reveal">I WANT TO BE PHOTOGRAPHED →</div>
-
-          {/* Sticker B — yellow note */}
           <div className="op-p2-sticker b op-reveal">02<br /><small>MATCH LINE</small></div>
-
-          {/* Request strip */}
           <div className="op-request-strip op-reveal">
             <h4>REQUEST NOTE / WANT</h4>
             <p><span>想拍</span><b>毕业照 / 胶片感</b></p>
@@ -626,15 +496,9 @@ export function LoginChoicePage() {
             <p><span>时间</span><b>本周末下午</b></p>
             <p><span>状态</span><b>可先沟通</b></p>
           </div>
-
-          {/* Contact sheet */}
           <div className="op-contact-sheet op-reveal" aria-label="contact sheet">
-            {[1,2,3,4,5,6].map(n => (
-              <div key={n} className={`op-frame brand-tile f${n}`} />
-            ))}
+            {[1, 2, 3, 4, 5, 6].map(frame => <div key={frame} className={`op-frame brand-tile f${frame}`} />)}
           </div>
-
-          {/* Film edge card */}
           <div className="op-film-edge-card op-reveal">
             <h4>FILM EDGE / RESPONSE</h4>
             <p><span>可响应</span><b>3 位摄影师</b></p>
@@ -643,177 +507,73 @@ export function LoginChoicePage() {
             <p><span>完成</span><b>18 次拍摄</b></p>
             <p><span>沟通</span><b>先聊再定</b></p>
           </div>
-
           <div className="op-material-caption op-reveal">CONTACT SHEET / STYLE SAMPLE / RESPONSE SLIP</div>
-
-          {/* Role switch */}
           <div className="op-role-switch op-reveal">
             {[
-              { label: '我想拍',   to: '/login/sign-in'   },
-              { label: '我来拍',   to: '/login/sign-in'   },
-              { label: '先看作品', to: '/login/sign-in'   },
-            ].map(({ label, to }) => (
-              <button
-                key={label}
-                className={roleActive === label ? 'active' : ''}
-                onClick={() => { setRoleActive(label); navigate(to) }}
-              >{label}</button>
+              { label: '我想拍', to: '/login/sign-in' },
+              { label: '我来拍', to: '/login/sign-in' },
+              { label: '先去看看', to: '/login/sign-in' },
+            ].map(({ label }) => (
+              <button key={label} className={roleActive === label ? 'active' : ''} onClick={() => setRoleActive(label)}>{label}</button>
             ))}
           </div>
-
           <div className="op-edge-text">WAITING FOR THE RIGHT SHUTTER</div>
-
-          {/* Sticker C — black/yellow */}
-          <div className="op-p2-sticker c op-reveal">MEET YOU RIGHT NOW</div>
         </section>
 
-        {/* ── PAGE 3 ─────────────────────────────────────────── */}
-        <section
-          className="op-section op-p3"
-          id="op-page3"
-          ref={p3Ref}
-          onPointerMove={e => onSectionPointerMove(e, p3Ref)}
-          onPointerLeave={() => onSectionPointerLeave(p3Ref)}
-        >
-          {/* MEET background word — exact inline params from v30 HTML */}
-          <div
-            className="op-bg-word"
-            style={{ right: '-2vw', top: '2vh', fontSize: '18vw', opacity: .22, letterSpacing: '.02em', transform: 'translate3d(3.3vw, 0px, 0px)' }}
-          >MEET</div>
-
+        <section className="op-section op-p3" id="op-page3" ref={p3Ref} onPointerMove={event => onSectionPointerMove(event, p3Ref)} onPointerLeave={() => onSectionPointerLeave(p3Ref)}>
+          <div className="op-bg-word" style={{ transform: 'translate3d(3.3vw, 0px, 0px)' }}>MEET</div>
           <div className="op-p3-blue-cut" />
           <div className="op-p3-yellow-floor" />
-
           <h1 className="op-p3-title op-reveal">现在，就开始一次<br />属于你的 Portra</h1>
-
-          {/* Ticket */}
           <div className="op-ticket-main" ref={ticketRef}>
             <div className="op-ticket-inner">
               <div className="op-ticket-spine">PORTRA · MEET YOU</div>
               <div className="op-ticket-body">
                 <small>INVITATION / START POINT</small>
                 <h2>从一张邀请开始，<br />让快门和你相遇。</h2>
-                <div className="op-ticket-meta">
-                  <span>PLACE</span><b>NJU / nearby</b>
-                  <span>STYLE</span><b>film / portrait</b>
-                  <span>FIRST STEP</span><b>message first</b>
-                  <span>FLOW</span><b>hall · post · order</b>
-                </div>
+                <div className="op-ticket-meta"><span>PLACE</span><b>NJU / nearby</b><span>STYLE</span><b>film / portrait</b><span>FIRST STEP</span><b>message first</b><span>FLOW</span><b>hall · post · order</b></div>
                 <div className="op-barcode" />
               </div>
             </div>
           </div>
-
-          {/* Invite cards */}
           <div className="op-invite-cards">
             <article className="op-invite-card" ref={card1Ref}>
-              <div className="num">01</div>
-              <div className="tiny">I WANT TO BE<br />PHOTOGRAPHED</div>
-              <h3>找摄影师</h3>
-              <div className="line" />
-              <p>浏览风格、地点与作品，找到合适的快门。</p>
-              <ul>
-                <li>看作品片段</li>
-                <li>先沟通再确认</li>
-                <li>收藏喜欢的风格</li>
-              </ul>
+              <div className="num">01</div><div className="tiny">I WANT TO BE<br />PHOTOGRAPHED</div><h3>找摄影师</h3><div className="line" />
+              <p>浏览风格、地点与作品，找到合适的快门。</p><ul><li>看作品片段</li><li>先沟通再确认</li><li>收藏喜欢的风格</li></ul>
               <button onClick={() => navigate('/login/sign-in')}>我去看看</button>
             </article>
-
             <article className="op-invite-card" ref={card2Ref}>
-              <div className="num">02</div>
-              <div className="tiny">SEND A<br />REQUEST</div>
-              <h3>发布需求</h3>
-              <div className="line" />
-              <p>写下想拍的时间和样子，等待合适的人来回应。</p>
-              <ul>
-                <li>填写地点预算</li>
-                <li>选择拍摄风格</li>
-                <li>收到邀请提醒</li>
-              </ul>
+              <div className="num">02</div><div className="tiny">SEND A<br />REQUEST</div><h3>发布需求</h3><div className="line" />
+              <p>写下想拍的时间和样子，等待合适的人来回应。</p><ul><li>填写地点预算</li><li>选择拍摄风格</li><li>收到邀请提醒</li></ul>
               <button onClick={() => navigate('/login/sign-in')}>我想拍照</button>
             </article>
-
             <article className="op-invite-card" ref={card3Ref}>
-              <div className="num">03</div>
-              <div className="tiny">I CAN TAKE<br />THIS SHOOT</div>
-              <h3>成为摄影师</h3>
-              <div className="line" />
-              <p>展示作品与风格，回应新的拍摄邀请。</p>
-              <ul>
-                <li>上传作品集</li>
-                <li>响应附近需求</li>
-                <li>管理订单评价</li>
-              </ul>
+              <div className="num">03</div><div className="tiny">I CAN TAKE<br />THIS SHOOT</div><h3>成为摄影师</h3><div className="line" />
+              <p>展示作品与风格，回应新的拍摄邀请。</p><ul><li>上传作品集</li><li>响应附近需求</li><li>管理订单评价</li></ul>
               <button onClick={() => navigate('/login/sign-in')}>我来拍照</button>
             </article>
           </div>
-
-          {/* Polaroids — p3 version */}
-          <img
-            alt="polaroid top row collage asset high resolution"
-            className="op-asset op-p3-polaroids"
-            decoding="async"
-            src={polaroidsP3Url}
-          />
-
-          {/* Mini path indicator */}
-          <div className="op-p3-mini-path">
-            <span>大厅</span><i /><span>消息</span><i /><span>订单</span>
-          </div>
+          <img alt="polaroid top row collage asset high resolution" className="op-asset op-p3-polaroids" decoding="async" src={polaroidsP3Url} />
+          <div className="op-p3-mini-path"><span>大厅</span><i /><span>消息</span><i /><span>订单</span></div>
         </section>
 
-        {/* ── FOOTER ─────────────────────────────────────────── */}
-        <section className="op-footer" id="op-about">
+        <section className="op-section op-footer op-in-view" id="op-about" ref={footerRef}>
           <div className="op-footer-inner">
             <div className="op-footer-top">
-              <div className="op-footer-brand" style={{ fontFamily: SERIF }}>
-                <span>P</span><span className="blue">o</span><span>r</span>
-                <span>t</span><span>r</span><span className="orange">a</span>
-              </div>
-              <p className="op-footer-tagline">
-                让"我想拍"的人和"我来拍"的人，在同一个页面里顺利相遇。
-                浏览风格、发布需求、沟通确认，再把一次拍摄认真落地。
-              </p>
+              <div className="op-footer-brand"><span>P</span><span className="blue">o</span><span>r</span><span>t</span><span>r</span><span className="orange">a</span></div>
+              <p className="op-footer-tagline">让“我想拍”的人和“我来拍”的人，在同一个页面里顺利相遇。浏览风格、发布需求、沟通确认，再把一次拍摄认真落地。</p>
             </div>
             <div className="op-footer-grid">
-              <div className="op-footer-col">
-                <h4>About Portra</h4>
-                <p>一个更轻松、更直接的约拍入口。</p>
-                <p>从灵感到拍摄，一步一步把匹配变简单。</p>
-              </div>
-              <div className="op-footer-col">
-                <h4>产品</h4>
-                <ul>
-                  <li>找摄影师</li><li>发布需求</li>
-                  <li>即时沟通</li><li>订单管理</li>
-                </ul>
-              </div>
-              <div className="op-footer-col">
-                <h4>关于我们</h4>
-                <ul>
-                  <li>平台理念</li><li>使用帮助</li>
-                  <li>校园合作</li><li>更新日志</li>
-                </ul>
-              </div>
-              <div className="op-footer-col">
-                <h4>支持</h4>
-                <ul>
-                  <li>用户协议</li><li>隐私说明</li>
-                  <li>常见问题</li><li>联系团队</li>
-                </ul>
-              </div>
+              <div className="op-footer-col"><h4>About Portra</h4><p>一个更轻松、更直接的约拍入口。</p><p>从灵感到拍摄，一步一步把匹配变简单。</p></div>
+              <div className="op-footer-col"><h4>产品</h4><ul><li>找摄影师</li><li>发布需求</li><li>即时沟通</li><li>订单管理</li></ul></div>
+              <div className="op-footer-col"><h4>关于我们</h4><ul><li>平台理念</li><li>使用帮助</li><li>校园合作</li><li>更新日志</li></ul></div>
+              <div className="op-footer-col"><h4>支持</h4><ul><li>用户协议</li><li>隐私说明</li><li>常见问题</li><li>联系团队</li></ul></div>
             </div>
-            <div className="op-footer-mini">
-              <span>© 2026 Portra. All rights reserved.</span>
-              <span>想拍 / 来拍 / 看看</span>
-            </div>
+            <div className="op-footer-mini"><span>© 2026 Portra. All rights reserved.</span><span>想拍 / 来拍 / 看看</span></div>
           </div>
         </section>
+      </div>
 
-      </div>{/* end op-scroll */}
-
-      {/* ── Modal overlay for sign-in / register child routes ── */}
       {hasModal && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 9900,
@@ -828,7 +588,6 @@ export function LoginChoicePage() {
     </div>
   )
 }
-
 function NavBtn({ children, onClick, primary }) {
   const [hov, setHov] = useState(false)
   return (
@@ -887,9 +646,17 @@ export function LoginInfoPage() {
     setLoading(true)
     try {
       const data = await authApi.login({ email: email.trim(), password })
+      const loginUser = data?.user || data || {}
       completeLogin({
         token: data?.token,
-        user: { userId: data?.userId, nickname: data?.nickname, role: data?.role, email: email.trim() }
+        refreshToken: data?.refreshToken,
+        user: {
+          ...loginUser,
+          userId: loginUser.userId ?? data?.userId ?? loginUser.id ?? data?.id,
+          nickname: loginUser.nickname ?? data?.nickname,
+          role: loginUser.role ?? data?.role,
+          email: email.trim()
+        }
       })
       navigate('/hall', { replace: true })
     } catch (err) {

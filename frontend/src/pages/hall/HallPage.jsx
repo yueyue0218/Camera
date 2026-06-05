@@ -10,19 +10,16 @@ import { EmptyState, ErrorState, LoadingState } from './components/HallState.jsx
 import { HallTabs } from './components/HallTabs.jsx'
 import { ServicePackageCard } from './components/ServicePackageCard.jsx'
 import { TIME_STYLE_OPTIONS, priceParamsFromBudget } from './components/hallUtils.js'
+import { promptAndRespondDemand } from './utils/respondDemand.js'
 import '../portraHall.css'
 
 const initialFilters = {
   keyword: '',
   cityCode: '',
   type: '',
-  budget: '',
+  minBudgetYuan: '',
+  maxBudgetYuan: '',
   timeTag: ''
-}
-
-function yuanToCent(value) {
-  if (value === '' || value === null || value === undefined) return null
-  return Math.round(Number(value) * 100)
 }
 
 function createStatus() {
@@ -62,6 +59,12 @@ export function HallPage() {
   }, [currentUser.userId, currentUser.role])
 
   useEffect(() => {
+    const role = currentUser.role === 'CUSTOMER' ? 'owner' : 'photographer'
+    document.body.setAttribute('data-role', role)
+    return () => document.body.removeAttribute('data-role')
+  }, [currentUser.role])
+
+  useEffect(() => {
     setActivePanel(panelFromSearch(location.search))
   }, [location.search])
 
@@ -70,15 +73,16 @@ export function HallPage() {
   }
 
   function demandParams(nextFilters = filters) {
-    const price = priceParamsFromBudget(nextFilters.budget)
+    const price = priceParamsFromBudget({
+      minYuan: nextFilters.minBudgetYuan,
+      maxYuan: nextFilters.maxBudgetYuan
+    })
     return {
       page: 1,
       size: 20,
       status: 'OPEN',
-      keyword: nextFilters.keyword,
-      scene: nextFilters.keyword,
-      cityCode: nextFilters.cityCode,
       styleTag: nextFilters.type,
+      cityCode: nextFilters.cityCode,
       timeTag: nextFilters.timeTag,
       minBudgetCent: price.minCent,
       maxBudgetCent: price.maxCent
@@ -86,13 +90,14 @@ export function HallPage() {
   }
 
   function serviceParams(nextFilters = filters) {
-    const price = priceParamsFromBudget(nextFilters.budget)
+    const price = priceParamsFromBudget({
+      minYuan: nextFilters.minBudgetYuan,
+      maxYuan: nextFilters.maxBudgetYuan
+    })
     return {
       page: 1,
       size: 20,
       cityCode: nextFilters.cityCode,
-      keyword: nextFilters.keyword,
-      scene: nextFilters.keyword,
       style: nextFilters.type,
       timeTag: nextFilters.timeTag,
       minPriceCent: price.minCent,
@@ -101,11 +106,30 @@ export function HallPage() {
     }
   }
 
+  function matchesKeyword(record, keyword) {
+    const normalized = keyword?.trim().toLowerCase()
+    if (!normalized) return true
+    const haystack = [
+      record.title,
+      record.scene,
+      record.description,
+      record.remark,
+      record.location,
+      record.serviceArea,
+      record.customerNickname,
+      record.customerName,
+      record.photographerNickname,
+      ...(Array.isArray(record.styleTags) ? record.styleTags : []),
+      ...(Array.isArray(record.timeTags) ? record.timeTags : [])
+    ].filter(Boolean).join(' ').toLowerCase()
+    return haystack.includes(normalized)
+  }
+
   async function loadDemands(nextFilters = filters) {
     setDemandStatus({ loading: true, error: '' })
     try {
       const page = await demandApi.list(demandParams(nextFilters), currentUser)
-      setDemands(page?.records || [])
+      setDemands((page?.records || []).filter(record => matchesKeyword(record, nextFilters.keyword)))
       setDemandStatus({ loading: false, error: '' })
     } catch (error) {
       setDemands([])
@@ -117,7 +141,7 @@ export function HallPage() {
     setServiceStatus({ loading: true, error: '' })
     try {
       const page = await servicePackageApi.list(serviceParams(nextFilters), currentUser)
-      setServices(page?.records || [])
+      setServices((page?.records || []).filter(record => matchesKeyword(record, nextFilters.keyword)))
       setServiceStatus({ loading: false, error: '' })
     } catch (error) {
       setServices([])
@@ -138,25 +162,45 @@ export function HallPage() {
     }
   }
 
-  function applyFilters() {
+  function applyFilters(nextFilters = filters) {
     if (activePanel === 'demands') {
-      loadDemands(filters)
-    } else {
-      loadServices(filters)
-      loadInterests(filters)
+      loadDemands(nextFilters)
+      return
     }
+    loadServices(nextFilters)
+    loadInterests(nextFilters)
+  }
+
+  function handlePublishClick() {
+    if (currentUser.role === 'PROVIDER') {
+      navigate('/publish/service-package')
+      return
+    }
+    navigate('/publish')
   }
 
   function changePanel(nextPanel) {
     setActivePanel(nextPanel)
+    setFilters(initialFilters)
     navigate(`/hall?tab=${nextPanel === 'demands' ? 'demand' : 'showcase'}`, { replace: true })
+    if (nextPanel === 'demands') {
+      loadDemands(initialFilters)
+    } else {
+      loadServices(initialFilters)
+      loadInterests(initialFilters)
+    }
   }
 
   function applyTimeFilter(timeTag) {
     const nextFilters = { ...filters, timeTag }
     setFilters(nextFilters)
-    loadServices(nextFilters)
-    loadInterests(nextFilters)
+    applyFilters(nextFilters)
+  }
+
+  function applyHotStyle(type) {
+    const nextFilters = { ...filters, type }
+    setFilters(nextFilters)
+    applyFilters(nextFilters)
   }
 
   async function openDemand(demand) {
@@ -180,30 +224,58 @@ export function HallPage() {
   }
 
   async function respondDemand(demand) {
-    const expectedPrice = window.prompt('请输入响应报价（元）', '')
-    if (expectedPrice === null) return
-    const message = window.prompt('给单主留一句话', '')
-    if (message === null) return
+    return promptAndRespondDemand({
+      demand,
+      currentUser,
+      demandApi,
+      normalizeError,
+      onSuccess: async () => {
+        await loadDemands(filters)
+        if (selectedDemand?.demandId === demand.demandId) {
+          const detail = await demandApi.detail(demand.demandId, currentUser)
+          setSelectedDemand(detail || demand)
+        }
+      }
+    })
+  }
+
+  function editDemand(demand) {
+    navigate(`/demands/${demand.demandId}/edit`)
+  }
+
+  async function closeDemand(demand) {
+    if (!window.confirm('确认下架这个需求吗？下架后不会继续作为开放需求展示。')) return
     try {
-      await demandApi.respond(demand.demandId, {
-        expectedPriceCent: yuanToCent(expectedPrice),
-        message
-      }, currentUser)
+      await demandApi.close(demand.demandId, currentUser)
       await loadDemands(filters)
+      setSelectedDemand(null)
+      window.alert('需求已下架')
     } catch (error) {
       window.alert(normalizeError(error))
     }
   }
 
-  async function reserveService(service) {
-    const selectedDate = window.prompt('预约日期（YYYY-MM-DD，可留空先沟通）', '')
-    if (selectedDate === null) return
-    const initialMessage = window.prompt('预约留言', '')
-    if (initialMessage === null) return
+  function editService(service) {
+    navigate(`/service-packages/${service.serviceId}/edit`)
+  }
+
+  async function offlineService(service) {
+    if (!window.confirm('确认下架这个橱窗吗？下架后不会继续作为在线橱窗展示。')) return
     try {
-      const result = await servicePackageApi.reserve(service.serviceId, {
-        selectedDate: selectedDate || null,
-        initialMessage
+      await servicePackageApi.offline(service.serviceId, currentUser)
+      await loadServices(filters)
+      await loadInterests(filters)
+      setSelectedService(null)
+      window.alert('橱窗已下架')
+    } catch (error) {
+      window.alert(normalizeError(error))
+    }
+  }
+
+  async function startServiceChat(service) {
+    try {
+      const result = await servicePackageApi.startChat(service.serviceId, {
+        initialMessage: `我想预约「${service.title || '这个橱窗'}」，想进一步确认时间与服务内容。`
       }, currentUser)
       if (result?.conversationId) navigate(`/messages/${result.conversationId}`)
     } catch (error) {
@@ -239,7 +311,9 @@ export function HallPage() {
         interested={interestedIds.has(service.serviceId)}
         onOpen={() => openService(service)}
         onDetail={() => navigate(`/service-packages/${service.serviceId}`)}
-        onReserve={() => reserveService(service)}
+        onReserve={() => startServiceChat(service)}
+        onEdit={() => editService(service)}
+        onOffline={() => offlineService(service)}
       />
     ))
   }
@@ -249,7 +323,8 @@ export function HallPage() {
       <FilterBar
         filters={filters}
         onChange={updateFilters}
-        onSubmit={applyFilters}
+        onApplyFilters={applyFilters}
+        onPublishClick={handlePublishClick}
         currentUserRole={currentUser.role}
       />
 
@@ -268,7 +343,15 @@ export function HallPage() {
           </div>
           <div className="order-layout">
             <div className="order-grid">{renderDemands()}</div>
-            <DemandAside selectedDemand={selectedDemand} error={demandStatus.error} />
+            <DemandAside
+              selectedDemand={selectedDemand}
+              error={demandStatus.error}
+              currentUser={currentUser}
+              onRespond={respondDemand}
+              onHotStyleClick={applyHotStyle}
+              onEditDemand={editDemand}
+              onCloseDemand={closeDemand}
+            />
           </div>
         </section>
       ) : (

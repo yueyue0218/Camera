@@ -3,8 +3,10 @@ package com.action.camera.review.service;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
+import com.action.camera.common.security.UserRole;
 import com.action.camera.notification.repository.NotificationRepository;
 import com.action.camera.repository.CreditRecordRepository;
+import com.action.camera.review.dto.ReviewComplaintCreateRequest;
 import com.action.camera.review.dto.ReviewCreateRequest;
 import com.action.camera.review.dto.ReviewFollowUpRequest;
 import com.action.camera.review.dto.ReviewResponse;
@@ -29,6 +31,7 @@ class ReviewServiceTest {
     private static final Long CUSTOMER_ID = 1001L;
     private static final Long PROVIDER_ID = 2001L;
     private static final Long OUTSIDER_ID = 3001L;
+    private static final Long ADMIN_ID = 4001L;
     private static final Long COMPLETED_ORDER_ID = 8002L;
     private static final Long PROVIDER_FAULT_REFUNDED_ORDER_ID = 8003L;
     private static final Long CUSTOMER_FAULT_REFUNDED_ORDER_ID = 8004L;
@@ -40,6 +43,9 @@ class ReviewServiceTest {
 
     @Autowired
     private ReviewService reviewService;
+
+    @Autowired
+    private ReviewComplaintService reviewComplaintService;
 
     @Autowired
     private ReviewRepository reviewRepository;
@@ -97,16 +103,79 @@ class ReviewServiceTest {
                     assertThat(record.getRelatedOrderId()).isEqualTo(COMPLETED_ORDER_ID);
                     assertThat(record.getEventType()).isEqualTo("REVIEW");
                     assertThat(record.getScoreChange()).isEqualTo(2);
+                    assertThat(record.getAppliedScoreChange()).isEqualTo(2);
+                    assertThat(record.getSourceType()).isEqualTo("REVIEW");
                 });
         assertThat(notificationRepository.findByUserIdOrderByCreatedAtDesc(PROVIDER_ID))
                 .hasSize(1)
                 .first()
                 .satisfies(notification -> {
                     assertThat(notification.getType()).isEqualTo("REVIEW_RECEIVED");
-                    assertThat(notification.getRelatedType()).isEqualTo("ORDER");
-                    assertThat(notification.getRelatedId()).isEqualTo(COMPLETED_ORDER_ID);
+                    assertThat(notification.getRelatedType()).isEqualTo("REVIEW");
                     assertThat(notification.getIsRead()).isFalse();
                 });
+    }
+
+    @Test
+    void createReviewRejectsOverlongContent() {
+        UserContext.setUserId(CUSTOMER_ID);
+        String content = "x".repeat(1001);
+
+        assertThatThrownBy(() -> reviewService.create(COMPLETED_ORDER_ID, new ReviewCreateRequest(5, content)))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.VALIDATION_ERROR);
+    }
+
+    @Test
+    void hiddenReviewDetailRequiresParticipant() {
+        UserContext.setUserId(CUSTOMER_ID);
+        ReviewResponse review = reviewService.create(COMPLETED_ORDER_ID, new ReviewCreateRequest(5, "服务很好"));
+        reviewRepository.findById(review.reviewId()).ifPresent(item -> item.setIsVisible(false));
+
+        UserContext.setUserId(PROVIDER_ID);
+        assertThat(reviewService.detail(review.reviewId()).reviewId()).isEqualTo(review.reviewId());
+
+        UserContext.setUserId(OUTSIDER_ID);
+        assertThatThrownBy(() -> reviewService.detail(review.reviewId()))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.FORBIDDEN);
+    }
+
+    @Test
+    void adminCanViewHiddenReviewDetail() {
+        UserContext.setUserId(CUSTOMER_ID);
+        ReviewResponse review = reviewService.create(COMPLETED_ORDER_ID, new ReviewCreateRequest(5, "服务很好"));
+        reviewRepository.findById(review.reviewId()).ifPresent(item -> item.setIsVisible(false));
+
+        UserContext.setUserId(ADMIN_ID);
+        UserContext.setCurrentRole(UserRole.ADMIN);
+
+        ReviewResponse response = reviewService.detail(review.reviewId());
+
+        assertThat(response.reviewId()).isEqualTo(review.reviewId());
+        assertThat(response.isVisible()).isFalse();
+    }
+
+    @Test
+    void detailReturnsComplaintStatusOnlyToRelatedUsersOrAdmin() {
+        UserContext.setUserId(CUSTOMER_ID);
+        ReviewResponse review = reviewService.create(COMPLETED_ORDER_ID, new ReviewCreateRequest(5, "服务很好"));
+
+        UserContext.setUserId(PROVIDER_ID);
+        reviewComplaintService.create(review.reviewId(), new ReviewComplaintCreateRequest("评价不真实", null));
+
+        UserContext.setUserId(CUSTOMER_ID);
+        UserContext.setCurrentRole(null);
+        assertThat(reviewService.detail(review.reviewId()).complaintStatus()).isEqualTo("PENDING");
+
+        UserContext.setUserId(OUTSIDER_ID);
+        assertThat(reviewService.detail(review.reviewId()).complaintStatus()).isNull();
+
+        UserContext.setUserId(ADMIN_ID);
+        UserContext.setCurrentRole(UserRole.ADMIN);
+        assertThat(reviewService.detail(review.reviewId()).complaintStatus()).isEqualTo("PENDING");
     }
 
     @Test

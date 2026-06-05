@@ -12,7 +12,9 @@ import com.action.camera.review.dto.ReviewCreateRequest;
 import com.action.camera.review.dto.ReviewFollowUpRequest;
 import com.action.camera.review.dto.ReviewResponse;
 import com.action.camera.review.entity.Review;
+import com.action.camera.review.repository.ReviewComplaintRepository;
 import com.action.camera.review.repository.ReviewRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,19 +30,22 @@ public class ReviewService {
     private static final String PROVIDER_TO_CUSTOMER = "PROVIDER_TO_CUSTOMER";
     private static final String REVIEW_RECEIVED = "REVIEW_RECEIVED";
     private static final String REVIEW_FOLLOW_UP_RECEIVED = "REVIEW_FOLLOW_UP_RECEIVED";
-    private static final String RELATED_ORDER = "ORDER";
+    private static final String RELATED_REVIEW = "REVIEW";
     private static final String CREDIT_EVENT_REVIEW = "REVIEW";
 
     private final ReviewRepository reviewRepository;
+    private final ReviewComplaintRepository complaintRepository;
     private final OrderQueryPort orderQueryPort;
     private final CreditService creditService;
     private final NotificationService notificationService;
 
     public ReviewService(ReviewRepository reviewRepository,
+                         ReviewComplaintRepository complaintRepository,
                          OrderQueryPort orderQueryPort,
                          CreditService creditService,
                          NotificationService notificationService) {
         this.reviewRepository = reviewRepository;
+        this.complaintRepository = complaintRepository;
         this.orderQueryPort = orderQueryPort;
         this.creditService = creditService;
         this.notificationService = notificationService;
@@ -63,25 +68,40 @@ public class ReviewService {
         review.setTargetUserId(target.targetUserId());
         review.setDirection(target.direction());
         review.setRating(request.rating());
-        review.setContent(request.content());
+        review.setContent(normalizeOptionalContent(request.content()));
         review.setIsVisible(true);
         review.setCreatedAt(LocalDateTime.now());
 
-        Review savedReview = reviewRepository.save(review);
+        Review savedReview;
+        try {
+            savedReview = reviewRepository.saveAndFlush(review);
+        } catch (DataIntegrityViolationException ex) {
+            throw new BusinessException(ErrorCode.DUPLICATE_OPERATION, "This order direction has already been reviewed");
+        }
         creditService.updateCreditScore(
                 savedReview.getTargetUserId(),
                 calculateReviewScoreChange(savedReview.getRating()),
                 CREDIT_EVENT_REVIEW,
                 savedReview.getOrderId(),
-                "Received order review"
+                "Received order review",
+                CREDIT_EVENT_REVIEW,
+                savedReview.getId()
         );
         notificationService.createNotification(new NotificationCreateRequest(
                 savedReview.getTargetUserId(),
+                savedReview.getReviewerId(),
                 "New review received",
                 "You have received a new order review.",
                 REVIEW_RECEIVED,
-                RELATED_ORDER,
-                savedReview.getOrderId()
+                REVIEW_RECEIVED,
+                RELATED_REVIEW,
+                savedReview.getId(),
+                RELATED_REVIEW,
+                savedReview.getId(),
+                RELATED_REVIEW,
+                savedReview.getId(),
+                "review:received:" + savedReview.getId(),
+                null
         ));
 
         return toResponse(savedReview);
@@ -109,13 +129,40 @@ public class ReviewService {
         Review savedReview = reviewRepository.save(review);
         notificationService.createNotification(new NotificationCreateRequest(
                 savedReview.getTargetUserId(),
+                savedReview.getReviewerId(),
                 "Review follow-up received",
                 "You have received a follow-up to an order review.",
                 REVIEW_FOLLOW_UP_RECEIVED,
-                RELATED_ORDER,
-                savedReview.getOrderId()
+                REVIEW_FOLLOW_UP_RECEIVED,
+                RELATED_REVIEW,
+                savedReview.getId(),
+                RELATED_REVIEW,
+                savedReview.getId(),
+                RELATED_REVIEW,
+                savedReview.getId(),
+                "review:follow-up:" + savedReview.getId(),
+                null
         ));
         return toResponse(savedReview);
+    }
+
+    @Transactional(readOnly = true)
+    public ReviewResponse detail(Long reviewId) {
+        Long currentUserId = requireCurrentUserId();
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Review not found"));
+        if (Boolean.TRUE.equals(review.getIsVisible())) {
+            return toResponse(review);
+        }
+        if (isAdmin()) {
+            return toResponse(review);
+        }
+        OrderSnapshot order = orderQueryPort.getOrderSnapshot(review.getOrderId());
+        if (currentUserId.equals(order.getCustomerId())
+                || currentUserId.equals(order.getProviderId())) {
+            return toResponse(review);
+        }
+        throw new BusinessException(ErrorCode.FORBIDDEN, "No permission to view hidden review");
     }
 
     @Transactional(readOnly = true)
@@ -200,6 +247,7 @@ public class ReviewService {
         if (request.rating() < 1 || request.rating() > 5) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Rating must be between 1 and 5");
         }
+        normalizeOptionalContent(request.content());
     }
 
     private void validateFollowUpRequest(ReviewFollowUpRequest request) {
@@ -222,6 +270,17 @@ public class ReviewService {
         };
     }
 
+    private String normalizeOptionalContent(String content) {
+        if (content == null) {
+            return null;
+        }
+        String normalized = content.trim();
+        if (normalized.length() > 1000) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Review content is too long");
+        }
+        return normalized.isEmpty() ? null : normalized;
+    }
+
     private ReviewResponse toResponse(Review review) {
         return new ReviewResponse(
                 review.getId(),
@@ -234,8 +293,25 @@ public class ReviewService {
                 review.getIsVisible(),
                 review.getCreatedAt(),
                 review.getReplyContent(),
-                review.getReplyTime()
+                review.getReplyTime(),
+                resolveComplaintStatusForCurrentUser(review)
         );
+    }
+
+    private String resolveComplaintStatusForCurrentUser(Review review) {
+        Long currentUserId = UserContext.getUserId();
+        if (currentUserId == null) {
+            return null;
+        }
+        if (!currentUserId.equals(review.getReviewerId())
+                && !currentUserId.equals(review.getTargetUserId())
+                && !isAdmin()) {
+            return null;
+        }
+        return complaintRepository.findByReviewIdOrderByCreatedAtDesc(review.getId()).stream()
+                .findFirst()
+                .map(complaint -> complaint.getStatus())
+                .orElse(null);
     }
 
     private boolean isBlank(String value) {
@@ -248,6 +324,10 @@ public class ReviewService {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
         return currentUserId;
+    }
+
+    private boolean isAdmin() {
+        return UserContext.getCurrentRole() != null && UserContext.getCurrentRole().name().equals("ADMIN");
     }
 
     private record ReviewTarget(Long targetUserId, String direction) {

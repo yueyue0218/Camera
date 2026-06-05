@@ -15,8 +15,14 @@ export const demandApi = {
   create(body, currentUser) {
     return request('/demands', { method: 'POST', body: JSON.stringify(body) }, currentUser)
   },
+  update(demandId, body, currentUser) {
+    return request(`/demands/${demandId}`, { method: 'PUT', body: JSON.stringify(body) }, currentUser)
+  },
   detail(demandId, currentUser) {
     return request(`/demands/${demandId}`, {}, currentUser)
+  },
+  close(demandId, currentUser) {
+    return request(`/demands/${demandId}/close`, { method: 'PATCH' }, currentUser)
   },
   delete(demandId, currentUser) {
     return request(`/demands/${demandId}`, { method: 'DELETE' }, currentUser)

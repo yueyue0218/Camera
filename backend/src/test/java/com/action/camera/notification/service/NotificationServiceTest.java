@@ -66,8 +66,44 @@ class NotificationServiceTest {
         assertThat(saved.getType()).isEqualTo("DELIVERY_UPLOADED");
         assertThat(saved.getRelatedType()).isEqualTo("ORDER");
         assertThat(saved.getRelatedId()).isEqualTo(8001L);
+        assertThat(saved.getTargetType()).isEqualTo("ORDER");
+        assertThat(saved.getTargetId()).isEqualTo(8001L);
+        assertThat(saved.getSourceType()).isEqualTo("ORDER");
+        assertThat(saved.getSourceId()).isEqualTo(8001L);
         assertThat(saved.getIsRead()).isFalse();
         assertThat(saved.getCreatedAt()).isNotNull();
+    }
+
+    @Test
+    void createNotificationPersistsFullRoutingContract() {
+        NotificationResponse response = notificationService.createNotification(new NotificationCreateRequest(
+                USER_ID,
+                OTHER_USER_ID,
+                "申诉已创建",
+                "对方发起了订单申诉",
+                "DISPUTE_CREATED",
+                "DISPUTE_CREATED",
+                "DISPUTE",
+                3001L,
+                "DISPUTE",
+                3001L,
+                "DISPUTE",
+                3001L,
+                "dispute:created:3001:" + USER_ID,
+                "{\"orderId\":8001}"
+        ));
+
+        assertThat(response.recipientUserId()).isEqualTo(USER_ID);
+        assertThat(response.actorUserId()).isEqualTo(OTHER_USER_ID);
+        assertThat(response.eventType()).isEqualTo("DISPUTE_CREATED");
+        assertThat(response.relatedType()).isEqualTo("DISPUTE");
+        assertThat(response.relatedId()).isEqualTo(3001L);
+        assertThat(response.targetType()).isEqualTo("DISPUTE");
+        assertThat(response.targetId()).isEqualTo(3001L);
+        assertThat(response.sourceType()).isEqualTo("DISPUTE");
+        assertThat(response.sourceId()).isEqualTo(3001L);
+        assertThat(response.dedupeKey()).isEqualTo("dispute:created:3001:" + USER_ID);
+        assertThat(response.metadataJson()).isEqualTo("{\"orderId\":8001}");
     }
 
     @Test
@@ -109,6 +145,49 @@ class NotificationServiceTest {
                 .containsExactly(mine.notificationId());
         assertThat(notificationRepository.findById(mine.notificationId()).orElseThrow().getIsRead()).isTrue();
         assertThat(notificationRepository.findById(other.notificationId()).orElseThrow().getIsRead()).isFalse();
+    }
+
+    @Test
+    void dedupeKeyMakesCreateIdempotent() {
+        NotificationCreateRequest request = new NotificationCreateRequest(
+                USER_ID,
+                OTHER_USER_ID,
+                "收到评价",
+                "你收到了一条评价",
+                "REVIEW_RECEIVED",
+                "REVIEW_RECEIVED",
+                "REVIEW",
+                100L,
+                "REVIEW",
+                100L,
+                "REVIEW",
+                100L,
+                "review:received:100",
+                null
+        );
+
+        NotificationResponse first = notificationService.createNotification(request);
+        NotificationResponse second = notificationService.createNotification(request);
+
+        assertThat(second.notificationId()).isEqualTo(first.notificationId());
+        assertThat(notificationRepository.findByUserIdOrderByCreatedAtDesc(USER_ID)).hasSize(1);
+    }
+
+    @Test
+    void paginationUnreadFilterAndUnreadCountWorkForCurrentUser() {
+        notificationService.createNotification(requestFor(USER_ID, "第一条"));
+        NotificationResponse second = notificationService.createNotification(requestFor(USER_ID, "第二条"));
+        notificationService.createNotification(requestFor(OTHER_USER_ID, "别人的通知"));
+        UserContext.setUserId(USER_ID);
+        notificationService.markRead(second.notificationId());
+
+        assertThat(notificationService.unreadCount()).isEqualTo(1);
+        assertThat(notificationService.listMine(0, 10, false).getRecords())
+                .extracting(NotificationResponse::title)
+                .containsExactly("第一条");
+        assertThat(notificationService.listMine(0, 1, null).getSize()).isEqualTo(1);
+        assertThat(notificationService.listMine(0, 1, null).getTotal()).isEqualTo(2);
+        assertThat(notificationService.listMine(0, 200, null).getSize()).isEqualTo(100);
     }
 
     private NotificationCreateRequest requestFor(Long userId, String title) {
