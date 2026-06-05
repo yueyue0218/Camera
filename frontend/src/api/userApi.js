@@ -16,6 +16,12 @@ export const userApi = {
   unfollow(userId, currentUser) {
     return request(`/users/${userId}/follow`, { method: 'DELETE' }, currentUser)
   },
+  followers(userId, currentUser) {
+    return request(`/users/${userId}/followers`, {}, currentUser)
+  },
+  following(userId, currentUser) {
+    return request(`/users/${userId}/following`, {}, currentUser)
+  },
   updateMe(data, currentUser) {
     return request('/users/me', { method: 'PATCH', body: JSON.stringify(data) }, currentUser)
   }

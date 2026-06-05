@@ -66,6 +66,7 @@ export function ProfilePage() {
   const [portfolioItems, setPortfolioItems] = useState([])
   const [actioningId, setActioningId] = useState(null)
   const [notice, setNotice] = useState(null)
+  const [myFollowers, setMyFollowers] = useState([])
 
   const dashboardRowRef = useRef(null)
   const frameNavRef = useRef(null)
@@ -123,11 +124,12 @@ export function ProfilePage() {
   useEffect(() => { loadProfileData() }, [currentUser.userId, currentUser.role])
 
   async function loadProfileData() {
-    const [momRes, revRes, credRes, ordRes] = await Promise.allSettled([
+    const [momRes, revRes, credRes, ordRes, followersRes] = await Promise.allSettled([
       momentApi.list({}, currentUser),
       reviewApi.listByUser(currentUser.userId, currentUser),
       creditApi.summary(currentUser.userId, currentUser),
-      orderApi.list({ role: isProvider ? 'provider' : 'customer' }, currentUser)
+      orderApi.list({ role: isProvider ? 'provider' : 'customer' }, currentUser),
+      userApi.followers(currentUser.userId, currentUser)
     ])
     setMoments(momRes.status === 'fulfilled' ? momRes.value : [])
     setReceivedReviews(mergeReviewLists(
@@ -139,6 +141,7 @@ export function ProfilePage() {
     setProfileOrders(orders)
     saveOrderSnapshots(orders)
     setPortfolioItems(readPortfolioItems(currentUser.userId))
+    setMyFollowers(followersRes.status === 'fulfilled' ? followersRes.value : [])
     if (!isProvider) {
       try { setInvitations(await demandApi.invitations(currentUser)) }
       catch { setInvitations([]) }
@@ -206,8 +209,12 @@ export function ProfilePage() {
     [moments, currentUser.userId]
   )
   const favoriteMoments = useMemo(() => moments.filter(m => m.favoritedByCurrentUser), [moments])
-  const follows = readFollows()
+  const follows = readFollows().filter(f => Number(f.authorId) !== currentUser.userId)
   const savedPhotos = readSavedPhotos()
+  const mutualFollowIds = useMemo(
+    () => new Set(myFollowers.filter(f => f.followedByCurrentUser).map(f => Number(f.userId))),
+    [myFollowers]
+  )
 
   const historicalOrders = profileOrders.filter(o => ['COMPLETED','REVIEWED'].includes(o.status)).length
   const ongoingOrders = profileOrders.filter(o => !['COMPLETED','REVIEWED','CANCELLED'].includes(o.status)).length
@@ -476,15 +483,19 @@ export function ProfilePage() {
               </div>
               {follows.length ? (
                 <div className="order-list">
-                  {follows.map(f => (
-                    <div key={f.authorId} className="order-slip" onClick={() => navigate(`/users/${f.authorId}`)}>
-                      <div className="order-num" style={{fontSize:20}}>★</div>
-                      <div>
-                        <h4>用户 {f.authorId}</h4>
-                        <p>{formatShortTime(f.followedAt)} 开始关注</p>
+                  {follows.map(f => {
+                    const isMutual = mutualFollowIds.has(Number(f.authorId))
+                    return (
+                      <div key={f.authorId} className="order-slip" onClick={() => navigate(`/users/${f.authorId}`)}>
+                        <div className="order-num" style={{fontSize:20}}>★</div>
+                        <div>
+                          <h4>用户 {f.authorId}</h4>
+                          <p>{formatShortTime(f.followedAt)} 开始关注</p>
+                        </div>
+                        {isMutual && <span className="status">互相关注</span>}
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               ) : (
                 <div className="pp-empty"><h3>还没有关注任何人</h3><p>在动态或大厅页面关注感兴趣的用户。</p></div>

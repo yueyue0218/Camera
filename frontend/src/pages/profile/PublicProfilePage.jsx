@@ -25,6 +25,7 @@ export function PublicProfilePage() {
   const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState(null)
   const [followedByMe, setFollowedByMe] = useState(false)
+  const [followsMe, setFollowsMe] = useState(false)
   const [followLoading, setFollowLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('portfolio')
 
@@ -35,10 +36,11 @@ export function PublicProfilePage() {
     let cancelled = false
     async function load() {
       setLoading(true)
-      const [profileResult, momentsResult, reviewsResult] = await Promise.allSettled([
+      const [profileResult, momentsResult, reviewsResult, myFollowersResult] = await Promise.allSettled([
         userApi.publicProfile(profileUserId, currentUser),
         momentApi.list({}, currentUser),
         reviewApi.listByUser(profileUserId, currentUser),
+        userApi.followers(currentUser.userId, currentUser),
       ])
       if (cancelled) return
 
@@ -47,6 +49,10 @@ export function PublicProfilePage() {
         setFollowedByMe(Boolean(profileResult.value.followedByCurrentUser))
       } else if (profileResult.status === 'rejected' && !isApiUnavailable(profileResult.reason)) {
         setNotice({ type: 'warn', text: '无法加载完整资料，显示本地缓存数据' })
+      }
+
+      if (myFollowersResult.status === 'fulfilled') {
+        setFollowsMe(myFollowersResult.value.some(f => Number(f.userId) === profileUserId))
       }
 
       const allMoments = momentsResult.status === 'fulfilled' ? momentsResult.value : []
@@ -94,7 +100,7 @@ export function PublicProfilePage() {
       } else {
         await userApi.follow(profileUserId, currentUser)
       }
-      toggleFollowLocal(profileUserId)
+      toggleFollowLocal(profileUserId, currentUser.userId)
       setNotice(null)
     } catch (error) {
       setFollowedByMe(wasFollowed)
@@ -240,7 +246,7 @@ export function PublicProfilePage() {
               发消息
             </button>
             <button className="secondary-btn" onClick={toggleFollow} disabled={followLoading}>
-              {followedByMe ? '已关注' : '关注'}
+              {followedByMe && followsMe ? '互相关注' : followedByMe ? '已关注' : '关注'}
             </button>
             {isProvider && (
               <button
