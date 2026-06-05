@@ -178,6 +178,26 @@ function getCounterpartyLabel(order, currentUser) {
   return `客户 ${order.customerId || '-'} / 摄影师 ${order.providerUserId || '-'}`
 }
 
+const settlementStatusLabelMap = {
+  NOT_SETTLED: '未结算',
+  SETTLED: '已结算'
+}
+
+const refundStatusLabelMap = {
+  NONE: '无退款',
+  REQUESTED: '退款处理中',
+  REFUNDED: '已退款'
+}
+
+const deliveryStatusLabelMap = {
+  DELIVERED: '已交付',
+  REWORKED: '返修交付'
+}
+
+function getSettlementRefundLabel(order) {
+  return `${settlementStatusLabelMap[order?.settlementStatus] || '未结算'} / ${refundStatusLabelMap[order?.refundStatus] || '无退款'}`
+}
+
 function formatOrderTimeRange(order) {
   return `${formatTime(order?.shootStartTime)} 至 ${formatTime(order?.shootEndTime)}`
 }
@@ -201,13 +221,24 @@ async function complaintApiSafeList(reviewId, currentUser) {
     throw error
   }
 }
+
+async function optionalOrderData(action, fallback = []) {
+  try {
+    return await action()
+  } catch (error) {
+    if (isApiUnavailable(error) || error.status === 403 || error.status === 404) return fallback
+    return fallback
+  }
+}
+
 export function OrdersPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { currentUser } = useAuth()
   const queryOrderId = useMemo(() => {
     const value = new URLSearchParams(location.search).get('orderId')
-    return value ? Number(value) : null
+    const id = Number(value)
+    return Number.isFinite(id) && id > 0 ? id : null
   }, [location.search])
   const [orders, setOrders] = useState([])
   const [selectedOrder, setSelectedOrder] = useState(null)
@@ -287,17 +318,18 @@ export function OrdersPage() {
   }
 
   async function openOrder(orderOrId, updateUrl = true) {
-    const orderId = typeof orderOrId === 'object' ? orderOrId.orderId : orderOrId
-    const detail = await orderApi.detail(orderId, currentUser)
-    const logs = await orderApi.statusLogs(orderId, currentUser)
-    const deliveries = await deliveryApi.listByOrder(orderId, currentUser)
-    const authorizations = await photoAuthorizationApi.listByOrder(orderId, currentUser)
-    let reviews = getLocalReviewsByOrder(orderId)
-    try {
-      reviews = mergeReviewLists(await reviewApi.listByOrder(orderId, currentUser), reviews)
-    } catch {
-      reviews = mergeReviewLists(reviews)
+    const orderId = Number(typeof orderOrId === 'object' ? orderOrId.orderId : orderOrId)
+    if (!Number.isFinite(orderId) || orderId <= 0) {
+      setNotice({ type: 'warning', text: '订单信息暂时不可用，请刷新后重试。' })
+      return false
     }
+    const detail = await orderApi.detail(orderId, currentUser)
+    const logs = await optionalOrderData(() => orderApi.statusLogs(orderId, currentUser))
+    const deliveries = await optionalOrderData(() => deliveryApi.listByOrder(orderId, currentUser))
+    const authorizations = await optionalOrderData(() => photoAuthorizationApi.listByOrder(orderId, currentUser))
+    let reviews = getLocalReviewsByOrder(orderId)
+    const remoteReviews = await optionalOrderData(() => reviewApi.listByOrder(orderId, currentUser), [])
+    reviews = mergeReviewLists(remoteReviews, reviews)
     let complaints = getArbitrationsByOrder(orderId)
     const complaintReviewIds = reviews
       .map(review => review.reviewId)
@@ -324,6 +356,7 @@ export function OrdersPage() {
     setShowReviewForm(false)
     setShowArbitrationForm(false)
     if (updateUrl) navigate(`/orders?orderId=${orderId}`, { replace: true })
+    return true
   }
 
   async function operateOrder(action) {
@@ -525,7 +558,7 @@ export function OrdersPage() {
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '350px 1fr' }, gap: 2 }}>
         <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 }, alignSelf: 'start' }}>
           <Stack spacing={2}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
               <Typography variant="h6">我的订单</Typography>
               <Button size="small" startIcon={<RefreshRoundedIcon />} onClick={() => loadOrders()} disabled={loading}>
                 刷新
@@ -550,7 +583,7 @@ export function OrdersPage() {
                 >
                   <CardContent>
                     <Stack spacing={1}>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
                         <Typography fontWeight={800}>{order.orderNo || `订单 ${order.orderId}`}</Typography>
                         <Chip size="small" label={orderStatusMap[order.status] || order.status} />
                       </Stack>
@@ -576,7 +609,7 @@ export function OrdersPage() {
                         <Stack spacing={0.7}>
                           <Typography fontWeight={800}>{invitation.demandScene}</Typography>
                           <Typography color="text.secondary" variant="body2">{invitation.message}</Typography>
-                          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
                             <Chip size="small" label={centToYuan(invitation.expectedPriceCent)} />
                             <Chip
                               size="small"
@@ -601,14 +634,14 @@ export function OrdersPage() {
           <Stack spacing={2}>
             <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 } }}>
               <Stack spacing={2}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between' }}>
                   <Box>
                     <Typography variant="h6">{selectedOrder.orderNo || `订单 ${selectedOrder.orderId}`}</Typography>
                     <Typography color="text.secondary">
                       归档订单 · 报价 {selectedOrder.quoteId} · 会话 {selectedOrder.conversationId}
                     </Typography>
                   </Box>
-                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                  <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                     <Chip variant="outlined" label={selectedOrderPerspective} />
                     <Chip color="primary" label={orderStatusMap[selectedOrder.status] || selectedOrder.status} />
                     <Chip color={selectedOrder.escrowStatus === 'HELD' ? 'success' : 'default'} label={escrowStatusMap[selectedOrder.escrowStatus] || selectedOrder.escrowStatus} />
@@ -620,7 +653,7 @@ export function OrdersPage() {
                   ['金额', centToYuan(selectedOrder.amountCent)],
                   ['当前身份', selectedOrderPerspective || '未确认'],
                   ['对方', selectedCounterpartyLabel],
-                  ['结算/退款', `${selectedOrder.settlementStatus || 'NOT_SETTLED'} / ${selectedOrder.refundStatus || 'NONE'}`]
+                  ['结算/退款', getSettlementRefundLabel(selectedOrder)]
                 ]} />
                 <Typography variant="overline" color="text.secondary">履约安排</Typography>
                 <InfoRows rows={[
@@ -631,7 +664,7 @@ export function OrdersPage() {
                 {fulfillmentNotice && (
                   <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
                     <Stack spacing={1}>
-                      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
+                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
                         <Box>
                           <Typography fontWeight={900}>{fulfillmentNotice.title}</Typography>
                           <Typography color="text.secondary" variant="body2">{fulfillmentNotice.description}</Typography>
@@ -693,7 +726,7 @@ export function OrdersPage() {
 
             <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 } }}>
               <Stack spacing={2}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between' }}>
                   <Box>
                     <Typography variant="h6">交付作品</Typography>
                     <Typography color="text.secondary">摄影师必须通过上传交付文件推进待确认状态，返修也从这里重新上传。</Typography>
@@ -706,7 +739,7 @@ export function OrdersPage() {
                 {canUploadDelivery && (
                   <Paper component="form" variant="outlined" onSubmit={submitDelivery} sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
                     <Stack spacing={1.5}>
-                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.2} alignItems={{ xs: 'stretch', sm: 'center' }}>
+                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.2} sx={{ alignItems: { xs: 'stretch', sm: 'center' } }}>
                         <Button variant="outlined" component="label" startIcon={<AddPhotoAlternateRoundedIcon />}>
                           选择交付文件
                           <input
@@ -759,14 +792,14 @@ export function OrdersPage() {
                   {deliveryRecords.map(record => (
                     <Paper key={record.deliveryId || `${record.orderId}-${record.fileId}-${record.uploadTime}`} variant="outlined" sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
                       <Stack spacing={0.7}>
-                        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
                           <Typography fontWeight={800}>
                             {record.fileName || `文件 ${record.fileId || '-'}`}
                           </Typography>
                           <Chip size="small" label={`第 ${record.deliveryRound || 1} 次交付${record.isLatest ? ' · 最新' : ''}`} />
                         </Stack>
                         <Typography color="text.secondary" variant="body2">
-                          fileId {record.fileId || '-'} · {record.status || 'DELIVERED'} · {formatTime(record.uploadTime)}
+                          fileId {record.fileId || '-'} · {deliveryStatusLabelMap[record.status] || '已交付'} · {formatTime(record.uploadTime)}
                         </Typography>
                         <Typography>{record.remark || '无交付说明'}</Typography>
                       </Stack>
@@ -779,7 +812,7 @@ export function OrdersPage() {
 
             <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 } }}>
               <Stack spacing={2}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between' }}>
                   <Box>
                     <Typography variant="h6">照片展示授权</Typography>
                     <Typography color="text.secondary">客户同意后，摄影师才能把本订单交付照片作为真实客片展示。</Typography>
@@ -851,7 +884,7 @@ export function OrdersPage() {
                     return (
                       <Paper key={authorization.id} variant="outlined" sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
                         <Stack spacing={1}>
-                          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
+                          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
                             <Box>
                               <Typography fontWeight={800}>授权申请 {authorization.id}</Typography>
                               <Typography color="text.secondary" variant="body2">
@@ -873,7 +906,7 @@ export function OrdersPage() {
                             {authorization.authorizedAt ? ` · ${formatTime(authorization.authorizedAt)}` : ''}
                           </Typography>
                           <Typography>{authorization.remark || '无备注'}</Typography>
-                          <Stack direction="row" spacing={1} flexWrap="wrap">
+                          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                             {(authorization.files || []).map(file => (
                               <Chip
                                 key={file.id || file.fileId}
@@ -898,7 +931,7 @@ export function OrdersPage() {
                                   [authorization.id]: event.target.value
                                 })}
                               />
-                              <Stack direction="row" spacing={1} flexWrap="wrap">
+                              <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                                 <Button
                                   variant="contained"
                                   color="success"
@@ -931,12 +964,12 @@ export function OrdersPage() {
 
             <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 } }}>
               <Stack spacing={2}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between' }}>
                   <Box>
                     <Typography variant="h6">评价与仲裁</Typography>
                     <Typography color="text.secondary">订单完成后双方都可以评价；被评价方可对不实评价发起投诉仲裁。</Typography>
                   </Box>
-                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                  <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                     {canReviewSelectedOrder && !myReview && (
                       <Button
                         variant={showReviewForm ? 'contained' : 'outlined'}
@@ -968,7 +1001,7 @@ export function OrdersPage() {
                 {showReviewForm && (
                   <Paper component="form" variant="outlined" onSubmit={submitReview} sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
                     <Stack spacing={1.5}>
-                      <Stack direction="row" spacing={1.2} alignItems="center">
+                      <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center' }}>
                         <Typography fontWeight={800}>评分</Typography>
                         <Rating
                           value={reviewForm.rating}
@@ -1027,7 +1060,7 @@ export function OrdersPage() {
                     {arbitrations.map(record => (
                       <Paper key={record.arbitrationId} variant="outlined" sx={{ p: 1.5, bgcolor: '#fffaf0' }}>
                         <Stack spacing={0.6}>
-                          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
+                          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
                             <Typography fontWeight={800}>{record.reason}</Typography>
                             <Chip size="small" color="warning" label={record.status === 'PENDING' ? '待处理' : record.status} />
                           </Stack>
@@ -1048,7 +1081,7 @@ export function OrdersPage() {
                 <Typography variant="h6">状态日志</Typography>
                 {statusLogs.map(log => (
                   <Paper key={log.logId || `${log.orderId}-${log.createdAt}`} variant="outlined" sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
                       <Box>
                         <Typography fontWeight={800}>
                           {orderStatusMap[log.fromStatus] || log.fromStatus || '创建'} → {orderStatusMap[log.toStatus] || log.toStatus}

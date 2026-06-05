@@ -300,6 +300,7 @@ export function buildConversationTimeline({
       id: `message-${message.messageId ?? message.id ?? index}`,
       type: 'MESSAGE',
       actorRole,
+      actorId: message.senderId,
       visibleRole,
       timestamp: message.createdAt || message.sentAt || message.updatedAt,
       stageOrder: STAGE_ORDER.MESSAGE,
@@ -315,6 +316,7 @@ export function buildConversationTimeline({
       id: `quote-sent-${quote.quotationId}`,
       type: 'QUOTE_SENT',
       actorRole: 'PROVIDER',
+      actorId: quote.providerUserId,
       visibleRole,
       timestamp: quote.createdAt,
       stageOrder: STAGE_ORDER.QUOTE_SENT,
@@ -341,6 +343,7 @@ export function buildConversationTimeline({
         id: `delivery-${delivery.deliveryId ?? delivery.fileId ?? index}`,
         type: 'DELIVERY',
         actorRole: 'PROVIDER',
+        actorId: delivery.providerUserId || order.providerUserId,
         visibleRole,
         timestamp: delivery.uploadTime,
         stageOrder: STAGE_ORDER.DELIVERY,
@@ -375,6 +378,7 @@ export function buildConversationTimeline({
           id: `authorization-${authorization.id ?? index}`,
           type: 'AUTHORIZATION',
           actorRole: 'PROVIDER',
+          actorId: authorization.providerUserId || order.providerUserId,
           visibleRole,
           timestamp: authorization.authorizedAt || order.updatedAt,
           stageOrder: STAGE_ORDER.AUTHORIZATION,
@@ -392,6 +396,7 @@ export function buildConversationTimeline({
   return items
     .filter(Boolean)
     .map((item, index) => normalizeTimelineItem(item, index))
+    .map(item => attachTimelineActor(item, conversation, currentUser, order))
     .sort((left, right) => left.timestamp - right.timestamp || left.stageOrder - right.stageOrder)
 }
 
@@ -480,6 +485,7 @@ function createTimelineItem({
   id,
   type,
   actorRole,
+  actorId,
   visibleRole,
   timestamp,
   stageOrder,
@@ -493,6 +499,7 @@ function createTimelineItem({
     key: id,
     type,
     actorRole,
+    actorId,
     actorLabel: actorRole === 'PLATFORM' ? '平台' : actorRole === 'PROVIDER' ? '摄影师' : '客户',
     side: actorRole === 'PLATFORM' ? 'center' : actorRole === visibleRole ? 'self' : 'other',
     timestamp: toTimestamp(timestamp),
@@ -520,6 +527,7 @@ function normalizeTimelineItem(item, index = 0) {
     key: String(item?.key || id),
     type,
     actorRole,
+    actorId: normalizeActorId(item?.actorId),
     actorLabel: item?.actorLabel || getActorLabel(actorRole),
     side,
     timestamp,
@@ -529,6 +537,75 @@ function normalizeTimelineItem(item, index = 0) {
     meta: item?.meta && typeof item.meta === 'object' ? item.meta : {},
     actions: Array.isArray(item?.actions) ? item.actions.filter(Boolean) : []
   }
+}
+
+function attachTimelineActor(item, conversation, currentUser, order) {
+  if (!item || item.actorRole === 'PLATFORM') {
+    return {
+      ...item,
+      actor: null
+    }
+  }
+  const userId = item.actorId || inferActorId(item, conversation, order)
+  const displayName = getTimelineActorDisplayName(userId, item.actorRole, conversation, currentUser)
+  return {
+    ...item,
+    actorId: userId,
+    actor: userId ? {
+      userId,
+      role: item.actorRole,
+      displayName,
+      avatarText: getTimelineActorAvatarText(userId, displayName, currentUser),
+      profilePath: `/users/${userId}`
+    } : {
+      userId: null,
+      role: item.actorRole,
+      displayName: item.actorLabel,
+      avatarText: item.actorLabel.slice(0, 1),
+      profilePath: ''
+    }
+  }
+}
+
+function inferActorId(item, conversation, order) {
+  const meta = item?.meta || {}
+  if (item.actorRole === 'CUSTOMER') {
+    return normalizeActorId(meta.quote?.customerId)
+      || normalizeActorId(meta.order?.customerId)
+      || normalizeActorId(order?.customerId)
+      || normalizeActorId(conversation?.participantAId)
+  }
+  if (item.actorRole === 'PROVIDER') {
+    return normalizeActorId(meta.quote?.providerUserId)
+      || normalizeActorId(meta.delivery?.providerUserId)
+      || normalizeActorId(meta.authorization?.providerUserId)
+      || normalizeActorId(meta.order?.providerUserId)
+      || normalizeActorId(order?.providerUserId)
+      || normalizeActorId(conversation?.participantBId)
+  }
+  return null
+}
+
+function normalizeActorId(value) {
+  const id = Number(value)
+  return Number.isFinite(id) && id > 0 ? id : null
+}
+
+function getTimelineActorDisplayName(userId, actorRole, conversation, currentUser) {
+  if (userId && Number(userId) === getCurrentUserId(currentUser)) {
+    return currentUser?.nickname || getActorLabel(actorRole)
+  }
+  const nickname = conversation?.counterpartyNickname
+    || conversation?.otherUserNickname
+    || (actorRole === 'PROVIDER' ? conversation?.providerNickname : conversation?.customerNickname)
+  return nickname || getActorLabel(actorRole)
+}
+
+function getTimelineActorAvatarText(userId, displayName, currentUser) {
+  if (userId && Number(userId) === getCurrentUserId(currentUser)) {
+    return String(currentUser?.nickname || displayName || '我').slice(0, 1) || '我'
+  }
+  return String(displayName || '对').slice(0, 1) || '对'
 }
 
 function getActorLabel(actorRole) {
@@ -564,6 +641,7 @@ function buildQuoteDecisionEvent(quote, order, visibleRole) {
     id: `quote-decision-${quote.quotationId}-${quote.status}`,
     type: 'QUOTE_DECISION',
     actorRole: config[0],
+    actorId: config[0] === 'CUSTOMER' ? quote.customerId : null,
     visibleRole,
     timestamp: quote.status === 'CONFIRMED'
       ? order?.createdAt || quote.createdAt
@@ -623,6 +701,7 @@ function buildStatusLogEvent(log, order, actions, visibleRole) {
     id: `status-${log.logId ?? `${log.toStatus}-${log.createdAt}`}`,
     type: 'STATUS',
     actorRole: log.toStatus === 'APPEALING' || log.toStatus === 'REFUNDED' ? 'PLATFORM' : actorRole,
+    actorId: getStatusEventActorId(log.toStatus, actorRole, log, order),
     visibleRole,
     timestamp: log.createdAt,
     stageOrder: statusConfig[2],
@@ -645,6 +724,15 @@ function getStatusActorRole(status, logActorRole) {
   return logActorRole
 }
 
+function getStatusEventActorId(status, actorRole, log, order) {
+  if (status === 'APPEALING' || status === 'REFUNDED') return null
+  const operatorId = normalizeActorId(log?.operatorId || log?.operatorUserId || log?.userId)
+  if (operatorId) return operatorId
+  if (actorRole === 'CUSTOMER') return normalizeActorId(order?.customerId)
+  if (actorRole === 'PROVIDER') return normalizeActorId(order?.providerUserId)
+  return null
+}
+
 function getStatusEventActions(status, actions) {
   if (status === 'PENDING_DELIVERY') {
     return [actions?.canUploadDelivery && 'UPLOAD_DELIVERY'].filter(Boolean)
@@ -664,6 +752,7 @@ function buildCurrentReworkEvent(order, actions, visibleRole) {
     id: `current-rework-${order.orderId}`,
     type: 'REWORK',
     actorRole: 'CUSTOMER',
+    actorId: order.customerId,
     visibleRole,
     timestamp: order.updatedAt,
     stageOrder: STAGE_ORDER.REWORK,
@@ -720,6 +809,7 @@ function buildCurrentStatusFallback(order, actions, visibleRole) {
     id: `current-status-${order.orderId}-${order.status}`,
     type: 'STATUS',
     actorRole: config[0],
+    actorId: config[0] === 'CUSTOMER' ? order.customerId : config[0] === 'PROVIDER' ? order.providerUserId : null,
     visibleRole,
     timestamp: order.updatedAt,
     stageOrder: config[3],

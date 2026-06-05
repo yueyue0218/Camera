@@ -444,7 +444,16 @@ export function ConversationDetailPage() {
     event?.stopPropagation()
     const id = Number(userId)
     if (!id) return
-    navigate(`/users/${id}`)
+    navigate(`/users/${id}`, { state: { fromMessageAvatar: true } })
+  }
+
+  function openOrderArchive(orderId = currentOrder?.orderId) {
+    const id = Number(orderId)
+    if (!id) {
+      setNotice({ type: 'warning', text: '订单信息暂时不可用，请稍后刷新后再查看。' })
+      return
+    }
+    navigate(`/orders?orderId=${id}`)
   }
 
   const currentUserId = getCurrentUserId(currentUser)
@@ -530,7 +539,7 @@ export function ConversationDetailPage() {
               variant="outlined"
               color="inherit"
               startIcon={<ReceiptLongRoundedIcon />}
-              onClick={() => currentOrder && navigate(`/orders?orderId=${currentOrder.orderId}`)}
+              onClick={() => openOrderArchive(currentOrder?.orderId)}
               disabled={!currentOrder}
             >
               订单档案
@@ -587,7 +596,7 @@ export function ConversationDetailPage() {
               setActiveQuote(quote)
               setActiveAction('QUOTE_DETAIL')
             }}
-            onOpenOrderArchive={() => currentOrder && navigate(`/orders?orderId=${currentOrder.orderId}`)}
+            onOpenOrderArchive={openOrderArchive}
             onOpenUserProfile={userId => openUserProfile(userId)}
             onQuoteFormChange={setQuoteForm}
             onSubmitQuote={createQuote}
@@ -612,7 +621,7 @@ export function ConversationDetailPage() {
           deliveryRecords={deliveryRecords}
           photoAuthorizations={photoAuthorizations}
           panelSummary={viewModel.panelSummary}
-          onOpenOrderArchive={() => currentOrder && navigate(`/orders?orderId=${currentOrder.orderId}`)}
+          onOpenOrderArchive={() => openOrderArchive(currentOrder?.orderId)}
           onConfirmOrder={confirmCurrentOrder}
           onUnavailableTool={showUnavailableTool}
           onOpenAction={setActiveAction}

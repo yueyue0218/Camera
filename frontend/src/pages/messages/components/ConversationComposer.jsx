@@ -22,6 +22,7 @@ export function ConversationComposer({
   canCreateQuote,
   showQuoteForm,
   quoteActionLabel = '发送报价',
+  quoteEntryHint = '',
   actions,
   onOpenQuoteForm,
   onStartQuoteEditing,
@@ -54,22 +55,29 @@ export function ConversationComposer({
     || actions.canViewDispute
   )
   return (
-    <Box sx={{ px: { xs: 1.2, md: 1.5 }, py: 1.2, bgcolor: PORTRA_COLORS.paper, borderTop: `1px solid ${PORTRA_COLORS.borderMuted}` }}>
-      <Stack spacing={0.9}>
+    <Box sx={{ px: { xs: 1.1, md: 1.35 }, py: 1, bgcolor: PORTRA_COLORS.paper, borderTop: `1px solid ${PORTRA_COLORS.borderMuted}` }}>
+      <Stack spacing={0.75}>
         {hasQuickActions && (
           <Stack
             direction={{ xs: 'column', md: 'row' }}
-            spacing={0.8}
+            spacing={0.75}
             sx={{
               alignItems: { xs: 'stretch', md: 'center' },
-              py: 0.7,
-              px: 0.9,
-              bgcolor: 'rgba(255, 253, 249, 0.56)',
+              py: 0.55,
+              px: 0.75,
+              bgcolor: 'rgba(255, 253, 249, 0.42)',
               borderRadius: PORTRA_RADII.control,
               border: `1px solid ${PORTRA_COLORS.borderMuted}`
             }}
           >
-            <Typography variant="caption" sx={{ color: PORTRA_COLORS.mutedInk, fontWeight: 950, flexShrink: 0 }}>下一步</Typography>
+            <Stack direction="row" spacing={0.8} sx={{ minWidth: 0, alignItems: 'center', flex: 1 }}>
+              <Typography variant="caption" sx={{ color: PORTRA_COLORS.mutedInk, fontWeight: 950, flexShrink: 0 }}>下一步</Typography>
+              {quoteEntryHint && (
+                <Typography variant="caption" noWrap sx={{ color: PORTRA_COLORS.faintInk, minWidth: 0 }}>
+                  {quoteEntryHint}
+                </Typography>
+              )}
+            </Stack>
             <Stack direction="row" spacing={0.65} sx={{ flexWrap: 'wrap', rowGap: 0.65 }}>
               {actions.canSendQuote && canSeeQuoteEntry && (
                 <Button

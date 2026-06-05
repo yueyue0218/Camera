@@ -16,6 +16,7 @@ import { StatusChip } from './StatusChip.jsx'
 
 export function ConversationSystemItem({
   event,
+  actor,
   loading,
   actions,
   onStartQuoteEditing,
@@ -27,6 +28,7 @@ export function ConversationSystemItem({
   onCancelOrder,
   onConfirmOrder,
   onOpenAction,
+  onOpenUserProfile,
   onDecidePhotoAuthorization,
   onUnavailableTool
 }) {
@@ -35,12 +37,14 @@ export function ConversationSystemItem({
   const eventActions = Array.isArray(event.actions) ? event.actions : []
   const eventMeta = event.meta || {}
   const quote = eventMeta.quote
+  const order = eventMeta.order
   const authorization = eventMeta.authorization
   const renderActionButton = action => (
     <EventActionButton
       key={action}
       action={action}
       quote={quote}
+      order={order}
       authorization={authorization}
       cancelAction={actionState.cancelAction}
       loading={loading}
@@ -68,7 +72,6 @@ export function ConversationSystemItem({
   )
 
   if (event.actorRole === 'PLATFORM') {
-    const order = eventMeta.order
     const noticeText = getSafeDisplayText(event.summary || event.title, '合作进展已更新')
     return (
       <Box id={event.type === 'AUTHORIZATION' ? 'conversation-authorization-action' : undefined} sx={{ display: 'flex', justifyContent: 'center', px: 2 }}>
@@ -94,8 +97,8 @@ export function ConversationSystemItem({
               {noticeText}
             </Typography>
             <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk, flexShrink: 0, fontSize: 11 }}>{formatTime(event.timestamp)}</Typography>
-            {order && (
-              <Button size="small" variant="text" color="inherit" onClick={onOpenOrderArchive} sx={stripActionSx}>
+            {order?.orderId && (
+              <Button size="small" variant="text" color="inherit" onClick={() => onOpenOrderArchive(order.orderId)} sx={stripActionSx}>
                 查看订单
               </Button>
             )}
@@ -114,10 +117,11 @@ export function ConversationSystemItem({
     <Box id={event.type === 'AUTHORIZATION' ? 'conversation-authorization-action' : undefined}>
       <EventAttachmentCard
         side={event.side}
-        actorRole={event.actorRole}
+        actor={actor || event.actor}
         title={getSafeDisplayText(event.title, '合作进展已更新')}
         summary={getSafeDisplayText(event.summary, '')}
         timestamp={formatTime(event.timestamp)}
+        onOpenUserProfile={onOpenUserProfile}
         actions={quote ? quoteAction : actionButtons}
       >
         {quote && <QuoteMeta quote={quote} />}
@@ -132,6 +136,7 @@ export function ConversationSystemItem({
 function EventActionButton({
   action,
   quote,
+  order,
   authorization,
   cancelAction,
   loading,
@@ -162,8 +167,8 @@ function EventActionButton({
   if (action === 'APPROVE_AUTHORIZATION' && authorization && typeof onDecidePhotoAuthorization === 'function') return <Button {...common} variant="contained" startIcon={<CheckCircleRoundedIcon />} onClick={() => onDecidePhotoAuthorization(authorization, 'approve')}>同意展示</Button>
   if (action === 'REJECT_AUTHORIZATION' && authorization && typeof onDecidePhotoAuthorization === 'function') return <Button {...common} variant="outlined" color="inherit" startIcon={<CloseRoundedIcon />} onClick={() => onDecidePhotoAuthorization(authorization, 'reject')}>拒绝展示</Button>
   if (action === 'PLATFORM_ASSISTANCE' && typeof onUnavailableTool === 'function') return <Button {...common} variant="text" color="inherit" onClick={() => onUnavailableTool('平台协助')}>申请平台协助</Button>
-  if (action === 'VIEW_DISPUTE' && typeof onOpenOrderArchive === 'function') return <Button {...common} variant="outlined" color="inherit" startIcon={<ReceiptLongRoundedIcon />} onClick={onOpenOrderArchive}>查看订单档案</Button>
-  if (action === 'OPEN_ORDER' && typeof onOpenOrderArchive === 'function') return <Button {...common} variant="outlined" color="inherit" startIcon={<ReceiptLongRoundedIcon />} onClick={onOpenOrderArchive}>查看订单档案</Button>
+  if (action === 'VIEW_DISPUTE' && order?.orderId && typeof onOpenOrderArchive === 'function') return <Button {...common} variant="outlined" color="inherit" startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenOrderArchive(order.orderId)}>查看订单档案</Button>
+  if (action === 'OPEN_ORDER' && order?.orderId && typeof onOpenOrderArchive === 'function') return <Button {...common} variant="outlined" color="inherit" startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenOrderArchive(order.orderId)}>查看订单档案</Button>
   return null
 }
 

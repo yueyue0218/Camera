@@ -1,11 +1,19 @@
 import { Avatar, Box, Paper, Stack, Typography } from '@mui/material'
 import { PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
 
-export function EventAttachmentCard({ side, actorRole, title, summary, timestamp, children, actions }) {
-  const provider = actorRole === 'PROVIDER'
+export function EventAttachmentCard({ side, actor, title, summary, timestamp, children, actions, onOpenUserProfile }) {
+  const provider = actor?.role === 'PROVIDER'
   const self = side === 'self'
   const accent = provider ? PORTRA_COLORS.blue : PORTRA_COLORS.orange
-  const avatarText = provider ? '摄' : '客'
+  const canOpenProfile = Boolean(actor?.userId && typeof onOpenUserProfile === 'function')
+  const openProfile = event => {
+    event.stopPropagation()
+    if (canOpenProfile) {
+      onOpenUserProfile(actor.userId, event)
+      return
+    }
+    console.debug('[messages] event actor missing userId', { title, actor })
+  }
   const avatarSx = {
     width: 32,
     height: 32,
@@ -14,7 +22,8 @@ export function EventAttachmentCard({ side, actorRole, title, summary, timestamp
     bgcolor: accent,
     color: PORTRA_COLORS.paper,
     fontSize: 13,
-    fontWeight: 950
+    fontWeight: 950,
+    cursor: canOpenProfile ? 'pointer' : 'default'
   }
 
   return (
@@ -28,7 +37,15 @@ export function EventAttachmentCard({ side, actorRole, title, summary, timestamp
           flexDirection: self ? 'row-reverse' : 'row'
         }}
       >
-        <Avatar sx={avatarSx}>{avatarText}</Avatar>
+        <Avatar
+          data-message-avatar="event"
+          data-avatar-user-id={actor?.userId || ''}
+          src={actor?.avatarData || undefined}
+          onClick={openProfile}
+          sx={avatarSx}
+        >
+          {actor?.avatarText || '对'}
+        </Avatar>
         <Paper
           variant="outlined"
           sx={{

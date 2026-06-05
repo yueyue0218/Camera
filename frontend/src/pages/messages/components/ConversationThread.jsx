@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Alert, Box, Divider, Paper, Stack, Typography } from '@mui/material'
+import { Box, Divider, Paper, Stack, Typography } from '@mui/material'
 import { ConversationComposer } from './ConversationComposer.jsx'
 import { ConversationSystemItem } from './ConversationSystemCard.jsx'
 import { MessageBubble } from './MessageBubble.jsx'
@@ -57,6 +57,20 @@ export function ConversationThread({
   const currentUserId = getCurrentUserId(currentUser)
   const counterparty = getCounterpartyProfile(conversation, currentUser)
   const safeTimeline = Array.isArray(timeline) ? timeline : []
+  const resolveEventActor = event => {
+    if (!event?.actor) return null
+    const actorUserId = Number(event.actor.userId)
+    const mine = actorUserId && actorUserId === currentUserId
+    const other = actorUserId && Number(counterparty.userId) === actorUserId
+    return {
+      ...event.actor,
+      avatarData: mine ? currentUser?.avatarData : other ? counterparty.avatarData : '',
+      avatarText: mine
+        ? String(currentUser?.nickname || '我').slice(0, 1)
+        : other ? counterparty.initial : event.actor.avatarText,
+      displayName: mine ? currentUser?.nickname || event.actor.displayName : other ? counterparty.nickname : event.actor.displayName
+    }
+  }
 
   useEffect(() => {
     const node = scrollRef.current
@@ -102,6 +116,7 @@ export function ConversationThread({
                 <ConversationSystemItem
                   key={item.key}
                   event={item}
+                  actor={resolveEventActor(item)}
                   actions={actions}
                   loading={loading}
                   onStartQuoteEditing={onStartQuoteEditing}
@@ -114,6 +129,7 @@ export function ConversationThread({
                   onDecidePhotoAuthorization={onDecidePhotoAuthorization}
                   onUnavailableTool={onUnavailableTool}
                   onOpenAction={onOpenAction}
+                  onOpenUserProfile={onOpenUserProfile}
                   onOpenOrderArchive={onOpenOrderArchive}
                 />
               )
@@ -162,12 +178,6 @@ export function ConversationThread({
           </Box>
         )}
 
-        {quoteEntryHint && canSeeQuoteEntry && !showQuoteForm && (
-          <Box sx={{ px: { xs: 1.4, md: 2 }, pt: 1, pb: 1 }}>
-            <Alert severity={canCreateQuote ? 'info' : 'warning'}>{quoteEntryHint}</Alert>
-          </Box>
-        )}
-
         <Divider sx={{ borderColor: PORTRA_COLORS.borderMuted }} />
         <ConversationComposer
           content={content}
@@ -177,6 +187,7 @@ export function ConversationThread({
           canCreateQuote={canCreateQuote}
           showQuoteForm={showQuoteForm}
           quoteActionLabel={quoteActionLabel}
+          quoteEntryHint={quoteEntryHint && canSeeQuoteEntry && !showQuoteForm ? quoteEntryHint : ''}
           actions={actions}
           onOpenQuoteForm={onOpenQuoteForm}
           onStartQuoteEditing={onStartQuoteEditing}

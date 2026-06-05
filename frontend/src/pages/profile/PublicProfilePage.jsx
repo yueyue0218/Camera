@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   Alert, Avatar, Box, Button, Chip, CircularProgress,
   Divider, LinearProgress, Paper, Rating, Stack, Typography
@@ -26,8 +26,8 @@ import {
 
 function StatItem({ label, value }) {
   return (
-    <Stack alignItems="center" spacing={0.3}>
-      <Typography fontWeight={800} variant="h6" lineHeight={1}>{value ?? '—'}</Typography>
+    <Stack spacing={0.3} sx={{ alignItems: 'center' }}>
+      <Typography fontWeight={800} variant="h6" sx={{ lineHeight: 1 }}>{value ?? '—'}</Typography>
       <Typography color="text.secondary" variant="caption">{label}</Typography>
     </Stack>
   )
@@ -42,8 +42,10 @@ function GenderIcon({ gender }) {
 export function PublicProfilePage() {
   const { userId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const { currentUser } = useAuth()
   const profileUserId = Number(userId)
+  const fromMessageAvatar = location.state?.fromMessageAvatar === true
 
   const [publicProfile, setPublicProfile] = useState(null)
   const [moments, setMoments] = useState([])
@@ -113,7 +115,7 @@ export function PublicProfilePage() {
     setFollowLoading(false)
   }
 
-  if (profileUserId === currentUser.userId) return <Navigate to="/profile" replace />
+  if (profileUserId === currentUser.userId && !fromMessageAvatar) return <Navigate to="/profile" replace />
 
   if (loading) {
     return (
@@ -154,7 +156,7 @@ export function PublicProfilePage() {
 
         {/* ─── 顶部信息卡 ─── */}
         <Paper variant="outlined" sx={{ p: 3, bgcolor: '#fff' }}>
-          <Stack spacing={2} alignItems="center">
+          <Stack spacing={2} sx={{ alignItems: 'center' }}>
             <Avatar
               src={avatarSrc}
               sx={{ width: 96, height: 96, bgcolor: isProvider ? 'secondary.main' : 'primary.main', fontSize: 36 }}
@@ -162,7 +164,7 @@ export function PublicProfilePage() {
               {nickname.slice(0, 1)}
             </Avatar>
 
-            <Stack direction="row" spacing={0.5} alignItems="center">
+            <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
               <Typography variant="h5" fontWeight={800}>{nickname}</Typography>
               <GenderIcon gender={gender} />
             </Stack>
@@ -186,7 +188,7 @@ export function PublicProfilePage() {
                     fontWeight: 700
                   }}
                 />
-                <Stack direction="row" spacing={4} justifyContent="center" sx={{ width: '100%', pt: 1 }}>
+                <Stack direction="row" spacing={4} sx={{ width: '100%', pt: 1, justifyContent: 'center' }}>
                   <StatItem label="完成订单" value={pp.completedOrders} />
                   <StatItem label="平均评分" value={pp.avgRating != null ? `${Number(pp.avgRating).toFixed(1)} ★` : null} />
                   <StatItem label="粉丝" value={publicProfile?.followerCount} />
@@ -199,7 +201,7 @@ export function PublicProfilePage() {
                 {bio && <Typography variant="body2" sx={{ textAlign: 'center', color: 'text.secondary' }}>{bio}</Typography>}
                 {creditScore != null && (
                   <Box sx={{ width: '100%', px: 1 }}>
-                    <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                    <Stack direction="row" sx={{ mb: 0.5, justifyContent: 'space-between' }}>
                       <Typography variant="body2" fontWeight={700}>信用分</Typography>
                       <Typography variant="body2" fontWeight={700} color="primary">{creditScore}</Typography>
                     </Stack>
@@ -210,7 +212,7 @@ export function PublicProfilePage() {
                     />
                   </Box>
                 )}
-                <Stack direction="row" spacing={4} justifyContent="center" sx={{ pt: 1 }}>
+                <Stack direction="row" spacing={4} sx={{ pt: 1, justifyContent: 'center' }}>
                   <StatItem label="动态" value={publicProfile?.momentCount ?? moments.length} />
                   <StatItem label="粉丝" value={publicProfile?.followerCount} />
                   <StatItem label="关注" value={publicProfile?.followingCount} />
@@ -219,7 +221,7 @@ export function PublicProfilePage() {
             )}
 
             {/* 操作按钮 */}
-            <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent="center">
+            <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', justifyContent: 'center' }}>
               <Button
                 variant="outlined"
                 size="small"
@@ -270,7 +272,7 @@ export function PublicProfilePage() {
               {styleTags.length > 0 && (
                 <Box>
                   <Typography fontWeight={700} variant="body2" sx={{ mb: 0.5 }}>风格标签</Typography>
-                  <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                    <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap' }}>
                     {styleTags.map(tag => (
                       <Chip key={tag} label={tag} size="small" sx={{ mb: 0.5 }} />
                     ))}
