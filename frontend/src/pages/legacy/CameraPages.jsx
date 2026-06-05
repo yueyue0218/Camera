@@ -2069,7 +2069,7 @@ function OrdersPage() {
           role: currentUser.role === 'PROVIDER' ? 'provider' : 'customer',
           status: statusFilter
         }, currentUser),
-        currentUser.role === 'PROVIDER' ? demandApi.sentInvitations(currentUser) : Promise.resolve([])
+        currentUser.role === 'PROVIDER' ? demandApi.sentInvitations(currentUser).catch(() => []) : Promise.resolve([])
       ])
       setOrders(nextOrders)
       saveOrderSnapshots(nextOrders)
