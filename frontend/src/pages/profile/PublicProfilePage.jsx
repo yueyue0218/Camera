@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { fileApi, momentApi, reviewApi, userApi } from '../../api.js'
 import {
@@ -14,6 +14,8 @@ import './profile.css'
 
 export function PublicProfilePage() {
   const { userId } = useParams()
+  const [searchParams] = useSearchParams()
+  const profileRole = searchParams.get('role') || null
   const navigate = useNavigate()
   const { currentUser } = useAuth()
   const profileUserId = Number(userId)
@@ -37,8 +39,8 @@ export function PublicProfilePage() {
     async function load() {
       setLoading(true)
       const [profileResult, momentsResult, reviewsResult, myFollowersResult] = await Promise.allSettled([
-        userApi.publicProfile(profileUserId, currentUser),
-        momentApi.list({}, currentUser),
+        userApi.publicProfile(profileUserId, currentUser, profileRole),
+        momentApi.list({ authorId: profileUserId, authorRole: profileRole }, currentUser),
         reviewApi.listByUser(profileUserId, currentUser),
         userApi.followers(currentUser.userId, currentUser),
       ])
@@ -56,7 +58,7 @@ export function PublicProfilePage() {
       }
 
       const allMoments = momentsResult.status === 'fulfilled' ? momentsResult.value : []
-      setMoments(allMoments.filter(m => Number(m.authorId) === profileUserId))
+      setMoments(allMoments)
 
       const remoteReviews = reviewsResult.status === 'fulfilled' ? reviewsResult.value : []
       setReviews(mergeReviewLists(remoteReviews, getLocalReviewsByTarget(profileUserId)))
@@ -65,13 +67,14 @@ export function PublicProfilePage() {
     }
     load()
     return () => { cancelled = true }
-  }, [profileUserId, currentUser.userId])
+  }, [profileUserId, currentUser.userId, profileRole])
 
   useEffect(() => {
-    if (!publicProfile?.avatarFileId) return
+    const fileId = publicProfile?.avatarFileId
+    if (!fileId) return
     let url = ''
     let cancelled = false
-    fileApi.downloadObjectUrl(publicProfile.avatarFileId, currentUser)
+    fileApi.downloadObjectUrl(fileId, currentUser)
       .then(u => { if (!cancelled) { url = u; setAvatarUrl(u) } })
       .catch(() => {})
     return () => { cancelled = true; if (url) URL.revokeObjectURL(url) }
@@ -96,9 +99,9 @@ export function PublicProfilePage() {
     setFollowLoading(true)
     try {
       if (wasFollowed) {
-        await userApi.unfollow(profileUserId, currentUser)
+        await userApi.unfollow(profileUserId, currentUser, profileRole)
       } else {
-        await userApi.follow(profileUserId, currentUser)
+        await userApi.follow(profileUserId, currentUser, profileRole)
       }
       toggleFollowLocal(profileUserId, currentUser.userId)
       setNotice(null)

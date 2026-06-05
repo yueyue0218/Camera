@@ -39,21 +39,30 @@ public class MomentService {
     }
 
     @Transactional(readOnly = true)
-    public List<MomentDto> listMoments(CurrentUser user, String scope) {
-        List<MomentPost> moments = switch (normalizeScope(scope)) {
-            case "hot" -> momentPostRepository.findByStatusOrderByCreatedAtDesc(MomentStatus.PUBLISHED).stream()
-                    .sorted(Comparator.comparingInt(this::hotScore).reversed()
-                            .thenComparing(MomentPost::getCreatedAt, Comparator.reverseOrder()))
-                    .toList();
-            case "following" -> {
-                List<Long> followingUserIds = userFollowRepository.findFollowingUserIdsByFollowerId(user.getUserId());
-                if (followingUserIds.isEmpty()) {
-                    yield Collections.emptyList();
-                }
-                yield momentPostRepository.findByAuthorIdInAndStatusOrderByCreatedAtDesc(followingUserIds, MomentStatus.PUBLISHED);
+    public List<MomentDto> listMoments(CurrentUser user, String scope, Long authorId, String authorRole) {
+        List<MomentPost> moments;
+        if (authorId != null) {
+            if (authorRole != null && !authorRole.isBlank()) {
+                moments = momentPostRepository.findByAuthorIdAndAuthorRoleAndStatusOrderByCreatedAtDesc(authorId, authorRole.toUpperCase(), MomentStatus.PUBLISHED);
+            } else {
+                moments = momentPostRepository.findByAuthorIdAndStatusOrderByCreatedAtDesc(authorId, MomentStatus.PUBLISHED);
             }
-            default -> momentPostRepository.findByStatusOrderByCreatedAtDesc(MomentStatus.PUBLISHED);
-        };
+        } else {
+            moments = switch (normalizeScope(scope)) {
+                case "hot" -> momentPostRepository.findByStatusOrderByCreatedAtDesc(MomentStatus.PUBLISHED).stream()
+                        .sorted(Comparator.comparingInt(this::hotScore).reversed()
+                                .thenComparing(MomentPost::getCreatedAt, Comparator.reverseOrder()))
+                        .toList();
+                case "following" -> {
+                    List<Long> followingUserIds = userFollowRepository.findFollowingUserIdsByFollowerId(user.getUserId());
+                    if (followingUserIds.isEmpty()) {
+                        yield Collections.emptyList();
+                    }
+                    yield momentPostRepository.findByAuthorIdInAndStatusOrderByCreatedAtDesc(followingUserIds, MomentStatus.PUBLISHED);
+                }
+                default -> momentPostRepository.findByStatusOrderByCreatedAtDesc(MomentStatus.PUBLISHED);
+            };
+        }
         return moments.stream()
                 .map(moment -> toDto(moment, user))
                 .collect(Collectors.toList());

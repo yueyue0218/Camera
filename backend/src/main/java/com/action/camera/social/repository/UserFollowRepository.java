@@ -10,9 +10,8 @@ import java.util.Optional;
 
 public interface UserFollowRepository extends JpaRepository<UserFollow, Long> {
 
+    // Legacy (any target_role) — kept for feed/following-scope queries
     boolean existsByFollowerIdAndFollowingUserId(Long followerId, Long followingUserId);
-
-    Optional<UserFollow> findByFollowerIdAndFollowingUserId(Long followerId, Long followingUserId);
 
     List<UserFollow> findByFollowerIdOrderByCreatedAtDesc(Long followerId);
 
@@ -27,4 +26,17 @@ public interface UserFollowRepository extends JpaRepository<UserFollow, Long> {
 
     @Query("select uf.followerId from UserFollow uf where uf.followingUserId = :followingUserId")
     List<Long> findFollowerUserIdsByFollowingUserId(@Param("followingUserId") Long followingUserId);
+
+    // Role-specific variants (STEP 5)
+    boolean existsByFollowerIdAndFollowingUserIdAndTargetRole(Long followerId, Long followingUserId, String targetRole);
+
+    Optional<UserFollow> findByFollowerIdAndFollowingUserIdAndTargetRole(Long followerId, Long followingUserId, String targetRole);
+
+    List<UserFollow> findByFollowingUserIdAndTargetRoleOrderByCreatedAtDesc(Long followingUserId, String targetRole);
+
+    List<UserFollow> findByFollowerIdAndTargetRoleOrderByCreatedAtDesc(Long followerId, String targetRole);
+
+    long countByFollowingUserIdAndTargetRole(Long followingUserId, String targetRole);
+
+    long countByFollowerIdAndTargetRole(Long followerId, String targetRole);
 }

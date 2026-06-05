@@ -22,10 +22,11 @@ function readUserProfiles() {
   return readJsonStorage(USER_PROFILE_STORAGE_KEY, {})
 }
 
-function openUserProfile(userId) {
+function openUserProfile(userId, authorRole) {
   const id = Number(userId)
   if (!id) return
-  window.open(new URL(`/users/${id}`, window.location.origin).toString(), '_blank', 'noopener,noreferrer')
+  const path = `/users/${id}${authorRole ? `?role=${authorRole}` : ''}`
+  window.open(new URL(path, window.location.origin).toString(), '_blank', 'noopener,noreferrer')
 }
 
 function resolveMentionUserId(mention) {
@@ -125,7 +126,7 @@ export function MomentDetailPage() {
               moment={moment}
               currentUser={currentUser}
               authorProfile={authorProfile}
-              onProfile={() => openUserProfile(moment.authorId)}
+              onProfile={() => openUserProfile(moment.authorId, moment.authorRole)}
               onOpenMention={openMention}
               onLike={() => likeMoment(moment.momentId)}
               onFavorite={() => favoriteMoment(moment.momentId)}

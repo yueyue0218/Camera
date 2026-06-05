@@ -47,6 +47,9 @@ public class ProviderProfile {
 
     private String equipment;
 
+    @TableField("provider_avatar_file_id")
+    private Long providerAvatarFileId;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

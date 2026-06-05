@@ -9,7 +9,6 @@ import com.action.camera.notification.service.NotificationService;
 import com.action.camera.provider.dto.ProviderProfilePublicVO;
 import com.action.camera.provider.mapper.ProviderProfileMapper;
 import com.action.camera.repository.UserRepository;
-import com.action.camera.social.domain.MomentPost;
 import com.action.camera.social.domain.MomentStatus;
 import com.action.camera.social.domain.UserFollow;
 import com.action.camera.social.dto.FollowStateResponse;
@@ -21,7 +20,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
@@ -49,16 +47,17 @@ public class SocialRelationService {
     }
 
     @Transactional
-    public FollowStateResponse follow(Long targetUserId, CurrentUser currentUser) {
+    public FollowStateResponse follow(Long targetUserId, String targetRole, CurrentUser currentUser) {
         validateTargetUser(targetUserId);
         Long currentUserId = requireCurrentUserId(currentUser);
         if (Objects.equals(currentUserId, targetUserId)) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "不能关注自己");
         }
-        boolean existed = userFollowRepository.existsByFollowerIdAndFollowingUserId(currentUserId, targetUserId);
+        String role = normalizeRole(targetRole);
+        boolean existed = userFollowRepository.existsByFollowerIdAndFollowingUserIdAndTargetRole(currentUserId, targetUserId, role);
         if (!existed) {
             try {
-                userFollowRepository.save(new UserFollow(currentUserId, targetUserId));
+                userFollowRepository.save(new UserFollow(currentUserId, targetUserId, role));
                 notificationService.createNotification(new NotificationCreateRequest(
                         targetUserId,
                         currentUserId,
@@ -72,64 +71,91 @@ public class SocialRelationService {
                         currentUserId,
                         "USER_FOLLOW",
                         currentUserId,
-                        "user:follow:" + currentUserId + ":" + targetUserId,
+                        "user:follow:" + currentUserId + ":" + targetUserId + ":" + role,
                         null
                 ));
             } catch (DataIntegrityViolationException ex) {
                 // Concurrent follow requests can race on the unique constraint; treat as idempotent.
             }
         }
-        return buildFollowState(targetUserId, currentUserId);
+        return buildFollowState(targetUserId, role, currentUserId);
     }
 
     @Transactional
-    public FollowStateResponse unfollow(Long targetUserId, CurrentUser currentUser) {
+    public FollowStateResponse unfollow(Long targetUserId, String targetRole, CurrentUser currentUser) {
         validateTargetUser(targetUserId);
         Long currentUserId = requireCurrentUserId(currentUser);
         if (Objects.equals(currentUserId, targetUserId)) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "不能取消关注自己");
         }
-        userFollowRepository.findByFollowerIdAndFollowingUserId(currentUserId, targetUserId)
+        String role = normalizeRole(targetRole);
+        userFollowRepository.findByFollowerIdAndFollowingUserIdAndTargetRole(currentUserId, targetUserId, role)
                 .ifPresent(userFollowRepository::delete);
-        return buildFollowState(targetUserId, currentUserId);
+        return buildFollowState(targetUserId, role, currentUserId);
     }
 
     @Transactional(readOnly = true)
-    public List<SocialUserBriefResponse> listFollowers(Long userId, CurrentUser currentUser) {
+    public List<SocialUserBriefResponse> listFollowers(Long userId, String targetRole, CurrentUser currentUser) {
         validateTargetUser(userId);
         Long currentUserId = requireCurrentUserId(currentUser);
-        return userFollowRepository.findByFollowingUserIdOrderByCreatedAtDesc(userId).stream()
+        List<UserFollow> follows = (targetRole != null && !targetRole.isBlank())
+                ? userFollowRepository.findByFollowingUserIdAndTargetRoleOrderByCreatedAtDesc(userId, normalizeRole(targetRole))
+                : userFollowRepository.findByFollowingUserIdOrderByCreatedAtDesc(userId);
+        return follows.stream()
                 .map(follow -> toUserBrief(follow.getFollowerId(), currentUserId))
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public List<SocialUserBriefResponse> listFollowing(Long userId, CurrentUser currentUser) {
+    public List<SocialUserBriefResponse> listFollowing(Long userId, String targetRole, CurrentUser currentUser) {
         validateTargetUser(userId);
         Long currentUserId = requireCurrentUserId(currentUser);
-        return userFollowRepository.findByFollowerIdOrderByCreatedAtDesc(userId).stream()
+        List<UserFollow> follows = (targetRole != null && !targetRole.isBlank())
+                ? userFollowRepository.findByFollowerIdAndTargetRoleOrderByCreatedAtDesc(userId, normalizeRole(targetRole))
+                : userFollowRepository.findByFollowerIdOrderByCreatedAtDesc(userId);
+        return follows.stream()
                 .map(follow -> toUserBrief(follow.getFollowingUserId(), currentUserId))
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public PublicProfileResponse getPublicProfile(Long userId, CurrentUser currentUser) {
+    public PublicProfileResponse getPublicProfile(Long userId, String role, CurrentUser currentUser) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
         Long currentUserId = requireCurrentUserId(currentUser);
-        long followerCount = userFollowRepository.countByFollowingUserId(userId);
-        long followingCount = userFollowRepository.countByFollowerId(userId);
-        boolean followedByCurrentUser = userFollowRepository.existsByFollowerIdAndFollowingUserId(currentUserId, userId);
-        long momentCount = momentPostRepository.countByAuthorIdAndStatus(userId, MomentStatus.PUBLISHED);
-        ProviderProfilePublicVO providerProfile = "PROVIDER".equalsIgnoreCase(user.getCurrentRole())
+        String resolvedRole = (role != null && !role.isBlank()) ? role.toUpperCase() : user.getCurrentRole();
+        boolean isProvider = "PROVIDER".equalsIgnoreCase(resolvedRole);
+
+        long followerCount = userFollowRepository.countByFollowingUserIdAndTargetRole(userId, resolvedRole);
+        long followingCount = userFollowRepository.countByFollowerIdAndTargetRole(userId, resolvedRole);
+        boolean followedByCurrentUser = userFollowRepository.existsByFollowerIdAndFollowingUserIdAndTargetRole(currentUserId, userId, resolvedRole);
+        long momentCount = momentPostRepository.countByAuthorIdAndAuthorRoleAndStatus(userId, resolvedRole, MomentStatus.PUBLISHED);
+
+        ProviderProfilePublicVO providerProfile = isProvider
                 ? providerProfileMapper.selectPublicProfile(userId)
                 : null;
+
+        String nickname;
+        Long avatarFileId;
+        String bio;
+        if (isProvider && providerProfile != null) {
+            nickname = providerProfile.getNickname() != null ? providerProfile.getNickname() : user.getNickname();
+            avatarFileId = providerProfile.getProviderAvatarFileId() != null
+                    ? providerProfile.getProviderAvatarFileId()
+                    : user.getAvatarFileId();
+            bio = providerProfile.getBio() != null ? providerProfile.getBio() : user.getBio();
+        } else {
+            nickname = user.getNickname();
+            avatarFileId = user.getAvatarFileId();
+            bio = user.getBio();
+        }
+
         return new PublicProfileResponse(
                 user.getId(),
-                user.getNickname(),
-                user.getAvatarFileId(),
-                user.getBio(),
-                user.getCurrentRole(),
+                nickname,
+                avatarFileId,
+                bio,
+                resolvedRole,
                 followerCount,
                 followingCount,
                 followedByCurrentUser,
@@ -138,12 +164,12 @@ public class SocialRelationService {
         );
     }
 
-    private FollowStateResponse buildFollowState(Long targetUserId, Long currentUserId) {
+    private FollowStateResponse buildFollowState(Long targetUserId, String targetRole, Long currentUserId) {
         return new FollowStateResponse(
                 targetUserId,
-                userFollowRepository.existsByFollowerIdAndFollowingUserId(currentUserId, targetUserId),
-                userFollowRepository.countByFollowingUserId(targetUserId),
-                userFollowRepository.countByFollowerId(currentUserId)
+                userFollowRepository.existsByFollowerIdAndFollowingUserIdAndTargetRole(currentUserId, targetUserId, targetRole),
+                userFollowRepository.countByFollowingUserIdAndTargetRole(targetUserId, targetRole),
+                userFollowRepository.countByFollowerIdAndTargetRole(currentUserId, targetRole)
         );
     }
 
@@ -175,5 +201,9 @@ public class SocialRelationService {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
         return currentUser.getUserId();
+    }
+
+    private String normalizeRole(String role) {
+        return (role != null && !role.isBlank()) ? role.toUpperCase() : "CUSTOMER";
     }
 }
