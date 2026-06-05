@@ -31,6 +31,7 @@ export function ConversationSystemItem({
   onUnavailableTool
 }) {
   if (!event) return null
+  const actionState = actions || {}
   const eventActions = Array.isArray(event.actions) ? event.actions : []
   const eventMeta = event.meta || {}
   const quote = eventMeta.quote
@@ -41,7 +42,7 @@ export function ConversationSystemItem({
       action={action}
       quote={quote}
       authorization={authorization}
-      cancelAction={actions.cancelAction}
+      cancelAction={actionState.cancelAction}
       loading={loading}
       onStartQuoteEditing={onStartQuoteEditing}
       onConfirmQuote={onConfirmQuote}

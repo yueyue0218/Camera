@@ -24,6 +24,22 @@ const STAGE_ORDER = {
   DISPUTE: 130
 }
 
+const VALID_EVENT_TYPES = new Set([
+  'MESSAGE',
+  'QUOTE_SENT',
+  'QUOTE_DECISION',
+  'ORDER_CREATED',
+  'STATUS',
+  'DELIVERY',
+  'DELIVERY_REMINDER',
+  'REWORK',
+  'AUTHORIZATION',
+  'DISPUTE'
+])
+
+const VALID_ACTOR_ROLES = new Set(['CUSTOMER', 'PROVIDER', 'PLATFORM'])
+const VALID_SIDES = new Set(['self', 'counterparty', 'center'])
+
 export function getCurrentUserId(currentUser) {
   const id = Number(currentUser?.id ?? currentUser?.userId)
   return Number.isFinite(id) ? id : 0
@@ -322,6 +338,7 @@ export function buildConversationTimeline({
 
   return items
     .filter(Boolean)
+    .map((item, index) => normalizeTimelineItem(item, index))
     .sort((left, right) => left.timestamp - right.timestamp || left.stageOrder - right.stageOrder)
 }
 
@@ -418,7 +435,7 @@ function createTimelineItem({
   meta = {},
   actions = []
 }) {
-  return {
+  return normalizeTimelineItem({
     id,
     key: id,
     type,
@@ -431,7 +448,40 @@ function createTimelineItem({
     summary,
     meta,
     actions
+  })
+}
+
+function normalizeTimelineItem(item, index = 0) {
+  const type = VALID_EVENT_TYPES.has(item?.type) ? item.type : 'STATUS'
+  const actorRole = VALID_ACTOR_ROLES.has(item?.actorRole) ? item.actorRole : 'PLATFORM'
+  const visibleRole = VALID_ACTOR_ROLES.has(item?.visibleRole) ? item.visibleRole : ''
+  const side = VALID_SIDES.has(item?.side)
+    ? item.side
+    : actorRole === 'PLATFORM' ? 'center' : actorRole === visibleRole ? 'self' : 'counterparty'
+  const timestamp = toTimestamp(item?.timestamp)
+  const fallbackId = `${type.toLowerCase()}-${timestamp || 'untimed'}-${index}`
+  const id = String(item?.id || item?.key || fallbackId)
+
+  return {
+    id,
+    key: String(item?.key || id),
+    type,
+    actorRole,
+    actorLabel: item?.actorLabel || getActorLabel(actorRole),
+    side,
+    timestamp,
+    stageOrder: Number.isFinite(Number(item?.stageOrder)) ? Number(item.stageOrder) : (STAGE_ORDER[type] || STAGE_ORDER.MESSAGE),
+    title: String(item?.title || '合作进展已更新'),
+    summary: String(item?.summary || ''),
+    meta: item?.meta && typeof item.meta === 'object' ? item.meta : {},
+    actions: Array.isArray(item?.actions) ? item.actions.filter(Boolean) : []
   }
+}
+
+function getActorLabel(actorRole) {
+  if (actorRole === 'PROVIDER') return '摄影师'
+  if (actorRole === 'CUSTOMER') return '客户'
+  return '平台'
 }
 
 function getMessageActorRole(message, conversation) {

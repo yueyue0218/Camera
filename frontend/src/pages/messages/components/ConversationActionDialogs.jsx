@@ -65,7 +65,7 @@ export function ConversationActionDialogs({
 
   return (
     <>
-      <Dialog open={activeAction === 'QUOTE_DETAIL'} onClose={onClose} fullWidth maxWidth="sm" PaperProps={dialogPaperProps}>
+      <Dialog open={activeAction === 'QUOTE_DETAIL' && Boolean(quote)} onClose={onClose} fullWidth maxWidth="sm" PaperProps={dialogPaperProps}>
         <DialogTitle sx={dialogTitleSx}>报价详情</DialogTitle>
         <DialogContent sx={dialogContentSx}>
           {quote ? (
@@ -107,7 +107,7 @@ export function ConversationActionDialogs({
         </DialogActions>
       </Dialog>
 
-      <Dialog open={activeAction === 'PAYMENT'} onClose={onClose} fullWidth maxWidth="sm" PaperProps={dialogPaperProps}>
+      <Dialog open={activeAction === 'PAYMENT' && Boolean(order)} onClose={onClose} fullWidth maxWidth="sm" PaperProps={dialogPaperProps}>
         <DialogTitle sx={dialogTitleSx}>确认支付</DialogTitle>
         <DialogContent sx={dialogContentSx}>
           {order ? (
