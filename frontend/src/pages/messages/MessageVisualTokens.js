@@ -1,33 +1,37 @@
+import { PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
+
+export { PORTRA_ARCHIVE_SURFACE_SX, PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
+
 export const PORTRA_COLORS = {
-  page: '#e6e2e0',
-  paper: '#f8f3eb',
-  paperMuted: '#ebe6dd',
-  paperSoft: '#f4efe8',
-  blue: '#0d2fb2',
-  blueDark: '#09258f',
-  blueSoft: '#e7ebfa',
-  yellow: '#f7ce3a',
-  yellowSoft: '#fff7d8',
-  orange: '#f85104',
-  orangeSoft: '#fae8df',
-  ink: '#111015',
-  subInk: '#151318',
-  mutedInk: '#625f63',
-  faintInk: '#858087',
-  border: '#cbc6c4',
-  borderMuted: '#d9d4d1',
-  white: '#fffdf9'
+  page: PORTRA_SURFACE.stone,
+  paper: PORTRA_SURFACE.paper,
+  paperMuted: PORTRA_SURFACE.paperMuted,
+  paperSoft: PORTRA_SURFACE.paperSoft,
+  blue: PORTRA_SURFACE.portraBlue,
+  blueDark: PORTRA_SURFACE.portraBlueHover,
+  blueSoft: PORTRA_SURFACE.portraBlueSoft,
+  yellow: PORTRA_SURFACE.filmYellow,
+  yellowSoft: PORTRA_SURFACE.filmYellowSoft,
+  orange: PORTRA_SURFACE.warmOrangeDeep,
+  orangeSoft: PORTRA_SURFACE.warmOrangeSoft,
+  ink: PORTRA_SURFACE.ink,
+  subInk: PORTRA_SURFACE.subInk,
+  mutedInk: PORTRA_SURFACE.muted,
+  faintInk: PORTRA_SURFACE.faint,
+  border: PORTRA_SURFACE.borderSubtle,
+  borderMuted: PORTRA_SURFACE.borderSoft,
+  white: PORTRA_SURFACE.surface
 }
 
 export const PORTRA_SHADOWS = {
-  subtle: '0 6px 18px rgba(17, 16, 21, 0.05)',
-  floating: '0 12px 30px rgba(17, 16, 21, 0.08)'
+  subtle: PORTRA_SHADOW.soft,
+  floating: PORTRA_SHADOW.floating
 }
 
 export const PORTRA_RADII = {
-  compact: '4px',
-  control: '6px',
-  panel: '8px'
+  compact: PORTRA_RADIUS.compact,
+  control: PORTRA_RADIUS.control,
+  panel: PORTRA_RADIUS.panel
 }
 
 const TECHNICAL_DISPLAY_PATTERNS = [
