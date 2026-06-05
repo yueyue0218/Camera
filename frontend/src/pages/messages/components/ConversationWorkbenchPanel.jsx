@@ -7,7 +7,7 @@ import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded'
 import { centToYuan } from '../../../utils/index.js'
 import { formatTime } from '../utils/conversationUtils.js'
 import { getPhotoUsageScopeLabel, getQuoteStatusLabel } from '../utils/quoteUtils.js'
-import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII } from '../MessageVisualTokens.js'
+import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
 import { StatusChip } from './StatusChip.jsx'
 import { WorkbenchSection } from './WorkbenchSection.jsx'
 
@@ -35,11 +35,11 @@ export function ConversationWorkbenchPanel({
       data-message-panel="true"
       variant="outlined"
       sx={{
-        p: { xs: 1.25, md: 1.4 },
+        p: { xs: 1.3, md: 1.5 },
         bgcolor: PORTRA_COLORS.paper,
         borderColor: PORTRA_COLORS.borderMuted,
         borderRadius: PORTRA_RADII.panel,
-        boxShadow: 'none',
+        boxShadow: PORTRA_SHADOWS.subtle,
         display: { xs: 'none', lg: 'block' },
         height: '100%',
         minHeight: 0,
@@ -48,15 +48,15 @@ export function ConversationWorkbenchPanel({
         alignSelf: 'stretch'
       }}
     >
-      <Stack spacing={1.25}>
-        <Box>
+      <Stack spacing={1.35}>
+        <Box sx={{ pb: 0.1 }}>
           <Typography variant="overline" sx={{ color: PORTRA_COLORS.faintInk, fontWeight: 900 }}>当前进展</Typography>
           <Typography sx={{ color: PORTRA_COLORS.ink, fontSize: 17, fontWeight: 900 }}>{summary.progressTitle || actions.stage.title}</Typography>
           <Typography variant="body2" sx={{ mt: 0.35, color: PORTRA_COLORS.mutedInk, lineHeight: 1.55 }}>{summary.nextStep || actions.stage.description}</Typography>
         </Box>
 
         <WorkbenchSection title="下一步">
-          <Box sx={{ p: 1, bgcolor: PORTRA_COLORS.white, borderRadius: PORTRA_RADII.control, borderLeft: `3px solid ${PORTRA_COLORS.blue}` }}>
+          <Box sx={{ p: 1.05, bgcolor: PORTRA_COLORS.white, borderRadius: PORTRA_RADII.control, borderLeft: `3px solid ${PORTRA_COLORS.blue}`, boxShadow: '0 1px 0 rgba(255, 255, 255, 0.7) inset' }}>
             <Stack spacing={0.8}>
             {actions.canConfirmDelivery ? (
               <Stack direction="row" spacing={0.8} sx={{ flexWrap: 'wrap' }}>
@@ -105,7 +105,7 @@ export function ConversationWorkbenchPanel({
               <StatusChip label={getQuoteStatusLabel(latestQuote.status)} />
               <Typography sx={{ color: PORTRA_COLORS.blue, fontSize: 18, fontWeight: 900 }}>{centToYuan(latestQuote.amountCent)}</Typography>
             </Stack>
-            <Typography color="text.secondary" variant="body2">
+            <Typography sx={{ color: PORTRA_COLORS.mutedInk }} variant="body2">
               {getSafeDisplayText(latestQuote.location, '拍摄地点待确认')} · {getPhotoUsageScopeLabel(latestQuote.photoUsageScope)}
             </Typography>
           </WorkbenchSection>
@@ -113,7 +113,7 @@ export function ConversationWorkbenchPanel({
 
         {order && (
           <WorkbenchSection title="订单档案">
-            <Typography color="text.secondary" variant="body2">
+            <Typography sx={{ color: PORTRA_COLORS.mutedInk }} variant="body2">
               {centToYuan(order.amountCent)} · {formatTime(order.shootStartTime)}
             </Typography>
             {order.orderId && (

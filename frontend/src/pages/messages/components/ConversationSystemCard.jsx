@@ -77,22 +77,22 @@ export function ConversationSystemItem({
         <Box
           data-message-system-strip="true"
           sx={{
-            maxWidth: 'min(76%, 660px)',
-            minHeight: 30,
-            px: 1.15,
+            maxWidth: 'min(78%, 680px)',
+            minHeight: 32,
+            px: 1.25,
             py: 0.35,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: 'rgba(244, 239, 232, 0.86)',
+            bgcolor: 'rgba(255, 253, 249, 0.72)',
             borderColor: PORTRA_COLORS.borderMuted,
             border: `1px solid ${PORTRA_COLORS.borderMuted}`,
             borderRadius: 999,
-            boxShadow: 'none'
+            boxShadow: '0 1px 0 rgba(255, 255, 255, 0.68) inset'
           }}
         >
           <Stack direction="row" spacing={0.9} sx={{ minWidth: 0, alignItems: 'center', justifyContent: 'center' }}>
-            <Typography variant="body2" noWrap sx={{ minWidth: 0, color: PORTRA_COLORS.mutedInk, fontSize: 12.5, fontWeight: 750 }}>
+            <Typography variant="body2" noWrap sx={{ minWidth: 0, color: PORTRA_COLORS.mutedInk, fontSize: 12.5, fontWeight: 800 }}>
               {noticeText}
             </Typography>
             <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk, flexShrink: 0, fontSize: 11 }}>{formatTime(event.timestamp)}</Typography>
@@ -218,10 +218,11 @@ const metaChipSx = {
 }
 
 const attachmentMetaSx = {
-  px: 1,
-  py: 0.8,
+  px: 1.05,
+  py: 0.85,
   color: PORTRA_COLORS.subInk,
   bgcolor: PORTRA_COLORS.paperSoft,
+  border: `1px solid ${PORTRA_COLORS.borderMuted}`,
   borderRadius: PORTRA_RADII.control
 }
 

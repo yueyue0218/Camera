@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Box, Divider, Paper, Stack, Typography } from '@mui/material'
+import { Box, Paper, Stack, Typography } from '@mui/material'
 import { ConversationComposer } from './ConversationComposer.jsx'
 import { ConversationSystemItem } from './ConversationSystemCard.jsx'
 import { MessageBubble } from './MessageBubble.jsx'
@@ -88,11 +88,12 @@ export function ConversationThread({
         minHeight: 0,
         display: 'flex',
         flexDirection: 'column',
-        bgcolor: PORTRA_COLORS.page,
+        bgcolor: PORTRA_COLORS.paperSoft,
         borderColor: PORTRA_COLORS.borderMuted,
         borderRadius: PORTRA_RADII.panel,
         overflow: 'hidden',
-        boxShadow: PORTRA_SHADOWS.subtle
+        boxShadow: PORTRA_SHADOWS.subtle,
+        backgroundImage: `linear-gradient(180deg, ${PORTRA_COLORS.paperSoft} 0%, ${PORTRA_COLORS.page} 100%)`
       }}
     >
       <Box
@@ -103,12 +104,12 @@ export function ConversationThread({
           minHeight: 0,
           overflowY: 'auto',
           overscrollBehavior: 'contain',
-          px: { xs: 1.4, md: 2.2 },
-          py: { xs: 1.8, md: 2.4 },
+          px: { xs: 1.45, md: 2.35 },
+          py: { xs: 1.8, md: 2.35 },
           scrollbarColor: `${PORTRA_COLORS.border} transparent`
         }}
       >
-        <Stack spacing={1.5}>
+        <Stack spacing={1.55}>
           {safeTimeline.filter(Boolean).map(item => {
             if (item.type !== 'MESSAGE') {
               return (
@@ -173,7 +174,6 @@ export function ConversationThread({
           </Box>
         )}
 
-        <Divider sx={{ borderColor: PORTRA_COLORS.borderMuted }} />
         <ConversationComposer
           content={content}
           loading={loading}

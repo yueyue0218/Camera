@@ -509,18 +509,41 @@ export function ConversationDetailPage() {
         overflow: 'hidden'
       }}
     >
-      <Paper variant="outlined" sx={{ flexShrink: 0, px: { xs: 1.2, md: 1.6 }, py: 1, bgcolor: PORTRA_COLORS.paper, borderColor: PORTRA_COLORS.borderMuted, borderRadius: PORTRA_RADII.panel, boxShadow: PORTRA_SHADOWS.subtle }}>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} sx={{ justifyContent: 'space-between', alignItems: { xs: 'stretch', md: 'center' } }}>
+      <Paper
+        variant="outlined"
+        sx={{
+          flexShrink: 0,
+          px: { xs: 1.35, md: 1.8 },
+          py: 1.15,
+          bgcolor: PORTRA_COLORS.paper,
+          borderColor: PORTRA_COLORS.borderMuted,
+          borderRadius: PORTRA_RADII.panel,
+          boxShadow: PORTRA_SHADOWS.subtle,
+          position: 'relative',
+          overflow: 'hidden',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            left: 18,
+            top: 0,
+            width: 54,
+            height: 3,
+            borderRadius: 999,
+            bgcolor: PORTRA_COLORS.blue
+          }
+        }}
+      >
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.15} sx={{ justifyContent: 'space-between', alignItems: { xs: 'stretch', md: 'center' } }}>
           <Stack direction="row" spacing={1.5} sx={{ minWidth: 0, alignItems: 'center' }}>
             <Tooltip title="返回消息">
-              <IconButton onClick={() => navigate('/messages')} sx={{ border: `1px solid ${PORTRA_COLORS.border}`, borderRadius: PORTRA_RADII.control }}>
+              <IconButton onClick={() => navigate('/messages')} sx={{ border: `1px solid ${PORTRA_COLORS.border}`, borderRadius: PORTRA_RADII.control, bgcolor: PORTRA_COLORS.white }}>
                 <ArrowBackRoundedIcon />
               </IconButton>
             </Tooltip>
             <Avatar
               src={counterparty.avatarData || undefined}
               onClick={event => conversation && openUserProfile(getOppositeUserId(conversation, currentUserId), event)}
-              sx={{ width: 42, height: 42, bgcolor: PORTRA_COLORS.blue, color: PORTRA_COLORS.paper, cursor: conversation ? 'pointer' : 'default', fontWeight: 900 }}
+              sx={{ width: 44, height: 44, bgcolor: PORTRA_COLORS.blue, color: PORTRA_COLORS.paper, cursor: conversation ? 'pointer' : 'default', fontWeight: 900, boxShadow: `0 0 0 3px ${PORTRA_COLORS.paperSoft}, 0 0 0 4px ${PORTRA_COLORS.border}` }}
             >
               {getSafeDisplayText(counterparty.initial, '对').slice(0, 1)}
             </Avatar>
@@ -557,7 +580,7 @@ export function ConversationDetailPage() {
         minHeight: 0,
         display: 'grid',
         gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(720px, 1fr) 300px', xl: 'minmax(760px, 1fr) 312px' },
-        gap: { xs: 1.25, lg: 2, xl: 2.5 },
+        gap: { xs: 1.25, lg: 2.25, xl: 2.5 },
         alignItems: 'stretch',
         overflow: 'hidden'
       }} data-message-workbench-grid="true">

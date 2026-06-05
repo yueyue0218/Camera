@@ -8,7 +8,7 @@ export function MessageBubble({ message, mine, actor, canSaveSubmittedPhoto, onS
   const isImage = message.messageType === 'IMAGE'
   const avatarAccent = mine ? PORTRA_COLORS.blue : PORTRA_COLORS.subInk
   return (
-    <Box sx={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: 1 }}>
+    <Box sx={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: 1.05 }}>
       {!mine && (
         <MessageActorAvatar
           actor={actor}
@@ -17,17 +17,17 @@ export function MessageBubble({ message, mine, actor, canSaveSubmittedPhoto, onS
           fallbackText="对"
         />
       )}
-      <Stack spacing={0.35} sx={{ maxWidth: { xs: '82%', md: '68%' }, alignItems: mine ? 'flex-end' : 'flex-start' }}>
+      <Stack spacing={0.35} sx={{ maxWidth: { xs: '82%', md: '66%' }, alignItems: mine ? 'flex-end' : 'flex-start' }}>
         <Paper
           elevation={0}
           sx={{
-            px: isImage ? 0.7 : 1.35,
-            py: isImage ? 0.7 : 1.05,
+            px: isImage ? 0.75 : 1.45,
+            py: isImage ? 0.75 : 1.08,
             bgcolor: mine ? PORTRA_COLORS.blue : PORTRA_COLORS.white,
             color: mine ? PORTRA_COLORS.paper : PORTRA_COLORS.subInk,
             border: mine ? `1px solid ${PORTRA_COLORS.blue}` : `1px solid ${PORTRA_COLORS.borderMuted}`,
-            borderRadius: mine ? '8px 8px 2px 8px' : '8px 8px 8px 2px',
-            boxShadow: mine ? '0 5px 14px rgba(13, 47, 178, 0.14)' : PORTRA_SHADOWS.subtle
+            borderRadius: mine ? '18px 18px 5px 18px' : '18px 18px 18px 5px',
+            boxShadow: mine ? '0 10px 24px rgba(13, 47, 178, 0.16)' : PORTRA_SHADOWS.subtle
           }}
         >
           {isImage ? (

@@ -61,20 +61,20 @@ export function ConversationComposer({
     || actions.canViewDispute
   )
   return (
-    <Box sx={{ px: { xs: 1.1, md: 1.35 }, pt: 0.85, pb: 0.65, bgcolor: PORTRA_COLORS.paper, borderTop: `1px solid ${PORTRA_COLORS.borderMuted}` }}>
-      <Stack spacing={0.65}>
+    <Box sx={{ px: { xs: 1.15, md: 1.45 }, pt: 0.85, pb: 0.75, bgcolor: PORTRA_COLORS.paper, borderTop: `1px solid ${PORTRA_COLORS.borderMuted}`, boxShadow: '0 -1px 0 rgba(255, 255, 255, 0.62) inset' }}>
+      <Stack spacing={0.7}>
         {hasQuickActions && (
           <Stack
             direction={{ xs: 'column', md: 'row' }}
             spacing={0.75}
             sx={{
               alignItems: { xs: 'stretch', md: 'center' },
-              py: 0.5,
-              px: 0.75,
-              bgcolor: 'rgba(255, 253, 249, 0.52)',
+              py: 0.48,
+              px: 0.85,
+              bgcolor: 'rgba(255, 253, 249, 0.64)',
               borderRadius: PORTRA_RADII.control,
               border: `1px solid ${PORTRA_COLORS.borderMuted}`,
-              boxShadow: '0 4px 12px rgba(17, 16, 21, 0.025)'
+              boxShadow: 'none'
             }}
           >
             <Stack direction="row" spacing={0.8} sx={{ minWidth: 0, alignItems: 'center', flex: 1 }}>
@@ -161,7 +161,7 @@ export function ConversationComposer({
           </Stack>
         )}
 
-        <Stack direction="row" spacing={0.3} sx={{ alignItems: 'center', flexWrap: 'wrap', minHeight: 34 }}>
+        <Stack direction="row" spacing={0.3} sx={{ alignItems: 'center', flexWrap: 'wrap', minHeight: 32 }}>
           <Typography variant="caption" sx={{ mr: 0.5, color: PORTRA_COLORS.faintInk, fontWeight: 750 }}>会话工具</Typography>
           <MessageToolbarButton title="发送图片" component="label" disabled={loading || imageSending}>
             <ImageRoundedIcon fontSize="small" />
@@ -195,7 +195,7 @@ export function ConversationComposer({
             }}
             sx={{
               '& .MuiOutlinedInput-root': {
-                minHeight: 42,
+                minHeight: 44,
                 bgcolor: PORTRA_COLORS.white,
                 borderRadius: PORTRA_RADII.control,
                 '& fieldset': { borderColor: PORTRA_COLORS.border },
@@ -210,8 +210,8 @@ export function ConversationComposer({
             onClick={onSendMessage}
             disabled={!content.trim() || loading}
             sx={{
-              minWidth: 88,
-              height: 42,
+              minWidth: 92,
+              height: 44,
               borderRadius: PORTRA_RADII.control,
               bgcolor: PORTRA_COLORS.blue,
               '&:hover': { bgcolor: PORTRA_COLORS.blueDark },
