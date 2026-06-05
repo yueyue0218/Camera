@@ -18,6 +18,7 @@ export function ConversationWorkbenchPanel({
   quotes,
   order,
   actions,
+  panelSummary,
   statusLogs,
   deliveryRecords,
   photoAuthorizations,
@@ -27,6 +28,7 @@ export function ConversationWorkbenchPanel({
   onOpenAction
 }) {
   const latestQuote = getLatestQuote(quotes)
+  const summary = panelSummary || {}
   const uploadLabel = actions.canReuploadDelivery ? '重新上传作品' : '上传作品'
   return (
     <Paper
@@ -45,8 +47,8 @@ export function ConversationWorkbenchPanel({
       <Stack spacing={1.25}>
         <Box>
           <Typography variant="overline" sx={{ color: PORTRA_COLORS.faintInk, fontWeight: 900 }}>当前进展</Typography>
-          <Typography sx={{ color: PORTRA_COLORS.ink, fontSize: 17, fontWeight: 900 }}>{actions.stage.title}</Typography>
-          <Typography variant="body2" sx={{ mt: 0.35, color: PORTRA_COLORS.mutedInk, lineHeight: 1.55 }}>{actions.stage.description}</Typography>
+          <Typography sx={{ color: PORTRA_COLORS.ink, fontSize: 17, fontWeight: 900 }}>{summary.progressTitle || actions.stage.title}</Typography>
+          <Typography variant="body2" sx={{ mt: 0.35, color: PORTRA_COLORS.mutedInk, lineHeight: 1.55 }}>{summary.nextStep || actions.stage.description}</Typography>
         </Box>
 
         <WorkbenchSection title="下一步">
@@ -76,7 +78,7 @@ export function ConversationWorkbenchPanel({
               </Stack>
             ) : (
               <Typography variant="body2" color="text.secondary">
-                {actions.stage.description || '等待对方处理后，合作进展会在会话中同步。'}
+                {summary.nextStep || actions.stage.description || '等待对方处理后，合作进展会在会话中同步。'}
               </Typography>
             )}
             {actions.canAppeal && (
@@ -120,11 +122,11 @@ export function ConversationWorkbenchPanel({
           <Stack direction="row" spacing={1.5} flexWrap="wrap">
             <Stack direction="row" spacing={0.5} alignItems="center">
               <TaskAltRoundedIcon sx={{ fontSize: 17, color: PORTRA_COLORS.blue }} />
-              <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk }}>交付 {deliveryRecords.length}</Typography>
+              <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk }}>交付 {summary.deliveryCount ?? deliveryRecords.length}</Typography>
             </Stack>
             <Stack direction="row" spacing={0.5} alignItems="center">
               <ImageRoundedIcon sx={{ fontSize: 17, color: PORTRA_COLORS.orange }} />
-              <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk }}>授权 {photoAuthorizations.length}</Typography>
+              <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk }}>授权 {summary.authorizationCount ?? photoAuthorizations.length}</Typography>
             </Stack>
           </Stack>
         </WorkbenchSection>

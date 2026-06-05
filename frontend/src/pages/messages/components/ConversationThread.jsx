@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { Alert, Box, Divider, Paper, Stack, Typography } from '@mui/material'
 import { ConversationComposer } from './ConversationComposer.jsx'
 import { ConversationSystemItem } from './ConversationSystemCard.jsx'
@@ -6,7 +6,7 @@ import { MessageBubble } from './MessageBubble.jsx'
 import { QuoteForm } from './QuoteForm.jsx'
 import { MessageWorkbenchErrorBoundary } from './MessageWorkbenchErrorBoundary.jsx'
 import { getCounterpartyProfile } from '../utils/conversationUtils.js'
-import { buildConversationTimeline, getCurrentUserId } from '../utils/workbenchState.js'
+import { getCurrentUserId } from '../utils/workbenchState.js'
 import { PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
 
 export function ConversationThread({
@@ -19,6 +19,7 @@ export function ConversationThread({
   statusLogs,
   deliveryRecords,
   photoAuthorizations,
+  timeline = [],
   content,
   loading,
   imageSending,
@@ -53,23 +54,13 @@ export function ConversationThread({
   const scrollRef = useRef(null)
   const currentUserId = getCurrentUserId(currentUser)
   const counterparty = getCounterpartyProfile(conversation, currentUser)
-  const timeline = useMemo(() => buildConversationTimeline({
-    messages,
-    quotes,
-    order,
-    statusLogs,
-    deliveries: deliveryRecords,
-    authorizations: photoAuthorizations,
-    actions,
-    conversation,
-    currentUser
-  }), [messages, quotes, order, statusLogs, deliveryRecords, photoAuthorizations, actions, conversation, currentUser])
+  const safeTimeline = Array.isArray(timeline) ? timeline : []
 
   useEffect(() => {
     const node = scrollRef.current
     if (!node) return
     node.scrollTop = node.scrollHeight
-  }, [conversation?.conversationId, timeline.length, timeline[timeline.length - 1]?.key])
+  }, [conversation?.conversationId, safeTimeline.length, safeTimeline[safeTimeline.length - 1]?.key])
 
   return (
     <MessageWorkbenchErrorBoundary resetKey={`${conversation?.conversationId || 'none'}-${currentUser?.role || 'role'}`}>
@@ -89,7 +80,7 @@ export function ConversationThread({
     >
       <Box ref={scrollRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: { xs: 1.4, md: 2.2 }, py: { xs: 1.8, md: 2.4 }, scrollbarColor: `${PORTRA_COLORS.border} transparent` }}>
         <Stack spacing={1.5}>
-          {(Array.isArray(timeline) ? timeline : []).filter(Boolean).map(item => {
+          {safeTimeline.filter(Boolean).map(item => {
             if (item.type !== 'MESSAGE') {
               return (
                 <ConversationSystemItem
@@ -128,7 +119,7 @@ export function ConversationThread({
               />
             )
           })}
-          {!timeline.length && (
+          {!safeTimeline.length && (
             <Box sx={{ py: 8, textAlign: 'center' }}>
               <Typography fontWeight={900} color={PORTRA_COLORS.subInk}>从一句问候开始本次合作</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>可以先确认拍摄时间、地点和交付要求</Typography>

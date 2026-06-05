@@ -17,13 +17,12 @@ import {
   buildConversationFallback,
   findConversationRecord,
   getCounterpartyProfile,
-  getConversationSourceLabel,
   getLocalMessages,
   getOppositeUserId,
   updateConversationLastMessage
 } from './utils/conversationUtils.js'
 import {
-  deriveConversationActions,
+  buildConversationWorkbenchViewModel,
   getCurrentUserId,
   selectConversationOrder
 } from './utils/workbenchState.js'
@@ -444,16 +443,18 @@ export function ConversationDetailPage() {
 
   const currentUserId = getCurrentUserId(currentUser)
   const counterparty = getCounterpartyProfile(conversation, currentUser)
-  const actions = deriveConversationActions({
+  const viewModel = buildConversationWorkbenchViewModel({
     conversation,
+    currentUser,
+    activeRole: currentUser.role,
+    messages,
     quotes,
     order: currentOrder,
+    statusLogs,
     deliveries: deliveryRecords,
     authorizations: photoAuthorizations,
-    statusLogs,
-    activeRole: currentUser.role,
-    currentUser
   })
+  const actions = viewModel.actions
   useEffect(() => {
     if (conversation && actions.roleMismatch) {
       navigate('/messages', { replace: true, state: { roleMismatch: true } })
@@ -468,8 +469,6 @@ export function ConversationDetailPage() {
   const canSubmitQuoteForm = editingQuotationId ? canEditSelectedQuote : canCreateQuote
   const canSeeQuoteEntry = !currentOrder && (actions.canSendQuote || actions.canEditQuote || showQuoteForm)
   const quoteEntryHint = currentOrder ? '' : getQuoteEntryHint(conversation, currentUser, quotes)
-  const sourceLabel = getSafeDisplayText(getConversationSourceLabel(conversation), '本次合作')
-  const topic = getConversationTopic(conversation, sourceLabel)
   const activeQuoteIsPending = activeQuote?.status === 'PENDING_CONFIRM' && String(activeQuote.quotationId) === String(actions.pendingQuote?.quotationId)
   const activeQuoteCanConfirm = activeQuoteIsPending && actions.canConfirmQuote
   const activeQuoteCanReject = activeQuoteIsPending && actions.canRejectQuote
@@ -499,7 +498,7 @@ export function ConversationDetailPage() {
                 <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk }}>{actions.role === 'PROVIDER' ? '摄影师视角' : '客户视角'}</Typography>
               </Stack>
               <Typography sx={{ color: PORTRA_COLORS.mutedInk }} variant="body2" noWrap>
-                {topic} · {sourceLabel}
+                {getSafeDisplayText(viewModel.conversationTitle, '本次合作')} · {getSafeDisplayText(viewModel.conversationSubtitle, '校园约拍会话')}
               </Typography>
             </Box>
           </Stack>
@@ -533,6 +532,7 @@ export function ConversationDetailPage() {
             statusLogs={statusLogs}
             deliveryRecords={deliveryRecords}
             photoAuthorizations={photoAuthorizations}
+            timeline={viewModel.timeline}
             content={content}
             loading={loading}
             imageSending={imageSending}
@@ -580,6 +580,7 @@ export function ConversationDetailPage() {
           statusLogs={statusLogs}
           deliveryRecords={deliveryRecords}
           photoAuthorizations={photoAuthorizations}
+          panelSummary={viewModel.panelSummary}
           onOpenOrderArchive={() => currentOrder && navigate(`/orders?orderId=${currentOrder.orderId}`)}
           onConfirmOrder={confirmCurrentOrder}
           onUnavailableTool={showUnavailableTool}
@@ -620,13 +621,6 @@ export function ConversationDetailPage() {
     </Stack>
     </MessageWorkbenchErrorBoundary>
   )
-}
-
-function getConversationTopic(conversation, sourceLabel) {
-  const scene = String(conversation?.scene || '').trim()
-  if (scene && scene !== '约拍沟通' && scene !== '约拍需求沟通') return getSafeDisplayText(scene, '校园约拍')
-  if (conversation?.location) return `${getSafeDisplayText(conversation.location, '校园')}约拍`
-  return getSafeDisplayText(sourceLabel, '校园约拍')
 }
 
 const noticeSx = {

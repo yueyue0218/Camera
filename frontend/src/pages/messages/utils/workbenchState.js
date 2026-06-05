@@ -38,7 +38,7 @@ const VALID_EVENT_TYPES = new Set([
 ])
 
 const VALID_ACTOR_ROLES = new Set(['CUSTOMER', 'PROVIDER', 'PLATFORM'])
-const VALID_SIDES = new Set(['self', 'counterparty', 'center'])
+const VALID_SIDES = new Set(['self', 'other', 'center'])
 
 export function getCurrentUserId(currentUser) {
   const id = Number(currentUser?.id ?? currentUser?.userId)
@@ -227,6 +227,59 @@ export function filterConversationsByActiveRole(conversations = [], currentUser,
 
 export function filterOrdersByActiveRole(orders = [], currentUser, activeRole = currentUser?.role) {
   return orders.filter(order => getUserRoleInOrder(order, currentUser) === activeRole)
+}
+
+export function buildConversationWorkbenchViewModel({
+  conversation,
+  currentUser,
+  activeRole = currentUser?.role,
+  messages = [],
+  quotes = [],
+  order,
+  statusLogs = [],
+  deliveries = [],
+  authorizations = []
+}) {
+  const currentUserId = getCurrentUserId(currentUser)
+  const actions = deriveConversationActions({
+    conversation,
+    quotes,
+    order,
+    deliveries,
+    authorizations,
+    statusLogs,
+    activeRole,
+    currentUser
+  })
+  const relationRole = actions.visibleRole || getUserRoleInConversation(conversation, currentUser) || getUserRoleInOrder(order, currentUser)
+  const timeline = buildConversationTimeline({
+    messages,
+    quotes,
+    order,
+    statusLogs,
+    deliveries,
+    authorizations,
+    actions,
+    conversation,
+    currentUser
+  })
+
+  return {
+    currentUserId,
+    activeRole,
+    relationRole,
+    roleMismatch: actions.roleMismatch,
+    stage: actions.stage,
+    stageLabel: actions.stage.title,
+    conversationTitle: getConversationTitle(conversation),
+    conversationSubtitle: getConversationSubtitle(conversation),
+    timeline,
+    primaryActions: actions.primaryActions,
+    toolbarActions: actions.toolbarActions,
+    panelSummary: buildPanelSummary({ actions, quotes, order, deliveries, authorizations }),
+    canOpenOrderArchive: actions.canOpenOrderArchive,
+    actions
+  }
 }
 
 export function buildConversationTimeline({
@@ -441,7 +494,7 @@ function createTimelineItem({
     type,
     actorRole,
     actorLabel: actorRole === 'PLATFORM' ? '平台' : actorRole === 'PROVIDER' ? '摄影师' : '客户',
-    side: actorRole === 'PLATFORM' ? 'center' : actorRole === visibleRole ? 'self' : 'counterparty',
+    side: actorRole === 'PLATFORM' ? 'center' : actorRole === visibleRole ? 'self' : 'other',
     timestamp: toTimestamp(timestamp),
     stageOrder,
     title,
@@ -457,7 +510,7 @@ function normalizeTimelineItem(item, index = 0) {
   const visibleRole = VALID_ACTOR_ROLES.has(item?.visibleRole) ? item.visibleRole : ''
   const side = VALID_SIDES.has(item?.side)
     ? item.side
-    : actorRole === 'PLATFORM' ? 'center' : actorRole === visibleRole ? 'self' : 'counterparty'
+    : actorRole === 'PLATFORM' ? 'center' : actorRole === visibleRole ? 'self' : 'other'
   const timestamp = toTimestamp(item?.timestamp)
   const fallbackId = `${type.toLowerCase()}-${timestamp || 'untimed'}-${index}`
   const id = String(item?.id || item?.key || fallbackId)
@@ -681,4 +734,45 @@ function normalizeReason(reason) {
   return String(reason || '')
     .replaceAll('需求方', '客户')
     .replaceAll('服务方', '摄影师')
+}
+
+function getConversationTitle(conversation) {
+  const scene = String(conversation?.scene || '').trim()
+  if (scene && scene !== '约拍沟通' && scene !== '约拍需求沟通') return scene
+  const location = String(conversation?.location || '').trim()
+  if (location) return `${location}约拍`
+  return '本次合作'
+}
+
+function getConversationSubtitle(conversation) {
+  const sourceType = String(conversation?.sourceType || '').toUpperCase()
+  if (sourceType === 'DEMAND') return '来自拍摄需求'
+  if (sourceType === 'SERVICE_PACKAGE') return '来自摄影服务橱窗'
+  return '校园约拍会话'
+}
+
+function buildPanelSummary({ actions, quotes = [], order, deliveries = [], authorizations = [] }) {
+  const latestQuote = getLatestItem(quotes.filter(Boolean), quote => quote.updatedAt || quote.createdAt)
+  return {
+    progressTitle: actions.stage.title,
+    nextStep: actions.stage.description,
+    quote: latestQuote
+      ? {
+          status: latestQuote.status || '',
+          amountCent: latestQuote.amountCent,
+          location: latestQuote.location || '',
+          photoUsageScope: latestQuote.photoUsageScope || ''
+        }
+      : null,
+    order: order
+      ? {
+          orderId: order.orderId,
+          amountCent: order.amountCent,
+          shootStartTime: order.shootStartTime,
+          status: order.status || ''
+        }
+      : null,
+    deliveryCount: Array.isArray(deliveries) ? deliveries.filter(Boolean).length : 0,
+    authorizationCount: Array.isArray(authorizations) ? authorizations.filter(Boolean).length : 0
+  }
 }
