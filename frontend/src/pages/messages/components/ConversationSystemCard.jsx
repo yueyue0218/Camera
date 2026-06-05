@@ -77,14 +77,14 @@ export function ConversationSystemItem({
         <Box
           data-message-system-strip="true"
           sx={{
-            maxWidth: 'min(78%, 680px)',
-            minHeight: 32,
-            px: 1.3,
-            py: 0.45,
+            maxWidth: 'min(76%, 660px)',
+            minHeight: 30,
+            px: 1.15,
+            py: 0.35,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: 'rgba(248, 243, 235, 0.72)',
+            bgcolor: 'rgba(244, 239, 232, 0.86)',
             borderColor: PORTRA_COLORS.borderMuted,
             border: `1px solid ${PORTRA_COLORS.borderMuted}`,
             borderRadius: 999,
@@ -92,7 +92,7 @@ export function ConversationSystemItem({
           }}
         >
           <Stack direction="row" spacing={0.9} sx={{ minWidth: 0, alignItems: 'center', justifyContent: 'center' }}>
-            <Typography variant="body2" noWrap sx={{ minWidth: 0, color: PORTRA_COLORS.mutedInk, fontSize: 12.5, fontWeight: 800 }}>
+            <Typography variant="body2" noWrap sx={{ minWidth: 0, color: PORTRA_COLORS.mutedInk, fontSize: 12.5, fontWeight: 750 }}>
               {noticeText}
             </Typography>
             <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk, flexShrink: 0, fontSize: 11 }}>{formatTime(event.timestamp)}</Typography>
@@ -221,7 +221,7 @@ const attachmentMetaSx = {
   px: 1,
   py: 0.8,
   color: PORTRA_COLORS.subInk,
-  bgcolor: PORTRA_COLORS.paperMuted,
+  bgcolor: PORTRA_COLORS.paperSoft,
   borderRadius: PORTRA_RADII.control
 }
 

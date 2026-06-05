@@ -32,15 +32,15 @@ export function EventAttachmentCard({ side, actor, title, summary, timestamp, ch
             maxWidth: '100%',
             px: 1.45,
             py: 1.2,
-            bgcolor: PORTRA_COLORS.paper,
-            borderColor: PORTRA_COLORS.border,
-            borderTop: `3px solid ${accent}`,
+            bgcolor: PORTRA_COLORS.white,
+            borderColor: PORTRA_COLORS.borderMuted,
+            borderLeft: `3px solid ${accent}`,
             borderRadius: self ? '8px 8px 2px 8px' : '8px 8px 8px 2px',
             boxShadow: PORTRA_SHADOWS.subtle
           }}
         >
           <Stack spacing={0.8}>
-            <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+            <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <Typography sx={{ color: PORTRA_COLORS.ink, fontWeight: 900, lineHeight: 1.4 }}>{title}</Typography>
               <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk, fontSize: 11 }}>{timestamp}</Typography>
             </Stack>

@@ -23,7 +23,7 @@ export function MessageBubble({ message, mine, actor, canSaveSubmittedPhoto, onS
           sx={{
             px: isImage ? 0.7 : 1.35,
             py: isImage ? 0.7 : 1.05,
-            bgcolor: mine ? PORTRA_COLORS.blue : PORTRA_COLORS.paper,
+            bgcolor: mine ? PORTRA_COLORS.blue : PORTRA_COLORS.white,
             color: mine ? PORTRA_COLORS.paper : PORTRA_COLORS.subInk,
             border: mine ? `1px solid ${PORTRA_COLORS.blue}` : `1px solid ${PORTRA_COLORS.borderMuted}`,
             borderRadius: mine ? '8px 8px 2px 8px' : '8px 8px 8px 2px',

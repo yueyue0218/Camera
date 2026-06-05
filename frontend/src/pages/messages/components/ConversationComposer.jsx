@@ -71,9 +71,10 @@ export function ConversationComposer({
               alignItems: { xs: 'stretch', md: 'center' },
               py: 0.5,
               px: 0.75,
-              bgcolor: 'rgba(255, 253, 249, 0.42)',
+              bgcolor: 'rgba(255, 253, 249, 0.52)',
               borderRadius: PORTRA_RADII.control,
-              border: `1px solid ${PORTRA_COLORS.borderMuted}`
+              border: `1px solid ${PORTRA_COLORS.borderMuted}`,
+              boxShadow: '0 4px 12px rgba(17, 16, 21, 0.025)'
             }}
           >
             <Stack direction="row" spacing={0.8} sx={{ minWidth: 0, alignItems: 'center', flex: 1 }}>
@@ -161,7 +162,7 @@ export function ConversationComposer({
         )}
 
         <Stack direction="row" spacing={0.3} sx={{ alignItems: 'center', flexWrap: 'wrap', minHeight: 34 }}>
-          <Typography variant="caption" sx={{ mr: 0.5, color: PORTRA_COLORS.faintInk, fontWeight: 800 }}>会话工具</Typography>
+          <Typography variant="caption" sx={{ mr: 0.5, color: PORTRA_COLORS.faintInk, fontWeight: 750 }}>会话工具</Typography>
           <MessageToolbarButton title="发送图片" component="label" disabled={loading || imageSending}>
             <ImageRoundedIcon fontSize="small" />
             <input hidden type="file" accept="image/*" onChange={onChooseMessageImage} />

@@ -2,6 +2,7 @@ export const PORTRA_COLORS = {
   page: '#e6e2e0',
   paper: '#f8f3eb',
   paperMuted: '#ebe6dd',
+  paperSoft: '#f4efe8',
   blue: '#0d2fb2',
   blueDark: '#09258f',
   blueSoft: '#e7ebfa',

@@ -36,7 +36,7 @@ export function ConversationWorkbenchPanel({
       variant="outlined"
       sx={{
         p: { xs: 1.25, md: 1.4 },
-        bgcolor: PORTRA_COLORS.paperMuted,
+        bgcolor: PORTRA_COLORS.paper,
         borderColor: PORTRA_COLORS.borderMuted,
         borderRadius: PORTRA_RADII.panel,
         boxShadow: 'none',
@@ -56,7 +56,7 @@ export function ConversationWorkbenchPanel({
         </Box>
 
         <WorkbenchSection title="下一步">
-          <Box sx={{ p: 1, bgcolor: PORTRA_COLORS.paper, borderRadius: PORTRA_RADII.control, borderLeft: `3px solid ${PORTRA_COLORS.blue}` }}>
+          <Box sx={{ p: 1, bgcolor: PORTRA_COLORS.white, borderRadius: PORTRA_RADII.control, borderLeft: `3px solid ${PORTRA_COLORS.blue}` }}>
             <Stack spacing={0.8}>
             {actions.canConfirmDelivery ? (
               <Stack direction="row" spacing={0.8} sx={{ flexWrap: 'wrap' }}>
