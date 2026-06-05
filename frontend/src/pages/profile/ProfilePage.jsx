@@ -237,6 +237,8 @@ export function ProfilePage() {
 
   const works = buildPortfolioWorks(currentUser.userId, myMoments, portfolioItems)
 
+  // frameImageUrls: reserved for future file-based images; moments use imageData directly
+
   function handleTabClick(id) {
     setActiveTab(id)
     requestAnimationFrame(syncHeight)
@@ -281,21 +283,14 @@ export function ProfilePage() {
         <div className="hero-info">
           <div className="ticket-kicker">Portra Profile Ticket</div>
           <div className="hero-name-row">
-            <h1 className="hero-name" data-role-content="customer">{displayName}</h1>
-            <h1 className="hero-name" data-role-content="provider">{displayName}</h1>
-            <span className="role-badge" data-role-content="customer">单主</span>
-            <span className="role-badge" data-role-content="provider">摄影师</span>
+            <h1 className="hero-name">{displayName}</h1>
+            <span className="role-badge">{isProvider ? '摄影师' : '单主'}</span>
           </div>
-          <p className="profile-uid" data-role-content="customer">UID：{currentUser.userId} · Portra ID</p>
-          <p className="profile-uid" data-role-content="provider">UID：{currentUser.userId} · Portra ID</p>
-          <div className="profile-meta-line" data-role-content="customer">
+          <p className="profile-uid">UID：{currentUser.userId} · Portra ID</p>
+          <div className="profile-meta-line">
             <span>IP：{currentUser.cityCode || '未知城市'} · {genderText}</span>
           </div>
-          <div className="profile-meta-line" data-role-content="provider">
-            <span>IP：{currentUser.cityCode || '未知城市'} · {genderText}</span>
-          </div>
-          <p className="profile-signature" data-role-content="customer">{profileForm.bio || '这个人还没有写简介。'}</p>
-          <p className="profile-signature" data-role-content="provider">{profileForm.bio || '这个人还没有写简介。'}</p>
+          <p className="profile-signature">{profileForm.bio || '这个人还没有写简介。'}</p>
         </div>
 
         <aside className="hero-side">
@@ -310,10 +305,11 @@ export function ProfilePage() {
             <div className="metric"><b>{ongoingOrders}</b><span>进行中</span></div>
           </div>
           <div className="hero-actions">
-            <button className="primary-btn" data-role-content="customer" onClick={() => setEditOpen(true)}>编辑资料</button>
-            <button className="primary-btn" data-role-content="provider" onClick={() => setEditOpen(true)}>编辑资料</button>
-            <button className="secondary-btn" data-role-content="customer" onClick={() => navigate('/feed')}>管理我的动态</button>
-            <button className="secondary-btn" data-role-content="provider" onClick={() => navigate('/publish/service-package')}>发布新橱窗</button>
+            <button className="primary-btn" onClick={() => setEditOpen(true)}>编辑资料</button>
+            {isProvider
+              ? <button className="secondary-btn" onClick={() => navigate('/publish/service-package')}>发布新橱窗</button>
+              : <button className="secondary-btn" onClick={() => navigate('/feed')}>管理我的动态</button>
+            }
           </div>
         </aside>
       </section>
@@ -331,65 +327,59 @@ export function ProfilePage() {
                 className={`frame-tab${activeTab === tab.id ? ' active' : ''}`}
                 onClick={() => handleTabClick(tab.id)}
               >
-                <span>
-                  {tab.labelC ? (
-                    <>
-                      <span data-role-content="customer">{tab.labelC}</span>
-                      <span data-role-content="provider">{tab.labelP}</span>
-                    </>
-                  ) : tab.label}
-                </span>
+                <span>{tab.labelC ? (isProvider ? tab.labelP : tab.labelC) : tab.label}</span>
                 <small>{tab.num}</small>
               </button>
             ))}
           </aside>
 
           {/* Middle: Tab Panels */}
-          <div className="content-stack">
+          <div className="content-stack" style={{height:'auto'}}>
 
             {/* PHOTOS */}
             <section className={`panel-card tab-panel${activeTab === 'photos' ? ' active' : ''}`}>
               <div className="section-head">
                 <div>
-                  <h2 data-role-content="customer">我的动态</h2>
-                  <h2 data-role-content="provider">我的作品集</h2>
-                  <p data-role-content="customer">被快门留下的时刻，会在这里成为自己的 contact sheet。</p>
-                  <p data-role-content="provider">作品不是普通九宫格，而是属于摄影师的胶片接触印相。</p>
+                  <h2>{isProvider ? '我的作品集' : '我的动态'}</h2>
+                  <p>{isProvider ? '作品不是普通九宫格，而是属于摄影师的胶片接触印相。' : '被快门留下的时刻，会在这里成为自己的 contact sheet。'}</p>
                 </div>
                 <div className="section-mark">01</div>
               </div>
               <div className="contact-sheet">
-                <div className="photo-grid">
-                  {Array.from({ length: 6 }, (_, i) => {
-                    const item = isProvider ? works[i] : myMoments[i]
-                    const imgSrc = item?.imageData
-                    const cap = item ? (item.title || `FRAME ${String(i+1).padStart(2,'0')}`) : `FRAME ${String(i+1).padStart(2,'0')}`
-                    return (
-                      <div key={i} className="film-frame"
-                        onClick={() => item && navigate(item.momentId ? `/moments/${item.momentId}` : `/moments/${item.momentId}`)}>
-                        {imgSrc && <img src={imgSrc} alt="" />}
-                        <span className="cap">{cap.slice(0, 12)}</span>
-                      </div>
-                    )
-                  })}
-                </div>
+                {(() => {
+                  const items = isProvider ? works : myMoments
+                  const scrollable = items.length > 6
+                  return (
+                    <div className={`photo-grid${scrollable ? ' photo-grid-scroll' : ''}`}>
+                      {scrollable
+                        ? items.map((m, i) => (
+                          <div key={i} className="film-frame">
+                            {m?.imageData && <div style={{position:'absolute',inset:0,zIndex:1,backgroundImage:`url(${m.imageData})`,backgroundSize:'cover',backgroundPosition:'center'}} />}
+                            <span className="cap">FRAME {String(i+1).padStart(2,'0')}</span>
+                          </div>
+                        ))
+                        : Array.from({length:6}).map((_, i) => {
+                          const m = items[i]
+                          return (
+                            <div key={i} className="film-frame">
+                              {m?.imageData && <div style={{position:'absolute',inset:0,zIndex:1,backgroundImage:`url(${m.imageData})`,backgroundSize:'cover',backgroundPosition:'center'}} />}
+                              <span className="cap">FRAME {String(i+1).padStart(2,'0')}</span>
+                            </div>
+                          )
+                        })
+                      }
+                    </div>
+                  )
+                })()}
               </div>
-              {isProvider && (
-                <label style={{display:'inline-flex',alignItems:'center',gap:8,marginTop:14,height:38,borderRadius:999,border:'1px solid rgba(13,47,178,.28)',background:'#fffaf2',color:'var(--blue)',padding:'0 16px',fontSize:13,letterSpacing:'.1em',fontWeight:700,cursor:'pointer'}}>
-                  上传作品图片
-                  <input type="file" accept="image/*" hidden onChange={choosePortfolioImage} />
-                </label>
-              )}
             </section>
 
             {/* INTENT */}
             <section className={`panel-card tab-panel${activeTab === 'intent' ? ' active' : ''}`}>
               <div className="section-head">
                 <div>
-                  <h2 data-role-content="customer">我的意向</h2>
-                  <h2 data-role-content="provider">橱窗管理</h2>
-                  <p data-role-content="customer">意向只是收藏感兴趣的橱窗，不自动下单、不锁定时间。</p>
-                  <p data-role-content="provider">管理正在展示的约拍服务，保持时间、价格和风格清晰。</p>
+                  <h2>{isProvider ? '橱窗管理' : '我的意向'}</h2>
+                  <p>{isProvider ? '管理正在展示的约拍服务，保持时间、价格和风格清晰。' : '意向只是收藏感兴趣的橱窗，不自动下单、不锁定时间。'}</p>
                 </div>
                 <div className="section-mark">02</div>
               </div>
@@ -525,7 +515,7 @@ export function ProfilePage() {
           </div>
 
           {/* Right: Side stack */}
-          <aside className="side-stack">
+          <aside className="side-stack" style={{height:'auto',minHeight:'var(--dashboard-left-card-height)',overflow:'visible'}}>
             <section className="panel-card">
               <div className="credit-stamp">
                 <b>{Number(creditScore).toFixed(1)}</b>
@@ -534,8 +524,7 @@ export function ProfilePage() {
               <div className="todo-list">
                 <div className="todo">
                   <div>
-                    <strong data-role-content="customer">待确认邀请</strong>
-                    <strong data-role-content="provider">待响应需求</strong>
+                    <strong>{isProvider ? '待响应需求' : '待确认邀请'}</strong>
                     <br /><small>今天需要处理</small>
                   </div>
                   <span className="status yellow">{pendingInvitations || 0}</span>
@@ -558,10 +547,8 @@ export function ProfilePage() {
           <div className="archive-head">
             <div>
               <p className="archive-eyebrow">PORTRA POST ARCHIVE</p>
-              <h2 data-role-content="customer">我的动态</h2>
-              <h2 data-role-content="provider">我的作品集</h2>
-              <p data-role-content="customer">这里只收纳我自己发布过的帖子：想拍记录、拍摄日记、成片分享。</p>
-              <p data-role-content="provider">这里只展示摄影师本人发布过的作品动态、拍摄花絮和档期说明。</p>
+              <h2>{isProvider ? '我的作品集' : '我的动态'}</h2>
+              <p>{isProvider ? '这里只展示摄影师本人发布过的作品动态、拍摄花絮和档期说明。' : '这里只收纳我自己发布过的帖子：想拍记录、拍摄日记、成片分享。'}</p>
             </div>
             <button className="archive-all" onClick={() => navigate('/feed')}>全部帖子 →</button>
           </div>
