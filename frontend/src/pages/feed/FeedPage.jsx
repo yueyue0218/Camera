@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Box, Alert, Stack } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
 import { USERS, useAuth } from '../../AuthContext.jsx'
-import { momentApi, readFileAsDataUrl, userApi } from '../../api.js'
+import { momentApi, compressImageToDataUrl, userApi } from '../../api.js'
 import { EmptyFeedCard } from './components/EmptyFeedCard.jsx'
 import { FeedSectionHeader } from './components/FeedSectionHeader.jsx'
 import { FeedToolbar } from './components/FeedToolbar.jsx'
@@ -64,18 +64,18 @@ export function FeedPage() {
   const navigate = useNavigate()
   const { currentUser } = useAuth()
 
-  function openUserProfile(userId) {
+  function openUserProfile(userId, authorRole) {
     const id = Number(userId)
     if (!id) return
     if (id === currentUser.userId) navigate('/profile')
-    else navigate(`/users/${id}`)
+    else navigate(`/users/${id}${authorRole ? `?role=${authorRole}` : ''}`)
   }
   const [moments, setMoments] = useState([])
   const [query, setQuery] = useState('')
   const [showComposer, setShowComposer] = useState(false)
   const [draft, setDraft] = useState({ title: '', content: '' })
   const [mentionsText, setMentionsText] = useState('')
-  const [imageData, setImageData] = useState('')
+  const [imageDataList, setImageDataList] = useState([])
   const [notice, setNotice] = useState(null)
 
   useEffect(() => {
@@ -90,14 +90,22 @@ export function FeedPage() {
     }
   }
 
-  async function chooseImage(event) {
-    const file = event.target.files?.[0]
-    if (!file) return
+  async function chooseImages(event) {
+    const files = Array.from(event.target.files || [])
+    if (!files.length) return
+    const slots = 9 - imageDataList.length
+    if (slots <= 0) return
     try {
-      setImageData(await readFileAsDataUrl(file))
+      const compressed = await Promise.all(files.slice(0, slots).map(f => compressImageToDataUrl(f)))
+      setImageDataList(prev => [...prev, ...compressed].slice(0, 9))
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }
+    event.target.value = ''
+  }
+
+  function removeImage(index) {
+    setImageDataList(prev => prev.filter((_, i) => i !== index))
   }
 
   async function publishMoment() {
@@ -106,12 +114,12 @@ export function FeedPage() {
       await momentApi.create({
         title: draft.title,
         content: draft.content,
-        imageData,
+        imageDataList,
         mentions: parseMentions(mentionsText)
       }, currentUser)
       setDraft({ title: '', content: '' })
       setMentionsText('')
-      setImageData('')
+      setImageDataList([])
       setShowComposer(false)
       setNotice({ type: 'success', text: '动态已发布' })
       await loadMoments()
@@ -148,14 +156,14 @@ export function FeedPage() {
     }
   }
 
-  async function followAuthor(authorId) {
+  async function followAuthor(authorId, authorRole) {
     const id = Number(authorId)
     const wasFollowing = isFollowing(id)
     toggleFollow(id)
     setNotice({ type: 'success', text: wasFollowing ? '已取消关注' : '已关注' })
     try {
-      if (wasFollowing) await userApi.unfollow(id, currentUser)
-      else await userApi.follow(id, currentUser)
+      if (wasFollowing) await userApi.unfollow(id, currentUser, authorRole)
+      else await userApi.follow(id, currentUser, authorRole)
     } catch {
       toggleFollow(id)
       setNotice({ type: 'warning', text: '网络异常，关注状态仅本地保存' })
@@ -183,10 +191,11 @@ export function FeedPage() {
         <MomentComposer
           draft={draft}
           mentionsText={mentionsText}
-          imageData={imageData}
+          imageDataList={imageDataList}
           onDraftChange={setDraft}
           onMentionsChange={setMentionsText}
-          onChooseImage={chooseImage}
+          onChooseImages={chooseImages}
+          onRemoveImage={removeImage}
           onCancel={() => setShowComposer(false)}
           onPublish={publishMoment}
         />
@@ -212,11 +221,11 @@ export function FeedPage() {
               authorProfile={authorProfile}
               isFollowing={isFollowing}
               onOpenMoment={momentId => navigate(`/moments/${momentId}`)}
-              onOpenProfile={openUserProfile}
+              onOpenProfile={(authorId) => openUserProfile(authorId, moment.authorRole)}
               onOpenMention={openMention}
               onLike={likeMoment}
               onFavorite={favoriteMoment}
-              onFollow={followAuthor}
+              onFollow={(authorId) => followAuthor(authorId, moment.authorRole)}
               onDelete={deleteMoment}
             />
           )

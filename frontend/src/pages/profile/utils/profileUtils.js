@@ -255,8 +255,9 @@ export function isFollowing(authorId) {
   return readFollows().some(follow => Number(follow.authorId) === Number(authorId))
 }
 
-export function toggleFollow(authorId) {
+export function toggleFollow(authorId, currentUserId) {
   const id = Number(authorId)
+  if (currentUserId && id === Number(currentUserId)) return false
   const follows = readFollows()
   const exists = follows.some(follow => Number(follow.authorId) === id)
   const nextFollows = exists

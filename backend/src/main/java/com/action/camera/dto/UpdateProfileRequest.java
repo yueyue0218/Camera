@@ -5,6 +5,8 @@ public class UpdateProfileRequest {
     private String nickname;
     private String bio;
     private String availability;
+    private String role;
+    private Long avatarFileId;
 
     public String getNickname() { return nickname; }
     public void setNickname(String nickname) { this.nickname = nickname; }
@@ -14,4 +16,10 @@ public class UpdateProfileRequest {
 
     public String getAvailability() { return availability; }
     public void setAvailability(String availability) { this.availability = availability; }
+
+    public String getRole() { return role; }
+    public void setRole(String role) { this.role = role; }
+
+    public Long getAvatarFileId() { return avatarFileId; }
+    public void setAvatarFileId(Long avatarFileId) { this.avatarFileId = avatarFileId; }
 }

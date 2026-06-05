@@ -24,4 +24,6 @@ public class ProviderProfilePublicVO {
     private BigDecimal priceMax;
     private Boolean acceptingOrders;
     private String serviceType;
+    private Long providerAvatarFileId;
+    private String bio;
 }

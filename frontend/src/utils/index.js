@@ -1,2 +1,2 @@
 export { yuanToCent, centToYuan } from './money.js'
-export { readFileAsDataUrl } from './file.js'
+export { readFileAsDataUrl, compressImageToDataUrl } from './file.js'

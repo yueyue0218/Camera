@@ -22,10 +22,11 @@ function readUserProfiles() {
   return readJsonStorage(USER_PROFILE_STORAGE_KEY, {})
 }
 
-function openUserProfile(userId) {
+function openUserProfile(userId, authorRole) {
   const id = Number(userId)
   if (!id) return
-  window.open(new URL(`/users/${id}`, window.location.origin).toString(), '_blank', 'noopener,noreferrer')
+  const path = `/users/${id}${authorRole ? `?role=${authorRole}` : ''}`
+  window.open(new URL(path, window.location.origin).toString(), '_blank', 'noopener,noreferrer')
 }
 
 function resolveMentionUserId(mention) {
@@ -108,18 +109,31 @@ export function MomentDetailPage() {
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
       <Button variant="text" color="inherit" onClick={() => navigate('/feed')} sx={{ alignSelf: 'flex-start' }}>返回动态</Button>
       <Stack spacing={2.5}>
-        {moments.map(moment => (
-          <MomentDetailCard
-            key={moment.momentId}
-            moment={moment}
-            currentUser={currentUser}
-            onProfile={() => openUserProfile(moment.authorId)}
-            onOpenMention={openMention}
-            onLike={() => likeMoment(moment.momentId)}
-            onFavorite={() => favoriteMoment(moment.momentId)}
-            onDelete={() => deleteMoment(moment.momentId)}
-          />
-        ))}
+        {moments.map(moment => {
+          const isSelf = Number(moment.authorId) === currentUser.userId
+          const stored = readUserProfiles()[String(moment.authorId)] || {}
+          const authorProfile = {
+            nickname: isSelf
+              ? (currentUser.nickname || currentUser.label)
+              : (stored.nickname || moment.authorNickname),
+            avatarData: isSelf
+              ? currentUser.avatarData
+              : (stored.avatarData || moment.authorAvatarData)
+          }
+          return (
+            <MomentDetailCard
+              key={moment.momentId}
+              moment={moment}
+              currentUser={currentUser}
+              authorProfile={authorProfile}
+              onProfile={() => openUserProfile(moment.authorId, moment.authorRole)}
+              onOpenMention={openMention}
+              onLike={() => likeMoment(moment.momentId)}
+              onFavorite={() => favoriteMoment(moment.momentId)}
+              onDelete={() => deleteMoment(moment.momentId)}
+            />
+          )
+        })}
       </Stack>
       {!moments.length && <EmptyFeedCard text="暂无动态" />}
     </Stack>

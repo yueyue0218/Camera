@@ -66,6 +66,7 @@ export function ProfilePage() {
   const [portfolioItems, setPortfolioItems] = useState([])
   const [actioningId, setActioningId] = useState(null)
   const [notice, setNotice] = useState(null)
+  const [myFollowers, setMyFollowers] = useState([])
 
   const dashboardRowRef = useRef(null)
   const frameNavRef = useRef(null)
@@ -123,12 +124,22 @@ export function ProfilePage() {
   useEffect(() => { loadProfileData() }, [currentUser.userId, currentUser.role])
 
   async function loadProfileData() {
-    const [momRes, revRes, credRes, ordRes] = await Promise.allSettled([
+    const [myProfileRes, momRes, revRes, credRes, ordRes, followersRes] = await Promise.allSettled([
+      userApi.me(currentUser),
       momentApi.list({}, currentUser),
       reviewApi.listByUser(currentUser.userId, currentUser),
       creditApi.summary(currentUser.userId, currentUser),
-      orderApi.list({ role: isProvider ? 'provider' : 'customer' }, currentUser)
+      orderApi.list({ role: isProvider ? 'provider' : 'customer' }, currentUser),
+      userApi.followers(currentUser.userId, currentUser)
     ])
+    if (myProfileRes.status === 'fulfilled' && myProfileRes.value) {
+      updateProfile({
+        customerNickname: myProfileRes.value.customerNickname,
+        customerBio: myProfileRes.value.customerBio,
+        providerNickname: myProfileRes.value.providerNickname,
+        providerBio: myProfileRes.value.providerBio
+      })
+    }
     setMoments(momRes.status === 'fulfilled' ? momRes.value : [])
     setReceivedReviews(mergeReviewLists(
       revRes.status === 'fulfilled' ? revRes.value : [],
@@ -139,6 +150,7 @@ export function ProfilePage() {
     setProfileOrders(orders)
     saveOrderSnapshots(orders)
     setPortfolioItems(readPortfolioItems(currentUser.userId))
+    setMyFollowers(followersRes.status === 'fulfilled' ? followersRes.value : [])
     if (!isProvider) {
       try { setInvitations(await demandApi.invitations(currentUser)) }
       catch { setInvitations([]) }
@@ -166,8 +178,18 @@ export function ProfilePage() {
     }
     saveUserProfile(currentUser.userId, next)
     updateProfile(next)
-    try { await userApi.updateMe({ nickname: next.nickname, bio: next.bio }, currentUser) } catch {}
+    try { await userApi.updateMe({ nickname: next.nickname, bio: next.bio, role: currentUser.role }, currentUser) } catch {}
     setNotice({ type: 'ok', text: '个人资料已更新' })
+  }
+
+  async function handleSwitchRole(newRole) {
+    try {
+      await userApi.switchRole(newRole, currentUser)
+      switchRole(newRole)
+      setNotice({ type: 'ok', text: `已切换到${newRole === 'PROVIDER' ? '摄影师' : '单主'}账号` })
+    } catch (err) {
+      setNotice({ type: 'err', text: err.message || '切换身份失败' })
+    }
   }
 
   async function choosePortfolioImage(e) {
@@ -202,12 +224,16 @@ export function ProfilePage() {
   }
 
   const myMoments = useMemo(
-    () => moments.filter(m => Number(m.authorId) === currentUser.userId),
-    [moments, currentUser.userId]
+    () => moments.filter(m => Number(m.authorId) === currentUser.userId && m.authorRole === currentUser.role),
+    [moments, currentUser.userId, currentUser.role]
   )
   const favoriteMoments = useMemo(() => moments.filter(m => m.favoritedByCurrentUser), [moments])
-  const follows = readFollows()
+  const follows = readFollows().filter(f => Number(f.authorId) !== currentUser.userId)
   const savedPhotos = readSavedPhotos()
+  const mutualFollowIds = useMemo(
+    () => new Set(myFollowers.filter(f => f.followedByCurrentUser).map(f => Number(f.userId))),
+    [myFollowers]
+  )
 
   const historicalOrders = profileOrders.filter(o => ['COMPLETED','REVIEWED'].includes(o.status)).length
   const ongoingOrders = profileOrders.filter(o => !['COMPLETED','REVIEWED','CANCELLED'].includes(o.status)).length
@@ -310,6 +336,20 @@ export function ProfilePage() {
               ? <button className="secondary-btn" onClick={() => navigate('/publish/service-package')}>发布新橱窗</button>
               : <button className="secondary-btn" onClick={() => navigate('/feed')}>管理我的动态</button>
             }
+            {isProvider ? (
+              <button className="secondary-btn" onClick={() => handleSwitchRole('CUSTOMER')}>
+                🎯 切换到我的单主账号
+              </button>
+            ) : (
+              <>
+                <button className="secondary-btn" onClick={() => handleSwitchRole('PROVIDER')}>
+                  📷 切换到我的摄影师账号
+                </button>
+                <p style={{fontSize:11, color:'#8a8d92', letterSpacing:'.1em', margin:'6px 0 0', textAlign:'center'}}>
+                  切换后昵称、头像和动态将独立展示
+                </p>
+              </>
+            )}
           </div>
         </aside>
       </section>
@@ -476,15 +516,19 @@ export function ProfilePage() {
               </div>
               {follows.length ? (
                 <div className="order-list">
-                  {follows.map(f => (
-                    <div key={f.authorId} className="order-slip" onClick={() => navigate(`/users/${f.authorId}`)}>
-                      <div className="order-num" style={{fontSize:20}}>★</div>
-                      <div>
-                        <h4>用户 {f.authorId}</h4>
-                        <p>{formatShortTime(f.followedAt)} 开始关注</p>
+                  {follows.map(f => {
+                    const isMutual = mutualFollowIds.has(Number(f.authorId))
+                    return (
+                      <div key={f.authorId} className="order-slip" onClick={() => navigate(`/users/${f.authorId}`)}>
+                        <div className="order-num" style={{fontSize:20}}>★</div>
+                        <div>
+                          <h4>用户 {f.authorId}</h4>
+                          <p>{formatShortTime(f.followedAt)} 开始关注</p>
+                        </div>
+                        {isMutual && <span className="status">互相关注</span>}
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               ) : (
                 <div className="pp-empty"><h3>还没有关注任何人</h3><p>在动态或大厅页面关注感兴趣的用户。</p></div>
@@ -637,19 +681,6 @@ export function ProfilePage() {
                     <img src={profileForm.avatarData} alt=""
                       style={{width:42,height:42,borderRadius:'50%',objectFit:'cover',border:'2px solid var(--line)'}} />
                   )}
-                </div>
-              </div>
-              <div>
-                <label className="pp-label">切换身份</label>
-                <div style={{display:'flex',gap:8}}>
-                  <button
-                    className={!isProvider ? 'primary-btn' : 'secondary-btn'}
-                    style={{flex:1}}
-                    onClick={() => switchRole('CUSTOMER')}>单主</button>
-                  <button
-                    className={isProvider ? 'primary-btn' : 'secondary-btn'}
-                    style={{flex:1}}
-                    onClick={() => switchRole('PROVIDER')}>摄影师</button>
                 </div>
               </div>
             </div>

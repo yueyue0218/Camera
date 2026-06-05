@@ -32,7 +32,11 @@ function saveStoredProfile(user) {
     avatarData: user.avatarData || '',
     bio: user.bio || user.description || '',
     description: user.description || user.bio || '',
-    availability: user.availability || ''
+    availability: user.availability || '',
+    customerNickname: user.customerNickname || user.nickname || '',
+    customerBio: user.customerBio !== undefined ? user.customerBio : (user.role !== 'PROVIDER' ? (user.bio || '') : profiles[userId]?.customerBio || ''),
+    providerNickname: user.providerNickname !== undefined ? user.providerNickname : profiles[userId]?.providerNickname || null,
+    providerBio: user.providerBio !== undefined ? user.providerBio : profiles[userId]?.providerBio || ''
   }
   localStorage.setItem(USER_PROFILE_STORAGE_KEY, JSON.stringify(profiles))
 }
@@ -64,8 +68,22 @@ function normalizeSession(session) {
   const demoUser = USERS[roleToUserKey(role)]
   const userId = normalizedUserId(session, demoUser)
   const storedProfile = readUserProfiles()[String(userId)] || {}
-  const bio = session.user.bio || session.user.description || storedProfile.bio || storedProfile.description || demoUser.bio || demoUser.description || ''
   const availability = session.user.availability || storedProfile.availability || demoUser.availability || ''
+
+  // Dual-identity: customer fields come from users table, provider fields from provider_profiles
+  const customerNickname = session.user.customerNickname || storedProfile.customerNickname
+    || session.user.nickname || storedProfile.nickname || demoUser.nickname
+  const customerBio = session.user.customerBio !== undefined ? session.user.customerBio
+    : (storedProfile.customerBio !== undefined ? storedProfile.customerBio : (session.user.bio || storedProfile.bio || demoUser.bio || demoUser.description || ''))
+  const providerNickname = session.user.providerNickname !== undefined ? session.user.providerNickname
+    : storedProfile.providerNickname || null
+  const providerBio = session.user.providerBio !== undefined ? session.user.providerBio
+    : storedProfile.providerBio || ''
+
+  const isProvider = role === 'PROVIDER'
+  const nickname = isProvider ? (providerNickname || customerNickname) : customerNickname
+  const bio = isProvider ? providerBio : customerBio
+
   return {
     token: session.token || session.accessToken || `demo-token-${role.toLowerCase()}-${userId}`,
     refreshToken: session.refreshToken || '',
@@ -77,11 +95,15 @@ function normalizeSession(session) {
       id: userId,
       role,
       label: role === 'PROVIDER' ? '服务方' : '需求方',
-      nickname: session.user.nickname || storedProfile.nickname || demoUser.nickname,
+      nickname,
       avatarData: storedProfile.avatarData || session.user.avatarData || demoUser.avatarData,
       bio,
       description: bio,
-      availability
+      availability,
+      customerNickname,
+      customerBio,
+      providerNickname,
+      providerBio
     }
   }
 }
@@ -142,15 +164,18 @@ export function AuthProvider({ children }) {
 
   function updateProfile(partial) {
     if (!session) return null
-    const nextUser = {
-      ...session.user,
-      ...partial
+    // Route nickname/bio updates to the correct role-specific field
+    const roleFields = {}
+    if (partial.role === 'PROVIDER') {
+      if (partial.nickname != null) roleFields.providerNickname = partial.nickname
+      if (partial.bio != null) roleFields.providerBio = partial.bio
+    } else if (partial.role === 'CUSTOMER') {
+      if (partial.nickname != null) roleFields.customerNickname = partial.nickname
+      if (partial.bio != null) roleFields.customerBio = partial.bio
     }
+    const nextUser = { ...session.user, ...partial, ...roleFields }
     saveStoredProfile(nextUser)
-    const nextSession = normalizeSession({
-      ...session,
-      user: nextUser
-    })
+    const nextSession = normalizeSession({ ...session, user: nextUser })
     setSession(nextSession)
     persistSession(nextSession)
     return nextSession

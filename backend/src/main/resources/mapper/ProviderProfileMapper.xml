@@ -18,8 +18,10 @@
         <result property="age"              column="age"/>
         <result property="priceMin"         column="price_min"/>
         <result property="priceMax"         column="price_max"/>
-        <result property="acceptingOrders"  column="accepting_orders"/>
-        <result property="serviceType"      column="service_type"/>
+        <result property="acceptingOrders"        column="accepting_orders"/>
+        <result property="serviceType"            column="service_type"/>
+        <result property="providerAvatarFileId"   column="provider_avatar_file_id"/>
+        <result property="bio"                    column="provider_bio"/>
         <!-- nested select：按 profile_id 查风格标签 name 列表，避免 JOIN 引入 null 行 -->
         <collection property="styleTags"
                     select="selectTagNamesByProfileId"
@@ -29,11 +31,13 @@
 
     <select id="selectPublicProfile" resultMap="PublicProfileResultMap">
         SELECT
-            pp.id            AS profile_id,
-            pp.user_id       AS provider_id,
-            u.nickname,
+            pp.id                       AS profile_id,
+            pp.user_id                  AS provider_id,
+            COALESCE(pp.display_name, u.nickname) AS nickname,
             u.gender,
-            f.url            AS avatar_url,
+            COALESCE(pf.url, f.url)     AS avatar_url,
+            pp.provider_avatar_file_id,
+            pp.bio                      AS provider_bio,
             pp.city_code,
             pp.city_area,
             u.credit_score,
@@ -47,7 +51,8 @@
             pp.service_type
         FROM provider_profiles pp
         JOIN  users u ON u.id = pp.user_id
-        LEFT JOIN files f ON f.id = u.avatar_file_id
+        LEFT JOIN files f  ON f.id  = u.avatar_file_id
+        LEFT JOIN files pf ON pf.id = pp.provider_avatar_file_id
         WHERE pp.user_id = #{providerUserId}
     </select>
 

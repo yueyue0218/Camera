@@ -21,4 +21,11 @@ public class UserProfileResponse {
     private String status;
     private BigDecimal creditScore;
     private LocalDateTime createdAt;
+    // Dual-identity fields
+    private String customerNickname;
+    private Long customerAvatarFileId;
+    private String customerBio;
+    private String providerNickname;
+    private Long providerAvatarFileId;
+    private String providerBio;
 }

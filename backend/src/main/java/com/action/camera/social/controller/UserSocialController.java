@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -30,28 +31,33 @@ public class UserSocialController {
     }
 
     @PutMapping("/{userId}/follow")
-    public Result<FollowStateResponse> follow(@PathVariable Long userId) {
-        return Result.success(socialRelationService.follow(userId, currentUser()));
+    public Result<FollowStateResponse> follow(@PathVariable Long userId,
+                                              @RequestParam(required = false) String targetRole) {
+        return Result.success(socialRelationService.follow(userId, targetRole, currentUser()));
     }
 
     @DeleteMapping("/{userId}/follow")
-    public Result<FollowStateResponse> unfollow(@PathVariable Long userId) {
-        return Result.success(socialRelationService.unfollow(userId, currentUser()));
+    public Result<FollowStateResponse> unfollow(@PathVariable Long userId,
+                                                @RequestParam(required = false) String targetRole) {
+        return Result.success(socialRelationService.unfollow(userId, targetRole, currentUser()));
     }
 
     @GetMapping("/{userId}/followers")
-    public Result<List<SocialUserBriefResponse>> followers(@PathVariable Long userId) {
-        return Result.success(socialRelationService.listFollowers(userId, currentUser()));
+    public Result<List<SocialUserBriefResponse>> followers(@PathVariable Long userId,
+                                                           @RequestParam(required = false) String role) {
+        return Result.success(socialRelationService.listFollowers(userId, role, currentUser()));
     }
 
     @GetMapping("/{userId}/following")
-    public Result<List<SocialUserBriefResponse>> following(@PathVariable Long userId) {
-        return Result.success(socialRelationService.listFollowing(userId, currentUser()));
+    public Result<List<SocialUserBriefResponse>> following(@PathVariable Long userId,
+                                                           @RequestParam(required = false) String role) {
+        return Result.success(socialRelationService.listFollowing(userId, role, currentUser()));
     }
 
     @GetMapping("/{userId}/public-profile")
-    public Result<PublicProfileResponse> publicProfile(@PathVariable Long userId) {
-        return Result.success(socialRelationService.getPublicProfile(userId, currentUser()));
+    public Result<PublicProfileResponse> publicProfile(@PathVariable Long userId,
+                                                       @RequestParam(required = false) String role) {
+        return Result.success(socialRelationService.getPublicProfile(userId, role, currentUser()));
     }
 
     private CurrentUser currentUser() {

@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(
         name = "user_follows",
-        uniqueConstraints = @UniqueConstraint(name = "uk_user_follows_pair", columnNames = {"follower_id", "following_user_id"})
+        uniqueConstraints = @UniqueConstraint(name = "uk_user_follows_triple", columnNames = {"follower_id", "following_user_id", "target_role"})
 )
 public class UserFollow {
 
@@ -34,18 +34,25 @@ public class UserFollow {
     @Column(name = "following_user_id", nullable = false)
     private Long followingUserId;
 
+    @Column(name = "target_role", nullable = false, length = 20)
+    private String targetRole = "CUSTOMER";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    public UserFollow(Long followerId, Long followingUserId) {
+    public UserFollow(Long followerId, Long followingUserId, String targetRole) {
         this.followerId = followerId;
         this.followingUserId = followingUserId;
+        this.targetRole = targetRole != null ? targetRole : "CUSTOMER";
     }
 
     @PrePersist
     void prePersist() {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
+        }
+        if (targetRole == null) {
+            targetRole = "CUSTOMER";
         }
     }
 }

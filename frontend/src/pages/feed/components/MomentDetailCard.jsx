@@ -5,22 +5,51 @@ import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded
 import { formatTime, roleMap } from '../utils/feedUtils.js'
 import { MentionChip } from './MentionChip.jsx'
 
-export function MomentDetailCard({ moment, currentUser, onProfile, onOpenMention, onLike, onFavorite, onDelete }) {
+// 详情页：保留原始比例，全宽展示，不裁剪，白底填充
+function DetailImage({ src, alt }) {
+  if (!src) return null
+  return (
+    <Box sx={{ width: '100%', bgcolor: '#fff', lineHeight: 0 }}>
+      <Box
+        component="img"
+        src={src}
+        alt={alt}
+        sx={{ width: '100%', height: 'auto', display: 'block' }}
+      />
+    </Box>
+  )
+}
+
+export function MomentDetailCard({ moment, currentUser, authorProfile, onProfile, onOpenMention, onLike, onFavorite, onDelete }) {
+  const displayName = authorProfile?.nickname || `${roleMap[moment.authorRole] || '用户'} ${moment.authorId}`
+  const avatarSrc = authorProfile?.avatarData || undefined
+
   return (
     <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
       <Stack spacing={1.6}>
         <Stack direction="row" alignItems="center" spacing={1.2}>
-          <Avatar onClick={onProfile} sx={{ cursor: 'pointer', bgcolor: moment.authorRole === 'PROVIDER' ? 'secondary.main' : 'primary.main' }}>
-            {roleMap[moment.authorRole]?.slice(0, 1) || '用'}
+          <Avatar
+            src={avatarSrc}
+            onClick={onProfile}
+            sx={{ cursor: 'pointer', bgcolor: moment.authorRole === 'PROVIDER' ? 'secondary.main' : 'primary.main' }}
+          >
+            {displayName.slice(0, 1)}
           </Avatar>
           <Box onClick={onProfile} sx={{ cursor: 'pointer', minWidth: 0 }}>
-            <Typography fontWeight={900}>{roleMap[moment.authorRole] || '用户'} {moment.authorId}</Typography>
+            <Typography fontWeight={900}>{displayName}</Typography>
             <Typography color="text.secondary" variant="body2">{formatTime(moment.createdAt)}</Typography>
           </Box>
         </Stack>
         <Typography variant="h5">{moment.title || '未命名动态'}</Typography>
         <Typography sx={{ whiteSpace: 'pre-wrap' }}>{moment.content || '分享了一张照片'}</Typography>
-        {moment.imageData && <img className="feed-image" src={moment.imageData} alt={moment.title || '动态照片'} />}
+        {(() => {
+          const images = moment.imageDataList?.length
+            ? moment.imageDataList
+            : moment.imageData ? [moment.imageData] : []
+          return images.map((src, i) => (
+            <DetailImage key={i} src={src} alt={`${moment.title || '动态照片'} ${images.length > 1 ? `(${i + 1}/${images.length})` : ''}`} />
+          ))
+        })()}
         {!!moment.mentions?.length && (
           <Stack direction="row" spacing={1} flexWrap="wrap">
             {moment.mentions.map(mention => (

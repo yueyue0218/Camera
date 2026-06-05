@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS moment_images
 (
     id          BIGINT PRIMARY KEY AUTO_INCREMENT,
     moment_id   BIGINT       NOT NULL COMMENT '动态 ID',
-    image_data  VARCHAR(2048) NOT NULL COMMENT '图片数据或地址',
+    image_data  MEDIUMTEXT   NOT NULL COMMENT '图片数据或地址',
     sort_order  INT          NOT NULL COMMENT '图片顺序',
     is_cover    TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '是否封面图',
     created_at  DATETIME     NOT NULL COMMENT '创建时间',

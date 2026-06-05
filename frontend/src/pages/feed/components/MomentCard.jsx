@@ -5,6 +5,47 @@ import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded
 import { formatTime, roleMap } from '../utils/feedUtils.js'
 import { MentionChip } from './MentionChip.jsx'
 
+// 按小红书规则将原始比例匹配到最近的标准展示比例
+function matchFeedRatio(naturalWidth, naturalHeight) {
+  const r = naturalWidth / naturalHeight
+  if (r <= 0.8) return '3/4'
+  if (r < 1.25) return '1/1'
+  return '4/3'
+}
+
+function FeedImage({ src, alt, onClick }) {
+  if (!src) return null
+  return (
+    <Box
+      sx={{
+        width: '100%',
+        overflow: 'hidden',
+        bgcolor: 'grey.100',
+        cursor: onClick ? 'pointer' : 'default',
+        '& img': { aspectRatio: 'var(--feed-ratio, 4/3)', transition: 'aspect-ratio 0s' }
+      }}
+      onClick={onClick}
+    >
+      <Box
+        component="img"
+        src={src}
+        alt={alt}
+        onLoad={e => {
+          const { naturalWidth: w, naturalHeight: h } = e.currentTarget
+          e.currentTarget.style.aspectRatio = matchFeedRatio(w, h)
+        }}
+        sx={{
+          width: '100%',
+          aspectRatio: '4/3',
+          objectFit: 'cover',
+          objectPosition: 'center',
+          display: 'block'
+        }}
+      />
+    </Box>
+  )
+}
+
 export function MomentCard({
   moment,
   currentUser,
@@ -23,16 +64,27 @@ export function MomentCard({
 
   return (
     <Card variant="outlined">
-      {moment.imageData && (
-        <Box
-          component="img"
-          className="feed-image"
-          src={moment.imageData}
-          alt="动态照片"
-          onClick={() => onOpenMoment(moment.momentId)}
-          sx={{ cursor: 'pointer' }}
-        />
-      )}
+      {(() => {
+        const cover = moment.imageDataList?.[0] || moment.imageData
+        const total = moment.imageDataList?.length || (moment.imageData ? 1 : 0)
+        if (!cover) return null
+        return (
+          <Box sx={{ position: 'relative' }}>
+            <FeedImage src={cover} alt="动态照片" onClick={() => onOpenMoment(moment.momentId)} />
+            {total > 1 && (
+              <Box sx={{
+                position: 'absolute', top: 8, right: 8,
+                bgcolor: 'rgba(0,0,0,0.55)', color: '#fff',
+                borderRadius: 999, px: 1, py: 0.25,
+                fontSize: 12, fontWeight: 700, lineHeight: 1.6,
+                pointerEvents: 'none'
+              }}>
+                1/{total}
+              </Box>
+            )}
+          </Box>
+        )
+      })()}
       <CardContent>
         <Stack spacing={1.2}>
           <Stack direction="row" alignItems="center" spacing={1}>
