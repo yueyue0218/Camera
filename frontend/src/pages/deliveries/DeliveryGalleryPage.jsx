@@ -9,6 +9,10 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { deliveryApi, fileApi, orderApi } from '../../api.js'
 import { goToOrder } from '../../utils/orderNavigation.js'
+import {
+  getReturnToConversation,
+  navigateBackToConversation
+} from '../../utils/conversationNavigation.js'
 import { formatOrderTitle } from '../../utils/displayFormatters.js'
 import { OrderCompletionDialog, PortraActionButton, PortraEmptyState, PortraInfoBanner, PortraStatusBadge, PortraTicketSection } from '../../components/portra/index.js'
 import { PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
@@ -193,6 +197,7 @@ export function DeliveryGalleryPage() {
   const viewerFile = viewerIndex >= 0 ? files[viewerIndex] : null
   const viewerUrl = viewerFile ? previewUrls[viewerFile.id] || previewUrls[viewerFile.fileId] : ''
   const conversationId = location.state?.conversationId || new URLSearchParams(location.search).get('conversationId')
+  const returnToConversation = getReturnToConversation(location, order?.conversationId || conversationId)
   const currentUserId = Number(currentUser?.userId)
   const canCustomerAct = Number(order?.customerId) === currentUserId && order?.status === 'DELIVERED_PENDING_CONFIRM'
   const isProvider = Number(order?.providerUserId) === currentUserId
@@ -210,7 +215,7 @@ export function DeliveryGalleryPage() {
   if (!batch) {
     return (
       <Stack spacing={1.5}>
-        <Button startIcon={<ArrowBackRoundedIcon />} color="inherit" onClick={() => goToOrder(navigate, orderId)}>返回订单</Button>
+        <Button startIcon={<ArrowBackRoundedIcon />} color="inherit" onClick={() => goToOrder(navigate, orderId, { returnTo: returnToConversation })}>返回订单</Button>
         <PortraEmptyState title="交付记录不存在" description="该交付记录可能不属于当前订单，或已经被移除。" />
       </Stack>
     )
@@ -222,9 +227,9 @@ export function DeliveryGalleryPage() {
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.4} sx={{ justifyContent: 'space-between', alignItems: { xs: 'stretch', md: 'center' } }}>
           <Stack spacing={0.8}>
             <Stack direction="row" spacing={0.8} sx={{ flexWrap: 'wrap' }}>
-              <Button startIcon={<ArrowBackRoundedIcon />} color="inherit" onClick={() => goToOrder(navigate, orderId)}>返回订单</Button>
-              {conversationId && (
-                <Button startIcon={<ForumRoundedIcon />} color="inherit" onClick={() => navigate(`/messages/${conversationId}`)}>返回会话</Button>
+              <Button startIcon={<ArrowBackRoundedIcon />} color="inherit" onClick={() => goToOrder(navigate, orderId, { returnTo: returnToConversation })}>返回订单</Button>
+              {returnToConversation && (
+                <Button startIcon={<ForumRoundedIcon />} color="inherit" onClick={() => navigateBackToConversation(navigate, location, order?.conversationId || conversationId)}>返回沟通</Button>
               )}
             </Stack>
             <Box>
@@ -292,9 +297,9 @@ export function DeliveryGalleryPage() {
               {isReworkForProvider && (
                 <Stack spacing={1}>
                   <PortraInfoBanner tone="warning">客户已提出返修要求，请回到会话重新上传作品。</PortraInfoBanner>
-                  {conversationId && (
-                    <Button startIcon={<ForumRoundedIcon />} variant="outlined" onClick={() => navigate(`/messages/${conversationId}`)}>
-                      进入会话重新上传作品
+                  {returnToConversation && (
+                    <Button startIcon={<ForumRoundedIcon />} variant="outlined" onClick={() => navigateBackToConversation(navigate, location, order?.conversationId || conversationId)}>
+                      返回沟通重新上传作品
                     </Button>
                   )}
                 </Stack>

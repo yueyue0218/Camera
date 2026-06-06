@@ -1,21 +1,28 @@
+import { buildConversationPath, normalizeConversationId } from './conversationNavigation.js'
+
 export function normalizeOrderId(value) {
   const id = Number(value)
   return Number.isFinite(id) && id > 0 ? id : null
 }
 
-export function buildOrderNavigationTarget(value) {
+export function buildOrderNavigationTarget(value, options = {}) {
   const orderId = normalizeOrderId(value)
   if (!orderId) return null
+  const conversationId = normalizeConversationId(options.conversationId)
+  const returnTo = sanitizeOrderReturnPath(options.returnTo) || buildConversationPath(conversationId)
+  const search = new URLSearchParams({ orderId: String(orderId) })
+  if (conversationId) search.set('conversationId', String(conversationId))
+  if (returnTo) search.set('returnTo', returnTo)
   return {
-    to: `/orders?orderId=${orderId}`,
-    state: { orderId }
+    to: `/orders?${search.toString()}`,
+    state: { orderId, conversationId, returnTo }
   }
 }
 
 export function goToOrder(navigate, value, options = {}) {
-  const target = buildOrderNavigationTarget(value)
+  const target = buildOrderNavigationTarget(value, options)
   if (!target || typeof navigate !== 'function') return false
-  navigate(target.to, { state: target.state, ...options })
+  navigate(target.to, { ...options, state: { ...target.state, ...(options.state || {}) } })
   return true
 }
 
@@ -64,4 +71,9 @@ export function goToUserProfile(navigate, actorOrUserId, currentUser, options = 
 function normalizeUserId(value) {
   const id = Number(value)
   return Number.isFinite(id) && id > 0 ? id : null
+}
+
+function sanitizeOrderReturnPath(value) {
+  const text = String(value || '')
+  return /^\/messages\/\d+$/.test(text) ? text : ''
 }

@@ -3,6 +3,7 @@ import { Alert, Box, Stack } from '@mui/material'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { conversationApi, orderApi } from '../../api.js'
+import { navigateToConversation } from '../../utils/conversationNavigation.js'
 import { ConversationList } from './components/ConversationList.jsx'
 import { MessagesSectionHeader } from './components/MessagesSectionHeader.jsx'
 import {
@@ -73,7 +74,7 @@ export function MessagesPage() {
       <ConversationList
         conversations={conversations}
         currentUser={currentUser}
-        onOpenConversation={conversationId => navigate(`/messages/${conversationId}`)}
+        onOpenConversation={conversationId => navigateToConversation(navigate, conversationId)}
       />
     </Stack>
   )

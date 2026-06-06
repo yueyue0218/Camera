@@ -1,3 +1,4 @@
+import { buildConversationPath, normalizeConversationId } from './conversationNavigation.js'
 import { normalizeOrderId } from './orderNavigation.js'
 
 export function normalizeDeliveryId(value) {
@@ -8,14 +9,20 @@ export function normalizeDeliveryId(value) {
 export function buildDeliveryGalleryTarget({ orderId, deliveryId, conversationId } = {}) {
   const normalizedOrderId = normalizeOrderId(orderId)
   const normalizedDeliveryId = normalizeDeliveryId(deliveryId)
+  const normalizedConversationId = normalizeConversationId(conversationId)
   if (!normalizedOrderId || !normalizedDeliveryId) return null
-  const search = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
+  const returnTo = buildConversationPath(normalizedConversationId)
+  const params = new URLSearchParams()
+  if (normalizedConversationId) params.set('conversationId', String(normalizedConversationId))
+  if (returnTo) params.set('returnTo', returnTo)
+  const search = params.toString() ? `?${params.toString()}` : ''
   return {
     to: `/orders/${normalizedOrderId}/deliveries/${normalizedDeliveryId}${search}`,
     state: {
       orderId: normalizedOrderId,
       deliveryId: normalizedDeliveryId,
-      conversationId
+      conversationId: normalizedConversationId,
+      returnTo
     }
   }
 }

@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { getLastConversationPath } from '../utils/conversationNavigation.js'
 
 const navItems = [
   { label: '\u5927\u5385', path: '/hall' },
@@ -33,7 +34,7 @@ export function Navbar({ activePath, currentUser, logout }) {
               className={`portra-nav-item ${!item.passive && tabValue === item.path ? 'active' : ''}`}
               key={`${item.label}-${item.path}`}
               type="button"
-              onClick={() => navigate(item.path)}
+              onClick={() => navigate(item.path === '/messages' ? getLastConversationPath() || '/messages' : item.path)}
             >
               {item.label}
             </button>

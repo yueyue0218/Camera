@@ -5,8 +5,12 @@ import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { conversationApi, deliveryApi, orderApi, photoAuthorizationApi, quoteApi, readFileAsDataUrl } from '../../api.js'
-import { goToOrder, goToUserProfile } from '../../utils/orderNavigation.js'
-import { goToDeliveryGallery } from '../../utils/deliveryNavigation.js'
+import { goToUserProfile } from '../../utils/orderNavigation.js'
+import {
+  navigateToDeliveryFromConversation,
+  navigateToOrderFromConversation,
+  rememberLastConversation
+} from '../../utils/conversationNavigation.js'
 import { ConversationThread } from './components/ConversationThread.jsx'
 import { ConversationWorkbenchPanel } from './components/ConversationWorkbenchPanel.jsx'
 import { ConversationActionDialogs } from './components/ConversationActionDialogs.jsx'
@@ -74,6 +78,13 @@ export function ConversationDetailPage() {
   const [activeQuote, setActiveQuote] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('WECHAT')
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
+
+  useEffect(() => {
+    rememberLastConversation(conversationId, {
+      orderId: currentOrder?.orderId,
+      role: currentUser.role
+    })
+  }, [conversationId, currentOrder?.orderId, currentUser.role])
 
   useEffect(() => {
     const stored = findConversationRecord(conversationId)
@@ -471,7 +482,10 @@ export function ConversationDetailPage() {
   }
 
   function openOrderArchive(orderId = currentOrder?.orderId) {
-    const succeeded = goToOrder(navigate, orderId || currentOrder?.orderId)
+    const succeeded = navigateToOrderFromConversation(navigate, {
+      orderId: orderId || currentOrder?.orderId,
+      conversationId
+    })
     if (!succeeded) {
       setNotice({ type: 'warning', text: '订单信息暂时不可用，请稍后刷新后再查看。' })
       return false
@@ -480,7 +494,7 @@ export function ConversationDetailPage() {
   }
 
   function openDeliveryGallery(delivery) {
-    const succeeded = goToDeliveryGallery(navigate, {
+    const succeeded = navigateToDeliveryFromConversation(navigate, {
       orderId: currentOrder?.orderId || delivery?.orderId,
       deliveryId: delivery?.deliveryId || delivery?.fileId,
       conversationId
@@ -568,7 +582,7 @@ export function ConversationDetailPage() {
       >
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.15} sx={{ justifyContent: 'space-between', alignItems: { xs: 'stretch', md: 'center' } }}>
           <Stack direction="row" spacing={1.5} sx={{ minWidth: 0, alignItems: 'center' }}>
-            <Tooltip title="返回消息">
+            <Tooltip title="全部沟通">
               <IconButton onClick={() => navigate('/messages')} sx={{ border: `1px solid ${PORTRA_COLORS.border}`, borderRadius: PORTRA_RADII.control, bgcolor: PORTRA_COLORS.white }}>
                 <ArrowBackRoundedIcon />
               </IconButton>
@@ -600,7 +614,7 @@ export function ConversationDetailPage() {
               onClick={() => openOrderArchive(currentOrder?.orderId)}
               disabled={!currentOrder?.orderId}
             >
-              订单档案
+              查看订单
             </Button>
           </Stack>
         </Stack>
