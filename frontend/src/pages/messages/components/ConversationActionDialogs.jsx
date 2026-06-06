@@ -92,7 +92,7 @@ export function ConversationActionDialogs({
                 ['备注', formatQuoteRemark(quote, '无额外备注')]
               ]} />
               <Box sx={{ p: 1, bgcolor: PORTRA_COLORS.paperMuted, borderRadius: PORTRA_RADII.control, color: PORTRA_COLORS.mutedInk, fontSize: 14, lineHeight: 1.7 }}>
-                客户确认报价后将生成平台托管订单；付款后资金先进入平台托管，订单完成后再结算给摄影师。
+                客户确认报价后将生成平台担保订单；付款后资金先进入平台担保，订单完成后再结算给摄影师。
               </Box>
             </Stack>
           ) : (
@@ -126,7 +126,7 @@ export function ConversationActionDialogs({
                 ['拍摄时间', `${formatTime(order.shootStartTime)} - ${formatTime(order.shootEndTime)}`]
               ]} />
               <Box sx={{ p: 1, bgcolor: PORTRA_COLORS.paperMuted, borderRadius: PORTRA_RADII.control, color: PORTRA_COLORS.mutedInk, fontSize: 14, lineHeight: 1.7 }}>
-                付款后资金进入平台托管，拍摄和交付完成后再结算给摄影师。
+                付款后资金进入平台担保，拍摄和作品确认后再结算给摄影师。
               </Box>
               <FormControl>
                 <Typography variant="caption" sx={{ mb: 0.5, color: PORTRA_COLORS.faintInk, fontWeight: 900 }}>支付方式</Typography>
@@ -201,7 +201,7 @@ export function ConversationActionDialogs({
       </Dialog>
 
       <Dialog open={activeAction === 'REQUEST_AUTHORIZATION'} onClose={onClose} fullWidth maxWidth="sm" PaperProps={dialogPaperProps}>
-        <DialogTitle sx={dialogTitleSx}>申请照片展示授权</DialogTitle>
+        <DialogTitle sx={dialogTitleSx}>申请展示授权</DialogTitle>
         <DialogContent sx={dialogContentSx}>
           <Stack component="form" id="authorization-dialog-form" spacing={2} sx={{ pt: 1 }} onSubmit={event => submitAndClose(onSubmitPhotoAuthorization, event)}>
             <DialogContentText>请选择已经交付的作品，并说明希望展示这些照片的用途。</DialogContentText>

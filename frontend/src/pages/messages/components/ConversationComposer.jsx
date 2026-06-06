@@ -141,7 +141,7 @@ export function ConversationComposer({
               )}
               {actions.canRequestPhotoAuthorization && (
                 <Button size="small" variant="outlined" startIcon={<ImageRoundedIcon />} onClick={() => onOpenAction('REQUEST_AUTHORIZATION')}>
-                  申请照片授权
+                  申请展示授权
                 </Button>
               )}
               {actions.canReviewPhotoAuthorization && (
@@ -173,7 +173,7 @@ export function ConversationComposer({
           <MessageToolbarButton title="表情" onClick={() => onUnavailableTool('表情')}><EmojiEmotionsRoundedIcon fontSize="small" /></MessageToolbarButton>
           <MessageToolbarButton title="补款" onClick={() => onUnavailableTool('补款')}><AccountBalanceWalletRoundedIcon fontSize="small" /></MessageToolbarButton>
           {actions.canOpenOrder && canOpenOrderArchive && (
-            <MessageToolbarButton title="订单档案" data-message-order-entry="composer-toolbar" onClick={openOrderArchive}><ReceiptLongRoundedIcon fontSize="small" /></MessageToolbarButton>
+            <MessageToolbarButton title="查看订单" data-message-order-entry="composer-toolbar" onClick={openOrderArchive}><ReceiptLongRoundedIcon fontSize="small" /></MessageToolbarButton>
           )}
           {actions.canAppeal && (
             <MessageToolbarButton title="平台协助" onClick={() => onUnavailableTool('平台协助')}><SupportAgentRoundedIcon fontSize="small" /></MessageToolbarButton>

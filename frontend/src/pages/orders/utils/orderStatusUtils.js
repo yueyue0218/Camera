@@ -255,7 +255,7 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
   if (status === 'PENDING_PAYMENT') {
     return {
       title: '等待客户支付',
-      description: '客户支付后，资金进入平台托管，订单再进入待拍摄履约阶段。',
+      description: '客户支付后，资金进入平台担保，订单再进入待拍摄履约阶段。',
       color: 'warning',
       severity: 'info',
       rows: [
@@ -269,7 +269,7 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
   if (status === 'PAID_PENDING_SHOOT') {
     return {
       title: '已支付，等待拍摄',
-      description: '平台托管资金已建立，双方应按报价约定的拍摄时间履约。',
+      description: '平台担保资金已建立，双方应按报价约定的拍摄时间履约。',
       color: 'info',
       severity: 'warning',
       rows: [

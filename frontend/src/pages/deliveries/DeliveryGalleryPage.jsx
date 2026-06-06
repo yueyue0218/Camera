@@ -60,7 +60,7 @@ export function DeliveryGalleryPage() {
         setOrder(nextOrder)
         setDeliveries(Array.isArray(nextDeliveries) ? nextDeliveries : [])
       } catch (loadError) {
-        if (!cancelled) setError(loadError.message || '交付记录加载失败。')
+        if (!cancelled) setError(loadError.message || '作品记录加载失败。')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -205,18 +205,18 @@ export function DeliveryGalleryPage() {
   const isCompleted = order?.status === 'COMPLETED'
 
   if (loading) {
-    return <PortraEmptyState title="交付记录加载中" description="正在读取订单和交付作品。" />
+    return <PortraEmptyState title="作品记录加载中" description="正在读取订单和作品文件。" />
   }
 
   if (error) {
-    return <PortraEmptyState title="交付记录加载失败" description={error} />
+    return <PortraEmptyState title="作品记录加载失败" description={error} />
   }
 
   if (!batch) {
     return (
       <Stack spacing={1.5}>
         <Button startIcon={<ArrowBackRoundedIcon />} color="inherit" onClick={() => goToOrder(navigate, orderId, { returnTo: returnToConversation })}>返回订单</Button>
-        <PortraEmptyState title="交付记录不存在" description="该交付记录可能不属于当前订单，或已经被移除。" />
+        <PortraEmptyState title="作品记录不存在" description="该作品记录可能不属于当前订单，或已经被移除。" />
       </Stack>
     )
   }
@@ -249,7 +249,7 @@ export function DeliveryGalleryPage() {
       <Box sx={galleryGridSx}>
         <Paper variant="outlined" sx={galleryPanelSx}>
           <Stack spacing={1.5} sx={{ minWidth: 0 }}>
-          <PortraTicketSection title="交付相册">
+          <PortraTicketSection title="作品相册">
             {files.length ? (
               <DeliveryFileGrid
                 files={files}
@@ -259,7 +259,7 @@ export function DeliveryGalleryPage() {
                 onOpenViewer={setViewerIndex}
               />
             ) : (
-              <PortraEmptyState title="暂无交付文件" description="该交付记录没有可展示的文件信息。" />
+              <PortraEmptyState title="暂无作品文件" description="该作品记录没有可展示的文件信息。" />
             )}
           </PortraTicketSection>
           <DeliveryActionBar
@@ -274,11 +274,11 @@ export function DeliveryGalleryPage() {
 
         <Paper variant="outlined" sx={sidePanelSx}>
           <Stack spacing={1.5}>
-            <PortraTicketSection title="交付信息">
+            <PortraTicketSection title="作品信息">
               <Stack spacing={0.85}>
                 <InfoLine label="订单金额" value={centToYuan(order?.amountCent)} />
                 <InfoLine label="文件数量" value={`${batch.fileCount} 个文件`} />
-                <InfoBlock label="交付说明" value={batch.description || '摄影师已上传作品，等待客户确认。'} />
+                <InfoBlock label="作品说明" value={batch.description || '摄影师已上传作品，等待客户确认。'} />
               </Stack>
             </PortraTicketSection>
             <Divider sx={{ borderColor: PORTRA_SURFACE.borderSoft }} />
@@ -305,7 +305,7 @@ export function DeliveryGalleryPage() {
                 </Stack>
               )}
               {isCompleted && (
-                <PortraInfoBanner>订单已完成，可返回订单档案查看评价入口。</PortraInfoBanner>
+                <PortraInfoBanner>订单已完成，可返回订单查看评价入口。</PortraInfoBanner>
               )}
               {!canCustomerAct && !isReworkForProvider && !isCompleted && (
                 <PortraInfoBanner>作品已提交，等待客户确认。</PortraInfoBanner>

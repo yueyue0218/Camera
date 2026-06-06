@@ -128,7 +128,7 @@ function getOrderAction(order, currentUser) {
       label: '模拟支付',
       icon: <PaidRoundedIcon />,
       allowed: true,
-      successText: '模拟支付成功，资金已进入平台托管'
+      successText: '模拟支付成功，资金已进入平台担保'
     }
   }
   if (order.status === 'PAID_PENDING_SHOOT') {
@@ -183,8 +183,8 @@ function getCustomerCancelAction(order, currentUser) {
     return {
       label: '取消并申请退款',
       title: '拍摄前取消并退款',
-      description: '订单已支付且拍摄尚未开始，取消后平台托管资金将退回客户。',
-      confirmText: '确定取消订单并申请退款吗？平台托管资金将退回客户。',
+      description: '订单已支付且拍摄尚未开始，取消后平台担保资金将退回客户。',
+      confirmText: '确定取消订单并申请退款吗？平台担保资金将退回客户。',
       reason: '客户拍摄前取消，申请退回托管款',
       successText: '订单已取消，退款状态已更新'
     }
@@ -473,7 +473,7 @@ export function OrdersPage() {
       deliveryForm.file,
       deliveryForm.remark.trim(),
       currentUser
-    ), selectedOrder.status === 'REWORK_REQUIRED' ? '返修交付已上传' : '交付文件已上传')
+    ), selectedOrder.status === 'REWORK_REQUIRED' ? '返修作品已上传' : '作品已上传')
     if (result) {
       setDeliveryForm({ file: null, remark: '' })
       await loadOrders(selectedOrder.orderId)
@@ -572,7 +572,7 @@ export function OrdersPage() {
     const result = await run(async () => photoAuthorizationApi.request(selectedOrder.orderId, {
       fileIds: photoAuthorizationForm.fileIds,
       remark: photoAuthorizationForm.remark.trim()
-    }, currentUser), '照片展示授权申请已发送')
+    }, currentUser), '展示授权申请已发送')
     if (result) {
       setPhotoAuthorizationForm({ fileIds: [], remark: '' })
       setPhotoAuthorizations(await photoAuthorizationApi.listByOrder(selectedOrder.orderId, currentUser))
@@ -583,7 +583,7 @@ export function OrdersPage() {
     if (!selectedOrder) return
     const remark = (authorizationRemarks[authorization.id] || '').trim()
     const action = decision === 'approve' ? photoAuthorizationApi.approve : photoAuthorizationApi.reject
-    const successText = decision === 'approve' ? '已同意照片展示授权' : '已拒绝照片展示授权'
+    const successText = decision === 'approve' ? '已同意展示授权' : '已拒绝展示授权'
     const result = await run(async () => action(authorization.id, { remark }, currentUser), successText)
     if (result) {
       setAuthorizationRemarks({ ...authorizationRemarks, [authorization.id]: '' })
@@ -718,7 +718,7 @@ export function OrdersPage() {
       returnTo: explicitReturnToConversation
     })
     if (!succeeded) {
-      setNotice({ type: 'warning', text: '交付记录暂不可查看，请刷新后重试。' })
+      setNotice({ type: 'warning', text: '作品记录暂不可查看，请刷新后重试。' })
     }
   }
 
@@ -734,7 +734,7 @@ export function OrdersPage() {
 
   return (
     <Stack spacing={2.5} sx={orderPageSx}>
-      <OrdersSectionHeader title="订单" subtitle="查看成单订单、平台托管状态和每次状态流转日志。" />
+      <OrdersSectionHeader title="订单" subtitle="查看订单进展、平台担保状态和每次状态流转。" />
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
 
       <Box sx={orderGridSx}>
@@ -778,7 +778,7 @@ export function OrdersPage() {
                   </PortraTicketCard>
                 )
               })}
-              {!orders.length && <PortraEmptyState title="暂无订单" description="当前还没有进入订单档案的合作。" />}
+              {!orders.length && <PortraEmptyState title="暂无订单" description="当前还没有进入订单阶段的合作。" />}
             </Stack>
             {currentUser.role === 'PROVIDER' && (
               <>
@@ -821,7 +821,7 @@ export function OrdersPage() {
                   <Box>
                     <Typography variant="h5" sx={{ fontSize: { xs: 20, md: 24 }, color: PORTRA_SURFACE.ink, fontWeight: 950 }}>{selectedOrderTitle}</Typography>
                     <Typography sx={{ color: PORTRA_SURFACE.muted, mt: 0.4 }}>
-                      订单档案 · {selectedCounterpartyLabel}
+                      订单 · {selectedCounterpartyLabel}
                     </Typography>
                     <Typography sx={{ mt: 1.2, color: PORTRA_SURFACE.ink, fontSize: { xs: 28, md: 32 }, fontWeight: 950, lineHeight: 1 }}>
                       {centToYuan(selectedOrder.amountCent)}
@@ -929,11 +929,11 @@ export function OrdersPage() {
               <Stack spacing={2}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between' }}>
                   <Box>
-                    <Typography variant="h6">交付作品</Typography>
-                    <Typography sx={{ color: PORTRA_SURFACE.muted }}>摄影师必须通过上传交付文件推进待确认状态，返修也从这里重新上传。</Typography>
+                    <Typography variant="h6">作品</Typography>
+                    <Typography sx={{ color: PORTRA_SURFACE.muted }}>摄影师通过上传作品推进待确认状态，返修也从这里重新上传。</Typography>
                   </Box>
                   {canUploadDelivery && (
-                    <Chip color="secondary" label={selectedOrder.status === 'REWORK_REQUIRED' ? '可上传返修交付' : '可上传交付'} />
+                    <Chip color="secondary" label={selectedOrder.status === 'REWORK_REQUIRED' ? '可上传返修作品' : '可上传作品'} />
                   )}
                 </Stack>
 
@@ -942,7 +942,7 @@ export function OrdersPage() {
                     <Stack spacing={1.5}>
                       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.2} sx={{ alignItems: { xs: 'stretch', sm: 'center' } }}>
                         <Button variant="outlined" component="label" startIcon={<AddPhotoAlternateRoundedIcon />}>
-                          选择交付文件
+                          选择作品文件
                           <input
                             hidden
                             type="file"
@@ -954,22 +954,22 @@ export function OrdersPage() {
                         </Typography>
                       </Stack>
                       <TextField
-                        label="交付说明"
+                        label="作品说明"
                         value={deliveryForm.remark}
                         onChange={event => setDeliveryForm({ ...deliveryForm, remark: event.target.value })}
                         multiline
                         minRows={2}
-                        placeholder="说明本次交付内容、返修修改点或注意事项"
+                        placeholder="说明本次作品内容、返修修改点或注意事项"
                       />
                       <Button type="submit" variant="contained" startIcon={<TaskAltRoundedIcon />} disabled={loading || !deliveryForm.file}>
-                        上传交付
+                        上传作品
                       </Button>
                     </Stack>
                   </Paper>
                 )}
 
                 {(canAcceptDelivery || canRequestRework) && (
-                  <PortraInfoBanner tone="warning" title="请处理交付作品">
+                  <PortraInfoBanner tone="warning" title="请处理作品">
                     <Stack direction="row" spacing={1} sx={{ mt: 0.8, flexWrap: 'wrap' }}>
                       {canAcceptDelivery && action && (
                         <PortraActionButton startIcon={<CheckCircleRoundedIcon />} onClick={() => operateOrder(action)} disabled={loading || !action.allowed}>
@@ -986,7 +986,7 @@ export function OrdersPage() {
                 )}
 
                 <Stack spacing={1}>
-                  <Typography variant="overline" sx={overlineSx}>交付记录</Typography>
+                  <Typography variant="overline" sx={overlineSx}>作品记录</Typography>
                   {deliveryBatches.map(batch => (
                     <DeliveryBatchCard
                       key={batch.id}
@@ -996,7 +996,7 @@ export function OrdersPage() {
                       disabled={!batch.deliveryId || !selectedOrder?.orderId}
                     />
                   ))}
-                  {!deliveryBatches.length && <PortraEmptyState title="暂无交付记录" compact />}
+                  {!deliveryBatches.length && <PortraEmptyState title="暂无作品记录" compact />}
                 </Stack>
               </Stack>
             </Paper>
@@ -1005,8 +1005,8 @@ export function OrdersPage() {
               <Stack spacing={2}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between' }}>
                   <Box>
-                    <Typography variant="h6">照片展示授权</Typography>
-                    <Typography sx={{ color: PORTRA_SURFACE.muted }}>客户同意后，摄影师才能把本订单交付照片作为真实客片展示。</Typography>
+                    <Typography variant="h6">展示授权</Typography>
+                    <Typography sx={{ color: PORTRA_SURFACE.muted }}>客户同意后，摄影师才能把本订单作品作为真实客片展示。</Typography>
                   </Box>
                   {selectedOrder.status === 'COMPLETED' && (
                     <Chip color="success" label="订单已完成，可处理授权" />
@@ -1020,10 +1020,10 @@ export function OrdersPage() {
                       {deliveryFileOptions.length ? (
                         <>
                           <FormControl size="small">
-                            <InputLabel>选择交付文件</InputLabel>
+                            <InputLabel>选择作品文件</InputLabel>
                             <Select
                               multiple
-                              label="选择交付文件"
+                              label="选择作品文件"
                               value={photoAuthorizationForm.fileIds}
                               onChange={event => {
                                 const value = event.target.value
@@ -1061,7 +1061,7 @@ export function OrdersPage() {
                           </Button>
                         </>
                       ) : (
-                        <PortraInfoBanner>暂无可授权交付文件，请先完成交付。</PortraInfoBanner>
+                        <PortraInfoBanner>暂无可授权作品，请先上传作品。</PortraInfoBanner>
                       )}
                     </Stack>
                   </Paper>

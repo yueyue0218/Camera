@@ -28,7 +28,7 @@ export function createDefaultQuoteFormModel() {
     refinedCount: '12',
     photoUsageScope: DEFAULT_SCOPE,
     terms: '包含本次沟通确认的拍摄内容、时间和交付范围。',
-    contractTerms: '客户确认报价后生成订单，支付后资金进入平台托管。',
+    contractTerms: '客户确认报价后生成订单，支付后资金进入平台担保。',
     remark: '可根据天气微调拍摄时间。'
   }
 }

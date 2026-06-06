@@ -24,8 +24,8 @@ export const PAYMENT_STATUS_LABELS = {
 export const ESCROW_STATUS_LABELS = {
   NONE: '暂无',
   NOT_PAID: '未付款',
-  HOLD: '平台托管中',
-  HELD: '平台托管中',
+  HOLD: '平台担保中',
+  HELD: '平台担保中',
   RELEASED: '已释放',
   REFUNDED: '已退款'
 }
@@ -194,7 +194,7 @@ export function formatOrderSubtitle(order, quote) {
   return [location, time].filter(Boolean).join(' · ') || '订单已创建，等待双方继续履约'
 }
 
-export function formatFileDisplayName(fileOrName, fallback = '交付作品') {
+export function formatFileDisplayName(fileOrName, fallback = '作品文件') {
   const rawName = typeof fileOrName === 'object'
     ? fileOrName?.fileName || fileOrName?.name || fileOrName?.originalName
     : fileOrName
@@ -217,7 +217,7 @@ export function formatDeliveryTitle(delivery, index = 0) {
   const fileName = formatFileDisplayName(delivery, '')
   if (fileName) return fileName
   const round = Number(delivery?.deliveryRound || index + 1)
-  return `交付作品 ${round}`
+  return `作品文件 ${round}`
 }
 
 export function formatDeliveryDescription(delivery, fallback = '摄影师已上传作品，等待客户确认。') {
@@ -226,10 +226,10 @@ export function formatDeliveryDescription(delivery, fallback = '摄影师已上�
 
 export function formatAuthorizationTitle(authorization, index = 0) {
   const id = authorization?.id || authorization?.authorizationId
-  return id ? `照片展示授权 ${id}` : `照片展示授权 ${index + 1}`
+  return id ? `展示授权 ${id}` : `展示授权 ${index + 1}`
 }
 
-export function formatAuthorizationDescription(authorization, fallback = '摄影师申请展示本次交付作品。') {
+export function formatAuthorizationDescription(authorization, fallback = '摄影师申请展示本次作品。') {
   return sanitizeSeedText(authorization?.remark || authorization?.description || authorization?.reason, fallback)
 }
 
@@ -249,7 +249,7 @@ export function formatQuoteRemark(quoteOrText, fallback = '无额外备注') {
 
 export function formatPhotoUsageScope(scope) {
   if (scope === 'PERSONAL_ONLY') return '仅限个人留念'
-  if (scope === 'PORTFOLIO_ALLOWED') return '可申请作品展示授权'
+  if (scope === 'PORTFOLIO_ALLOWED') return '可申请展示授权'
   if (scope === 'COMMERCIAL_ALLOWED') return '包含商业使用约定'
   return scope ? sanitizeSeedText(scope, '按双方约定使用') : '未填写'
 }
@@ -258,8 +258,8 @@ export function formatStatusLogText(log) {
   const status = log?.toStatus || log?.targetStatus || log?.status
   const naturalByStatus = {
     PENDING_PAYMENT: '订单已创建，等待客户付款。',
-    PAID: '客户已完成付款，资金进入平台托管。',
-    PAID_PENDING_SHOOT: '客户已完成付款，资金进入平台托管。',
+    PAID: '客户已完成付款，资金进入平台担保。',
+    PAID_PENDING_SHOOT: '客户已完成付款，资金进入平台担保。',
     SCHEDULED: '拍摄时间已确认，等待按约定执行。',
     SHOOTING: '拍摄已开始。',
     PENDING_DELIVERY: '拍摄已完成，等待摄影师上传作品。',

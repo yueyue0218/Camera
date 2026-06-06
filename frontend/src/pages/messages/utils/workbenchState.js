@@ -77,7 +77,7 @@ export function deriveConversationStage({ conversation, quotes = [], order, curr
       return {
         key: 'QUOTE_PENDING',
         title: role === 'CUSTOMER' ? '等待你确认报价' : '等待客户确认报价',
-        description: role === 'CUSTOMER' ? '确认后会生成平台托管订单。' : '方案变化时可以编辑这份待确认报价。',
+        description: role === 'CUSTOMER' ? '确认后会生成平台担保订单。' : '方案变化时可以编辑这份待确认报价。',
         role,
         visibleRole,
         roleMismatch,
@@ -91,7 +91,7 @@ export function deriveConversationStage({ conversation, quotes = [], order, curr
       return {
         key: 'QUOTE_CONFIRMED',
         title: '报价已确认',
-        description: '订单信息同步后，可在会话中继续处理履约。',
+        description: '订单信息同步后，可在沟通中继续处理履约。',
         role,
         visibleRole,
         roleMismatch,
@@ -103,7 +103,7 @@ export function deriveConversationStage({ conversation, quotes = [], order, curr
     return {
       key: 'DISCUSSING',
       title: '沟通拍摄方案',
-      description: role === 'PROVIDER' ? '确认时间、地点和交付范围后发送报价。' : '和摄影师确认时间、地点和交付要求。',
+      description: role === 'PROVIDER' ? '确认时间、地点和成片范围后发送报价。' : '和摄影师确认时间、地点和成片要求。',
       role,
       visibleRole,
       roleMismatch,
@@ -115,31 +115,31 @@ export function deriveConversationStage({ conversation, quotes = [], order, curr
 
   const stages = {
     CUSTOMER: {
-      PENDING_PAYMENT: ['等待你支付', '支付后资金将进入平台托管。'],
+      PENDING_PAYMENT: ['等待你支付', '支付后资金将进入平台担保。'],
       PAID_PENDING_SHOOT: ['等待拍摄', '请按约定时间准备拍摄，拍摄前仍可申请退款。'],
       SHOOTING: ['拍摄履约中', '当前正在按约定完成拍摄。'],
-      PENDING_DELIVERY: ['等待摄影师交付', '摄影师会在会话中上传作品。'],
+      PENDING_DELIVERY: ['等待摄影师上传作品', '摄影师会在沟通中上传作品。'],
       DELIVERED_PENDING_CONFIRM: ['等待你确认作品', '确认接收后订单完成；如需调整，可以提交返修要求。'],
-      REWORK_REQUIRED: ['等待摄影师重新交付', '摄影师正在根据返修要求调整作品。'],
+      REWORK_REQUIRED: ['等待摄影师重新上传作品', '摄影师正在根据返修要求调整作品。'],
       APPEALING: ['争议处理中', '等待平台处理结果。'],
-      COMPLETED: ['订单已完成', '可以查看作品、授权和订单档案。'],
+      COMPLETED: ['订单已完成', '可以查看作品、授权和订单。'],
       CANCELLED: ['订单已取消', '本次订单已经结束。'],
       REFUNDED: ['订单已退款', '本次订单已退款结束。']
     },
     PROVIDER: {
-      PENDING_PAYMENT: ['等待客户付款', '客户付款后资金将进入平台托管。'],
+      PENDING_PAYMENT: ['等待客户付款', '客户付款后资金将进入平台担保。'],
       PAID_PENDING_SHOOT: ['等待拍摄', '请按约定时间准备拍摄。'],
       SHOOTING: ['拍摄履约中', '当前正在按约定完成拍摄。'],
-      PENDING_DELIVERY: ['等待你交付', '请上传本次拍摄作品。'],
+      PENDING_DELIVERY: ['等待你上传作品', '请上传本次拍摄作品。'],
       DELIVERED_PENDING_CONFIRM: ['等待客户确认作品', '客户可以确认接收或提交返修要求。'],
-      REWORK_REQUIRED: ['返修待交付', '请根据客户要求重新上传作品。'],
+      REWORK_REQUIRED: ['返修中', '请根据客户要求重新上传作品。'],
       APPEALING: ['争议处理中', '等待平台处理结果。'],
-      COMPLETED: ['订单已完成', '可以处理照片展示授权或查看订单档案。'],
+      COMPLETED: ['订单已完成', '可以处理展示授权或查看订单。'],
       CANCELLED: ['订单已取消', '本次订单已经结束。'],
       REFUNDED: ['订单已退款', '本次订单已退款结束。']
     }
   }
-  const [title, description] = stages[role]?.[order.status] || ['合作进展已更新', '可以继续在会话中沟通。']
+  const [title, description] = stages[role]?.[order.status] || ['合作进展已更新', '可以继续在沟通中协商。']
   return {
     key: order.status,
     title,
@@ -179,7 +179,7 @@ export function deriveConversationActions({
     : role === 'CUSTOMER' && order?.status === 'PAID_PENDING_SHOOT' && beforeShootStart
       ? {
           label: '取消并申请退款',
-          confirmText: '确定取消订单并申请退款吗？平台托管资金将退回客户。',
+          confirmText: '确定取消订单并申请退款吗？平台担保资金将退回客户。',
           reason: '客户拍摄前取消，申请退回托管款'
         }
       : null
@@ -353,7 +353,7 @@ export function buildConversationTimeline({
         timestamp: delivery.uploadTime,
         stageOrder: STAGE_ORDER.DELIVERY,
         title: delivery.deliveryRound > 1 ? '摄影师重新上传了作品' : '摄影师上传了作品',
-        summary: delivery.remark || `第 ${delivery.deliveryRound || index + 1} 次交付已上传。`,
+        summary: delivery.remark || `第 ${delivery.deliveryRound || index + 1} 次作品已上传。`,
         meta: { delivery, deliveryCount: deliveries.length, order },
         actions: latest && order.status === 'DELIVERED_PENDING_CONFIRM'
           ? [
@@ -698,8 +698,8 @@ function buildOrderCreatedEvent(order, actions, visibleRole) {
       : '订单已生成',
     summary: pendingPayment
       ? actions?.role === 'CUSTOMER'
-        ? '平台会先托管资金，拍摄和交付完成后再结算给摄影师。'
-        : '客户付款后，平台会托管资金。'
+        ? '平台会先担保资金，拍摄和作品确认后再结算给摄影师。'
+        : '客户付款后，平台会担保资金。'
       : '本次合作已经进入平台担保履约流程。',
     meta: { order },
     actions: pendingPayment
@@ -713,18 +713,18 @@ function buildStatusLogEvent(log, order, actions, visibleRole) {
   const logActorRole = getStatusLogActorRole(log)
   const actorRole = getStatusActorRole(log.toStatus, logActorRole)
   const statusConfig = {
-    PAID_PENDING_SHOOT: [actions?.role === 'CUSTOMER' ? '你完成了付款' : '客户完成了付款', '资金已进入平台托管，等待约定拍摄时间。', STAGE_ORDER.PAYMENT],
+    PAID_PENDING_SHOOT: [actions?.role === 'CUSTOMER' ? '你完成了付款' : '客户完成了付款', '资金已进入平台担保，等待约定拍摄时间。', STAGE_ORDER.PAYMENT],
     SHOOTING: ['拍摄履约已开始', '双方正在按约定完成拍摄。', STAGE_ORDER.SHOOTING],
-    PENDING_DELIVERY: ['拍摄已完成，等待作品交付', '摄影师可以上传本次拍摄作品。', STAGE_ORDER.PENDING_DELIVERY],
+    PENDING_DELIVERY: ['拍摄已完成，等待上传作品', '摄影师可以上传本次拍摄作品。', STAGE_ORDER.PENDING_DELIVERY],
     REWORK_REQUIRED: [actions?.role === 'CUSTOMER' ? '你已提交返修要求' : '客户提交了返修要求', '等待摄影师根据要求重新上传作品。', STAGE_ORDER.REWORK],
     COMPLETED: [
       actorRole === 'PLATFORM' ? '订单已自动确认完成' : '客户确认接收作品',
-      actorRole === 'PLATFORM' ? '客户逾期未处理，平台已按规则自动确认。' : '订单已完成，平台托管资金将结算给摄影师。',
+      actorRole === 'PLATFORM' ? '客户逾期未处理，平台已按规则自动确认。' : '订单已完成，平台担保资金将结算给摄影师。',
       STAGE_ORDER.COMPLETED
     ],
     CANCELLED: ['客户取消了订单', '本次订单已经取消。', STAGE_ORDER.CLOSED],
     REFUNDED: ['平台已完成退款', '本次订单已退款结束。', STAGE_ORDER.CLOSED],
-    APPEALING: ['平台正在处理争议', '可以在订单档案查看争议进展。', STAGE_ORDER.DISPUTE]
+    APPEALING: ['平台正在处理争议', '可以在订单中查看争议进展。', STAGE_ORDER.DISPUTE]
   }[log.toStatus]
   if (!statusConfig) return null
   return createTimelineItem({
@@ -801,8 +801,8 @@ function buildCurrentDeliveryReminder(order, actions, visibleRole) {
     visibleRole,
     timestamp: order.updatedAt,
     stageOrder: STAGE_ORDER.PENDING_DELIVERY,
-    title: actions?.role === 'PROVIDER' ? '等待你交付作品' : '等待摄影师交付作品',
-    summary: actions?.role === 'PROVIDER' ? '请上传本次拍摄作品。' : '摄影师会在会话中上传作品。',
+    title: actions?.role === 'PROVIDER' ? '等待你上传作品' : '等待摄影师上传作品',
+    summary: actions?.role === 'PROVIDER' ? '请上传本次拍摄作品。' : '摄影师会在沟通中上传作品。',
     meta: { order },
     actions: [actions?.canUploadDelivery && 'UPLOAD_DELIVERY'].filter(Boolean)
   })
@@ -817,7 +817,7 @@ function buildDisputeEvent(order, visibleRole) {
     timestamp: order.updatedAt,
     stageOrder: STAGE_ORDER.DISPUTE,
     title: '平台正在处理争议',
-    summary: '可以在订单档案查看争议进展。',
+    summary: '可以在订单中查看争议进展。',
     meta: { order },
     actions: ['VIEW_DISPUTE']
   })
@@ -828,7 +828,7 @@ function buildCurrentStatusFallback(order, actions, visibleRole) {
     COMPLETED: [
       'PLATFORM',
       '订单已完成',
-      actions?.role === 'PROVIDER' ? '你可以申请照片展示授权，或查看订单档案。' : '可以查看订单档案和评价记录。',
+      actions?.role === 'PROVIDER' ? '你可以申请展示授权，或查看订单。' : '可以查看订单和评价记录。',
       STAGE_ORDER.COMPLETED,
       [actions?.canRequestPhotoAuthorization && 'REQUEST_AUTHORIZATION', actions?.canOpenOrderArchive && 'OPEN_ORDER'].filter(Boolean)
     ],
@@ -868,7 +868,7 @@ function getConversationSubtitle(conversation) {
   const sourceType = String(conversation?.sourceType || '').toUpperCase()
   if (sourceType === 'DEMAND') return '来自拍摄需求'
   if (sourceType === 'SERVICE_PACKAGE') return '来自摄影服务橱窗'
-  return '校园约拍会话'
+  return '校园约拍沟通'
 }
 
 function buildPanelSummary({ actions, quotes = [], order, deliveries = [], authorizations = [] }) {

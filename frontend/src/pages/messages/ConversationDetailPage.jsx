@@ -229,7 +229,7 @@ export function ConversationDetailPage() {
     addSavedPhoto({
       photoId: `message-${message.messageId}`,
       source: 'conversation-submission',
-      title: `${conversation.scene || '会话'} 提交照片`,
+      title: `${conversation.scene || '沟通'} 提交照片`,
       imageData: message.content,
       authorId: message.senderId,
       createdAt: message.createdAt
@@ -379,7 +379,7 @@ export function ConversationDetailPage() {
 
   async function payCurrentOrder() {
     if (!currentOrder) return false
-    const result = await run(async () => orderApi.mockPay(currentOrder.orderId, currentOrder.amountCent, currentUser), '支付成功，资金已进入平台托管')
+    const result = await run(async () => orderApi.mockPay(currentOrder.orderId, currentOrder.amountCent, currentUser), '支付成功，资金已进入平台担保')
     if (result) {
       await refreshConversationData(conversation, currentOrder.orderId)
       return true
@@ -396,7 +396,7 @@ export function ConversationDetailPage() {
 
   async function confirmCurrentOrder() {
     if (!currentOrder) return
-    if (!window.confirm('确认接收后，订单将完成，平台托管资金会结算给摄影师。是否确认？')) return
+    if (!window.confirm('确认接收后，订单将完成，平台担保资金会结算给摄影师。是否确认？')) return
     const result = await run(async () => orderApi.transition(currentOrder.orderId, 'COMPLETED', '客户确认接收作品', currentUser), '订单已完成')
     if (result) {
       await refreshConversationData(conversation, currentOrder.orderId)
@@ -408,7 +408,7 @@ export function ConversationDetailPage() {
     event.preventDefault()
     if (!currentOrder || !deliveryForm.file) return false
     const result = await run(async () => deliveryApi.upload(currentOrder.orderId, deliveryForm.file, deliveryForm.remark.trim(), currentUser),
-      currentOrder.status === 'REWORK_REQUIRED' ? '返修作品已上传' : '交付作品已上传')
+      currentOrder.status === 'REWORK_REQUIRED' ? '返修作品已上传' : '作品已上传')
     if (result) {
       await refreshConversationData(conversation, currentOrder.orderId)
       return true
@@ -438,7 +438,7 @@ export function ConversationDetailPage() {
     const result = await run(async () => photoAuthorizationApi.request(currentOrder.orderId, {
       fileIds: photoAuthorizationForm.fileIds,
       remark: photoAuthorizationForm.remark.trim()
-    }, currentUser), '照片展示授权申请已发送')
+    }, currentUser), '展示授权申请已发送')
     if (result) {
       await refreshConversationData(conversation, currentOrder.orderId)
       return true
@@ -450,7 +450,7 @@ export function ConversationDetailPage() {
     if (!currentOrder) return
     const remark = (authorizationRemarks[authorization.id] || '').trim()
     const action = decision === 'approve' ? photoAuthorizationApi.approve : photoAuthorizationApi.reject
-    const successText = decision === 'approve' ? '已同意照片展示授权' : '已拒绝照片展示授权'
+    const successText = decision === 'approve' ? '已同意展示授权' : '已拒绝展示授权'
     const result = await run(async () => action(authorization.id, { remark }, currentUser), successText)
     if (result) await refreshConversationData(conversation, currentOrder.orderId)
   }
@@ -468,10 +468,10 @@ export function ConversationDetailPage() {
 
   function showUnavailableTool(name) {
     const messages = {
-      附件: '附件发送能力暂未接入，可以先发送图片或在会话中说明文件内容。',
+      附件: '附件发送能力暂未接入，可以先发送图片或在沟通中说明文件内容。',
       表情: '表情工具暂未接入，可以继续使用文字沟通。',
-      补款: '补款能力暂未接入，双方可先在会话中协商金额。',
-      平台协助: '平台协助功能由仲裁模块处理，当前演示可在订单档案中查看争议状态。'
+      补款: '补款能力暂未接入，双方可先在沟通中协商金额。',
+      平台协助: '平台协助功能由仲裁模块处理，当前演示可在订单中查看争议状态。'
     }
     setNotice({ type: 'info', text: messages[name] || '该能力暂未接入。' })
   }
@@ -600,7 +600,7 @@ export function ConversationDetailPage() {
                 <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk }}>{actions.role === 'PROVIDER' ? '摄影师视角' : '客户视角'}</Typography>
               </Stack>
               <Typography sx={{ color: PORTRA_COLORS.mutedInk }} variant="body2" noWrap>
-                {getSafeDisplayText(viewModel.conversationTitle, '本次合作')} · {getSafeDisplayText(viewModel.conversationSubtitle, '校园约拍会话')}
+                {getSafeDisplayText(viewModel.conversationTitle, '本次合作')} · {getSafeDisplayText(viewModel.conversationSubtitle, '校园约拍沟通')}
               </Typography>
             </Box>
           </Stack>

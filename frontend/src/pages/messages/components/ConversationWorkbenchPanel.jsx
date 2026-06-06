@@ -31,7 +31,7 @@ export function ConversationWorkbenchPanel({
   const latestQuote = getLatestQuote(quotes)
   const summary = panelSummary || {}
   const uploadLabel = actions.canReuploadDelivery ? '重新上传作品' : '上传作品'
-  const orderAction = buildOrderAction(order, { label: '查看订单档案' })
+  const orderAction = buildOrderAction(order, { label: '查看订单' })
   return (
     <Paper
       data-message-panel="true"
@@ -78,14 +78,14 @@ export function ConversationWorkbenchPanel({
               </Stack>
             ) : actions.canRequestPhotoAuthorization ? (
               <Stack spacing={0.8}>
-                <Typography variant="body2" color="text.secondary">订单已完成，可以选择已交付作品申请展示授权。</Typography>
+                <Typography variant="body2" color="text.secondary">订单已完成，可以选择作品申请展示授权。</Typography>
                 <Button size="small" variant="outlined" startIcon={<ImageRoundedIcon />} onClick={() => onOpenAction('REQUEST_AUTHORIZATION')} sx={{ alignSelf: 'flex-start' }}>
-                  申请照片授权
+                  申请展示授权
                 </Button>
               </Stack>
             ) : (
               <Typography variant="body2" color="text.secondary">
-                {summary.nextStep || actions.stage.description || '等待对方处理后，合作进展会在会话中同步。'}
+                {summary.nextStep || actions.stage.description || '等待对方处理后，合作进展会在沟通中同步。'}
               </Typography>
             )}
             {actions.canAppeal && (
@@ -119,7 +119,7 @@ export function ConversationWorkbenchPanel({
         )}
 
         {order && (
-          <WorkbenchSection title="订单档案">
+          <WorkbenchSection title="订单">
             <Typography sx={{ color: PORTRA_COLORS.mutedInk }} variant="body2">
               {centToYuan(order.amountCent)} · {formatTime(order.shootStartTime)}
             </Typography>
@@ -131,11 +131,11 @@ export function ConversationWorkbenchPanel({
           </WorkbenchSection>
         )}
 
-        <WorkbenchSection title="交付与授权">
+        <WorkbenchSection title="作品与授权">
           <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap' }}>
             <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
               <TaskAltRoundedIcon sx={{ fontSize: 17, color: PORTRA_COLORS.blue }} />
-              <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk }}>交付 {summary.deliveryCount ?? deliveryRecords.length}</Typography>
+              <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk }}>作品 {summary.deliveryCount ?? deliveryRecords.length}</Typography>
             </Stack>
             <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
               <ImageRoundedIcon sx={{ fontSize: 17, color: PORTRA_COLORS.orange }} />

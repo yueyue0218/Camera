@@ -98,7 +98,7 @@ export function QuoteDraftDialog({
               value={quoteForm.amountYuan}
               onChange={event => updateField('amountYuan', event.target.value)}
               error={Boolean(quoteFieldErrors.amountYuan)}
-              helperText={quoteFieldErrors.amountYuan || '客户确认后将生成平台托管订单。'}
+              helperText={quoteFieldErrors.amountYuan || '客户确认后将生成平台担保订单。'}
               required
               sx={{ '& .MuiInputBase-input': { fontSize: 22, fontWeight: 900, color: PORTRA_COLORS.ink } }}
             />

@@ -3,7 +3,7 @@ import { PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portra
 
 const toneMap = {
   primary: { bgcolor: PORTRA_SURFACE.portraBlue, color: '#fff' },
-  waiting: { bgcolor: PORTRA_SURFACE.filmYellow, color: PORTRA_SURFACE.ink },
+  waiting: { bgcolor: PORTRA_SURFACE.filmYellowSoft, color: PORTRA_SURFACE.ink },
   warning: { bgcolor: PORTRA_SURFACE.filmYellowSoft, color: PORTRA_SURFACE.ink },
   danger: { bgcolor: PORTRA_SURFACE.warmOrangeDeep, color: '#fff' },
   cancelled: { bgcolor: 'rgba(93,97,103,.14)', color: PORTRA_SURFACE.muted },

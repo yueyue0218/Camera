@@ -43,7 +43,7 @@ export function QuotePanel({
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between' }}>
           <Box>
             <Typography variant="h6">报价与订单</Typography>
-            <Typography color="text.secondary">摄影师发送正式报价，客户确认后生成平台托管订单。</Typography>
+            <Typography color="text.secondary">摄影师发送正式报价，客户确认后生成平台担保订单。</Typography>
           </Box>
           {canSeeQuoteEntry && (
             <Button
