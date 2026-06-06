@@ -740,7 +740,7 @@ export function OrdersPage() {
       <OrdersSectionHeader title="订单" subtitle="查看订单进展、平台担保状态和每次状态流转。" />
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
 
-      <Box sx={orderGridSx}>
+      <Box data-order-workspace="true" sx={orderGridSx}>
         <Paper variant="outlined" sx={orderIndexPanelSx}>
           <Stack spacing={2}>
             <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1355,17 +1355,18 @@ export function OrdersPage() {
 }
 
 const orderPageSx = {
-  color: PORTRA_SURFACE.ink
+  color: PORTRA_SURFACE.ink,
+  overflowWrap: 'anywhere'
 }
 
 const orderGridSx = {
   display: 'grid',
   gridTemplateColumns: {
     xs: 'minmax(0, 1fr)',
-    md: `${PORTRA_LAYOUT.orderSidebarWidth.md} minmax(0, 1fr)`,
+    lg: `${PORTRA_LAYOUT.orderSidebarWidth.lg} minmax(0, 1fr)`,
     xl: `${PORTRA_LAYOUT.orderSidebarWidth.xl} minmax(0, 1fr)`
   },
-  gap: { xs: 1.6, md: 3.5 },
+  gap: { xs: 1.6, lg: 2.75 },
   alignItems: 'start',
   minWidth: 0
 }
@@ -1383,7 +1384,8 @@ const orderIndexPanelSx = {
 const orderDetailWorkspaceSx = {
   minWidth: 0,
   width: '100%',
-  maxWidth: 1120
+  maxWidth: '100%',
+  overflowWrap: 'anywhere'
 }
 
 const filterControlSx = {

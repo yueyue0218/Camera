@@ -18,6 +18,7 @@ import { QuoteDraftDialog } from './components/QuoteDraftDialog.jsx'
 import { MessageWorkbenchErrorBoundary } from './components/MessageWorkbenchErrorBoundary.jsx'
 import { StatusChip } from './components/StatusChip.jsx'
 import { OrderCompletionDialog, PortraContextActionButton, PortraWorkbenchFrame, PortraWorkflowFrame } from '../../components/portra/index.js'
+import { PORTRA_LAYOUT } from '../../theme/portraSurfaceTokens.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from './MessageVisualTokens.js'
 import {
   addLocalMessage,
@@ -615,8 +616,8 @@ export function ConversationDetailPage() {
 
       <PortraWorkbenchFrame
         data-message-workbench-grid="true"
-        rightPanelWidth={{ lg: '300px', xl: '320px' }}
-        gap={{ xs: 1.25, lg: 2.75, xl: 3 }}
+        rightPanelWidth={PORTRA_LAYOUT.rightPanelWidth}
+        gap={{ xs: 1.25, lg: 2.5, xl: 2.5 }}
       >
         <Box sx={{ minHeight: 0, minWidth: 0, height: '100%', display: 'flex', overflow: 'hidden' }}>
           <ConversationThread

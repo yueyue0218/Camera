@@ -278,7 +278,7 @@ export function DeliveryGalleryPage() {
 
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
 
-      <Box sx={galleryGridSx}>
+      <Box data-delivery-gallery-grid="true" sx={galleryGridSx}>
         <Paper variant="outlined" sx={galleryPanelSx}>
           <Stack spacing={1.5} sx={{ minWidth: 0 }}>
           <PortraTicketSection title="作品相册">
@@ -435,7 +435,7 @@ const galleryGridSx = {
     lg: `minmax(0, 1fr) ${PORTRA_LAYOUT.compactRightPanelWidth.lg}`,
     xl: `minmax(0, 1fr) ${PORTRA_LAYOUT.compactRightPanelWidth.xl}`
   },
-  gap: { xs: 1.6, lg: 3 },
+  gap: { xs: 1.6, lg: 2.5 },
   alignItems: 'start',
   minWidth: 0
 }
@@ -451,6 +451,7 @@ const galleryPanelSx = {
 
 const sidePanelSx = {
   p: 1.5,
+  minWidth: 0,
   position: { lg: 'sticky' },
   top: { lg: 18 },
   bgcolor: PORTRA_SURFACE.paper,

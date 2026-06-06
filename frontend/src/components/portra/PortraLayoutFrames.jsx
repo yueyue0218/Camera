@@ -20,13 +20,16 @@ export function PortraPageFrame({ children, maxWidth = 'page', topGap = true, sx
         '--portra-mobile-gutter-total': PORTRA_LAYOUT.mobileGutterTotal,
         width: {
           xs: 'calc(100vw - var(--portra-mobile-gutter-total))',
-          md: 'min(calc(100vw - var(--portra-page-gutter-total)), var(--portra-page-max-width))'
+          md: 'min(100%, var(--portra-page-max-width))'
         },
         mx: 'auto',
         mt: topGap ? `${PORTRA_LAYOUT.contentTopGap}px` : 0,
         boxSizing: 'border-box',
         minWidth: 0,
-        maxWidth: 'var(--portra-page-max-width)',
+        maxWidth: {
+          xs: 'calc(100vw - var(--portra-mobile-gutter-total))',
+          md: 'min(var(--portra-page-max-width), calc(100vw - var(--portra-page-gutter-total)))'
+        },
         ...sx
       }}
     >
@@ -41,6 +44,7 @@ export function PortraWorkflowFrame({ children, maxWidth = 'workflow', height, s
       component={Stack}
       maxWidth={maxWidth}
       spacing={spacing}
+      data-portra-workflow-frame="true"
       {...props}
       sx={{
         color: 'inherit',
@@ -72,7 +76,7 @@ export function PortraWorkbenchFrame({
         gridTemplateColumns: {
           xs: 'minmax(0, 1fr)',
           lg: `minmax(0, 1fr) ${rightPanelWidth.lg || rightPanelWidth}`,
-          xl: `minmax(${PORTRA_LAYOUT.conversationMainMinWidth.xl}, 1fr) ${rightPanelWidth.xl || rightPanelWidth.lg || rightPanelWidth}`
+          xl: `minmax(0, 1fr) ${rightPanelWidth.xl || rightPanelWidth.lg || rightPanelWidth}`
         },
         gap,
         alignItems: 'stretch',
