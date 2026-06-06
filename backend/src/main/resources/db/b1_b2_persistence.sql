@@ -331,7 +331,6 @@ CALL b1b2_exec_if_columns_exist(
     'demand_responses', 'expected_price_cent', 'expected_price', '',
     'UPDATE demand_responses SET expected_price_cent = ROUND(expected_price * 100) WHERE expected_price_cent IS NULL AND expected_price IS NOT NULL'
 );
-CALL b1b2_add_index_if_missing('demand_responses', 'idx_response_demand_status_time', 'INDEX idx_response_demand_status_time (demand_id, status, response_time)');
 
 DROP PROCEDURE IF EXISTS b1b2_exec_if_columns_exist;
 DROP PROCEDURE IF EXISTS b1b2_exec_if_tables_exist;

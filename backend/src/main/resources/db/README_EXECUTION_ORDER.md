@@ -8,10 +8,12 @@
 
 ---
 
-## 全新库执行顺序
+## 路径 A：全新库初始化（从零建库）
 
-| 步骤 | 文件 | 覆盖的表 |
-|------|------|---------|
+> 只执行以下步骤，不执行路径 B 的任何脚本。
+
+| 步骤 | 文件 | 说明 |
+|------|------|------|
 | 1 | `V1_baseline.sql` | users、files、user_role_bindings、credit_records、quotes、orders、order_status_logs、payment_records、disputes、dispute_replies、deliveries、delivery_files、photo_authorizations、photo_authorization_files、student_certifications |
 | 2 | `certification.sql` | real_name_certifications、audit_records、provider_profiles |
 | 3 | `b1_b2_persistence.sql` | service_packages、demands、service_package_interests、demand_responses |
@@ -21,30 +23,40 @@
 | 7 | `migration/add_dual_identity_fields.sql` | provider_profiles 双身份字段、user_follows 三列唯一索引 |
 | 8 | `migration/alter_moment_images_image_data.sql` | moment_images 图片数据字段变更 |
 
-**以下表目前不在本目录任何脚本中定义，需团队另行补充（在步骤 1 之前或之后）：**
-- `schedules`：被其他模块引用，但当前代码库无对应 Java entity
-- `user_follows`：被步骤 7 引用，需在步骤 7 之前存在
+> 注：以下表当前无对应脚本，需团队另行补充后再初始化：`schedules`
 
 ---
 
-## 特殊文件说明
+## 路径 B：旧库迁移（从 P3 历史库升级）
 
-### certification_compat.sql
-**仅用于从 P3 老结构迁移，全新库勿执行。**  
-将旧版 `real_name_certifications`、`provider_profiles`、`audit_records` 表结构对齐到当前版本。  
-所有 DDL 已改写为 information_schema 幂等写法，可安全重复执行。执行前务必备份。
+> **执行前必须备份数据库。**  
+> 不要在全新库上执行路径 B 的任何脚本。
 
-### local_patch_*.sql
-**仅用于本地补迁移历史遗留库，全新库勿执行。**
-- `local_patch_camera_app_missing_schema.sql`：补充 `credit_records`、`notifications`、`reviews`、`review_complaints` 缺失列和索引
-- `local_patch_camera_app_certification_disputes_sync.sql`：认证与纠纷相关历史补丁，含 UPDATE 回填，执行前务必备份
+按以下顺序执行：
+
+| 步骤 | 文件 | 说明 |
+|------|------|------|
+| 1 | `migration/fix_disputes_refund_amount_type.sql` | 将 disputes.refund_amount 从 DECIMAL 改 BIGINT；脚本会自动检测小数值并回填，但整数值须人工确认单位（详见脚本注释） |
+| 2 | `certification_compat.sql` | 将旧版认证/审核表字段对齐到当前模型，PENDING_REVIEW → PENDING |
+| 3 | `local_patch_camera_app_missing_schema.sql` | 补充 credit_records / notifications / reviews / review_complaints 缺失列和索引 |
+| 4 | `local_patch_camera_app_certification_disputes_sync.sql` | 认证与纠纷字段同步，含 UPDATE 回填 |
+| 5 | `migration/add_dual_identity_fields.sql` | provider_profiles 双身份字段、user_follows 三列唯一索引 |
+| 6 | `migration/alter_moment_images_image_data.sql` | moment_images 图片字段扩展 |
 
 ---
 
-## 旧库迁移补丁
+## 文件属性速查
 
-**`disputes.refund_amount` 类型迁移**  
-- `V1_baseline.sql` 已将新库定义为 `BIGINT`（分），与 Java `Dispute.refundAmount: Long` 对齐  
-- 已有旧库（P3 建表）中此列可能为 `DECIMAL(10,2)`（元），需执行：  
-  `migration/fix_disputes_refund_amount_type.sql`  
-  该脚本幂等，重复执行安全；执行前务必备份数据库
+| 文件 | 属性 | 适用路径 |
+|------|------|---------|
+| V1_baseline.sql | 全量建表，幂等 | 路径 A |
+| certification.sql | 认证/审核/档案建表，幂等 | 路径 A |
+| b1_b2_persistence.sql | 供需模块建表+迁移，含存储过程 | 路径 A |
+| conversations_messages.sql | 会话消息建表+迁移，含存储过程 | 路径 A |
+| d_line_backend.sql | 评价/通知模块建表+迁移，含存储过程 | 路径 A |
+| moments.sql | 动态模块建表，幂等 | 路径 A |
+| certification_compat.sql | P3 历史兼容迁移，一次性 | 路径 B |
+| local_patch_*.sql | 本地历史补丁，一次性 | 路径 B |
+| migration/add_dual_identity_fields.sql | 双身份字段迁移，幂等 | 路径 A & B |
+| migration/alter_moment_images_image_data.sql | 图片字段扩展，幂等 | 路径 A & B |
+| migration/fix_disputes_refund_amount_type.sql | 旧数据类型迁移，幂等 | 路径 B |
