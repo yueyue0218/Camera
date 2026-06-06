@@ -64,6 +64,7 @@ import {
 } from '../../utils/displayFormatters.js'
 import {
   PortraActionButton,
+  PortraContextActionButton,
   PortraEmptyState,
   PortraInfoBanner,
   OrderCompletionDialog,
@@ -822,16 +823,13 @@ export function OrdersPage() {
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between' }}>
                   <Box>
                     {canReturnToConversation && (
-                      <Button
-                        size="small"
-                        variant="text"
-                        color="inherit"
+                      <PortraContextActionButton
                         startIcon={<ArrowBackRoundedIcon />}
                         onClick={returnToConversation}
                         sx={returnLinkSx}
                       >
                         返回沟通
-                      </Button>
+                      </PortraContextActionButton>
                     )}
                     <Typography variant="h5" sx={{ fontSize: { xs: 20, md: 24 }, color: PORTRA_SURFACE.ink, fontWeight: 950 }}>{selectedOrderTitle}</Typography>
                     <Typography sx={{ color: PORTRA_SURFACE.muted, mt: 0.4 }}>
@@ -842,9 +840,9 @@ export function OrdersPage() {
                     </Typography>
                   </Box>
                   <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                    <Button size="small" variant="outlined" color="inherit" startIcon={<ForumRoundedIcon />} onClick={continueConversation} disabled={!canContinueConversation}>
+                    <PortraContextActionButton startIcon={<ForumRoundedIcon />} onClick={continueConversation} disabled={!canContinueConversation}>
                       继续沟通
-                    </Button>
+                    </PortraContextActionButton>
                     <PortraStatusBadge label={selectedOrderPerspective || '身份待确认'} tone="neutral" />
                     <PortraStatusBadge label={formatOrderStatus(selectedOrder.status)} />
                     <PortraStatusBadge label={formatEscrowStatus(selectedOrder.escrowStatus)} />
@@ -1469,14 +1467,6 @@ const statusChipSx = {
 const returnLinkSx = {
   alignSelf: 'flex-start',
   mb: 0.8,
-  ml: -0.8,
-  minHeight: 32,
-  px: 0.8,
-  borderRadius: 999,
-  color: PORTRA_SURFACE.portraBlue,
-  fontWeight: 850,
-  '&:hover': {
-    bgcolor: PORTRA_SURFACE.portraBlueSoft
-  }
+  ml: -0.4
 }
 

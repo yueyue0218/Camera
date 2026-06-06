@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Alert, Avatar, Box, Button, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material'
+import { Alert, Avatar, Box, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material'
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -17,7 +17,7 @@ import { ConversationActionDialogs } from './components/ConversationActionDialog
 import { QuoteDraftDialog } from './components/QuoteDraftDialog.jsx'
 import { MessageWorkbenchErrorBoundary } from './components/MessageWorkbenchErrorBoundary.jsx'
 import { StatusChip } from './components/StatusChip.jsx'
-import { OrderCompletionDialog, PortraWorkbenchFrame, PortraWorkflowFrame } from '../../components/portra/index.js'
+import { OrderCompletionDialog, PortraContextActionButton, PortraWorkbenchFrame, PortraWorkflowFrame } from '../../components/portra/index.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from './MessageVisualTokens.js'
 import {
   addLocalMessage,
@@ -600,16 +600,13 @@ export function ConversationDetailPage() {
           </Stack>
           <Stack direction="row" spacing={0.8} sx={{ alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
             <StatusChip label={actions.stage.title} emphasis />
-            <Button
-              size="small"
-              variant="outlined"
-              color="inherit"
+            <PortraContextActionButton
               startIcon={<ReceiptLongRoundedIcon />}
               onClick={() => openOrderArchive(currentOrder?.orderId)}
               disabled={!currentOrder?.orderId}
             >
               查看订单
-            </Button>
+            </PortraContextActionButton>
           </Stack>
         </Stack>
       </Paper>

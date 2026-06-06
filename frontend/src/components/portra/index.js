@@ -1,5 +1,6 @@
 export {
   PortraActionButton,
+  PortraContextActionButton,
   PortraEmptyState,
   PortraInfoBanner,
   PortraStatusBadge,

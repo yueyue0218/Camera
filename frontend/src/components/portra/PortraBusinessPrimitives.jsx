@@ -227,3 +227,44 @@ export function PortraActionButton({ children, tone = 'primary', sx, ...props })
     </Button>
   )
 }
+
+export function PortraContextActionButton({ children, emphasis = false, sx, ...props }) {
+  return (
+    <Button
+      size="small"
+      variant={emphasis ? 'contained' : 'outlined'}
+      {...props}
+      sx={{
+        minHeight: 32,
+        px: 1.15,
+        borderRadius: 999,
+        textTransform: 'none',
+        fontSize: 13,
+        fontWeight: 850,
+        lineHeight: 1.1,
+        whiteSpace: 'nowrap',
+        color: emphasis ? '#fff' : PORTRA_SURFACE.ink,
+        bgcolor: emphasis ? PORTRA_SURFACE.portraBlue : 'rgba(255, 253, 249, 0.62)',
+        borderColor: emphasis ? PORTRA_SURFACE.portraBlue : PORTRA_SURFACE.borderSubtle,
+        boxShadow: emphasis ? '0 8px 18px rgba(13, 47, 178, 0.16)' : 'none',
+        '& .MuiButton-startIcon': {
+          mr: 0.55,
+          '& svg': { fontSize: 17 }
+        },
+        '&:hover': {
+          bgcolor: emphasis ? PORTRA_SURFACE.portraBlueHover : PORTRA_SURFACE.portraBlueSoft,
+          borderColor: emphasis ? PORTRA_SURFACE.portraBlueHover : 'rgba(13,47,178,.28)',
+          boxShadow: emphasis ? '0 10px 22px rgba(13, 47, 178, 0.2)' : 'none'
+        },
+        '&.Mui-disabled': {
+          color: 'rgba(55, 61, 73, 0.42)',
+          bgcolor: 'rgba(248, 243, 235, 0.48)',
+          borderColor: PORTRA_SURFACE.borderSoft
+        },
+        ...sx
+      }}
+    >
+      {children}
+    </Button>
+  )
+}
