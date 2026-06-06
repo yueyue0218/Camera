@@ -2,38 +2,37 @@ package com.action.camera.application;
 
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
-import jakarta.mail.internet.InternetAddress;
-import jakarta.mail.internet.MimeMessage;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.MailAuthenticationException;
-import org.springframework.mail.MailException;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.security.SecureRandom;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 邮箱验证码：生成、发邮件、校验。验证码存内存，5 分钟有效，60 秒冷却。
+ * 使用 Resend HTTP API 发信（绕过 Railway 的 SMTP 封锁）。
  */
 @Service
 public class VerificationCodeService {
 
-    private final JavaMailSender mailSender;
-
     @Value("${camera.mail.from:onboarding@resend.dev}")
     private String fromEmail;
 
+    @Value("${RESEND_API_KEY:}")
+    private String resendApiKey;
+
+    private final RestTemplate restTemplate = new RestTemplate();
     private final ConcurrentHashMap<String, CodeEntry> store = new ConcurrentHashMap<>();
     private final SecureRandom random = new SecureRandom();
 
-    private static final long CODE_TTL_MS = 5 * 60 * 1000;    // 验证码有效期 5 分钟
-    private static final long RESEND_COOLDOWN_MS = 60 * 1000;  // 重发冷却 60 秒
-
-    public VerificationCodeService(JavaMailSender mailSender) {
-        this.mailSender = mailSender;
-    }
+    private static final long CODE_TTL_MS = 5 * 60 * 1000;
+    private static final long RESEND_COOLDOWN_MS = 60 * 1000;
 
     /** 生成验证码并发邮件 */
     public void sendCode(String email) {
@@ -60,19 +59,26 @@ public class VerificationCodeService {
     }
 
     private void sendEmail(String to, String code) {
+        if (resendApiKey == null || resendApiKey.isEmpty()) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "邮件服务未配置，请联系管理员");
+        }
         try {
-            MimeMessage mime = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mime, false, "UTF-8");
-            helper.setFrom(new InternetAddress(fromEmail, "Portra约拍", "UTF-8"));
-            helper.setTo(to);
-            helper.setSubject("【Portra约拍】注册验证码");
-            helper.setText("你的验证码是：" + code + "，5 分钟内有效。如非本人操作请忽略。");
-            mailSender.send(mime);
-        } catch (MailAuthenticationException e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR,
-                    "邮箱 SMTP 认证失败：请确认 application-local.yml 中 password 为 QQ 邮箱「授权码」（非登录密码），且已开启 SMTP 服务");
-        } catch (MailException e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "邮件发送失败: " + e.getMessage());
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(resendApiKey);
+
+            Map<String, Object> body = Map.of(
+                    "from", "Portra约拍 <" + fromEmail + ">",
+                    "to", List.of(to),
+                    "subject", "【Portra约拍】注册验证码",
+                    "text", "你的验证码是：" + code + "，5 分钟内有效。如非本人操作请忽略。"
+            );
+
+            restTemplate.postForEntity(
+                    "https://api.resend.com/emails",
+                    new HttpEntity<>(body, headers),
+                    String.class
+            );
         } catch (Exception e) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "邮件发送失败: " + e.getMessage());
         }
