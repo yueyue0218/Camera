@@ -18,6 +18,8 @@
 .portra-app { min-height: 100vh; background: var(--portra-bg); color: var(--portra-ink); }
 .portra-main,
 .portra-main-shell { width: min(1180px, calc(100vw - 48px)); margin: 0 auto; padding: 26px 0 56px; }
+.portra-main-shell--fixed-workflow { height: calc(100dvh - 72px); padding: 18px 0 24px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; }
+.portra-main-shell--fixed-workflow > * { min-height: 0; }
 .portra-header { position: sticky; top: 0; z-index: 80; height: 72px; background: #f2ede6; border-bottom: 1px solid var(--portra-line); box-shadow: 0 1px 0 rgba(255,255,255,.55) inset; }
 .portra-header-inner { width: min(1180px, calc(100vw - 48px)); height: 72px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .portra-wordmark { display: flex; align-items: flex-end; gap: 12px; min-width: 168px; border: 0; background: transparent; padding: 0; color: inherit; text-align: left; }
