@@ -1,4 +1,4 @@
-import { buildConversationPath, normalizeConversationId } from './conversationNavigation.js'
+import { normalizeConversationId } from './conversationNavigation.js'
 import { normalizeOrderId } from './orderNavigation.js'
 
 export function normalizeDeliveryId(value) {
@@ -11,7 +11,7 @@ export function buildDeliveryGalleryTarget({ orderId, deliveryId, conversationId
   const normalizedDeliveryId = normalizeDeliveryId(deliveryId)
   const normalizedConversationId = normalizeConversationId(conversationId)
   if (!normalizedOrderId || !normalizedDeliveryId) return null
-  const returnTo = sanitizeConversationReturnPath(explicitReturnTo) || buildConversationPath(normalizedConversationId)
+  const returnTo = sanitizeConversationReturnPath(explicitReturnTo)
   const params = new URLSearchParams()
   if (normalizedConversationId) params.set('conversationId', String(normalizedConversationId))
   if (returnTo) params.set('returnTo', returnTo)

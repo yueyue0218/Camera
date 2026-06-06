@@ -10,8 +10,10 @@ import { useAuth } from '../../AuthContext.jsx'
 import { deliveryApi, fileApi, orderApi } from '../../api.js'
 import { goToOrder } from '../../utils/orderNavigation.js'
 import {
+  getExplicitReturnToConversation,
   getReturnToConversation,
-  navigateBackToConversation
+  navigateBackToConversation,
+  navigateToConversation
 } from '../../utils/conversationNavigation.js'
 import { formatOrderTitle } from '../../utils/displayFormatters.js'
 import { OrderCompletionDialog, PortraActionButton, PortraEmptyState, PortraInfoBanner, PortraStatusBadge, PortraTicketSection } from '../../components/portra/index.js'
@@ -197,7 +199,10 @@ export function DeliveryGalleryPage() {
   const viewerFile = viewerIndex >= 0 ? files[viewerIndex] : null
   const viewerUrl = viewerFile ? previewUrls[viewerFile.id] || previewUrls[viewerFile.fileId] : ''
   const conversationId = location.state?.conversationId || new URLSearchParams(location.search).get('conversationId')
+  const explicitReturnToConversation = getExplicitReturnToConversation(location)
   const returnToConversation = getReturnToConversation(location, order?.conversationId || conversationId)
+  const primaryBackIsConversation = Boolean(explicitReturnToConversation)
+  const associatedConversationId = order?.conversationId || conversationId
   const currentUserId = Number(currentUser?.userId)
   const canCustomerAct = Number(order?.customerId) === currentUserId && order?.status === 'DELIVERED_PENDING_CONFIRM'
   const isProvider = Number(order?.providerUserId) === currentUserId
@@ -215,7 +220,15 @@ export function DeliveryGalleryPage() {
   if (!batch) {
     return (
       <Stack spacing={1.5}>
-        <Button startIcon={<ArrowBackRoundedIcon />} color="inherit" onClick={() => goToOrder(navigate, orderId, { returnTo: returnToConversation })}>返回订单</Button>
+        <Button
+          startIcon={<ArrowBackRoundedIcon />}
+          color="inherit"
+          onClick={() => primaryBackIsConversation
+            ? navigateBackToConversation(navigate, location, associatedConversationId)
+            : goToOrder(navigate, orderId, { conversationId: associatedConversationId })}
+        >
+          {primaryBackIsConversation ? '返回沟通' : '返回订单'}
+        </Button>
         <PortraEmptyState title="作品记录不存在" description="该作品记录可能不属于当前订单，或已经被移除。" />
       </Stack>
     )
@@ -226,12 +239,16 @@ export function DeliveryGalleryPage() {
       <Paper variant="outlined" sx={headerSx}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.4} sx={{ justifyContent: 'space-between', alignItems: { xs: 'stretch', md: 'center' } }}>
           <Stack spacing={0.8}>
-            <Stack direction="row" spacing={0.8} sx={{ flexWrap: 'wrap' }}>
-              <Button startIcon={<ArrowBackRoundedIcon />} color="inherit" onClick={() => goToOrder(navigate, orderId, { returnTo: returnToConversation })}>返回订单</Button>
-              {returnToConversation && (
-                <Button startIcon={<ForumRoundedIcon />} color="inherit" onClick={() => navigateBackToConversation(navigate, location, order?.conversationId || conversationId)}>返回沟通</Button>
-              )}
-            </Stack>
+            <Button
+              startIcon={<ArrowBackRoundedIcon />}
+              color="inherit"
+              sx={primaryBackButtonSx}
+              onClick={() => primaryBackIsConversation
+                ? navigateBackToConversation(navigate, location, associatedConversationId)
+                : goToOrder(navigate, orderId, { conversationId: associatedConversationId })}
+            >
+              {primaryBackIsConversation ? '返回沟通' : '返回订单'}
+            </Button>
             <Box>
               <Typography variant="h5" sx={{ fontWeight: 950 }}>{batch.title}</Typography>
               <Typography sx={{ mt: 0.45, color: PORTRA_SURFACE.muted }}>{batch.subtitle}</Typography>
@@ -240,6 +257,29 @@ export function DeliveryGalleryPage() {
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
             <PortraStatusBadge label={batch.statusLabel} />
             <Chip icon={<ReceiptLongIconShim />} label={formatOrderTitle(order)} />
+            {primaryBackIsConversation ? (
+              <Button
+                size="small"
+                variant="outlined"
+                color="inherit"
+                startIcon={<ReceiptLongRoundedIcon />}
+                onClick={() => goToOrder(navigate, orderId, { conversationId: associatedConversationId, returnTo: explicitReturnToConversation })}
+                sx={secondaryPillSx}
+              >
+                查看订单
+              </Button>
+            ) : associatedConversationId ? (
+              <Button
+                size="small"
+                variant="outlined"
+                color="inherit"
+                startIcon={<ForumRoundedIcon />}
+                onClick={() => navigateToConversation(navigate, associatedConversationId)}
+                sx={secondaryPillSx}
+              >
+                继续沟通
+              </Button>
+            ) : null}
           </Stack>
         </Stack>
       </Paper>
@@ -296,9 +336,9 @@ export function DeliveryGalleryPage() {
               )}
               {isReworkForProvider && (
                 <Stack spacing={1}>
-                  <PortraInfoBanner tone="warning">客户已提出返修要求，请回到会话重新上传作品。</PortraInfoBanner>
+                  <PortraInfoBanner tone="warning">客户已提出返修要求，请回到沟通重新上传作品。</PortraInfoBanner>
                   {returnToConversation && (
-                    <Button startIcon={<ForumRoundedIcon />} variant="outlined" onClick={() => navigateBackToConversation(navigate, location, order?.conversationId || conversationId)}>
+                    <Button startIcon={<ForumRoundedIcon />} variant="outlined" onClick={() => navigateBackToConversation(navigate, location, associatedConversationId)}>
                       返回沟通重新上传作品
                     </Button>
                   )}
@@ -420,4 +460,29 @@ const sidePanelSx = {
   borderColor: PORTRA_SURFACE.borderSubtle,
   borderRadius: PORTRA_RADIUS.card,
   boxShadow: PORTRA_SHADOW.soft
+}
+
+const primaryBackButtonSx = {
+  alignSelf: 'flex-start',
+  minHeight: 32,
+  px: 1,
+  borderRadius: 999,
+  color: PORTRA_SURFACE.portraBlue,
+  fontWeight: 850,
+  '&:hover': {
+    bgcolor: PORTRA_SURFACE.portraBlueSoft
+  }
+}
+
+const secondaryPillSx = {
+  minHeight: 32,
+  borderRadius: 999,
+  borderColor: PORTRA_SURFACE.borderSubtle,
+  bgcolor: 'rgba(248, 243, 235, 0.72)',
+  color: PORTRA_SURFACE.ink,
+  fontWeight: 800,
+  '&:hover': {
+    borderColor: PORTRA_SURFACE.portraBlue,
+    bgcolor: PORTRA_SURFACE.portraBlueSoft
+  }
 }

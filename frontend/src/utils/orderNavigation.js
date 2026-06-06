@@ -1,4 +1,4 @@
-import { buildConversationPath, normalizeConversationId } from './conversationNavigation.js'
+import { normalizeConversationId } from './conversationNavigation.js'
 
 export function normalizeOrderId(value) {
   const id = Number(value)
@@ -9,7 +9,7 @@ export function buildOrderNavigationTarget(value, options = {}) {
   const orderId = normalizeOrderId(value)
   if (!orderId) return null
   const conversationId = normalizeConversationId(options.conversationId)
-  const returnTo = sanitizeOrderReturnPath(options.returnTo) || buildConversationPath(conversationId)
+  const returnTo = sanitizeOrderReturnPath(options.returnTo)
   const search = new URLSearchParams({ orderId: String(orderId) })
   if (conversationId) search.set('conversationId', String(conversationId))
   if (returnTo) search.set('returnTo', returnTo)

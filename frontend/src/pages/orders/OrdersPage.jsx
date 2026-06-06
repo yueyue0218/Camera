@@ -20,6 +20,7 @@ import {
   TextField,
   Typography
 } from '@mui/material'
+import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import ForumRoundedIcon from '@mui/icons-material/ForumRounded'
@@ -819,6 +820,18 @@ export function OrdersPage() {
               <Stack spacing={2}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between' }}>
                   <Box>
+                    {canReturnToConversation && (
+                      <Button
+                        size="small"
+                        variant="text"
+                        color="inherit"
+                        startIcon={<ArrowBackRoundedIcon />}
+                        onClick={returnToConversation}
+                        sx={returnLinkSx}
+                      >
+                        返回沟通
+                      </Button>
+                    )}
                     <Typography variant="h5" sx={{ fontSize: { xs: 20, md: 24 }, color: PORTRA_SURFACE.ink, fontWeight: 950 }}>{selectedOrderTitle}</Typography>
                     <Typography sx={{ color: PORTRA_SURFACE.muted, mt: 0.4 }}>
                       订单 · {selectedCounterpartyLabel}
@@ -828,11 +841,6 @@ export function OrdersPage() {
                     </Typography>
                   </Box>
                   <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                    {canReturnToConversation && (
-                      <Button size="small" variant="outlined" color="inherit" startIcon={<ForumRoundedIcon />} onClick={returnToConversation}>
-                        返回沟通
-                      </Button>
-                    )}
                     <Button size="small" variant="outlined" color="inherit" startIcon={<ForumRoundedIcon />} onClick={continueConversation} disabled={!canContinueConversation}>
                       继续沟通
                     </Button>
@@ -1443,5 +1451,19 @@ const statusChipSx = {
   borderRadius: PORTRA_RADIUS.compact,
   fontWeight: 800,
   '& .MuiChip-label': { px: 1 }
+}
+
+const returnLinkSx = {
+  alignSelf: 'flex-start',
+  mb: 0.8,
+  ml: -0.8,
+  minHeight: 32,
+  px: 0.8,
+  borderRadius: 999,
+  color: PORTRA_SURFACE.portraBlue,
+  fontWeight: 850,
+  '&:hover': {
+    bgcolor: PORTRA_SURFACE.portraBlueSoft
+  }
 }
 
