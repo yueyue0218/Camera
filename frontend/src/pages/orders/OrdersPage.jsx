@@ -4,8 +4,6 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
   Divider,
   FormControl,
@@ -38,6 +36,16 @@ import {
 } from '../../api.js'
 import { normalizeOrderId } from '../../utils/orderNavigation.js'
 import { centToYuan } from '../../utils/index.js'
+import { formatDateOnly } from '../../utils/displayFormatters.js'
+import {
+  PortraActionButton,
+  PortraEmptyState,
+  PortraInfoBanner,
+  PortraStatusBadge,
+  PortraTicketCard,
+  PortraTicketSection,
+  PortraTimeline
+} from '../../components/portra/index.js'
 import { PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
 import {
   canCustomerConfirm,
@@ -198,6 +206,11 @@ function getSettlementRefundLabel(order) {
 
 function formatOrderTimeRange(order) {
   return `${formatTime(order?.shootStartTime)} 至 ${formatTime(order?.shootEndTime)}`
+}
+
+function formatOrderIndexDate(order) {
+  const label = formatDateOnly(order?.shootStartTime || order?.createdAt, '')
+  return label ? label.slice(5).replace('-', '/') : '待定'
 }
 
 function formatQuoteCount(quoteSnapshot) {
@@ -572,6 +585,13 @@ export function OrdersPage() {
   const selectedOrderLocation = quoteSnapshot?.location || selectedOrder?.shootLocation || '未填写'
   const selectedOrderServiceContent = sanitizeSeedText(quoteSnapshot?.serviceContent || selectedOrder?.serviceContent, '校园约拍服务')
   const selectedOrderTitle = selectedOrder ? formatOrderTitle(selectedOrder, quoteSnapshot) : ''
+  const statusTimelineItems = statusLogs.map(log => ({
+    id: log.logId || `${log.orderId}-${log.createdAt}`,
+    title: `${log.fromStatus ? formatOrderStatus(log.fromStatus) : '创建'} → ${formatOrderStatus(log.toStatus)}`,
+    description: sanitizeSeedText(log.reason, '订单状态已更新'),
+    time: formatTime(log.createdAt),
+    tone: log.toStatus === 'APPEALING' || log.toStatus === 'REWORK_REQUIRED' ? 'danger' : 'primary'
+  }))
 
   return (
     <Stack spacing={2.5} sx={orderPageSx}>
@@ -600,28 +620,26 @@ export function OrdersPage() {
               {orders.map(order => {
                 const orderQuoteSnapshot = parseQuoteSnapshot(order.quoteSnapshotJson)
                 return (
-                  <Card
+                  <PortraTicketCard
                     key={order.orderId}
-                    variant="outlined"
                     onClick={() => openOrder(order)}
+                    selected={selectedOrder?.orderId === order.orderId}
                     sx={orderIndexCardSx(selectedOrder?.orderId === order.orderId)}
                   >
-                    <CardContent sx={{ p: 1.55, '&:last-child': { pb: 1.55 } }}>
-                      <Stack spacing={1}>
-                        <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <Typography fontWeight={900} sx={{ color: PORTRA_SURFACE.ink, lineHeight: 1.35 }}>{formatOrderTitle(order, orderQuoteSnapshot)}</Typography>
-                          <Chip size="small" label={formatOrderStatus(order.status)} sx={statusChipSx} />
-                        </Stack>
-                        <Typography sx={{ color: PORTRA_SURFACE.muted, fontWeight: 700 }}>{centToYuan(order.amountCent)} · {getCounterpartyLabel(order, currentUser)}</Typography>
-                        <Typography sx={{ color: PORTRA_SURFACE.faint }} variant="body2">
-                          {formatOrderTimeRange(order)} · 更新 {formatTime(order.updatedAt)}
-                        </Typography>
+                    <Stack spacing={0.55} sx={{ minHeight: 66, px: 1.5, py: 1.05, pl: 2.3, justifyContent: 'center' }}>
+                      <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
+                        <Typography fontWeight={900} noWrap sx={{ minWidth: 0, color: PORTRA_SURFACE.ink, lineHeight: 1.3 }}>{formatOrderTitle(order, orderQuoteSnapshot)}</Typography>
+                        <PortraStatusBadge label={formatOrderStatus(order.status)} />
                       </Stack>
-                    </CardContent>
-                  </Card>
+                      <Typography sx={{ color: PORTRA_SURFACE.ink, fontWeight: 850 }}>{centToYuan(order.amountCent)} · {getCounterpartyLabel(order, currentUser)}</Typography>
+                      <Typography sx={{ color: PORTRA_SURFACE.faint, fontSize: 12.5 }} variant="body2">
+                        拍摄日期 {formatOrderIndexDate(order)}
+                      </Typography>
+                    </Stack>
+                  </PortraTicketCard>
                 )
               })}
-              {!orders.length && <EmptyOrderCard text="暂无订单" />}
+              {!orders.length && <PortraEmptyState title="暂无订单" description="当前还没有进入订单档案的合作。" />}
             </Stack>
             {currentUser.role === 'PROVIDER' && (
               <>
@@ -647,7 +665,7 @@ export function OrdersPage() {
                       </Paper>
                     )
                   })}
-                  {!sentInvitations.length && <Typography sx={{ color: PORTRA_SURFACE.muted }}>暂无邀请记录</Typography>}
+                  {!sentInvitations.length && <PortraEmptyState title="暂无邀请记录" compact />}
                 </Stack>
               </>
             )}
@@ -666,65 +684,75 @@ export function OrdersPage() {
                     <Typography sx={{ color: PORTRA_SURFACE.muted, mt: 0.4 }}>
                       订单档案 · {selectedCounterpartyLabel}
                     </Typography>
+                    <Typography sx={{ mt: 1.2, color: PORTRA_SURFACE.ink, fontSize: { xs: 28, md: 32 }, fontWeight: 950, lineHeight: 1 }}>
+                      {centToYuan(selectedOrder.amountCent)}
+                    </Typography>
                   </Box>
                   <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                    <Chip variant="outlined" label={selectedOrderPerspective} sx={statusChipSx} />
-                    <Chip color="primary" label={formatOrderStatus(selectedOrder.status)} sx={statusChipSx} />
-                    <Chip color={selectedOrder.escrowStatus === 'HELD' ? 'success' : 'default'} label={formatEscrowStatus(selectedOrder.escrowStatus)} sx={statusChipSx} />
+                    <PortraStatusBadge label={selectedOrderPerspective || '身份待确认'} tone="neutral" />
+                    <PortraStatusBadge label={formatOrderStatus(selectedOrder.status)} />
+                    <PortraStatusBadge label={formatEscrowStatus(selectedOrder.escrowStatus)} />
                   </Stack>
                 </Stack>
                 <Divider sx={{ borderColor: PORTRA_SURFACE.borderSoft }} />
-                <Typography variant="overline" sx={overlineSx}>交易概览</Typography>
-                <InfoRows rows={[
-                  ['金额', centToYuan(selectedOrder.amountCent)],
-                  ['当前身份', selectedOrderPerspective || '未确认'],
-                  ['对方', selectedCounterpartyLabel],
-                  ['结算/退款', getSettlementRefundLabel(selectedOrder)]
-                ]} />
-                <Typography variant="overline" sx={overlineSx}>履约安排</Typography>
-                <InfoRows rows={[
-                  ['拍摄时间', formatOrderTimeRange(selectedOrder)],
-                  ['拍摄地点', selectedOrderLocation],
-                  ['交付截止', formatTime(selectedOrder.deliveryDeadline)]
-                ]} />
+                <PortraTicketSection title="交易概览">
+                  <InfoRows rows={[
+                    ['当前身份', selectedOrderPerspective || '未确认'],
+                    ['对方', selectedCounterpartyLabel],
+                    ['结算/退款', getSettlementRefundLabel(selectedOrder)]
+                  ]} />
+                </PortraTicketSection>
+                <PortraTicketSection title="履约安排">
+                  <InfoRows rows={[
+                    ['拍摄时间', formatOrderTimeRange(selectedOrder)],
+                    ['拍摄地点', selectedOrderLocation],
+                    ['交付截止', formatTime(selectedOrder.deliveryDeadline)]
+                  ]} />
+                </PortraTicketSection>
                 {fulfillmentNotice && (
-                  <Paper variant="outlined" sx={subCardSx}>
+                  <PortraInfoBanner tone={fulfillmentNotice.severity === 'warning' ? 'warning' : 'info'} title={fulfillmentNotice.title}>
+                    {fulfillmentNotice.description}
+                  </PortraInfoBanner>
+                )}
+                {fulfillmentNotice && (
+                  <PortraTicketCard sx={{ px: 2, py: 1.6, pl: 2.5 }}>
                     <Stack spacing={1}>
                       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
                         <Box>
                           <Typography fontWeight={900}>{fulfillmentNotice.title}</Typography>
                           <Typography sx={{ color: PORTRA_SURFACE.muted }} variant="body2">{fulfillmentNotice.description}</Typography>
                         </Box>
-                        <Chip size="small" color={fulfillmentNotice.color} label={formatOrderStatus(selectedOrder.status)} />
+                        <PortraStatusBadge label={formatOrderStatus(selectedOrder.status)} />
                       </Stack>
                       <InfoRows rows={fulfillmentNotice.rows} />
-                      {fulfillmentNotice.note && <Alert severity={fulfillmentNotice.severity}>{fulfillmentNotice.note}</Alert>}
+                      {fulfillmentNotice.note && (
+                        <PortraInfoBanner tone={fulfillmentNotice.severity === 'warning' ? 'warning' : 'info'}>
+                          {fulfillmentNotice.note}
+                        </PortraInfoBanner>
+                      )}
                     </Stack>
-                  </Paper>
+                  </PortraTicketCard>
                 )}
                 {quoteSnapshot && (
-                  <>
-                    <Divider sx={{ borderColor: PORTRA_SURFACE.borderSoft }} />
-                    <Typography variant="overline" sx={overlineSx}>报价快照</Typography>
+                  <PortraTicketSection title="报价快照">
                     <InfoRows rows={[
                       ['服务内容', selectedOrderServiceContent],
                       ['原片/精修', formatQuoteCount(quoteSnapshot)],
                       ['照片用途', sanitizeSeedText(quoteSnapshot.photoUsageScope, '未填写')]
                     ]} />
-                  </>
+                  </PortraTicketSection>
                 )}
                 {action && canShowOrderNormalActions(selectedOrder) ? (
-                  <Button
-                    variant="contained"
+                  <PortraActionButton
                     startIcon={action.icon}
                     onClick={() => operateOrder(action)}
                     disabled={loading || !action.allowed}
                     sx={{ alignSelf: 'flex-start' }}
                   >
                     {action.label}
-                  </Button>
+                  </PortraActionButton>
                 ) : (
-                  <Chip icon={<TaskAltRoundedIcon />} label="当前没有可执行操作" sx={{ alignSelf: 'flex-start' }} />
+                  <PortraStatusBadge label="暂无需要你操作的事项" tone="neutral" sx={{ alignSelf: 'flex-start' }} />
                 )}
                 {cancelAction && (
                   <Paper variant="outlined" sx={warmNoticeSx}>
@@ -745,7 +773,7 @@ export function OrdersPage() {
                   </Paper>
                 )}
                 {showShootStartedCancelNotice && (
-                  <Alert severity="warning">拍摄开始后不可直接取消，如有争议请走申诉或联系平台处理。</Alert>
+                  <PortraInfoBanner tone="warning">拍摄开始后不可直接取消，如有争议请走申诉或联系平台处理。</PortraInfoBanner>
                 )}
               </Stack>
             </Paper>
@@ -831,7 +859,7 @@ export function OrdersPage() {
                       </Stack>
                     </Paper>
                   ))}
-                  {!deliveryRecords.length && <Typography sx={{ color: PORTRA_SURFACE.muted }}>暂无交付记录</Typography>}
+                  {!deliveryRecords.length && <PortraEmptyState title="暂无交付记录" compact />}
                 </Stack>
               </Stack>
             </Paper>
@@ -896,7 +924,7 @@ export function OrdersPage() {
                           </Button>
                         </>
                       ) : (
-                        <Alert severity="info">暂无可授权交付文件，请先完成交付。</Alert>
+                        <PortraInfoBanner>暂无可授权交付文件，请先完成交付。</PortraInfoBanner>
                       )}
                     </Stack>
                   </Paper>
@@ -983,7 +1011,7 @@ export function OrdersPage() {
                       </Paper>
                     )
                   })}
-                  {!photoAuthorizations.length && <Typography sx={{ color: PORTRA_SURFACE.muted }}>暂无照片授权申请</Typography>}
+                  {!photoAuthorizations.length && <PortraEmptyState title="暂无照片授权申请" compact />}
                 </Stack>
               </Stack>
             </Paper>
@@ -1018,10 +1046,10 @@ export function OrdersPage() {
                 </Stack>
 
                 {myReview && (
-                  <Alert severity="success">你已评价过该订单，可以在历史评价中查看。</Alert>
+                  <PortraInfoBanner>你已评价过该订单，可以在历史评价中查看。</PortraInfoBanner>
                 )}
                 {!reviewToComplain && (
-                  <Alert severity="info">收到对方评价后，才可以对该评价发起仲裁。</Alert>
+                  <PortraInfoBanner>需收到对方评价后才可发起仲裁。</PortraInfoBanner>
                 )}
 
                 {showReviewForm && (
@@ -1104,21 +1132,9 @@ export function OrdersPage() {
 
             <Paper variant="outlined" sx={archiveSectionSx}>
               <Stack spacing={2}>
-                <Typography variant="h6">状态日志</Typography>
-                {statusLogs.map(log => (
-                  <Paper key={log.logId || `${log.orderId}-${log.createdAt}`} variant="outlined" sx={subCardSx}>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
-                      <Box>
-                        <Typography fontWeight={800}>
-                          {log.fromStatus ? formatOrderStatus(log.fromStatus) : '创建'} → {formatOrderStatus(log.toStatus)}
-                        </Typography>
-                        <Typography sx={{ color: PORTRA_SURFACE.muted }}>{sanitizeSeedText(log.reason, '订单状态已更新')}</Typography>
-                      </Box>
-                      <Typography sx={{ color: PORTRA_SURFACE.muted }} variant="body2">{formatTime(log.createdAt)}</Typography>
-                    </Stack>
-                  </Paper>
-                ))}
-                {!statusLogs.length && <Typography sx={{ color: PORTRA_SURFACE.muted }}>暂无状态日志</Typography>}
+                <PortraTicketSection title="状态日志">
+                  <PortraTimeline items={statusTimelineItems} emptyText="暂无状态日志" />
+                </PortraTicketSection>
               </Stack>
             </Paper>
           </Stack>
