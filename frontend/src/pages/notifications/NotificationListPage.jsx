@@ -1,11 +1,28 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Badge, Box, Button, Paper, Stack, Typography } from '@mui/material'
 import DoneAllRoundedIcon from '@mui/icons-material/DoneAllRounded'
+import { useNavigate } from 'react-router-dom'
 import { notificationApi } from '../../api/index.js'
 import { useAuth } from '../../AuthContext.jsx'
 import { EmptyState, Feedback, PageHeader, formatDateTime, portra } from '../dline/shared.jsx'
 
+function resolveNotificationTarget(item) {
+  if (item?.navigationPath?.startsWith('/')) return item.navigationPath
+
+  const type = String(item?.targetType || item?.relatedType || item?.sourceType || item?.type || '').toUpperCase()
+  const id = item?.targetId || item?.relatedId || item?.sourceId
+  if (type.includes('ORDER') && id) return `/orders?orderId=${id}`
+  if (type.includes('REVIEW_COMPLAINT') && id) return `/review-complaints/${id}`
+  if (type.includes('REVIEW')) return item?.orderId ? `/orders?orderId=${item.orderId}` : '/reviews'
+  if ((type.includes('CONVERSATION') || type.includes('MESSAGE')) && id) return `/messages/${id}`
+  if (type.includes('MOMENT') && id) return `/moments/${id}`
+  if (type.includes('USER') && id) return `/users/${id}`
+  if (type.includes('CREDIT')) return '/profile/credit'
+  return null
+}
+
 export function NotificationListPage() {
+  const navigate = useNavigate()
   const { currentUser } = useAuth()
   const [items, setItems] = useState([])
   const [feedback, setFeedback] = useState({})
@@ -53,8 +70,10 @@ export function NotificationListPage() {
   }
 
   async function openNotification(item) {
-    if (!item || item.isRead) return
-    await markRead(item.notificationId)
+    if (!item) return
+    if (!item.isRead) await markRead(item.notificationId)
+    const target = resolveNotificationTarget(item)
+    if (target) navigate(target)
   }
 
   return (
@@ -75,24 +94,24 @@ export function NotificationListPage() {
               component="button"
               type="button"
               onClick={() => openNotification(item)}
-              disabled={item.isRead}
+              disabled={!resolveNotificationTarget(item) && item.isRead}
               sx={{
                 p: 2,
                 width: '100%',
                 textAlign: 'left',
                 font: 'inherit',
-                cursor: item.isRead ? 'default' : 'pointer',
+                cursor: resolveNotificationTarget(item) || !item.isRead ? 'pointer' : 'default',
                 bgcolor: item.isRead ? portra.surface : '#F0F4FF',
                 borderLeft: `5px solid ${item.isRead ? portra.muted : portra.primary}`,
                 transition: 'transform 180ms ease-out, box-shadow 180ms ease-out, border-color 180ms ease-out, background-color 180ms ease-out',
-                '&:hover': item.isRead
+                '&:hover': !resolveNotificationTarget(item) && item.isRead
                   ? {}
                   : {
                       transform: 'translateY(-2px)',
                       borderColor: 'rgba(13,47,178,.18)',
                       boxShadow: '0 18px 32px rgba(13,47,178,.09)'
                     },
-                '&:active': item.isRead
+                '&:active': !resolveNotificationTarget(item) && item.isRead
                   ? {}
                   : {
                       transform: 'scale(.988)'

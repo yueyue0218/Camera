@@ -317,7 +317,7 @@ export function FeedPage() {
         savedMoment = await momentApi.create(payload, currentUser)
       }
       setComposerOpen(false)
-      setNotice({ type: 'success', text: composerMode === 'edit' ? '动态已保存' : '动态已发布' })
+      setNotice({ type: 'success', text: composerMode === 'edit' ? '动态已保存' : '动态发布成功' })
       if (savedMoment) {
         mergeMoment(savedMoment)
       }
@@ -394,7 +394,7 @@ export function FeedPage() {
       setDrawerMomentId(null)
       setDeleteTarget(null)
       await refreshPage()
-      setNotice({ type: 'success', text: '动态已删除' })
+      setNotice({ type: 'success', text: '动态已删除，广场和我的动态都不会再显示' })
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }
@@ -553,9 +553,7 @@ export function FeedPage() {
 
       <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)}>
         <DialogTitle>删除动态</DialogTitle>
-        <DialogContent>
-          删除后，这条动态将不再显示。确认删除吗？
-        </DialogContent>
+        <DialogContent>删除后不可恢复，确认删除吗？</DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteTarget(null)}>取消</Button>
           <Button color="error" variant="contained" onClick={confirmDelete}>确认删除</Button>
