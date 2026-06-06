@@ -26,7 +26,7 @@ export function getQuoteNextStepText(quote, currentUser) {
   if (quote.status === 'PENDING_CONFIRM') {
     return isCustomer ? '确认报价后将生成托管订单' : '等待客户确认，也可以继续沟通后编辑报价'
   }
-  if (quote.status === 'CONFIRMED') return '报价已确认，可以在本次会话里继续处理订单'
+  if (quote.status === 'CONFIRMED') return '报价已确认，可以在本次沟通里继续处理订单'
   if (quote.status === 'REJECTED') return '客户已拒绝，可重新沟通后再发送报价'
   if (quote.status === 'EXPIRED') return '报价已过期，需要摄影师重新发送'
   if (quote.status === 'CANCELLED') return '报价已取消，可继续沟通新的方案'

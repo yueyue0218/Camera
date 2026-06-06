@@ -27,7 +27,7 @@ export function QuoteForm({
         border: `1.5px solid ${PORTRA_COLORS.blue}`,
         borderRadius: 16,
         '& .MuiOutlinedInput-root': {
-          bgcolor: PORTRA_COLORS.white,
+          bgcolor: PORTRA_COLORS.paperSoft,
           borderRadius: PORTRA_RADII.control,
           '&.Mui-focused fieldset': {
             borderColor: PORTRA_COLORS.blue,

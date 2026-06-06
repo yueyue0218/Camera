@@ -59,17 +59,17 @@ export function ConversationWorkbenchPanel({
         </Box>
 
         <WorkbenchSection title="下一步">
-          <Box sx={{ p: 1.05, bgcolor: PORTRA_COLORS.white, borderRadius: PORTRA_RADII.control, borderLeft: `3px solid ${PORTRA_COLORS.blue}`, boxShadow: '0 1px 0 rgba(255, 255, 255, 0.7) inset' }}>
+          <Box sx={{ p: 0, bgcolor: 'transparent', borderRadius: 0, borderLeft: 0, boxShadow: 'none' }}>
             <Stack spacing={0.8}>
             {actions.canConfirmDelivery ? (
               <Stack direction="row" spacing={0.8} sx={{ flexWrap: 'wrap' }}>
-                <Typography variant="body2" color="text.secondary" sx={{ width: '100%' }}>请查看交付作品，确认接收或说明返修要求。</Typography>
+                <Typography variant="body2" sx={{ width: '100%', color: PORTRA_COLORS.mutedInk, lineHeight: 1.7 }}>请查看作品，确认接收或说明返修要求。</Typography>
                 <Button size="small" variant="contained" startIcon={<CheckCircleRoundedIcon />} onClick={onConfirmOrder}>确认接收</Button>
                 <Button size="small" variant="outlined" onClick={() => onOpenAction('REQUEST_REWORK')}>提交返修</Button>
               </Stack>
             ) : actions.canUploadDelivery || actions.canReuploadDelivery ? (
               <Stack spacing={0.8}>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk, lineHeight: 1.7 }}>
                   {actions.canReuploadDelivery ? '客户提出返修，请根据要求重新上传作品。' : '请上传本次拍摄作品。'}
                 </Typography>
                 <Button size="small" variant="contained" startIcon={<AddPhotoAlternateRoundedIcon />} onClick={() => onOpenAction(actions.canReuploadDelivery ? 'REUPLOAD_DELIVERY' : 'UPLOAD_DELIVERY')} sx={{ alignSelf: 'flex-start' }}>
@@ -84,7 +84,7 @@ export function ConversationWorkbenchPanel({
                 </Button>
               </Stack>
             ) : (
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk, lineHeight: 1.7 }}>
                 {summary.nextStep || actions.stage.description || '等待对方处理后，合作进展会在沟通中同步。'}
               </Typography>
             )}

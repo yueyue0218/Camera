@@ -323,7 +323,7 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
         ['交付记录', `${deliveryRecords.length} 条`],
         ...baseRows
       ],
-      note: '摄影师已交付作品。客户需在交付后 7 天内确认接收或提交返修要求；若 7 天内未处理，系统将自动确认订单完成并释放托管资金。前端仅展示规则，不模拟自动确认。'
+      note: '摄影师已交付作品。客户需在交付后 7 天内确认接收或提交返修要求；若 7 天内未处理，系统将自动确认订单完成并释放平台担保资金。前端仅展示规则，不模拟自动确认。'
     }
   }
 

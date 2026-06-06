@@ -73,15 +73,19 @@ export function ConversationActionDialogs({
 
   return (
     <>
-      <Dialog open={activeAction === 'QUOTE_DETAIL' && Boolean(quote)} onClose={onClose} fullWidth maxWidth="sm" PaperProps={dialogPaperProps}>
-        <DialogTitle sx={dialogTitleSx}>报价详情</DialogTitle>
-        <DialogContent sx={dialogContentSx}>
+      <Dialog open={activeAction === 'QUOTE_DETAIL' && Boolean(quote)} onClose={onClose} fullWidth maxWidth="sm" PaperProps={quoteDialogPaperProps}>
+        <DialogTitle sx={quoteDialogTitleSx}>
+          <Typography sx={{ color: 'rgba(255,255,255,.66)', fontSize: 10, fontWeight: 900, letterSpacing: '.15em', textTransform: 'uppercase' }}>报价详情</Typography>
+          <Stack direction="row" spacing={1.2} sx={{ mt: 0.6, justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <Typography sx={{ color: '#fff', fontSize: 32, fontWeight: 950, lineHeight: 1 }}>
+              {quote ? centToYuan(quote.amountCent) : '--'}
+            </Typography>
+            {quote && <PortraStatusBadge label={getQuoteStatusLabel(quote.status)} sx={{ bgcolor: 'rgba(255,255,255,.18)', color: '#fff' }} />}
+          </Stack>
+        </DialogTitle>
+        <DialogContent sx={quoteDialogContentSx}>
           {quote ? (
             <Stack spacing={1.4} sx={{ pt: 1 }}>
-              <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography sx={{ color: PORTRA_COLORS.ink, fontSize: 32, fontWeight: 950, lineHeight: 1 }}>{centToYuan(quote.amountCent)}</Typography>
-                <PortraStatusBadge label={getQuoteStatusLabel(quote.status)} />
-              </Stack>
               <DetailRows rows={[
                 ['拍摄时间', `${formatTime(quote.shootStartTime)} - ${formatTime(quote.shootEndTime)}`],
                 ['拍摄地点', getSafeDisplayText(quote.location, '拍摄地点待确认')],
@@ -271,6 +275,34 @@ const dialogPaperProps = {
   }
 }
 
+const quoteDialogPaperProps = {
+  sx: {
+    bgcolor: PORTRA_COLORS.paper,
+    borderRadius: '14px',
+    border: `1px solid ${PORTRA_COLORS.border}`,
+    overflow: 'hidden',
+    boxShadow: '0 20px 60px rgba(13,47,178,.12), 0 2px 8px rgba(0,0,0,.08)'
+  }
+}
+
+const quoteDialogTitleSx = {
+  px: 2.5,
+  py: 1.8,
+  bgcolor: PORTRA_COLORS.blue
+}
+
+const quoteDialogContentSx = {
+  pt: 2,
+  '& .MuiDialogContentText-root': { color: PORTRA_COLORS.mutedInk, lineHeight: 1.7 },
+  '& .MuiOutlinedInput-root': { bgcolor: PORTRA_COLORS.paperSoft, borderRadius: PORTRA_RADII.control },
+  '&::after': {
+    content: '""',
+    display: 'block',
+    borderTop: '1px dashed rgba(13,47,178,.18)',
+    mt: 2
+  }
+}
+
 const dialogTitleSx = {
   pb: 1,
   color: PORTRA_COLORS.ink,
@@ -279,7 +311,7 @@ const dialogTitleSx = {
 
 const dialogContentSx = {
   '& .MuiDialogContentText-root': { color: PORTRA_COLORS.mutedInk, lineHeight: 1.7 },
-  '& .MuiOutlinedInput-root': { bgcolor: PORTRA_COLORS.white, borderRadius: PORTRA_RADII.control }
+  '& .MuiOutlinedInput-root': { bgcolor: PORTRA_COLORS.paperSoft, borderRadius: PORTRA_RADII.control }
 }
 
 const dialogActionsSx = {

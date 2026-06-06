@@ -36,7 +36,7 @@ export class MessageWorkbenchErrorBoundary extends Component {
       <Box sx={{ p: 2 }}>
         <Alert severity="error" sx={{ bgcolor: PORTRA_COLORS.paper, borderRadius: PORTRA_RADII.control }}>
           <Stack spacing={1}>
-            <Typography fontWeight={900}>会话工作台暂时无法打开</Typography>
+            <Typography fontWeight={900}>沟通工作台暂时无法打开</Typography>
             <Typography variant="body2">请返回消息列表，或刷新后重试。错误详情已保留在控制台，方便定位。</Typography>
             {showDebugDetails && (
               <Box

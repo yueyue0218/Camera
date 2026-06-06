@@ -238,7 +238,7 @@ export function buildConversationSourceRows(conversation, currentUser, sourceLab
 }
 
 export function getConversationSourceHint(conversation) {
-  if (!conversation) return '会话仍在加载。'
+  if (!conversation) return '沟通仍在加载。'
   if (conversation.isLocal) {
     return '这段沟通还没有进入正式成单流程，可以先继续沟通。'
   }

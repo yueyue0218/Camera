@@ -6,7 +6,7 @@ import { MessageActorAvatar } from './MessageActorAvatar.jsx'
 export function EventAttachmentCard({ side, actor, title, summary, timestamp, children, actions }) {
   const provider = actor?.role === 'PROVIDER'
   const self = side === 'self'
-  const accent = provider ? PORTRA_COLORS.blue : PORTRA_COLORS.orange
+  const accent = /拒绝|返修|争议|异常/.test(`${title || ''}${summary || ''}`) ? PORTRA_COLORS.orange : PORTRA_COLORS.blue
 
   return (
     <Box sx={{ display: 'flex', justifyContent: self ? 'flex-end' : 'flex-start' }}>
@@ -34,9 +34,10 @@ export function EventAttachmentCard({ side, actor, title, summary, timestamp, ch
             px: 1.5,
             py: 1.22,
             pl: 2.2,
-            bgcolor: PORTRA_COLORS.white,
+            bgcolor: PORTRA_COLORS.paper,
             borderColor: PORTRA_COLORS.borderMuted,
-            borderRadius: self ? '18px 18px 6px 18px' : '18px 18px 18px 6px',
+            borderRadius: self ? '10px 10px 4px 10px' : '10px 10px 10px 4px',
+            boxShadow: '0 2px 12px rgba(21,19,24,.07)',
             '& .MuiButton-root': {
               minHeight: 30,
               borderRadius: 999,

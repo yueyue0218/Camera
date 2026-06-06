@@ -798,7 +798,7 @@ export function OrdersPage() {
                             <Chip
                               size="small"
                               color={status === 'ACCEPTED' ? 'success' : status === 'REJECTED' ? 'default' : 'warning'}
-                              label={status === 'ACCEPTED' ? '已接受，可在会话中沟通' : status === 'REJECTED' ? '已被婉拒' : '待处理'}
+                              label={status === 'ACCEPTED' ? '已接受，可继续沟通' : status === 'REJECTED' ? '已被婉拒' : '待处理'}
                             />
                           </Stack>
                         </Stack>
@@ -1377,7 +1377,7 @@ const orderIndexPanelSx = {
 
 const filterControlSx = {
   '& .MuiOutlinedInput-root': {
-    bgcolor: PORTRA_SURFACE.surface,
+    bgcolor: PORTRA_SURFACE.paperSoft,
     borderRadius: PORTRA_RADIUS.control
   }
 }
@@ -1385,7 +1385,7 @@ const filterControlSx = {
 function orderIndexCardSx(selected) {
   return {
     cursor: 'pointer',
-    bgcolor: selected ? PORTRA_SURFACE.surface : 'rgba(255, 253, 249, 0.62)',
+    bgcolor: selected ? PORTRA_SURFACE.portraBlueSoft : PORTRA_SURFACE.paper,
     borderColor: selected ? PORTRA_SURFACE.portraBlue : PORTRA_SURFACE.borderSoft,
     borderRadius: PORTRA_RADIUS.card,
     borderLeft: `4px solid ${selected ? PORTRA_SURFACE.portraBlue : 'transparent'}`,
@@ -1421,7 +1421,7 @@ const orderArchiveHeroSx = {
 
 const archiveSectionSx = {
   p: { xs: 2, md: 2.35 },
-  bgcolor: 'rgba(255, 253, 249, 0.72)',
+  bgcolor: PORTRA_SURFACE.paper,
   borderColor: PORTRA_SURFACE.borderSoft,
   borderRadius: PORTRA_RADIUS.panel,
   boxShadow: '0 10px 26px rgba(25, 30, 45, 0.055)'
@@ -1429,7 +1429,7 @@ const archiveSectionSx = {
 
 const subCardSx = {
   p: 1.5,
-  bgcolor: PORTRA_SURFACE.surface,
+  bgcolor: PORTRA_SURFACE.paperSoft,
   borderColor: PORTRA_SURFACE.borderSoft,
   borderRadius: PORTRA_RADIUS.card,
   boxShadow: '0 1px 0 rgba(255, 255, 255, 0.68) inset'

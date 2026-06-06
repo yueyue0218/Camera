@@ -54,7 +54,7 @@ export function MessagesPage() {
         }
       } catch (error) {
         if (!mounted) return
-        setNotice({ type: 'warning', text: `${getCWorkbenchErrorText(error, '暂时无法加载最新会话。')} 已先显示本地会话记录。` })
+        setNotice({ type: 'warning', text: `${getCWorkbenchErrorText(error, '暂时无法加载最新沟通。')} 已先显示本地沟通记录。` })
         setConversations(getConversationRecordsForUser(currentUser, currentUser.role))
       }
     }
@@ -68,7 +68,7 @@ export function MessagesPage() {
     <Stack spacing={2} sx={{ maxWidth: 1120, mx: 'auto', color: PORTRA_COLORS.ink }}>
       <MessagesSectionHeader title="消息" subtitle="管理正在沟通的约拍、报价和交付进展" />
       <Box>
-        {location.state?.roleMismatch && <Alert severity="info" sx={noticeSx}>这条会话属于另一身份视角，请切换身份后查看。</Alert>}
+        {location.state?.roleMismatch && <Alert severity="info" sx={noticeSx}>这条沟通属于另一身份视角，请切换身份后查看。</Alert>}
         {notice && <Alert severity={notice.type} sx={noticeSx}>{notice.text}</Alert>}
       </Box>
       <ConversationList

@@ -3,7 +3,8 @@ export const PORTRA_SURFACE = {
   paper: '#f8f3eb',
   paperMuted: '#ebe6dd',
   paperSoft: '#f0ece5',
-  surface: '#fffdf9',
+  surface: '#f0ece5',
+  inset: '#f0ece5',
   stone: '#e6e2e0',
   stoneDeep: '#d8d3cf',
   ink: '#111015',
@@ -19,7 +20,8 @@ export const PORTRA_SURFACE = {
   warmOrangeDeep: '#f85104',
   warmOrangeSoft: '#fae8df',
   borderSubtle: 'rgba(21,19,24,.12)',
-  borderSoft: 'rgba(21,19,24,.08)'
+  borderSoft: 'rgba(21,19,24,.08)',
+  borderDashed: 'rgba(13,47,178,.15)'
 }
 
 export const PORTRA_RADIUS = {
@@ -33,7 +35,8 @@ export const PORTRA_RADIUS = {
 export const PORTRA_SHADOW = {
   hairline: '0 1px 0 rgba(255, 255, 255, 0.62) inset',
   soft: '0 16px 40px rgba(21,19,24,.09)',
-  floating: '0 22px 54px rgba(21,19,24,.12)'
+  floating: '0 22px 54px rgba(21,19,24,.12)',
+  hover: '0 6px 20px rgba(13,47,178,.10)'
 }
 
 export const PORTRA_ARCHIVE_SURFACE_SX = {

@@ -583,7 +583,7 @@ export function ConversationDetailPage() {
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.15} sx={{ justifyContent: 'space-between', alignItems: { xs: 'stretch', md: 'center' } }}>
           <Stack direction="row" spacing={1.5} sx={{ minWidth: 0, alignItems: 'center' }}>
             <Tooltip title="全部沟通">
-              <IconButton onClick={() => navigate('/messages')} sx={{ border: `1px solid ${PORTRA_COLORS.border}`, borderRadius: PORTRA_RADII.control, bgcolor: PORTRA_COLORS.white }}>
+              <IconButton onClick={() => navigate('/messages')} sx={{ border: `1px solid ${PORTRA_COLORS.border}`, borderRadius: PORTRA_RADII.control, bgcolor: PORTRA_COLORS.paperSoft }}>
                 <ArrowBackRoundedIcon />
               </IconButton>
             </Tooltip>

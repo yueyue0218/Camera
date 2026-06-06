@@ -73,9 +73,9 @@ export function ConversationComposer({
               alignItems: { xs: 'stretch', md: 'center' },
               py: 0.48,
               px: 0.85,
-              bgcolor: 'rgba(255, 253, 249, 0.64)',
+              bgcolor: 'transparent',
               borderRadius: PORTRA_RADII.control,
-              border: `1px solid ${PORTRA_COLORS.borderMuted}`,
+              border: 0,
               boxShadow: 'none'
             }}
           >
@@ -164,7 +164,7 @@ export function ConversationComposer({
         )}
 
         <Stack direction="row" spacing={0.3} sx={{ alignItems: 'center', flexWrap: 'wrap', minHeight: 32 }}>
-          <Typography variant="caption" sx={{ mr: 0.5, color: PORTRA_COLORS.faintInk, fontWeight: 750 }}>会话工具</Typography>
+          <Typography variant="caption" sx={{ mr: 0.5, color: PORTRA_COLORS.faintInk, fontWeight: 750 }}>沟通工具</Typography>
           <MessageToolbarButton title="发送图片" component="label" disabled={loading || imageSending}>
             <ImageRoundedIcon fontSize="small" />
             <input hidden type="file" accept="image/*" onChange={onChooseMessageImage} />
@@ -198,11 +198,12 @@ export function ConversationComposer({
             sx={{
               '& .MuiOutlinedInput-root': {
                 minHeight: 44,
-                bgcolor: PORTRA_COLORS.white,
+                bgcolor: PORTRA_COLORS.page,
                 borderRadius: PORTRA_RADII.control,
                 '& fieldset': { borderColor: PORTRA_COLORS.border },
                 '&:hover fieldset': { borderColor: PORTRA_COLORS.mutedInk },
-                '&.Mui-focused fieldset': { borderColor: PORTRA_COLORS.blue, borderWidth: 1 }
+                '&.Mui-focused fieldset': { borderColor: PORTRA_COLORS.blue, borderWidth: 1 },
+                '&.Mui-focused': { boxShadow: '0 0 0 3px rgba(13,47,178,.08)' }
               }
             }}
           />

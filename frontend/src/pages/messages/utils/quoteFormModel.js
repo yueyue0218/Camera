@@ -87,7 +87,7 @@ export function validateQuoteFormModel(form, { conversation, currentUser, quotes
   }
 
   if (!conversation || conversation.isLocal || !getBackendConversationId(conversation)) {
-    push('form', '这段沟通暂时不能生成正式报价，请先进入正式会话。')
+    push('form', '这段沟通暂时不能生成正式报价，请先进入正式沟通。')
   }
   if (currentUser?.role !== 'PROVIDER' || getCurrentUserId(currentUser) !== Number(conversation?.participantBId)) {
     push('form', '只有这次沟通中的摄影师可以发送报价。')
@@ -144,7 +144,7 @@ export function validateQuoteFormModel(form, { conversation, currentUser, quotes
     const scheduleStart = parseInputDate(conversation.scheduleStartTime)
     const scheduleEnd = parseInputDate(conversation.scheduleEndTime)
     if (scheduleStart && scheduleEnd && (shootStart < scheduleStart || shootEnd > scheduleEnd)) {
-      push('shootStartTime', '拍摄时间必须落在该会话明确返回的档期范围内。')
+      push('shootStartTime', '拍摄时间必须落在该沟通明确返回的档期范围内。')
     }
   }
 

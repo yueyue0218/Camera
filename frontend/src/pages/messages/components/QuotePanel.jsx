@@ -122,7 +122,7 @@ export function QuotePanel({
             </PortraTicketCard>
           )
         })}
-        {!quotes.length && <Typography color="text.secondary">当前会话还没有正式报价。</Typography>}
+        {!quotes.length && <Typography color="text.secondary">当前沟通还没有正式报价。</Typography>}
 
         {showQuoteForm && canSeeQuoteEntry && (
           <QuoteForm

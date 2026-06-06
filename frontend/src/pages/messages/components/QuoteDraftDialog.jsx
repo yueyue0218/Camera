@@ -69,7 +69,7 @@ export function QuoteDraftDialog({
           px: { xs: 2.25, md: 3.5 },
           py: { xs: 2.25, md: 3 },
           '& .MuiOutlinedInput-root': {
-            bgcolor: PORTRA_COLORS.white,
+            bgcolor: PORTRA_COLORS.paperSoft,
             borderRadius: PORTRA_RADII.control,
             '&.Mui-focused fieldset': {
               borderColor: PORTRA_COLORS.blue,
@@ -244,7 +244,7 @@ function QuoteSection({ title, children }) {
 
 const sectionSx = {
   p: { xs: 1.45, md: 1.75 },
-  bgcolor: 'rgba(255, 253, 249, 0.62)',
+  bgcolor: PORTRA_COLORS.paperSoft,
   border: `1px solid ${PORTRA_COLORS.borderMuted}`,
   borderRadius: PORTRA_RADII.control
 }

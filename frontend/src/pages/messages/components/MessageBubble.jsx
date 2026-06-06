@@ -23,7 +23,7 @@ export function MessageBubble({ message, mine, actor, canSaveSubmittedPhoto, onS
           sx={{
             px: isImage ? 0.75 : 1.55,
             py: isImage ? 0.75 : 1.12,
-            bgcolor: mine ? PORTRA_COLORS.blue : PORTRA_COLORS.white,
+            bgcolor: mine ? PORTRA_COLORS.blue : PORTRA_COLORS.paper,
             color: mine ? PORTRA_COLORS.paper : PORTRA_COLORS.subInk,
             border: mine ? `1px solid ${PORTRA_COLORS.blue}` : `1px solid ${PORTRA_COLORS.borderMuted}`,
             borderRadius: mine ? '20px 20px 6px 20px' : '20px 20px 20px 6px',
@@ -36,7 +36,7 @@ export function MessageBubble({ message, mine, actor, canSaveSubmittedPhoto, onS
               <Box
                 component="img"
                 src={message.content}
-                alt="会话图片"
+                alt="沟通图片"
                 sx={{ display: 'block', maxWidth: { xs: '100%', md: 420 }, maxHeight: 300, borderRadius: PORTRA_RADII.control, objectFit: 'cover' }}
               />
               {canSaveSubmittedPhoto && (
