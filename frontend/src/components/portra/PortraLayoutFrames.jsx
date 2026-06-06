@@ -17,9 +17,10 @@ export function PortraPageFrame({ children, maxWidth = 'page', topGap = true, sx
         '--portra-page-max-width': resolveMaxWidth(maxWidth),
         '--portra-page-gutter': PORTRA_LAYOUT.pageGutter,
         '--portra-page-gutter-total': PORTRA_LAYOUT.pageGutterTotal,
+        '--portra-mobile-gutter-total': PORTRA_LAYOUT.mobileGutterTotal,
         width: {
-          xs: 'calc(100% - var(--portra-mobile-gutter-total, 24px))',
-          sm: 'min(calc(100% - var(--portra-page-gutter-total)), var(--portra-page-max-width))'
+          xs: 'calc(100vw - var(--portra-mobile-gutter-total))',
+          md: 'min(calc(100vw - var(--portra-page-gutter-total)), var(--portra-page-max-width))'
         },
         mx: 'auto',
         mt: topGap ? `${PORTRA_LAYOUT.contentTopGap}px` : 0,
@@ -71,7 +72,7 @@ export function PortraWorkbenchFrame({
         gridTemplateColumns: {
           xs: 'minmax(0, 1fr)',
           lg: `minmax(0, 1fr) ${rightPanelWidth.lg || rightPanelWidth}`,
-          xl: `minmax(0, 1fr) ${rightPanelWidth.xl || rightPanelWidth.lg || rightPanelWidth}`
+          xl: `minmax(${PORTRA_LAYOUT.conversationMainMinWidth.xl}, 1fr) ${rightPanelWidth.xl || rightPanelWidth.lg || rightPanelWidth}`
         },
         gap,
         alignItems: 'stretch',

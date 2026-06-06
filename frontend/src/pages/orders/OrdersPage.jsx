@@ -735,7 +735,7 @@ export function OrdersPage() {
   }
 
   return (
-    <PortraWorkflowFrame spacing={2.5} maxWidth="workflow" sx={orderPageSx}>
+    <PortraWorkflowFrame spacing={2.5} maxWidth="page" sx={orderPageSx}>
       <OrdersSectionHeader title="订单" subtitle="查看订单进展、平台担保状态和每次状态流转。" />
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
 
@@ -1367,7 +1367,7 @@ const orderGridSx = {
     md: `${PORTRA_LAYOUT.orderSidebarWidth.md} minmax(0, 1fr)`,
     xl: `${PORTRA_LAYOUT.orderSidebarWidth.xl} minmax(0, 1fr)`
   },
-  gap: { xs: 1.6, md: 3 },
+  gap: { xs: 1.6, md: 3.5 },
   alignItems: 'start',
   minWidth: 0
 }
@@ -1385,7 +1385,7 @@ const orderIndexPanelSx = {
 const orderDetailWorkspaceSx = {
   minWidth: 0,
   width: '100%',
-  maxWidth: 980
+  maxWidth: 1120
 }
 
 const filterControlSx = {

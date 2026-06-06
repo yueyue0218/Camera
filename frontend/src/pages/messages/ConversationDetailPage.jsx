@@ -618,8 +618,8 @@ export function ConversationDetailPage() {
 
       <PortraWorkbenchFrame
         data-message-workbench-grid="true"
-        rightPanelWidth={{ lg: '320px', xl: '320px' }}
-        gap={{ xs: 1.25, lg: 2.25, xl: 2.5 }}
+        rightPanelWidth={{ lg: '300px', xl: '320px' }}
+        gap={{ xs: 1.25, lg: 2.75, xl: 3 }}
       >
         <Box sx={{ minHeight: 0, minWidth: 0, height: '100%', display: 'flex', overflow: 'hidden' }}>
           <ConversationThread

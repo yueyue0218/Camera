@@ -40,13 +40,13 @@ export const PORTRA_SHADOW = {
 }
 
 export const PORTRA_LAYOUT = {
-  pageMaxWidth: 1360,
-  workflowMaxWidth: 1360,
-  wideWorkflowMaxWidth: 1440,
-  galleryMaxWidth: 1320,
-  pageGutter: 'clamp(20px, 4vw, 48px)',
-  pageGutterTotal: 'clamp(40px, 8vw, 96px)',
-  mobileGutterTotal: '24px',
+  pageMaxWidth: 1480,
+  workflowMaxWidth: 1520,
+  wideWorkflowMaxWidth: 1520,
+  galleryMaxWidth: 1440,
+  pageGutter: 'clamp(32px, 4vw, 72px)',
+  pageGutterTotal: 'clamp(56px, 8vw, 144px)',
+  mobileGutterTotal: '48px',
   contentTopGap: 24,
   sectionGap: 24,
   workbenchHeight: {
@@ -54,7 +54,7 @@ export const PORTRA_LAYOUT = {
     md: 'calc(100dvh - 154px)'
   },
   rightPanelWidth: {
-    lg: '320px',
+    lg: '300px',
     xl: '320px'
   },
   compactRightPanelWidth: {
@@ -62,8 +62,17 @@ export const PORTRA_LAYOUT = {
     xl: '320px'
   },
   orderSidebarWidth: {
-    md: '320px',
-    xl: '328px'
+    md: '330px',
+    xl: '330px'
+  },
+  orderDetailMinWidth: {
+    lg: '760px'
+  },
+  conversationMainMinWidth: {
+    xl: '860px'
+  },
+  conversationMainPreferredWidth: {
+    xl: '960px'
   }
 }
 
