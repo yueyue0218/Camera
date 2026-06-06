@@ -43,12 +43,11 @@ import {
   reviewApi,
   reviewComplaintApi
 } from '../../api.js'
-import { buildOrderNavigationTarget, normalizeOrderId } from '../../utils/orderNavigation.js'
+import { buildOrderNavigationTarget, goToOrderConversation, normalizeOrderId } from '../../utils/orderNavigation.js'
 import { goToDeliveryGallery } from '../../utils/deliveryNavigation.js'
 import {
   getExplicitReturnToConversation,
-  navigateBackToConversation,
-  navigateToConversation
+  navigateBackToConversation
 } from '../../utils/conversationNavigation.js'
 import { centToYuan } from '../../utils/index.js'
 import {
@@ -704,7 +703,7 @@ export function OrdersPage() {
   const selectedOrderTitle = selectedOrder ? formatOrderTitle(selectedOrder, quoteSnapshot) : ''
   const selectedOrderConversationId = selectedOrder?.conversationId
   const canReturnToConversation = Boolean(explicitReturnToConversation)
-  const canContinueConversation = Boolean(selectedOrderConversationId)
+  const canContactCounterparty = !canReturnToConversation && Boolean(selectedOrderConversationId)
   const statusTimelineItems = statusLogs.map(log => ({
     id: log.logId || `${log.orderId}-${log.createdAt}`,
     title: formatStatusLogText(log),
@@ -731,7 +730,7 @@ export function OrdersPage() {
   }
 
   function continueConversation() {
-    const succeeded = navigateToConversation(navigate, selectedOrderConversationId)
+    const succeeded = goToOrderConversation(navigate, selectedOrderConversationId)
     if (!succeeded) setNotice({ type: 'warning', text: '暂无可进入的沟通记录。' })
   }
 
@@ -822,7 +821,7 @@ export function OrdersPage() {
               <Stack spacing={2}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between' }}>
                   <Box>
-                    {(canReturnToConversation || canContinueConversation) && (
+                    {(canReturnToConversation || canContactCounterparty) && (
                       <PortraActionLink
                         startIcon={canReturnToConversation ? <ArrowBackRoundedIcon /> : null}
                         onClick={canReturnToConversation ? returnToConversation : continueConversation}

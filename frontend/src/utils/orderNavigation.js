@@ -26,6 +26,13 @@ export function goToOrder(navigate, value, options = {}) {
   return true
 }
 
+export function goToOrderConversation(navigate, conversationId, options = {}) {
+  const normalizedConversationId = normalizeConversationId(conversationId)
+  if (!normalizedConversationId || typeof navigate !== 'function') return false
+  navigate(`/messages/${normalizedConversationId}`, options)
+  return true
+}
+
 export function buildOrderAction(orderOrId, options = {}) {
   const orderId = normalizeOrderId(
     typeof orderOrId === 'object' ? orderOrId?.orderId : orderOrId
