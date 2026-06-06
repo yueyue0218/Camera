@@ -324,7 +324,6 @@ export function LoginChoicePage() {
   const hasModal = location.pathname !== '/login' && location.pathname !== '/login/'
 
   const [activeSection, setActiveSection] = useState('op-page1')
-  const [navRole, setNavRole] = useState('owner')
   const [roleActive, setRoleActive] = useState('我想拍')
 
   const scrollRef = useRef(null)
@@ -441,16 +440,6 @@ export function LoginChoicePage() {
           </nav>
 
           <div className="op-header-actions">
-            <div className="op-role-toggle">
-              {[{ key: 'owner', label: '单主' }, { key: 'photographer', label: '摄影师' }].map(role => (
-                <button
-                  type="button"
-                  key={role.key}
-                  className={`op-role-btn${navRole === role.key ? ' active' : ''}`}
-                  onClick={() => setNavRole(role.key)}
-                >{role.label}</button>
-              ))}
-            </div>
             <button type="button" className="op-avatar" title="登录" onClick={() => navigate('/login/sign-in')} />
           </div>
         </div>

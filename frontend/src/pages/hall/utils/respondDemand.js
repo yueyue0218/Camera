@@ -1,21 +1,17 @@
-function yuanToCent(value) {
-  if (value === '' || value === null || value === undefined) return null
-  return Math.round(Number(value) * 100)
-}
+export const DEFAULT_DEMAND_RESPONSE_MESSAGE = '我想响应这个需求，可以进一步沟通拍摄时间和方案'
 
-export async function promptAndRespondDemand({ demand, currentUser, demandApi, normalizeError, onSuccess }) {
-  const expectedPrice = window.prompt('请输入响应报价（元）', '')
-  if (expectedPrice === null) return
-  const message = window.prompt('给单主留一句话', '')
-  if (message === null) return
+export async function submitDemandResponse({ demand, currentUser, demandApi, normalizeError, onSuccess, onError }) {
   try {
-    await demandApi.respond(demand.demandId, {
-      expectedPriceCent: yuanToCent(expectedPrice),
-      message
+    // One-click response only creates DemandResponse; conversation/notifications stay on customer accept.
+    const response = await demandApi.createDemandResponse(demand.demandId, {
+      message: DEFAULT_DEMAND_RESPONSE_MESSAGE,
+      expectedPriceCent: null
     }, currentUser)
-    await onSuccess?.()
-    window.alert('响应已提交')
+    await onSuccess?.(response)
+    return response
   } catch (error) {
-    window.alert(normalizeError(error))
+    const message = normalizeError(error)
+    await onError?.(message, error)
+    return null
   }
 }

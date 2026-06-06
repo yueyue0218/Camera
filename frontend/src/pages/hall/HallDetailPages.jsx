@@ -3,10 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { demandApi } from '../../api/demandApi.js'
 import { fileApi } from '../../api/fileApi.js'
 import { servicePackageApi } from '../../api/servicePackageApi.js'
+import { userApi } from '../../api/userApi.js'
 import { useAuth } from '../../AuthContext.jsx'
 import { EmptyState, ErrorState, LoadingState } from './components/HallState.jsx'
 import { cityName, firstText, gradientFor, latestTimeText, money, moneyRange, readableDate, splitTags, timeTagLabel } from './components/hallUtils.js'
-import { promptAndRespondDemand } from './utils/respondDemand.js'
+import { submitDemandResponse } from './utils/respondDemand.js'
 import '../portraHall.css'
 
 function createStatus() {
@@ -104,6 +105,30 @@ function isSameOwner(currentUser, ownerIds) {
   return userIds.some(userId => ownerIds.includes(userId))
 }
 
+async function enrichDemandPublisher(demand, currentUser) {
+  if (!demand?.customerId) return demand
+  try {
+    const brief = await userApi.brief(demand.customerId, currentUser)
+    let avatarUrl = ''
+    if (brief?.avatarFileId) {
+      try {
+        avatarUrl = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser)
+      } catch {
+        avatarUrl = ''
+      }
+    }
+    return {
+      ...demand,
+      customerNickname: brief?.nickname || demand.customerNickname,
+      customerName: brief?.nickname || demand.customerName,
+      customerAvatarFileId: brief?.avatarFileId || demand.customerAvatarFileId,
+      customerAvatarUrl: avatarUrl || demand.customerAvatarUrl
+    }
+  } catch {
+    return demand
+  }
+}
+
 function referenceSlots(referenceFileIds) {
   const count = Math.max(3, Math.min(4, Number(referenceFileIds?.length) || 0))
   const slots = Array.from({ length: count }, (_, index) => `参考图 ${String(index + 1).padStart(2, '0')}`)
@@ -166,6 +191,9 @@ export function DemandDetailPage() {
   const { currentUser } = useAuth()
   const [demand, setDemand] = useState(null)
   const [status, setStatus] = useState(createStatus)
+  const [notice, setNotice] = useState(null)
+  const [responded, setResponded] = useState(false)
+  const [responding, setResponding] = useState(false)
   const referenceUrls = useFileObjectUrls(demand?.referenceFileIds, currentUser)
   useBodyRole(currentUser.role)
 
@@ -175,8 +203,9 @@ export function DemandDetailPage() {
       setStatus({ loading: true, error: '' })
       try {
         const detail = await demandApi.detail(demandId, currentUser)
+        const enrichedDetail = await enrichDemandPublisher(detail, currentUser)
         if (!ignored) {
-          setDemand(detail)
+          setDemand(enrichedDetail)
           setStatus({ loading: false, error: '' })
         }
       } catch (error) {
@@ -190,6 +219,28 @@ export function DemandDetailPage() {
     return () => { ignored = true }
   }, [currentUser, demandId])
 
+  useEffect(() => {
+    if (currentUser.role !== 'PROVIDER') {
+      setResponded(false)
+      return
+    }
+    let ignored = false
+    demandApi.myResponses(currentUser)
+      .then(responses => {
+        if (!ignored) setResponded((responses || []).some(item => Number(item.demandId) === Number(demandId)))
+      })
+      .catch(() => {
+        if (!ignored) setResponded(false)
+      })
+    return () => { ignored = true }
+  }, [currentUser, demandId])
+
+  useEffect(() => {
+    if (!notice) return undefined
+    const timer = window.setTimeout(() => setNotice(null), 3200)
+    return () => window.clearTimeout(timer)
+  }, [notice])
+
   if (status.loading) return <DetailShell backLabel="← 返回订单大厅"><LoadingState text="正在加载真实需求详情" /></DetailShell>
   if (status.error) return <DetailShell backLabel="← 返回订单大厅"><ErrorState message={status.error} /></DetailShell>
   if (!demand) return <DetailShell backLabel="← 返回订单大厅"><EmptyState text="暂无需求详情" /></DetailShell>
@@ -201,18 +252,28 @@ export function DemandDetailPage() {
   const timeText = demand.timeDescription || demand.timeSlot || readableDate(demand.expectedDate) || '暂无'
   const isDemandOwner = isSameOwner(currentUser, collectDemandOwnerIds(demand))
   const canRespond = currentUser.role === 'PROVIDER' && demand.status === 'OPEN'
+  const publisherName = firstText(demand.customerNickname, demand.customerName) || '单主'
+  const publisherAvatar = firstText(demand.customerAvatarUrl, demand.customerAvatar)
 
   async function respondDemand() {
-    await promptAndRespondDemand({
+    if (responded || responding) return
+    setResponding(true)
+    await submitDemandResponse({
       demand,
       currentUser,
       demandApi,
       normalizeError,
       onSuccess: async () => {
+        setResponded(true)
+        setNotice({ type: 'success', text: '响应已提交，等待单主确认后会开启会话。' })
         const detail = await demandApi.detail(demandId, currentUser)
-        setDemand(detail || demand)
+        setDemand(await enrichDemandPublisher(detail || demand, currentUser))
+      },
+      onError: message => {
+        setNotice({ type: 'error', text: message })
       }
     })
+    setResponding(false)
   }
 
   async function closeDemand() {
@@ -220,7 +281,7 @@ export function DemandDetailPage() {
     try {
       const result = await demandApi.close(demand.demandId, currentUser)
       const detail = await demandApi.detail(demand.demandId, currentUser).catch(() => result)
-      setDemand(detail || result || demand)
+      setDemand(await enrichDemandPublisher(detail || result || demand, currentUser))
       window.alert('需求已下架')
     } catch (error) {
       window.alert(normalizeError(error))
@@ -229,6 +290,11 @@ export function DemandDetailPage() {
 
   return (
     <DetailShell backLabel="← 返回订单大厅">
+      {notice && (
+        <div className={`hall-notice ${notice.type === 'error' ? 'error' : 'success'}`} role="status">
+          {notice.text}
+        </div>
+      )}
       <div className="detail-grid">
         <article className="panel-card">
           <div className="detail-heading">
@@ -272,20 +338,26 @@ export function DemandDetailPage() {
         <aside className="aside">
           <div className="aside-card">
             <h3>发布者信息</h3>
-            <div className="profile-mini detail-provider-link">
-              <div className="mini-avatar" aria-hidden="true" />
+            <button
+              className="profile-mini detail-provider-link profile-link-button"
+              type="button"
+              onClick={() => demand.customerId && navigate(`/users/${demand.customerId}?role=CUSTOMER`)}
+              disabled={!demand.customerId}
+            >
+              <div className="mini-avatar" style={publisherAvatar ? { '--avatar-art': `url(${publisherAvatar})` } : undefined} aria-hidden="true" />
               <div>
-                <strong>{firstText(demand.customerNickname, demand.customerName) || '单主'}</strong><br />
+                <strong>{publisherName}</strong><br />
                 <span className="micro">响应 {demand.responseCount ?? 0} 次 · {latestTimeText(demand)}</span>
               </div>
-            </div>
-            <div className="aside-item"><strong>完成约拍</strong><span>后端暂无发布者历史统计接口，当前展示需求响应数据。</span></div>
+            </button>
           </div>
           {canRespond && (
           <div className="photographer-only aside-card">
             <h3>操作</h3>
             <div className="side-actions">
-              <button className="primary-btn photographer-only" type="button" onClick={respondDemand}>我要响应</button>
+              <button className="primary-btn photographer-only" type="button" disabled={responded || responding} onClick={respondDemand}>
+                {responding ? '提交中' : responded ? '已响应' : '我要响应'}
+              </button>
             </div>
           </div>
           )}
