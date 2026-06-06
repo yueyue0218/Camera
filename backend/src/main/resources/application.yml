@@ -20,10 +20,12 @@ spring:
       hibernate:
         format_sql: true
   mail:
-    host: smtp.qq.com
-    port: 465
+    host: ${SPRING_MAIL_HOST:smtp.resend.com}
+    port: ${SPRING_MAIL_PORT:465}
     protocol: smtps
     default-encoding: UTF-8
+    username: ${SPRING_MAIL_USERNAME:resend}
+    password: ${SPRING_MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
