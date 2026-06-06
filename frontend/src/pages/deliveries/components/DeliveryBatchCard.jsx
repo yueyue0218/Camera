@@ -14,7 +14,8 @@ export function DeliveryBatchCard({
 }) {
   if (!batch) return null
   const message = variant === 'message'
-  const clickable = Boolean(onOpen) && !disabled
+  const hasGalleryTarget = Boolean(batch.orderId && batch.deliveryId)
+  const clickable = Boolean(onOpen) && hasGalleryTarget && !disabled
 
   return (
     <PortraTicketCard
@@ -22,7 +23,10 @@ export function DeliveryBatchCard({
       tabIndex={clickable ? 0 : undefined}
       onClick={clickable ? onOpen : undefined}
       onKeyDown={event => {
-        if (clickable && (event.key === 'Enter' || event.key === ' ')) onOpen()
+        if (clickable && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault()
+          onOpen()
+        }
       }}
       sx={{
         width: message ? { xs: 'min(100%, 540px)', md: 'min(600px, 100%)' } : '100%',
@@ -60,7 +64,7 @@ export function DeliveryBatchCard({
             查看作品
           </Button>
         </Stack>
-        {!clickable && (
+        {!hasGalleryTarget && (
           <Typography variant="caption" sx={{ color: PORTRA_SURFACE.muted }}>交付记录暂不可查看</Typography>
         )}
       </Stack>

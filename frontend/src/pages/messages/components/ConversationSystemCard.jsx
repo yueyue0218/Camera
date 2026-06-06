@@ -212,7 +212,7 @@ function DeliveryMeta({ event, onOpenDeliveryGallery }) {
         }}
         variant="message"
         onOpen={() => onOpenDeliveryGallery?.(delivery)}
-        disabled={!delivery.deliveryId && !delivery.fileId}
+        disabled={!batch?.orderId || !batch?.deliveryId}
       />
     </Stack>
   )

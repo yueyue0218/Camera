@@ -32,13 +32,13 @@ export function DeliveryFileGrid({
               boxShadow: selected ? '0 0 0 3px rgba(13,47,178,.12)' : 'none'
             }}
           >
-            <Box sx={{ aspectRatio: '4 / 3', bgcolor: PORTRA_SURFACE.paperMuted, cursor: previewUrl ? 'zoom-in' : 'default' }} onClick={() => previewUrl && onOpenViewer(index)}>
+            <Box sx={{ aspectRatio: '4 / 3', bgcolor: PORTRA_SURFACE.paperMuted, cursor: 'zoom-in' }} onClick={() => onOpenViewer(index)}>
               {previewUrl && isImageDeliveryFile(file) ? (
                 <Box component="img" src={previewUrl} alt={file.fileName} sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               ) : (
                 <Stack spacing={0.5} sx={{ height: '100%', alignItems: 'center', justifyContent: 'center', color: PORTRA_SURFACE.muted }}>
                   <InsertDriveFileRoundedIcon />
-                  <Typography variant="caption">不可预览</Typography>
+                  <Typography variant="caption">暂无缩略图</Typography>
                 </Stack>
               )}
             </Box>
@@ -49,7 +49,6 @@ export function DeliveryFileGrid({
             />
             <IconButton
               size="small"
-              disabled={!previewUrl}
               onClick={() => onOpenViewer(index)}
               sx={{ position: 'absolute', top: 6, right: 6, bgcolor: 'rgba(255,255,255,.78)' }}
             >

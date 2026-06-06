@@ -34,9 +34,10 @@ export function QuoteDraftDialog({
       open={open}
       onClose={onClose}
       fullWidth
-      maxWidth="md"
+      maxWidth="lg"
       PaperProps={{
         sx: {
+          width: 'min(1120px, calc(100vw - 32px))',
           bgcolor: '#f8f3eb',
           borderRadius: PORTRA_RADII.panel,
           border: `1px solid ${PORTRA_COLORS.border}`,
@@ -65,6 +66,8 @@ export function QuoteDraftDialog({
           bgcolor: '#f8f3eb',
           borderColor: PORTRA_COLORS.borderMuted,
           overflowY: 'auto',
+          px: { xs: 2.25, md: 3.5 },
+          py: { xs: 2.25, md: 3 },
           '& .MuiOutlinedInput-root': {
             bgcolor: PORTRA_COLORS.white,
             borderRadius: PORTRA_RADII.control,
@@ -75,7 +78,7 @@ export function QuoteDraftDialog({
           }
         }}
       >
-        <Stack component="form" id="quote-draft-dialog-form" spacing={1.6} onSubmit={onSubmit}>
+        <Stack component="form" id="quote-draft-dialog-form" spacing={2.2} onSubmit={onSubmit}>
           {editingQuotationId && (
             <PortraInfoBanner>正在编辑一份待确认报价。客户确认生成订单后，金额、拍摄时间和交付范围会锁定。</PortraInfoBanner>
           )}
@@ -214,7 +217,13 @@ export function QuoteDraftDialog({
         </Stack>
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, py: 1.5, bgcolor: '#ebe6dd', borderTop: `1px solid ${PORTRA_COLORS.borderMuted}` }}>
+      <DialogActions sx={{
+        minHeight: 78,
+        px: { xs: 2.25, md: 3.5 },
+        py: 1.35,
+        bgcolor: '#ebe6dd',
+        borderTop: `1px solid ${PORTRA_COLORS.borderMuted}`
+      }}>
         <Button color="inherit" onClick={onClose}>取消</Button>
         <Button type="submit" form="quote-draft-dialog-form" variant="contained" disabled={loading || !canSubmitQuoteForm}>
           {editingQuotationId ? '保存修改' : '发送报价'}
@@ -234,7 +243,7 @@ function QuoteSection({ title, children }) {
 }
 
 const sectionSx = {
-  p: 1.35,
+  p: { xs: 1.45, md: 1.75 },
   bgcolor: 'rgba(255, 253, 249, 0.62)',
   border: `1px solid ${PORTRA_COLORS.borderMuted}`,
   borderRadius: PORTRA_RADII.control
@@ -243,6 +252,6 @@ const sectionSx = {
 const fieldGridSx = {
   display: 'grid',
   gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
-  gap: 1.25,
+  gap: { xs: 1.5, md: 2.25 },
   alignItems: 'start'
 }

@@ -8,18 +8,20 @@ export function DeliveryThumbnailStrip({ files = [], previewUrls = {}, variant =
   const visible = files.slice(0, 4)
   const extraCount = Math.max(0, files.length - visible.length)
   const compact = variant === 'message'
+  const height = getStripHeight(visible.length, compact)
 
   return (
     <Box
       sx={{
         display: 'grid',
         gridTemplateColumns: visible.length === 1 ? '1fr' : 'repeat(2, 1fr)',
-        gridAutoRows: compact ? 48 : 72,
+        gridAutoRows: visible.length <= 1 ? '1fr' : compact ? 48 : 72,
         gap: 0.6,
-        minHeight: compact ? 96 : 148,
+        height,
+        minHeight: 0,
         borderRadius: PORTRA_RADIUS.control,
         overflow: 'hidden',
-        bgcolor: PORTRA_SURFACE.paperMuted
+        bgcolor: 'rgba(255,253,249,.72)'
       }}
     >
       {visible.length ? visible.map((file, index) => (
@@ -30,7 +32,7 @@ export function DeliveryThumbnailStrip({ files = [], previewUrls = {}, variant =
           overlay={index === 3 && extraCount > 0 ? `+${extraCount}` : ''}
         />
       )) : (
-        <ThumbnailPlaceholder label="暂无可预览文件" />
+        <ThumbnailPlaceholder label="暂无缩略图" />
       )}
     </Box>
   )
@@ -42,7 +44,7 @@ function ThumbnailTile({ file, previewUrl, overlay }) {
       {previewUrl && isImageDeliveryFile(file) ? (
         <Box component="img" src={previewUrl} alt={file.fileName} sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
       ) : (
-        <ThumbnailPlaceholder label={isImageDeliveryFile(file) ? '图片待加载' : '文件'} />
+        <ThumbnailPlaceholder label={isImageDeliveryFile(file) ? '暂无缩略图' : '文件'} />
       )}
       {overlay && (
         <Box sx={{
@@ -79,4 +81,9 @@ function ThumbnailPlaceholder({ label }) {
       </Box>
     </Box>
   )
+}
+
+function getStripHeight(count, compact) {
+  if (count <= 1) return compact ? 86 : 126
+  return compact ? 108 : 148
 }

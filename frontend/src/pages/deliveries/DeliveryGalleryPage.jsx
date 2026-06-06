@@ -21,7 +21,6 @@ import {
   isImageDeliveryFile
 } from './deliveryDisplay.js'
 import { DeliveryActionBar } from './components/DeliveryActionBar.jsx'
-import { DeliveryBatchCard } from './components/DeliveryBatchCard.jsx'
 import { DeliveryFileGrid } from './components/DeliveryFileGrid.jsx'
 import { DeliveryPreviewViewer } from './components/DeliveryPreviewViewer.jsx'
 
@@ -218,7 +217,7 @@ export function DeliveryGalleryPage() {
   }
 
   return (
-    <Stack spacing={2.2} sx={{ color: PORTRA_SURFACE.ink }}>
+    <Stack spacing={2.2} sx={{ width: '100%', maxWidth: 1280, mx: 'auto', color: PORTRA_SURFACE.ink }}>
       <Paper variant="outlined" sx={headerSx}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.4} sx={{ justifyContent: 'space-between', alignItems: { xs: 'stretch', md: 'center' } }}>
           <Stack spacing={0.8}>
@@ -243,8 +242,8 @@ export function DeliveryGalleryPage() {
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
 
       <Box sx={galleryGridSx}>
-        <Stack spacing={1.5} sx={{ minWidth: 0 }}>
-          <DeliveryBatchCard batch={batch} previewUrls={previewUrls} disabled />
+        <Paper variant="outlined" sx={galleryPanelSx}>
+          <Stack spacing={1.5} sx={{ minWidth: 0 }}>
           <PortraTicketSection title="交付相册">
             {files.length ? (
               <DeliveryFileGrid
@@ -265,7 +264,8 @@ export function DeliveryGalleryPage() {
             onDownloadAll={() => downloadFiles(files)}
             onClearSelection={() => setSelectedIds(new Set())}
           />
-        </Stack>
+          </Stack>
+        </Paper>
 
         <Paper variant="outlined" sx={sidePanelSx}>
           <Stack spacing={1.5}>
@@ -273,13 +273,9 @@ export function DeliveryGalleryPage() {
               <Stack spacing={0.85}>
                 <InfoLine label="订单金额" value={centToYuan(order?.amountCent)} />
                 <InfoLine label="文件数量" value={`${batch.fileCount} 个文件`} />
-                <InfoLine label="交付说明" value={batch.description} />
+                <InfoBlock label="交付说明" value={batch.description || '摄影师已上传作品，等待客户确认。'} />
               </Stack>
             </PortraTicketSection>
-            <Divider sx={{ borderColor: PORTRA_SURFACE.borderSoft }} />
-            <PortraInfoBanner>
-              图片会在可预览时显示缩略图；没有真实预览 URL 的文件会保持占位，不伪造图片。
-            </PortraInfoBanner>
             <Divider sx={{ borderColor: PORTRA_SURFACE.borderSoft }} />
             <PortraTicketSection title="处理动作">
               {canCustomerAct && (
@@ -307,7 +303,7 @@ export function DeliveryGalleryPage() {
                 <PortraInfoBanner>订单已完成，可返回订单档案查看评价入口。</PortraInfoBanner>
               )}
               {!canCustomerAct && !isReworkForProvider && !isCompleted && (
-                <PortraInfoBanner>当前状态没有需要你处理的交付动作。</PortraInfoBanner>
+                <PortraInfoBanner>作品已提交，等待客户确认。</PortraInfoBanner>
               )}
             </PortraTicketSection>
           </Stack>
@@ -373,6 +369,15 @@ function InfoLine({ label, value }) {
   )
 }
 
+function InfoBlock({ label, value }) {
+  return (
+    <Stack spacing={0.4}>
+      <Typography variant="body2" sx={{ color: PORTRA_SURFACE.muted }}>{label}</Typography>
+      <Typography variant="body2" sx={{ color: PORTRA_SURFACE.ink, fontWeight: 850, lineHeight: 1.65 }}>{value || '暂无'}</Typography>
+    </Stack>
+  )
+}
+
 function ReceiptLongIconShim() {
   return <ReceiptLongRoundedIcon fontSize="small" />
 }
@@ -388,9 +393,18 @@ const headerSx = {
 
 const galleryGridSx = {
   display: 'grid',
-  gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) 320px' },
+  gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) 330px' },
   gap: 2,
   alignItems: 'start'
+}
+
+const galleryPanelSx = {
+  p: { xs: 1.25, md: 1.6 },
+  minWidth: 0,
+  bgcolor: PORTRA_SURFACE.paper,
+  borderColor: PORTRA_SURFACE.borderSubtle,
+  borderRadius: PORTRA_RADIUS.card,
+  boxShadow: PORTRA_SHADOW.soft
 }
 
 const sidePanelSx = {
