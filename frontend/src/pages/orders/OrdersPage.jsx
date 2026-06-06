@@ -5,6 +5,10 @@ import {
   Box,
   Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   FormControl,
   InputLabel,
@@ -20,15 +24,19 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import GavelRoundedIcon from '@mui/icons-material/GavelRounded'
 import AddPhotoAlternateRoundedIcon from '@mui/icons-material/AddPhotoAlternateRounded'
+import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded'
 import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
+import InsertDriveFileRoundedIcon from '@mui/icons-material/InsertDriveFileRounded'
 import PaidRoundedIcon from '@mui/icons-material/PaidRounded'
 import RateReviewRoundedIcon from '@mui/icons-material/RateReviewRounded'
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
 import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded'
+import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded'
 import { useAuth } from '../../AuthContext.jsx'
 import {
   demandApi,
   deliveryApi,
+  fileApi,
   orderApi,
   photoAuthorizationApi,
   reviewApi,
@@ -221,6 +229,11 @@ function formatOrderIndexDate(order) {
   return label ? label.slice(5).replace('-', '/') : '待定'
 }
 
+function isImageDelivery(record) {
+  const text = `${record?.mimeType || ''} ${record?.contentType || ''} ${record?.fileName || ''}`.toLowerCase()
+  return /image\//.test(text) || /\.(png|jpe?g|webp|gif|bmp)$/i.test(text)
+}
+
 function formatQuoteCount(quoteSnapshot) {
   const originalCount = quoteSnapshot?.originalCount
   const refinedCount = quoteSnapshot?.refinedCount
@@ -268,6 +281,11 @@ export function OrdersPage() {
   const [deliveryRecords, setDeliveryRecords] = useState([])
   const [deliveryForm, setDeliveryForm] = useState({ file: null, remark: '' })
   const [reworkRequirement, setReworkRequirement] = useState('')
+  const [reworkDialogOpen, setReworkDialogOpen] = useState(false)
+  const [previewDelivery, setPreviewDelivery] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState('')
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState('')
   const [photoAuthorizations, setPhotoAuthorizations] = useState([])
   const [photoAuthorizationForm, setPhotoAuthorizationForm] = useState({ fileIds: [], remark: '' })
   const [authorizationRemarks, setAuthorizationRemarks] = useState({})
@@ -288,6 +306,10 @@ export function OrdersPage() {
   useEffect(() => {
     loadOrders(focusOrderId)
   }, [currentUser.userId, currentUser.role, statusFilter, focusOrderId])
+
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+  }, [previewUrl])
 
   async function run(action, successText) {
     setLoading(true)
@@ -445,7 +467,61 @@ export function OrdersPage() {
     ), '返修请求已提交')
     if (result) {
       setReworkRequirement('')
+      setReworkDialogOpen(false)
       await loadOrders(selectedOrder.orderId)
+    }
+  }
+
+  async function openDeliveryPreview(record) {
+    setPreviewDelivery(record)
+    setPreviewError('')
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl)
+      setPreviewUrl('')
+    }
+    if (!record?.fileId) {
+      setPreviewError('当前文件暂未提供预览链接。')
+      return
+    }
+    if (!isImageDelivery(record)) {
+      setPreviewError('该文件暂不支持预览，可以先下载查看。')
+      return
+    }
+    setPreviewLoading(true)
+    try {
+      const url = await fileApi.downloadObjectUrl(record.fileId, currentUser)
+      setPreviewUrl(url)
+    } catch (error) {
+      setPreviewError(error.message || '作品预览加载失败。')
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  function closeDeliveryPreview() {
+    setPreviewDelivery(null)
+    setPreviewError('')
+    setPreviewLoading(false)
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl)
+      setPreviewUrl('')
+    }
+  }
+
+  async function downloadDeliveryFile(record) {
+    if (!record?.fileId) {
+      setNotice({ type: 'warning', text: '当前文件暂未提供下载链接。' })
+      return
+    }
+    try {
+      const url = await fileApi.downloadObjectUrl(record.fileId, currentUser)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = formatFileDisplayName(record, `交付作品-${record.fileId}`)
+      anchor.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (error) {
+      setNotice({ type: 'error', text: error.message || '文件下载失败，请稍后重试。' })
     }
   }
 
@@ -555,6 +631,7 @@ export function OrdersPage() {
   const action = selectedOrder ? getOrderAction(selectedOrder, currentUser) : null
   const quoteSnapshot = parseQuoteSnapshot(selectedOrder?.quoteSnapshotJson)
   const canUploadDelivery = selectedOrder && canProviderUploadDelivery(selectedOrder, currentUser)
+  const canAcceptDelivery = selectedOrder && canCustomerConfirm(selectedOrder, currentUser)
   const canRequestRework = selectedOrder && canCustomerRequestRework(selectedOrder, currentUser)
   const canRequestPhotoAuthorization = selectedOrder && canProviderRequestPhotoAuthorization(selectedOrder, currentUser)
   const cancelAction = selectedOrder ? getCustomerCancelAction(selectedOrder, currentUser) : null
@@ -829,44 +906,67 @@ export function OrdersPage() {
                   </Paper>
                 )}
 
-                {canRequestRework && (
-                  <Paper component="form" variant="outlined" onSubmit={submitRework} sx={warmNoticeSx}>
-                    <Stack spacing={1.5}>
-                      <Typography fontWeight={800}>请写出后续返修要求</Typography>
-                      <TextField
-                        label="返修要求"
-                        value={reworkRequirement}
-                        onChange={event => setReworkRequirement(event.target.value)}
-                        multiline
-                        minRows={3}
-                        placeholder="请说明需要返修的照片、问题和期望修改方向"
-                        required
-                      />
-                      <Button type="submit" variant="contained" color="warning" startIcon={<RefreshRoundedIcon />} disabled={loading}>
-                        请求返修
-                      </Button>
+                {(canAcceptDelivery || canRequestRework) && (
+                  <PortraInfoBanner tone="warning" title="请处理交付作品">
+                    <Stack direction="row" spacing={1} sx={{ mt: 0.8, flexWrap: 'wrap' }}>
+                      {canAcceptDelivery && action && (
+                        <PortraActionButton startIcon={<CheckCircleRoundedIcon />} onClick={() => operateOrder(action)} disabled={loading || !action.allowed}>
+                          确认接收作品
+                        </PortraActionButton>
+                      )}
+                      {canRequestRework && (
+                        <PortraActionButton tone="secondary" startIcon={<RefreshRoundedIcon />} onClick={() => setReworkDialogOpen(true)} disabled={loading}>
+                          提交返修要求
+                        </PortraActionButton>
+                      )}
                     </Stack>
-                  </Paper>
+                  </PortraInfoBanner>
                 )}
 
                 <Stack spacing={1}>
                   <Typography variant="overline" sx={overlineSx}>交付记录</Typography>
-                  {deliveryRecords.map((record, index) => (
-                    <Paper key={record.deliveryId || `${record.orderId}-${record.fileId}-${record.uploadTime}`} variant="outlined" sx={subCardSx}>
-                      <Stack spacing={0.7}>
-                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
-                          <Typography fontWeight={800}>
-                            {formatDeliveryTitle(record, index)}
+                  {deliveryRecords.map((record, index) => {
+                    const isImage = isImageDelivery(record)
+                    return (
+                    <PortraTicketCard key={record.deliveryId || `${record.orderId}-${record.fileId}-${record.uploadTime}`} sx={{ p: 1.35, pl: 2.2 }}>
+                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.3}>
+                        <Box sx={{
+                          width: { xs: '100%', sm: 116 },
+                          height: 84,
+                          flexShrink: 0,
+                          borderRadius: PORTRA_RADIUS.control,
+                          bgcolor: PORTRA_SURFACE.paperMuted,
+                          border: `1px solid ${PORTRA_SURFACE.borderSubtle}`,
+                          display: 'grid',
+                          placeItems: 'center',
+                          color: PORTRA_SURFACE.muted,
+                          overflow: 'hidden'
+                        }}>
+                          {isImage ? <ImageRoundedIcon /> : <InsertDriveFileRoundedIcon />}
+                        </Box>
+                        <Stack spacing={0.7} sx={{ minWidth: 0, flex: 1 }}>
+                          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
+                            <Typography fontWeight={850} noWrap sx={{ color: PORTRA_SURFACE.ink }}>
+                              {formatDeliveryTitle(record, index)}
+                            </Typography>
+                            <PortraStatusBadge label={`第 ${record.deliveryRound || 1} 次交付${record.isLatest ? ' · 最新' : ''}`} tone="neutral" />
+                          </Stack>
+                          <Typography sx={{ color: PORTRA_SURFACE.muted }} variant="body2">
+                            文件编号 {record.fileId || '-'} · {deliveryStatusLabelMap[record.status] || '已交付'} · {formatTime(record.uploadTime)}
                           </Typography>
-                          <Chip size="small" label={`第 ${record.deliveryRound || 1} 次交付${record.isLatest ? ' · 最新' : ''}`} />
+                          <Typography>{formatDeliveryDescription(record, '无交付说明')}</Typography>
+                          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+                            <Button size="small" variant="outlined" startIcon={<VisibilityRoundedIcon />} onClick={() => openDeliveryPreview(record)} disabled={!record.fileId}>
+                              查看
+                            </Button>
+                            <Button size="small" variant="text" startIcon={<DownloadRoundedIcon />} onClick={() => downloadDeliveryFile(record)} disabled={!record.fileId}>
+                              下载
+                            </Button>
+                          </Stack>
                         </Stack>
-                        <Typography sx={{ color: PORTRA_SURFACE.muted }} variant="body2">
-                          文件编号 {record.fileId || '-'} · {deliveryStatusLabelMap[record.status] || '已交付'} · {formatTime(record.uploadTime)}
-                        </Typography>
-                        <Typography>{formatDeliveryDescription(record, '无交付说明')}</Typography>
                       </Stack>
-                    </Paper>
-                  ))}
+                    </PortraTicketCard>
+                  )})}
                   {!deliveryRecords.length && <PortraEmptyState title="暂无交付记录" compact />}
                 </Stack>
               </Stack>
@@ -1148,6 +1248,65 @@ export function OrdersPage() {
           </Stack>
         )}
       </Box>
+      <Dialog open={Boolean(previewDelivery)} onClose={closeDeliveryPreview} fullWidth maxWidth="md">
+        <DialogTitle>{previewDelivery ? formatDeliveryTitle(previewDelivery) : '交付作品'}</DialogTitle>
+        <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
+          <Stack spacing={1.5}>
+            {previewLoading && <Typography sx={{ color: PORTRA_SURFACE.muted }}>作品预览加载中...</Typography>}
+            {!previewLoading && previewUrl && (
+              <Box
+                component="img"
+                src={previewUrl}
+                alt={previewDelivery ? formatDeliveryTitle(previewDelivery) : '交付作品'}
+                sx={{ width: '100%', maxHeight: '62vh', objectFit: 'contain', borderRadius: PORTRA_RADIUS.control, bgcolor: PORTRA_SURFACE.paperMuted }}
+              />
+            )}
+            {!previewLoading && !previewUrl && (
+              <PortraEmptyState
+                title={previewError || '该文件暂不支持预览'}
+                description="可以下载到本地后查看原文件。"
+              />
+            )}
+            {previewDelivery && (
+              <InfoRows rows={[
+                ['文件名', formatDeliveryTitle(previewDelivery)],
+                ['交付时间', formatTime(previewDelivery.uploadTime)],
+                ['交付说明', formatDeliveryDescription(previewDelivery, '无交付说明')]
+              ]} />
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ bgcolor: PORTRA_SURFACE.paperMuted }}>
+          <Button color="inherit" onClick={closeDeliveryPreview}>关闭</Button>
+          <Button startIcon={<DownloadRoundedIcon />} onClick={() => downloadDeliveryFile(previewDelivery)} disabled={!previewDelivery?.fileId}>
+            下载
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={reworkDialogOpen} onClose={() => setReworkDialogOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>提交返修要求</DialogTitle>
+        <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
+          <Stack component="form" id="order-rework-dialog-form" spacing={1.5} onSubmit={submitRework}>
+            <PortraInfoBanner tone="warning">请说明需要返修的照片、问题和期望修改方向。</PortraInfoBanner>
+            <TextField
+              autoFocus
+              label="返修要求"
+              value={reworkRequirement}
+              onChange={event => setReworkRequirement(event.target.value)}
+              multiline
+              minRows={4}
+              required
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ bgcolor: PORTRA_SURFACE.paperMuted }}>
+          <Button color="inherit" onClick={() => setReworkDialogOpen(false)}>取消</Button>
+          <Button type="submit" form="order-rework-dialog-form" variant="contained" disabled={loading || !reworkRequirement.trim()}>
+            提交返修
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   )
 }
