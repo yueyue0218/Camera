@@ -1,34 +1,30 @@
 import { centToYuan } from '../../../utils/index.js'
-import { ORDER_STATUS_LABELS } from '../orderActions.js'
+import {
+  ESCROW_STATUS_LABELS,
+  ORDER_STATUS_LABELS,
+  SETTLEMENT_STATUS_LABELS,
+  formatDateTime,
+  formatEscrowStatus as formatDisplayEscrowStatus,
+  formatOrderStatus as formatDisplayOrderStatus,
+  formatOrderTitle as formatDisplayOrderTitle,
+  formatSettlementStatus as formatDisplaySettlementStatus,
+  sanitizeSeedText as sanitizeDisplaySeedText
+} from '../../../utils/displayFormatters.js'
 
 const LOCAL_REVIEW_STORAGE_KEY = 'camera-p4-local-reviews'
 const ARBITRATION_STORAGE_KEY = 'camera-p4-arbitrations'
 const ORDER_SNAPSHOT_STORAGE_KEY = 'camera-p4-order-snapshots'
 
 export const orderStatusMap = {
-  ...ORDER_STATUS_LABELS,
-  PENDING_PAYMENT: '待支付',
-  PAID_PENDING_SHOOT: '已支付待拍摄',
-  SHOOTING: '拍摄中',
-  PENDING_DELIVERY: '待交付',
-  DELIVERED_PENDING_CONFIRM: '已交付待确认',
-  COMPLETED: '已完成',
-  CANCELLED: '已取消',
-  REFUNDED: '已退款',
-  APPEALING: '申诉中',
-  REWORK_REQUIRED: '返修中'
+  ...ORDER_STATUS_LABELS
 }
 
 export const escrowStatusMap = {
-  NOT_PAID: '未支付',
-  HELD: '平台托管中',
-  RELEASED: '已结算',
-  REFUNDED: '已退款'
+  ...ESCROW_STATUS_LABELS
 }
 
 export const settlementStatusMap = {
-  NOT_SETTLED: '未结算',
-  SETTLED: '已结算'
+  ...SETTLEMENT_STATUS_LABELS
 }
 
 export const refundStatusMap = {
@@ -45,15 +41,15 @@ export const complaintStatusMap = {
 }
 
 export function formatOrderStatus(status, fallback = '状态已更新') {
-  return orderStatusMap[status] || fallback
+  return formatDisplayOrderStatus(status, fallback)
 }
 
 export function formatEscrowStatus(status, fallback = '托管状态待同步') {
-  return escrowStatusMap[status] || fallback
+  return formatDisplayEscrowStatus(status, fallback)
 }
 
 export function formatSettlementStatus(status, fallback = '未结算') {
-  return settlementStatusMap[status] || fallback
+  return formatDisplaySettlementStatus(status, fallback)
 }
 
 export function formatRefundStatus(status, fallback = '暂无退款') {
@@ -61,31 +57,11 @@ export function formatRefundStatus(status, fallback = '暂无退款') {
 }
 
 export function sanitizeSeedText(value, fallback = '校园约拍服务') {
-  const raw = String(value || '').trim()
-  if (!raw) return fallback
-  if (/^UIO/i.test(raw)) return fallback
-  let text = raw
-    .replace(/^UI_REVIEW_SEED\s*/i, '')
-    .replace(/^我接的拍摄\s*[^｜|]*[｜|]\s*/i, '')
-    .replace(/\b(?:PENDING_PAYMENT|PAID_PENDING_SHOOT|DELIVERED_PENDING_CONFIRM|REWORK_REQUIRED|NOT_SETTLED|NONE)\b/g, '')
-    .trim()
-  if (/[｜|]/.test(text)) {
-    text = text.split(/[｜|]/).map(item => item.trim()).filter(Boolean).pop() || text
-  }
-  text = text.replace(/\s{2,}/g, ' ').trim()
-  if (!text || /^UI_REVIEW_SEED/i.test(text) || /^UIO/i.test(text)) return fallback
-  return text
+  return sanitizeDisplaySeedText(value, fallback)
 }
 
 export function formatOrderTitle(order, quoteSnapshot) {
-  const serviceTitle = sanitizeSeedText(
-    quoteSnapshot?.serviceContent || order?.serviceContent || order?.scene || '',
-    ''
-  )
-  if (serviceTitle) return serviceTitle
-  const location = sanitizeSeedText(quoteSnapshot?.location || order?.shootLocation || '', '')
-  if (location) return `${location}校园约拍`
-  return '校园约拍订单'
+  return formatDisplayOrderTitle(order, quoteSnapshot)
 }
 
 export function readJsonStorage(key, fallback) {
@@ -247,8 +223,7 @@ export function directionLabel(direction) {
 }
 
 export function formatTime(value) {
-  if (!value) return '刚刚'
-  return new Date(value).toLocaleString('zh-CN', { hour12: false })
+  return formatDateTime(value, '刚刚')
 }
 
 export function parseQuoteSnapshot(raw) {
@@ -280,7 +255,7 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
   if (status === 'PENDING_PAYMENT') {
     return {
       title: '等待客户支付',
-      description: '客户支付后，资金进入平台托管，订单再进入待拍摄履约阶段。',
+      description: '客户支付后，资金进入平台担保，订单再进入待拍摄履约阶段。',
       color: 'warning',
       severity: 'info',
       rows: [
@@ -294,7 +269,7 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
   if (status === 'PAID_PENDING_SHOOT') {
     return {
       title: '已支付，等待拍摄',
-      description: '平台托管资金已建立，双方应按报价约定的拍摄时间履约。',
+      description: '平台担保资金已建立，双方应按报价约定的拍摄时间履约。',
       color: 'info',
       severity: 'warning',
       rows: [
@@ -348,7 +323,7 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
         ['交付记录', `${deliveryRecords.length} 条`],
         ...baseRows
       ],
-      note: '摄影师已交付作品。客户需在交付后 7 天内确认接收或提交返修要求；若 7 天内未处理，系统将自动确认订单完成并释放托管资金。前端仅展示规则，不模拟自动确认。'
+      note: '摄影师已交付作品。客户需在交付后 7 天内确认接收或提交返修要求；若 7 天内未处理，系统将自动确认订单完成并释放平台担保资金。前端仅展示规则，不模拟自动确认。'
     }
   }
 

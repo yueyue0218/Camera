@@ -1,4 +1,10 @@
 import { USERS } from '../../../AuthContext.jsx'
+import {
+  USER_ROLE_LABELS,
+  formatDateOnly,
+  formatDateTime,
+  formatShortDate
+} from '../../../utils/displayFormatters.js'
 import { filterConversationsByActiveRole, getCurrentUserId } from './workbenchState.js'
 
 const CONVERSATION_STORAGE_KEY = 'camera-p4-conversations'
@@ -7,8 +13,8 @@ const SAVED_PHOTO_STORAGE_KEY = 'camera-p4-saved-photos'
 const USER_PROFILE_STORAGE_KEY = 'camera-p4-user-profiles'
 
 export const roleMap = {
-  CUSTOMER: '客户',
-  PROVIDER: '摄影师'
+  CUSTOMER: USER_ROLE_LABELS.CUSTOMER,
+  PROVIDER: USER_ROLE_LABELS.PROVIDER
 }
 
 export function readJsonStorage(key, fallback) {
@@ -25,34 +31,15 @@ function writeJsonStorage(key, value) {
 }
 
 export function formatShortTime(value) {
-  if (!value) return ''
-  const date = new Date(value)
-  return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
+  return formatShortDate(value)
 }
 
 export function formatTime(value) {
-  if (!value) return '刚刚'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '刚刚'
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  })
+  return formatDateTime(value, '刚刚')
 }
 
 export function formatDate(value) {
-  if (!value) return '待确认'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '待确认'
-  return date.toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  })
+  return formatDateOnly(value)
 }
 
 export function readConversationRecords() {
@@ -251,7 +238,7 @@ export function buildConversationSourceRows(conversation, currentUser, sourceLab
 }
 
 export function getConversationSourceHint(conversation) {
-  if (!conversation) return '会话仍在加载。'
+  if (!conversation) return '沟通仍在加载。'
   if (conversation.isLocal) {
     return '这段沟通还没有进入正式成单流程，可以先继续沟通。'
   }

@@ -19,9 +19,10 @@ import {
 } from '@mui/material'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
 import { centToYuan } from '../../../utils/index.js'
+import { formatFileDisplayName, formatQuoteRemark, formatQuoteServiceContent } from '../../../utils/displayFormatters.js'
+import { PortraStatusBadge } from '../../../components/portra/index.js'
 import { formatDate, formatTime } from '../utils/conversationUtils.js'
 import { getPhotoUsageScopeLabel, getQuoteStatusLabel } from '../utils/quoteUtils.js'
-import { StatusChip } from './StatusChip.jsx'
 
 export function ConversationActionDialogs({
   activeAction,
@@ -60,7 +61,7 @@ export function ConversationActionDialogs({
     .filter(record => record.fileId)
     .map(record => ({
       fileId: Number(record.fileId),
-      fileName: getSafeDisplayText(record.fileName, '作品文件')
+      fileName: formatFileDisplayName(record, '作品文件')
     }))
 
   async function submitAndClose(handler, event) {
@@ -72,26 +73,30 @@ export function ConversationActionDialogs({
 
   return (
     <>
-      <Dialog open={activeAction === 'QUOTE_DETAIL' && Boolean(quote)} onClose={onClose} fullWidth maxWidth="sm" PaperProps={dialogPaperProps}>
-        <DialogTitle sx={dialogTitleSx}>报价详情</DialogTitle>
-        <DialogContent sx={dialogContentSx}>
+      <Dialog open={activeAction === 'QUOTE_DETAIL' && Boolean(quote)} onClose={onClose} fullWidth maxWidth="sm" PaperProps={quoteDialogPaperProps}>
+        <DialogTitle sx={quoteDialogTitleSx}>
+          <Typography sx={{ color: 'rgba(255,255,255,.66)', fontSize: 10, fontWeight: 900, letterSpacing: '.15em', textTransform: 'uppercase' }}>报价详情</Typography>
+          <Stack direction="row" spacing={1.2} sx={{ mt: 0.6, justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <Typography sx={{ color: '#fff', fontSize: 32, fontWeight: 950, lineHeight: 1 }}>
+              {quote ? centToYuan(quote.amountCent) : '--'}
+            </Typography>
+            {quote && <PortraStatusBadge label={getQuoteStatusLabel(quote.status)} sx={{ bgcolor: 'rgba(255,255,255,.18)', color: '#fff' }} />}
+          </Stack>
+        </DialogTitle>
+        <DialogContent sx={quoteDialogContentSx}>
           {quote ? (
             <Stack spacing={1.4} sx={{ pt: 1 }}>
-              <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography sx={{ color: PORTRA_COLORS.blue, fontSize: 24, fontWeight: 950 }}>{centToYuan(quote.amountCent)}</Typography>
-                <StatusChip label={getQuoteStatusLabel(quote.status)} />
-              </Stack>
               <DetailRows rows={[
                 ['拍摄时间', `${formatTime(quote.shootStartTime)} - ${formatTime(quote.shootEndTime)}`],
                 ['拍摄地点', getSafeDisplayText(quote.location, '拍摄地点待确认')],
-                ['服务内容', getSafeDisplayText(quote.serviceContent, '按双方沟通内容执行')],
+                ['服务内容', formatQuoteServiceContent(quote, '按双方沟通内容执行')],
                 ['原片/精修', `${quote.originalCount ?? 0} / ${quote.refinedCount ?? 0}`],
                 ['照片用途', getPhotoUsageScopeLabel(quote.photoUsageScope)],
                 ['最晚交付', formatDate(quote.deliveryDeadline)],
-                ['备注', getSafeDisplayText(quote.remark, '无额外备注')]
+                ['备注', formatQuoteRemark(quote, '无额外备注')]
               ]} />
               <Box sx={{ p: 1, bgcolor: PORTRA_COLORS.paperMuted, borderRadius: PORTRA_RADII.control, color: PORTRA_COLORS.mutedInk, fontSize: 14, lineHeight: 1.7 }}>
-                客户确认报价后将生成平台托管订单；付款后资金先进入平台托管，订单完成后再结算给摄影师。
+                客户确认报价后将生成平台担保订单；付款后资金先进入平台担保，订单完成后再结算给摄影师。
               </Box>
             </Stack>
           ) : (
@@ -125,7 +130,7 @@ export function ConversationActionDialogs({
                 ['拍摄时间', `${formatTime(order.shootStartTime)} - ${formatTime(order.shootEndTime)}`]
               ]} />
               <Box sx={{ p: 1, bgcolor: PORTRA_COLORS.paperMuted, borderRadius: PORTRA_RADII.control, color: PORTRA_COLORS.mutedInk, fontSize: 14, lineHeight: 1.7 }}>
-                付款后资金进入平台托管，拍摄和交付完成后再结算给摄影师。
+                付款后资金进入平台担保，拍摄和作品确认后再结算给摄影师。
               </Box>
               <FormControl>
                 <Typography variant="caption" sx={{ mb: 0.5, color: PORTRA_COLORS.faintInk, fontWeight: 900 }}>支付方式</Typography>
@@ -200,7 +205,7 @@ export function ConversationActionDialogs({
       </Dialog>
 
       <Dialog open={activeAction === 'REQUEST_AUTHORIZATION'} onClose={onClose} fullWidth maxWidth="sm" PaperProps={dialogPaperProps}>
-        <DialogTitle sx={dialogTitleSx}>申请照片展示授权</DialogTitle>
+        <DialogTitle sx={dialogTitleSx}>申请展示授权</DialogTitle>
         <DialogContent sx={dialogContentSx}>
           <Stack component="form" id="authorization-dialog-form" spacing={2} sx={{ pt: 1 }} onSubmit={event => submitAndClose(onSubmitPhotoAuthorization, event)}>
             <DialogContentText>请选择已经交付的作品，并说明希望展示这些照片的用途。</DialogContentText>
@@ -240,14 +245,14 @@ export function ConversationActionDialogs({
 
 function DetailRows({ rows = [] }) {
   return (
-    <Stack spacing={0.7}>
+    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.1 }}>
       {(Array.isArray(rows) ? rows : []).map(([label, value]) => (
-        <Stack key={label} direction="row" spacing={1.2} sx={{ alignItems: 'flex-start' }}>
-          <Typography variant="caption" sx={{ width: 76, flexShrink: 0, color: PORTRA_COLORS.faintInk, fontWeight: 900 }}>{label}</Typography>
-          <Typography variant="body2" sx={{ color: PORTRA_COLORS.subInk, lineHeight: 1.65 }}>{value}</Typography>
-        </Stack>
+        <Box key={label} sx={{ minWidth: 0 }}>
+          <Typography sx={{ color: PORTRA_COLORS.faintInk, fontSize: 11, fontWeight: 900 }}>{label}</Typography>
+          <Typography sx={{ color: PORTRA_COLORS.subInk, fontSize: 14, lineHeight: 1.65 }}>{value}</Typography>
+        </Box>
       ))}
-    </Stack>
+    </Box>
   )
 }
 
@@ -256,8 +261,45 @@ const dialogPaperProps = {
     bgcolor: PORTRA_COLORS.paper,
     borderRadius: PORTRA_RADII.control,
     border: `1px solid ${PORTRA_COLORS.border}`,
-    borderTop: `4px solid ${PORTRA_COLORS.blue}`,
-    boxShadow: PORTRA_SHADOWS.floating
+    borderTop: `6px solid ${PORTRA_COLORS.blue}`,
+    boxShadow: PORTRA_SHADOWS.floating,
+    position: 'relative',
+    '&::after': {
+      content: '""',
+      position: 'absolute',
+      left: 24,
+      right: 24,
+      bottom: 58,
+      borderTop: '1px dashed rgba(13,47,178,.2)'
+    }
+  }
+}
+
+const quoteDialogPaperProps = {
+  sx: {
+    bgcolor: PORTRA_COLORS.paper,
+    borderRadius: '14px',
+    border: `1px solid ${PORTRA_COLORS.border}`,
+    overflow: 'hidden',
+    boxShadow: '0 20px 60px rgba(13,47,178,.12), 0 2px 8px rgba(0,0,0,.08)'
+  }
+}
+
+const quoteDialogTitleSx = {
+  px: 2.5,
+  py: 1.8,
+  bgcolor: PORTRA_COLORS.blue
+}
+
+const quoteDialogContentSx = {
+  pt: 2,
+  '& .MuiDialogContentText-root': { color: PORTRA_COLORS.mutedInk, lineHeight: 1.7 },
+  '& .MuiOutlinedInput-root': { bgcolor: PORTRA_COLORS.paperSoft, borderRadius: PORTRA_RADII.control },
+  '&::after': {
+    content: '""',
+    display: 'block',
+    borderTop: '1px dashed rgba(13,47,178,.18)',
+    mt: 2
   }
 }
 
@@ -269,7 +311,7 @@ const dialogTitleSx = {
 
 const dialogContentSx = {
   '& .MuiDialogContentText-root': { color: PORTRA_COLORS.mutedInk, lineHeight: 1.7 },
-  '& .MuiOutlinedInput-root': { bgcolor: PORTRA_COLORS.white, borderRadius: PORTRA_RADII.control }
+  '& .MuiOutlinedInput-root': { bgcolor: PORTRA_COLORS.paperSoft, borderRadius: PORTRA_RADII.control }
 }
 
 const dialogActionsSx = {

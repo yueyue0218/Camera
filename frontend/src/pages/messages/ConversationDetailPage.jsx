@@ -5,12 +5,19 @@ import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { conversationApi, deliveryApi, orderApi, photoAuthorizationApi, quoteApi, readFileAsDataUrl } from '../../api.js'
-import { buildOrderNavigationTarget } from '../../utils/orderNavigation.js'
+import { goToUserProfile } from '../../utils/orderNavigation.js'
+import {
+  navigateToDeliveryFromConversation,
+  navigateToOrderFromConversation,
+  rememberLastConversation
+} from '../../utils/conversationNavigation.js'
 import { ConversationThread } from './components/ConversationThread.jsx'
 import { ConversationWorkbenchPanel } from './components/ConversationWorkbenchPanel.jsx'
 import { ConversationActionDialogs } from './components/ConversationActionDialogs.jsx'
+import { QuoteDraftDialog } from './components/QuoteDraftDialog.jsx'
 import { MessageWorkbenchErrorBoundary } from './components/MessageWorkbenchErrorBoundary.jsx'
 import { StatusChip } from './components/StatusChip.jsx'
+import { OrderCompletionDialog } from '../../components/portra/index.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from './MessageVisualTokens.js'
 import {
   addLocalMessage,
@@ -35,8 +42,8 @@ import {
   getCWorkbenchErrorText,
   getQuoteConfirmationErrorText,
   getQuoteEntryHint,
-  validateQuoteForm
 } from './utils/quoteUtils.js'
+import { validateQuoteFormModel } from './utils/quoteFormModel.js'
 
 const DETAIL_SHELL_HEIGHT = {
   xs: 'calc(100dvh - 212px)',
@@ -64,11 +71,20 @@ export function ConversationDetailPage() {
   const [showQuoteForm, setShowQuoteForm] = useState(false)
   const [editingQuotationId, setEditingQuotationId] = useState(null)
   const [quoteValidationErrors, setQuoteValidationErrors] = useState([])
+  const [quoteFieldErrors, setQuoteFieldErrors] = useState({})
   const [notice, setNotice] = useState(null)
   const [loading, setLoading] = useState(false)
   const [activeAction, setActiveAction] = useState(null)
   const [activeQuote, setActiveQuote] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('WECHAT')
+  const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
+
+  useEffect(() => {
+    rememberLastConversation(conversationId, {
+      orderId: currentOrder?.orderId,
+      role: currentUser.role
+    })
+  }, [conversationId, currentOrder?.orderId, currentUser.role])
 
   useEffect(() => {
     const stored = findConversationRecord(conversationId)
@@ -213,7 +229,7 @@ export function ConversationDetailPage() {
     addSavedPhoto({
       photoId: `message-${message.messageId}`,
       source: 'conversation-submission',
-      title: `${conversation.scene || '会话'} 提交照片`,
+      title: `${conversation.scene || '沟通'} 提交照片`,
       imageData: message.content,
       authorId: message.senderId,
       createdAt: message.createdAt
@@ -223,10 +239,16 @@ export function ConversationDetailPage() {
 
   async function createQuote(event) {
     event.preventDefault()
-    const validationErrors = validateQuoteForm(quoteForm, conversation, currentUser, quotes, { editingQuotationId })
-    setQuoteValidationErrors(validationErrors)
-    if (validationErrors.length) {
-      setNotice({ type: 'warning', text: validationErrors[0] })
+    const validation = validateQuoteFormModel(quoteForm, {
+      conversation,
+      currentUser,
+      quotes,
+      editingQuotationId
+    })
+    setQuoteValidationErrors(validation.errors)
+    setQuoteFieldErrors(validation.fieldErrors)
+    if (validation.errors.length) {
+      setNotice({ type: 'warning', text: validation.errors[0] })
       return
     }
     const quotePayload = buildQuotePayload(quoteForm, conversation)
@@ -237,6 +259,7 @@ export function ConversationDetailPage() {
       setShowQuoteForm(false)
       setEditingQuotationId(null)
       setQuoteValidationErrors([])
+      setQuoteFieldErrors({})
       setQuoteForm(createDefaultQuoteForm())
       await loadConversationData()
     }
@@ -250,6 +273,7 @@ export function ConversationDetailPage() {
     setEditingQuotationId(quote.quotationId)
     setQuoteForm(createQuoteFormFromQuote(quote))
     setQuoteValidationErrors([])
+    setQuoteFieldErrors({})
     setShowQuoteForm(true)
     setNotice({ type: 'info', text: '正在编辑待确认报价，保存前客户仍看到原报价。' })
   }
@@ -258,7 +282,13 @@ export function ConversationDetailPage() {
     setShowQuoteForm(false)
     setEditingQuotationId(null)
     setQuoteValidationErrors([])
+    setQuoteFieldErrors({})
     setQuoteForm(createDefaultQuoteForm())
+  }
+
+  function updateQuoteForm(nextForm) {
+    setQuoteForm(nextForm)
+    if (Object.keys(quoteFieldErrors).length) setQuoteFieldErrors({})
   }
 
   function openQuoteForm() {
@@ -269,6 +299,7 @@ export function ConversationDetailPage() {
     setQuoteForm(createDefaultQuoteForm())
     setEditingQuotationId(null)
     setQuoteValidationErrors([])
+    setQuoteFieldErrors({})
     setShowQuoteForm(true)
   }
 
@@ -280,6 +311,7 @@ export function ConversationDetailPage() {
     setQuoteForm(createQuoteFormFromQuote(quote))
     setEditingQuotationId(null)
     setQuoteValidationErrors([])
+    setQuoteFieldErrors({})
     setShowQuoteForm(true)
     setActiveAction(null)
     setActiveQuote(null)
@@ -347,7 +379,7 @@ export function ConversationDetailPage() {
 
   async function payCurrentOrder() {
     if (!currentOrder) return false
-    const result = await run(async () => orderApi.mockPay(currentOrder.orderId, currentOrder.amountCent, currentUser), '支付成功，资金已进入平台托管')
+    const result = await run(async () => orderApi.mockPay(currentOrder.orderId, currentOrder.amountCent, currentUser), '支付成功，资金已进入平台担保')
     if (result) {
       await refreshConversationData(conversation, currentOrder.orderId)
       return true
@@ -364,16 +396,19 @@ export function ConversationDetailPage() {
 
   async function confirmCurrentOrder() {
     if (!currentOrder) return
-    if (!window.confirm('确认接收后，订单将完成，平台托管资金会结算给摄影师。是否确认？')) return
+    if (!window.confirm('确认接收后，订单将完成，平台担保资金会结算给摄影师。是否确认？')) return
     const result = await run(async () => orderApi.transition(currentOrder.orderId, 'COMPLETED', '客户确认接收作品', currentUser), '订单已完成')
-    if (result) await refreshConversationData(conversation, currentOrder.orderId)
+    if (result) {
+      await refreshConversationData(conversation, currentOrder.orderId)
+      setCompletionDialogOpen(true)
+    }
   }
 
   async function submitDelivery(event) {
     event.preventDefault()
     if (!currentOrder || !deliveryForm.file) return false
     const result = await run(async () => deliveryApi.upload(currentOrder.orderId, deliveryForm.file, deliveryForm.remark.trim(), currentUser),
-      currentOrder.status === 'REWORK_REQUIRED' ? '返修作品已上传' : '交付作品已上传')
+      currentOrder.status === 'REWORK_REQUIRED' ? '返修作品已上传' : '作品已上传')
     if (result) {
       await refreshConversationData(conversation, currentOrder.orderId)
       return true
@@ -403,7 +438,7 @@ export function ConversationDetailPage() {
     const result = await run(async () => photoAuthorizationApi.request(currentOrder.orderId, {
       fileIds: photoAuthorizationForm.fileIds,
       remark: photoAuthorizationForm.remark.trim()
-    }, currentUser), '照片展示授权申请已发送')
+    }, currentUser), '展示授权申请已发送')
     if (result) {
       await refreshConversationData(conversation, currentOrder.orderId)
       return true
@@ -415,7 +450,7 @@ export function ConversationDetailPage() {
     if (!currentOrder) return
     const remark = (authorizationRemarks[authorization.id] || '').trim()
     const action = decision === 'approve' ? photoAuthorizationApi.approve : photoAuthorizationApi.reject
-    const successText = decision === 'approve' ? '已同意照片展示授权' : '已拒绝照片展示授权'
+    const successText = decision === 'approve' ? '已同意展示授权' : '已拒绝展示授权'
     const result = await run(async () => action(authorization.id, { remark }, currentUser), successText)
     if (result) await refreshConversationData(conversation, currentOrder.orderId)
   }
@@ -433,29 +468,41 @@ export function ConversationDetailPage() {
 
   function showUnavailableTool(name) {
     const messages = {
-      附件: '附件发送能力暂未接入，可以先发送图片或在会话中说明文件内容。',
+      附件: '附件发送能力暂未接入，可以先发送图片或在沟通中说明文件内容。',
       表情: '表情工具暂未接入，可以继续使用文字沟通。',
-      补款: '补款能力暂未接入，双方可先在会话中协商金额。',
-      平台协助: '平台协助功能由仲裁模块处理，当前演示可在订单档案中查看争议状态。'
+      补款: '补款能力暂未接入，双方可先在沟通中协商金额。',
+      平台协助: '平台协助功能由仲裁模块处理，当前演示可在订单中查看争议状态。'
     }
     setNotice({ type: 'info', text: messages[name] || '该能力暂未接入。' })
   }
 
   function openUserProfile(userId, event) {
     event?.stopPropagation()
-    const id = Number(userId)
-    if (!id) return
-    navigate(id === currentUserId ? '/profile' : `/users/${id}`)
+    goToUserProfile(navigate, userId, currentUser)
   }
 
   function openOrderArchive(orderId = currentOrder?.orderId) {
-    const target = buildOrderNavigationTarget(orderId || currentOrder?.orderId)
-    if (!target) {
+    const succeeded = navigateToOrderFromConversation(navigate, {
+      orderId: orderId || currentOrder?.orderId,
+      conversationId
+    })
+    if (!succeeded) {
       setNotice({ type: 'warning', text: '订单信息暂时不可用，请稍后刷新后再查看。' })
       return false
     }
-    navigate(target.to, { state: target.state })
     return true
+  }
+
+  function openDeliveryGallery(delivery) {
+    const succeeded = navigateToDeliveryFromConversation(navigate, {
+      orderId: currentOrder?.orderId || delivery?.orderId,
+      deliveryId: delivery?.deliveryId || delivery?.fileId,
+      conversationId
+    })
+    if (!succeeded) {
+      setNotice({ type: 'warning', text: '交付记录暂不可查看，请刷新后重试。' })
+    }
+    return succeeded
   }
 
   const currentUserId = getCurrentUserId(currentUser)
@@ -535,8 +582,8 @@ export function ConversationDetailPage() {
       >
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.15} sx={{ justifyContent: 'space-between', alignItems: { xs: 'stretch', md: 'center' } }}>
           <Stack direction="row" spacing={1.5} sx={{ minWidth: 0, alignItems: 'center' }}>
-            <Tooltip title="返回消息">
-              <IconButton onClick={() => navigate('/messages')} sx={{ border: `1px solid ${PORTRA_COLORS.border}`, borderRadius: PORTRA_RADII.control, bgcolor: PORTRA_COLORS.white }}>
+            <Tooltip title="全部沟通">
+              <IconButton onClick={() => navigate('/messages')} sx={{ border: `1px solid ${PORTRA_COLORS.border}`, borderRadius: PORTRA_RADII.control, bgcolor: PORTRA_COLORS.paperSoft }}>
                 <ArrowBackRoundedIcon />
               </IconButton>
             </Tooltip>
@@ -553,7 +600,7 @@ export function ConversationDetailPage() {
                 <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk }}>{actions.role === 'PROVIDER' ? '摄影师视角' : '客户视角'}</Typography>
               </Stack>
               <Typography sx={{ color: PORTRA_COLORS.mutedInk }} variant="body2" noWrap>
-                {getSafeDisplayText(viewModel.conversationTitle, '本次合作')} · {getSafeDisplayText(viewModel.conversationSubtitle, '校园约拍会话')}
+                {getSafeDisplayText(viewModel.conversationTitle, '本次合作')} · {getSafeDisplayText(viewModel.conversationSubtitle, '校园约拍沟通')}
               </Typography>
             </Box>
           </Stack>
@@ -567,7 +614,7 @@ export function ConversationDetailPage() {
               onClick={() => openOrderArchive(currentOrder?.orderId)}
               disabled={!currentOrder?.orderId}
             >
-              订单档案
+              查看订单
             </Button>
           </Stack>
         </Stack>
@@ -622,7 +669,8 @@ export function ConversationDetailPage() {
               setActiveAction('QUOTE_DETAIL')
             }}
             onOpenOrderArchive={openOrderArchive}
-            onQuoteFormChange={setQuoteForm}
+            onOpenDeliveryGallery={openDeliveryGallery}
+            onQuoteFormChange={updateQuoteForm}
             onSubmitQuote={createQuote}
             onContentChange={setContent}
             onSendMessage={sendMessage}
@@ -636,6 +684,19 @@ export function ConversationDetailPage() {
             onOpenAction={setActiveAction}
           />
         </Box>
+
+        <QuoteDraftDialog
+          open={showQuoteForm && canSeeQuoteEntry}
+          quoteForm={quoteForm}
+          onQuoteFormChange={updateQuoteForm}
+          onSubmit={createQuote}
+          onClose={closeQuoteForm}
+          editingQuotationId={editingQuotationId}
+          quoteValidationErrors={quoteValidationErrors}
+          quoteFieldErrors={quoteFieldErrors}
+          loading={loading}
+          canSubmitQuoteForm={canSubmitQuoteForm}
+        />
 
         <ConversationWorkbenchPanel
           quotes={quotes}
@@ -681,6 +742,15 @@ export function ConversationDetailPage() {
         onSubmitDelivery={submitDelivery}
         onSubmitRework={submitRework}
         onSubmitPhotoAuthorization={submitPhotoAuthorizationRequest}
+      />
+      <OrderCompletionDialog
+        open={completionDialogOpen}
+        onClose={() => setCompletionDialogOpen(false)}
+        onReview={() => {
+          setCompletionDialogOpen(false)
+          openOrderArchive(currentOrder?.orderId)
+        }}
+        reviewDisabled={!currentOrder?.orderId}
       />
     </Stack>
     </MessageWorkbenchErrorBoundary>

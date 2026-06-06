@@ -8,8 +8,8 @@ import { StatusChip } from './StatusChip.jsx'
 
 export function ConversationList({ conversations, currentUser, onOpenConversation }) {
   return (
-    <Paper variant="outlined" sx={{ overflow: 'hidden', bgcolor: PORTRA_COLORS.paper, borderColor: PORTRA_COLORS.borderMuted, borderRadius: PORTRA_RADII.panel, boxShadow: PORTRA_SHADOWS.subtle }}>
-      <Stack spacing={0}>
+    <Paper variant="outlined" sx={{ p: 1, overflow: 'hidden', bgcolor: PORTRA_COLORS.paperMuted, borderColor: PORTRA_COLORS.borderMuted, borderRadius: PORTRA_RADII.panel, boxShadow: PORTRA_SHADOWS.subtle }}>
+      <Stack spacing={1}>
         {conversations.map(conversation => {
           const counterparty = getCounterpartyProfile(conversation, currentUser)
           const actions = deriveConversationActions({
@@ -31,15 +31,33 @@ export function ConversationList({ conversations, currentUser, onOpenConversatio
                 gap: 1.4,
                 alignItems: 'center',
                 minHeight: 84,
-                px: { xs: 1.4, md: 2 },
-                py: 1.3,
+                px: { xs: 1.5, md: 2 },
+                py: 1.4,
                 cursor: 'pointer',
-                bgcolor: needsMyAction ? PORTRA_COLORS.yellowSoft : PORTRA_COLORS.paper,
-                borderLeft: `4px solid ${needsMyAction ? PORTRA_COLORS.yellow : 'transparent'}`,
-                borderBottom: `1px solid ${PORTRA_COLORS.borderMuted}`,
-                transition: 'background-color 140ms ease, box-shadow 140ms ease',
-                '&:last-of-type': { borderBottom: 0 },
-                '&:hover': { bgcolor: PORTRA_COLORS.paperMuted, boxShadow: `inset 4px 0 ${PORTRA_COLORS.blue}` },
+                position: 'relative',
+                overflow: 'hidden',
+                bgcolor: needsMyAction ? PORTRA_COLORS.blueSoft : PORTRA_COLORS.paper,
+                border: `1px solid ${needsMyAction ? 'rgba(13,47,178,.2)' : PORTRA_COLORS.borderMuted}`,
+                borderRadius: '10px',
+                transition: 'transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease, background-color 150ms ease',
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  left: 0,
+                  top: 8,
+                  bottom: 8,
+                  width: 3,
+                  bgcolor: needsMyAction ? PORTRA_COLORS.blue : PORTRA_COLORS.paper,
+                  borderRadius: '0 2px 2px 0',
+                  transition: 'background-color 150ms ease'
+                },
+                '&:hover': {
+                  transform: 'translateY(-2px)',
+                  bgcolor: needsMyAction ? PORTRA_COLORS.blueSoft : PORTRA_COLORS.paper,
+                  boxShadow: '0 6px 20px rgba(13,47,178,.10)',
+                  borderColor: 'rgba(13,47,178,.22)'
+                },
+                '&:hover::before': { bgcolor: PORTRA_COLORS.blue },
                 '&:hover .conversation-chevron': { opacity: 1, transform: 'translateX(0)' }
               }}
             >

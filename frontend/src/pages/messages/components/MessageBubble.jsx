@@ -17,17 +17,18 @@ export function MessageBubble({ message, mine, actor, canSaveSubmittedPhoto, onS
           fallbackText="对"
         />
       )}
-      <Stack spacing={0.35} sx={{ maxWidth: { xs: '82%', md: '66%' }, alignItems: mine ? 'flex-end' : 'flex-start' }}>
+      <Stack spacing={0.38} sx={{ maxWidth: { xs: '86%', md: 'min(66%, 620px)' }, alignItems: mine ? 'flex-end' : 'flex-start' }}>
         <Paper
           elevation={0}
           sx={{
-            px: isImage ? 0.75 : 1.45,
-            py: isImage ? 0.75 : 1.08,
-            bgcolor: mine ? PORTRA_COLORS.blue : PORTRA_COLORS.white,
+            px: isImage ? 0.75 : 1.55,
+            py: isImage ? 0.75 : 1.12,
+            bgcolor: mine ? PORTRA_COLORS.blue : PORTRA_COLORS.paper,
             color: mine ? PORTRA_COLORS.paper : PORTRA_COLORS.subInk,
             border: mine ? `1px solid ${PORTRA_COLORS.blue}` : `1px solid ${PORTRA_COLORS.borderMuted}`,
-            borderRadius: mine ? '18px 18px 5px 18px' : '18px 18px 18px 5px',
-            boxShadow: mine ? '0 10px 24px rgba(13, 47, 178, 0.16)' : PORTRA_SHADOWS.subtle
+            borderRadius: mine ? '20px 20px 6px 20px' : '20px 20px 20px 6px',
+            boxShadow: mine ? '0 10px 22px rgba(13, 47, 178, 0.14)' : PORTRA_SHADOWS.subtle,
+            overflow: 'hidden'
           }}
         >
           {isImage ? (
@@ -35,8 +36,8 @@ export function MessageBubble({ message, mine, actor, canSaveSubmittedPhoto, onS
               <Box
                 component="img"
                 src={message.content}
-                alt="会话图片"
-                sx={{ display: 'block', maxWidth: '100%', maxHeight: 280, borderRadius: PORTRA_RADII.control, objectFit: 'cover' }}
+                alt="沟通图片"
+                sx={{ display: 'block', maxWidth: { xs: '100%', md: 420 }, maxHeight: 300, borderRadius: PORTRA_RADII.control, objectFit: 'cover' }}
               />
               {canSaveSubmittedPhoto && (
                 <Button size="small" variant="contained" color="inherit" onClick={onSaveSubmittedPhoto}>
@@ -45,7 +46,7 @@ export function MessageBubble({ message, mine, actor, canSaveSubmittedPhoto, onS
               )}
             </Stack>
           ) : (
-            <Typography variant="body2" sx={{ lineHeight: 1.7, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{getSafeDisplayText(message.content, '消息内容')}</Typography>
+            <Typography variant="body2" sx={{ lineHeight: 1.68, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{getSafeDisplayText(message.content, '消息内容')}</Typography>
           )}
         </Paper>
         <Typography variant="caption" sx={{ px: 0.4, color: PORTRA_COLORS.faintInk, fontSize: 11 }}>{formatTime(message.createdAt)}</Typography>

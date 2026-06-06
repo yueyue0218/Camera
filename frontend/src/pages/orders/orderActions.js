@@ -1,27 +1,10 @@
-export const ORDER_STATUS_LABELS = {
-  PENDING_PAYMENT: '待支付',
-  PAID_PENDING_SHOOT: '已支付待拍摄',
-  SHOOTING: '拍摄中',
-  PENDING_DELIVERY: '待交付',
-  DELIVERED_PENDING_CONFIRM: '已交付待确认',
-  REWORK_REQUIRED: '返修中',
-  APPEALING: '申诉中',
-  COMPLETED: '已完成',
-  CANCELLED: '已取消',
-  REFUNDED: '已退款'
-}
+import {
+  ESCROW_STATUS_LABELS,
+  ORDER_STATUS_LABELS,
+  SETTLEMENT_STATUS_LABELS
+} from '../../utils/displayFormatters.js'
 
-export const ESCROW_STATUS_LABELS = {
-  NOT_PAID: '未支付',
-  HELD: '平台托管中',
-  RELEASED: '已结算给服务方',
-  REFUNDED: '已退款'
-}
-
-export const SETTLEMENT_STATUS_LABELS = {
-  NOT_SETTLED: '未结算',
-  SETTLED: '已结算'
-}
+export { ESCROW_STATUS_LABELS, ORDER_STATUS_LABELS, SETTLEMENT_STATUS_LABELS }
 
 export const PHOTO_AUTHORIZATION_STATUS_LABELS = {
   PENDING: '待客户确认',

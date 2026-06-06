@@ -1,11 +1,12 @@
-import { Box, Paper, Stack, Typography } from '@mui/material'
-import { PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
+import { Box, Stack, Typography } from '@mui/material'
+import { PortraTicketCard } from '../../../components/portra/index.js'
+import { PORTRA_COLORS } from '../MessageVisualTokens.js'
 import { MessageActorAvatar } from './MessageActorAvatar.jsx'
 
 export function EventAttachmentCard({ side, actor, title, summary, timestamp, children, actions }) {
   const provider = actor?.role === 'PROVIDER'
   const self = side === 'self'
-  const accent = provider ? PORTRA_COLORS.blue : PORTRA_COLORS.orange
+  const accent = /拒绝|返修|争议|异常/.test(`${title || ''}${summary || ''}`) ? PORTRA_COLORS.orange : PORTRA_COLORS.blue
 
   return (
     <Box sx={{ display: 'flex', justifyContent: self ? 'flex-end' : 'flex-start' }}>
@@ -14,7 +15,7 @@ export function EventAttachmentCard({ side, actor, title, summary, timestamp, ch
         spacing={1.05}
         sx={{
           alignItems: 'flex-start',
-          maxWidth: { xs: '100%', md: 'min(78%, 640px)' },
+          maxWidth: { xs: '100%', md: 'min(82%, 620px)' },
           flexDirection: self ? 'row-reverse' : 'row'
         }}
       >
@@ -25,30 +26,36 @@ export function EventAttachmentCard({ side, actor, title, summary, timestamp, ch
           fallbackText="对"
           sx={{ mt: 0.25, fontWeight: 950 }}
         />
-        <Paper
-          variant="outlined"
+        <PortraTicketCard
+          accent={accent}
           sx={{
-            width: { xs: 'min(100%, 520px)', md: 'clamp(460px, 54vw, 560px)' },
+            width: { xs: 'min(100%, 540px)', md: 'min(560px, 100%)' },
             maxWidth: '100%',
-            px: 1.55,
-            py: 1.3,
-            bgcolor: PORTRA_COLORS.white,
+            px: 1.5,
+            py: 1.22,
+            pl: 2.2,
+            bgcolor: PORTRA_COLORS.paper,
             borderColor: PORTRA_COLORS.borderMuted,
-            borderLeft: `3px solid ${accent}`,
-            borderRadius: self ? '18px 18px 5px 18px' : '18px 18px 18px 5px',
-            boxShadow: PORTRA_SHADOWS.subtle
+            borderRadius: self ? '10px 10px 4px 10px' : '10px 10px 10px 4px',
+            boxShadow: '0 2px 12px rgba(21,19,24,.07)',
+            '& .MuiButton-root': {
+              minHeight: 30,
+              borderRadius: 999,
+              textTransform: 'none',
+              fontWeight: 850
+            }
           }}
         >
-          <Stack spacing={0.85}>
+          <Stack spacing={0.78}>
             <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <Typography sx={{ color: PORTRA_COLORS.ink, fontWeight: 950, lineHeight: 1.38 }}>{title}</Typography>
               <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk, fontSize: 11 }}>{timestamp}</Typography>
             </Stack>
-            {summary && <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk, lineHeight: 1.55 }}>{summary}</Typography>}
+            {summary && <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk, lineHeight: 1.55, overflowWrap: 'anywhere' }}>{summary}</Typography>}
             {children}
             {actions}
           </Stack>
-        </Paper>
+        </PortraTicketCard>
       </Stack>
     </Box>
   )

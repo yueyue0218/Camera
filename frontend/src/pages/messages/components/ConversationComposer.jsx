@@ -11,6 +11,7 @@ import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
 import SendRoundedIcon from '@mui/icons-material/SendRounded'
 import SupportAgentRoundedIcon from '@mui/icons-material/SupportAgentRounded'
+import { buildOrderAction } from '../../../utils/orderNavigation.js'
 import { PORTRA_COLORS, PORTRA_RADII } from '../MessageVisualTokens.js'
 import { MessageToolbarButton } from './MessageToolbarButton.jsx'
 
@@ -41,10 +42,11 @@ export function ConversationComposer({
   onOpenAction
 }) {
   const pendingQuote = actions.pendingQuote
-  const canOpenOrderArchive = Boolean(orderId && typeof onOpenOrderArchive === 'function')
+  const orderAction = buildOrderAction(orderId)
+  const canOpenOrderArchive = Boolean(orderAction && typeof onOpenOrderArchive === 'function')
   const openOrderArchive = event => {
     event?.stopPropagation()
-    if (canOpenOrderArchive) onOpenOrderArchive(orderId)
+    if (canOpenOrderArchive) onOpenOrderArchive(orderAction.orderId)
   }
   const hasQuickActions = Boolean(
     actions.canSendQuote
@@ -71,9 +73,9 @@ export function ConversationComposer({
               alignItems: { xs: 'stretch', md: 'center' },
               py: 0.48,
               px: 0.85,
-              bgcolor: 'rgba(255, 253, 249, 0.64)',
+              bgcolor: 'transparent',
               borderRadius: PORTRA_RADII.control,
-              border: `1px solid ${PORTRA_COLORS.borderMuted}`,
+              border: 0,
               boxShadow: 'none'
             }}
           >
@@ -139,7 +141,7 @@ export function ConversationComposer({
               )}
               {actions.canRequestPhotoAuthorization && (
                 <Button size="small" variant="outlined" startIcon={<ImageRoundedIcon />} onClick={() => onOpenAction('REQUEST_AUTHORIZATION')}>
-                  申请照片授权
+                  申请展示授权
                 </Button>
               )}
               {actions.canReviewPhotoAuthorization && (
@@ -162,7 +164,7 @@ export function ConversationComposer({
         )}
 
         <Stack direction="row" spacing={0.3} sx={{ alignItems: 'center', flexWrap: 'wrap', minHeight: 32 }}>
-          <Typography variant="caption" sx={{ mr: 0.5, color: PORTRA_COLORS.faintInk, fontWeight: 750 }}>会话工具</Typography>
+          <Typography variant="caption" sx={{ mr: 0.5, color: PORTRA_COLORS.faintInk, fontWeight: 750 }}>沟通工具</Typography>
           <MessageToolbarButton title="发送图片" component="label" disabled={loading || imageSending}>
             <ImageRoundedIcon fontSize="small" />
             <input hidden type="file" accept="image/*" onChange={onChooseMessageImage} />
@@ -171,7 +173,7 @@ export function ConversationComposer({
           <MessageToolbarButton title="表情" onClick={() => onUnavailableTool('表情')}><EmojiEmotionsRoundedIcon fontSize="small" /></MessageToolbarButton>
           <MessageToolbarButton title="补款" onClick={() => onUnavailableTool('补款')}><AccountBalanceWalletRoundedIcon fontSize="small" /></MessageToolbarButton>
           {actions.canOpenOrder && canOpenOrderArchive && (
-            <MessageToolbarButton title="订单档案" data-message-order-entry="composer-toolbar" onClick={openOrderArchive}><ReceiptLongRoundedIcon fontSize="small" /></MessageToolbarButton>
+            <MessageToolbarButton title="查看订单" data-message-order-entry="composer-toolbar" onClick={openOrderArchive}><ReceiptLongRoundedIcon fontSize="small" /></MessageToolbarButton>
           )}
           {actions.canAppeal && (
             <MessageToolbarButton title="平台协助" onClick={() => onUnavailableTool('平台协助')}><SupportAgentRoundedIcon fontSize="small" /></MessageToolbarButton>
@@ -196,29 +198,31 @@ export function ConversationComposer({
             sx={{
               '& .MuiOutlinedInput-root': {
                 minHeight: 44,
-                bgcolor: PORTRA_COLORS.white,
+                bgcolor: PORTRA_COLORS.page,
                 borderRadius: PORTRA_RADII.control,
                 '& fieldset': { borderColor: PORTRA_COLORS.border },
                 '&:hover fieldset': { borderColor: PORTRA_COLORS.mutedInk },
-                '&.Mui-focused fieldset': { borderColor: PORTRA_COLORS.blue, borderWidth: 1 }
+                '&.Mui-focused fieldset': { borderColor: PORTRA_COLORS.blue, borderWidth: 1 },
+                '&.Mui-focused': { boxShadow: '0 0 0 3px rgba(13,47,178,.08)' }
               }
             }}
           />
           <Button
             variant="contained"
-            endIcon={<SendRoundedIcon />}
             onClick={onSendMessage}
             disabled={!content.trim() || loading}
+            aria-label="发送"
             sx={{
-              minWidth: 92,
+              minWidth: 44,
+              width: 44,
               height: 44,
-              borderRadius: PORTRA_RADII.control,
+              borderRadius: '50%',
               bgcolor: PORTRA_COLORS.blue,
               '&:hover': { bgcolor: PORTRA_COLORS.blueDark },
               '&.Mui-disabled': { bgcolor: PORTRA_COLORS.paperMuted, color: PORTRA_COLORS.faintInk }
             }}
           >
-            发送
+            <SendRoundedIcon />
           </Button>
         </Stack>
       </Stack>

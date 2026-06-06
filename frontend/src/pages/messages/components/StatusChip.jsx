@@ -24,13 +24,13 @@ export function StatusChip({ label, emphasis = false, size = 'small', sx = {}, .
 
 function getStatusTone(label = '') {
   if (/完成|授权|已确认|已支付/.test(label)) {
-    return { bg: PORTRA_COLORS.blueSoft, strongBg: PORTRA_COLORS.blue, color: PORTRA_COLORS.blue, strongColor: PORTRA_COLORS.paper, border: PORTRA_COLORS.blue }
+    return { bg: '#d1fae5', strongBg: PORTRA_COLORS.blue, color: '#065f46', strongColor: PORTRA_COLORS.paper, border: 'rgba(6,95,70,.18)' }
   }
   if (/等待|待|返修|轮到我|付款/.test(label)) {
-    return { bg: PORTRA_COLORS.yellowSoft, strongBg: PORTRA_COLORS.yellow, color: PORTRA_COLORS.ink, strongColor: PORTRA_COLORS.ink, border: PORTRA_COLORS.yellow }
+    return { bg: '#fef3c7', strongBg: PORTRA_COLORS.orange, color: '#92400e', strongColor: '#fff', border: 'rgba(146,64,14,.18)' }
   }
   if (/取消|退款|拒绝|争议|平台协助/.test(label)) {
-    return { bg: PORTRA_COLORS.orangeSoft, strongBg: PORTRA_COLORS.orange, color: PORTRA_COLORS.orange, strongColor: PORTRA_COLORS.paper, border: PORTRA_COLORS.orange }
+    return { bg: '#fee2e2', strongBg: PORTRA_COLORS.orange, color: '#991b1b', strongColor: '#fff', border: 'rgba(153,27,27,.18)' }
   }
   return { bg: PORTRA_COLORS.paperMuted, strongBg: PORTRA_COLORS.subInk, color: PORTRA_COLORS.subInk, strongColor: PORTRA_COLORS.paper, border: PORTRA_COLORS.border }
 }

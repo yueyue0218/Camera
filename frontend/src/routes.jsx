@@ -6,6 +6,7 @@ import { PublishPage, PublishServicePackagePage } from './pages/demand/index.js'
 import { FeedPage, MomentDetailPage } from './pages/feed/index.js'
 import { ConversationDetailPage, MessagesPage } from './pages/messages/index.js'
 import { OrdersPage } from './pages/orders/index.js'
+import { DeliveryGalleryPage } from './pages/deliveries/index.js'
 import { ProfilePage, PublicProfilePage } from './pages/profile/index.js'
 import { AdminPage } from './pages/admin/index.jsx'
 import { DeliveryPage } from './pages/delivery/DeliveryPage.jsx'
@@ -34,6 +35,7 @@ export function AppRoutes() {
       <Route path="/messages" element={<MessagesPage />} />
       <Route path="/messages/:conversationId" element={<ConversationDetailPage />} />
       <Route path="/orders" element={<OrdersPage />} />
+      <Route path="/orders/:orderId/deliveries/:deliveryId" element={<DeliveryGalleryPage />} />
       <Route path="/orders/:orderId/delivery" element={<DeliveryPage />} />
       <Route path="/orders/:orderId/reviews" element={<ReviewPage />} />
       <Route path="/reviews" element={<ReviewPage />} />

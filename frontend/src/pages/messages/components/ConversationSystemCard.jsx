@@ -7,12 +7,16 @@ import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
 import UploadRoundedIcon from '@mui/icons-material/UploadRounded'
 import { centToYuan } from '../../../utils/index.js'
+import { formatFileDisplayName, formatQuoteServiceContent } from '../../../utils/displayFormatters.js'
+import { buildOrderAction } from '../../../utils/orderNavigation.js'
+import { PortraStatusBadge } from '../../../components/portra/index.js'
 import { PHOTO_AUTHORIZATION_STATUS_LABELS } from '../../orders/orderActions.js'
 import { formatTime } from '../utils/conversationUtils.js'
 import { getPhotoUsageScopeLabel, getQuoteStatusLabel } from '../utils/quoteUtils.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII } from '../MessageVisualTokens.js'
 import { EventAttachmentCard } from './EventAttachmentCard.jsx'
-import { StatusChip } from './StatusChip.jsx'
+import { DeliveryBatchCard } from '../../deliveries/components/DeliveryBatchCard.jsx'
+import { buildDeliveryBatches } from '../../deliveries/deliveryDisplay.js'
 
 export function ConversationSystemItem({
   event,
@@ -27,6 +31,7 @@ export function ConversationSystemItem({
   onPayOrder,
   onCancelOrder,
   onConfirmOrder,
+  onOpenDeliveryGallery,
   onOpenAction,
   onDecidePhotoAuthorization,
   onUnavailableTool
@@ -38,6 +43,8 @@ export function ConversationSystemItem({
   const quote = eventMeta.quote
   const order = eventMeta.order
   const authorization = eventMeta.authorization
+  const delivery = eventMeta.delivery
+  const orderAction = buildOrderAction(order)
   const renderActionButton = action => (
     <EventActionButton
       key={action}
@@ -77,14 +84,14 @@ export function ConversationSystemItem({
         <Box
           data-message-system-strip="true"
           sx={{
-            maxWidth: 'min(78%, 680px)',
+            maxWidth: 'min(74%, 660px)',
             minHeight: 32,
             px: 1.25,
             py: 0.35,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: 'rgba(255, 253, 249, 0.72)',
+            bgcolor: 'rgba(248, 246, 241, 0.82)',
             borderColor: PORTRA_COLORS.borderMuted,
             border: `1px solid ${PORTRA_COLORS.borderMuted}`,
             borderRadius: 999,
@@ -96,9 +103,9 @@ export function ConversationSystemItem({
               {noticeText}
             </Typography>
             <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk, flexShrink: 0, fontSize: 11 }}>{formatTime(event.timestamp)}</Typography>
-            {order?.orderId && (
-              <Button size="small" variant="text" color="inherit" onClick={() => onOpenOrderArchive(order.orderId)} sx={stripActionSx}>
-                查看订单
+            {orderAction && (
+              <Button size="small" variant="text" color="inherit" onClick={() => onOpenOrderArchive(orderAction.orderId)} sx={stripActionSx}>
+                {orderAction.label}
               </Button>
             )}
             {eventActions.includes('PAY') && (
@@ -124,7 +131,12 @@ export function ConversationSystemItem({
       >
         {quote && <QuoteMeta quote={quote} />}
         {event.type === 'ORDER_CREATED' && eventMeta.order && <OrderMeta order={eventMeta.order} />}
-        {event.type === 'DELIVERY' && eventMeta.delivery && <DeliveryMeta event={event} />}
+        {event.type === 'DELIVERY' && delivery && (
+          <DeliveryMeta
+            event={event}
+            onOpenDeliveryGallery={onOpenDeliveryGallery}
+          />
+        )}
         {authorization && <AuthorizationMeta authorization={authorization} />}
       </EventAttachmentCard>
     </Box>
@@ -161,12 +173,13 @@ function EventActionButton({
     if (typeof onOpenAction !== 'function') return null
     return <Button {...common} variant="contained" startIcon={<UploadRoundedIcon />} onClick={() => onOpenAction(action)}>{action === 'REUPLOAD_DELIVERY' ? '重新上传作品' : '上传作品'}</Button>
   }
-  if (action === 'REQUEST_AUTHORIZATION' && typeof onOpenAction === 'function') return <Button {...common} variant="outlined" onClick={() => onOpenAction('REQUEST_AUTHORIZATION')}>申请照片授权</Button>
+  if (action === 'REQUEST_AUTHORIZATION' && typeof onOpenAction === 'function') return <Button {...common} variant="outlined" onClick={() => onOpenAction('REQUEST_AUTHORIZATION')}>申请展示授权</Button>
   if (action === 'APPROVE_AUTHORIZATION' && authorization && typeof onDecidePhotoAuthorization === 'function') return <Button {...common} variant="contained" startIcon={<CheckCircleRoundedIcon />} onClick={() => onDecidePhotoAuthorization(authorization, 'approve')}>同意展示</Button>
   if (action === 'REJECT_AUTHORIZATION' && authorization && typeof onDecidePhotoAuthorization === 'function') return <Button {...common} variant="outlined" color="inherit" startIcon={<CloseRoundedIcon />} onClick={() => onDecidePhotoAuthorization(authorization, 'reject')}>拒绝展示</Button>
   if (action === 'PLATFORM_ASSISTANCE' && typeof onUnavailableTool === 'function') return <Button {...common} variant="text" color="inherit" onClick={() => onUnavailableTool('平台协助')}>申请平台协助</Button>
-  if (action === 'VIEW_DISPUTE' && order?.orderId && typeof onOpenOrderArchive === 'function') return <Button {...common} variant="outlined" color="inherit" startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenOrderArchive(order.orderId)}>查看订单档案</Button>
-  if (action === 'OPEN_ORDER' && order?.orderId && typeof onOpenOrderArchive === 'function') return <Button {...common} variant="outlined" color="inherit" startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenOrderArchive(order.orderId)}>查看订单档案</Button>
+  const orderAction = buildOrderAction(order, { label: '查看订单' })
+  if (action === 'VIEW_DISPUTE' && orderAction && typeof onOpenOrderArchive === 'function') return <Button {...common} variant="outlined" color="inherit" startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenOrderArchive(orderAction.orderId)}>{orderAction.label}</Button>
+  if (action === 'OPEN_ORDER' && orderAction && typeof onOpenOrderArchive === 'function') return <Button {...common} variant="outlined" color="inherit" startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenOrderArchive(orderAction.orderId)}>{orderAction.label}</Button>
   return null
 }
 
@@ -176,8 +189,11 @@ function QuoteMeta({ quote }) {
       <Typography variant="body2" sx={{ color: PORTRA_COLORS.subInk, fontWeight: 800 }}>
         {centToYuan(quote.amountCent)} · {formatTime(quote.shootStartTime)} · {getSafeDisplayText(quote.location, '拍摄地点待确认')}
       </Typography>
+      <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk }}>
+        {formatQuoteServiceContent(quote, '按双方沟通内容执行')}
+      </Typography>
       <Stack direction="row" spacing={0.6} sx={{ flexWrap: 'wrap' }}>
-        <StatusChip label={getQuoteStatusLabel(quote.status)} />
+        <PortraStatusBadge label={getQuoteStatusLabel(quote.status)} />
       </Stack>
     </Stack>
   )
@@ -187,13 +203,22 @@ function OrderMeta({ order }) {
   return <Typography variant="body2" sx={attachmentMetaSx}>{centToYuan(order.amountCent)} · {formatTime(order.shootStartTime)}</Typography>
 }
 
-function DeliveryMeta({ event }) {
+function DeliveryMeta({ event, onOpenDeliveryGallery }) {
   const delivery = event?.meta?.delivery
   if (!delivery) return null
+  const batch = buildDeliveryBatches([delivery], event?.meta?.order)[0]
   return (
     <Stack spacing={0.4} sx={attachmentMetaSx}>
-      <Typography variant="body2">共 {event.meta?.deliveryCount || 1} 次交付 · 最近交付：{formatTime(delivery.uploadTime)}</Typography>
-      {delivery.fileName && <Chip size="small" label={getSafeDisplayText(delivery.fileName, '已交付作品')} sx={{ ...metaChipSx, alignSelf: 'flex-start' }} />}
+      <DeliveryBatchCard
+        batch={{
+          ...batch,
+          fileCount: event.meta?.deliveryCount || batch.fileCount
+        }}
+        variant="message"
+        chrome="none"
+        onOpen={() => onOpenDeliveryGallery?.(delivery)}
+        disabled={!batch?.orderId || !batch?.deliveryId}
+      />
     </Stack>
   )
 }
@@ -202,8 +227,8 @@ function AuthorizationMeta({ authorization }) {
   if (!authorization) return null
   return (
     <Stack direction="row" spacing={0.8} sx={{ flexWrap: 'wrap' }}>
-      <StatusChip label={PHOTO_AUTHORIZATION_STATUS_LABELS[authorization.status] || '授权状态已更新'} />
-      {(authorization.files || []).map(file => <Chip key={file.id || file.fileId} size="small" label="已选交付作品" sx={metaChipSx} />)}
+      <PortraStatusBadge label={PHOTO_AUTHORIZATION_STATUS_LABELS[authorization.status] || '授权状态已更新'} />
+      {(authorization.files || []).map(file => <Chip key={file.id || file.fileId} size="small" label={formatFileDisplayName(file, '已选交付作品')} sx={metaChipSx} />)}
     </Stack>
   )
 }
@@ -218,12 +243,12 @@ const metaChipSx = {
 }
 
 const attachmentMetaSx = {
-  px: 1.05,
-  py: 0.85,
+  px: 0,
+  py: 0.15,
   color: PORTRA_COLORS.subInk,
-  bgcolor: PORTRA_COLORS.paperSoft,
-  border: `1px solid ${PORTRA_COLORS.borderMuted}`,
-  borderRadius: PORTRA_RADII.control
+  bgcolor: 'transparent',
+  border: 0,
+  borderRadius: 0
 }
 
 const stripActionSx = {
