@@ -1,5 +1,6 @@
 import { Avatar } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
+import { buildUserProfileTarget } from '../../../utils/orderNavigation.js'
 import { PORTRA_COLORS } from '../MessageVisualTokens.js'
 
 export function MessageActorAvatar({
@@ -13,7 +14,8 @@ export function MessageActorAvatar({
   const navigate = useNavigate()
   if (!actor) return null
 
-  const profilePath = actor.profilePath || (actor.userId ? `/users/${actor.userId}` : '')
+  const profileTarget = buildUserProfileTarget(actor, actor.isCurrentUser ? { userId: actor.userId } : null)
+  const profilePath = actor.profilePath || profileTarget?.to || ''
   const canOpenProfile = Boolean(profilePath)
   const openProfile = event => {
     event.stopPropagation()

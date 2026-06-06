@@ -11,6 +11,7 @@ import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
 import SendRoundedIcon from '@mui/icons-material/SendRounded'
 import SupportAgentRoundedIcon from '@mui/icons-material/SupportAgentRounded'
+import { buildOrderAction } from '../../../utils/orderNavigation.js'
 import { PORTRA_COLORS, PORTRA_RADII } from '../MessageVisualTokens.js'
 import { MessageToolbarButton } from './MessageToolbarButton.jsx'
 
@@ -41,10 +42,11 @@ export function ConversationComposer({
   onOpenAction
 }) {
   const pendingQuote = actions.pendingQuote
-  const canOpenOrderArchive = Boolean(orderId && typeof onOpenOrderArchive === 'function')
+  const orderAction = buildOrderAction(orderId)
+  const canOpenOrderArchive = Boolean(orderAction && typeof onOpenOrderArchive === 'function')
   const openOrderArchive = event => {
     event?.stopPropagation()
-    if (canOpenOrderArchive) onOpenOrderArchive(orderId)
+    if (canOpenOrderArchive) onOpenOrderArchive(orderAction.orderId)
   }
   const hasQuickActions = Boolean(
     actions.canSendQuote

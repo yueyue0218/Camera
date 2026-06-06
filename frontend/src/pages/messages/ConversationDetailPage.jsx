@@ -5,7 +5,7 @@ import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { conversationApi, deliveryApi, orderApi, photoAuthorizationApi, quoteApi, readFileAsDataUrl } from '../../api.js'
-import { buildOrderNavigationTarget } from '../../utils/orderNavigation.js'
+import { goToOrder, goToUserProfile } from '../../utils/orderNavigation.js'
 import { ConversationThread } from './components/ConversationThread.jsx'
 import { ConversationWorkbenchPanel } from './components/ConversationWorkbenchPanel.jsx'
 import { ConversationActionDialogs } from './components/ConversationActionDialogs.jsx'
@@ -443,18 +443,15 @@ export function ConversationDetailPage() {
 
   function openUserProfile(userId, event) {
     event?.stopPropagation()
-    const id = Number(userId)
-    if (!id) return
-    navigate(id === currentUserId ? '/profile' : `/users/${id}`)
+    goToUserProfile(navigate, userId, currentUser)
   }
 
   function openOrderArchive(orderId = currentOrder?.orderId) {
-    const target = buildOrderNavigationTarget(orderId || currentOrder?.orderId)
-    if (!target) {
+    const succeeded = goToOrder(navigate, orderId || currentOrder?.orderId)
+    if (!succeeded) {
       setNotice({ type: 'warning', text: '订单信息暂时不可用，请稍后刷新后再查看。' })
       return false
     }
-    navigate(target.to, { state: target.state })
     return true
   }
 

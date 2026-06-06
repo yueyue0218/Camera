@@ -5,6 +5,7 @@ import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded'
 import { centToYuan } from '../../../utils/index.js'
+import { buildOrderAction } from '../../../utils/orderNavigation.js'
 import { formatTime } from '../utils/conversationUtils.js'
 import { getPhotoUsageScopeLabel, getQuoteStatusLabel } from '../utils/quoteUtils.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
@@ -30,6 +31,7 @@ export function ConversationWorkbenchPanel({
   const latestQuote = getLatestQuote(quotes)
   const summary = panelSummary || {}
   const uploadLabel = actions.canReuploadDelivery ? '重新上传作品' : '上传作品'
+  const orderAction = buildOrderAction(order, { label: '查看订单档案' })
   return (
     <Paper
       data-message-panel="true"
@@ -90,8 +92,8 @@ export function ConversationWorkbenchPanel({
                 申请平台协助
               </Button>
             )}
-            {actions.canViewDispute && order?.orderId && (
-              <Button size="small" variant="outlined" color="inherit" onClick={() => onOpenOrderArchive(order.orderId)} sx={{ alignSelf: 'flex-start' }}>
+            {actions.canViewDispute && orderAction && (
+              <Button size="small" variant="outlined" color="inherit" onClick={() => onOpenOrderArchive(orderAction.orderId)} sx={{ alignSelf: 'flex-start' }}>
                 查看争议进展
               </Button>
             )}
@@ -116,9 +118,9 @@ export function ConversationWorkbenchPanel({
             <Typography sx={{ color: PORTRA_COLORS.mutedInk }} variant="body2">
               {centToYuan(order.amountCent)} · {formatTime(order.shootStartTime)}
             </Typography>
-            {order.orderId && (
-              <Button variant="text" color="inherit" size="small" startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenOrderArchive(order.orderId)} sx={{ alignSelf: 'flex-start', px: 0 }}>
-                查看订单档案
+            {orderAction && (
+              <Button variant="text" color="inherit" size="small" startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenOrderArchive(orderAction.orderId)} sx={{ alignSelf: 'flex-start', px: 0 }}>
+                {orderAction.label}
               </Button>
             )}
           </WorkbenchSection>

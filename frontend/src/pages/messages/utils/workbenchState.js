@@ -1,3 +1,5 @@
+import { buildUserProfileTarget } from '../../../utils/orderNavigation.js'
+
 const ACTIVE_ORDER_STATUSES = new Set([
   'PENDING_PAYMENT',
   'PAID_PENDING_SHOOT',
@@ -558,7 +560,7 @@ function attachTimelineActor(item, conversation, currentUser, order) {
       isCurrentUser: Number(userId) === getCurrentUserId(currentUser),
       displayName,
       avatarText: getTimelineActorAvatarText(userId, displayName, currentUser),
-      profilePath: Number(userId) === getCurrentUserId(currentUser) ? '/profile' : `/users/${userId}`
+      profilePath: buildUserProfileTarget(userId, currentUser)?.to || ''
     } : {
       userId: null,
       role: item.actorRole,

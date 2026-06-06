@@ -2,12 +2,12 @@ import { Alert, Box, Button, Paper, Stack, Typography } from '@mui/material'
 import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import { centToYuan } from '../../../utils/index.js'
+import { buildQuoteAction } from '../../../utils/orderNavigation.js'
 import { formatTime } from '../utils/conversationUtils.js'
 import {
   canEditQuote,
   getPhotoUsageScopeLabel,
   getQuoteNextStepText,
-  getQuoteOrderId,
   getQuoteStatusLabel
 } from '../utils/quoteUtils.js'
 import { InfoRows } from './InfoRows.jsx'
@@ -60,7 +60,7 @@ export function QuotePanel({
         {quoteEntryHint && canSeeQuoteEntry && <Alert severity={canCreateQuote ? 'info' : 'warning'}>{quoteEntryHint}</Alert>}
 
         {quotes.map(quote => {
-          const orderId = getQuoteOrderId(quote)
+          const orderAction = buildQuoteAction(quote)
           return (
             <Paper
               key={quote.quotationId}
@@ -116,9 +116,9 @@ export function QuotePanel({
                   </Stack>
                 )}
                 {quote.status === 'CONFIRMED' && (
-                  orderId ? (
-                    <Button size="small" variant="outlined" startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenOrder(orderId)} sx={{ alignSelf: 'flex-start' }}>
-                      查看订单
+                  orderAction ? (
+                    <Button size="small" variant="outlined" startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenOrder(orderAction.orderId)} sx={{ alignSelf: 'flex-start' }}>
+                      {orderAction.label}
                     </Button>
                   ) : (
                     <Alert severity="info">报价已确认，订单信息会在本次合作面板中同步。</Alert>

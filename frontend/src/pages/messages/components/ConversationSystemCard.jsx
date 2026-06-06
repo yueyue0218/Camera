@@ -7,6 +7,7 @@ import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
 import UploadRoundedIcon from '@mui/icons-material/UploadRounded'
 import { centToYuan } from '../../../utils/index.js'
+import { buildOrderAction } from '../../../utils/orderNavigation.js'
 import { PHOTO_AUTHORIZATION_STATUS_LABELS } from '../../orders/orderActions.js'
 import { formatTime } from '../utils/conversationUtils.js'
 import { getPhotoUsageScopeLabel, getQuoteStatusLabel } from '../utils/quoteUtils.js'
@@ -38,6 +39,7 @@ export function ConversationSystemItem({
   const quote = eventMeta.quote
   const order = eventMeta.order
   const authorization = eventMeta.authorization
+  const orderAction = buildOrderAction(order)
   const renderActionButton = action => (
     <EventActionButton
       key={action}
@@ -96,9 +98,9 @@ export function ConversationSystemItem({
               {noticeText}
             </Typography>
             <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk, flexShrink: 0, fontSize: 11 }}>{formatTime(event.timestamp)}</Typography>
-            {order?.orderId && (
-              <Button size="small" variant="text" color="inherit" onClick={() => onOpenOrderArchive(order.orderId)} sx={stripActionSx}>
-                查看订单
+            {orderAction && (
+              <Button size="small" variant="text" color="inherit" onClick={() => onOpenOrderArchive(orderAction.orderId)} sx={stripActionSx}>
+                {orderAction.label}
               </Button>
             )}
             {eventActions.includes('PAY') && (
@@ -165,8 +167,9 @@ function EventActionButton({
   if (action === 'APPROVE_AUTHORIZATION' && authorization && typeof onDecidePhotoAuthorization === 'function') return <Button {...common} variant="contained" startIcon={<CheckCircleRoundedIcon />} onClick={() => onDecidePhotoAuthorization(authorization, 'approve')}>同意展示</Button>
   if (action === 'REJECT_AUTHORIZATION' && authorization && typeof onDecidePhotoAuthorization === 'function') return <Button {...common} variant="outlined" color="inherit" startIcon={<CloseRoundedIcon />} onClick={() => onDecidePhotoAuthorization(authorization, 'reject')}>拒绝展示</Button>
   if (action === 'PLATFORM_ASSISTANCE' && typeof onUnavailableTool === 'function') return <Button {...common} variant="text" color="inherit" onClick={() => onUnavailableTool('平台协助')}>申请平台协助</Button>
-  if (action === 'VIEW_DISPUTE' && order?.orderId && typeof onOpenOrderArchive === 'function') return <Button {...common} variant="outlined" color="inherit" startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenOrderArchive(order.orderId)}>查看订单档案</Button>
-  if (action === 'OPEN_ORDER' && order?.orderId && typeof onOpenOrderArchive === 'function') return <Button {...common} variant="outlined" color="inherit" startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenOrderArchive(order.orderId)}>查看订单档案</Button>
+  const orderAction = buildOrderAction(order, { label: '查看订单档案' })
+  if (action === 'VIEW_DISPUTE' && orderAction && typeof onOpenOrderArchive === 'function') return <Button {...common} variant="outlined" color="inherit" startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenOrderArchive(orderAction.orderId)}>{orderAction.label}</Button>
+  if (action === 'OPEN_ORDER' && orderAction && typeof onOpenOrderArchive === 'function') return <Button {...common} variant="outlined" color="inherit" startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenOrderArchive(orderAction.orderId)}>{orderAction.label}</Button>
   return null
 }
 
