@@ -15,7 +15,7 @@ export function EventAttachmentCard({ side, actor, title, summary, timestamp, ch
         spacing={1.05}
         sx={{
           alignItems: 'flex-start',
-          maxWidth: { xs: '100%', md: 'min(78%, 640px)' },
+          maxWidth: { xs: '100%', md: 'min(82%, 620px)' },
           flexDirection: self ? 'row-reverse' : 'row'
         }}
       >
@@ -29,20 +29,28 @@ export function EventAttachmentCard({ side, actor, title, summary, timestamp, ch
         <PortraTicketCard
           accent={accent}
           sx={{
-            width: { xs: 'min(100%, 520px)', md: 'clamp(460px, 54vw, 560px)' },
+            width: { xs: 'min(100%, 540px)', md: 'min(560px, 100%)' },
             maxWidth: '100%',
-            px: 1.55,
-            py: 1.3,
+            px: 1.5,
+            py: 1.22,
             pl: 2.2,
-            borderRadius: self ? '18px 18px 5px 18px' : '18px 18px 18px 5px'
+            bgcolor: PORTRA_COLORS.white,
+            borderColor: PORTRA_COLORS.borderMuted,
+            borderRadius: self ? '18px 18px 6px 18px' : '18px 18px 18px 6px',
+            '& .MuiButton-root': {
+              minHeight: 30,
+              borderRadius: 999,
+              textTransform: 'none',
+              fontWeight: 850
+            }
           }}
         >
-          <Stack spacing={0.85}>
+          <Stack spacing={0.78}>
             <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <Typography sx={{ color: PORTRA_COLORS.ink, fontWeight: 950, lineHeight: 1.38 }}>{title}</Typography>
               <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk, fontSize: 11 }}>{timestamp}</Typography>
             </Stack>
-            {summary && <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk, lineHeight: 1.55 }}>{summary}</Typography>}
+            {summary && <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk, lineHeight: 1.55, overflowWrap: 'anywhere' }}>{summary}</Typography>}
             {children}
             {actions}
           </Stack>

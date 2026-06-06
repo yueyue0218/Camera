@@ -79,14 +79,14 @@ export function ConversationSystemItem({
         <Box
           data-message-system-strip="true"
           sx={{
-            maxWidth: 'min(78%, 680px)',
+            maxWidth: 'min(74%, 660px)',
             minHeight: 32,
             px: 1.25,
             py: 0.35,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: 'rgba(255, 253, 249, 0.72)',
+            bgcolor: 'rgba(248, 246, 241, 0.82)',
             borderColor: PORTRA_COLORS.borderMuted,
             border: `1px solid ${PORTRA_COLORS.borderMuted}`,
             borderRadius: 999,
@@ -221,12 +221,12 @@ const metaChipSx = {
 }
 
 const attachmentMetaSx = {
-  px: 1.05,
-  py: 0.85,
+  px: 0,
+  py: 0.15,
   color: PORTRA_COLORS.subInk,
-  bgcolor: PORTRA_COLORS.paperSoft,
-  border: `1px solid ${PORTRA_COLORS.borderMuted}`,
-  borderRadius: PORTRA_RADII.control
+  bgcolor: 'transparent',
+  border: 0,
+  borderRadius: 0
 }
 
 const stripActionSx = {
