@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Box, Button, Chip, Divider, Paper, Stack, Typography } from '@mui/material'
+import { Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Paper, Stack, TextField, Typography } from '@mui/material'
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import ForumRoundedIcon from '@mui/icons-material/ForumRounded'
+import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { deliveryApi, fileApi, orderApi } from '../../api.js'
 import { goToOrder } from '../../utils/orderNavigation.js'
 import { formatOrderTitle } from '../../utils/displayFormatters.js'
-import { PortraEmptyState, PortraInfoBanner, PortraStatusBadge, PortraTicketSection } from '../../components/portra/index.js'
+import { OrderCompletionDialog, PortraActionButton, PortraEmptyState, PortraInfoBanner, PortraStatusBadge, PortraTicketSection } from '../../components/portra/index.js'
 import { PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
 import { centToYuan } from '../../utils/index.js'
 import {
@@ -36,6 +38,10 @@ export function DeliveryGalleryPage() {
   const [previewUrls, setPreviewUrls] = useState({})
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [viewerIndex, setViewerIndex] = useState(-1)
+  const [actionLoading, setActionLoading] = useState(false)
+  const [reworkDialogOpen, setReworkDialogOpen] = useState(false)
+  const [reworkRequirement, setReworkRequirement] = useState('')
+  const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -134,10 +140,65 @@ export function DeliveryGalleryPage() {
     setNotice({ type: 'info', text: downloadable.length > 1 ? '浏览器可能会逐个确认多个文件下载。' : '已开始下载。' })
   }
 
+  async function reloadOrderAndDeliveries() {
+    const [nextOrder, nextDeliveries] = await Promise.all([
+      orderApi.detail(orderId, currentUser),
+      deliveryApi.listByOrder(orderId, currentUser)
+    ])
+    setOrder(nextOrder)
+    setDeliveries(Array.isArray(nextDeliveries) ? nextDeliveries : [])
+  }
+
+  async function confirmDelivery() {
+    if (!order?.orderId || !canCustomerAct) return
+    setActionLoading(true)
+    setNotice(null)
+    try {
+      await orderApi.transition(order.orderId, 'COMPLETED', '客户确认接收作品', currentUser)
+      await reloadOrderAndDeliveries()
+      setCompletionDialogOpen(true)
+    } catch (actionError) {
+      setNotice({ type: 'error', text: actionError.message || '确认接收失败。' })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  async function submitRework(event) {
+    event.preventDefault()
+    const reason = reworkRequirement.trim()
+    if (!reason) {
+      setNotice({ type: 'warning', text: '请填写返修要求。' })
+      return
+    }
+    if (reason.length > 500) {
+      setNotice({ type: 'warning', text: '返修要求不能超过 500 字。' })
+      return
+    }
+    setActionLoading(true)
+    setNotice(null)
+    try {
+      await orderApi.requestRework(order.orderId, reason, currentUser)
+      setReworkDialogOpen(false)
+      setReworkRequirement('')
+      await reloadOrderAndDeliveries()
+      setNotice({ type: 'success', text: '返修要求已提交。' })
+    } catch (actionError) {
+      setNotice({ type: 'error', text: actionError.message || '返修要求提交失败。' })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   const selectedFiles = files.filter(file => selectedIds.has(file.id))
   const viewerFile = viewerIndex >= 0 ? files[viewerIndex] : null
   const viewerUrl = viewerFile ? previewUrls[viewerFile.id] || previewUrls[viewerFile.fileId] : ''
   const conversationId = location.state?.conversationId || new URLSearchParams(location.search).get('conversationId')
+  const currentUserId = Number(currentUser?.userId)
+  const canCustomerAct = Number(order?.customerId) === currentUserId && order?.status === 'DELIVERED_PENDING_CONFIRM'
+  const isProvider = Number(order?.providerUserId) === currentUserId
+  const isReworkForProvider = isProvider && order?.status === 'REWORK_REQUIRED'
+  const isCompleted = order?.status === 'COMPLETED'
 
   if (loading) {
     return <PortraEmptyState title="交付记录加载中" description="正在读取订单和交付作品。" />
@@ -219,6 +280,36 @@ export function DeliveryGalleryPage() {
             <PortraInfoBanner>
               图片会在可预览时显示缩略图；没有真实预览 URL 的文件会保持占位，不伪造图片。
             </PortraInfoBanner>
+            <Divider sx={{ borderColor: PORTRA_SURFACE.borderSoft }} />
+            <PortraTicketSection title="处理动作">
+              {canCustomerAct && (
+                <Stack spacing={1}>
+                  <PortraInfoBanner tone="warning">请确认作品是否符合约定；确认接收后订单将完成。</PortraInfoBanner>
+                  <PortraActionButton startIcon={<CheckCircleRoundedIcon />} onClick={confirmDelivery} disabled={actionLoading}>
+                    确认接收作品
+                  </PortraActionButton>
+                  <PortraActionButton tone="secondary" startIcon={<RefreshRoundedIcon />} onClick={() => setReworkDialogOpen(true)} disabled={actionLoading}>
+                    提交返修要求
+                  </PortraActionButton>
+                </Stack>
+              )}
+              {isReworkForProvider && (
+                <Stack spacing={1}>
+                  <PortraInfoBanner tone="warning">客户已提出返修要求，请回到会话重新上传作品。</PortraInfoBanner>
+                  {conversationId && (
+                    <Button startIcon={<ForumRoundedIcon />} variant="outlined" onClick={() => navigate(`/messages/${conversationId}`)}>
+                      进入会话重新上传作品
+                    </Button>
+                  )}
+                </Stack>
+              )}
+              {isCompleted && (
+                <PortraInfoBanner>订单已完成，可返回订单档案查看评价入口。</PortraInfoBanner>
+              )}
+              {!canCustomerAct && !isReworkForProvider && !isCompleted && (
+                <PortraInfoBanner>当前状态没有需要你处理的交付动作。</PortraInfoBanner>
+              )}
+            </PortraTicketSection>
           </Stack>
         </Paper>
       </Box>
@@ -233,6 +324,41 @@ export function DeliveryGalleryPage() {
         onPrev={() => setViewerIndex(index => (index <= 0 ? files.length - 1 : index - 1))}
         onNext={() => setViewerIndex(index => (index >= files.length - 1 ? 0 : index + 1))}
         onDownload={downloadFile}
+      />
+
+      <Dialog open={reworkDialogOpen} onClose={() => setReworkDialogOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>提交返修要求</DialogTitle>
+        <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
+          <Stack component="form" id="delivery-gallery-rework-form" spacing={1.5} onSubmit={submitRework}>
+            <PortraInfoBanner tone="warning">请说明需要返修的照片、问题和期望修改方向。</PortraInfoBanner>
+            <TextField
+              autoFocus
+              label="返修要求"
+              value={reworkRequirement}
+              onChange={event => setReworkRequirement(event.target.value)}
+              multiline
+              minRows={4}
+              inputProps={{ maxLength: 500 }}
+              helperText={`${reworkRequirement.length}/500`}
+              required
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ bgcolor: PORTRA_SURFACE.paperMuted }}>
+          <Button color="inherit" onClick={() => setReworkDialogOpen(false)}>取消</Button>
+          <Button type="submit" form="delivery-gallery-rework-form" variant="contained" disabled={actionLoading || !reworkRequirement.trim()}>
+            提交返修
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <OrderCompletionDialog
+        open={completionDialogOpen}
+        onClose={() => setCompletionDialogOpen(false)}
+        onReview={() => {
+          setCompletionDialogOpen(false)
+          goToOrder(navigate, order?.orderId, { state: { orderId: order?.orderId, focusReview: true } })
+        }}
       />
     </Stack>
   )
