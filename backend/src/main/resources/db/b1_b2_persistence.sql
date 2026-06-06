@@ -29,7 +29,6 @@ CREATE TABLE IF NOT EXISTS service_packages (
     time_tags TEXT NOT NULL,
     status VARCHAR(30) NOT NULL DEFAULT 'ONLINE',
     is_available BOOLEAN NOT NULL DEFAULT TRUE,
-    temporary_schedule_hold_id BIGINT NULL,
     hidden_by_provider BOOLEAN NOT NULL DEFAULT FALSE,
     hidden_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -225,7 +224,6 @@ CALL b1b2_add_column_if_missing('service_packages', 'portfolio_ids', 'portfolio_
 CALL b1b2_add_column_if_missing('service_packages', 'time_description', 'time_description TEXT NULL');
 CALL b1b2_add_column_if_missing('service_packages', 'time_tags', 'time_tags TEXT NULL');
 CALL b1b2_add_column_if_missing('service_packages', 'is_available', 'is_available BOOLEAN NULL');
-CALL b1b2_add_column_if_missing('service_packages', 'temporary_schedule_hold_id', 'temporary_schedule_hold_id BIGINT NULL');
 CALL b1b2_add_column_if_missing('service_packages', 'hidden_by_provider', 'hidden_by_provider BOOLEAN NULL');
 CALL b1b2_add_column_if_missing('service_packages', 'hidden_at', 'hidden_at DATETIME NULL');
 
