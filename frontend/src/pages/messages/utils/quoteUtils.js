@@ -1,12 +1,9 @@
 import { yuanToCent } from '../../../utils/index.js'
+import { QUOTE_STATUS_LABELS } from '../../../utils/displayFormatters.js'
 import { getCurrentUserId } from './workbenchState.js'
 
 export const quoteStatusMap = {
-  PENDING_CONFIRM: '待确认',
-  CONFIRMED: '已确认',
-  REJECTED: '已拒绝',
-  EXPIRED: '已过期',
-  CANCELLED: '已取消'
+  ...QUOTE_STATUS_LABELS
 }
 
 export function getQuoteStatusLabel(status) {
