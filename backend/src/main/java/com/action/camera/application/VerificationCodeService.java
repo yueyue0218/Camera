@@ -25,6 +25,9 @@ public class VerificationCodeService {
     @Value("${spring.mail.username:}")
     private String fromEmail;
 
+    @Value("${CAMERA_DEMO_BYPASS_CODE:}")
+    private String demoBypassCode;
+
     private final ConcurrentHashMap<String, CodeEntry> store = new ConcurrentHashMap<>();
     private final SecureRandom random = new SecureRandom();
 
@@ -40,6 +43,10 @@ public class VerificationCodeService {
         CodeEntry existing = store.get(email);
         if (existing != null && now - existing.sentAt < RESEND_COOLDOWN_MS) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "发送过于频繁，请稍后再试");
+        }
+        if (demoBypassCode != null && !demoBypassCode.isEmpty()) {
+            store.put(email, new CodeEntry(demoBypassCode, now + CODE_TTL_MS, now));
+            return;
         }
         String code = String.format("%06d", random.nextInt(1_000_000));
         sendEmail(email, code);
