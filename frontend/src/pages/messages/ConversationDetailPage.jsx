@@ -16,8 +16,7 @@ import { ConversationWorkbenchPanel } from './components/ConversationWorkbenchPa
 import { ConversationActionDialogs } from './components/ConversationActionDialogs.jsx'
 import { QuoteDraftDialog } from './components/QuoteDraftDialog.jsx'
 import { MessageWorkbenchErrorBoundary } from './components/MessageWorkbenchErrorBoundary.jsx'
-import { StatusChip } from './components/StatusChip.jsx'
-import { OrderCompletionDialog, PortraContextActionButton, PortraWorkbenchFrame, PortraWorkflowFrame } from '../../components/portra/index.js'
+import { OrderCompletionDialog, PortraActionLink, PortraStatusPill, PortraWorkbenchFrame, PortraWorkflowFrame } from '../../components/portra/index.js'
 import { PORTRA_LAYOUT } from '../../theme/portraSurfaceTokens.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from './MessageVisualTokens.js'
 import {
@@ -600,14 +599,14 @@ export function ConversationDetailPage() {
             </Box>
           </Stack>
           <Stack direction="row" spacing={0.8} sx={{ alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
-            <StatusChip label={actions.stage.title} emphasis />
-            <PortraContextActionButton
+            <PortraStatusPill label={actions.stage.title} />
+            <PortraActionLink
               startIcon={<ReceiptLongRoundedIcon />}
               onClick={() => openOrderArchive(currentOrder?.orderId)}
               disabled={!currentOrder?.orderId}
             >
               查看订单
-            </PortraContextActionButton>
+            </PortraActionLink>
           </Stack>
         </Stack>
       </Paper>

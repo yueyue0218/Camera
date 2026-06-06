@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Paper, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Paper, Stack, TextField, Typography } from '@mui/material'
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import ForumRoundedIcon from '@mui/icons-material/ForumRounded'
@@ -16,7 +16,7 @@ import {
   navigateToConversation
 } from '../../utils/conversationNavigation.js'
 import { formatOrderTitle } from '../../utils/displayFormatters.js'
-import { OrderCompletionDialog, PortraActionButton, PortraContextActionButton, PortraEmptyState, PortraInfoBanner, PortraStatusBadge, PortraTicketSection, PortraWorkflowFrame } from '../../components/portra/index.js'
+import { OrderCompletionDialog, PortraActionButton, PortraActionLink, PortraContextActionButton, PortraEmptyState, PortraInfoBanner, PortraStatusPill, PortraTicketSection, PortraWorkflowFrame } from '../../components/portra/index.js'
 import { PORTRA_LAYOUT, PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
 import { centToYuan } from '../../utils/index.js'
 import {
@@ -253,24 +253,26 @@ export function DeliveryGalleryPage() {
             </Box>
           </Stack>
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
-            <PortraStatusBadge label={batch.statusLabel} />
-            <Chip icon={<ReceiptLongIconShim />} label={formatOrderTitle(order)} />
+            <PortraStatusPill label={batch.statusLabel} />
+            <Typography sx={{ color: PORTRA_SURFACE.muted, fontSize: 13, fontWeight: 800 }}>
+              {formatOrderTitle(order)}
+            </Typography>
             {primaryBackIsConversation ? (
-              <PortraContextActionButton
+              <PortraActionLink
                 startIcon={<ReceiptLongRoundedIcon />}
                 onClick={() => goToOrder(navigate, orderId, { conversationId: associatedConversationId, returnTo: explicitReturnToConversation })}
                 sx={secondaryPillSx}
               >
                 查看订单
-              </PortraContextActionButton>
+              </PortraActionLink>
             ) : associatedConversationId ? (
-              <PortraContextActionButton
+              <PortraActionLink
                 startIcon={<ForumRoundedIcon />}
                 onClick={() => navigateToConversation(navigate, associatedConversationId)}
                 sx={secondaryPillSx}
               >
-                继续沟通
-              </PortraContextActionButton>
+                联系对方
+              </PortraActionLink>
             ) : null}
           </Stack>
         </Stack>
@@ -413,10 +415,6 @@ function InfoBlock({ label, value }) {
       <Typography variant="body2" sx={{ color: PORTRA_SURFACE.ink, fontWeight: 850, lineHeight: 1.65 }}>{value || '暂无'}</Typography>
     </Stack>
   )
-}
-
-function ReceiptLongIconShim() {
-  return <ReceiptLongRoundedIcon fontSize="small" />
 }
 
 const headerSx = {

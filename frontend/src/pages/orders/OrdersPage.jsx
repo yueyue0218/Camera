@@ -23,7 +23,6 @@ import {
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
-import ForumRoundedIcon from '@mui/icons-material/ForumRounded'
 import GavelRoundedIcon from '@mui/icons-material/GavelRounded'
 import AddPhotoAlternateRoundedIcon from '@mui/icons-material/AddPhotoAlternateRounded'
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded'
@@ -64,12 +63,13 @@ import {
 } from '../../utils/displayFormatters.js'
 import {
   PortraActionButton,
-  PortraContextActionButton,
+  PortraActionLink,
   PortraEmptyState,
   PortraInfoBanner,
   OrderCompletionDialog,
   PortraWorkflowFrame,
   PortraStatusBadge,
+  PortraStatusPill,
   PortraTicketCard,
   PortraTicketSection,
   PortraTimeline
@@ -822,14 +822,14 @@ export function OrdersPage() {
               <Stack spacing={2}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between' }}>
                   <Box>
-                    {canReturnToConversation && (
-                      <PortraContextActionButton
-                        startIcon={<ArrowBackRoundedIcon />}
-                        onClick={returnToConversation}
+                    {(canReturnToConversation || canContinueConversation) && (
+                      <PortraActionLink
+                        startIcon={canReturnToConversation ? <ArrowBackRoundedIcon /> : null}
+                        onClick={canReturnToConversation ? returnToConversation : continueConversation}
                         sx={returnLinkSx}
                       >
-                        返回沟通
-                      </PortraContextActionButton>
+                        {canReturnToConversation ? '返回沟通' : '联系对方'}
+                      </PortraActionLink>
                     )}
                     <Typography variant="h5" sx={{ fontSize: { xs: 20, md: 24 }, color: PORTRA_SURFACE.ink, fontWeight: 950 }}>{selectedOrderTitle}</Typography>
                     <Typography sx={{ color: PORTRA_SURFACE.muted, mt: 0.4 }}>
@@ -840,12 +840,9 @@ export function OrdersPage() {
                     </Typography>
                   </Box>
                   <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                    <PortraContextActionButton startIcon={<ForumRoundedIcon />} onClick={continueConversation} disabled={!canContinueConversation}>
-                      继续沟通
-                    </PortraContextActionButton>
-                    <PortraStatusBadge label={selectedOrderPerspective || '身份待确认'} tone="neutral" />
-                    <PortraStatusBadge label={formatOrderStatus(selectedOrder.status)} />
-                    <PortraStatusBadge label={formatEscrowStatus(selectedOrder.escrowStatus)} />
+                    <PortraStatusPill label={selectedOrderPerspective || '身份待确认'} tone="neutral" />
+                    <PortraStatusPill label={formatOrderStatus(selectedOrder.status)} />
+                    <PortraStatusPill label={formatEscrowStatus(selectedOrder.escrowStatus)} />
                   </Stack>
                 </Stack>
                 <Divider sx={{ borderColor: PORTRA_SURFACE.borderSoft }} />

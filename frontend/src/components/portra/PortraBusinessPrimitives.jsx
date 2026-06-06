@@ -95,7 +95,7 @@ export function PortraTicketSection({ title, eyebrow, action, children, sx }) {
   )
 }
 
-export function PortraStatusBadge({ label, tone, sx }) {
+export function PortraStatusPill({ label, tone, sx }) {
   const resolvedTone = tone || inferStatusTone(label)
   const colors = toneMap[resolvedTone] || toneMap.neutral
   return (
@@ -108,12 +108,18 @@ export function PortraStatusBadge({ label, tone, sx }) {
         bgcolor: colors.bgcolor,
         color: colors.color,
         fontSize: 12,
-        fontWeight: 850,
-        '& .MuiChip-label': { px: 1 },
+        fontWeight: 800,
+        boxShadow: 'none',
+        cursor: 'default',
+        '& .MuiChip-label': { px: 1.05 },
         ...sx
       }}
     />
   )
+}
+
+export function PortraStatusBadge(props) {
+  return <PortraStatusPill {...props} />
 }
 
 export function PortraInfoBanner({ tone = 'info', title, children, action, sx }) {
@@ -211,6 +217,7 @@ export function PortraActionButton({ children, tone = 'primary', sx, ...props })
       sx={{
         borderRadius: PORTRA_RADIUS.compact,
         px: 1.35,
+        minHeight: primary ? 40 : 34,
         fontWeight: 850,
         textTransform: 'none',
         bgcolor: primary ? PORTRA_SURFACE.portraBlue : 'transparent',
@@ -219,6 +226,75 @@ export function PortraActionButton({ children, tone = 'primary', sx, ...props })
         '&:hover': {
           bgcolor: primary ? PORTRA_SURFACE.portraBlueHover : PORTRA_SURFACE.portraBlueSoft,
           borderColor: PORTRA_SURFACE.portraBlue
+        },
+        ...sx
+      }}
+    >
+      {children}
+    </Button>
+  )
+}
+
+export function PortraPrimaryAction({ children, sx, ...props }) {
+  return (
+    <PortraActionButton
+      tone="primary"
+      {...props}
+      sx={{
+        borderRadius: PORTRA_RADIUS.control,
+        minHeight: 40,
+        px: 1.6,
+        boxShadow: 'none',
+        ...sx
+      }}
+    >
+      {children}
+    </PortraActionButton>
+  )
+}
+
+export function PortraSecondaryAction({ children, sx, ...props }) {
+  return (
+    <PortraActionButton
+      tone="secondary"
+      {...props}
+      sx={{
+        borderRadius: PORTRA_RADIUS.control,
+        minHeight: 34,
+        px: 1.35,
+        color: PORTRA_SURFACE.ink,
+        borderColor: PORTRA_SURFACE.borderSubtle,
+        ...sx
+      }}
+    >
+      {children}
+    </PortraActionButton>
+  )
+}
+
+export function PortraActionLink({ children, sx, ...props }) {
+  return (
+    <Button
+      size="small"
+      variant="text"
+      {...props}
+      sx={{
+        minHeight: 28,
+        minWidth: 0,
+        px: 0.45,
+        py: 0,
+        borderRadius: PORTRA_RADIUS.control,
+        textTransform: 'none',
+        fontSize: 12.5,
+        fontWeight: 850,
+        lineHeight: 1.2,
+        color: PORTRA_SURFACE.portraBlue,
+        '& .MuiButton-startIcon': {
+          mr: 0.45,
+          '& svg': { fontSize: 16 }
+        },
+        '&:hover': {
+          bgcolor: 'rgba(13,47,178,.06)'
         },
         ...sx
       }}
@@ -266,5 +342,62 @@ export function PortraContextActionButton({ children, emphasis = false, sx, ...p
     >
       {children}
     </Button>
+  )
+}
+
+export function PortraSystemNotice({ children, time, action, sx }) {
+  return (
+    <Box
+      data-portra-system-notice="true"
+      sx={{
+        display: 'flex',
+        justifyContent: 'center',
+        px: { xs: 1, md: 2 },
+        ...sx
+      }}
+    >
+      <Stack
+        direction="row"
+        spacing={0.75}
+        sx={{
+          maxWidth: { xs: 'min(94%, 520px)', md: 520 },
+          minHeight: 26,
+          px: 0.75,
+          py: 0.15,
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexWrap: 'wrap',
+          rowGap: 0.15,
+          bgcolor: 'rgba(248,243,235,.38)',
+          borderRadius: PORTRA_RADIUS.compact,
+          boxShadow: 'none'
+        }}
+      >
+        <Typography sx={{ color: PORTRA_SURFACE.muted, fontSize: 12.5, fontWeight: 700, lineHeight: 1.35 }}>
+          {children}
+        </Typography>
+        {time && <Typography sx={{ color: PORTRA_SURFACE.faint, fontSize: 11.5, lineHeight: 1.2 }}>{time}</Typography>}
+        {action}
+      </Stack>
+    </Box>
+  )
+}
+
+export function PortraWorkflowPanel({ children, sx, ...props }) {
+  return (
+    <Box
+      {...props}
+      sx={{
+        p: { xs: 1.25, md: 1.4 },
+        bgcolor: 'rgba(248,243,235,.72)',
+        border: `1px solid ${PORTRA_SURFACE.borderSoft}`,
+        borderRadius: PORTRA_RADIUS.card,
+        boxShadow: 'none',
+        minWidth: 0,
+        ...sx
+      }}
+    >
+      {children}
+    </Box>
   )
 }
