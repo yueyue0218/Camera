@@ -67,12 +67,13 @@ import {
   PortraEmptyState,
   PortraInfoBanner,
   OrderCompletionDialog,
+  PortraWorkflowFrame,
   PortraStatusBadge,
   PortraTicketCard,
   PortraTicketSection,
   PortraTimeline
 } from '../../components/portra/index.js'
-import { PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
+import { PORTRA_LAYOUT, PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
 import {
   canCustomerConfirm,
   canCustomerPay,
@@ -734,7 +735,7 @@ export function OrdersPage() {
   }
 
   return (
-    <Stack spacing={2.5} sx={orderPageSx}>
+    <PortraWorkflowFrame spacing={2.5} maxWidth="workflow" sx={orderPageSx}>
       <OrdersSectionHeader title="订单" subtitle="查看订单进展、平台担保状态和每次状态流转。" />
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
 
@@ -815,7 +816,7 @@ export function OrdersPage() {
         {!selectedOrder ? (
           <EmptyOrderCard text="选择订单查看详情" />
         ) : (
-          <Stack spacing={2}>
+          <Stack spacing={2} sx={orderDetailWorkspaceSx}>
             <Paper variant="outlined" sx={orderArchiveHeroSx}>
               <Stack spacing={2}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between' }}>
@@ -1351,7 +1352,7 @@ export function OrdersPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Stack>
+    </PortraWorkflowFrame>
   )
 }
 
@@ -1361,18 +1362,30 @@ const orderPageSx = {
 
 const orderGridSx = {
   display: 'grid',
-  gridTemplateColumns: { xs: '1fr', md: '330px minmax(0, 1fr)' },
-  gap: { xs: 1.6, md: 2.4 },
-  alignItems: 'start'
+  gridTemplateColumns: {
+    xs: 'minmax(0, 1fr)',
+    md: `${PORTRA_LAYOUT.orderSidebarWidth.md} minmax(0, 1fr)`,
+    xl: `${PORTRA_LAYOUT.orderSidebarWidth.xl} minmax(0, 1fr)`
+  },
+  gap: { xs: 1.6, md: 3 },
+  alignItems: 'start',
+  minWidth: 0
 }
 
 const orderIndexPanelSx = {
   p: { xs: 1.6, md: 1.8 },
   alignSelf: 'start',
+  minWidth: 0,
   bgcolor: PORTRA_SURFACE.paper,
   borderColor: PORTRA_SURFACE.borderSubtle,
   borderRadius: PORTRA_RADIUS.panel,
   boxShadow: PORTRA_SHADOW.soft
+}
+
+const orderDetailWorkspaceSx = {
+  minWidth: 0,
+  width: '100%',
+  maxWidth: 980
 }
 
 const filterControlSx = {

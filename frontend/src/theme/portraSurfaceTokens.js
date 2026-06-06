@@ -39,6 +39,34 @@ export const PORTRA_SHADOW = {
   hover: '0 6px 20px rgba(13,47,178,.10)'
 }
 
+export const PORTRA_LAYOUT = {
+  pageMaxWidth: 1360,
+  workflowMaxWidth: 1360,
+  wideWorkflowMaxWidth: 1440,
+  galleryMaxWidth: 1320,
+  pageGutter: 'clamp(20px, 4vw, 48px)',
+  pageGutterTotal: 'clamp(40px, 8vw, 96px)',
+  mobileGutterTotal: '24px',
+  contentTopGap: 24,
+  sectionGap: 24,
+  workbenchHeight: {
+    xs: 'calc(100dvh - 212px)',
+    md: 'calc(100dvh - 154px)'
+  },
+  rightPanelWidth: {
+    lg: '320px',
+    xl: '320px'
+  },
+  compactRightPanelWidth: {
+    lg: '300px',
+    xl: '320px'
+  },
+  orderSidebarWidth: {
+    md: '320px',
+    xl: '328px'
+  }
+}
+
 export const PORTRA_ARCHIVE_SURFACE_SX = {
   bgcolor: PORTRA_SURFACE.paper,
   borderColor: PORTRA_SURFACE.borderSubtle,

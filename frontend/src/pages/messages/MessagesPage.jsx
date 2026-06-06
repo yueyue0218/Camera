@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { conversationApi, orderApi } from '../../api.js'
 import { navigateToConversation } from '../../utils/conversationNavigation.js'
+import { PortraPageFrame } from '../../components/portra/index.js'
 import { ConversationList } from './components/ConversationList.jsx'
 import { MessagesSectionHeader } from './components/MessagesSectionHeader.jsx'
 import {
@@ -65,7 +66,7 @@ export function MessagesPage() {
   }, [getCurrentUserId(currentUser), currentUser.role, currentUser.token, location.search, navigate])
 
   return (
-    <Stack spacing={2} sx={{ maxWidth: 1120, mx: 'auto', color: PORTRA_COLORS.ink }}>
+    <PortraPageFrame component={Stack} spacing={2} maxWidth={1120} sx={{ color: PORTRA_COLORS.ink }}>
       <MessagesSectionHeader title="消息" subtitle="管理正在沟通的约拍、报价和交付进展" />
       <Box>
         {location.state?.roleMismatch && <Alert severity="info" sx={noticeSx}>这条沟通属于另一身份视角，请切换身份后查看。</Alert>}
@@ -76,7 +77,7 @@ export function MessagesPage() {
         currentUser={currentUser}
         onOpenConversation={conversationId => navigateToConversation(navigate, conversationId)}
       />
-    </Stack>
+    </PortraPageFrame>
   )
 }
 

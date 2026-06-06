@@ -16,8 +16,8 @@ import {
   navigateToConversation
 } from '../../utils/conversationNavigation.js'
 import { formatOrderTitle } from '../../utils/displayFormatters.js'
-import { OrderCompletionDialog, PortraActionButton, PortraEmptyState, PortraInfoBanner, PortraStatusBadge, PortraTicketSection } from '../../components/portra/index.js'
-import { PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
+import { OrderCompletionDialog, PortraActionButton, PortraEmptyState, PortraInfoBanner, PortraStatusBadge, PortraTicketSection, PortraWorkflowFrame } from '../../components/portra/index.js'
+import { PORTRA_LAYOUT, PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
 import { centToYuan } from '../../utils/index.js'
 import {
   buildDeliveryBatches,
@@ -219,7 +219,7 @@ export function DeliveryGalleryPage() {
 
   if (!batch) {
     return (
-      <Stack spacing={1.5}>
+      <PortraWorkflowFrame spacing={1.5} maxWidth="gallery">
         <Button
           startIcon={<ArrowBackRoundedIcon />}
           color="inherit"
@@ -230,12 +230,12 @@ export function DeliveryGalleryPage() {
           {primaryBackIsConversation ? '返回沟通' : '返回订单'}
         </Button>
         <PortraEmptyState title="作品记录不存在" description="该作品记录可能不属于当前订单，或已经被移除。" />
-      </Stack>
+      </PortraWorkflowFrame>
     )
   }
 
   return (
-    <Stack spacing={2.2} sx={{ width: '100%', maxWidth: 1280, mx: 'auto', color: PORTRA_SURFACE.ink }}>
+    <PortraWorkflowFrame spacing={2.2} maxWidth="gallery" sx={{ color: PORTRA_SURFACE.ink }}>
       <Paper variant="outlined" sx={headerSx}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.4} sx={{ justifyContent: 'space-between', alignItems: { xs: 'stretch', md: 'center' } }}>
           <Stack spacing={0.8}>
@@ -401,7 +401,7 @@ export function DeliveryGalleryPage() {
           goToOrder(navigate, order?.orderId, { state: { orderId: order?.orderId, focusReview: true } })
         }}
       />
-    </Stack>
+    </PortraWorkflowFrame>
   )
 }
 
@@ -438,9 +438,14 @@ const headerSx = {
 
 const galleryGridSx = {
   display: 'grid',
-  gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) 330px' },
-  gap: 2,
-  alignItems: 'start'
+  gridTemplateColumns: {
+    xs: 'minmax(0, 1fr)',
+    lg: `minmax(0, 1fr) ${PORTRA_LAYOUT.compactRightPanelWidth.lg}`,
+    xl: `minmax(0, 1fr) ${PORTRA_LAYOUT.compactRightPanelWidth.xl}`
+  },
+  gap: { xs: 1.6, lg: 3 },
+  alignItems: 'start',
+  minWidth: 0
 }
 
 const galleryPanelSx = {

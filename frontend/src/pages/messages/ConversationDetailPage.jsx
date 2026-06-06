@@ -17,7 +17,7 @@ import { ConversationActionDialogs } from './components/ConversationActionDialog
 import { QuoteDraftDialog } from './components/QuoteDraftDialog.jsx'
 import { MessageWorkbenchErrorBoundary } from './components/MessageWorkbenchErrorBoundary.jsx'
 import { StatusChip } from './components/StatusChip.jsx'
-import { OrderCompletionDialog } from '../../components/portra/index.js'
+import { OrderCompletionDialog, PortraWorkbenchFrame, PortraWorkflowFrame } from '../../components/portra/index.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from './MessageVisualTokens.js'
 import {
   addLocalMessage,
@@ -540,18 +540,12 @@ export function ConversationDetailPage() {
 
   return (
     <MessageWorkbenchErrorBoundary resetKey={`${conversationId}-${currentUser.role}`}>
-    <Stack
+    <PortraWorkflowFrame
       data-message-detail-shell="true"
       spacing={1.2}
+      maxWidth="workflow"
+      height={DETAIL_SHELL_HEIGHT}
       sx={{
-        width: { xs: '100%', lg: 'min(1360px, calc(100vw - 48px))' },
-        maxWidth: { lg: 1360 },
-        mx: { xs: 0, lg: 'auto' },
-        position: { lg: 'relative' },
-        left: { lg: '50%' },
-        transform: { lg: 'translateX(-50%)' },
-        height: DETAIL_SHELL_HEIGHT,
-        maxHeight: DETAIL_SHELL_HEIGHT,
         minHeight: 0,
         overflow: 'hidden'
       }}
@@ -622,15 +616,11 @@ export function ConversationDetailPage() {
 
       {notice && <Alert severity={notice.type} sx={noticeSx}>{notice.text}</Alert>}
 
-      <Box sx={{
-        flex: 1,
-        minHeight: 0,
-        display: 'grid',
-        gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(720px, 1fr) 300px', xl: 'minmax(760px, 1fr) 312px' },
-        gap: { xs: 1.25, lg: 2.25, xl: 2.5 },
-        alignItems: 'stretch',
-        overflow: 'hidden'
-      }} data-message-workbench-grid="true">
+      <PortraWorkbenchFrame
+        data-message-workbench-grid="true"
+        rightPanelWidth={{ lg: '320px', xl: '320px' }}
+        gap={{ xs: 1.25, lg: 2.25, xl: 2.5 }}
+      >
         <Box sx={{ minHeight: 0, minWidth: 0, height: '100%', display: 'flex', overflow: 'hidden' }}>
           <ConversationThread
             messages={messages}
@@ -711,7 +701,7 @@ export function ConversationDetailPage() {
           onUnavailableTool={showUnavailableTool}
           onOpenAction={setActiveAction}
         />
-      </Box>
+      </PortraWorkbenchFrame>
       <ConversationActionDialogs
         activeAction={activeAction}
         loading={loading}
@@ -752,7 +742,7 @@ export function ConversationDetailPage() {
         }}
         reviewDisabled={!currentOrder?.orderId}
       />
-    </Stack>
+    </PortraWorkflowFrame>
     </MessageWorkbenchErrorBoundary>
   )
 }
