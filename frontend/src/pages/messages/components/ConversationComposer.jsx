@@ -208,19 +208,20 @@ export function ConversationComposer({
           />
           <Button
             variant="contained"
-            endIcon={<SendRoundedIcon />}
             onClick={onSendMessage}
             disabled={!content.trim() || loading}
+            aria-label="发送"
             sx={{
-              minWidth: 92,
+              minWidth: 44,
+              width: 44,
               height: 44,
-              borderRadius: PORTRA_RADII.control,
+              borderRadius: '50%',
               bgcolor: PORTRA_COLORS.blue,
               '&:hover': { bgcolor: PORTRA_COLORS.blueDark },
               '&.Mui-disabled': { bgcolor: PORTRA_COLORS.paperMuted, color: PORTRA_COLORS.faintInk }
             }}
           >
-            发送
+            <SendRoundedIcon />
           </Button>
         </Stack>
       </Stack>

@@ -1,5 +1,6 @@
-import { Box, Paper, Stack, Typography } from '@mui/material'
-import { PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
+import { Box, Stack, Typography } from '@mui/material'
+import { PortraTicketCard } from '../../../components/portra/index.js'
+import { PORTRA_COLORS } from '../MessageVisualTokens.js'
 import { MessageActorAvatar } from './MessageActorAvatar.jsx'
 
 export function EventAttachmentCard({ side, actor, title, summary, timestamp, children, actions }) {
@@ -25,18 +26,15 @@ export function EventAttachmentCard({ side, actor, title, summary, timestamp, ch
           fallbackText="对"
           sx={{ mt: 0.25, fontWeight: 950 }}
         />
-        <Paper
-          variant="outlined"
+        <PortraTicketCard
+          accent={accent}
           sx={{
             width: { xs: 'min(100%, 520px)', md: 'clamp(460px, 54vw, 560px)' },
             maxWidth: '100%',
             px: 1.55,
             py: 1.3,
-            bgcolor: PORTRA_COLORS.white,
-            borderColor: PORTRA_COLORS.borderMuted,
-            borderLeft: `3px solid ${accent}`,
-            borderRadius: self ? '18px 18px 5px 18px' : '18px 18px 18px 5px',
-            boxShadow: PORTRA_SHADOWS.subtle
+            pl: 2.2,
+            borderRadius: self ? '18px 18px 5px 18px' : '18px 18px 18px 5px'
           }}
         >
           <Stack spacing={0.85}>
@@ -48,7 +46,7 @@ export function EventAttachmentCard({ side, actor, title, summary, timestamp, ch
             {children}
             {actions}
           </Stack>
-        </Paper>
+        </PortraTicketCard>
       </Stack>
     </Box>
   )

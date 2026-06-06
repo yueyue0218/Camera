@@ -19,9 +19,9 @@ import {
 } from '@mui/material'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
 import { centToYuan } from '../../../utils/index.js'
+import { PortraStatusBadge } from '../../../components/portra/index.js'
 import { formatDate, formatTime } from '../utils/conversationUtils.js'
 import { getPhotoUsageScopeLabel, getQuoteStatusLabel } from '../utils/quoteUtils.js'
-import { StatusChip } from './StatusChip.jsx'
 
 export function ConversationActionDialogs({
   activeAction,
@@ -78,8 +78,8 @@ export function ConversationActionDialogs({
           {quote ? (
             <Stack spacing={1.4} sx={{ pt: 1 }}>
               <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography sx={{ color: PORTRA_COLORS.blue, fontSize: 24, fontWeight: 950 }}>{centToYuan(quote.amountCent)}</Typography>
-                <StatusChip label={getQuoteStatusLabel(quote.status)} />
+                <Typography sx={{ color: PORTRA_COLORS.ink, fontSize: 32, fontWeight: 950, lineHeight: 1 }}>{centToYuan(quote.amountCent)}</Typography>
+                <PortraStatusBadge label={getQuoteStatusLabel(quote.status)} />
               </Stack>
               <DetailRows rows={[
                 ['拍摄时间', `${formatTime(quote.shootStartTime)} - ${formatTime(quote.shootEndTime)}`],
@@ -240,14 +240,14 @@ export function ConversationActionDialogs({
 
 function DetailRows({ rows = [] }) {
   return (
-    <Stack spacing={0.7}>
+    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.1 }}>
       {(Array.isArray(rows) ? rows : []).map(([label, value]) => (
-        <Stack key={label} direction="row" spacing={1.2} sx={{ alignItems: 'flex-start' }}>
-          <Typography variant="caption" sx={{ width: 76, flexShrink: 0, color: PORTRA_COLORS.faintInk, fontWeight: 900 }}>{label}</Typography>
-          <Typography variant="body2" sx={{ color: PORTRA_COLORS.subInk, lineHeight: 1.65 }}>{value}</Typography>
-        </Stack>
+        <Box key={label} sx={{ minWidth: 0 }}>
+          <Typography sx={{ color: PORTRA_COLORS.faintInk, fontSize: 11, fontWeight: 900 }}>{label}</Typography>
+          <Typography sx={{ color: PORTRA_COLORS.subInk, fontSize: 14, lineHeight: 1.65 }}>{value}</Typography>
+        </Box>
       ))}
-    </Stack>
+    </Box>
   )
 }
 
@@ -256,8 +256,17 @@ const dialogPaperProps = {
     bgcolor: PORTRA_COLORS.paper,
     borderRadius: PORTRA_RADII.control,
     border: `1px solid ${PORTRA_COLORS.border}`,
-    borderTop: `4px solid ${PORTRA_COLORS.blue}`,
-    boxShadow: PORTRA_SHADOWS.floating
+    borderTop: `6px solid ${PORTRA_COLORS.blue}`,
+    boxShadow: PORTRA_SHADOWS.floating,
+    position: 'relative',
+    '&::after': {
+      content: '""',
+      position: 'absolute',
+      left: 24,
+      right: 24,
+      bottom: 58,
+      borderTop: '1px dashed rgba(13,47,178,.2)'
+    }
   }
 }
 

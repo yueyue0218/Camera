@@ -8,12 +8,12 @@ import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
 import UploadRoundedIcon from '@mui/icons-material/UploadRounded'
 import { centToYuan } from '../../../utils/index.js'
 import { buildOrderAction } from '../../../utils/orderNavigation.js'
+import { PortraStatusBadge } from '../../../components/portra/index.js'
 import { PHOTO_AUTHORIZATION_STATUS_LABELS } from '../../orders/orderActions.js'
 import { formatTime } from '../utils/conversationUtils.js'
 import { getPhotoUsageScopeLabel, getQuoteStatusLabel } from '../utils/quoteUtils.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII } from '../MessageVisualTokens.js'
 import { EventAttachmentCard } from './EventAttachmentCard.jsx'
-import { StatusChip } from './StatusChip.jsx'
 
 export function ConversationSystemItem({
   event,
@@ -180,7 +180,7 @@ function QuoteMeta({ quote }) {
         {centToYuan(quote.amountCent)} · {formatTime(quote.shootStartTime)} · {getSafeDisplayText(quote.location, '拍摄地点待确认')}
       </Typography>
       <Stack direction="row" spacing={0.6} sx={{ flexWrap: 'wrap' }}>
-        <StatusChip label={getQuoteStatusLabel(quote.status)} />
+        <PortraStatusBadge label={getQuoteStatusLabel(quote.status)} />
       </Stack>
     </Stack>
   )
@@ -205,7 +205,7 @@ function AuthorizationMeta({ authorization }) {
   if (!authorization) return null
   return (
     <Stack direction="row" spacing={0.8} sx={{ flexWrap: 'wrap' }}>
-      <StatusChip label={PHOTO_AUTHORIZATION_STATUS_LABELS[authorization.status] || '授权状态已更新'} />
+      <PortraStatusBadge label={PHOTO_AUTHORIZATION_STATUS_LABELS[authorization.status] || '授权状态已更新'} />
       {(authorization.files || []).map(file => <Chip key={file.id || file.fileId} size="small" label="已选交付作品" sx={metaChipSx} />)}
     </Stack>
   )

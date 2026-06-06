@@ -3,6 +3,7 @@ import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import { centToYuan } from '../../../utils/index.js'
 import { buildQuoteAction } from '../../../utils/orderNavigation.js'
+import { PortraInfoBanner, PortraStatusBadge, PortraTicketCard } from '../../../components/portra/index.js'
 import { formatTime } from '../utils/conversationUtils.js'
 import {
   canEditQuote,
@@ -13,7 +14,6 @@ import {
 import { InfoRows } from './InfoRows.jsx'
 import { QuoteForm } from './QuoteForm.jsx'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII } from '../MessageVisualTokens.js'
-import { StatusChip } from './StatusChip.jsx'
 
 export function QuotePanel({
   quotes,
@@ -57,22 +57,16 @@ export function QuotePanel({
           )}
         </Stack>
 
-        {quoteEntryHint && canSeeQuoteEntry && <Alert severity={canCreateQuote ? 'info' : 'warning'}>{quoteEntryHint}</Alert>}
+        {quoteEntryHint && canSeeQuoteEntry && <PortraInfoBanner tone={canCreateQuote ? 'info' : 'warning'}>{quoteEntryHint}</PortraInfoBanner>}
 
         {quotes.map(quote => {
           const orderAction = buildQuoteAction(quote)
           return (
-            <Paper
+            <PortraTicketCard
               key={quote.quotationId}
-              variant="outlined"
               sx={{
                 p: { xs: 1.6, md: 2 },
-                pl: { xs: 2.4, md: 3 },
-                bgcolor: PORTRA_COLORS.paper,
-                borderColor: PORTRA_COLORS.borderMuted,
-                borderLeft: `4px solid ${PORTRA_COLORS.blue}`,
-                borderRadius: PORTRA_RADII.panel,
-                boxShadow: 'none'
+                pl: { xs: 2.5, md: 3 }
               }}
             >
               <Stack spacing={1.2}>
@@ -84,7 +78,7 @@ export function QuotePanel({
                       {quote.quoteNo ? `报价编号 ${getSafeDisplayText(quote.quoteNo, '本次报价')}` : '确认前可继续沟通调整'}
                     </Typography>
                   </Box>
-                  <StatusChip label={getQuoteStatusLabel(quote.status)} />
+                  <PortraStatusBadge label={getQuoteStatusLabel(quote.status)} />
                 </Stack>
                 <InfoRows rows={[
                   ['拍摄地点', getSafeDisplayText(quote.location, '拍摄地点待确认')],
@@ -121,11 +115,11 @@ export function QuotePanel({
                       {orderAction.label}
                     </Button>
                   ) : (
-                    <Alert severity="info">报价已确认，订单信息会在本次合作面板中同步。</Alert>
+                    <PortraInfoBanner>报价已确认，订单信息会在本次合作面板中同步。</PortraInfoBanner>
                   )
                 )}
               </Stack>
-            </Paper>
+            </PortraTicketCard>
           )
         })}
         {!quotes.length && <Typography color="text.secondary">当前会话还没有正式报价。</Typography>}

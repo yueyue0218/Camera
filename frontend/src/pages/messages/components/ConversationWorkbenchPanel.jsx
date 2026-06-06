@@ -6,10 +6,10 @@ import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded'
 import { centToYuan } from '../../../utils/index.js'
 import { buildOrderAction } from '../../../utils/orderNavigation.js'
+import { PortraActionButton, PortraStatusBadge, PortraTicketCard } from '../../../components/portra/index.js'
 import { formatTime } from '../utils/conversationUtils.js'
 import { getPhotoUsageScopeLabel, getQuoteStatusLabel } from '../utils/quoteUtils.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
-import { StatusChip } from './StatusChip.jsx'
 import { WorkbenchSection } from './WorkbenchSection.jsx'
 
 function getLatestQuote(quotes) {
@@ -38,10 +38,11 @@ export function ConversationWorkbenchPanel({
       variant="outlined"
       sx={{
         p: { xs: 1.3, md: 1.5 },
-        bgcolor: PORTRA_COLORS.paper,
+        bgcolor: PORTRA_COLORS.paperMuted,
         borderColor: PORTRA_COLORS.borderMuted,
         borderRadius: PORTRA_RADII.panel,
         boxShadow: PORTRA_SHADOWS.subtle,
+        borderTop: `3px solid ${PORTRA_COLORS.blue}`,
         display: { xs: 'none', lg: 'block' },
         height: '100%',
         minHeight: 0,
@@ -103,13 +104,17 @@ export function ConversationWorkbenchPanel({
 
         {latestQuote && (
           <WorkbenchSection title="当前报价">
-            <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-              <StatusChip label={getQuoteStatusLabel(latestQuote.status)} />
-              <Typography sx={{ color: PORTRA_COLORS.blue, fontSize: 18, fontWeight: 900 }}>{centToYuan(latestQuote.amountCent)}</Typography>
-            </Stack>
-            <Typography sx={{ color: PORTRA_COLORS.mutedInk }} variant="body2">
-              {getSafeDisplayText(latestQuote.location, '拍摄地点待确认')} · {getPhotoUsageScopeLabel(latestQuote.photoUsageScope)}
-            </Typography>
+            <PortraTicketCard sx={{ p: 1.3, pl: 2.1, boxShadow: 'none' }}>
+              <Stack spacing={0.65}>
+                <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography sx={{ color: PORTRA_COLORS.ink, fontSize: 20, fontWeight: 950 }}>{centToYuan(latestQuote.amountCent)}</Typography>
+                  <PortraStatusBadge label={getQuoteStatusLabel(latestQuote.status)} />
+                </Stack>
+                <Typography sx={{ color: PORTRA_COLORS.mutedInk }} variant="body2">
+                  {getSafeDisplayText(latestQuote.location, '拍摄地点待确认')} · {getPhotoUsageScopeLabel(latestQuote.photoUsageScope)}
+                </Typography>
+              </Stack>
+            </PortraTicketCard>
           </WorkbenchSection>
         )}
 
@@ -119,9 +124,9 @@ export function ConversationWorkbenchPanel({
               {centToYuan(order.amountCent)} · {formatTime(order.shootStartTime)}
             </Typography>
             {orderAction && (
-              <Button variant="text" color="inherit" size="small" startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenOrderArchive(orderAction.orderId)} sx={{ alignSelf: 'flex-start', px: 0 }}>
+              <PortraActionButton tone="secondary" startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenOrderArchive(orderAction.orderId)} sx={{ alignSelf: 'flex-start', px: 1 }}>
                 {orderAction.label}
-              </Button>
+              </PortraActionButton>
             )}
           </WorkbenchSection>
         )}
