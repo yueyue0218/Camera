@@ -50,6 +50,19 @@ export const QUOTE_STATUS_LABELS = {
   CANCELLED: '已取消'
 }
 
+export const PHOTO_USAGE_SCOPE_LABELS = {
+  PERSONAL_ONLY: '仅限个人留念',
+  PERSONAL_USE: '仅限个人留念',
+  PRIVATE_USE: '仅限个人留念',
+  PORTFOLIO_ALLOWED: '可申请展示授权',
+  PUBLIC_DISPLAY: '可申请展示授权',
+  PORTFOLIO_USE: '可申请展示授权',
+  COMMERCIAL_ALLOWED: '包含商业使用约定',
+  COMMERCIAL_USE: '包含商业使用约定'
+}
+
+const RAW_WORKFLOW_ENUM_PATTERN = /\b(?:PENDING_PAYMENT|PAID_PENDING_SHOOT|PAID|SCHEDULED|DELIVERED_PENDING_CONFIRM|REWORK_REQUIRED|NOT_SETTLED|SETTLED|NONE|HOLD|HELD|RELEASED|PERSONAL_ONLY|PERSONAL_USE|PRIVATE_USE|PORTFOLIO_ALLOWED|PUBLIC_DISPLAY|PORTFOLIO_USE|COMMERCIAL_ALLOWED|COMMERCIAL_USE)\b/g
+
 function warnUnknown(kind, status) {
   if (status) {
     console.warn(`[display] unknown ${kind} status`, status)
@@ -158,7 +171,7 @@ export function sanitizeSeedText(value, fallback = '校园约拍服务') {
     .replace(/^UI_REVIEW_SEED\s*/i, '')
     .replace(/^Demo\s+\d+\s+pending\s+payment\s*/i, '')
     .replace(/^我接的拍摄\s*[^｜|]*[｜|]\s*/i, '')
-    .replace(/\b(?:PENDING_PAYMENT|PAID_PENDING_SHOOT|PAID|SCHEDULED|DELIVERED_PENDING_CONFIRM|REWORK_REQUIRED|NOT_SETTLED|SETTLED|NONE|HOLD|HELD|RELEASED)\b/g, '')
+    .replace(RAW_WORKFLOW_ENUM_PATTERN, '')
     .trim()
 
   if (/[｜|]/.test(text)) {
@@ -204,7 +217,7 @@ export function formatFileDisplayName(fileOrName, fallback = '作品文件') {
   const cleaned = raw
     .replace(/^UI_REVIEW_SEED[_\s-]*/i, '')
     .replace(/^Demo\s+\d+[_\s-]*/i, '')
-    .replace(/\b(?:PENDING_PAYMENT|NOT_SETTLED|NONE)\b/gi, '')
+    .replace(RAW_WORKFLOW_ENUM_PATTERN, '')
     .replace(/^[_\s-]+/, '')
     .replace(/\s{2,}/g, ' ')
     .trim()
@@ -248,10 +261,9 @@ export function formatQuoteRemark(quoteOrText, fallback = '无额外备注') {
 }
 
 export function formatPhotoUsageScope(scope) {
-  if (scope === 'PERSONAL_ONLY') return '仅限个人留念'
-  if (scope === 'PORTFOLIO_ALLOWED') return '可申请展示授权'
-  if (scope === 'COMMERCIAL_ALLOWED') return '包含商业使用约定'
-  return scope ? sanitizeSeedText(scope, '按双方约定使用') : '未填写'
+  const normalized = String(scope || '').trim().toUpperCase()
+  if (PHOTO_USAGE_SCOPE_LABELS[normalized]) return PHOTO_USAGE_SCOPE_LABELS[normalized]
+  return normalized ? sanitizeSeedText(scope, '按双方约定使用') : '未填写'
 }
 
 export function formatStatusLogText(log) {
