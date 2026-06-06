@@ -22,6 +22,7 @@ import {
 } from '@mui/material'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
+import ForumRoundedIcon from '@mui/icons-material/ForumRounded'
 import GavelRoundedIcon from '@mui/icons-material/GavelRounded'
 import AddPhotoAlternateRoundedIcon from '@mui/icons-material/AddPhotoAlternateRounded'
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded'
@@ -42,8 +43,13 @@ import {
   reviewApi,
   reviewComplaintApi
 } from '../../api.js'
-import { normalizeOrderId } from '../../utils/orderNavigation.js'
+import { buildOrderNavigationTarget, normalizeOrderId } from '../../utils/orderNavigation.js'
 import { goToDeliveryGallery } from '../../utils/deliveryNavigation.js'
+import {
+  getExplicitReturnToConversation,
+  navigateBackToConversation,
+  navigateToConversation
+} from '../../utils/conversationNavigation.js'
 import { centToYuan } from '../../utils/index.js'
 import {
   formatAuthorizationDescription,
@@ -280,6 +286,7 @@ export function OrdersPage() {
     const value = new URLSearchParams(location.search).get('orderId')
     return normalizeOrderId(location.state?.orderId) || normalizeOrderId(value)
   }, [location.search, location.state])
+  const explicitReturnToConversation = useMemo(() => getExplicitReturnToConversation(location), [location.search, location.state])
   const [orders, setOrders] = useState([])
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [statusLogs, setStatusLogs] = useState([])
@@ -420,7 +427,14 @@ export function OrdersPage() {
       setArbitrations(complaints)
       setShowReviewForm(false)
       setShowArbitrationForm(false)
-      if (updateUrl) navigate(`/orders?orderId=${orderId}`, { replace: true, state: { orderId } })
+      if (updateUrl) {
+        const searchConversationId = new URLSearchParams(location.search).get('conversationId')
+        const target = buildOrderNavigationTarget(orderId, {
+          conversationId: detail.conversationId || location.state?.conversationId || searchConversationId,
+          returnTo: explicitReturnToConversation
+        })
+        if (target) navigate(target.to, { replace: true, state: target.state })
+      }
       return true
     } catch (error) {
       setNotice({ type: 'error', text: error.message || '订单详情暂时无法打开，请刷新后重试。' })
@@ -685,6 +699,9 @@ export function OrdersPage() {
   const selectedOrderLocation = quoteSnapshot?.location || selectedOrder?.shootLocation || '未填写'
   const selectedOrderServiceContent = sanitizeSeedText(quoteSnapshot?.serviceContent || selectedOrder?.serviceContent, '校园约拍服务')
   const selectedOrderTitle = selectedOrder ? formatOrderTitle(selectedOrder, quoteSnapshot) : ''
+  const selectedOrderConversationId = selectedOrder?.conversationId
+  const canReturnToConversation = Boolean(explicitReturnToConversation)
+  const canContinueConversation = Boolean(selectedOrderConversationId)
   const statusTimelineItems = statusLogs.map(log => ({
     id: log.logId || `${log.orderId}-${log.createdAt}`,
     title: formatStatusLogText(log),
@@ -696,11 +713,23 @@ export function OrdersPage() {
   function openDeliveryBatch(batch) {
     const succeeded = goToDeliveryGallery(navigate, {
       orderId: selectedOrder?.orderId || batch?.orderId,
-      deliveryId: batch?.deliveryId
+      deliveryId: batch?.deliveryId,
+      conversationId: selectedOrderConversationId,
+      returnTo: explicitReturnToConversation
     })
     if (!succeeded) {
       setNotice({ type: 'warning', text: '交付记录暂不可查看，请刷新后重试。' })
     }
+  }
+
+  function returnToConversation() {
+    const succeeded = navigateBackToConversation(navigate, location, selectedOrderConversationId)
+    if (!succeeded) setNotice({ type: 'warning', text: '暂时没有可返回的沟通记录。' })
+  }
+
+  function continueConversation() {
+    const succeeded = navigateToConversation(navigate, selectedOrderConversationId)
+    if (!succeeded) setNotice({ type: 'warning', text: '暂无可进入的沟通记录。' })
   }
 
   return (
@@ -799,6 +828,14 @@ export function OrdersPage() {
                     </Typography>
                   </Box>
                   <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+                    {canReturnToConversation && (
+                      <Button size="small" variant="outlined" color="inherit" startIcon={<ForumRoundedIcon />} onClick={returnToConversation}>
+                        返回沟通
+                      </Button>
+                    )}
+                    <Button size="small" variant="outlined" color="inherit" startIcon={<ForumRoundedIcon />} onClick={continueConversation} disabled={!canContinueConversation}>
+                      继续沟通
+                    </Button>
                     <PortraStatusBadge label={selectedOrderPerspective || '身份待确认'} tone="neutral" />
                     <PortraStatusBadge label={formatOrderStatus(selectedOrder.status)} />
                     <PortraStatusBadge label={formatEscrowStatus(selectedOrder.escrowStatus)} />

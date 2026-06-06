@@ -46,6 +46,12 @@ export function buildReturnToConversation(conversationId) {
 }
 
 export function getReturnToConversation(location, fallbackConversationId) {
+  const explicit = getExplicitReturnToConversation(location)
+  if (explicit) return explicit
+  return buildConversationPath(fallbackConversationId || getLastConversationId())
+}
+
+export function getExplicitReturnToConversation(location) {
   const state = location?.state || {}
   const search = new URLSearchParams(location?.search || '')
   const explicitReturnTo = sanitizeConversationReturnPath(state.returnTo || search.get('returnTo'))
@@ -53,8 +59,6 @@ export function getReturnToConversation(location, fallbackConversationId) {
   return buildConversationPath(
     state.conversationId
     || search.get('conversationId')
-    || fallbackConversationId
-    || getLastConversationId()
   )
 }
 

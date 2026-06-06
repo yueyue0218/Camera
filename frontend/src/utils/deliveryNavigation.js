@@ -6,12 +6,12 @@ export function normalizeDeliveryId(value) {
   return Number.isFinite(id) && id > 0 ? id : null
 }
 
-export function buildDeliveryGalleryTarget({ orderId, deliveryId, conversationId } = {}) {
+export function buildDeliveryGalleryTarget({ orderId, deliveryId, conversationId, returnTo: explicitReturnTo } = {}) {
   const normalizedOrderId = normalizeOrderId(orderId)
   const normalizedDeliveryId = normalizeDeliveryId(deliveryId)
   const normalizedConversationId = normalizeConversationId(conversationId)
   if (!normalizedOrderId || !normalizedDeliveryId) return null
-  const returnTo = buildConversationPath(normalizedConversationId)
+  const returnTo = sanitizeConversationReturnPath(explicitReturnTo) || buildConversationPath(normalizedConversationId)
   const params = new URLSearchParams()
   if (normalizedConversationId) params.set('conversationId', String(normalizedConversationId))
   if (returnTo) params.set('returnTo', returnTo)
@@ -32,4 +32,9 @@ export function goToDeliveryGallery(navigate, params, options = {}) {
   if (!target || typeof navigate !== 'function') return false
   navigate(target.to, { state: target.state, ...options })
   return true
+}
+
+function sanitizeConversationReturnPath(value) {
+  const text = String(value || '')
+  return /^\/messages\/\d+$/.test(text) ? text : ''
 }
