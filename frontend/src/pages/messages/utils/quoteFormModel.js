@@ -23,11 +23,11 @@ export function createDefaultQuoteFormModel() {
     shootEndMinute: '00',
     deliveryDeadlineDate: toDateValue(delivery),
     location: '南京大学鼓楼校区',
-    serviceContent: '2 小时校园约拍，包含沟通、拍摄、基础调色和精修交付。',
+    serviceContent: '2 小时校园约拍，包含沟通、拍摄、基础调色和作品上传。',
     originalCount: '60',
     refinedCount: '12',
     photoUsageScope: DEFAULT_SCOPE,
-    terms: '包含本次沟通确认的拍摄内容、时间和交付范围。',
+    terms: '包含本次沟通确认的拍摄内容、时间和成片范围。',
     contractTerms: '客户确认报价后生成订单，支付后资金进入平台担保。',
     remark: '可根据天气微调拍摄时间。'
   }
@@ -113,7 +113,7 @@ export function validateQuoteFormModel(form, { conversation, currentUser, quotes
   const now = new Date()
   if (!shootStart) push('shootStartTime', '拍摄开始时间必填。')
   if (!shootEnd) push('shootEndTime', '拍摄结束时间必填。')
-  if (!deliveryDate) push('deliveryDeadlineDate', '最晚交付日期必填。')
+  if (!deliveryDate) push('deliveryDeadlineDate', '最晚成片日期必填。')
   if (shootStart && shootStart <= now) {
     push('shootStartTime', '拍摄开始时间必须晚于当前时间。')
   }
@@ -121,7 +121,7 @@ export function validateQuoteFormModel(form, { conversation, currentUser, quotes
     push('shootEndTime', '拍摄结束时间必须晚于拍摄开始时间。')
   }
   if (shootEnd && deliveryDate && endOfDate(deliveryDate) < shootEnd) {
-    push('deliveryDeadlineDate', '最晚交付日期不能早于拍摄结束日期。')
+    push('deliveryDeadlineDate', '最晚成片日期不能早于拍摄结束日期。')
   }
 
   if (!String(form.location || '').trim()) {

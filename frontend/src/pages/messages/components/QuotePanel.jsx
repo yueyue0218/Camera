@@ -84,7 +84,7 @@ export function QuotePanel({
                   ['拍摄地点', getSafeDisplayText(quote.location, '拍摄地点待确认')],
                   ['拍摄开始', formatTime(quote.shootStartTime)],
                   ['拍摄结束', formatTime(quote.shootEndTime)],
-                  ['最晚交付', formatTime(quote.deliveryDeadline)],
+                  ['最晚成片', formatTime(quote.deliveryDeadline)],
                   ['服务内容', quote.serviceContent || '未填写'],
                   ['原片/精修', `${quote.originalCount ?? 0} / ${quote.refinedCount ?? 0}`],
                   ['照片使用范围', getPhotoUsageScopeLabel(quote.photoUsageScope)],

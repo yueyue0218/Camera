@@ -248,7 +248,7 @@ export function getConversationSourceHint(conversation) {
   if (conversation.sourceType === 'SERVICE_PACKAGE') {
     return '这次沟通来自摄影服务橱窗，确认拍摄时间和内容后再进入报价。'
   }
-  return '可以在这里继续沟通拍摄内容、时间和交付要求。'
+  return '可以在这里继续沟通拍摄内容、时间和成片要求。'
 }
 
 export function getCounterpartyLabel(conversation, currentUser) {

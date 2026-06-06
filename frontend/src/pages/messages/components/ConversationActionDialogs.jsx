@@ -92,7 +92,7 @@ export function ConversationActionDialogs({
                 ['服务内容', formatQuoteServiceContent(quote, '按双方沟通内容执行')],
                 ['原片/精修', `${quote.originalCount ?? 0} / ${quote.refinedCount ?? 0}`],
                 ['照片用途', getPhotoUsageScopeLabel(quote.photoUsageScope)],
-                ['最晚交付', formatDate(quote.deliveryDeadline)],
+                ['最晚成片', formatDate(quote.deliveryDeadline)],
                 ['备注', formatQuoteRemark(quote, '无额外备注')]
               ]} />
               <Box sx={{ p: 1, bgcolor: PORTRA_COLORS.paperMuted, borderRadius: PORTRA_RADII.control, color: PORTRA_COLORS.mutedInk, fontSize: 14, lineHeight: 1.7 }}>
@@ -157,7 +157,7 @@ export function ConversationActionDialogs({
         <DialogContent sx={dialogContentSx}>
           <Stack component="form" id="delivery-dialog-form" spacing={2} sx={{ pt: 1 }} onSubmit={event => submitAndClose(onSubmitDelivery, event)}>
             <DialogContentText>
-              {activeAction === 'REUPLOAD_DELIVERY' ? '请根据客户的返修要求上传调整后的作品。' : '选择本次交付文件，并补充必要的交付说明。'}
+              {activeAction === 'REUPLOAD_DELIVERY' ? '请根据客户的返修要求上传调整后的作品。' : '选择本次作品文件，并补充必要的作品说明。'}
             </DialogContentText>
             <Button component="label" variant="outlined" sx={{ alignSelf: 'flex-start' }}>
               选择作品文件
@@ -165,12 +165,12 @@ export function ConversationActionDialogs({
             </Button>
             <Typography color="text.secondary" variant="body2">{safeDeliveryForm.file ? getSafeDisplayText(safeDeliveryForm.file.name, '已选择作品文件') : '尚未选择文件'}</Typography>
             <TextField
-              label="交付说明"
+              label="作品说明"
               value={safeDeliveryForm.remark}
               onChange={event => onDeliveryRemarkChange(event.target.value)}
               multiline
               minRows={3}
-              placeholder="说明本次交付内容、返修修改点或注意事项"
+              placeholder="说明本次作品内容、返修修改点或注意事项"
             />
           </Stack>
         </DialogContent>
@@ -186,7 +186,7 @@ export function ConversationActionDialogs({
         <DialogTitle sx={dialogTitleSx}>提交返修要求</DialogTitle>
         <DialogContent sx={dialogContentSx}>
           <Stack component="form" id="rework-dialog-form" spacing={2} sx={{ pt: 1 }} onSubmit={event => submitAndClose(onSubmitRework, event)}>
-            <DialogContentText>请说明需要调整的照片和修改方向，摄影师会根据要求重新交付。</DialogContentText>
+            <DialogContentText>请说明需要调整的照片和修改方向，摄影师会根据要求重新上传作品。</DialogContentText>
             <TextField
               autoFocus
               label="返修要求"
@@ -208,12 +208,12 @@ export function ConversationActionDialogs({
         <DialogTitle sx={dialogTitleSx}>申请展示授权</DialogTitle>
         <DialogContent sx={dialogContentSx}>
           <Stack component="form" id="authorization-dialog-form" spacing={2} sx={{ pt: 1 }} onSubmit={event => submitAndClose(onSubmitPhotoAuthorization, event)}>
-            <DialogContentText>请选择已经交付的作品，并说明希望展示这些照片的用途。</DialogContentText>
+            <DialogContentText>请选择已经上传的作品，并说明希望展示这些照片的用途。</DialogContentText>
             <FormControl>
-              <InputLabel>选择已交付作品</InputLabel>
+              <InputLabel>选择已上传作品</InputLabel>
               <Select
                 multiple
-                label="选择已交付作品"
+                label="选择已上传作品"
                 value={safePhotoAuthorizationForm.fileIds}
                 onChange={event => {
                   const value = event.target.value

@@ -213,7 +213,7 @@ function AuthorizationMeta({ authorization }) {
   return (
     <Stack direction="row" spacing={0.8} sx={{ flexWrap: 'wrap' }}>
       <PortraStatusPill label={PHOTO_AUTHORIZATION_STATUS_LABELS[authorization.status] || '授权状态已更新'} />
-      {(authorization.files || []).map(file => <Chip key={file.id || file.fileId} size="small" label={formatFileDisplayName(file, '已选交付作品')} sx={metaChipSx} />)}
+      {(authorization.files || []).map(file => <Chip key={file.id || file.fileId} size="small" label={formatFileDisplayName(file, '已选作品文件')} sx={metaChipSx} />)}
     </Stack>
   )
 }

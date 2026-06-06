@@ -6,7 +6,7 @@ export const ORDER_STATUS_LABELS = {
   PAID_PENDING_SHOOT: '待拍摄',
   SCHEDULED: '待拍摄',
   SHOOTING: '拍摄中',
-  PENDING_DELIVERY: '待交付',
+  PENDING_DELIVERY: '待上传作品',
   DELIVERED_PENDING_CONFIRM: '待确认作品',
   REWORK_REQUIRED: '返修中',
   COMPLETED: '已完成',

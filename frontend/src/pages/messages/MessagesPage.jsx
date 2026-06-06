@@ -67,7 +67,7 @@ export function MessagesPage() {
 
   return (
     <PortraPageFrame component={Stack} spacing={2} maxWidth={1120} sx={{ color: PORTRA_COLORS.ink }}>
-      <MessagesSectionHeader title="消息" subtitle="管理正在沟通的约拍、报价和交付进展" />
+      <MessagesSectionHeader title="消息" subtitle="管理正在沟通的约拍、报价和作品进展" />
       <Box>
         {location.state?.roleMismatch && <Alert severity="info" sx={noticeSx}>这条沟通属于另一身份视角，请切换身份后查看。</Alert>}
         {notice && <Alert severity={notice.type} sx={noticeSx}>{notice.text}</Alert>}

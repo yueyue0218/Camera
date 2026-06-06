@@ -32,7 +32,7 @@ export function buildDeliveryBatches(deliveries = [], order) {
   return Array.from(groups.values()).map((batch, index) => ({
     ...batch,
     fileCount: batch.files.length,
-    subtitle: `第 ${batch.round || index + 1} 次交付 · 最近交付：${formatTime(batch.latestUploadTime)}`,
+    subtitle: `第 ${batch.round || index + 1} 次上传 · 最近上传：${formatTime(batch.latestUploadTime)}`,
     statusLabel: getDeliveryBatchStatusLabel(order)
   }))
 }
@@ -46,7 +46,7 @@ export function findDeliveryBatch(batches = [], deliveryId) {
 }
 
 export function getDeliveryBatchStatusLabel(order) {
-  if (!order) return '已交付'
+  if (!order) return '已上传作品'
   if (order.status === 'DELIVERED_PENDING_CONFIRM') return '待客户确认'
   if (order.status === 'REWORK_REQUIRED') return '客户已要求返修'
   if (order.status === 'COMPLETED') return '订单已完成'
@@ -60,7 +60,7 @@ export function normalizeDeliveryFile(delivery, index = 0) {
     deliveryId: delivery.deliveryId,
     orderId: delivery.orderId,
     fileId,
-    fileName: formatFileDisplayName(delivery, `交付作品 ${index + 1}`),
+    fileName: formatFileDisplayName(delivery, `作品文件 ${index + 1}`),
     rawFileName: delivery.fileName || delivery.name || delivery.originalName || '',
     mimeType: delivery.mimeType || delivery.contentType || '',
     uploadTime: delivery.uploadTime || delivery.createdAt,
@@ -85,7 +85,7 @@ export function isImageDeliveryFile(file) {
 }
 
 export function getDeliveryDownloadName(file, index = 0) {
-  return formatFileDisplayName(file, `交付作品 ${index + 1}`)
+  return formatFileDisplayName(file, `作品文件 ${index + 1}`)
 }
 
 export function getDeliveryTitleForRecord(delivery, index = 0) {

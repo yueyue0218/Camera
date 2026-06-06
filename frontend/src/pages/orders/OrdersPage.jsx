@@ -149,11 +149,11 @@ function getOrderAction(order, currentUser) {
     return {
       kind: 'transition',
       targetStatus: 'PENDING_DELIVERY',
-      label: '进入待交付',
+      label: '进入待上传作品',
       icon: <TaskAltRoundedIcon />,
       allowed: isProvider,
-      reason: '拍摄完成，进入待交付',
-      successText: '订单已进入待交付'
+      reason: '拍摄完成，进入待上传作品',
+      successText: '订单已进入待上传作品'
     }
   }
   if (canCustomerConfirm(order, currentUser)) {
@@ -226,8 +226,8 @@ function getCounterpartyLabel(order, currentUser) {
 }
 
 const deliveryStatusLabelMap = {
-  DELIVERED: '已交付',
-  REWORKED: '返修交付'
+  DELIVERED: '已上传作品',
+  REWORKED: '返修作品'
 }
 
 function getSettlementRefundLabel(order) {
@@ -548,7 +548,7 @@ export function OrdersPage() {
       const url = await fileApi.downloadObjectUrl(record.fileId, currentUser)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = formatFileDisplayName(record, `交付作品-${record.fileId}`)
+      anchor.download = formatFileDisplayName(record, `作品文件-${record.fileId}`)
       anchor.click()
       setTimeout(() => URL.revokeObjectURL(url), 1000)
     } catch (error) {
@@ -677,7 +677,7 @@ export function OrdersPage() {
         if (!map.has(fileId)) {
           map.set(fileId, {
             fileId,
-            fileName: formatFileDisplayName(record, `交付作品 ${fileId}`),
+            fileName: formatFileDisplayName(record, `作品文件 ${fileId}`),
             uploadTime: record.uploadTime
           })
         }
@@ -857,7 +857,7 @@ export function OrdersPage() {
                   <InfoRows rows={[
                     ['拍摄时间', formatOrderTimeRange(selectedOrder)],
                     ['拍摄地点', selectedOrderLocation],
-                    ['交付截止', formatTime(selectedOrder.deliveryDeadline)]
+                    ['成片截止', formatTime(selectedOrder.deliveryDeadline)]
                   ]} />
                 </PortraTicketSection>
                 {fulfillmentNotice && (
@@ -1107,7 +1107,7 @@ export function OrdersPage() {
                                 key={file.id || file.fileId}
                                 size="small"
                                 icon={<ImageRoundedIcon />}
-                                label={deliveryFileNameMap.get(Number(file.fileId)) || formatFileDisplayName(file, `交付作品 ${file.fileId}`)}
+                                label={deliveryFileNameMap.get(Number(file.fileId)) || formatFileDisplayName(file, `作品文件 ${file.fileId}`)}
                               />
                             ))}
                             {!(authorization.files || []).length && (
@@ -1282,7 +1282,7 @@ export function OrdersPage() {
         )}
       </Box>
       <Dialog open={Boolean(previewDelivery)} onClose={closeDeliveryPreview} fullWidth maxWidth="md">
-        <DialogTitle>{previewDelivery ? formatDeliveryTitle(previewDelivery) : '交付作品'}</DialogTitle>
+        <DialogTitle>{previewDelivery ? formatDeliveryTitle(previewDelivery) : '作品文件'}</DialogTitle>
         <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
           <Stack spacing={1.5}>
             {previewLoading && <Typography sx={{ color: PORTRA_SURFACE.muted }}>作品预览加载中...</Typography>}
@@ -1290,7 +1290,7 @@ export function OrdersPage() {
               <Box
                 component="img"
                 src={previewUrl}
-                alt={previewDelivery ? formatDeliveryTitle(previewDelivery) : '交付作品'}
+                alt={previewDelivery ? formatDeliveryTitle(previewDelivery) : '作品文件'}
                 sx={{ width: '100%', maxHeight: '62vh', objectFit: 'contain', borderRadius: PORTRA_RADIUS.control, bgcolor: PORTRA_SURFACE.paperMuted }}
               />
             )}
@@ -1303,8 +1303,8 @@ export function OrdersPage() {
             {previewDelivery && (
               <InfoRows rows={[
                 ['文件名', formatDeliveryTitle(previewDelivery)],
-                ['交付时间', formatTime(previewDelivery.uploadTime)],
-                ['交付说明', formatDeliveryDescription(previewDelivery, '无交付说明')]
+                ['上传时间', formatTime(previewDelivery.uploadTime)],
+                ['作品说明', formatDeliveryDescription(previewDelivery, '无作品说明')]
               ]} />
             )}
           </Stack>

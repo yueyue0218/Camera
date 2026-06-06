@@ -146,7 +146,7 @@ export function ConversationThread({
           {!safeTimeline.length && (
             <Box sx={{ py: 8, textAlign: 'center' }}>
               <Typography fontWeight={900} color={PORTRA_COLORS.subInk}>从一句问候开始本次合作</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>可以先确认拍摄时间、地点和交付要求</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>可以先确认拍摄时间、地点和成片要求</Typography>
             </Box>
           )}
         </Stack>

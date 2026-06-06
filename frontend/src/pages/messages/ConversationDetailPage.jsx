@@ -500,7 +500,7 @@ export function ConversationDetailPage() {
       conversationId
     })
     if (!succeeded) {
-      setNotice({ type: 'warning', text: '交付记录暂不可查看，请刷新后重试。' })
+      setNotice({ type: 'warning', text: '作品记录暂不可查看，请刷新后重试。' })
     }
     return succeeded
   }

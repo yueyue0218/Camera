@@ -46,7 +46,7 @@ export function DeliveryBatchCard({
             <Typography variant="body2" sx={{ color: PORTRA_SURFACE.muted, fontWeight: 800, minWidth: 0 }}>
               {batch.subtitle}
             </Typography>
-            <PortraStatusBadge label={batch.statusLabel || '已交付'} />
+            <PortraStatusBadge label={batch.statusLabel || '已上传作品'} />
           </Stack>
         ) : (
           <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
@@ -61,7 +61,7 @@ export function DeliveryBatchCard({
                 {batch.subtitle}
               </Typography>
             </Box>
-            <PortraStatusBadge label={batch.statusLabel || '已交付'} />
+            <PortraStatusBadge label={batch.statusLabel || '已上传作品'} />
           </Stack>
         )}
         <DeliveryThumbnailStrip files={batch.files} previewUrls={previewUrls} variant={variant} />
@@ -77,7 +77,7 @@ export function DeliveryBatchCard({
           </Button>
         </Stack>
         {!hasGalleryTarget && (
-          <Typography variant="caption" sx={{ color: PORTRA_SURFACE.muted }}>交付记录暂不可查看</Typography>
+          <Typography variant="caption" sx={{ color: PORTRA_SURFACE.muted }}>作品记录暂不可查看</Typography>
         )}
       </Stack>
     </Root>
