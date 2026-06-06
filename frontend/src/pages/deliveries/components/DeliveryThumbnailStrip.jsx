@@ -1,14 +1,19 @@
 import { Box, Typography } from '@mui/material'
 import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
 import InsertDriveFileRoundedIcon from '@mui/icons-material/InsertDriveFileRounded'
+import { useAuth } from '../../../AuthContext.jsx'
 import { PORTRA_RADIUS, PORTRA_SURFACE } from '../../../theme/portraSurfaceTokens.js'
-import { isImageDeliveryFile } from '../deliveryDisplay.js'
+import { getDeliveryFileId, isImageDeliveryFile } from '../deliveryDisplay.js'
+import { getPreviewKey, useDeliveryFilePreviews } from '../useDeliveryFilePreviews.js'
 
 export function DeliveryThumbnailStrip({ files = [], previewUrls = {}, variant = 'order' }) {
+  const { currentUser } = useAuth()
   const visible = files.slice(0, 4)
   const extraCount = Math.max(0, files.length - visible.length)
   const compact = variant === 'message'
   const height = getStripHeight(visible.length, compact)
+  const shouldLoadPreviews = !previewUrls || !Object.keys(previewUrls).length
+  const loadedPreviews = useDeliveryFilePreviews(visible, currentUser, { enabled: shouldLoadPreviews })
 
   return (
     <Box
@@ -28,7 +33,8 @@ export function DeliveryThumbnailStrip({ files = [], previewUrls = {}, variant =
         <ThumbnailTile
           key={file.id || `${file.fileId}-${index}`}
           file={file}
-          previewUrl={previewUrls[file.id] || previewUrls[file.fileId]}
+          previewUrl={previewUrls[file.id] || previewUrls[file.fileId] || loadedPreviews.previewUrls[getPreviewKey(file)]}
+          loading={loadedPreviews.loadingIds.has(getPreviewKey(file))}
           overlay={index === 3 && extraCount > 0 ? `+${extraCount}` : ''}
         />
       )) : (
@@ -38,13 +44,16 @@ export function DeliveryThumbnailStrip({ files = [], previewUrls = {}, variant =
   )
 }
 
-function ThumbnailTile({ file, previewUrl, overlay }) {
+function ThumbnailTile({ file, previewUrl, loading, overlay }) {
+  const imageFile = getDeliveryFileId(file) && isImageDeliveryFile(file)
   return (
     <Box sx={{ position: 'relative', minWidth: 0, minHeight: 0 }}>
       {previewUrl && isImageDeliveryFile(file) ? (
         <Box component="img" src={previewUrl} alt={file.fileName} sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      ) : loading && imageFile ? (
+        <ThumbnailLoading />
       ) : (
-        <ThumbnailPlaceholder label={isImageDeliveryFile(file) ? '暂无缩略图' : '文件'} />
+        <ThumbnailPlaceholder label={imageFile ? '暂无缩略图' : '文件'} />
       )}
       {overlay && (
         <Box sx={{
@@ -61,6 +70,30 @@ function ThumbnailTile({ file, previewUrl, overlay }) {
         </Box>
       )}
     </Box>
+  )
+}
+
+function ThumbnailLoading() {
+  return (
+    <Box sx={{
+      width: '100%',
+      height: '100%',
+      minHeight: 48,
+      bgcolor: 'rgba(255,253,249,.9)',
+      position: 'relative',
+      overflow: 'hidden',
+      '&::after': {
+        content: '""',
+        position: 'absolute',
+        inset: 0,
+        transform: 'translateX(-100%)',
+        background: 'linear-gradient(90deg, transparent, rgba(13,47,178,.10), transparent)',
+        animation: 'portraThumbLoading 1.15s ease-in-out infinite'
+      },
+      '@keyframes portraThumbLoading': {
+        '100%': { transform: 'translateX(100%)' }
+      }
+    }} />
   )
 }
 

@@ -1,6 +1,7 @@
-import { FormControl, FormHelperText, InputLabel, MenuItem, Select, Stack, Typography } from '@mui/material'
+import { FormHelperText, Stack, Typography } from '@mui/material'
 import { PORTRA_RADIUS, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
-import { PortraDateField, PORTRA_SELECT_MENU_PROPS } from './PortraDateField.jsx'
+import { PortraCompactSelect } from './PortraCompactSelect.jsx'
+import { PortraDateField } from './PortraDateField.jsx'
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, '0'))
 const MINUTE_OPTIONS = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55']
@@ -51,19 +52,15 @@ export function PortraDateTimeField({
 
 function TimeSelect({ label, value, options, onChange, error }) {
   return (
-    <FormControl size="small" sx={timeSelectSx} error={error}>
-      <InputLabel>{label}</InputLabel>
-      <Select
-        label={label}
-        value={value}
-        MenuProps={PORTRA_SELECT_MENU_PROPS}
-        onChange={event => onChange(event.target.value)}
-      >
-        {options.map(option => (
-          <MenuItem key={option} value={option}>{option}</MenuItem>
-        ))}
-      </Select>
-    </FormControl>
+    <PortraCompactSelect
+      label={label}
+      value={value}
+      options={options}
+      onChange={onChange}
+      error={error}
+      width={118}
+      columns={label === '小时' ? 4 : 3}
+    />
   )
 }
 
@@ -78,24 +75,4 @@ const dateTimeFieldSx = {
   bgcolor: 'rgba(255,253,249,.78)',
   border: `1px solid ${PORTRA_SURFACE.borderSoft}`,
   borderRadius: PORTRA_RADIUS.control
-}
-
-const timeSelectSx = {
-  flex: '0 0 auto',
-  width: 132,
-  minWidth: 120,
-  '& .MuiOutlinedInput-root': {
-    bgcolor: PORTRA_SURFACE.paper,
-    borderRadius: PORTRA_RADIUS.control,
-    minHeight: 46,
-    '&.Mui-focused fieldset': {
-      borderColor: PORTRA_SURFACE.portraBlue,
-      boxShadow: '0 0 0 3px rgba(13,47,178,.12)'
-    }
-  },
-  '& .MuiSelect-select': {
-    py: 1.2,
-    fontSize: 15,
-    fontWeight: 800
-  }
 }

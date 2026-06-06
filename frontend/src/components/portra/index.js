@@ -9,5 +9,6 @@ export {
 } from './PortraBusinessPrimitives.jsx'
 
 export { OrderCompletionDialog } from './OrderCompletionDialog.jsx'
+export { PortraCompactSelect } from './PortraCompactSelect.jsx'
 export { PortraDateField } from './PortraDateField.jsx'
 export { PortraDateTimeField } from './PortraDateTimeField.jsx'

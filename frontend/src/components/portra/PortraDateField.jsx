@@ -1,29 +1,6 @@
-import { FormControl, FormHelperText, InputLabel, MenuItem, Select, Stack, Typography } from '@mui/material'
-import { PORTRA_RADIUS, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
-
-export const PORTRA_SELECT_MENU_PROPS = {
-  PaperProps: {
-    sx: {
-      maxHeight: 252,
-      mt: 0.75,
-      borderRadius: '16px',
-      bgcolor: '#f8f3eb',
-      border: '1px solid rgba(21,19,24,.12)',
-      boxShadow: '0 18px 45px rgba(21,19,24,.16)',
-      overflowY: 'auto'
-    }
-  },
-  MenuListProps: {
-    dense: true,
-    sx: {
-      py: 0.5,
-      '& .MuiMenuItem-root': {
-        minHeight: 36,
-        fontSize: 15
-      }
-    }
-  }
-}
+import { FormHelperText, Stack, Typography } from '@mui/material'
+import { PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
+import { PortraCompactSelect } from './PortraCompactSelect.jsx'
 
 export function PortraDateField({
   label,
@@ -63,9 +40,9 @@ export function PortraDateField({
         </Typography>
       )}
       <Stack direction="row" spacing={0.85} sx={{ flexWrap: 'wrap', rowGap: 0.85 }}>
-        <DateSelect label="年" value={parsed.year || ''} onChange={year => update({ year })} options={years} error={Boolean(error)} width={132} />
-        <DateSelect label="月" value={parsed.month || ''} onChange={month => update({ month })} options={months} error={Boolean(error)} format={pad} width={100} />
-        <DateSelect label="日" value={parsed.day || ''} onChange={day => update({ day })} options={days} error={Boolean(error)} format={pad} width={100} />
+        <DateSelect label="年" value={parsed.year || ''} onChange={year => update({ year })} options={years} error={Boolean(error)} width={132} columns={1} />
+        <DateSelect label="月" value={parsed.month || ''} onChange={month => update({ month })} options={months} error={Boolean(error)} format={pad} width={100} columns={3} />
+        <DateSelect label="日" value={parsed.day || ''} onChange={day => update({ day })} options={days} error={Boolean(error)} format={pad} width={100} columns={3} />
       </Stack>
       {showHelper && (
         <FormHelperText error={Boolean(error)} sx={{ mx: 0, color: error ? undefined : PORTRA_SURFACE.muted }}>
@@ -76,21 +53,18 @@ export function PortraDateField({
   )
 }
 
-function DateSelect({ label, value, onChange, options, error, width, format = value => value }) {
+function DateSelect({ label, value, onChange, options, error, width, columns, format = value => value }) {
   return (
-    <FormControl size="small" sx={{ ...selectSx, width }} error={error}>
-      <InputLabel>{label}</InputLabel>
-      <Select
-        label={label}
-        value={value}
-        MenuProps={PORTRA_SELECT_MENU_PROPS}
-        onChange={event => onChange(Number(event.target.value))}
-      >
-        {options.map(option => (
-          <MenuItem key={option} value={option}>{format(option)}</MenuItem>
-        ))}
-      </Select>
-    </FormControl>
+    <PortraCompactSelect
+      label={label}
+      value={value}
+      options={options}
+      onChange={value => onChange(Number(value))}
+      error={error}
+      width={width}
+      columns={columns}
+      format={format}
+    />
   )
 }
 
@@ -132,23 +106,4 @@ function buildNumberRange(start, end) {
 
 function pad(value) {
   return String(value).padStart(2, '0')
-}
-
-const selectSx = {
-  flex: '0 0 auto',
-  minWidth: 92,
-  '& .MuiOutlinedInput-root': {
-    bgcolor: PORTRA_SURFACE.paper,
-    borderRadius: PORTRA_RADIUS.control,
-    minHeight: 46,
-    '&.Mui-focused fieldset': {
-      borderColor: PORTRA_SURFACE.portraBlue,
-      boxShadow: '0 0 0 3px rgba(13,47,178,.12)'
-    }
-  },
-  '& .MuiSelect-select': {
-    py: 1.2,
-    fontSize: 15,
-    fontWeight: 800
-  }
 }

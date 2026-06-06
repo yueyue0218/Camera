@@ -211,6 +211,7 @@ function DeliveryMeta({ event, onOpenDeliveryGallery }) {
           fileCount: event.meta?.deliveryCount || batch.fileCount
         }}
         variant="message"
+        chrome="none"
         onOpen={() => onOpenDeliveryGallery?.(delivery)}
         disabled={!batch?.orderId || !batch?.deliveryId}
       />
