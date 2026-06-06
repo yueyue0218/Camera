@@ -96,6 +96,8 @@ public class MomentService {
         MomentPost moment = requireEditableMoment(momentId, user);
         validateCreateRequestForEdit(request);
 
+        moment.getImages().clear();
+        momentPostRepository.flush();
         moment.setTitle(normalizeOptionalText(request.getTitle(), 50, "动态标题"));
         moment.setContent(normalizeOptionalText(request.getContent(), 1000, "动态正文"));
         moment.replaceMentions(normalizeMentions(request.getMentions()));
@@ -164,6 +166,8 @@ public class MomentService {
         if (!Objects.equals(moment.getAuthorId(), user.getUserId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "只有动态作者可以删除该动态");
         }
+        moment.getImages().clear();
+        momentPostRepository.flush();
         moment.markDeleted();
         momentPostRepository.save(moment);
     }

@@ -92,7 +92,7 @@ class MomentServiceTest {
         momentService.deleteMoment(created.getMomentId(), author);
         MomentPost deleted = momentPostRepository.findById(created.getMomentId()).orElseThrow();
         assertThat(deleted.getStatus()).isEqualTo(MomentStatus.DELETED);
-        assertThat(momentService.listMoments(author, null))
+        assertThat(momentService.listMoments(author, null, null, null))
                 .extracting(MomentDto::getMomentId)
                 .doesNotContain(created.getMomentId());
     }
