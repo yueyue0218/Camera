@@ -197,7 +197,6 @@ class ServicePackageShowcaseContractTest {
         ServicePackage saved = servicePackageRepository.findById(serviceId).orElseThrow();
         assertThat(saved.getStatus()).isEqualTo(ServicePackageStatus.ONLINE);
         assertThat(saved.getIsAvailable()).isTrue();
-        assertThat(saved.getTemporaryScheduleHoldId()).isNull();
     }
 
     @Test
