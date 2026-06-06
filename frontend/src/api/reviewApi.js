@@ -10,6 +10,12 @@ export const reviewApi = {
       body: JSON.stringify(body)
     }, currentUser)
   },
+  followUp(reviewId, body, currentUser) {
+    return request(`/reviews/${reviewId}/follow-up`, {
+      method: 'POST',
+      body: JSON.stringify(body)
+    }, currentUser)
+  },
   listByUser(userId, currentUser) {
     return request(`/users/${userId}/reviews`, {}, currentUser)
   }
@@ -21,6 +27,9 @@ export const reviewComplaintApi = {
       method: 'POST',
       body: JSON.stringify(body)
     }, currentUser)
+  },
+  detail(complaintId, currentUser) {
+    return request(`/reviews/complaints/${complaintId}`, {}, currentUser)
   },
   listMine(currentUser) {
     return request('/reviews/complaints/my', {}, currentUser)

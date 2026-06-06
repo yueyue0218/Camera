@@ -53,6 +53,8 @@ a{text-decoration:none;color:inherit}
 .id-label{font-size:11px;letter-spacing:.22em;color:#696e76;text-transform:uppercase;margin-top:5px;}
 .metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0;}
 .metric{background:#fffaf2;border:1px solid rgba(21,19,24,.1);border-radius:16px;padding:12px;}
+.metric-button{appearance:none;width:100%;text-align:left;cursor:pointer;font:inherit;transition:transform .18s,border-color .18s,box-shadow .18s;}
+.metric-button:hover{transform:translateY(-2px);border-color:rgba(13,47,178,.34);box-shadow:0 10px 20px rgba(13,47,178,.08);}
 .metric b{display:block;font-size:20px;color:var(--ink);margin-bottom:4px;}
 .metric span{font-size:11px;color:#73777f;letter-spacing:.14em;}
 .hero-actions{display:flex;flex-direction:column;gap:10px;}
@@ -140,6 +142,9 @@ a{text-decoration:none;color:inherit}
 
 .side-stack{display:grid;gap:14px;position:static;align-self:start;}
 .credit-stamp{width:132px;height:132px;aspect-ratio:1/1;min-width:132px;min-height:132px;max-width:132px;max-height:132px;border-radius:50%;border:1px dashed rgba(13,47,178,.55);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:rgba(248,243,235,.72);color:var(--blue);margin:0 auto 10px;flex:0 0 132px;}
+.credit-stamp-button{cursor:pointer;font:inherit;transition:transform .18s,box-shadow .18s,background .18s;}
+.credit-stamp-button:hover{transform:translateY(-2px);box-shadow:0 14px 28px rgba(13,47,178,.12);background:#fffaf2;}
+.credit-stamp--large{width:164px;height:164px;min-width:164px;min-height:164px;max-width:164px;max-height:164px;}
 .credit-stamp b{font-family:"Playfair Display","Bodoni 72",Georgia,serif;font-size:42px;line-height:.95;}
 .credit-stamp span{font-size:10px;letter-spacing:.18em;text-transform:uppercase;margin-top:5px;}
 .todo-list{display:grid;gap:7px;}
