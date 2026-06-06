@@ -1,14 +1,22 @@
 import { useEffect, useState } from 'react'
-import { Alert, Stack } from '@mui/material'
+import { Alert, Box, Stack } from '@mui/material'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
-import { conversationApi } from '../../api.js'
+import { conversationApi, orderApi } from '../../api.js'
 import { ConversationList } from './components/ConversationList.jsx'
 import { MessagesSectionHeader } from './components/MessagesSectionHeader.jsx'
 import {
   getConversationRecordsForUser,
   mergeConversationRecords
 } from './utils/conversationUtils.js'
+import { getCWorkbenchErrorText } from './utils/quoteUtils.js'
+import {
+  filterConversationsByActiveRole,
+  filterOrdersByActiveRole,
+  getCurrentUserId,
+  selectConversationOrder
+} from './utils/workbenchState.js'
+import { PORTRA_COLORS, PORTRA_RADII } from './MessageVisualTokens.js'
 
 export function MessagesPage() {
   const location = useLocation()
@@ -27,24 +35,41 @@ export function MessagesPage() {
     async function loadConversations() {
       setNotice(null)
       try {
-        const remoteConversations = await conversationApi.list(currentUser)
-        if (mounted) setConversations(mergeConversationRecords(remoteConversations || [], currentUser))
+        const [remoteConversations, remoteOrders] = await Promise.all([
+          conversationApi.list(currentUser),
+          orderApi.list({ role: currentUser.role === 'PROVIDER' ? 'provider' : 'customer' }, currentUser)
+        ])
+        if (mounted) {
+          const conversationsForRole = filterConversationsByActiveRole(
+            mergeConversationRecords(remoteConversations || [], currentUser, currentUser.role),
+            currentUser,
+            currentUser.role
+          )
+          const ordersForRole = filterOrdersByActiveRole(remoteOrders || [], currentUser, currentUser.role)
+          setConversations(conversationsForRole.map(conversation => ({
+            ...conversation,
+            activeOrder: selectConversationOrder(ordersForRole, conversation, [])
+          })))
+        }
       } catch (error) {
         if (!mounted) return
-        setNotice({ type: 'warning', text: `${error.message} 已先显示本地会话记录。` })
-        setConversations(getConversationRecordsForUser(currentUser))
+        setNotice({ type: 'warning', text: `${getCWorkbenchErrorText(error, '暂时无法加载最新会话。')} 已先显示本地会话记录。` })
+        setConversations(getConversationRecordsForUser(currentUser, currentUser.role))
       }
     }
     loadConversations()
     return () => {
       mounted = false
     }
-  }, [currentUser.userId, currentUser.role, currentUser.token, location.search, navigate])
+  }, [getCurrentUserId(currentUser), currentUser.role, currentUser.token, location.search, navigate])
 
   return (
-    <Stack spacing={2.5}>
-      <MessagesSectionHeader title="会话" subtitle="消息列表页只展示对话入口，点击后进入具体聊天框。" />
-      {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
+    <Stack spacing={2} sx={{ maxWidth: 1120, mx: 'auto', color: PORTRA_COLORS.ink }}>
+      <MessagesSectionHeader title="消息" subtitle="管理正在沟通的约拍、报价和交付进展" />
+      <Box>
+        {location.state?.roleMismatch && <Alert severity="info" sx={noticeSx}>这条会话属于另一身份视角，请切换身份后查看。</Alert>}
+        {notice && <Alert severity={notice.type} sx={noticeSx}>{notice.text}</Alert>}
+      </Box>
       <ConversationList
         conversations={conversations}
         currentUser={currentUser}
@@ -52,4 +77,12 @@ export function MessagesPage() {
       />
     </Stack>
   )
+}
+
+const noticeSx = {
+  py: 0.4,
+  borderRadius: PORTRA_RADII.control,
+  border: `1px solid ${PORTRA_COLORS.borderMuted}`,
+  bgcolor: PORTRA_COLORS.paper,
+  '& .MuiAlert-message': { py: 0.4 }
 }

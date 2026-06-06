@@ -36,15 +36,24 @@ CREATE TABLE IF NOT EXISTS audit_records
 -- 摄影师档案表
 CREATE TABLE IF NOT EXISTS provider_profiles
 (
-    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_id         BIGINT UNIQUE NOT NULL COMMENT '对应用户 ID',
-    certified_at    DATETIME COMMENT '认证通过时间',
-    bio             VARCHAR(500) COMMENT '个人简介',
-    style_tags      VARCHAR(200) COMMENT '风格标签，逗号分隔',
-    city_code       VARCHAR(32) COMMENT '所在城市',
-    price_per_hour  DECIMAL(10, 2) COMMENT '每小时收费（元）',
-    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    id                      BIGINT           PRIMARY KEY AUTO_INCREMENT,
+    user_id                 BIGINT           UNIQUE NOT NULL COMMENT '对应用户 ID',
+    service_type            VARCHAR(40)      NULL    COMMENT '服务类型',
+    display_name            VARCHAR(100)     NULL    COMMENT '展示名称',
+    bio                     VARCHAR(500)     NULL    COMMENT '个人简介',
+    city_code               VARCHAR(32)      NULL    COMMENT '所在城市',
+    city_area               VARCHAR(100)     NULL    COMMENT '城市区域',
+    price_min               DECIMAL(10, 2)   NULL    COMMENT '最低报价（元）',
+    price_max               DECIMAL(10, 2)   NULL    COMMENT '最高报价（元）',
+    accepting_orders        BOOLEAN          NOT NULL DEFAULT TRUE  COMMENT '是否接单',
+    avg_rating              DECIMAL(3, 2)    NULL    COMMENT '平均评分',
+    completed_orders        INT              NOT NULL DEFAULT 0     COMMENT '已完成订单数',
+    audit_status            VARCHAR(20)      NOT NULL DEFAULT 'PENDING' COMMENT '审核状态',
+    age                     TINYINT UNSIGNED NULL    COMMENT '年龄',
+    equipment               VARCHAR(500)     NULL    COMMENT '常用设备',
+    provider_avatar_file_id BIGINT           NULL    COMMENT '摄影师头像文件 ID',
+    created_at              DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at              DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_user_id (user_id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4

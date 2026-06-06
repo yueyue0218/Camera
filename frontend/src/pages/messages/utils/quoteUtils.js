@@ -1,10 +1,36 @@
 import { yuanToCent } from '../../../utils/index.js'
+import { getCurrentUserId } from './workbenchState.js'
 
 export const quoteStatusMap = {
   PENDING_CONFIRM: '待确认',
   CONFIRMED: '已确认',
   REJECTED: '已拒绝',
-  EXPIRED: '已过期'
+  EXPIRED: '已过期',
+  CANCELLED: '已取消'
+}
+
+export function getQuoteStatusLabel(status) {
+  return quoteStatusMap[status] || '报价状态已更新'
+}
+
+export function getPhotoUsageScopeLabel(scope) {
+  if (scope === 'PERSONAL_ONLY') return '仅限个人留念'
+  if (scope === 'PORTFOLIO_ALLOWED') return '可申请作品展示授权'
+  if (scope === 'COMMERCIAL_ALLOWED') return '包含商业使用约定'
+  return scope ? '按双方约定使用' : '未填写'
+}
+
+export function getQuoteNextStepText(quote, currentUser) {
+  if (!quote) return '等待进一步沟通'
+  const isCustomer = currentUser?.role === 'CUSTOMER'
+  if (quote.status === 'PENDING_CONFIRM') {
+    return isCustomer ? '确认报价后将生成托管订单' : '等待客户确认，也可以继续沟通后编辑报价'
+  }
+  if (quote.status === 'CONFIRMED') return '报价已确认，可以在本次会话里继续处理订单'
+  if (quote.status === 'REJECTED') return '客户已拒绝，可重新沟通后再发送报价'
+  if (quote.status === 'EXPIRED') return '报价已过期，需要摄影师重新发送'
+  if (quote.status === 'CANCELLED') return '报价已取消，可继续沟通新的方案'
+  return '继续沟通拍摄方案'
 }
 
 export function createDefaultQuoteForm() {
@@ -27,8 +53,8 @@ export function createDefaultQuoteForm() {
     originalCount: 60,
     refinedCount: 12,
     photoUsageScope: 'PERSONAL_ONLY',
-    terms: 'P4 演示报价',
-    contractTerms: '确认报价后生成订单，模拟支付后资金进入平台托管。',
+    terms: '包含本次沟通确认的拍摄内容、时间和交付范围。',
+    contractTerms: '客户确认报价后生成订单，支付后资金进入平台托管。',
     remark: '可根据天气微调拍摄时间。'
   }
 }
@@ -91,12 +117,13 @@ export function getQuoteOrderId(quote) {
 }
 
 export function canEditQuote(quote, conversation, currentUser) {
+  const currentUserId = getCurrentUserId(currentUser)
   return Boolean(quote)
     && quote.status === 'PENDING_CONFIRM'
     && !getQuoteOrderId(quote)
     && currentUser?.role === 'PROVIDER'
-    && Number(currentUser.userId) === Number(conversation?.participantBId)
-    && Number(currentUser.userId) === Number(quote.providerUserId)
+    && currentUserId === Number(conversation?.participantBId)
+    && currentUserId === Number(quote.providerUserId)
 }
 
 export function hasPendingQuote(quotes) {
@@ -106,26 +133,26 @@ export function hasPendingQuote(quotes) {
 export function getQuoteEntryHint(conversation, currentUser, quotes) {
   if (!conversation) return ''
   if (currentUser.role !== 'PROVIDER') return ''
-  if (currentUser.userId !== Number(conversation.participantBId)) {
-    return '只有该会话的服务方可以发起正式报价。'
+  if (getCurrentUserId(currentUser) !== Number(conversation.participantBId)) {
+    return '只有这次沟通中的摄影师可以发送正式报价。'
   }
   if (conversation.isLocal || !getBackendConversationId(conversation)) {
-    return '当前不是后端真实会话，不能生成报价。'
+    return '这段沟通暂时不能生成正式报价，可以先继续聊天确认需求。'
   }
   if (hasPendingQuote(quotes)) {
     return '已有待确认报价，需客户确认或拒绝后再发新报价。'
   }
-  return '可以基于本次沟通发起正式报价，顾客确认后会生成订单。'
+  return '可以基于本次沟通发送正式报价，客户确认后会生成订单。'
 }
 
 export function validateQuoteForm(form, conversation, currentUser, quotes, options = {}) {
   const errors = []
   const editingQuotationId = options.editingQuotationId
   if (!conversation || conversation.isLocal || !getBackendConversationId(conversation)) {
-    errors.push('当前会话必须是真实后端会话，才能发起报价。')
+    errors.push('这段沟通暂时不能生成正式报价，请先进入正式会话。')
   }
-  if (currentUser.role !== 'PROVIDER' || currentUser.userId !== Number(conversation?.participantBId)) {
-    errors.push('只有该会话的服务方可以发起报价。')
+  if (currentUser.role !== 'PROVIDER' || getCurrentUserId(currentUser) !== Number(conversation?.participantBId)) {
+    errors.push('只有这次沟通中的摄影师可以发送报价。')
   }
   const hasOtherPendingQuote = quotes.some(quote =>
     quote.status === 'PENDING_CONFIRM'
@@ -184,14 +211,21 @@ export function validateQuoteForm(form, conversation, currentUser, quotes, optio
 }
 
 export function getQuoteConfirmationErrorText(error) {
+  return getCWorkbenchErrorText(error)
+}
+
+export function getCWorkbenchErrorText(error, fallback = '操作没有成功，请稍后重试。') {
   const message = error?.message || ''
   if (message.includes('Quote has expired')) {
-    return '该报价已过期，请摄影师重新发起报价。'
+    return '该报价已过期，请摄影师重新发送报价。'
   }
   if (message.includes('Provider already has an active order in this shoot time range')) {
-    return '该摄影师在所选拍摄时间已有订单，请重新协商时间。'
+    return '该摄影师在所选拍摄时间已有安排，请重新协商拍摄时间。'
   }
-  return message || '报价确认失败'
+  if (message.includes('Network Error') || message.includes('Failed to fetch') || error?.isNetworkError) {
+    return '网络连接异常，请稍后重试。'
+  }
+  return fallback
 }
 
 function hasAtMostTwoDecimalPlaces(value) {

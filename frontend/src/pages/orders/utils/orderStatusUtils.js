@@ -31,6 +31,63 @@ export const settlementStatusMap = {
   SETTLED: '已结算'
 }
 
+export const refundStatusMap = {
+  NONE: '暂无退款',
+  REQUESTED: '退款处理中',
+  REFUNDED: '已退款'
+}
+
+export const complaintStatusMap = {
+  PENDING: '待处理',
+  PROCESSING: '处理中',
+  RESOLVED: '已处理',
+  REJECTED: '已驳回'
+}
+
+export function formatOrderStatus(status, fallback = '状态已更新') {
+  return orderStatusMap[status] || fallback
+}
+
+export function formatEscrowStatus(status, fallback = '托管状态待同步') {
+  return escrowStatusMap[status] || fallback
+}
+
+export function formatSettlementStatus(status, fallback = '未结算') {
+  return settlementStatusMap[status] || fallback
+}
+
+export function formatRefundStatus(status, fallback = '暂无退款') {
+  return refundStatusMap[status] || fallback
+}
+
+export function sanitizeSeedText(value, fallback = '校园约拍服务') {
+  const raw = String(value || '').trim()
+  if (!raw) return fallback
+  if (/^UIO/i.test(raw)) return fallback
+  let text = raw
+    .replace(/^UI_REVIEW_SEED\s*/i, '')
+    .replace(/^我接的拍摄\s*[^｜|]*[｜|]\s*/i, '')
+    .replace(/\b(?:PENDING_PAYMENT|PAID_PENDING_SHOOT|DELIVERED_PENDING_CONFIRM|REWORK_REQUIRED|NOT_SETTLED|NONE)\b/g, '')
+    .trim()
+  if (/[｜|]/.test(text)) {
+    text = text.split(/[｜|]/).map(item => item.trim()).filter(Boolean).pop() || text
+  }
+  text = text.replace(/\s{2,}/g, ' ').trim()
+  if (!text || /^UI_REVIEW_SEED/i.test(text) || /^UIO/i.test(text)) return fallback
+  return text
+}
+
+export function formatOrderTitle(order, quoteSnapshot) {
+  const serviceTitle = sanitizeSeedText(
+    quoteSnapshot?.serviceContent || order?.serviceContent || order?.scene || '',
+    ''
+  )
+  if (serviceTitle) return serviceTitle
+  const location = sanitizeSeedText(quoteSnapshot?.location || order?.shootLocation || '', '')
+  if (location) return `${location}校园约拍`
+  return '校园约拍订单'
+}
+
 export function readJsonStorage(key, fallback) {
   try {
     const raw = localStorage.getItem(key)
@@ -214,8 +271,8 @@ export function getLatestDeliveryUploadTime(records) {
 export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, latestDeliveryUploadTime, estimatedAutoConfirmTime) {
   const status = order.status
   const baseRows = [
-    ['托管状态', escrowStatusMap[order.escrowStatus] || order.escrowStatus || '当前接口未返回'],
-    ['结算状态', settlementStatusMap[order.settlementStatus] || order.settlementStatus || '当前接口未返回']
+    ['托管状态', formatEscrowStatus(order.escrowStatus)],
+    ['结算状态', formatSettlementStatus(order.settlementStatus)]
   ]
   const latestReworkLog = getLatestStatusLog(statusLogs, 'REWORK_REQUIRED')
   const latestCompletedLog = getLatestStatusLog(statusLogs, 'COMPLETED')
@@ -287,7 +344,7 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
       severity: latestDeliveryUploadTime ? 'info' : 'warning',
       rows: [
         ['最新交付时间', formatTimeOrMissing(latestDeliveryUploadTime)],
-        ['预计自动确认时间', estimatedAutoConfirmTime ? formatTime(estimatedAutoConfirmTime) : '当前接口未返回可靠交付时间'],
+        ['预计自动确认时间', estimatedAutoConfirmTime ? formatTime(estimatedAutoConfirmTime) : '等待交付时间同步'],
         ['交付记录', `${deliveryRecords.length} 条`],
         ...baseRows
       ],
@@ -302,7 +359,7 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
       color: 'warning',
       severity: 'warning',
       rows: [
-        ['最近返修要求', latestReworkLog?.reason || latestReworkLog?.remark || '当前接口未返回'],
+        ['最近返修要求', latestReworkLog?.reason || latestReworkLog?.remark || '等待返修说明同步'],
         ['返修状态时间', formatTimeOrMissing(latestReworkLog?.createdAt)],
         ['已有交付记录', `${deliveryRecords.length} 条`],
         ...baseRows
@@ -344,7 +401,7 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
       color: 'default',
       severity: 'info',
       rows: [
-        ['退款状态', order.refundStatus || '当前接口未返回'],
+        ['退款状态', formatRefundStatus(order.refundStatus)],
         ...baseRows
       ],
       note: '退款/取消后的后续处理以状态日志和后端返回为准。'
@@ -368,7 +425,7 @@ function getLatestStatusLog(statusLogs, targetStatus) {
 }
 
 function formatTimeOrMissing(value) {
-  return value ? formatTime(value) : '当前接口未返回'
+  return value ? formatTime(value) : '待同步'
 }
 
 export function addDays(value, days) {

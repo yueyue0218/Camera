@@ -233,7 +233,6 @@ public class ServicePackageService {
         return new ReserveServicePackageResult(
                 saved.getId(),
                 chat.getConversationId(),
-                null,
                 saved.getStatus().name(),
                 saved.getIsAvailable()
         );
