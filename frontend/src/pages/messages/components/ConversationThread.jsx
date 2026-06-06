@@ -3,7 +3,6 @@ import { Box, Paper, Stack, Typography } from '@mui/material'
 import { ConversationComposer } from './ConversationComposer.jsx'
 import { ConversationSystemItem } from './ConversationSystemCard.jsx'
 import { MessageBubble } from './MessageBubble.jsx'
-import { QuoteForm } from './QuoteForm.jsx'
 import { MessageWorkbenchErrorBoundary } from './MessageWorkbenchErrorBoundary.jsx'
 import { getCounterpartyProfile } from '../utils/conversationUtils.js'
 import { getCurrentUserId } from '../utils/workbenchState.js'
@@ -26,21 +25,14 @@ export function ConversationThread({
   canSeeQuoteEntry,
   canCreateQuote,
   showQuoteForm,
-  editingQuotationId,
   quoteEntryHint,
   quoteActionLabel,
-  quoteForm,
-  quoteValidationErrors,
-  canSubmitQuoteForm,
   onOpenQuoteForm,
-  onCloseQuoteForm,
   onStartQuoteEditing,
   onConfirmQuote,
   onRejectQuote,
   onOpenQuoteDetail,
   onOpenOrderArchive,
-  onQuoteFormChange,
-  onSubmitQuote,
   onContentChange,
   onSendMessage,
   onChooseMessageImage,
@@ -159,21 +151,6 @@ export function ConversationThread({
       </Box>
 
       <Box data-message-composer="true" sx={{ flexShrink: 0, bgcolor: PORTRA_COLORS.paper }}>
-        {showQuoteForm && canSeeQuoteEntry && (
-          <Box sx={{ px: { xs: 1.4, md: 2 }, pt: 1.2, pb: 1.5, maxHeight: 260, overflowY: 'auto', overscrollBehavior: 'contain' }}>
-            <QuoteForm
-              quoteForm={quoteForm}
-              onQuoteFormChange={onQuoteFormChange}
-              onSubmit={onSubmitQuote}
-              onClose={onCloseQuoteForm}
-              editingQuotationId={editingQuotationId}
-              quoteValidationErrors={quoteValidationErrors}
-              loading={loading}
-              canSubmitQuoteForm={canSubmitQuoteForm}
-            />
-          </Box>
-        )}
-
         <ConversationComposer
           content={content}
           loading={loading}

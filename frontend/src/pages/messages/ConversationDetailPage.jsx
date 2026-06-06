@@ -9,6 +9,7 @@ import { goToOrder, goToUserProfile } from '../../utils/orderNavigation.js'
 import { ConversationThread } from './components/ConversationThread.jsx'
 import { ConversationWorkbenchPanel } from './components/ConversationWorkbenchPanel.jsx'
 import { ConversationActionDialogs } from './components/ConversationActionDialogs.jsx'
+import { QuoteDraftDialog } from './components/QuoteDraftDialog.jsx'
 import { MessageWorkbenchErrorBoundary } from './components/MessageWorkbenchErrorBoundary.jsx'
 import { StatusChip } from './components/StatusChip.jsx'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from './MessageVisualTokens.js'
@@ -633,6 +634,18 @@ export function ConversationDetailPage() {
             onOpenAction={setActiveAction}
           />
         </Box>
+
+        <QuoteDraftDialog
+          open={showQuoteForm && canSeeQuoteEntry}
+          quoteForm={quoteForm}
+          onQuoteFormChange={setQuoteForm}
+          onSubmit={createQuote}
+          onClose={closeQuoteForm}
+          editingQuotationId={editingQuotationId}
+          quoteValidationErrors={quoteValidationErrors}
+          loading={loading}
+          canSubmitQuoteForm={canSubmitQuoteForm}
+        />
 
         <ConversationWorkbenchPanel
           quotes={quotes}
