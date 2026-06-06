@@ -30,8 +30,14 @@ export const demandApi = {
   respond(demandId, body, currentUser) {
     return request(`/demands/${demandId}/responses`, { method: 'POST', body: JSON.stringify(body) }, currentUser)
   },
+  createDemandResponse(demandId, body, currentUser) {
+    return request(`/demands/${demandId}/responses`, { method: 'POST', body: JSON.stringify(body) }, currentUser)
+  },
   responses(demandId, currentUser) {
     return request(`/demands/${demandId}/responses`, {}, currentUser)
+  },
+  myResponses(currentUser) {
+    return request('/demands/responses/me', {}, currentUser)
   },
   accept(demandId, responseId, currentUser) {
     return request(`/demands/${demandId}/responses/${responseId}/accept`, { method: 'POST' }, currentUser)
