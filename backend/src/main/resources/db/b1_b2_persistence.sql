@@ -1,3 +1,9 @@
+-- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+-- WARNING: This script contains UPDATE backfill statements.
+-- BACKUP YOUR DATABASE before executing.
+-- This script is ONE-TIME ONLY for migrating legacy databases.
+-- Do NOT execute on a fresh database initialized from V1_baseline.sql.
+-- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 -- B1/B2 persistence migration.
 -- Aligns ServicePackage, Demand, and DemandResponse JPA entities with real MySQL tables.
 

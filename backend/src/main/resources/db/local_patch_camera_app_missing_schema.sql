@@ -4,24 +4,13 @@
 --   backend/src/main/resources/db/d_line_backend.sql
 --
 -- Scope:
---   1. Create missing conversation_hidden_by_user table.
---   2. Add missing credit_records columns and indexes.
---   3. Add missing notifications columns and indexes.
---   4. Add missing reviews and review_complaints indexes.
+--   1. Add missing credit_records columns and indexes.
+--   2. Add missing notifications columns and indexes.
+--   3. Add missing reviews and review_complaints indexes.
 --
 -- Execute this script only after selecting the camera_app database.
 
-CREATE TABLE IF NOT EXISTS conversation_hidden_by_user (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    conversation_id BIGINT NOT NULL,
-    user_id BIGINT NOT NULL,
-    hidden_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_conversation_hidden_user (conversation_id, user_id),
-    KEY idx_conversation_hidden_user (user_id, hidden_at),
-    KEY idx_conversation_hidden_conversation (conversation_id),
-    CONSTRAINT fk_conversation_hidden_conversation FOREIGN KEY (conversation_id) REFERENCES conversations(id),
-    CONSTRAINT fk_conversation_hidden_user FOREIGN KEY (user_id) REFERENCES users(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='User-scoped hidden conversations';
+-- conversation_hidden_by_user is now defined in conversations_messages.sql
 
 SET @ddl = (
     SELECT IF(
