@@ -295,6 +295,7 @@ export function HallPage() {
         onOpen={() => openDemand(demand)}
         onDetail={() => navigate(`/demands/${demand.demandId}`)}
         onRespond={() => respondDemand(demand)}
+        onOpenPublisher={demand.customerId ? () => navigate(`/users/${demand.customerId}?role=CUSTOMER`) : undefined}
       />
     ))
   }
@@ -308,6 +309,7 @@ export function HallPage() {
         key={service.serviceId}
         service={service}
         currentUser={currentUser}
+        onOpenProvider={(service.photographerId || service.providerId) ? () => navigate(`/users/${service.photographerId || service.providerId}?role=PROVIDER`) : undefined}
         interested={interestedIds.has(service.serviceId)}
         onOpen={() => openService(service)}
         onDetail={() => navigate(`/service-packages/${service.serviceId}`)}

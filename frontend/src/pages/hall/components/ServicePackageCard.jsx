@@ -6,7 +6,7 @@ function sameId(a, b) {
   return a !== undefined && a !== null && b !== undefined && b !== null && Number(a) === Number(b)
 }
 
-export function ServicePackageCard({ service, currentUser, onOpen, onDetail, onReserve, onEdit, onOffline }) {
+export function ServicePackageCard({ service, currentUser, onOpen, onDetail, onReserve, onEdit, onOffline, onOpenProvider }) {
   const styleTags = splitTags(service.styleTags)
   const timeTags = splitTags(service.timeTags)
   const firstPortfolioId = Array.isArray(service.portfolioIds) ? service.portfolioIds[0] : null
@@ -53,7 +53,11 @@ export function ServicePackageCard({ service, currentUser, onOpen, onDetail, onR
         <span className="city-tag">{cityName(service.cityName || service.cityCode) || '暂无城市'}</span>
       </div>
       <div className="show-info">
-        <div className="provider-card-row">
+        <div
+          className="provider-card-row"
+          onClick={onOpenProvider ? e => { e.stopPropagation(); onOpenProvider() } : undefined}
+          style={onOpenProvider ? { cursor: 'pointer' } : undefined}
+        >
           <div
             className="provider-avatar"
             style={{ '--avatar-art': service.photographerAvatarUrl ? `url(${service.photographerAvatarUrl})` : gradientFor(service.photographerId || service.providerId) }}

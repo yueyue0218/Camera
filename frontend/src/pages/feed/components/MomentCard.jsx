@@ -1,83 +1,133 @@
-import { Avatar, Box, Button, Card, CardActions, CardContent, IconButton, Stack, Typography } from '@mui/material'
+import { Avatar, IconButton, Menu, MenuItem, Paper } from '@mui/material'
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded'
+import EditRoundedIcon from '@mui/icons-material/EditRounded'
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded'
 import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded'
-import { formatTime, roleMap } from '../utils/feedUtils.js'
-import { MentionChip } from './MentionChip.jsx'
+import BookmarkRoundedIcon from '@mui/icons-material/BookmarkRounded'
+import BookmarkBorderRoundedIcon from '@mui/icons-material/BookmarkBorderRounded'
+import MoreHorizRoundedIcon from '@mui/icons-material/MoreHorizRounded'
+
+function roleLabel(role) {
+  return role === 'PROVIDER' ? '摄影师' : '单主'
+}
+
+function formatTime(value) {
+  if (!value) return '刚刚'
+  return new Date(value).toLocaleString('zh-CN', { hour12: false })
+}
 
 export function MomentCard({
   moment,
-  currentUser,
+  authorName,
+  authorAvatar,
   isFollowing,
+  isSelf,
+  menuOpen,
+  menuAnchorEl,
+  onMenuOpen,
+  onMenuClose,
   onOpenMoment,
   onOpenProfile,
-  onOpenMention,
   onLike,
   onFavorite,
   onFollow,
+  onEdit,
   onDelete
 }) {
+  const images = moment.imageDataList?.length
+    ? moment.imageDataList
+    : moment.imageData ? [moment.imageData] : []
+  const previewImages = images.slice(0, 3)
+  const total = images.length
+
   return (
-    <Card variant="outlined">
-      {moment.imageData && (
-        <Box
-          component="img"
-          className="feed-image"
-          src={moment.imageData}
-          alt="动态照片"
-          onClick={() => onOpenMoment(moment.momentId)}
-          sx={{ cursor: 'pointer' }}
-        />
-      )}
-      <CardContent>
-        <Stack spacing={1.2}>
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <Avatar
-              onClick={() => onOpenProfile(moment.authorId)}
-              sx={{ cursor: 'pointer' }}
-            >
-              {roleMap[moment.authorRole]?.slice(0, 1) || '用'}
-            </Avatar>
-            <Box sx={{ cursor: 'pointer' }} onClick={() => onOpenProfile(moment.authorId)}>
-              <Typography fontWeight={800}>{roleMap[moment.authorRole] || '用户'} {moment.authorId}</Typography>
-              <Typography color="text.secondary" variant="body2">{formatTime(moment.createdAt)}</Typography>
-            </Box>
-          </Stack>
-          <Typography
-            variant="h6"
-            onClick={() => onOpenMoment(moment.momentId)}
-            sx={{ cursor: 'pointer' }}
+    <Paper className="moment-card" elevation={0}>
+      <div className="moment-card__side">
+        <div className="moment-card__serial">No. {String(moment.momentId).padStart(6, '0')}</div>
+        <div className="moment-card__avatar-shell" onClick={() => onOpenProfile(moment.authorId, moment.authorRole)}>
+          <Avatar src={authorAvatar || undefined} className="moment-card__avatar">
+            {(authorName || roleLabel(moment.authorRole)).slice(0, 1)}
+          </Avatar>
+        </div>
+        <div className="moment-card__author" onClick={() => onOpenProfile(moment.authorId, moment.authorRole)}>
+          <strong>{authorName || `${roleLabel(moment.authorRole)} ${moment.authorId}`}</strong>
+        </div>
+        <div className="moment-card__meta-time">{formatTime(moment.createdAt)}</div>
+        {!isSelf && (
+          <button
+            type="button"
+            className={`moment-card__follow ${moment.followedByCurrentUser ? 'is-following' : ''}`}
+            onClick={() => onFollow(moment.authorId, moment.authorRole)}
           >
-            {moment.title || '未命名动态'}
-          </Typography>
-          <Typography>{moment.content || '分享了一张照片'}</Typography>
-          {!!moment.mentions?.length && (
-            <Stack direction="row" spacing={1} flexWrap="wrap">
-              {moment.mentions.map(mention => (
-                <MentionChip key={mention} mention={mention} onOpen={onOpenMention(mention)} />
-              ))}
-            </Stack>
-          )}
-        </Stack>
-      </CardContent>
-      <CardActions>
-        <IconButton color={moment.likedByCurrentUser ? 'secondary' : 'default'} onClick={() => onLike(moment.momentId)}>
-          {moment.likedByCurrentUser ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
-        </IconButton>
-        <Typography color="text.secondary">{moment.likeCount} 个赞</Typography>
-        <Button size="small" onClick={() => onFavorite(moment.momentId)}>
-          {moment.favoritedByCurrentUser ? '已收藏' : '收藏'} {moment.favoriteCount || 0}
-        </Button>
-        <Button size="small" onClick={() => onFollow(moment.authorId)}>
-          {isFollowing(moment.authorId) ? '已关注' : '关注作者'}
-        </Button>
-        <Button size="small" onClick={() => onOpenMoment(moment.momentId)}>详情</Button>
-        {Number(moment.authorId) === currentUser.userId && (
-          <Button size="small" color="error" startIcon={<DeleteRoundedIcon />} onClick={() => onDelete(moment.momentId)}>
-            删除
-          </Button>
+            {isFollowing ? '已关注' : '关注'}
+          </button>
         )}
-      </CardActions>
-    </Card>
+      </div>
+
+      <div className="moment-card__main">
+        <div className="moment-card__stamp">PORTRA FILE</div>
+        <h2 onClick={() => onOpenMoment(moment.momentId)}>{moment.title || '未命名动态'}</h2>
+        <p>{moment.content || '分享了一段被放慢的生活。'}</p>
+
+        {total > 0 ? (
+          <div className={`moment-card__filmstrip count-${Math.min(total, 3)}`} onClick={() => onOpenMoment(moment.momentId)}>
+            {previewImages.map((src, index) => (
+              <img key={`${moment.momentId}-${index}`} src={src} alt={`${moment.title || '动态'} ${index + 1}`} />
+            ))}
+            {total > 3 && <span className="moment-card__film-count">+{total - 3}</span>}
+          </div>
+        ) : null}
+
+        <div className="moment-card__actions">
+          <button
+            type="button"
+            className={`moment-action like ${moment.likedByCurrentUser ? 'active' : ''}`}
+            onClick={() => onLike(moment.momentId)}
+          >
+            {moment.likedByCurrentUser ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
+            <span>{moment.likeCount || 0}</span>
+          </button>
+          <button
+            type="button"
+            className={`moment-action save ${moment.favoritedByCurrentUser ? 'active' : ''}`}
+            onClick={() => onFavorite(moment.momentId)}
+          >
+            {moment.favoritedByCurrentUser ? <BookmarkRoundedIcon /> : <BookmarkBorderRoundedIcon />}
+            <span>{moment.favoriteCount || 0}</span>
+          </button>
+
+          <div className="moment-card__menu-wrap">
+            <IconButton
+              className="moment-card__menu-btn"
+              onClick={event => onMenuOpen(event, moment.momentId)}
+              aria-label="更多"
+            >
+              <MoreHorizRoundedIcon fontSize="small" />
+            </IconButton>
+            <Menu
+              open={menuOpen}
+              anchorEl={menuAnchorEl}
+              onClose={onMenuClose}
+              anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+              transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            >
+              {isSelf && (
+                <MenuItem onClick={() => { onMenuClose(); onEdit(moment); }}>
+                  <EditRoundedIcon fontSize="small" sx={{ mr: 1 }} />
+                  编辑动态
+                </MenuItem>
+              )}
+              {isSelf && (
+                <MenuItem onClick={() => { onMenuClose(); onDelete(moment.momentId); }} sx={{ color: 'error.main' }}>
+                  <DeleteRoundedIcon fontSize="small" sx={{ mr: 1 }} />
+                  删除动态
+                </MenuItem>
+              )}
+              {!isSelf && <MenuItem onClick={() => onOpenMoment(moment.momentId)}>查看详情</MenuItem>}
+            </Menu>
+          </div>
+        </div>
+      </div>
+    </Paper>
   )
 }

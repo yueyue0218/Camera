@@ -7,6 +7,7 @@ import com.action.camera.common.security.UserRole;
 import com.action.camera.domain.User;
 import com.action.camera.dto.LoginResponse;
 import com.action.camera.dto.SwitchRoleResponse;
+import com.action.camera.dto.UpdateProfileRequest;
 import com.action.camera.dto.UserBriefResponse;
 import com.action.camera.dto.UserProfileResponse;
 import com.action.camera.provider.entity.ProviderProfile;
@@ -97,10 +98,14 @@ public class UserService {
         }
     }
 
-    /** GET /users/me：返回当前用户完整资料 */
+    /** GET /users/me：返回当前用户完整资料（含双身份字段） */
     public UserProfileResponse getMyProfile(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_ERROR, "用户不存在"));
+
+        ProviderProfile pp = providerProfileMapper.selectOne(
+                new LambdaQueryWrapper<ProviderProfile>().eq(ProviderProfile::getUserId, userId)
+        );
 
         UserProfileResponse resp = new UserProfileResponse();
         resp.setId(user.getId());
@@ -115,6 +120,13 @@ public class UserService {
         resp.setStatus(user.getStatus());
         resp.setCreditScore(user.getCreditScore());
         resp.setCreatedAt(user.getCreatedAt());
+        // Dual-identity fields
+        resp.setCustomerNickname(user.getNickname());
+        resp.setCustomerAvatarFileId(user.getAvatarFileId());
+        resp.setCustomerBio(user.getBio());
+        resp.setProviderNickname(pp != null ? pp.getDisplayName() : null);
+        resp.setProviderAvatarFileId(pp != null ? pp.getProviderAvatarFileId() : null);
+        resp.setProviderBio(pp != null ? pp.getBio() : null);
         return resp;
     }
 
@@ -146,5 +158,38 @@ public class UserService {
         user.setCurrentRole(targetRole.name());
         userRepository.save(user);
         return new SwitchRoleResponse(user.getId(), user.getCurrentRole(), user.getNickname());
+    }
+
+    @Transactional
+    public void updateMyProfile(Long userId, UpdateProfileRequest req) {
+        if ("PROVIDER".equals(req.getRole())) {
+            ensureProviderProfile(userId);
+            ProviderProfile pp = providerProfileMapper.selectOne(
+                    new LambdaQueryWrapper<ProviderProfile>().eq(ProviderProfile::getUserId, userId)
+            );
+            if (req.getNickname() != null && !req.getNickname().isBlank()) {
+                pp.setDisplayName(req.getNickname().trim());
+            }
+            if (req.getBio() != null) {
+                pp.setBio(req.getBio().trim());
+            }
+            if (req.getAvatarFileId() != null) {
+                pp.setProviderAvatarFileId(req.getAvatarFileId());
+            }
+            providerProfileMapper.updateById(pp);
+        } else {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
+            if (req.getNickname() != null && !req.getNickname().isBlank()) {
+                user.setNickname(req.getNickname().trim());
+            }
+            if (req.getBio() != null) {
+                user.setBio(req.getBio().trim());
+            }
+            if (req.getAvatarFileId() != null) {
+                user.setAvatarFileId(req.getAvatarFileId());
+            }
+            userRepository.save(user);
+        }
     }
 }

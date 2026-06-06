@@ -21,4 +21,8 @@ public interface MomentPostRepository extends JpaRepository<MomentPost, Long> {
     Optional<MomentPost> findByIdAndStatus(Long id, MomentStatus status);
 
     long countByAuthorIdAndStatus(Long authorId, MomentStatus status);
+
+    List<MomentPost> findByAuthorIdAndAuthorRoleAndStatusOrderByCreatedAtDesc(Long authorId, String authorRole, MomentStatus status);
+
+    long countByAuthorIdAndAuthorRoleAndStatus(Long authorId, String authorRole, MomentStatus status);
 }

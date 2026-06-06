@@ -426,7 +426,7 @@ export function LoginChoicePage() {
 
           <nav className="op-nav">
             {[
-              { label: '约拍大厅', id: 'op-page1' },
+              { label: '大厅', id: 'op-page1' },
               { label: '动态', id: 'op-page2' },
               { label: '消息', id: 'op-page3' },
               { label: '个人', id: 'op-about' },
@@ -451,7 +451,6 @@ export function LoginChoicePage() {
                 >{role.label}</button>
               ))}
             </div>
-            <button type="button" className="op-icon-btn" onClick={() => navigate('/login/sign-in')}>⌕</button>
             <button type="button" className="op-avatar" title="登录" onClick={() => navigate('/login/sign-in')} />
           </div>
         </div>
@@ -513,8 +512,8 @@ export function LoginChoicePage() {
               { label: '我想拍', to: '/login/sign-in' },
               { label: '我来拍', to: '/login/sign-in' },
               { label: '先去看看', to: '/login/sign-in' },
-            ].map(({ label }) => (
-              <button key={label} className={roleActive === label ? 'active' : ''} onClick={() => setRoleActive(label)}>{label}</button>
+            ].map(({ label, to }) => (
+              <button key={label} className={roleActive === label ? 'active' : ''} onClick={() => { setRoleActive(label); navigate(to) }}>{label}</button>
             ))}
           </div>
           <div className="op-edge-text">WAITING FOR THE RIGHT SHUTTER</div>

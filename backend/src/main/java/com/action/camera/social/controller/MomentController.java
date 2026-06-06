@@ -34,9 +34,11 @@ public class MomentController {
 
     @GetMapping
     public Result<List<MomentDto>> listMoments(@RequestParam(required = false, defaultValue = "latest") String scope,
+                                               @RequestParam(required = false) Long authorId,
+                                               @RequestParam(required = false) String authorRole,
                                                HttpServletRequest request) {
         CurrentUser currentUser = currentUser();
-        return Result.success(momentService.listMoments(currentUser, scope));
+        return Result.success(momentService.listMoments(currentUser, scope, authorId, authorRole));
     }
 
     @PostMapping

@@ -149,7 +149,7 @@ export function PublishServicePackagePage() {
   return (
     <main className="portra-page">
       <div className="crumb">
-        <button className="back" type="button" onClick={() => navigate('/hall')}>← 返回约拍大厅</button>
+        <button className="back" type="button" onClick={() => navigate('/hall')}>← 返回大厅</button>
         <span>{editMode ? '编辑后会调用后端橱窗更新接口并刷新详情时间' : '把作品、价格和档期整理成可预约的服务橱窗'}</span>
       </div>
       {notice && <Alert severity={notice.type} className="form-alert">{notice.text}</Alert>}

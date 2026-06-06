@@ -2070,7 +2070,7 @@ function OrdersPage() {
           role: currentUser.role === 'PROVIDER' ? 'provider' : 'customer',
           status: statusFilter
         }, currentUser),
-        currentUser.role === 'PROVIDER' ? demandApi.sentInvitations(currentUser) : Promise.resolve([])
+        currentUser.role === 'PROVIDER' ? demandApi.sentInvitations(currentUser).catch(() => []) : Promise.resolve([])
       ])
       setOrders(nextOrders)
       saveOrderSnapshots(nextOrders)
@@ -2957,7 +2957,22 @@ function ProfilePage() {
     const file = event.target.files?.[0]
     if (!file) return
     try {
-      setProfileForm({ ...profileForm, avatarData: await readFileAsDataUrl(file) })
+      const compressed = await new Promise((resolve, reject) => {
+        const img = new Image()
+        const url = URL.createObjectURL(file)
+        img.onload = () => {
+          URL.revokeObjectURL(url)
+          const ratio = Math.min(200 / img.width, 200 / img.height, 1)
+          const canvas = document.createElement('canvas')
+          canvas.width = Math.round(img.width * ratio)
+          canvas.height = Math.round(img.height * ratio)
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+          resolve(canvas.toDataURL('image/jpeg', 0.85))
+        }
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片加载失败')) }
+        img.src = url
+      })
+      setProfileForm({ ...profileForm, avatarData: compressed })
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }
@@ -4602,7 +4617,7 @@ export {
   ProfilePage,
   PublicProfilePage,
   PublishPage,
-  RegisterPage
+  RegisterPage11不要恢复原版，本来个人主页前端
 }
 
 export default App

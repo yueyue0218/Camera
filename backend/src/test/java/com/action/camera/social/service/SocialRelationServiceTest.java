@@ -68,8 +68,8 @@ class SocialRelationServiceTest {
     void followCreatesRelationAndSendsNotificationOnce() {
         CurrentUser viewer = new CurrentUser(VIEWER_ID, UserRole.CUSTOMER);
 
-        FollowStateResponse first = socialRelationService.follow(PROVIDER_ID, viewer);
-        FollowStateResponse second = socialRelationService.follow(PROVIDER_ID, viewer);
+        FollowStateResponse first = socialRelationService.follow(PROVIDER_ID, "PROVIDER", viewer);
+        FollowStateResponse second = socialRelationService.follow(PROVIDER_ID, "PROVIDER", viewer);
 
         assertThat(first.isFollowed()).isTrue();
         assertThat(second.isFollowed()).isTrue();
@@ -82,10 +82,10 @@ class SocialRelationServiceTest {
     @Test
     void unfollowIsIdempotentAndDoesNotNotify() {
         CurrentUser viewer = new CurrentUser(VIEWER_ID, UserRole.CUSTOMER);
-        socialRelationService.follow(PROVIDER_ID, viewer);
+        socialRelationService.follow(PROVIDER_ID, "PROVIDER", viewer);
 
-        FollowStateResponse first = socialRelationService.unfollow(PROVIDER_ID, viewer);
-        FollowStateResponse second = socialRelationService.unfollow(PROVIDER_ID, viewer);
+        FollowStateResponse first = socialRelationService.unfollow(PROVIDER_ID, "PROVIDER", viewer);
+        FollowStateResponse second = socialRelationService.unfollow(PROVIDER_ID, "PROVIDER", viewer);
 
         assertThat(first.isFollowed()).isFalse();
         assertThat(second.isFollowed()).isFalse();
@@ -98,14 +98,14 @@ class SocialRelationServiceTest {
     @Test
     void publicProfileIncludesProviderExtensionAndCounts() {
         CurrentUser viewer = new CurrentUser(VIEWER_ID, UserRole.CUSTOMER);
-        socialRelationService.follow(PROVIDER_ID, viewer);
+        socialRelationService.follow(PROVIDER_ID, "PROVIDER", viewer);
         momentService.createMoment(new CurrentUser(PROVIDER_ID, UserRole.PROVIDER), momentRequest("from provider"));
         momentService.createMoment(new CurrentUser(OTHER_ID, UserRole.CUSTOMER), momentRequest("from other"));
 
-        PublicProfileResponse response = socialRelationService.getPublicProfile(PROVIDER_ID, viewer);
+        PublicProfileResponse response = socialRelationService.getPublicProfile(PROVIDER_ID, "PROVIDER", viewer);
 
         assertThat(response.getUserId()).isEqualTo(PROVIDER_ID);
-        assertThat(response.getNickname()).isEqualTo("provider");
+        assertThat(response.getNickname()).isEqualTo("Provider Display");
         assertThat(response.getFollowerCount()).isEqualTo(1);
         assertThat(response.getFollowingCount()).isEqualTo(0);
         assertThat(response.isFollowedByCurrentUser()).isTrue();
@@ -119,11 +119,11 @@ class SocialRelationServiceTest {
     @Test
     void followingFeedOnlyShowsFollowedPublishers() {
         CurrentUser viewer = new CurrentUser(VIEWER_ID, UserRole.CUSTOMER);
-        socialRelationService.follow(PROVIDER_ID, viewer);
+        socialRelationService.follow(PROVIDER_ID, "PROVIDER", viewer);
         momentService.createMoment(new CurrentUser(PROVIDER_ID, UserRole.PROVIDER), momentRequest("followed"));
         momentService.createMoment(new CurrentUser(OTHER_ID, UserRole.CUSTOMER), momentRequest("ignored"));
 
-        List<Long> ids = momentService.listMoments(viewer, "following").stream()
+        List<Long> ids = momentService.listMoments(viewer, "following", null, null).stream()
                 .map(response -> response.getMomentId())
                 .toList();
 
@@ -136,12 +136,12 @@ class SocialRelationServiceTest {
     @Test
     void listFollowersAndFollowingReturnsBriefUserCards() {
         CurrentUser viewer = new CurrentUser(VIEWER_ID, UserRole.CUSTOMER);
-        socialRelationService.follow(PROVIDER_ID, viewer);
-        socialRelationService.follow(OTHER_ID, viewer);
-        socialRelationService.follow(PROVIDER_ID, new CurrentUser(OTHER_ID, UserRole.CUSTOMER));
+        socialRelationService.follow(PROVIDER_ID, "PROVIDER", viewer);
+        socialRelationService.follow(OTHER_ID, "CUSTOMER", viewer);
+        socialRelationService.follow(PROVIDER_ID, "PROVIDER", new CurrentUser(OTHER_ID, UserRole.CUSTOMER));
 
-        List<SocialUserBriefResponse> followers = socialRelationService.listFollowers(PROVIDER_ID, viewer);
-        List<SocialUserBriefResponse> following = socialRelationService.listFollowing(VIEWER_ID, viewer);
+        List<SocialUserBriefResponse> followers = socialRelationService.listFollowers(PROVIDER_ID, "PROVIDER", viewer);
+        List<SocialUserBriefResponse> following = socialRelationService.listFollowing(VIEWER_ID, null, viewer);
 
         assertThat(followers).extracting(SocialUserBriefResponse::getUserId)
                 .containsExactlyInAnyOrder(OTHER_ID, VIEWER_ID);
@@ -197,6 +197,7 @@ class SocialRelationServiceTest {
                     audit_status VARCHAR(20),
                     age INT,
                     equipment VARCHAR(500),
+                    provider_avatar_file_id BIGINT NULL,
                     created_at TIMESTAMP,
                     updated_at TIMESTAMP
                 )

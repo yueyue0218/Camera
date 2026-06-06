@@ -9,6 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -31,7 +32,8 @@ public class MomentImage {
     @JoinColumn(name = "moment_id", nullable = false)
     private MomentPost moment;
 
-    @Column(name = "image_data", nullable = false, length = 2048)
+    @Lob
+    @Column(name = "image_data", nullable = false, columnDefinition = "MEDIUMTEXT")
     private String imageData;
 
     @Column(name = "sort_order", nullable = false)

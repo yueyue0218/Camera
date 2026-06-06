@@ -1,127 +1,162 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button, Stack } from '@mui/material'
+import { Alert, Box, Button, Paper, Stack } from '@mui/material'
 import { useNavigate, useParams } from 'react-router-dom'
-import { USERS, useAuth } from '../../AuthContext.jsx'
-import { momentApi } from '../../api.js'
-import { EmptyFeedCard } from './components/EmptyFeedCard.jsx'
-import { FeedSectionHeader } from './components/FeedSectionHeader.jsx'
+import { useAuth } from '../../AuthContext.jsx'
+import { fileApi, momentApi, userApi } from '../../api.js'
 import { MomentDetailCard } from './components/MomentDetailCard.jsx'
 
-const USER_PROFILE_STORAGE_KEY = 'camera-p4-user-profiles'
-
-function readJsonStorage(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? JSON.parse(raw) : fallback
-  } catch {
-    return fallback
-  }
-}
-
-function readUserProfiles() {
-  return readJsonStorage(USER_PROFILE_STORAGE_KEY, {})
-}
-
-function openUserProfile(userId) {
-  const id = Number(userId)
-  if (!id) return
-  window.open(new URL(`/users/${id}`, window.location.origin).toString(), '_blank', 'noopener,noreferrer')
-}
-
-function resolveMentionUserId(mention) {
-  const value = String(mention || '').replace(/^@+/, '').trim()
-  if (!value) return null
-  if (/^\d+$/.test(value)) return Number(value)
-  const profiles = readUserProfiles()
-  const storedMatch = Object.entries(profiles).find(([, profile]) => profile?.nickname === value)
-  if (storedMatch) return Number(storedMatch[0])
-  const demoMatch = Object.values(USERS).find(user => user.nickname === value || user.label === value)
-  return demoMatch?.userId || null
+function emptyFollowState() {
+  return { CUSTOMER: new Set(), PROVIDER: new Set() }
 }
 
 export function MomentDetailPage() {
   const { momentId } = useParams()
   const navigate = useNavigate()
   const { currentUser } = useAuth()
-  const [moments, setMoments] = useState([])
-  const [receivedReviews, setReceivedReviews] = useState([])
-  const [showReviews, setShowReviews] = useState(false)
-  const [creditSummary, setCreditSummary] = useState(null)
+  const [moment, setMoment] = useState(null)
+  const [authorProfile, setAuthorProfile] = useState(null)
+  const [followingMap, setFollowingMap] = useState(emptyFollowState)
   const [notice, setNotice] = useState(null)
 
   useEffect(() => {
-    loadMoments()
-  }, [momentId, currentUser.userId])
+    let cancelled = false
 
-  async function loadMoments() {
-    try {
-      const [detail, list] = await Promise.all([
-        momentApi.detail(momentId, currentUser).catch(() => null),
-        momentApi.list({}, currentUser)
-      ])
-      const selectedId = Number(momentId)
-      const selected = detail || list.find(moment => Number(moment.momentId) === selectedId)
-      setMoments(selected ? [selected, ...list.filter(moment => Number(moment.momentId) !== Number(selected.momentId))] : list)
+    async function load() {
       setNotice(null)
-      if (!selected) setNotice({ type: 'warning', text: '该动态不存在或已被删除，先展示最新动态。' })
+      try {
+        const [detail, customerFollowing, providerFollowing] = await Promise.all([
+          momentApi.detail(momentId, currentUser),
+          userApi.following(currentUser.userId, currentUser, 'CUSTOMER'),
+          userApi.following(currentUser.userId, currentUser, 'PROVIDER')
+        ])
+        if (cancelled) return
+        setMoment(detail)
+        const profile = await loadAuthorProfile(detail)
+        if (!cancelled) setAuthorProfile(profile)
+        const nextFollowing = emptyFollowState()
+        customerFollowing.forEach(item => nextFollowing.CUSTOMER.add(Number(item.userId)))
+        providerFollowing.forEach(item => nextFollowing.PROVIDER.add(Number(item.userId)))
+        setFollowingMap(nextFollowing)
+      } catch (error) {
+        if (!cancelled) setNotice({ type: 'error', text: error.message })
+      }
+    }
+
+    async function loadAuthorProfile(detail) {
+      if (!detail) return null
+      if (Number(detail.authorId) === currentUser.userId) {
+        return {
+          nickname: currentUser.nickname || currentUser.label || `用户 ${currentUser.userId}`,
+          avatarData: currentUser.avatarData || ''
+        }
+      }
+      try {
+        const brief = await userApi.brief(detail.authorId, currentUser)
+        let avatarData = ''
+        if (brief.avatarFileId) {
+          try {
+            avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser)
+          } catch {
+            avatarData = ''
+          }
+        }
+        return { nickname: brief.nickname, avatarData }
+      } catch {
+        return { nickname: `用户 ${detail.authorId}`, avatarData: '' }
+      }
+    }
+
+    load()
+    return () => { cancelled = true }
+  }, [momentId, currentUser])
+
+  async function toggleLike() {
+    if (!moment) return
+    try {
+      const next = await momentApi.like(moment.momentId, currentUser)
+      setMoment(next)
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }
   }
 
-  async function likeMoment(id) {
+  async function toggleFavorite() {
+    if (!moment) return
     try {
-      await momentApi.like(id, currentUser)
-      await loadMoments()
+      const next = await momentApi.favorite(moment.momentId, currentUser)
+      setMoment(next)
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }
   }
 
-  async function favoriteMoment(id) {
+  async function deleteMoment() {
+    if (!moment) return
     try {
-      await momentApi.favorite(id, currentUser)
-      await loadMoments()
-    } catch (error) {
-      setNotice({ type: 'error', text: error.message })
-    }
-  }
-
-  async function deleteMoment(id) {
-    try {
-      await momentApi.delete(id, currentUser)
-      setNotice({ type: 'success', text: '动态已删除' })
+      await momentApi.delete(moment.momentId, currentUser)
       navigate('/feed')
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }
   }
 
-  function openMention(mention) {
-    const userId = resolveMentionUserId(mention)
-    return userId ? () => openUserProfile(userId) : undefined
+  async function toggleFollow(authorId, authorRole) {
+    const followed = followingMap[(authorRole || 'CUSTOMER').toUpperCase()]?.has(Number(authorId))
+    try {
+      if (followed) {
+        await userApi.unfollow(authorId, currentUser, authorRole)
+      } else {
+        await userApi.follow(authorId, currentUser, authorRole)
+      }
+      setNotice({ type: 'success', text: followed ? '已取消关注' : '已关注' })
+      const customerFollowing = await userApi.following(currentUser.userId, currentUser, 'CUSTOMER')
+      const providerFollowing = await userApi.following(currentUser.userId, currentUser, 'PROVIDER')
+      const nextFollowing = emptyFollowState()
+      customerFollowing.forEach(item => nextFollowing.CUSTOMER.add(Number(item.userId)))
+      providerFollowing.forEach(item => nextFollowing.PROVIDER.add(Number(item.userId)))
+      setFollowingMap(nextFollowing)
+    } catch (error) {
+      setNotice({ type: 'error', text: error.message })
+    }
   }
+
+  const followed = moment ? followingMap[(moment.authorRole || 'CUSTOMER').toUpperCase()]?.has(Number(moment.authorId)) : false
 
   return (
     <Stack spacing={2.5}>
-      <FeedSectionHeader title="动态详情" subtitle="查看完整动态，继续下滑浏览更多人的动态详情。" />
+      <Box className="moments-page__head">
+        <div>
+          <div className="moments-page__eyebrow">动态详情</div>
+          <h1>动态详情</h1>
+          <p>查看完整照片组，继续点赞、收藏或关注作者。</p>
+        </div>
+        <Button variant="text" onClick={() => navigate('/feed')}>返回广场</Button>
+      </Box>
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
-      <Button variant="text" color="inherit" onClick={() => navigate('/feed')} sx={{ alignSelf: 'flex-start' }}>返回动态</Button>
-      <Stack spacing={2.5}>
-        {moments.map(moment => (
-          <MomentDetailCard
-            key={moment.momentId}
-            moment={moment}
-            currentUser={currentUser}
-            onProfile={() => openUserProfile(moment.authorId)}
-            onOpenMention={openMention}
-            onLike={() => likeMoment(moment.momentId)}
-            onFavorite={() => favoriteMoment(moment.momentId)}
-            onDelete={() => deleteMoment(moment.momentId)}
-          />
-        ))}
-      </Stack>
-      {!moments.length && <EmptyFeedCard text="暂无动态" />}
+      {moment ? (
+        <MomentDetailCard
+          moment={moment}
+          authorName={authorProfile?.nickname}
+          authorAvatar={authorProfile?.avatarData}
+          isFollowing={followed}
+          isSelf={Number(moment.authorId) === currentUser.userId}
+          menuOpen={false}
+          menuAnchorEl={null}
+          onMenuOpen={() => {}}
+          onMenuClose={() => {}}
+          onOpenProfile={(authorId, authorRole) => {
+            if (Number(authorId) === currentUser.userId) navigate('/profile')
+            else navigate(`/users/${authorId}${authorRole ? `?role=${authorRole}` : ''}`)
+          }}
+          onLike={toggleLike}
+          onFavorite={toggleFavorite}
+          onFollow={toggleFollow}
+          onEdit={() => navigate('/feed')}
+          onDelete={deleteMoment}
+        />
+      ) : (
+        <Paper className="moments-empty" variant="outlined">正在加载...</Paper>
+      )}
     </Stack>
   )
 }

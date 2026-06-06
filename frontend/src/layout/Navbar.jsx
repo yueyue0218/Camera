@@ -31,6 +31,7 @@ export function Navbar({ activePath, currentUser, logout }) {
 
   useEffect(() => {
     let alive = true
+
     const refresh = async event => {
       if (import.meta.env.DEV && typeof event?.detail?.previewUnreadCount === 'number') {
         setUnreadCount(event.detail.previewUnreadCount)
@@ -40,6 +41,7 @@ export function Navbar({ activePath, currentUser, logout }) {
         }
         return
       }
+
       try {
         const dnd = localStorage.getItem(DND_KEY) === '1'
         const data = await notificationApi.listMine(currentUser)
@@ -63,6 +65,7 @@ export function Navbar({ activePath, currentUser, logout }) {
         if (alive) setUnreadCount(0)
       }
     }
+
     refresh()
     window.addEventListener(PORTRA_STATE_EVENT, refresh)
     window.addEventListener('storage', refresh)
@@ -80,6 +83,7 @@ export function Navbar({ activePath, currentUser, logout }) {
           <div className="portra-wordmark-text">Por<span className="t">t</span>r<span className="a">a</span></div>
           <div className="portra-wordmark-sub">Meet Right Now</div>
         </button>
+
         <nav className="portra-nav" aria-label="主导航">
           {navItems.map(item => (
             <button
@@ -92,6 +96,7 @@ export function Navbar({ activePath, currentUser, logout }) {
             </button>
           ))}
         </nav>
+
         <div className="portra-header-actions">
           <div className="portra-role-toggle" aria-label="身份切换">
             <button
