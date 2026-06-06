@@ -19,6 +19,7 @@ import {
 } from '@mui/material'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
 import { centToYuan } from '../../../utils/index.js'
+import { formatFileDisplayName, formatQuoteRemark, formatQuoteServiceContent } from '../../../utils/displayFormatters.js'
 import { PortraStatusBadge } from '../../../components/portra/index.js'
 import { formatDate, formatTime } from '../utils/conversationUtils.js'
 import { getPhotoUsageScopeLabel, getQuoteStatusLabel } from '../utils/quoteUtils.js'
@@ -60,7 +61,7 @@ export function ConversationActionDialogs({
     .filter(record => record.fileId)
     .map(record => ({
       fileId: Number(record.fileId),
-      fileName: getSafeDisplayText(record.fileName, '作品文件')
+      fileName: formatFileDisplayName(record, '作品文件')
     }))
 
   async function submitAndClose(handler, event) {
@@ -84,11 +85,11 @@ export function ConversationActionDialogs({
               <DetailRows rows={[
                 ['拍摄时间', `${formatTime(quote.shootStartTime)} - ${formatTime(quote.shootEndTime)}`],
                 ['拍摄地点', getSafeDisplayText(quote.location, '拍摄地点待确认')],
-                ['服务内容', getSafeDisplayText(quote.serviceContent, '按双方沟通内容执行')],
+                ['服务内容', formatQuoteServiceContent(quote, '按双方沟通内容执行')],
                 ['原片/精修', `${quote.originalCount ?? 0} / ${quote.refinedCount ?? 0}`],
                 ['照片用途', getPhotoUsageScopeLabel(quote.photoUsageScope)],
                 ['最晚交付', formatDate(quote.deliveryDeadline)],
-                ['备注', getSafeDisplayText(quote.remark, '无额外备注')]
+                ['备注', formatQuoteRemark(quote, '无额外备注')]
               ]} />
               <Box sx={{ p: 1, bgcolor: PORTRA_COLORS.paperMuted, borderRadius: PORTRA_RADII.control, color: PORTRA_COLORS.mutedInk, fontSize: 14, lineHeight: 1.7 }}>
                 客户确认报价后将生成平台托管订单；付款后资金先进入平台托管，订单完成后再结算给摄影师。

@@ -233,6 +233,27 @@ export function formatAuthorizationDescription(authorization, fallback = '摄影
   return sanitizeSeedText(authorization?.remark || authorization?.description || authorization?.reason, fallback)
 }
 
+export function formatQuoteServiceContent(quoteOrText, fallback = '校园约拍服务') {
+  const value = typeof quoteOrText === 'object'
+    ? quoteOrText?.serviceContent || quoteOrText?.title || quoteOrText?.scene
+    : quoteOrText
+  return sanitizeSeedText(value, fallback)
+}
+
+export function formatQuoteRemark(quoteOrText, fallback = '无额外备注') {
+  const value = typeof quoteOrText === 'object'
+    ? quoteOrText?.remark || quoteOrText?.note || quoteOrText?.description
+    : quoteOrText
+  return sanitizeSeedText(value, fallback)
+}
+
+export function formatPhotoUsageScope(scope) {
+  if (scope === 'PERSONAL_ONLY') return '仅限个人留念'
+  if (scope === 'PORTFOLIO_ALLOWED') return '可申请作品展示授权'
+  if (scope === 'COMMERCIAL_ALLOWED') return '包含商业使用约定'
+  return scope ? sanitizeSeedText(scope, '按双方约定使用') : '未填写'
+}
+
 export function formatStatusLogText(log) {
   const status = log?.toStatus || log?.targetStatus || log?.status
   const naturalByStatus = {

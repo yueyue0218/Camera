@@ -52,6 +52,7 @@ import {
   formatDeliveryDescription,
   formatDeliveryTitle,
   formatFileDisplayName,
+  formatPhotoUsageScope,
   formatStatusLogText
 } from '../../utils/displayFormatters.js'
 import {
@@ -847,7 +848,7 @@ export function OrdersPage() {
                     <InfoRows rows={[
                       ['服务内容', selectedOrderServiceContent],
                       ['原片/精修', formatQuoteCount(quoteSnapshot)],
-                      ['照片用途', sanitizeSeedText(quoteSnapshot.photoUsageScope, '未填写')]
+                      ['照片用途', formatPhotoUsageScope(quoteSnapshot.photoUsageScope)]
                     ]} />
                   </PortraTicketSection>
                 )}

@@ -7,6 +7,7 @@ import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
 import UploadRoundedIcon from '@mui/icons-material/UploadRounded'
 import { centToYuan } from '../../../utils/index.js'
+import { formatFileDisplayName, formatQuoteServiceContent } from '../../../utils/displayFormatters.js'
 import { buildOrderAction } from '../../../utils/orderNavigation.js'
 import { PortraStatusBadge } from '../../../components/portra/index.js'
 import { PHOTO_AUTHORIZATION_STATUS_LABELS } from '../../orders/orderActions.js'
@@ -188,6 +189,9 @@ function QuoteMeta({ quote }) {
       <Typography variant="body2" sx={{ color: PORTRA_COLORS.subInk, fontWeight: 800 }}>
         {centToYuan(quote.amountCent)} · {formatTime(quote.shootStartTime)} · {getSafeDisplayText(quote.location, '拍摄地点待确认')}
       </Typography>
+      <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk }}>
+        {formatQuoteServiceContent(quote, '按双方沟通内容执行')}
+      </Typography>
       <Stack direction="row" spacing={0.6} sx={{ flexWrap: 'wrap' }}>
         <PortraStatusBadge label={getQuoteStatusLabel(quote.status)} />
       </Stack>
@@ -224,7 +228,7 @@ function AuthorizationMeta({ authorization }) {
   return (
     <Stack direction="row" spacing={0.8} sx={{ flexWrap: 'wrap' }}>
       <PortraStatusBadge label={PHOTO_AUTHORIZATION_STATUS_LABELS[authorization.status] || '授权状态已更新'} />
-      {(authorization.files || []).map(file => <Chip key={file.id || file.fileId} size="small" label="已选交付作品" sx={metaChipSx} />)}
+      {(authorization.files || []).map(file => <Chip key={file.id || file.fileId} size="small" label={formatFileDisplayName(file, '已选交付作品')} sx={metaChipSx} />)}
     </Stack>
   )
 }

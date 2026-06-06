@@ -1,5 +1,5 @@
 import { yuanToCent } from '../../../utils/index.js'
-import { QUOTE_STATUS_LABELS } from '../../../utils/displayFormatters.js'
+import { formatPhotoUsageScope, QUOTE_STATUS_LABELS } from '../../../utils/displayFormatters.js'
 import { getCurrentUserId } from './workbenchState.js'
 import {
   buildQuotePayload as buildQuotePayloadFromModel,
@@ -17,10 +17,7 @@ export function getQuoteStatusLabel(status) {
 }
 
 export function getPhotoUsageScopeLabel(scope) {
-  if (scope === 'PERSONAL_ONLY') return '仅限个人留念'
-  if (scope === 'PORTFOLIO_ALLOWED') return '可申请作品展示授权'
-  if (scope === 'COMMERCIAL_ALLOWED') return '包含商业使用约定'
-  return scope ? '按双方约定使用' : '未填写'
+  return formatPhotoUsageScope(scope)
 }
 
 export function getQuoteNextStepText(quote, currentUser) {
