@@ -147,56 +147,56 @@ const theme = createTheme({
 const navItems = [
   { label: '大厅', path: '/hall', icon: <HomeRoundedIcon /> },
   { label: '发布', path: '/publish', icon: <PublishRoundedIcon /> },
-  { label: '动态', path: '/feed', icon: <DynamicFeedRoundedIcon /> },
+  { label: '动�?, path: '/feed', icon: <DynamicFeedRoundedIcon /> },
   { label: '会话', path: '/messages', icon: <ChatRoundedIcon /> },
   { label: '个人', path: '/profile', icon: <PersonRoundedIcon /> }
 ]
 
 const demandStatusMap = {
   OPEN: '开放中',
-  MATCHED: '已匹配',
-  CLOSED: '已关闭'
+  MATCHED: '已匹�?,
+  CLOSED: '已关�?
 }
 
 const responseStatusMap = {
   PENDING_CUSTOMER_ACCEPT: '待需求方接受',
-  ACCEPTED: '已接受',
-  REJECTED: '已婉拒'
+  ACCEPTED: '已接�?,
+  REJECTED: '已婉�?
 }
 
 const roleMap = {
   CUSTOMER: '需求方',
-  PROVIDER: '服务方',
-  ADMIN: '管理员'
+  PROVIDER: '服务�?,
+  ADMIN: '管理�?
 }
 
 const quoteStatusMap = {
-  PENDING_CONFIRM: '待确认',
-  CONFIRMED: '已确认',
-  REJECTED: '已拒绝',
-  EXPIRED: '已过期',
-  CANCELLED: '已取消'
+  PENDING_CONFIRM: '待确�?,
+  CONFIRMED: '已确�?,
+  REJECTED: '已拒�?,
+  EXPIRED: '已过�?,
+  CANCELLED: '已取�?
 }
 
 const orderStatusMap = {
   ...ORDER_STATUS_LABELS,
-  PENDING_PAYMENT: '待支付',
+  PENDING_PAYMENT: '待支�?,
   PAID_PENDING_SHOOT: '已支付待拍摄',
-  SHOOTING: '拍摄中',
-  PENDING_DELIVERY: '待交付',
+  SHOOTING: '拍摄�?,
+  PENDING_DELIVERY: '待交�?,
   DELIVERED_PENDING_CONFIRM: '已交付待确认',
-  COMPLETED: '已完成',
-  CANCELLED: '已取消',
-  REFUNDED: '已退款',
-  APPEALING: '申诉中',
-  REWORK_REQUIRED: '返修中'
+  COMPLETED: '已完�?,
+  CANCELLED: '已取�?,
+  REFUNDED: '已退�?,
+  APPEALING: '申诉�?,
+  REWORK_REQUIRED: '返修�?
 }
 
 const escrowStatusMap = {
-  NOT_PAID: '未支付',
-  HELD: '平台托管中',
-  RELEASED: '已结算',
-  REFUNDED: '已退款'
+  NOT_PAID: '未支�?,
+  HELD: '平台托管�?,
+  RELEASED: '已结�?,
+  REFUNDED: '已退�?
 }
 
 function BrandLockup({ hero = false }) {
@@ -313,7 +313,7 @@ function Shell() {
           </Tabs>
 
           <Chip
-            label={`当前：${roleMap[currentUser.role]}`}
+            label={`当前�?{roleMap[currentUser.role]}`}
             color={currentUser.role === 'CUSTOMER' ? 'primary' : 'secondary'}
             variant="outlined"
             sx={{ display: { xs: 'none', sm: 'inline-flex' } }}
@@ -328,7 +328,7 @@ function Shell() {
             }}
             sx={{ display: { xs: 'none', md: 'inline-flex' } }}
           >
-            退出
+            退�?
           </Button>
         </Toolbar>
       </AppBar>
@@ -493,7 +493,7 @@ function LoginInfoPage() {
               <Box component="img" className="brand-logo brand-logo-form" src={cameraLogoUrl} alt="" aria-hidden="true" />
               <Box>
                 <Typography variant="h5">登录</Typography>
-                <Typography color="text.secondary">当前后端登录接口使用手机号和验证码。</Typography>
+                <Typography color="text.secondary">当前后端登录接口使用手机号和验证码�?/Typography>
               </Box>
             </Stack>
 
@@ -503,19 +503,19 @@ function LoginInfoPage() {
               <Typography fontWeight={800} sx={{ mb: 1 }}>本次登录身份</Typography>
               <ToggleButtonGroup exclusive value={role} onChange={(_, value) => value && setRole(value)}>
                 <ToggleButton value="CUSTOMER">需求方</ToggleButton>
-                <ToggleButton value="PROVIDER">服务方</ToggleButton>
+                <ToggleButton value="PROVIDER">服务�?/ToggleButton>
               </ToggleButtonGroup>
             </Box>
 
             <TextField
-              label="手机号"
+              label="手机�?
               value={form.mobile}
               onChange={event => setForm({ ...form, mobile: event.target.value })}
               inputProps={{ inputMode: 'tel', maxLength: 11 }}
               required
             />
             <TextField
-              label="验证码"
+              label="验证�?
               value={form.verifyCode}
               onChange={event => setForm({ ...form, verifyCode: event.target.value })}
               inputProps={{ inputMode: 'numeric', maxLength: 6 }}
@@ -529,7 +529,7 @@ function LoginInfoPage() {
               startIcon={<LoginRoundedIcon />}
               disabled={loading || !form.mobile.trim() || !form.verifyCode.trim()}
             >
-              {loading ? '登录中' : '登录'}
+              {loading ? '登录�? : '登录'}
             </Button>
             <Button variant="text" color="inherit" onClick={() => navigate('/login')}>
               返回选择身份
@@ -557,7 +557,7 @@ function RegisterPage() {
     setLoading(true)
     try {
       await authApi.sendCode(form.email.trim())
-      setNotice({ type: 'success', text: '南大邮箱验证码已发送' })
+      setNotice({ type: 'success', text: '南大邮箱验证码已发�? })
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     } finally {
@@ -597,7 +597,7 @@ function RegisterPage() {
               <Box component="img" className="brand-logo brand-logo-form" src={cameraLogoUrl} alt="" aria-hidden="true" />
               <Box>
                 <Typography variant="h5">注册</Typography>
-                <Typography color="text.secondary">使用南大邮箱验证码完成 A3 注册。</Typography>
+                <Typography color="text.secondary">使用南大邮箱验证码完�?A3 注册�?/Typography>
               </Box>
             </Stack>
             {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
@@ -627,7 +627,7 @@ function RegisterPage() {
               </Button>
             </Stack>
             <TextField
-              label="验证码"
+              label="验证�?
               value={form.verifyCode}
               onChange={event => setForm({ ...form, verifyCode: event.target.value })}
               inputProps={{ inputMode: 'numeric', maxLength: 6 }}
@@ -641,7 +641,7 @@ function RegisterPage() {
               required
             />
             <Button type="submit" variant="contained" size="large" disabled={loading}>
-              {loading ? '注册中' : '注册并返回登录'}
+              {loading ? '注册�? : '注册并返回登�?}
             </Button>
             <Button variant="text" color="inherit" onClick={() => navigate('/login/sign-in')}>
               已有账号，去登录
@@ -667,7 +667,7 @@ function HallPage() {
   const [demands, setDemands] = useState([])
   const [selectedDemand, setSelectedDemand] = useState(null)
   const [responses, setResponses] = useState([])
-  const [inviteForm, setInviteForm] = useState({ expectedPriceYuan: 399, message: '你好，我很适合这个需求，想邀请你进一步沟通拍摄方案。' })
+  const [inviteForm, setInviteForm] = useState({ expectedPriceYuan: 399, message: '你好，我很适合这个需求，想邀请你进一步沟通拍摄方案�? })
   const [snapshot, setSnapshot] = useState(null)
   const [notice, setNotice] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -728,7 +728,7 @@ function HallPage() {
     await run(async () => demandApi.invite(selectedDemand.demandId, {
       expectedPriceCent: yuanToCent(inviteForm.expectedPriceYuan),
       message: inviteForm.message
-    }, currentUser), '邀请已发送')
+    }, currentUser), '邀请已发�?)
   }
 
   async function deleteDemand(demand) {
@@ -781,7 +781,7 @@ function HallPage() {
 
   return (
     <Stack spacing={2.5}>
-      <SectionHeader title="需求大厅" subtitle="浏览约拍需求，服务方可响应，需求方可接受响应。" />
+      <SectionHeader title="需求大�? subtitle="浏览约拍需求，服务方可响应，需求方可接受响应�? />
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
 
       <Paper className="portra-toolbar" variant="outlined" sx={{ p: 2 }}>
@@ -852,17 +852,17 @@ function HallPage() {
           </Stack>
           <Stack spacing={0.5} sx={{ minWidth: { md: 140 }, justifyContent: 'flex-end' }}>
             <Typography component="label" htmlFor="hall-filter-status" variant="caption" color="text.secondary" fontWeight={800}>
-              状态
+              状�?
             </Typography>
             <FormControl size="small">
               <Select
                 id="hall-filter-status"
                 value={filters.status}
                 onChange={event => setFilters({ ...filters, status: event.target.value })}
-                inputProps={{ 'aria-label': '状态' }}
+                inputProps={{ 'aria-label': '状�? }}
               >
                 <MenuItem value="OPEN">开放中</MenuItem>
-                <MenuItem value="MATCHED">已匹配</MenuItem>
+                <MenuItem value="MATCHED">已匹�?/MenuItem>
                 <MenuItem value="">全部</MenuItem>
               </Select>
             </FormControl>
@@ -895,18 +895,18 @@ function HallPage() {
                     <Chip size="small" label={demandStatusMap[demand.status] || demand.status} />
                   </Stack>
                   <Typography color="text.secondary">{demand.cityCode} · {demand.location}</Typography>
-                  <Typography>{centToYuan(demand.budgetMinCent)} 至 {centToYuan(demand.budgetMaxCent)}</Typography>
-                  <Typography color="text.secondary">{demand.responseCount} 个响应</Typography>
+                  <Typography>{centToYuan(demand.budgetMinCent)} �?{centToYuan(demand.budgetMaxCent)}</Typography>
+                  <Typography color="text.secondary">{demand.responseCount} 个响�?/Typography>
                 </Stack>
               </CardContent>
             </Card>
           ))}
-          {!demands.length && <EmptyCard text="暂无需求" />}
+          {!demands.length && <EmptyCard text="暂无需�? />}
         </Stack>
 
         <Paper className="portra-detail-ticket" variant="outlined" sx={{ p: { xs: 2, md: 2.5 }, minHeight: 420 }}>
           {!selectedDemand ? (
-            <EmptyCard text="选择一条需求查看详情" />
+            <EmptyCard text="选择一条需求查看详�? />
           ) : (
             <Stack spacing={2.2}>
               <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2}>
@@ -925,51 +925,51 @@ function HallPage() {
                       onClick={() => deleteDemand(selectedDemand)}
                       disabled={loading || selectedDemandInProgress}
                     >
-                      删除需求
+                      删除需�?
                     </Button>
                   )}
                 </Stack>
               </Stack>
               {isSelectedDemandOwner && selectedDemandInProgress && (
-                <Alert severity="info">需求交易正在进行，暂时不能删除。</Alert>
+                <Alert severity="info">需求交易正在进行，暂时不能删除�?/Alert>
               )}
               <Divider />
               <InfoRows rows={[
                 ['需求方编号', selectedDemand.customerId],
                 ['时间', `${selectedDemand.expectedDate || '未定日期'} ${selectedDemand.timeSlot || ''}`],
-                ['预算', `${centToYuan(selectedDemand.budgetMinCent)} 至 ${centToYuan(selectedDemand.budgetMaxCent)}`],
-                ['风格', selectedDemand.styleTags?.length ? selectedDemand.styleTags.join(' / ') : '未填写'],
-                ['描述', selectedDemand.description || '未填写']
+                ['预算', `${centToYuan(selectedDemand.budgetMinCent)} �?${centToYuan(selectedDemand.budgetMaxCent)}`],
+                ['风格', selectedDemand.styleTags?.length ? selectedDemand.styleTags.join(' / ') : '未填�?],
+                ['描述', selectedDemand.description || '未填�?]
               ]} />
 
               {canInvite && (
                 <Paper className="portra-system-card" variant="outlined" sx={{ p: 2 }}>
                   <Stack spacing={1.5}>
                     <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
-                      <Typography variant="h6">发起邀请</Typography>
+                      <Typography variant="h6">发起邀�?/Typography>
                       <Button
                         variant="contained"
                         startIcon={<SendRoundedIcon />}
                         onClick={sendInvitation}
                         disabled={loading}
                       >
-                        发起邀请
+                        发起邀�?
                       </Button>
                     </Stack>
                     <TextField
-                      label="邀请报价"
+                      label="邀请报�?
                       type="number"
                       value={inviteForm.expectedPriceYuan}
                       onChange={event => setInviteForm({ ...inviteForm, expectedPriceYuan: event.target.value })}
                     />
                     <TextField
-                      label="邀请说明"
+                      label="邀请说�?
                       multiline
                       minRows={2}
                       value={inviteForm.message}
                       onChange={event => setInviteForm({ ...inviteForm, message: event.target.value })}
                     />
-                    <Alert severity="info">服务方需要先发起邀请；需求方接受后才会创建会话。</Alert>
+                    <Alert severity="info">服务方需要先发起邀请；需求方接受后才会创建会话�?/Alert>
                   </Stack>
                 </Paper>
               )}
@@ -985,7 +985,7 @@ function HallPage() {
                       <Paper key={response.responseId} variant="outlined" sx={{ p: 1.5 }}>
                         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
                           <Box>
-                            <Typography fontWeight={700}>服务方 {response.providerId}</Typography>
+                            <Typography fontWeight={700}>服务�?{response.providerId}</Typography>
                             <Typography>{response.message}</Typography>
                             <Typography color="text.secondary">
                               {centToYuan(response.expectedPriceCent)} · {responseStatusMap[response.status] || response.status}
@@ -1017,7 +1017,7 @@ function HallPage() {
                     ) : null
                   }
                 >
-                  已创建 C 模块会话：响应 {snapshot.responseId}，会话 {snapshot.conversation?.conversationId || '待生成'}。
+                  已创�?C 模块会话：响�?{snapshot.responseId}，会�?{snapshot.conversation?.conversationId || '待生�?}�?
                 </Alert>
               )}
             </Stack>
@@ -1033,15 +1033,15 @@ function PublishPage() {
   const { currentUser } = useAuth()
   const [notice, setNotice] = useState(null)
   const [form, setForm] = useState({
-    scene: '毕业照',
+    scene: '毕业�?,
     cityCode: 'NJU',
     location: '南京大学鼓楼校区',
     expectedDate: '',
     timeSlot: '14:00-16:00',
     budgetMinYuan: 199,
     budgetMaxYuan: 399,
-    styleTagsText: '自然抓拍,校园,生活感',
-    description: '想拍一组自然、不模板化的校园毕业照，偏生活感。'
+    styleTagsText: '自然抓拍,校园,生活�?,
+    description: '想拍一组自然、不模板化的校园毕业照，偏生活感�?
   })
 
   async function submit(event) {
@@ -1069,15 +1069,15 @@ function PublishPage() {
   if (currentUser.role !== 'CUSTOMER') {
     return (
       <Stack spacing={2}>
-        <SectionHeader title="发布" subtitle="发布约拍需求需要使用需求方身份。" />
-        <Alert severity="info">请到个人页切换为需求方。</Alert>
+        <SectionHeader title="发布" subtitle="发布约拍需求需要使用需求方身份�? />
+        <Alert severity="info">请到个人页切换为需求方�?/Alert>
       </Stack>
     )
   }
 
   return (
     <Stack spacing={2.5}>
-      <SectionHeader title="发布" subtitle="填写约拍需求，服务方会在大厅中响应。" />
+      <SectionHeader title="发布" subtitle="填写约拍需求，服务方会在大厅中响应�? />
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
       <Paper component="form" variant="outlined" onSubmit={submit} sx={{ p: { xs: 2, md: 3 } }}>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
@@ -1085,12 +1085,12 @@ function PublishPage() {
           <TextField label="城市" value={form.cityCode} onChange={event => setForm({ ...form, cityCode: event.target.value })} required />
           <TextField label="地点" value={form.location} onChange={event => setForm({ ...form, location: event.target.value })} required />
           <TextField label="日期" value={form.expectedDate} onChange={event => setForm({ ...form, expectedDate: event.target.value })} placeholder="2026-06-01" inputProps={{ inputMode: 'numeric' }} />
-          <TextField label="时间段" value={form.timeSlot} onChange={event => setForm({ ...form, timeSlot: event.target.value })} />
+          <TextField label="时间�? value={form.timeSlot} onChange={event => setForm({ ...form, timeSlot: event.target.value })} />
           <TextField label="风格标签" value={form.styleTagsText} onChange={event => setForm({ ...form, styleTagsText: event.target.value })} />
-          <TextField label="最低预算" type="number" value={form.budgetMinYuan} onChange={event => setForm({ ...form, budgetMinYuan: event.target.value })} />
-          <TextField label="最高预算" type="number" value={form.budgetMaxYuan} onChange={event => setForm({ ...form, budgetMaxYuan: event.target.value })} />
+          <TextField label="最低预�? type="number" value={form.budgetMinYuan} onChange={event => setForm({ ...form, budgetMinYuan: event.target.value })} />
+          <TextField label="最高预�? type="number" value={form.budgetMaxYuan} onChange={event => setForm({ ...form, budgetMaxYuan: event.target.value })} />
           <TextField
-            label="需求描述"
+            label="需求描�?
             multiline
             minRows={4}
             value={form.description}
@@ -1099,7 +1099,7 @@ function PublishPage() {
           />
         </Box>
         <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-          <Button type="submit" variant="contained" size="large">发布需求</Button>
+          <Button type="submit" variant="contained" size="large">发布需�?/Button>
         </Stack>
       </Paper>
     </Stack>
@@ -1180,7 +1180,7 @@ function FeedPage() {
   async function deleteMoment(momentId) {
     try {
       await momentApi.delete(momentId, currentUser)
-      setNotice({ type: 'success', text: '动态已删除' })
+      setNotice({ type: 'success', text: '��̬��ɾ��' })
       await loadMoments()
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
@@ -1189,19 +1189,19 @@ function FeedPage() {
 
   function followAuthor(authorId) {
     toggleFollow(authorId)
-    setNotice({ type: 'success', text: '关注列表已更新' })
+    setNotice({ type: 'success', text: '关注列表已更�? })
   }
 
   return (
     <Stack spacing={2.5}>
-      <SectionHeader title="动态" subtitle="搜索动态标题和文案，发布带标题、文案和照片的动态。" />
+      <SectionHeader title="动�? subtitle="搜索动态标题和文案，发布带标题、文案和照片的动态�? />
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
       <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
           <TextField
             fullWidth
-            label="搜索动态"
-            placeholder="输入标题或文案"
+            label="搜索动�?
+            placeholder="输入标题或文�?
             value={query}
             onChange={event => setQuery(event.target.value)}
             onKeyDown={event => {
@@ -1212,7 +1212,7 @@ function FeedPage() {
             搜索
           </Button>
           <Button variant="contained" startIcon={<PublishRoundedIcon />} onClick={() => setShowComposer(value => !value)}>
-            发布动态
+            发布动�?
           </Button>
         </Stack>
       </Paper>
@@ -1221,13 +1221,13 @@ function FeedPage() {
         <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
           <Stack spacing={2}>
             <TextField
-              label="动态题目"
+              label="动态题�?
               value={draft.title}
               onChange={event => setDraft({ ...draft, title: event.target.value })}
               required
             />
             <TextField
-              label="动态文案"
+              label="动态文�?
               multiline
               minRows={3}
               value={draft.content}
@@ -1240,7 +1240,7 @@ function FeedPage() {
               onChange={event => setMentionsText(event.target.value)}
               InputProps={{ startAdornment: <AlternateEmailRoundedIcon color="action" sx={{ mr: 1 }} /> }}
             />
-            {imageData && <img className="feed-image" src={imageData} alt="待发布照片" />}
+            {imageData && <img className="feed-image" src={imageData} alt="待发布照�? />}
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between">
               <Button component="label" variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />}>
                 选择照片
@@ -1263,7 +1263,7 @@ function FeedPage() {
                 component="img"
                 className="feed-image"
                 src={moment.imageData}
-                alt="动态照片"
+                alt="动态照�?
                 onClick={() => navigate(`/moments/${moment.momentId}`)}
                 sx={{ cursor: 'pointer' }}
               />
@@ -1275,7 +1275,7 @@ function FeedPage() {
                     onClick={() => openUserProfile(moment.authorId)}
                     sx={{ cursor: 'pointer' }}
                   >
-                    {roleMap[moment.authorRole]?.slice(0, 1) || '用'}
+                    {roleMap[moment.authorRole]?.slice(0, 1) || '�?}
                   </Avatar>
                   <Box sx={{ cursor: 'pointer' }} onClick={() => openUserProfile(moment.authorId)}>
                     <Typography fontWeight={800}>{roleMap[moment.authorRole] || '用户'} {moment.authorId}</Typography>
@@ -1287,9 +1287,9 @@ function FeedPage() {
                   onClick={() => navigate(`/moments/${moment.momentId}`)}
                   sx={{ cursor: 'pointer' }}
                 >
-                  {moment.title || '未命名动态'}
+                  {moment.title || '未命名动�?}
                 </Typography>
-                <Typography>{moment.content || '分享了一张照片'}</Typography>
+                <Typography>{moment.content || '分享了一张照�?}</Typography>
                 {!!moment.mentions?.length && (
                   <Stack direction="row" spacing={1} flexWrap="wrap">
                     {moment.mentions.map(mention => <MentionChip key={mention} mention={mention} />)}
@@ -1303,10 +1303,10 @@ function FeedPage() {
               </IconButton>
               <Typography color="text.secondary">{moment.likeCount} 个赞</Typography>
               <Button size="small" onClick={() => favoriteMoment(moment.momentId)}>
-                {moment.favoritedByCurrentUser ? '已收藏' : '收藏'} {moment.favoriteCount || 0}
+                {moment.favoritedByCurrentUser ? '已收�? : '收藏'} {moment.favoriteCount || 0}
               </Button>
               <Button size="small" onClick={() => followAuthor(moment.authorId)}>
-                {isFollowing(moment.authorId) ? '已关注' : '关注作者'}
+                {isFollowing(moment.authorId) ? '已关�? : '关注作�?}
               </Button>
               <Button size="small" onClick={() => navigate(`/moments/${moment.momentId}`)}>详情</Button>
               {Number(moment.authorId) === currentUser.userId && (
@@ -1318,7 +1318,7 @@ function FeedPage() {
           </Card>
         ))}
       </Box>
-      {!moments.length && <EmptyCard text="暂无动态" />}
+      {!moments.length && <EmptyCard text="暂无动�? />}
     </Stack>
   )
 }
@@ -1347,7 +1347,7 @@ function MomentDetailPage() {
       const selected = detail || list.find(moment => Number(moment.momentId) === selectedId)
       setMoments(selected ? [selected, ...list.filter(moment => Number(moment.momentId) !== Number(selected.momentId))] : list)
       setNotice(null)
-      if (!selected) setNotice({ type: 'warning', text: '该动态不存在或已被删除，先展示最新动态。' })
+      if (!selected) setNotice({ type: 'warning', text: '该动态不存在或已被删除，先展示最新动态�? })
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }
@@ -1374,7 +1374,7 @@ function MomentDetailPage() {
   async function deleteMoment(id) {
     try {
       await momentApi.delete(id, currentUser)
-      setNotice({ type: 'success', text: '动态已删除' })
+      setNotice({ type: 'success', text: '��̬��ɾ��' })
       navigate('/feed')
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
@@ -1383,9 +1383,9 @@ function MomentDetailPage() {
 
   return (
     <Stack spacing={2.5}>
-      <SectionHeader title="动态详情" subtitle="查看完整动态，继续下滑浏览更多人的动态详情。" />
+      <SectionHeader title="动态详�? subtitle="查看完整动态，继续下滑浏览更多人的动态详情�? />
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
-      <Button variant="text" color="inherit" onClick={() => navigate('/feed')} sx={{ alignSelf: 'flex-start' }}>返回动态</Button>
+      <Button variant="text" color="inherit" onClick={() => navigate('/feed')} sx={{ alignSelf: 'flex-start' }}>返回动�?/Button>
       <Stack spacing={2.5}>
         {moments.map(moment => (
           <MomentDetailCard
@@ -1399,7 +1399,7 @@ function MomentDetailPage() {
           />
         ))}
       </Stack>
-      {!moments.length && <EmptyCard text="暂无动态" />}
+      {!moments.length && <EmptyCard text="暂无动�? />}
     </Stack>
   )
 }
@@ -1410,16 +1410,16 @@ function MomentDetailCard({ moment, currentUser, onProfile, onLike, onFavorite, 
       <Stack spacing={1.6}>
         <Stack direction="row" alignItems="center" spacing={1.2}>
           <Avatar onClick={onProfile} sx={{ cursor: 'pointer', bgcolor: moment.authorRole === 'PROVIDER' ? 'secondary.main' : 'primary.main' }}>
-            {roleMap[moment.authorRole]?.slice(0, 1) || '用'}
+            {roleMap[moment.authorRole]?.slice(0, 1) || '�?}
           </Avatar>
           <Box onClick={onProfile} sx={{ cursor: 'pointer', minWidth: 0 }}>
             <Typography fontWeight={900}>{roleMap[moment.authorRole] || '用户'} {moment.authorId}</Typography>
             <Typography color="text.secondary" variant="body2">{formatTime(moment.createdAt)}</Typography>
           </Box>
         </Stack>
-        <Typography variant="h5">{moment.title || '未命名动态'}</Typography>
-        <Typography sx={{ whiteSpace: 'pre-wrap' }}>{moment.content || '分享了一张照片'}</Typography>
-        {moment.imageData && <img className="feed-image" src={moment.imageData} alt={moment.title || '动态照片'} />}
+        <Typography variant="h5">{moment.title || '未命名动�?}</Typography>
+        <Typography sx={{ whiteSpace: 'pre-wrap' }}>{moment.content || '分享了一张照�?}</Typography>
+        {moment.imageData && <img className="feed-image" src={moment.imageData} alt={moment.title || '动态照�?} />}
         {!!moment.mentions?.length && (
           <Stack direction="row" spacing={1} flexWrap="wrap">
             {moment.mentions.map(mention => <MentionChip key={mention} mention={mention} />)}
@@ -1430,7 +1430,7 @@ function MomentDetailCard({ moment, currentUser, onProfile, onLike, onFavorite, 
             {moment.likeCount || 0} 个赞
           </Button>
           <Button variant="outlined" onClick={onFavorite}>
-            {moment.favoritedByCurrentUser ? '已收藏' : '收藏'} {moment.favoriteCount || 0}
+            {moment.favoritedByCurrentUser ? '已收�? : '收藏'} {moment.favoriteCount || 0}
           </Button>
           {Number(moment.authorId) === currentUser.userId && (
             <Button variant="outlined" color="error" startIcon={<DeleteRoundedIcon />} onClick={onDelete}>
@@ -1476,7 +1476,7 @@ function MessagesPage() {
 
   return (
     <Stack spacing={2.5}>
-      <SectionHeader title="会话" subtitle="消息列表页只展示对话入口，点击后进入具体聊天框。" />
+      <SectionHeader title="会话" subtitle="消息列表页只展示对话入口，点击后进入具体聊天框�? />
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
       <Paper variant="outlined" sx={{ p: { xs: 1, md: 1.5 } }}>
         <Stack spacing={0.5}>
@@ -1498,14 +1498,14 @@ function MessagesPage() {
                 }}
               >
                 <Avatar sx={{ bgcolor: conversation.isLocal ? 'secondary.main' : 'primary.main' }}>
-                  {conversation.scene?.slice(0, 1) || '会'}
+                  {conversation.scene?.slice(0, 1) || '�?}
                 </Avatar>
                 <Box sx={{ minWidth: 0 }}>
                   <Typography fontWeight={800} noWrap>
                     {conversation.scene || `会话 ${conversation.conversationId}`}
                   </Typography>
                   <Typography color="text.secondary" noWrap>
-                    {conversation.lastMessage || `${roleMap[currentUser.role]}与用户 ${oppositeId} 的对话`}
+                    {conversation.lastMessage || `${roleMap[currentUser.role]}与用�?${oppositeId} 的对话`}
                   </Typography>
                 </Box>
                 <Stack spacing={0.5} alignItems="flex-end">
@@ -1516,7 +1516,7 @@ function MessagesPage() {
             )
           })}
           {!conversations.length && (
-            <EmptyCard text={currentUser.role === 'PROVIDER' ? '暂无会话。到需求大厅选择具体需求后发起邀请，接受后会出现在这里。' : '暂无会话。接受服务方邀请后会出现在这里。'} />
+            <EmptyCard text={currentUser.role === 'PROVIDER' ? '暂无会话。到需求大厅选择具体需求后发起邀请，接受后会出现在这里�? : '暂无会话。接受服务方邀请后会出现在这里�?} />
           )}
         </Stack>
       </Paper>
@@ -1628,7 +1628,7 @@ function ConversationDetailPage() {
         image,
         currentUser,
         'IMAGE'
-      ), '图片已发送')
+      ), '图片已发�?)
       if (sent) {
         updateConversationLastMessage(conversation.conversationId, '[图片]')
         await loadConversationData()
@@ -1664,7 +1664,7 @@ function ConversationDetailPage() {
     const quotePayload = buildQuotePayload(quoteForm, conversation)
     const quote = await run(async () => editingQuotationId
       ? quoteApi.update(editingQuotationId, quotePayload, currentUser)
-      : quoteApi.create(quotePayload, currentUser), editingQuotationId ? '报价已更新' : '报价已发送')
+      : quoteApi.create(quotePayload, currentUser), editingQuotationId ? '报价已更�? : '报价已发�?)
     if (quote) {
       setShowQuoteForm(false)
       setEditingQuotationId(null)
@@ -1679,7 +1679,7 @@ function ConversationDetailPage() {
     setQuoteForm(createQuoteFormFromQuote(quote))
     setQuoteValidationErrors([])
     setShowQuoteForm(true)
-    setNotice({ type: 'info', text: '正在编辑待确认报价，保存前客户仍看到原报价。' })
+    setNotice({ type: 'info', text: '正在编辑待确认报价，保存前客户仍看到原报价�? })
   }
 
   function closeQuoteForm() {
@@ -1694,13 +1694,13 @@ function ConversationDetailPage() {
     setNotice(null)
     try {
       const result = await quoteApi.confirm(quote.quotationId, '需求方确认报价', currentUser)
-      setNotice({ type: 'success', text: '报价已确认，订单已生成' })
+      setNotice({ type: 'success', text: '报价已确认，订单已生�? })
       if (result?.orderId) {
         await refreshConversationData()
         navigate(`/orders?orderId=${result.orderId}`)
       } else {
         await refreshConversationData()
-        setNotice({ type: 'success', text: '报价已确认，可在订单页查看关联订单。' })
+        setNotice({ type: 'success', text: '报价已确认，可在订单页查看关联订单�? })
       }
     } catch (error) {
       try {
@@ -1715,7 +1715,7 @@ function ConversationDetailPage() {
   }
 
   async function rejectQuote(quote) {
-    const result = await run(async () => quoteApi.reject(quote.quotationId, '本次暂不采用该报价', currentUser), '报价已拒绝')
+    const result = await run(async () => quoteApi.reject(quote.quotationId, '本次暂不采用该报�?, currentUser), '报价已拒�?)
     if (result) await loadConversationData()
   }
 
@@ -1753,7 +1753,7 @@ function ConversationDetailPage() {
               onClick={() => conversation && openUserProfile(getOppositeUserId(conversation, currentUser.userId))}
               sx={{ bgcolor: conversation?.isLocal ? 'secondary.main' : 'primary.main', cursor: conversation ? 'pointer' : 'default' }}
             >
-              {conversation?.scene?.slice(0, 1) || '会'}
+              {conversation?.scene?.slice(0, 1) || '�?}
             </Avatar>
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="h6" noWrap>{conversation?.scene || `会话 ${conversationId}`}</Typography>
@@ -1773,12 +1773,12 @@ function ConversationDetailPage() {
         <Stack spacing={1.5}>
           <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
             <Box>
-              <Typography variant="h6">会话工作台</Typography>
-              <Typography color="text.secondary">这里承载沟通、报价、订单入口和后续履约协作，不是普通私聊。</Typography>
+              <Typography variant="h6">会话工作�?/Typography>
+              <Typography color="text.secondary">这里承载沟通、报价、订单入口和后续履约协作，不是普通私聊�?/Typography>
             </Box>
             <Stack direction="row" spacing={1} flexWrap="wrap">
               <Chip size="small" color={isBackendConversation ? 'primary' : 'default'} label={isBackendConversation ? '真实 C 会话' : '本地 fallback 会话'} />
-              <Chip size="small" label={currentUser.role === 'PROVIDER' ? '当前身份：服务方' : '当前身份：顾客'} />
+              <Chip size="small" label={currentUser.role === 'PROVIDER' ? '当前身份：服务方' : '当前身份：顾�?} />
             </Stack>
           </Stack>
           <InfoRows rows={sourceRows} />
@@ -1790,8 +1790,8 @@ function ConversationDetailPage() {
         <Stack spacing={1.5}>
           <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
             <Box>
-              <Typography variant="h6">报价 / 订单协作区</Typography>
-              <Typography color="text.secondary">服务方发正式报价，顾客确认后生成订单，再进入托管和交付流程。</Typography>
+              <Typography variant="h6">报价 / 订单协作�?/Typography>
+              <Typography color="text.secondary">服务方发正式报价，顾客确认后生成订单，再进入托管和交付流程�?/Typography>
             </Box>
             {canSeeQuoteEntry && (
               <Button
@@ -1825,19 +1825,19 @@ function ConversationDetailPage() {
                     <Box>
                       <Typography fontWeight={900}>{centToYuan(quote.amountCent)}</Typography>
                       <Typography color="text.secondary" variant="body2">
-                        报价 ID {quote.quotationId} · {quote.quoteNo || '当前接口未返回报价编号'}
+                        报价 ID {quote.quotationId} · {quote.quoteNo || '当前接口未返回报价编�?}
                       </Typography>
                     </Box>
                     <Chip size="small" color={quote.status === 'PENDING_CONFIRM' ? 'warning' : quote.status === 'CONFIRMED' ? 'success' : 'default'} label={quoteStatusMap[quote.status] || quote.status} />
                   </Stack>
                   <InfoRows rows={[
-                    ['拍摄地点', quote.location || '未填写'],
-                    ['拍摄开始', formatTime(quote.shootStartTime)],
+                    ['拍摄地点', quote.location || '未填�?],
+                    ['拍摄开�?, formatTime(quote.shootStartTime)],
                     ['拍摄结束', formatTime(quote.shootEndTime)],
-                    ['最晚交付', formatTime(quote.deliveryDeadline)],
-                    ['服务内容', quote.serviceContent || '未填写'],
+                    ['最晚交�?, formatTime(quote.deliveryDeadline)],
+                    ['服务内容', quote.serviceContent || '未填�?],
                     ['原片/精修', `${quote.originalCount ?? 0} / ${quote.refinedCount ?? 0}`],
-                    ['照片使用范围', quote.photoUsageScope || '未填写'],
+                    ['照片使用范围', quote.photoUsageScope || '未填�?],
                     ['条款', quote.terms || '当前报价接口未返回该字段'],
                     ['合同条款', quote.contractTerms || '当前报价接口未返回该字段'],
                     ['备注', quote.remark || '当前报价接口未返回该字段']
@@ -1867,20 +1867,20 @@ function ConversationDetailPage() {
                         查看订单
                       </Button>
                     ) : (
-                      <Alert severity="info">报价已确认，可在订单页查看关联订单；当前报价列表接口未返回 orderId。</Alert>
+                      <Alert severity="info">报价已确认，可在订单页查看关联订单；当前报价列表接口未返�?orderId�?/Alert>
                     )
                   )}
                 </Stack>
               </Paper>
             )
           })}
-          {!quotes.length && <Typography color="text.secondary">当前会话还没有正式报价。</Typography>}
+          {!quotes.length && <Typography color="text.secondary">当前会话还没有正式报价�?/Typography>}
 
           {showQuoteForm && canSeeQuoteEntry && (
             <Paper component="form" variant="outlined" onSubmit={createQuote} sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
               <Stack spacing={1.5}>
                 {editingQuotationId && (
-                  <Alert severity="info">当前正在编辑报价 {editingQuotationId}。仅待确认报价可编辑；客户确认生成订单后，订单核心条款会冻结。</Alert>
+                  <Alert severity="info">当前正在编辑报价 {editingQuotationId}。仅待确认报价可编辑；客户确认生成订单后，订单核心条款会冻结�?/Alert>
                 )}
                 {!!quoteValidationErrors.length && (
                   <Alert severity="warning">
@@ -1892,7 +1892,7 @@ function ConversationDetailPage() {
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.5 }}>
                   <TextField label="报价金额" type="number" size="small" value={quoteForm.amountYuan} onChange={event => setQuoteForm({ ...quoteForm, amountYuan: event.target.value })} required />
                   <TextField label="拍摄地点" size="small" value={quoteForm.location} onChange={event => setQuoteForm({ ...quoteForm, location: event.target.value })} required />
-                  <TextField label="开始时间" type="datetime-local" size="small" value={quoteForm.shootStartTime} onChange={event => setQuoteForm({ ...quoteForm, shootStartTime: event.target.value })} InputLabelProps={{ shrink: true }} required />
+                  <TextField label="开始时�? type="datetime-local" size="small" value={quoteForm.shootStartTime} onChange={event => setQuoteForm({ ...quoteForm, shootStartTime: event.target.value })} InputLabelProps={{ shrink: true }} required />
                   <TextField label="结束时间" type="datetime-local" size="small" value={quoteForm.shootEndTime} onChange={event => setQuoteForm({ ...quoteForm, shootEndTime: event.target.value })} InputLabelProps={{ shrink: true }} required />
                   <TextField label="交付截止" type="datetime-local" size="small" value={quoteForm.deliveryDeadline} onChange={event => setQuoteForm({ ...quoteForm, deliveryDeadline: event.target.value })} InputLabelProps={{ shrink: true }} required />
                   <TextField label="原片数量" type="number" size="small" value={quoteForm.originalCount} onChange={event => setQuoteForm({ ...quoteForm, originalCount: event.target.value })} />
@@ -1903,10 +1903,10 @@ function ConversationDetailPage() {
                   <TextField label="合同条款" multiline minRows={2} size="small" value={quoteForm.contractTerms} onChange={event => setQuoteForm({ ...quoteForm, contractTerms: event.target.value })} sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }} />
                   <TextField label="备注" multiline minRows={2} size="small" value={quoteForm.remark} onChange={event => setQuoteForm({ ...quoteForm, remark: event.target.value })} sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }} />
                 </Box>
-                <Alert severity="info">当前会话接口未返回明确档期开始/结束字段，因此本轮无法做档期范围校验，只校验报价时间顺序。</Alert>
+                <Alert severity="info">当前会话接口未返回明确档期开�?结束字段，因此本轮无法做档期范围校验，只校验报价时间顺序�?/Alert>
                 <Stack direction="row" spacing={1}>
                   <Button type="submit" variant="contained" disabled={loading || !canSubmitQuoteForm}>
-                    {editingQuotationId ? '保存报价修改' : '发送报价'}
+                    {editingQuotationId ? '保存报价修改' : '发送报�?}
                   </Button>
                   <Button variant="text" color="inherit" onClick={closeQuoteForm}>收起</Button>
                 </Stack>
@@ -1956,7 +1956,7 @@ function ConversationDetailPage() {
               </Box>
             )
           })}
-          {!messages.length && <Typography color="text.secondary">还没有消息</Typography>}
+          {!messages.length && <Typography color="text.secondary">还没有消�?/Typography>}
         </Stack>
 
         <Divider sx={{ my: 1.5 }} />
@@ -1983,7 +1983,7 @@ function ConversationDetailPage() {
               </span>
             </Tooltip>
           )}
-          <Tooltip title="发送图片">
+          <Tooltip title="发送图�?>
             <span>
               <IconButton component="label" disabled={loading || imageSending}>
                 <ImageRoundedIcon />
@@ -2005,7 +2005,7 @@ function ConversationDetailPage() {
             }}
           />
           <Button variant="contained" endIcon={<SendRoundedIcon />} onClick={sendMessage} disabled={!content.trim() || loading}>
-            发送
+            发�?
           </Button>
         </Stack>
       </Paper>
@@ -2031,7 +2031,7 @@ function OrdersPage() {
   const [photoAuthorizationForm, setPhotoAuthorizationForm] = useState({ fileIds: [], remark: '' })
   const [authorizationRemarks, setAuthorizationRemarks] = useState({})
   const [orderReviews, setOrderReviews] = useState([])
-  const [reviewForm, setReviewForm] = useState({ rating: 5, content: '沟通顺畅，履约体验很好。' })
+  const [reviewForm, setReviewForm] = useState({ rating: 5, content: '沟通顺畅，履约体验很好�? })
   const [showReviewForm, setShowReviewForm] = useState(false)
   const [arbitrations, setArbitrations] = useState([])
   const [arbitrationForm, setArbitrationForm] = useState({
@@ -2151,7 +2151,7 @@ function OrdersPage() {
       deliveryForm.file,
       deliveryForm.remark.trim(),
       currentUser
-    ), selectedOrder.status === 'REWORK_REQUIRED' ? '返修交付已上传' : '交付文件已上传')
+    ), selectedOrder.status === 'REWORK_REQUIRED' ? '返修交付已上�? : '交付文件已上�?)
     if (result) {
       setDeliveryForm({ file: null, remark: '' })
       await loadOrders(selectedOrder.orderId)
@@ -2163,14 +2163,14 @@ function OrdersPage() {
     if (!selectedOrder) return
     const trimmedRequirement = reworkRequirement.trim()
     if (!trimmedRequirement) {
-      setNotice({ type: 'warning', text: '请填写返修要求' })
+      setNotice({ type: 'warning', text: '请填写返修要�? })
       return
     }
     const result = await run(async () => orderApi.requestRework(
       selectedOrder.orderId,
       trimmedRequirement,
       currentUser
-    ), '返修请求已提交')
+    ), '返修请求已提�?)
     if (result) {
       setReworkRequirement('')
       await loadOrders(selectedOrder.orderId)
@@ -2196,7 +2196,7 @@ function OrdersPage() {
     const result = await run(async () => photoAuthorizationApi.request(selectedOrder.orderId, {
       fileIds: photoAuthorizationForm.fileIds,
       remark: photoAuthorizationForm.remark.trim()
-    }, currentUser), '照片展示授权申请已发送')
+    }, currentUser), '照片展示授权申请已发�?)
     if (result) {
       setPhotoAuthorizationForm({ fileIds: [], remark: '' })
       setPhotoAuthorizations(await photoAuthorizationApi.listByOrder(selectedOrder.orderId, currentUser))
@@ -2207,7 +2207,7 @@ function OrdersPage() {
     if (!selectedOrder) return
     const remark = (authorizationRemarks[authorization.id] || '').trim()
     const action = decision === 'approve' ? photoAuthorizationApi.approve : photoAuthorizationApi.reject
-    const successText = decision === 'approve' ? '已同意照片展示授权' : '已拒绝照片展示授权'
+    const successText = decision === 'approve' ? '已同意照片展示授�? : '已拒绝照片展示授�?
     const result = await run(async () => action(authorization.id, { remark }, currentUser), successText)
     if (result) {
       setAuthorizationRemarks({ ...authorizationRemarks, [authorization.id]: '' })
@@ -2239,18 +2239,18 @@ function OrdersPage() {
           content: reviewForm.content.trim()
         })
       }
-    }, '评价已提交')
+    }, '评价已提�?)
     if (result) {
       setOrderReviews(mergeReviewLists([result], orderReviews, getLocalReviewsByOrder(selectedOrder.orderId)))
       setShowReviewForm(false)
-      setReviewForm({ rating: 5, content: '沟通顺畅，履约体验很好。' })
+      setReviewForm({ rating: 5, content: '沟通顺畅，履约体验很好�? })
     }
   }
 
   async function submitArbitration(event) {
     event.preventDefault()
     if (!selectedOrder) return
-    const reason = `${arbitrationForm.reason}${arbitrationForm.description.trim() ? `：${arbitrationForm.description.trim()}` : ''}`
+    const reason = `${arbitrationForm.reason}${arbitrationForm.description.trim() ? `�?{arbitrationForm.description.trim()}` : ''}`
     const localRecord = {
       orderId: selectedOrder.orderId,
       reviewId: reviewToComplain?.reviewId,
@@ -2272,7 +2272,7 @@ function OrdersPage() {
         }
       }
       return saveLocalArbitration(localRecord)
-    }, '仲裁申请已提交')
+    }, '仲裁申请已提�?)
     if (result) {
       setArbitrations(mergeComplaints([result], arbitrations, getArbitrationsByOrder(selectedOrder.orderId)))
       setShowArbitrationForm(false)
@@ -2319,7 +2319,7 @@ function OrdersPage() {
 
   return (
     <Stack spacing={2.5}>
-      <SectionHeader title="订单" subtitle="查看成单订单、平台托管状态和每次状态流转日志。" />
+      <SectionHeader title="订单" subtitle="查看成单订单、平台托管状态和每次状态流转日志�? />
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '350px 1fr' }, gap: 2 }}>
@@ -2332,8 +2332,8 @@ function OrdersPage() {
               </Button>
             </Stack>
             <FormControl size="small">
-              <InputLabel>状态</InputLabel>
-              <Select label="状态" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
+              <InputLabel>状�?/InputLabel>
+              <Select label="状�? value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
                 <MenuItem value="">全部</MenuItem>
                 {Object.entries(orderStatusMap).map(([value, label]) => (
                   <MenuItem key={value} value={value}>{label}</MenuItem>
@@ -2366,7 +2366,7 @@ function OrdersPage() {
               <>
                 <Divider />
                 <Stack spacing={1}>
-                  <Typography variant="overline" color="text.secondary">邀请状态</Typography>
+                  <Typography variant="overline" color="text.secondary">邀请状�?/Typography>
                   {sentInvitations.map(invitation => {
                     const status = invitation.status || 'PENDING'
                     return (
@@ -2379,14 +2379,14 @@ function OrdersPage() {
                             <Chip
                               size="small"
                               color={status === 'ACCEPTED' ? 'success' : status === 'REJECTED' ? 'default' : 'warning'}
-                              label={status === 'ACCEPTED' ? '已接受，可在会话中沟通' : status === 'REJECTED' ? '已被婉拒' : '待处理'}
+                              label={status === 'ACCEPTED' ? '已接受，可在会话中沟�? : status === 'REJECTED' ? '已被婉拒' : '待处�?}
                             />
                           </Stack>
                         </Stack>
                       </Paper>
                     )
                   })}
-                  {!sentInvitations.length && <Typography color="text.secondary">还没有发起过邀请</Typography>}
+                  {!sentInvitations.length && <Typography color="text.secondary">还没有发起过邀�?/Typography>}
                 </Stack>
               </>
             )}
@@ -2413,10 +2413,10 @@ function OrdersPage() {
                 <InfoRows rows={[
                   ['金额', centToYuan(selectedOrder.amountCent)],
                   ['需求方', selectedOrder.customerId],
-                  ['服务方', selectedOrder.providerUserId],
-                  ['拍摄时间', `${formatTime(selectedOrder.shootStartTime)} 至 ${formatTime(selectedOrder.shootEndTime)}`],
+                  ['服务�?, selectedOrder.providerUserId],
+                  ['拍摄时间', `${formatTime(selectedOrder.shootStartTime)} �?${formatTime(selectedOrder.shootEndTime)}`],
                   ['交付截止', formatTime(selectedOrder.deliveryDeadline)],
-                  ['结算/退款', `${selectedOrder.settlementStatus || 'NOT_SETTLED'} / ${selectedOrder.refundStatus || 'NONE'}`]
+                  ['结算/退�?, `${selectedOrder.settlementStatus || 'NOT_SETTLED'} / ${selectedOrder.refundStatus || 'NONE'}`]
                 ]} />
                 {fulfillmentNotice && (
                   <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
@@ -2437,10 +2437,10 @@ function OrdersPage() {
                   <>
                     <Divider />
                     <InfoRows rows={[
-                      ['拍摄地点', quoteSnapshot.location || '未填写'],
-                      ['服务内容', quoteSnapshot.serviceContent || '未填写'],
+                      ['拍摄地点', quoteSnapshot.location || '未填�?],
+                      ['服务内容', quoteSnapshot.serviceContent || '未填�?],
                       ['原片/精修', `${quoteSnapshot.originalCount || 0} / ${quoteSnapshot.refinedCount || 0}`],
-                      ['照片用途', quoteSnapshot.photoUsageScope || '未填写']
+                      ['照片用�?, quoteSnapshot.photoUsageScope || '未填�?]
                     ]} />
                   </>
                 )}
@@ -2449,7 +2449,7 @@ function OrdersPage() {
                     查看交付
                   </Button>
                   <Button variant="outlined" onClick={() => navigate(`/orders/${selectedOrder.orderId}/reviews`)}>
-                    D 线评价
+                    D 线评�?
                   </Button>
                 </Stack>
                 {action && canShowOrderNormalActions(selectedOrder) ? (
@@ -2463,7 +2463,7 @@ function OrdersPage() {
                     {action.label}
                   </Button>
                 ) : (
-                  <Chip icon={<TaskAltRoundedIcon />} label="当前没有可执行操作" sx={{ alignSelf: 'flex-start' }} />
+                  <Chip icon={<TaskAltRoundedIcon />} label="当前没有可执行操�? sx={{ alignSelf: 'flex-start' }} />
                 )}
                 {cancelAction && (
                   <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#fffaf8' }}>
@@ -2484,7 +2484,7 @@ function OrdersPage() {
                   </Paper>
                 )}
                 {showShootStartedCancelNotice && (
-                  <Alert severity="warning">拍摄开始后不可直接取消，如有争议请走申诉或联系平台处理。</Alert>
+                  <Alert severity="warning">拍摄开始后不可直接取消，如有争议请走申诉或联系平台处理�?/Alert>
                 )}
               </Stack>
             </Paper>
@@ -2494,10 +2494,10 @@ function OrdersPage() {
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
                   <Box>
                     <Typography variant="h6">交付作品</Typography>
-                    <Typography color="text.secondary">摄影师必须通过上传交付文件推进待确认状态，返修也从这里重新上传。</Typography>
+                    <Typography color="text.secondary">摄影师必须通过上传交付文件推进待确认状态，返修也从这里重新上传�?/Typography>
                   </Box>
                   {canUploadDelivery && (
-                    <Chip color="secondary" label={selectedOrder.status === 'REWORK_REQUIRED' ? '可上传返修交付' : '可上传交付'} />
+                    <Chip color="secondary" label={selectedOrder.status === 'REWORK_REQUIRED' ? '可上传返修交�? : '可上传交�?} />
                   )}
                 </Stack>
 
@@ -2523,7 +2523,7 @@ function OrdersPage() {
                         onChange={event => setDeliveryForm({ ...deliveryForm, remark: event.target.value })}
                         multiline
                         minRows={2}
-                        placeholder="说明本次交付内容、返修修改点或注意事项"
+                        placeholder="说明本次交付内容、返修修改点或注意事�?
                       />
                       <Button type="submit" variant="contained" startIcon={<TaskAltRoundedIcon />} disabled={loading || !deliveryForm.file}>
                         上传交付
@@ -2535,7 +2535,7 @@ function OrdersPage() {
                 {canRequestRework && (
                   <Paper component="form" variant="outlined" onSubmit={submitRework} sx={{ p: 1.5, bgcolor: '#fffaf0' }}>
                     <Stack spacing={1.5}>
-                      <Typography fontWeight={800}>请写出后续返修要求</Typography>
+                      <Typography fontWeight={800}>请写出后续返修要�?/Typography>
                       <TextField
                         label="返修要求"
                         value={reworkRequirement}
@@ -2561,12 +2561,12 @@ function OrdersPage() {
                           <Typography fontWeight={800}>
                             {record.fileName || `文件 ${record.fileId || '-'}`}
                           </Typography>
-                          <Chip size="small" label={`第 ${record.deliveryRound || 1} 次交付${record.isLatest ? ' · 最新' : ''}`} />
+                          <Chip size="small" label={`�?${record.deliveryRound || 1} 次交�?{record.isLatest ? ' · 最�? : ''}`} />
                         </Stack>
                         <Typography color="text.secondary" variant="body2">
                           fileId {record.fileId || '-'} · {record.status || 'DELIVERED'} · {formatTime(record.uploadTime)}
                         </Typography>
-                        <Typography>{record.remark || '无交付说明'}</Typography>
+                        <Typography>{record.remark || '无交付说�?}</Typography>
                       </Stack>
                     </Paper>
                   ))}
@@ -2580,10 +2580,10 @@ function OrdersPage() {
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
                   <Box>
                     <Typography variant="h6">照片展示授权</Typography>
-                    <Typography color="text.secondary">客户同意后，摄影师才能把本订单交付照片作为真实客片展示。</Typography>
+                    <Typography color="text.secondary">客户同意后，摄影师才能把本订单交付照片作为真实客片展示�?/Typography>
                   </Box>
                   {selectedOrder.status === 'COMPLETED' && (
-                    <Chip color="success" label="订单已完成，可处理授权" />
+                    <Chip color="success" label="订单已完成，可处理授�? />
                   )}
                 </Stack>
 
@@ -2608,7 +2608,7 @@ function OrdersPage() {
                               }}
                               renderValue={selected => selected
                                 .map(fileId => deliveryFileNameMap.get(Number(fileId)) || `文件 ${fileId}`)
-                                .join('、')}
+                                .join('�?)}
                             >
                               {deliveryFileOptions.map(file => (
                                 <MenuItem key={file.fileId} value={file.fileId}>
@@ -2623,7 +2623,7 @@ function OrdersPage() {
                             onChange={event => setPhotoAuthorizationForm({ ...photoAuthorizationForm, remark: event.target.value })}
                             multiline
                             minRows={2}
-                            placeholder="说明希望展示这些照片的用途，例如作品集客片展示"
+                            placeholder="说明希望展示这些照片的用途，例如作品集客片展�?
                           />
                           <Button
                             type="submit"
@@ -2631,11 +2631,11 @@ function OrdersPage() {
                             startIcon={<ImageRoundedIcon />}
                             disabled={loading || !photoAuthorizationForm.fileIds.length}
                           >
-                            发送授权申请
+                            发送授权申�?
                           </Button>
                         </>
                       ) : (
-                        <Alert severity="info">暂无可授权交付文件，请先完成交付。</Alert>
+                        <Alert severity="info">暂无可授权交付文件，请先完成交付�?/Alert>
                       )}
                     </Stack>
                   </Paper>
@@ -2653,7 +2653,7 @@ function OrdersPage() {
                             <Box>
                               <Typography fontWeight={800}>授权申请 {authorization.id}</Typography>
                               <Typography color="text.secondary" variant="body2">
-                                服务方 {authorization.providerUserId} · 客户 {authorization.customerId}
+                                服务�?{authorization.providerUserId} · 客户 {authorization.customerId}
                               </Typography>
                             </Box>
                             <Chip
@@ -2666,11 +2666,11 @@ function OrdersPage() {
                             {authorization.status === 'GRANTED'
                               ? '可用于作品集'
                               : authorization.status === 'REJECTED'
-                                ? '客户已拒绝'
+                                ? '客户已拒�?
                                 : '等待客户确认'}
                             {authorization.authorizedAt ? ` · ${formatTime(authorization.authorizedAt)}` : ''}
                           </Typography>
-                          <Typography>{authorization.remark || '无备注'}</Typography>
+                          <Typography>{authorization.remark || '无备�?}</Typography>
                           <Stack direction="row" spacing={1} flexWrap="wrap">
                             {(authorization.files || []).map(file => (
                               <Chip
@@ -2681,7 +2681,7 @@ function OrdersPage() {
                               />
                             ))}
                             {!(authorization.files || []).length && (
-                              <Typography color="text.secondary" variant="body2">未返回授权文件信息</Typography>
+                              <Typography color="text.secondary" variant="body2">未返回授权文件信�?/Typography>
                             )}
                           </Stack>
 
@@ -2731,8 +2731,8 @@ function OrdersPage() {
               <Stack spacing={2}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
                   <Box>
-                    <Typography variant="h6">评价与仲裁</Typography>
-                    <Typography color="text.secondary">订单完成后双方都可以评价；被评价方可对不实评价发起投诉仲裁。</Typography>
+                    <Typography variant="h6">评价与仲�?/Typography>
+                    <Typography color="text.secondary">订单完成后双方都可以评价；被评价方可对不实评价发起投诉仲裁�?/Typography>
                   </Box>
                   <Stack direction="row" spacing={1} flexWrap="wrap">
                     {canReviewSelectedOrder && !myReview && (
@@ -2757,10 +2757,10 @@ function OrdersPage() {
                 </Stack>
 
                 {myReview && (
-                  <Alert severity="success">你已评价过该订单，可以在历史评价中查看。</Alert>
+                  <Alert severity="success">你已评价过该订单，可以在历史评价中查看�?/Alert>
                 )}
                 {!reviewToComplain && (
-                  <Alert severity="info">收到对方评价后，才可以对该评价发起仲裁。</Alert>
+                  <Alert severity="info">收到对方评价后，才可以对该评价发起仲裁�?/Alert>
                 )}
 
                 {showReviewForm && (
@@ -2798,8 +2798,8 @@ function OrdersPage() {
                         onChange={event => setArbitrationForm({ ...arbitrationForm, reason: event.target.value })}
                       >
                         <MenuItem value="评价内容不实">评价内容不实</MenuItem>
-                        <MenuItem value="评价包含攻击性表述">评价包含攻击性表述</MenuItem>
-                        <MenuItem value="评价与订单无关">评价与订单无关</MenuItem>
+                        <MenuItem value="评价包含攻击性表�?>评价包含攻击性表�?/MenuItem>
+                        <MenuItem value="评价与订单无�?>评价与订单无�?/MenuItem>
                         <MenuItem value="其他评价争议">其他评价争议</MenuItem>
                       </TextField>
                       <TextField
@@ -2827,11 +2827,11 @@ function OrdersPage() {
                         <Stack spacing={0.6}>
                           <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
                             <Typography fontWeight={800}>{record.reason}</Typography>
-                            <Chip size="small" color="warning" label={record.status === 'PENDING' ? '待处理' : record.status} />
+                            <Chip size="small" color="warning" label={record.status === 'PENDING' ? '待处�? : record.status} />
                           </Stack>
                           <Typography>{record.description}</Typography>
                           <Typography color="text.secondary" variant="body2">
-                            申请人 {record.applicantId} · 被申请人 {record.respondentId} · {formatTime(record.createdAt)}
+                            申请�?{record.applicantId} · 被申请人 {record.respondentId} · {formatTime(record.createdAt)}
                           </Typography>
                         </Stack>
                       </Paper>
@@ -2843,21 +2843,21 @@ function OrdersPage() {
 
             <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 } }}>
               <Stack spacing={2}>
-                <Typography variant="h6">状态日志</Typography>
+                <Typography variant="h6">状态日�?/Typography>
                 {statusLogs.map(log => (
                   <Paper key={log.logId || `${log.orderId}-${log.createdAt}`} variant="outlined" sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
                     <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
                       <Box>
                         <Typography fontWeight={800}>
-                          {orderStatusMap[log.fromStatus] || log.fromStatus || '创建'} → {orderStatusMap[log.toStatus] || log.toStatus}
+                          {orderStatusMap[log.fromStatus] || log.fromStatus || '创建'} �?{orderStatusMap[log.toStatus] || log.toStatus}
                         </Typography>
-                        <Typography color="text.secondary">{log.reason || '状态流转'}</Typography>
+                        <Typography color="text.secondary">{log.reason || '状态流�?}</Typography>
                       </Box>
                       <Typography color="text.secondary" variant="body2">{formatTime(log.createdAt)}</Typography>
                     </Stack>
                   </Paper>
                 ))}
-                {!statusLogs.length && <Typography color="text.secondary">暂无状态日志</Typography>}
+                {!statusLogs.length && <Typography color="text.secondary">暂无状态日�?/Typography>}
               </Stack>
             </Paper>
           </Stack>
@@ -2989,7 +2989,7 @@ function ProfilePage() {
     }
     saveUserProfile(currentUser.userId, nextProfile)
     updateProfile(nextProfile)
-    setNotice({ type: 'success', text: '个人资料已更新' })
+    setNotice({ type: 'success', text: '个人资料已更�? })
   }
 
   async function choosePortfolioImage(event) {
@@ -3035,7 +3035,7 @@ function ProfilePage() {
     try {
       await demandApi.rejectInvitation(invitation.invitationId, currentUser)
       await loadProfileData()
-      setNotice({ type: 'success', text: '已暂不接受该邀请' })
+      setNotice({ type: 'success', text: '已暂不接受该邀�? })
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     } finally {
@@ -3070,7 +3070,7 @@ function ProfilePage() {
               <Stack spacing={1}>
                 <img className="feed-image" src={photo.imageData} alt={photo.title} />
                 <Typography fontWeight={800}>{photo.title}</Typography>
-                <Typography color="text.secondary" variant="body2">作者 {photo.authorId} · {formatShortTime(photo.createdAt)}</Typography>
+                <Typography color="text.secondary" variant="body2">作�?{photo.authorId} · {formatShortTime(photo.createdAt)}</Typography>
                 <Button
                   component="a"
                   href={photo.imageData}
@@ -3111,22 +3111,22 @@ function ProfilePage() {
           {favoriteMoments.map(moment => (
             <Paper key={moment.momentId} variant="outlined" sx={{ p: 1.5, cursor: 'pointer' }} onClick={() => navigate(`/moments/${moment.momentId}`)}>
               <Stack spacing={0.7}>
-                <Typography fontWeight={800}>{moment.title || '未命名动态'}</Typography>
-                <Typography>{moment.content || '分享了一张照片'}</Typography>
+                <Typography fontWeight={800}>{moment.title || '未命名动�?}</Typography>
+                <Typography>{moment.content || '分享了一张照�?}</Typography>
                 <Typography color="text.secondary" variant="body2">
-                  作者 {moment.authorId} · {moment.favoriteCount || 0} 次收藏
+                  作�?{moment.authorId} · {moment.favoriteCount || 0} 次收�?
                 </Typography>
               </Stack>
             </Paper>
           ))}
         </Stack>
-      ) : <EmptyCard text="还没有收藏动态" />
+      ) : <EmptyCard text="还没有收藏动�? />
     }
 
     if (profileView === 'reviews') {
       return (
         <Stack spacing={2}>
-          <SectionHeader title="历史评价" subtitle="这里展示别人给你的订单评价。" />
+          <SectionHeader title="历史评价" subtitle="这里展示别人给你的订单评价�? />
           <ReviewList reviews={receivedReviews} />
         </Stack>
       )
@@ -3158,14 +3158,14 @@ function ProfilePage() {
                 </Paper>
               ))}
             </Box>
-          ) : <EmptyCard text="作品集里还没有照片动态" />}
+          ) : <EmptyCard text="作品集里还没有照片动�? />}
         </Stack>
       )
     }
 
     if (profileView === 'invitations') {
       if (currentUser.role !== 'CUSTOMER') {
-        return <EmptyCard text="切换到需求方身份后可以查看收到的邀请" />
+        return <EmptyCard text="切换到需求方身份后可以查看收到的邀�? />
       }
       return invitations.length ? (
         <Stack spacing={1.5}>
@@ -3178,12 +3178,12 @@ function ProfilePage() {
                 <Stack spacing={1}>
                   <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
                     <Box sx={{ minWidth: 0 }}>
-                      <Typography fontWeight={800}>服务方 {invitation.providerId}</Typography>
+                      <Typography fontWeight={800}>服务�?{invitation.providerId}</Typography>
                       <Typography color="text.secondary" noWrap>{invitation.demandScene}</Typography>
                     </Box>
                     <Stack direction="row" spacing={0.8} alignItems="center">
                       <Chip size="small" label={centToYuan(invitation.expectedPriceCent)} />
-                      <Chip size="small" color={isPending ? 'warning' : status === 'ACCEPTED' ? 'success' : 'default'} label={status === 'ACCEPTED' ? '已接受' : status === 'REJECTED' ? '已婉拒' : '待处理'} />
+                      <Chip size="small" color={isPending ? 'warning' : status === 'ACCEPTED' ? 'success' : 'default'} label={status === 'ACCEPTED' ? '已接�? : status === 'REJECTED' ? '已婉�? : '待处�?} />
                     </Stack>
                   </Stack>
                   <Typography>{invitation.message}</Typography>
@@ -3191,7 +3191,7 @@ function ProfilePage() {
                   {isPending && (
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
                       <Button variant="contained" startIcon={<ChatRoundedIcon />} onClick={() => acceptInvitation(invitation)} disabled={busy}>
-                        接受并进入会话
+                        接受并进入会�?
                       </Button>
                       <Button variant="outlined" color="inherit" onClick={() => rejectInvitation(invitation)} disabled={busy}>
                         暂不接受
@@ -3200,7 +3200,7 @@ function ProfilePage() {
                   )}
                   {status === 'ACCEPTED' && invitation.responseId && (
                     <Button variant="text" startIcon={<ChatRoundedIcon />} onClick={() => navigate('/messages')}>
-                      去会话列表
+                      去会话列�?
                     </Button>
                   )}
                 </Stack>
@@ -3208,7 +3208,7 @@ function ProfilePage() {
             )
           })}
         </Stack>
-      ) : <EmptyCard text="还没有服务方对你的需求发起邀请" />
+      ) : <EmptyCard text="还没有服务方对你的需求发起邀�? />
     }
 
     return null
@@ -3218,7 +3218,7 @@ function ProfilePage() {
 
   return (
     <Stack spacing={2.5}>
-      <SectionHeader title="个人" subtitle="管理头像昵称、身份切换和需求方个人入口。" />
+      <SectionHeader title="个人" subtitle="管理头像昵称、身份切换和需求方个人入口�? />
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
       <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
         <Stack spacing={2.5}>
@@ -3239,7 +3239,7 @@ function ProfilePage() {
                 onChange={event => setProfileForm({ ...profileForm, nickname: event.target.value })}
               />
               <TextField
-                label="简介"
+                label="简�?
                 multiline
                 minRows={2}
                 value={profileForm.bio}
@@ -3264,7 +3264,7 @@ function ProfilePage() {
             <Typography fontWeight={800} sx={{ mb: 1 }}>切换身份</Typography>
             <ToggleButtonGroup exclusive value={userKey} onChange={(_, value) => value && setUserKey(value)}>
               <ToggleButton value="customer">需求方</ToggleButton>
-              <ToggleButton value="provider">服务方</ToggleButton>
+              <ToggleButton value="provider">服务�?/ToggleButton>
             </ToggleButtonGroup>
           </Box>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 1, width: '100%' }}>
@@ -3294,7 +3294,7 @@ function ProfilePage() {
                 }}
                 fullWidth
               >
-                作品集
+                作品�?
               </Button>
             ) : (
               <Button
@@ -3306,7 +3306,7 @@ function ProfilePage() {
                 }}
                 fullWidth
               >
-                邀请
+                邀�?
               </Button>
             )}
           </Box>
@@ -3321,19 +3321,19 @@ function ProfilePage() {
                 navigate('/login', { replace: true })
               }}
             >
-              退出登录
+              退出登�?
             </Button>
           </Stack>
         </Stack>
       </Paper>
       <Stack spacing={1.5}>
-        <Typography variant="overline" color="text.secondary">动态</Typography>
+        <Typography variant="overline" color="text.secondary">动�?/Typography>
         {myMoments.map(moment => (
           <Paper key={moment.momentId} variant="outlined" sx={{ p: 1.5 }}>
             <Stack spacing={1}>
               <Stack direction="row" justifyContent="space-between" alignItems="center">
                 <Typography fontWeight={800} onClick={() => navigate(`/moments/${moment.momentId}`)} sx={{ cursor: 'pointer' }}>
-                  {moment.title || '未命名动态'}
+                  {moment.title || '未命名动�?}
                 </Typography>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Typography color="text.secondary" variant="body2">{formatShortTime(moment.createdAt)}</Typography>
@@ -3342,15 +3342,15 @@ function ProfilePage() {
                   </IconButton>
                 </Stack>
               </Stack>
-              <Typography>{moment.content || '分享了一张照片'}</Typography>
-              {moment.imageData && <img className="feed-image" src={moment.imageData} alt={moment.title || '动态照片'} onClick={() => navigate(`/moments/${moment.momentId}`)} style={{ cursor: 'pointer' }} />}
+              <Typography>{moment.content || '分享了一张照�?}</Typography>
+              {moment.imageData && <img className="feed-image" src={moment.imageData} alt={moment.title || '动态照�?} onClick={() => navigate(`/moments/${moment.momentId}`)} style={{ cursor: 'pointer' }} />}
               <Typography color="text.secondary" variant="body2">
-                {moment.likeCount || 0} 个赞 · {moment.favoriteCount || 0} 次收藏
+                {moment.likeCount || 0} 个赞 · {moment.favoriteCount || 0} 次收�?
               </Typography>
             </Stack>
           </Paper>
         ))}
-        {!myMoments.length && <EmptyCard text="还没有发布过动态" />}
+        {!myMoments.length && <EmptyCard text="还没有发布过动�? />}
       </Stack>
     </Stack>
   )
@@ -3403,7 +3403,7 @@ function PublicProfilePage() {
 
   function follow() {
     toggleFollow(profileUserId)
-    setNotice({ type: 'success', text: isFollowing(profileUserId) ? '已关注' : '已取消关注' })
+    setNotice({ type: 'success', text: isFollowing(profileUserId) ? '已关�? : '已取消关�? })
   }
 
   if (profileUserId === currentUser.userId) {
@@ -3416,19 +3416,19 @@ function PublicProfilePage() {
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'flex-start', sm: 'center' }}>
           <Stack spacing={1} alignItems="center">
             <Avatar src={profile.avatarData || undefined} sx={{ width: 76, height: 76, bgcolor: role === 'PROVIDER' ? 'secondary.main' : 'primary.main' }}>
-              {profile.nickname?.slice(0, 1) || roleMap[role]?.slice(0, 1) || '用'}
+              {profile.nickname?.slice(0, 1) || roleMap[role]?.slice(0, 1) || '�?}
             </Avatar>
             <ProfileMetrics stats={profileStats} compact />
           </Stack>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography variant="h5">{profile.nickname}</Typography>
-            <Typography color="text.secondary">{roleMap[role] || '用户'} {profileUserId} · 动态 {userMoments.length}{role === 'PROVIDER' ? ` · 作品 ${works.length}` : ''}</Typography>
+            <Typography color="text.secondary">{roleMap[role] || '用户'} {profileUserId} · 动�?{userMoments.length}{role === 'PROVIDER' ? ` · 作品 ${works.length}` : ''}</Typography>
             <Typography sx={{ mt: 1 }}>{profile.bio}</Typography>
             <Typography color="text.secondary" variant="body2" sx={{ mt: 0.5 }}>档期：{profile.availability}</Typography>
           </Box>
           <Stack direction={{ xs: 'row', sm: 'column' }} spacing={1}>
             <Button variant={isFollowing(profileUserId) ? 'contained' : 'outlined'} onClick={follow}>
-              {isFollowing(profileUserId) ? '已关注' : '关注'}
+              {isFollowing(profileUserId) ? '已关�? : '关注'}
             </Button>
             <Button variant={showReviews ? 'contained' : 'outlined'} startIcon={<HistoryRoundedIcon />} onClick={() => setShowReviews(!showReviews)}>
               历史评价
@@ -3440,14 +3440,14 @@ function PublicProfilePage() {
 
       {showReviews && (
         <Stack spacing={2}>
-          <SectionHeader title="历史评价" subtitle="这个用户收到过的订单评价。" />
+          <SectionHeader title="历史评价" subtitle="这个用户收到过的订单评价�? />
           <ReviewList reviews={receivedReviews} />
         </Stack>
       )}
 
       {role === 'PROVIDER' && (
         <>
-          <SectionHeader title="作品集" subtitle="查看这个用户公开发布过的照片动态。" />
+          <SectionHeader title="作品�? subtitle="查看这个用户公开发布过的照片动态�? />
           {works.length ? (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(3, 1fr)' }, gap: 1.5 }}>
           {works.map(work => (
@@ -3468,18 +3468,18 @@ function PublicProfilePage() {
         </>
       )}
 
-      <SectionHeader title="动态" subtitle="点击动态进入详情页继续浏览。" />
+      <SectionHeader title="动�? subtitle="点击动态进入详情页继续浏览�? />
       <Stack spacing={1.5}>
         {userMoments.map(moment => (
           <Paper key={moment.momentId} variant="outlined" sx={{ p: 1.5, cursor: 'pointer' }} onClick={() => navigate(`/moments/${moment.momentId}`)}>
             <Stack spacing={0.7}>
-              <Typography fontWeight={800}>{moment.title || '未命名动态'}</Typography>
-              <Typography>{moment.content || '分享了一张照片'}</Typography>
+              <Typography fontWeight={800}>{moment.title || '未命名动�?}</Typography>
+              <Typography>{moment.content || '分享了一张照�?}</Typography>
               <Typography color="text.secondary" variant="body2">{formatTime(moment.createdAt)}</Typography>
             </Stack>
           </Paper>
         ))}
-        {!userMoments.length && <EmptyCard text="还没有公开动态" />}
+        {!userMoments.length && <EmptyCard text="还没有公开动�? />}
       </Stack>
     </Stack>
   )
@@ -3501,13 +3501,13 @@ function createDefaultQuoteForm() {
     shootEndTime: toDateTimeInput(end),
     deliveryDeadline: toDateTimeInput(delivery),
     location: '南京大学鼓楼校区',
-    serviceContent: '2 小时校园约拍，包含沟通、拍摄、基础调色和精修交付。',
+    serviceContent: '2 小时校园约拍，包含沟通、拍摄、基础调色和精修交付�?,
     originalCount: 60,
     refinedCount: 12,
     photoUsageScope: 'PERSONAL_ONLY',
     terms: 'P4 演示报价',
-    contractTerms: '确认报价后生成订单，模拟支付后资金进入平台托管。',
-    remark: '可根据天气微调拍摄时间。'
+    contractTerms: '确认报价后生成订单，模拟支付后资金进入平台托管�?,
+    remark: '可根据天气微调拍摄时间�?
   }
 }
 
@@ -3576,52 +3576,52 @@ function getBackendConversationId(conversation) {
 function getConversationSourceLabel(conversation) {
   const sourceType = conversation?.sourceType
   if (!sourceType) return '当前接口未返回该字段'
-  if (sourceType === 'DEMAND_RESPONSE') return '需求大厅沟通'
-  if (sourceType === 'SERVICE_PACKAGE') return '服务橱窗预订沟通'
-  if (sourceType.includes('SCHEDULE')) return '档期预约沟通'
+  if (sourceType === 'DEMAND_RESPONSE') return '需求大厅沟�?
+  if (sourceType === 'SERVICE_PACKAGE') return '服务橱窗预订沟�?
+  if (sourceType.includes('SCHEDULE')) return '档期预约沟�?
   return sourceType
 }
 
 function buildConversationSourceRows(conversation, currentUser, sourceLabel) {
   const rows = [
-    ['会话 ID', conversation?.conversationId || '未加载'],
+    ['会话 ID', conversation?.conversationId || '未加�?],
     ['后端 conversationId', getBackendConversationId(conversation) || '当前接口未返回该字段'],
-    ['对方用户 ID', conversation ? getOppositeUserId(conversation, currentUser.userId) : '未加载'],
+    ['对方用户 ID', conversation ? getOppositeUserId(conversation, currentUser.userId) : '未加�?],
     ['来源类型', conversation?.sourceType || '当前接口未返回该字段'],
     ['业务来源', sourceLabel]
   ]
 
   if (conversation?.sourceType === 'DEMAND_RESPONSE') {
     rows.push(['响应 ID', conversation.sourceId || '当前接口未返回该字段'])
-    rows.push(['需求 ID', conversation.demandId || '当前接口未返回'])
+    rows.push(['需�?ID', conversation.demandId || '当前接口未返�?])
     return rows
   }
 
   if (conversation?.sourceType === 'SERVICE_PACKAGE') {
     rows.push(['服务橱窗 ID', conversation.sourceId || '当前接口未返回该字段'])
-    rows.push(['档期 ID', conversation.scheduleId || '当前接口未返回'])
+    rows.push(['档期 ID', conversation.scheduleId || '当前接口未返�?])
     return rows
   }
 
   rows.push(['来源 ID', conversation?.sourceId || '当前接口未返回该字段'])
-  rows.push(['需求 ID', conversation?.demandId || '当前接口未返回该字段'])
+  rows.push(['需�?ID', conversation?.demandId || '当前接口未返回该字段'])
   rows.push(['服务橱窗 ID', conversation?.servicePackageId || '当前接口未返回该字段'])
   rows.push(['档期 ID', conversation?.scheduleId || '当前接口未返回该字段'])
   return rows
 }
 
 function getConversationSourceHint(conversation) {
-  if (!conversation) return '会话仍在加载。'
+  if (!conversation) return '会话仍在加载�?
   if (conversation.isLocal) {
-    return '当前是本地 fallback 会话，只能聊天演示，不能创建真实报价或订单。'
+    return '当前是本�?fallback 会话，只能聊天演示，不能创建真实报价或订单�?
   }
   if (conversation.sourceType === 'DEMAND_RESPONSE') {
-    return '该会话来自需求大厅响应接受，后续应在这里沟通、报价并生成托管订单。'
+    return '该会话来自需求大厅响应接受，后续应在这里沟通、报价并生成托管订单�?
   }
   if (conversation.sourceType === 'SERVICE_PACKAGE') {
-    return '该会话来自服务橱窗咨询或预约意向；当前前端只展示来源，不实现橱窗预订、锁档期或付款。'
+    return '该会话来自服务橱窗咨询或预约意向；当前前端只展示来源，不实现橱窗预订、锁档期或付款�?
   }
-  return '当前来源类型不属于已明确的需求大厅或服务橱窗流程，本轮只做展示，不新增业务动作。'
+  return '当前来源类型不属于已明确的需求大厅或服务橱窗流程，本轮只做展示，不新增业务动作�?
 }
 
 function getQuoteOrderId(quote) {
@@ -3645,77 +3645,77 @@ function getQuoteEntryHint(conversation, currentUser, quotes) {
   if (!conversation) return ''
   if (currentUser.role !== 'PROVIDER') return ''
   if (currentUser.userId !== Number(conversation.participantBId)) {
-    return '只有该会话的服务方可以发起正式报价。'
+    return '只有该会话的服务方可以发起正式报价�?
   }
   if (conversation.isLocal || !getBackendConversationId(conversation)) {
-    return '当前不是后端真实会话，不能生成报价。'
+    return '当前不是后端真实会话，不能生成报价�?
   }
   if (hasPendingQuote(quotes)) {
-    return '已有待确认报价，需客户确认或拒绝后再发新报价。'
+    return '已有待确认报价，需客户确认或拒绝后再发新报价�?
   }
-  return '可以基于本次沟通发起正式报价，顾客确认后会生成订单。'
+  return '可以基于本次沟通发起正式报价，顾客确认后会生成订单�?
 }
 
 function validateQuoteForm(form, conversation, currentUser, quotes, options = {}) {
   const errors = []
   const editingQuotationId = options.editingQuotationId
   if (!conversation || conversation.isLocal || !getBackendConversationId(conversation)) {
-    errors.push('当前会话必须是真实后端会话，才能发起报价。')
+    errors.push('当前会话必须是真实后端会话，才能发起报价�?)
   }
   if (currentUser.role !== 'PROVIDER' || currentUser.userId !== Number(conversation?.participantBId)) {
-    errors.push('只有该会话的服务方可以发起报价。')
+    errors.push('只有该会话的服务方可以发起报价�?)
   }
   const hasOtherPendingQuote = quotes.some(quote =>
     quote.status === 'PENDING_CONFIRM'
     && (!editingQuotationId || String(quote.quotationId) !== String(editingQuotationId))
   )
   if (hasOtherPendingQuote) {
-    errors.push('已有待确认报价，需客户确认或拒绝后再发新报价。')
+    errors.push('已有待确认报价，需客户确认或拒绝后再发新报价�?)
   }
 
   const amountCent = yuanToCent(form.amountYuan)
   if (!hasAtMostTwoDecimalPlaces(form.amountYuan)) {
-    errors.push('金额最多保留两位小数。')
+    errors.push('金额最多保留两位小数�?)
   }
   if (!Number.isInteger(amountCent) || amountCent <= 0) {
-    errors.push('报价金额必须大于 0，且转换成分后必须是有效整数。')
+    errors.push('报价金额必须大于 0，且转换成分后必须是有效整数�?)
   }
 
   const shootStart = parseInputDate(form.shootStartTime)
   const shootEnd = parseInputDate(form.shootEndTime)
   const deliveryDeadline = parseInputDate(form.deliveryDeadline)
   const now = new Date()
-  if (!shootStart) errors.push('拍摄开始时间必填。')
-  if (!shootEnd) errors.push('拍摄结束时间必填。')
-  if (!deliveryDeadline) errors.push('最晚交付时间必填。')
+  if (!shootStart) errors.push('拍摄开始时间必填�?)
+  if (!shootEnd) errors.push('拍摄结束时间必填�?)
+  if (!deliveryDeadline) errors.push('最晚交付时间必填�?)
   if (shootStart && shootStart <= now) {
-    errors.push('拍摄开始时间必须晚于当前时间。')
+    errors.push('拍摄开始时间必须晚于当前时间�?)
   }
   if (shootStart && shootEnd && shootEnd <= shootStart) {
-    errors.push('拍摄结束时间必须晚于拍摄开始时间。')
+    errors.push('拍摄结束时间必须晚于拍摄开始时间�?)
   }
   if (shootEnd && deliveryDeadline && deliveryDeadline <= shootEnd) {
-    errors.push('最晚交付时间必须晚于拍摄结束时间。')
+    errors.push('最晚交付时间必须晚于拍摄结束时间�?)
   }
 
   if (!String(form.location || '').trim()) {
-    errors.push('拍摄地点不能为空。')
+    errors.push('拍摄地点不能为空�?)
   }
   if (!String(form.serviceContent || '').trim()) {
-    errors.push('服务内容不能为空。')
+    errors.push('服务内容不能为空�?)
   }
   if (!isNonNegativeInteger(form.originalCount)) {
-    errors.push('原片数量必须是非负整数。')
+    errors.push('原片数量必须是非负整数�?)
   }
   if (!isNonNegativeInteger(form.refinedCount)) {
-    errors.push('精修数量必须是非负整数。')
+    errors.push('精修数量必须是非负整数�?)
   }
 
   if (conversation?.scheduleStartTime && conversation?.scheduleEndTime && shootStart && shootEnd) {
     const scheduleStart = parseInputDate(conversation.scheduleStartTime)
     const scheduleEnd = parseInputDate(conversation.scheduleEndTime)
     if (scheduleStart && scheduleEnd && (shootStart < scheduleStart || shootEnd > scheduleEnd)) {
-      errors.push('拍摄时间必须落在该会话明确返回的档期范围内。')
+      errors.push('拍摄时间必须落在该会话明确返回的档期范围内�?)
     }
   }
   return errors
@@ -3724,10 +3724,10 @@ function validateQuoteForm(form, conversation, currentUser, quotes, options = {}
 function getQuoteConfirmationErrorText(error) {
   const message = error?.message || ''
   if (message.includes('Quote has expired')) {
-    return '该报价已过期，请摄影师重新发起报价。'
+    return '该报价已过期，请摄影师重新发起报价�?
   }
   if (message.includes('Provider already has an active order in this shoot time range')) {
-    return '该摄影师在所选拍摄时间已有订单，请重新协商时间。'
+    return '该摄影师在所选拍摄时间已有订单，请重新协商时间�?
   }
   return message || '报价确认失败'
 }
@@ -3764,10 +3764,10 @@ function getOrderAction(order, currentUser) {
     return {
       kind: 'transition',
       targetStatus: 'SHOOTING',
-      label: '开始拍摄',
+      label: '开始拍�?,
       icon: <CheckCircleRoundedIcon />,
       allowed: isProvider,
-      reason: '服务方开始拍摄',
+      reason: '服务方开始拍�?,
       successText: '订单已进入拍摄中'
     }
   }
@@ -3775,7 +3775,7 @@ function getOrderAction(order, currentUser) {
     return {
       kind: 'transition',
       targetStatus: 'PENDING_DELIVERY',
-      label: '进入待交付',
+      label: '进入待交�?,
       icon: <TaskAltRoundedIcon />,
       allowed: isProvider,
       reason: '拍摄完成，进入待交付',
@@ -3790,7 +3790,7 @@ function getOrderAction(order, currentUser) {
       icon: <CheckCircleRoundedIcon />,
       allowed: true,
       reason: '需求方确认完成',
-      successText: '订单已完成'
+      successText: '订单已完�?
     }
   }
   return null
@@ -3800,20 +3800,20 @@ function getCustomerCancelAction(order, currentUser) {
   if (!isOrderCustomer(order, currentUser)) return null
   if (order.status === 'PENDING_PAYMENT') {
     return {
-      label: '取消待支付订单',
-      title: '取消待支付订单',
-      description: '该订单尚未支付，取消后订单结束，不涉及退款。',
-      confirmText: '确定取消这个待支付订单吗？该操作不涉及退款。',
-      reason: '客户取消未支付订单',
+      label: '取消待支付订�?,
+      title: '取消待支付订�?,
+      description: '该订单尚未支付，取消后订单结束，不涉及退款�?,
+      confirmText: '确定取消这个待支付订单吗？该操作不涉及退款�?,
+      reason: '客户取消未支付订�?,
       successText: '待支付订单已取消'
     }
   }
   if (order.status === 'PAID_PENDING_SHOOT' && isBeforeShootStart(order)) {
     return {
-      label: '取消并申请退款',
-      title: '拍摄前取消并退款',
-      description: '订单已支付且拍摄尚未开始，取消后平台托管资金将退回客户。',
-      confirmText: '确定取消订单并申请退款吗？平台托管资金将退回客户。',
+      label: '取消并申请退�?,
+      title: '拍摄前取消并退�?,
+      description: '订单已支付且拍摄尚未开始，取消后平台托管资金将退回客户�?,
+      confirmText: '确定取消订单并申请退款吗？平台托管资金将退回客户�?,
       reason: '客户拍摄前取消，申请退回托管款',
       successText: '订单已取消，退款状态已更新'
     }
@@ -4041,7 +4041,7 @@ function buildProfileStats(userId, reviews = [], orders = []) {
 }
 
 function directionLabel(direction) {
-  if (direction === 'CUSTOMER_TO_PROVIDER') return '需求方评价服务方'
+  if (direction === 'CUSTOMER_TO_PROVIDER') return '需求方评价服务�?
   if (direction === 'PROVIDER_TO_CUSTOMER') return '服务方评价需求方'
   return '订单评价'
 }
@@ -4074,7 +4074,7 @@ function saveConversationRecord(conversation, meta = {}) {
     sourceType: conversation.sourceType || previous?.sourceType || 'DEMAND_RESPONSE',
     sourceId: conversation.sourceId ?? previous?.sourceId ?? meta.demandId,
     demandId: meta.demandId ?? previous?.demandId ?? conversation.sourceId,
-    scene: meta.scene || previous?.scene || `需求 ${meta.demandId || conversation.sourceId || ''}`,
+    scene: meta.scene || previous?.scene || `需�?${meta.demandId || conversation.sourceId || ''}`,
     location: meta.location || previous?.location || '',
     lastMessage: meta.lastMessage || previous?.lastMessage || '点击进入对话',
     interfaceNote: meta.interfaceNote || previous?.interfaceNote || '',
@@ -4107,7 +4107,7 @@ function mergeConversationRecords(remoteConversations, currentUser) {
       demandId: previous?.demandId,
       scene: previous?.scene || `会话 ${conversationId}`,
       location: previous?.location || '',
-      lastMessage: previous?.lastMessage || (conversation.lastMessageTime ? '最近有新消息' : '点击进入对话')
+      lastMessage: previous?.lastMessage || (conversation.lastMessageTime ? '最近有新消�? : '点击进入对话')
     })
     merged.set(conversationId, record)
   })
@@ -4220,7 +4220,7 @@ function getUserProfile(userId, role, moments = []) {
   const demoUser = Object.values(USERS).find(user => Number(user.userId) === id)
   const inferredRole = role || stored.role || demoUser?.role || moments.find(moment => Number(moment.authorId) === id)?.authorRole || 'CUSTOMER'
   const nickname = stored.nickname || demoUser?.nickname || `${roleMap[inferredRole] || '用户'} ${id}`
-  const bio = stored.bio || stored.description || demoUser?.bio || demoUser?.description || '这个人还没有填写简介。'
+  const bio = stored.bio || stored.description || demoUser?.bio || demoUser?.description || '这个人还没有填写简介�?
   return {
     userId: id,
     role: inferredRole,
@@ -4263,7 +4263,7 @@ function buildPortfolioWorks(userId, moments, portfolioItems = readPortfolioItem
     .map(moment => ({
       key: `moment-${moment.momentId}`,
       momentId: moment.momentId,
-      title: moment.title || '动态作品',
+      title: moment.title || '动态作�?,
       imageData: moment.imageData,
       createdAt: moment.createdAt
     }))
@@ -4377,7 +4377,7 @@ function ProfileMetrics({ stats, compact = false }) {
       <Chip
         size="small"
         color={completionRate === null ? 'default' : completionRate >= 80 ? 'success' : 'warning'}
-        label={`完成率 ${completionRate === null ? '暂无' : `${completionRate}%`}`}
+        label={`完成�?${completionRate === null ? '暂无' : `${completionRate}%`}`}
       />
     </Stack>
   )
@@ -4389,12 +4389,13 @@ function ReviewList({ reviews, emptyText = '暂无历史评价' }) {
 
   return reviews.length ? (
     <Stack spacing={1.2}>
-      {reviews.map(review => {
+      {reviews.map((review, index) => {
         const canOpenOrder = [review.reviewerId, review.targetUserId].some(userId => Number(userId) === Number(currentUser.userId))
         return (
         <Paper
           key={review.reviewId || `${review.orderId}-${review.direction}-${review.createdAt}`}
           variant="outlined"
+          className="review-item"
           role={canOpenOrder ? 'button' : undefined}
           tabIndex={canOpenOrder ? 0 : undefined}
           onClick={canOpenOrder ? () => navigate(`/orders?orderId=${review.orderId}`) : undefined}
@@ -4404,7 +4405,7 @@ function ReviewList({ reviews, emptyText = '暂无历史评价' }) {
               navigate(`/orders?orderId=${review.orderId}`)
             }
           } : undefined}
-          sx={{ p: 1.5, bgcolor: '#fbfdff', cursor: canOpenOrder ? 'pointer' : 'default' }}
+          sx={{ animationDelay: `${index * 80}ms`, cursor: canOpenOrder ? 'pointer' : 'default' }}
         >
           <Stack spacing={0.8}>
             <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
@@ -4417,7 +4418,7 @@ function ReviewList({ reviews, emptyText = '暂无历史评价' }) {
             </Stack>
             <Typography>{review.content || '对方没有留下文字评价'}</Typography>
             <Typography color="text.secondary" variant="body2">
-              评价人 {review.reviewerId} · 被评价人 {review.targetUserId}
+              评价�?{review.reviewerId} · 被评价人 {review.targetUserId}
             </Typography>
           </Stack>
         </Paper>
@@ -4442,8 +4443,8 @@ function getLatestDeliveryUploadTime(records) {
 function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, latestDeliveryUploadTime, estimatedAutoConfirmTime) {
   const status = order.status
   const baseRows = [
-    ['托管状态', escrowStatusMap[order.escrowStatus] || order.escrowStatus || '当前接口未返回'],
-    ['结算状态', settlementStatusMap[order.settlementStatus] || order.settlementStatus || '当前接口未返回']
+    ['托管状�?, escrowStatusMap[order.escrowStatus] || order.escrowStatus || '当前接口未返�?],
+    ['结算状�?, settlementStatusMap[order.settlementStatus] || order.settlementStatus || '当前接口未返�?]
   ]
   const latestReworkLog = getLatestStatusLog(statusLogs, 'REWORK_REQUIRED')
   const latestCompletedLog = getLatestStatusLog(statusLogs, 'COMPLETED')
@@ -4451,98 +4452,98 @@ function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, latestDel
   if (status === 'PENDING_PAYMENT') {
     return {
       title: '等待客户支付',
-      description: '客户支付后，资金进入平台托管，订单再进入待拍摄履约阶段。',
+      description: '客户支付后，资金进入平台托管，订单再进入待拍摄履约阶段�?,
       color: 'warning',
       severity: 'info',
       rows: [
         ['订单金额', centToYuan(order.amountCent)],
         ...baseRows
       ],
-      note: '当前支付入口调用后端模拟支付接口；未支付前不应进入拍摄或交付。'
+      note: '当前支付入口调用后端模拟支付接口；未支付前不应进入拍摄或交付�?
     }
   }
 
   if (status === 'PAID_PENDING_SHOOT') {
     return {
       title: '已支付，等待拍摄',
-      description: '平台托管资金已建立，双方应按报价约定的拍摄时间履约。',
+      description: '平台托管资金已建立，双方应按报价约定的拍摄时间履约�?,
       color: 'info',
       severity: 'warning',
       rows: [
-        ['拍摄开始', formatTimeOrMissing(order.shootStartTime)],
+        ['拍摄开�?, formatTimeOrMissing(order.shootStartTime)],
         ['拍摄结束', formatTimeOrMissing(order.shootEndTime)],
         ...baseRows
       ],
-      note: '当前状态推进由后端状态接口完成；按拍摄时间自动推进仍待后端定时任务或接口接入。'
+      note: '当前状态推进由后端状态接口完成；按拍摄时间自动推进仍待后端定时任务或接口接入�?
     }
   }
 
   if (status === 'SHOOTING') {
     return {
-      title: '拍摄中',
-      description: '订单处于拍摄履约阶段，拍摄完成后才进入待交付。',
+      title: '拍摄�?,
+      description: '订单处于拍摄履约阶段，拍摄完成后才进入待交付�?,
       color: 'info',
       severity: 'warning',
       rows: [
-        ['拍摄开始', formatTimeOrMissing(order.shootStartTime)],
+        ['拍摄开�?, formatTimeOrMissing(order.shootStartTime)],
         ['拍摄结束', formatTimeOrMissing(order.shootEndTime)],
         ...baseRows
       ],
-      note: '当前状态推进由后端状态接口完成；按拍摄时间自动推进仍待后端定时任务或接口接入。'
+      note: '当前状态推进由后端状态接口完成；按拍摄时间自动推进仍待后端定时任务或接口接入�?
     }
   }
 
   if (status === 'PENDING_DELIVERY') {
     return {
-      title: '等待服务方上传作品',
-      description: '摄影师需通过交付入口上传作品，上传成功后订单进入待客户确认。',
+      title: '等待服务方上传作�?,
+      description: '摄影师需通过交付入口上传作品，上传成功后订单进入待客户确认�?,
       color: 'secondary',
       severity: 'info',
       rows: [
-        ['最晚交付时间', formatTimeOrMissing(order.deliveryDeadline)],
+        ['最晚交付时�?, formatTimeOrMissing(order.deliveryDeadline)],
         ['已有交付记录', `${deliveryRecords.length} 条`],
         ...baseRows
       ],
-      note: '超时未交付退款规则待后端接口确认/接入；前端本轮不会触发退款。'
+      note: '超时未交付退款规则待后端接口确认/接入；前端本轮不会触发退款�?
     }
   }
 
   if (status === 'DELIVERED_PENDING_CONFIRM') {
     return {
       title: '已交付，等待客户确认',
-      description: '客户需确认接收作品，或提交返修要求；未处理时由后端自动确认任务处理。',
+      description: '客户需确认接收作品，或提交返修要求；未处理时由后端自动确认任务处理�?,
       color: 'primary',
       severity: latestDeliveryUploadTime ? 'info' : 'warning',
       rows: [
-        ['最新交付时间', formatTimeOrMissing(latestDeliveryUploadTime)],
-        ['预计自动确认时间', estimatedAutoConfirmTime ? formatTime(estimatedAutoConfirmTime) : '当前接口未返回可靠交付时间'],
+        ['最新交付时�?, formatTimeOrMissing(latestDeliveryUploadTime)],
+        ['预计自动确认时间', estimatedAutoConfirmTime ? formatTime(estimatedAutoConfirmTime) : '当前接口未返回可靠交付时�?],
         ['交付记录', `${deliveryRecords.length} 条`],
         ...baseRows
       ],
-      note: '摄影师已交付作品。客户需在交付后 7 天内确认接收或提交返修要求；若 7 天内未处理，系统将自动确认订单完成并释放托管资金。前端仅展示规则，不模拟自动确认。'
+      note: '摄影师已交付作品。客户需在交付后 7 天内确认接收或提交返修要求；�?7 天内未处理，系统将自动确认订单完成并释放托管资金。前端仅展示规则，不模拟自动确认�?
     }
   }
 
   if (status === 'REWORK_REQUIRED') {
     return {
-      title: '返修中',
-      description: '客户已提交返修要求，等待服务方重新上传作品。',
+      title: '返修�?,
+      description: '客户已提交返修要求，等待服务方重新上传作品�?,
       color: 'warning',
       severity: 'warning',
       rows: [
-        ['最近返修要求', latestReworkLog?.reason || latestReworkLog?.remark || '当前接口未返回'],
-        ['返修状态时间', formatTimeOrMissing(latestReworkLog?.createdAt)],
+        ['最近返修要�?, latestReworkLog?.reason || latestReworkLog?.remark || '当前接口未返�?],
+        ['返修状态时�?, formatTimeOrMissing(latestReworkLog?.createdAt)],
         ['已有交付记录', `${deliveryRecords.length} 条`],
         ...baseRows
       ],
-      note: '服务方必须通过交付入口重新上传作品；页面不会提供绕过上传的返修完成按钮。'
+      note: '服务方必须通过交付入口重新上传作品；页面不会提供绕过上传的返修完成按钮�?
     }
   }
 
   if (status === 'COMPLETED') {
     return {
-      title: '订单已完成',
-      description: '订单完成后，托管资金应释放给服务方，并进入结算完成状态。',
+      title: '订单已完�?,
+      description: '订单完成后，托管资金应释放给服务方，并进入结算完成状态�?,
       color: 'success',
       severity: 'success',
       rows: [
@@ -4550,38 +4551,38 @@ function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, latestDel
         ['自动确认时间', formatTimeOrMissing(order.autoConfirmTime)],
         ...baseRows
       ],
-      note: '完成后的评价入口和照片授权入口在下方展示；若订单由 7 天规则自动确认，可通过状态日志查看系统完成记录。'
+      note: '完成后的评价入口和照片授权入口在下方展示；若订单�?7 天规则自动确认，可通过状态日志查看系统完成记录�?
     }
   }
 
   if (status === 'APPEALING') {
     return {
-      title: '订单申诉中',
-      description: '订单处于争议处理阶段，正常履约动作应暂停。',
+      title: '订单申诉�?,
+      description: '订单处于争议处理阶段，正常履约动作应暂停�?,
       color: 'error',
       severity: 'warning',
       rows: baseRows,
-      note: '申诉/仲裁结果、退款或结算裁定仍待后端正式接口接入，本轮不假实现。'
+      note: '申诉/仲裁结果、退款或结算裁定仍待后端正式接口接入，本轮不假实现�?
     }
   }
 
   if (status === 'REFUNDED' || status === 'CANCELLED') {
     return {
-      title: status === 'REFUNDED' ? '订单已退款' : '订单已取消',
-      description: '订单已结束，不再展示正常履约动作。',
+      title: status === 'REFUNDED' ? '订单已退�? : '订单已取�?,
+      description: '订单已结束，不再展示正常履约动作�?,
       color: 'default',
       severity: 'info',
       rows: [
-        ['退款状态', order.refundStatus || '当前接口未返回'],
+        ['退款状�?, order.refundStatus || '当前接口未返�?],
         ...baseRows
       ],
-      note: '退款/取消后的后续处理以状态日志和后端返回为准。'
+      note: '退�?取消后的后续处理以状态日志和后端返回为准�?
     }
   }
 
   return {
-    title: '订单履约状态',
-    description: '当前状态暂无专门提示。',
+    title: '订单履约状�?,
+    description: '当前状态暂无专门提示�?,
     color: 'default',
     severity: 'info',
     rows: baseRows,
@@ -4596,7 +4597,7 @@ function getLatestStatusLog(statusLogs, targetStatus) {
 }
 
 function formatTimeOrMissing(value) {
-  return value ? formatTime(value) : '当前接口未返回'
+  return value ? formatTime(value) : '当前接口未返�?
 }
 
 function addDays(value, days) {
@@ -4617,7 +4618,8 @@ export {
   ProfilePage,
   PublicProfilePage,
   PublishPage,
-  RegisterPage11不要恢复原版，本来个人主页前端
+  RegisterPage11不要恢复原版，本来个人主页前�?
 }
 
 export default App
+

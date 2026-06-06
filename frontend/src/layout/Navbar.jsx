@@ -23,7 +23,7 @@ function activeKeyFromPath(pathname) {
 
 export function Navbar({ activePath, currentUser, logout }) {
   const navigate = useNavigate()
-  const { setUserKey } = useAuth()
+  const { setUserKey, switchRole, session } = useAuth()
   const [unreadCount, setUnreadCount] = useState(0)
   const [bellRinging, setBellRinging] = useState(false)
   const initializedRef = useRef(false)
@@ -103,14 +103,14 @@ export function Navbar({ activePath, currentUser, logout }) {
             <button
               type="button"
               className={`portra-role-btn ${!isProvider ? 'active' : ''}`}
-              onClick={() => setUserKey('customer')}
+              onClick={() => session?.token?.startsWith('demo') ? setUserKey('customer') : switchRole('CUSTOMER')}
             >
               单主
             </button>
             <button
               type="button"
               className={`portra-role-btn ${isProvider ? 'active' : ''}`}
-              onClick={() => setUserKey('provider')}
+              onClick={() => session?.token?.startsWith('demo') ? setUserKey('provider') : switchRole('PROVIDER')}
             >
               摄影师
             </button>
