@@ -194,3 +194,64 @@ export function formatOrderSubtitle(order, quote) {
   return [location, time].filter(Boolean).join(' · ') || '订单已创建，等待双方继续履约'
 }
 
+export function formatFileDisplayName(fileOrName, fallback = '交付作品') {
+  const rawName = typeof fileOrName === 'object'
+    ? fileOrName?.fileName || fileOrName?.name || fileOrName?.originalName
+    : fileOrName
+  const raw = String(rawName || '').trim()
+  if (!raw) return fallback
+
+  const cleaned = raw
+    .replace(/^UI_REVIEW_SEED[_\s-]*/i, '')
+    .replace(/^Demo\s+\d+[_\s-]*/i, '')
+    .replace(/\b(?:PENDING_PAYMENT|NOT_SETTLED|NONE)\b/gi, '')
+    .replace(/^[_\s-]+/, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+
+  if (!cleaned || /^UI_REVIEW_SEED/i.test(cleaned) || /^UIO/i.test(cleaned)) return fallback
+  return cleaned
+}
+
+export function formatDeliveryTitle(delivery, index = 0) {
+  const fileName = formatFileDisplayName(delivery, '')
+  if (fileName) return fileName
+  const round = Number(delivery?.deliveryRound || index + 1)
+  return `交付作品 ${round}`
+}
+
+export function formatDeliveryDescription(delivery, fallback = '摄影师已上传作品，等待客户确认。') {
+  return sanitizeSeedText(delivery?.remark || delivery?.description || delivery?.note, fallback)
+}
+
+export function formatAuthorizationTitle(authorization, index = 0) {
+  const id = authorization?.id || authorization?.authorizationId
+  return id ? `照片展示授权 ${id}` : `照片展示授权 ${index + 1}`
+}
+
+export function formatAuthorizationDescription(authorization, fallback = '摄影师申请展示本次交付作品。') {
+  return sanitizeSeedText(authorization?.remark || authorization?.description || authorization?.reason, fallback)
+}
+
+export function formatStatusLogText(log) {
+  const status = log?.toStatus || log?.targetStatus || log?.status
+  const naturalByStatus = {
+    PENDING_PAYMENT: '订单已创建，等待客户付款。',
+    PAID: '客户已完成付款，资金进入平台托管。',
+    PAID_PENDING_SHOOT: '客户已完成付款，资金进入平台托管。',
+    SCHEDULED: '拍摄时间已确认，等待按约定执行。',
+    SHOOTING: '拍摄已开始。',
+    PENDING_DELIVERY: '拍摄已完成，等待摄影师上传作品。',
+    DELIVERED_PENDING_CONFIRM: '摄影师已上传作品，等待客户确认。',
+    REWORK_REQUIRED: '客户提出返修要求。',
+    COMPLETED: '订单已完成。',
+    CANCELLED: '订单已取消。',
+    REFUNDED: '订单已退款。',
+    APPEALING: '订单进入申诉处理。'
+  }
+  const rawReason = sanitizeSeedText(log?.reason || log?.remark || log?.description, '')
+  if (rawReason) return rawReason
+  if (naturalByStatus[status]) return naturalByStatus[status]
+  if (status) warnUnknown('status log', status)
+  return '状态已更新。'
+}

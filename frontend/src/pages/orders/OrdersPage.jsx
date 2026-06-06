@@ -36,7 +36,15 @@ import {
 } from '../../api.js'
 import { normalizeOrderId } from '../../utils/orderNavigation.js'
 import { centToYuan } from '../../utils/index.js'
-import { formatDateOnly } from '../../utils/displayFormatters.js'
+import {
+  formatAuthorizationDescription,
+  formatAuthorizationTitle,
+  formatDateOnly,
+  formatDeliveryDescription,
+  formatDeliveryTitle,
+  formatFileDisplayName,
+  formatStatusLogText
+} from '../../utils/displayFormatters.js'
 import {
   PortraActionButton,
   PortraEmptyState,
@@ -561,7 +569,7 @@ export function OrdersPage() {
         if (!map.has(fileId)) {
           map.set(fileId, {
             fileId,
-            fileName: record.fileName || `文件 ${fileId}`,
+            fileName: formatFileDisplayName(record, `交付作品 ${fileId}`),
             uploadTime: record.uploadTime
           })
         }
@@ -588,7 +596,7 @@ export function OrdersPage() {
   const statusTimelineItems = statusLogs.map(log => ({
     id: log.logId || `${log.orderId}-${log.createdAt}`,
     title: `${log.fromStatus ? formatOrderStatus(log.fromStatus) : '创建'} → ${formatOrderStatus(log.toStatus)}`,
-    description: sanitizeSeedText(log.reason, '订单状态已更新'),
+    description: formatStatusLogText(log),
     time: formatTime(log.createdAt),
     tone: log.toStatus === 'APPEALING' || log.toStatus === 'REWORK_REQUIRED' ? 'danger' : 'primary'
   }))
@@ -843,19 +851,19 @@ export function OrdersPage() {
 
                 <Stack spacing={1}>
                   <Typography variant="overline" sx={overlineSx}>交付记录</Typography>
-                  {deliveryRecords.map(record => (
+                  {deliveryRecords.map((record, index) => (
                     <Paper key={record.deliveryId || `${record.orderId}-${record.fileId}-${record.uploadTime}`} variant="outlined" sx={subCardSx}>
                       <Stack spacing={0.7}>
                         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
                           <Typography fontWeight={800}>
-                            {record.fileName || `文件 ${record.fileId || '-'}`}
+                            {formatDeliveryTitle(record, index)}
                           </Typography>
                           <Chip size="small" label={`第 ${record.deliveryRound || 1} 次交付${record.isLatest ? ' · 最新' : ''}`} />
                         </Stack>
                         <Typography sx={{ color: PORTRA_SURFACE.muted }} variant="body2">
                           文件编号 {record.fileId || '-'} · {deliveryStatusLabelMap[record.status] || '已交付'} · {formatTime(record.uploadTime)}
                         </Typography>
-                        <Typography>{record.remark || '无交付说明'}</Typography>
+                        <Typography>{formatDeliveryDescription(record, '无交付说明')}</Typography>
                       </Stack>
                     </Paper>
                   ))}
@@ -932,7 +940,7 @@ export function OrdersPage() {
 
                 <Stack spacing={1}>
                   <Typography variant="overline" sx={overlineSx}>授权申请记录</Typography>
-                  {photoAuthorizations.map(authorization => {
+                  {photoAuthorizations.map((authorization, index) => {
                     const canReviewAuthorization = canCustomerReviewPhotoAuthorization(selectedOrder, currentUser, authorization)
                     const statusLabel = PHOTO_AUTHORIZATION_STATUS_LABELS[authorization.status] || '授权状态已更新'
                     return (
@@ -940,7 +948,7 @@ export function OrdersPage() {
                         <Stack spacing={1}>
                           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
                             <Box>
-                              <Typography fontWeight={800}>授权申请 {authorization.id}</Typography>
+                              <Typography fontWeight={800}>{formatAuthorizationTitle(authorization, index)}</Typography>
                               <Typography sx={{ color: PORTRA_SURFACE.muted }} variant="body2">
                                 摄影师 · 客户
                               </Typography>
@@ -959,14 +967,14 @@ export function OrdersPage() {
                                 : '等待客户确认'}
                             {authorization.authorizedAt ? ` · ${formatTime(authorization.authorizedAt)}` : ''}
                           </Typography>
-                          <Typography>{authorization.remark || '无备注'}</Typography>
+                          <Typography>{formatAuthorizationDescription(authorization, '无备注')}</Typography>
                           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                             {(authorization.files || []).map(file => (
                               <Chip
                                 key={file.id || file.fileId}
                                 size="small"
                                 icon={<ImageRoundedIcon />}
-                                label={deliveryFileNameMap.get(Number(file.fileId)) || `文件 ${file.fileId}`}
+                                label={deliveryFileNameMap.get(Number(file.fileId)) || formatFileDisplayName(file, `交付作品 ${file.fileId}`)}
                               />
                             ))}
                             {!(authorization.files || []).length && (
