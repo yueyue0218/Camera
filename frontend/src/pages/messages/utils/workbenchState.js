@@ -338,7 +338,9 @@ export function buildConversationTimeline({
       const event = buildStatusLogEvent(log, order, actions, visibleRole)
       if (event) items.push(event)
     })
-    const validDeliveries = deliveries.filter(Boolean)
+    const validDeliveries = deliveries
+      .filter(Boolean)
+      .filter(delivery => isNormalTimelineDelivery(delivery, order, statusLogs))
     const latestDelivery = getLatestItem(validDeliveries, delivery => delivery.uploadTime)
     validDeliveries.forEach((delivery, index) => {
       const latest = delivery === latestDelivery
@@ -429,6 +431,29 @@ function isBeforeShootStart(order) {
 
 function getLatestItem(items, getTime) {
   return [...items].sort((left, right) => toTimestamp(getTime(right)) - toTimestamp(getTime(left)))[0] || null
+}
+
+function isNormalTimelineDelivery(delivery, order, statusLogs = []) {
+  if (!delivery || !order?.orderId) return false
+  const deliveryOrderId = normalizeActorId(delivery.orderId)
+  if (deliveryOrderId && deliveryOrderId !== normalizeActorId(order.orderId)) return false
+
+  const uploadTime = toTimestamp(delivery.uploadTime || delivery.createdAt)
+  if (!uploadTime) return false
+  const orderCreatedTime = toTimestamp(order.createdAt)
+  if (orderCreatedTime && uploadTime < orderCreatedTime) return false
+
+  const paidTime = getOrderPaidTimestamp(statusLogs, order)
+  if (paidTime && uploadTime < paidTime) return false
+
+  // Defensive guard for inconsistent seed or stale API data: a delivery cannot be
+  // shown as a normal business-flow event before the order has reached delivery.
+  return ['DELIVERED_PENDING_CONFIRM', 'REWORK_REQUIRED', 'COMPLETED', 'APPEALING'].includes(order.status)
+}
+
+function getOrderPaidTimestamp(statusLogs = [], order) {
+  const paidLog = statusLogs.find(log => ['PAID', 'PAID_PENDING_SHOOT'].includes(log?.toStatus))
+  return toTimestamp(paidLog?.createdAt || order?.paidAt || order?.paymentTime)
 }
 
 function toTimestamp(value) {
