@@ -123,7 +123,6 @@ function parseInputDate(value) {
 }
 
 function getOrderAction(order, currentUser) {
-  const isProvider = Number(order.providerUserId) === currentUser.userId
   if (canCustomerPay(order, currentUser)) {
     return {
       kind: 'pay',
@@ -131,28 +130,6 @@ function getOrderAction(order, currentUser) {
       icon: <PaidRoundedIcon />,
       allowed: true,
       successText: '模拟支付成功，资金已进入平台担保'
-    }
-  }
-  if (order.status === 'PAID_PENDING_SHOOT') {
-    return {
-      kind: 'transition',
-      targetStatus: 'SHOOTING',
-      label: '开始拍摄',
-      icon: <CheckCircleRoundedIcon />,
-      allowed: isProvider,
-      reason: '服务方开始拍摄',
-      successText: '订单已进入拍摄中'
-    }
-  }
-  if (order.status === 'SHOOTING') {
-    return {
-      kind: 'transition',
-      targetStatus: 'PENDING_DELIVERY',
-      label: '进入待上传作品',
-      icon: <TaskAltRoundedIcon />,
-      allowed: isProvider,
-      reason: '拍摄完成，进入待上传作品',
-      successText: '订单已进入待上传作品'
     }
   }
   if (canCustomerConfirm(order, currentUser)) {
