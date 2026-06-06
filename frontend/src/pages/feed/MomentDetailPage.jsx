@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Alert, Box, Button, Paper, Stack } from '@mui/material'
+import { Alert, Box, Button, Stack } from '@mui/material'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { fileApi, momentApi, userApi } from '../../api.js'
 import { MomentDetailCard } from './components/MomentDetailCard.jsx'
+import { FeedLoadingCard } from './components/FeedLoadingCard.jsx'
 
 function emptyFollowState() {
   return { CUSTOMER: new Set(), PROVIDER: new Set() }
@@ -155,7 +156,7 @@ export function MomentDetailPage() {
           onDelete={deleteMoment}
         />
       ) : (
-        <Paper className="moments-empty" variant="outlined">正在加载...</Paper>
+        <FeedLoadingCard compact />
       )}
     </Stack>
   )

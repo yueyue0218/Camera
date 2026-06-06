@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { Alert, Avatar, Box, Button, Paper, Rating, Stack, TextField, Typography } from '@mui/material'
 import RateReviewRoundedIcon from '@mui/icons-material/RateReviewRounded'
 import ReportProblemRoundedIcon from '@mui/icons-material/ReportProblemRounded'
+import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import { useNavigate, useParams } from 'react-router-dom'
 import { creditApi, orderApi, reviewApi, reviewComplaintApi } from '../../api/index.js'
 import { useAuth } from '../../AuthContext.jsx'
 import { EmptyState, Feedback, PageHeader, formatDateTime, panelSx, portra } from '../dline/shared.jsx'
+import './reviews.css'
 
 function ReviewScore({ value }) {
   const numeric = Number(value)
@@ -24,11 +26,12 @@ function ReviewScore({ value }) {
   )
 }
 
-function ReviewItem({ item }) {
+function ReviewItem({ item, index = 0, onOpenOrder }) {
   const avatarText = String(item.reviewerId || item.targetUserId || 'U').slice(-2)
+  const orderId = item.orderId || item.targetOrderId
 
   return (
-    <Paper sx={{ ...panelSx, p: 2 }}>
+    <Paper className="review-ticket" style={{ '--review-index': index }} sx={{ ...panelSx, p: 2 }}>
       <Stack spacing={1.5}>
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
           <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0 }}>
@@ -56,12 +59,24 @@ function ReviewItem({ item }) {
             <p>{item.replyContent}</p>
           </Box>
         ) : null}
+        {orderId ? (
+          <Button
+            size="small"
+            variant="text"
+            startIcon={<ReceiptLongRoundedIcon />}
+            onClick={() => onOpenOrder(orderId)}
+            sx={{ alignSelf: 'flex-start', fontWeight: 900 }}
+          >
+            查看关联订单
+          </Button>
+        ) : null}
       </Stack>
     </Paper>
   )
 }
 
 export function ReviewPage() {
+  const navigate = useNavigate()
   const { orderId } = useParams()
   const { currentUser } = useAuth()
   const [order, setOrder] = useState(null)
@@ -212,7 +227,9 @@ export function ReviewPage() {
       {loading ? <EmptyState>正在加载评价...</EmptyState> : null}
       {!loading && items.length ? (
         <Stack gap={1.5}>
-          {items.map(item => <ReviewItem key={item.reviewId} item={item} />)}
+          {items.map((item, index) => (
+            <ReviewItem key={item.reviewId} item={item} index={index} onOpenOrder={id => navigate(`/orders?orderId=${id}`)} />
+          ))}
         </Stack>
       ) : null}
       {!loading && !items.length ? <EmptyState>暂无评价</EmptyState> : null}
@@ -259,7 +276,9 @@ export function UserReviewsPage() {
       {loading ? <EmptyState>正在加载评价...</EmptyState> : null}
       {!loading && items.length ? (
         <Stack gap={1.5}>
-          {items.map(item => <ReviewItem key={item.reviewId} item={item} />)}
+          {items.map((item, index) => (
+            <ReviewItem key={item.reviewId} item={item} index={index} onOpenOrder={id => navigate(`/orders?orderId=${id}`)} />
+          ))}
         </Stack>
       ) : null}
       {!loading && !items.length ? <EmptyState>暂无收到的评价。</EmptyState> : null}
