@@ -2,226 +2,54 @@
   box-sizing: border-box;
 }
 
-html,
-body,
-#app {
+html, body, #app {
   min-height: 100%;
 }
 
 body {
   margin: 0;
   background: #e6e2e0;
-  color: #151318;
+  color: #111015;
   font-family: "Avenir Next", "Helvetica Neue", Arial, "Noto Sans SC", "PingFang SC", sans-serif;
-  overflow-x: hidden;
 }
 
-button,
-input,
-textarea,
-select {
+button, input, textarea, select {
   font: inherit;
 }
 
-.portra-app {
-  min-height: 100vh;
-  background: #e6e2e0;
-  padding-bottom: 56px;
-}
-
-.portra-main-shell {
-  width: min(1180px, calc(100vw - 48px));
-  margin: 0 auto;
-  padding: 26px 0 0;
-}
-
-.portra-header {
-  position: sticky;
-  top: 0;
-  z-index: 80;
-  height: 72px;
-  background: #f2ede6;
-  border-bottom: 1px solid rgba(21,19,24,.12);
-  box-shadow: 0 1px 0 rgba(255,255,255,.55) inset;
-}
-
-.portra-header-inner {
-  width: min(1180px, calc(100vw - 48px));
-  height: 72px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-}
-
-.portra-wordmark {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  min-width: 168px;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  padding: 0;
-  cursor: pointer;
-}
-
-.portra-wordmark-text {
-  font-family: Didot, "Bodoni 72", Georgia, serif;
-  font-size: 32px;
-  line-height: .9;
-  letter-spacing: -.04em;
-  font-weight: 500;
-}
-
-.portra-wordmark-text .t {
-  color: #0d2fb2;
-}
-
-.portra-wordmark-text .a {
-  color: #f85104;
-}
-
-.portra-wordmark-sub {
-  font-size: 10px;
-  letter-spacing: .22em;
-  color: #686b70;
-  text-transform: uppercase;
-  margin-bottom: 2px;
-}
-
-.portra-nav {
-  display: flex;
-  align-items: center;
-  gap: 34px;
-  height: 100%;
-}
-
-.portra-nav-item {
-  position: relative;
-  height: 72px;
-  display: flex;
-  align-items: center;
-  border: 0;
-  background: transparent;
-  color: #333842;
-  font-size: 15px;
-  letter-spacing: .12em;
-  transition: .2s;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.portra-nav-item:hover {
-  color: #0d2fb2;
-  transform: translateY(-1px);
-}
-
-.portra-nav-item.active {
-  color: #0d2fb2;
-  font-weight: 700;
-}
-
-.portra-nav-item.active::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: 26px;
-  height: 3px;
-  border-radius: 999px;
-  background: #0d2fb2;
-  transform: translateX(-50%);
-}
-
-.portra-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 220px;
-  justify-content: flex-end;
-}
-
-.portra-role-toggle {
-  display: flex;
-  background: #fffaf2;
-  border: 1px solid rgba(21,19,24,.12);
-  border-radius: 999px;
-  padding: 4px;
-}
-
-.portra-role-btn {
-  border: 0;
-  background: transparent;
-  border-radius: 999px;
-  padding: 8px 13px;
-  font-size: 13px;
-  letter-spacing: .08em;
-  color: #3d4148;
-}
-
-.portra-role-btn.active {
-  background: #0d2fb2;
-  color: #fff;
-}
-
-.portra-role-btn:disabled {
-  cursor: default;
-  opacity: 1;
-}
-
-.portra-role-pill {
-  display: inline-flex;
-  align-items: center;
-  min-height: 38px;
-  border-radius: 999px;
-  background: #fffaf2;
-  border: 1px solid rgba(21,19,24,.12);
-  color: #3d4148;
-  padding: 0 14px;
-  font-size: 13px;
-  letter-spacing: .08em;
-}
-
-.portra-icon-btn {
-  height: 38px;
-  border: 1px solid rgba(21,19,24,.12);
-  border-radius: 999px;
-  background: #f9f5ee;
-  color: #0d2fb2;
-  padding: 0 13px;
-  cursor: pointer;
-}
-
-.portra-avatar {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #0d2fb2, #3857c8 45%, #f85104);
-  border: 3px solid #f4efe8;
-  box-shadow: 0 0 0 1px rgba(21,19,24,.12);
-}
-
 .camera-word {
-  font-family: Didot, "Bodoni 72", Georgia, serif;
-  font-weight: 600;
-  letter-spacing: -.04em;
+  font-family: "Bodoni 72", "Didot", "Baskerville", "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  font-weight: 900;
+  letter-spacing: 0.04em;
   line-height: 1;
   display: inline-flex;
   align-items: center;
-  color: #0d2fb2;
-  background: none;
-  text-shadow: none;
 }
 
-.camera-hero-word,
+.camera-hero-word {
+  color: #111015;
+  text-shadow: 0 12px 28px rgba(13, 47, 178, 0.16);
+}
+
 .camera-nav-word {
+  font-size: 1.56rem;
+}
+
+.portra-word-t {
   color: #0d2fb2;
-  background: none;
-  background-clip: initial;
-  -webkit-background-clip: initial;
-  text-shadow: none;
+}
+
+.portra-word-a {
+  color: #f85104;
+}
+
+.portra-word-sub {
+  color: #5d6167;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  line-height: 1.1;
+  text-transform: uppercase;
 }
 
 .brand-lockup {
@@ -237,7 +65,7 @@ select {
   object-fit: cover;
   object-position: center;
   border-radius: 50%;
-  filter: drop-shadow(0 8px 18px rgba(21,19,24,.12));
+  filter: drop-shadow(0 8px 18px rgba(13, 47, 178, 0.2));
   flex: 0 0 auto;
 }
 
@@ -248,7 +76,7 @@ select {
 .brand-logo-hero {
   width: clamp(116px, 14vw, 156px);
   height: clamp(116px, 14vw, 156px);
-  filter: drop-shadow(0 18px 42px rgba(21,19,24,.14));
+  filter: drop-shadow(0 18px 42px rgba(13, 47, 178, 0.24));
 }
 
 .brand-lockup-hero .camera-word {
@@ -265,19 +93,21 @@ select {
   --filmstrip-height: clamp(180px, 24vh, 260px);
   position: relative;
   overflow: hidden;
-  background: #e6e2e0;
 }
 
 .login-choice-page::after {
   content: "";
   position: absolute;
   inset: 0;
-  z-index: 1;
   pointer-events: none;
-  opacity: .36;
+}
+
+.login-choice-page::after {
+  z-index: 1;
+  opacity: 0.36;
   background:
-    linear-gradient(180deg, rgba(248,243,235,.42) 0%, rgba(248,243,235,.08) 44%, rgba(230,226,224,.26) 100%),
-    linear-gradient(110deg, transparent 0%, rgba(255,250,242,.22) 45%, transparent 74%);
+    linear-gradient(180deg, rgba(248, 243, 235, 0.42) 0%, rgba(248, 243, 235, 0.08) 44%, rgba(230, 226, 224, 0.26) 100%),
+    linear-gradient(110deg, transparent 0%, rgba(248, 243, 235, 0.22) 45%, transparent 74%);
 }
 
 .login-brand-zone {
@@ -308,7 +138,7 @@ select {
 }
 
 .login-entry-button-late {
-  animation-delay: .18s;
+  animation-delay: 0.18s;
 }
 
 @keyframes loginButtonBounce {
@@ -328,8 +158,9 @@ select {
   width: 100%;
   height: var(--filmstrip-height);
   overflow: hidden;
-  background: linear-gradient(90deg, rgba(230,226,224,.95), rgba(230,226,224,0) 14%, rgba(230,226,224,0) 86%, rgba(230,226,224,.95));
-  box-shadow: 0 -18px 42px rgba(21,19,24,.12);
+  background:
+    linear-gradient(90deg, rgba(230, 226, 224, 0.95), rgba(230, 226, 224, 0) 14%, rgba(230, 226, 224, 0) 86%, rgba(230, 226, 224, 0.95));
+  box-shadow: 0 -18px 42px rgba(13, 47, 178, 0.14);
 }
 
 .filmstrip-title {
@@ -339,25 +170,13 @@ select {
   left: 0;
   width: 100%;
   text-align: center;
-  font-family: Didot, "Bodoni 72", Georgia, serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: clamp(1.45rem, 4vw, 3.1rem);
-  font-weight: 600;
+  font-weight: 800;
   line-height: 1;
-  color: #0d2fb2;
-  text-shadow: none;
+  color: #111015;
+  text-shadow: 0 8px 24px rgba(13, 47, 178, 0.16);
   pointer-events: none;
-}
-
-.filmstrip-reel {
-  position: relative;
-  width: 100vw;
-  height: 100%;
-  flex: 0 0 100vw;
-  box-sizing: border-box;
-  overflow: hidden;
-  background: linear-gradient(180deg, #0d2fb2 0%, #092585 54%, #3857c8 100%);
-  border-top: 4px solid rgba(248,243,235,.96);
-  border-bottom: 4px solid rgba(248,243,235,.96);
 }
 
 .filmstrip-track {
@@ -372,6 +191,18 @@ select {
   animation: filmstripSlide 42s linear infinite;
 }
 
+.filmstrip-reel {
+  position: relative;
+  width: 100vw;
+  height: 100%;
+  flex: 0 0 100vw;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: linear-gradient(180deg, #092585 0%, #0d2fb2 54%, #092585 100%);
+  border-top: 4px solid rgba(248, 243, 235, 0.96);
+  border-bottom: 4px solid rgba(248, 243, 235, 0.96);
+}
+
 .filmstrip-reel::before,
 .filmstrip-reel::after {
   content: "";
@@ -380,10 +211,10 @@ select {
   left: 0;
   width: 100%;
   height: 18px;
-  background-image: radial-gradient(circle, rgba(248,243,235,.92) 0 42%, transparent 44%);
+  background-image: radial-gradient(circle, rgba(248, 243, 235, 0.92) 0 42%, transparent 44%);
   background-size: 34px 18px;
   border-radius: 3px;
-  opacity: .95;
+  opacity: 0.95;
 }
 
 .filmstrip-reel::before {
@@ -404,6 +235,9 @@ select {
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  gap: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 .film-frame {
@@ -414,6 +248,7 @@ select {
   align-items: center;
   justify-content: center;
   padding: 4px;
+  box-sizing: border-box;
 }
 
 .film-photo {
@@ -423,7 +258,7 @@ select {
   display: block;
   object-fit: cover;
   object-position: top center;
-  border: 4px solid rgba(248,243,235,.94);
+  border: 4px solid rgba(248, 243, 235, 0.94);
   overflow: hidden;
 }
 
@@ -452,35 +287,98 @@ select {
   display: block;
 }
 
-@media (max-width: 760px) {
-  .portra-header {
-    height: auto;
+.portra-section-header {
+  position: relative;
+  padding-left: 16px;
+}
+
+.portra-section-header::before {
+  content: "";
+  position: absolute;
+  inset: 2px auto 2px 0;
+  width: 5px;
+  border-radius: 999px;
+  background: #0d2fb2;
+}
+
+.portra-section-kicker {
+  color: #0d2fb2;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+}
+
+.portra-toolbar {
+  background: rgba(248, 243, 235, 0.92) !important;
+  border-color: rgba(21, 19, 24, 0.12) !important;
+  box-shadow: 0 12px 28px rgba(21, 19, 24, 0.06);
+}
+
+.portra-ticket-card {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(21, 19, 24, 0.12) !important;
+  background: rgba(248, 243, 235, 0.96) !important;
+  box-shadow: 0 12px 24px rgba(21, 19, 24, 0.07);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.portra-ticket-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 6px;
+  background: #0d2fb2;
+}
+
+.portra-ticket-card::after {
+  content: "";
+  position: absolute;
+  right: 18px;
+  bottom: 12px;
+  width: 72px;
+  height: 14px;
+  opacity: 0.14;
+  background: repeating-linear-gradient(90deg, #111015 0 2px, transparent 2px 5px, #111015 5px 6px, transparent 6px 10px);
+}
+
+.portra-ticket-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(13, 47, 178, 0.42) !important;
+  box-shadow: 0 18px 34px rgba(13, 47, 178, 0.13);
+}
+
+.portra-detail-ticket {
+  position: relative;
+  overflow: hidden;
+  background: rgba(248, 243, 235, 0.96) !important;
+  border-color: rgba(21, 19, 24, 0.12) !important;
+  box-shadow: 0 18px 36px rgba(21, 19, 24, 0.08);
+}
+
+.portra-detail-ticket::before {
+  content: "PORTRA / REQUEST NOTE";
+  display: block;
+  margin: -20px -20px 18px;
+  padding: 9px 20px;
+  color: #fff;
+  background: #0d2fb2;
+  font-size: 0.65rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+}
+
+.portra-system-card {
+  background: rgba(244, 239, 232, 0.9) !important;
+  border-color: rgba(21, 19, 24, 0.12) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portra-ticket-card {
+    transition: none;
   }
 
-  .portra-header-inner {
-    height: auto;
-    min-height: 72px;
-    flex-wrap: wrap;
-    padding: 14px 0;
-  }
-
-  .portra-nav {
-    order: 3;
-    width: 100%;
-    justify-content: space-between;
-    gap: 10px;
-  }
-
-  .portra-nav-item {
-    height: 38px;
-    font-size: 13px;
-  }
-
-  .portra-main-shell {
-    width: min(100vw - 28px, 1180px);
-  }
-
-  .portra-wordmark-sub {
-    display: none;
+  .portra-ticket-card:hover {
+    transform: none;
   }
 }

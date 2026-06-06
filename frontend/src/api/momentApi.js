@@ -15,14 +15,17 @@ export const momentApi = {
   create(body, currentUser) {
     return request('/moments', { method: 'POST', body: JSON.stringify(body) }, currentUser)
   },
+  update(momentId, body, currentUser) {
+    return request(`/moments/${momentId}`, { method: 'PUT', body: JSON.stringify(body) }, currentUser)
+  },
   detail(momentId, currentUser) {
     return request(`/moments/${momentId}`, {}, currentUser)
   },
   like(momentId, currentUser) {
-    return request(`/moments/${momentId}/like`, { method: 'POST' }, currentUser)
+    return request(`/moments/${momentId}/like`, { method: 'PUT' }, currentUser)
   },
   favorite(momentId, currentUser) {
-    return request(`/moments/${momentId}/favorite`, { method: 'POST' }, currentUser)
+    return request(`/moments/${momentId}/favorite`, { method: 'PUT' }, currentUser)
   },
   delete(momentId, currentUser) {
     return request(`/moments/${momentId}`, { method: 'DELETE' }, currentUser)

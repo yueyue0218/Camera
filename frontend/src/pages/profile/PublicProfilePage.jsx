@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
-import { fileApi, momentApi, reviewApi, userApi } from '../../api.js'
+import { creditApi, fileApi, momentApi, reviewApi, userApi } from '../../api.js'
 import {
   formatShortTime,
   getLocalReviewsByTarget,
+  isFollowing,
   isApiUnavailable,
   mergeReviewLists,
   readUserProfiles,
@@ -23,6 +24,7 @@ export function PublicProfilePage() {
   const [publicProfile, setPublicProfile] = useState(null)
   const [moments, setMoments] = useState([])
   const [reviews, setReviews] = useState([])
+  const [creditSummary, setCreditSummary] = useState(null)
   const [avatarUrl, setAvatarUrl] = useState('')
   const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState(null)
@@ -38,10 +40,12 @@ export function PublicProfilePage() {
     let cancelled = false
     async function load() {
       setLoading(true)
-      const [profileResult, momentsResult, reviewsResult, myFollowersResult] = await Promise.allSettled([
+      const [profileResult, briefResult, momentsResult, reviewsResult, creditResult, myFollowersResult] = await Promise.allSettled([
         userApi.publicProfile(profileUserId, currentUser, profileRole),
+        userApi.brief(profileUserId, currentUser),
         momentApi.list({ authorId: profileUserId, authorRole: profileRole }, currentUser),
         reviewApi.listByUser(profileUserId, currentUser),
+        creditApi.summary(profileUserId, currentUser),
         userApi.followers(currentUser.userId, currentUser),
       ])
       if (cancelled) return
@@ -49,6 +53,16 @@ export function PublicProfilePage() {
       if (profileResult.status === 'fulfilled' && profileResult.value) {
         setPublicProfile(profileResult.value)
         setFollowedByMe(Boolean(profileResult.value.followedByCurrentUser))
+      } else if (briefResult.status === 'fulfilled' && briefResult.value) {
+        const storedProfile = readUserProfiles()[String(profileUserId)] || {}
+        setPublicProfile({
+          ...storedProfile,
+          ...briefResult.value,
+          userId: briefResult.value.userId || profileUserId,
+          currentRole: profileRole || storedProfile.currentRole || storedProfile.role || 'CUSTOMER',
+          followedByCurrentUser: isFollowing(profileUserId)
+        })
+        setFollowedByMe(isFollowing(profileUserId))
       } else if (profileResult.status === 'rejected' && !isApiUnavailable(profileResult.reason)) {
         setNotice({ type: 'warn', text: '无法加载完整资料，显示本地缓存数据' })
       }
@@ -62,6 +76,7 @@ export function PublicProfilePage() {
 
       const remoteReviews = reviewsResult.status === 'fulfilled' ? reviewsResult.value : []
       setReviews(mergeReviewLists(remoteReviews, getLocalReviewsByTarget(profileUserId)))
+      setCreditSummary(creditResult.status === 'fulfilled' ? creditResult.value : null)
 
       setLoading(false)
     }
@@ -103,11 +118,19 @@ export function PublicProfilePage() {
       } else {
         await userApi.follow(profileUserId, currentUser, profileRole)
       }
-      toggleFollowLocal(profileUserId, currentUser.userId)
+      if (isFollowing(profileUserId) === wasFollowed) {
+        toggleFollowLocal(profileUserId, currentUser.userId)
+      }
       setNotice(null)
     } catch (error) {
-      setFollowedByMe(wasFollowed)
-      setNotice({ type: 'err', text: error.message })
+      if (isApiUnavailable(error)) {
+        const nextFollowed = toggleFollowLocal(profileUserId, currentUser.userId)
+        setFollowedByMe(nextFollowed)
+        setNotice(null)
+      } else {
+        setFollowedByMe(wasFollowed)
+        setNotice({ type: 'err', text: error.message })
+      }
     }
     setFollowLoading(false)
   }
@@ -148,7 +171,7 @@ export function PublicProfilePage() {
   const gender = publicProfile?.gender
   const genderText = gender === 'MALE' ? '男' : gender === 'FEMALE' ? '女' : '保密'
   const bio = publicProfile?.bio || storedProfile.bio || ''
-  const creditScore = publicProfile?.creditScore ?? storedProfile.creditScore ?? null
+  const creditScore = creditSummary?.creditScore ?? publicProfile?.creditScore ?? storedProfile.creditScore ?? null
   const cityPin = pp?.cityCode || publicProfile?.school || publicProfile?.cityCode || storedProfile.school || 'Portra'
   const cityMeta = pp?.cityCode || publicProfile?.cityCode || '未知城市'
 
@@ -157,8 +180,14 @@ export function PublicProfilePage() {
     .slice(0, 6)
     .map(m => ({ imageData: m.imageData, momentId: m.momentId }))
 
-  const providerReviews = reviews.filter(r => r.direction === 'CUSTOMER_TO_PROVIDER')
-  const customerReviews = reviews.filter(r => r.direction === 'PROVIDER_TO_CUSTOMER')
+  const providerReviews = reviews.filter(r =>
+    r.direction === 'CUSTOMER_TO_PROVIDER' ||
+    (!r.direction && isProvider && Number(r.targetUserId) === profileUserId)
+  )
+  const customerReviews = reviews.filter(r =>
+    r.direction === 'PROVIDER_TO_CUSTOMER' ||
+    (!r.direction && !isProvider && Number(r.targetUserId) === profileUserId)
+  )
 
   const styleTags = (() => {
     const raw = pp?.styleTags
@@ -232,7 +261,7 @@ export function PublicProfilePage() {
             </div>
           ) : (
             <div className="metric-grid">
-              <div className="metric"><b>{creditScore ?? '—'}</b><span>信用评分</span></div>
+              <button className="metric metric-button" type="button" onClick={() => navigate(`/users/${profileUserId}/credit`)}><b>{creditScore ?? '—'}</b><span>信用评分</span></button>
               <div className="metric"><b>{publicProfile?.followerCount ?? '—'}</b><span>粉丝</span></div>
               <div className="metric"><b>{publicProfile?.followingCount ?? '—'}</b><span>关注</span></div>
               <div className="metric"><b>{publicProfile?.momentCount ?? moments.length}</b><span>动态数</span></div>

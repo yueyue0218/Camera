@@ -172,8 +172,8 @@ CALL local_patch_update_column_from_old_if_both_exist('real_name_certifications'
 
 CALL local_patch_create_index_if_missing(
     'real_name_certifications',
-    'idx_cert_user_id',
-    'INDEX `idx_cert_user_id` (`user_id`)'
+    'idx_user_id',
+    'INDEX `idx_user_id` (`user_id`)'
 );
 
 -- 2. audit_records: add current Java fields and backfill from P3 fields.

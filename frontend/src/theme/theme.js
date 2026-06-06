@@ -1,19 +1,36 @@
 import { createTheme } from '@mui/material/styles'
 
+export const portraTokens = {
+  background: '#e6e2e0',
+  surface: '#f4efe8',
+  surfaceAlt: '#ebe6dd',
+  paper: '#f8f3eb',
+  primary: '#0d2fb2',
+  primaryDark: '#092585',
+  secondary: '#f7ce3a',
+  accent: '#f85104',
+  textPrimary: '#111015',
+  textSecondary: '#5d6167',
+  border: 'rgba(21, 19, 24, 0.12)',
+  borderStrong: 'rgba(21, 19, 24, 0.18)',
+  muted: '#777b82'
+}
+
 export const theme = createTheme({
   palette: {
-    primary: { main: '#0d2fb2', light: '#3857c8', dark: '#092585' },
-    secondary: { main: '#f85104', light: '#ff8d47', dark: '#c53b05' },
-    warning: { main: '#f7ce3a' },
-    background: { default: '#e6e2e0', paper: '#f8f3eb' },
-    text: { primary: '#151318', secondary: '#686b70' },
-    divider: 'rgba(21,19,24,.12)'
+    primary: { main: portraTokens.primary, light: '#dbe3ff', dark: portraTokens.primaryDark },
+    secondary: { main: portraTokens.secondary, light: '#fff1a8', dark: '#b08b00' },
+    background: { default: portraTokens.background, paper: portraTokens.paper },
+    text: { primary: portraTokens.textPrimary, secondary: portraTokens.textSecondary },
+    divider: portraTokens.border
   },
-  shape: { borderRadius: 8 },
+  shape: { borderRadius: 18 },
   typography: {
     fontFamily: '"Avenir Next", "Helvetica Neue", Arial, "Noto Sans SC", "PingFang SC", sans-serif',
-    h5: { fontWeight: 800 },
-    h6: { fontWeight: 800 }
+    h4: { fontWeight: 800, letterSpacing: '0.06em' },
+    h5: { fontWeight: 800, letterSpacing: '0.05em' },
+    h6: { fontWeight: 800, letterSpacing: '0.04em' },
+    button: { fontWeight: 700, letterSpacing: '0.08em' }
   },
   components: {
     MuiCssBaseline: {
@@ -36,7 +53,7 @@ export const theme = createTheme({
           '--shadow-hover': '0 6px 20px rgba(13,47,178,0.10)'
         },
         body: {
-          backgroundColor: '#e6e2e0',
+          backgroundColor: portraTokens.background,
           backgroundImage: 'none'
         }
       }
@@ -44,24 +61,51 @@ export const theme = createTheme({
     MuiAppBar: {
       styleOverrides: {
         root: {
-          backgroundColor: '#f2ede6',
-          backdropFilter: 'none'
+          backgroundColor: 'rgba(248, 243, 235, 0.92)',
+          backdropFilter: 'blur(14px)',
+          borderColor: portraTokens.border
         }
       }
     },
     MuiPaper: {
       styleOverrides: {
         root: {
-          backgroundColor: 'rgba(248,243,235,.9)',
-          borderColor: 'rgba(21,19,24,.12)'
+          backgroundColor: 'rgba(248, 243, 235, 0.94)',
+          borderColor: portraTokens.border
         }
       }
     },
     MuiCard: {
       styleOverrides: {
         root: {
-          backgroundColor: 'rgba(248,243,235,.9)',
-          borderColor: 'rgba(21,19,24,.12)'
+          backgroundColor: 'rgba(248, 243, 235, 0.96)',
+          borderColor: portraTokens.border,
+          transition: 'transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease'
+        }
+      }
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: 999,
+          minHeight: 42,
+          textTransform: 'none'
+        },
+        containedPrimary: {
+          boxShadow: '0 10px 22px rgba(13, 47, 178, 0.18)'
+        }
+      }
+    },
+    MuiChip: {
+      styleOverrides: {
+        root: { borderRadius: 999, fontWeight: 700 }
+      }
+    },
+    MuiOutlinedInput: {
+      styleOverrides: {
+        root: {
+          backgroundColor: 'rgba(248, 243, 235, 0.86)',
+          borderRadius: 18
         }
       }
     }

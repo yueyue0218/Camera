@@ -64,6 +64,7 @@ function normalizedUserId(session, demoUser) {
 
 function normalizeSession(session) {
   if (!session?.user) return null
+  if (session.user.role === 'ADMIN') return null
   const role = session.user.role === 'PROVIDER' ? 'PROVIDER' : 'CUSTOMER'
   const demoUser = USERS[roleToUserKey(role)]
   const userId = normalizedUserId(session, demoUser)

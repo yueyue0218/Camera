@@ -784,7 +784,7 @@ function HallPage() {
       <SectionHeader title="需求大厅" subtitle="浏览约拍需求，服务方可响应，需求方可接受响应。" />
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
 
-      <Paper variant="outlined" sx={{ p: 2 }}>
+      <Paper className="portra-toolbar" variant="outlined" sx={{ p: 2 }}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'flex-end' }}>
           <Stack spacing={0.5} sx={{ minWidth: { md: 108 }, justifyContent: 'flex-end' }}>
             <Typography component="label" htmlFor="hall-filter-city" variant="caption" color="text.secondary" fontWeight={800}>
@@ -882,6 +882,7 @@ function HallPage() {
         <Stack spacing={1.5}>
           {demands.map(demand => (
             <Card
+              className="portra-ticket-card"
               key={demand.demandId}
               variant="outlined"
               onClick={() => openDemand(demand)}
@@ -903,7 +904,7 @@ function HallPage() {
           {!demands.length && <EmptyCard text="暂无需求" />}
         </Stack>
 
-        <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 }, minHeight: 420 }}>
+        <Paper className="portra-detail-ticket" variant="outlined" sx={{ p: { xs: 2, md: 2.5 }, minHeight: 420 }}>
           {!selectedDemand ? (
             <EmptyCard text="选择一条需求查看详情" />
           ) : (
@@ -942,7 +943,7 @@ function HallPage() {
               ]} />
 
               {canInvite && (
-                <Paper variant="outlined" sx={{ p: 2, bgcolor: 'rgba(250, 244, 255, 0.86)' }}>
+                <Paper className="portra-system-card" variant="outlined" sx={{ p: 2 }}>
                   <Stack spacing={1.5}>
                     <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
                       <Typography variant="h6">发起邀请</Typography>
@@ -974,7 +975,7 @@ function HallPage() {
               )}
 
               {canSeeResponses && (
-                <Paper variant="outlined" sx={{ p: 2, bgcolor: 'rgba(250, 244, 255, 0.86)' }}>
+                <Paper className="portra-system-card" variant="outlined" sx={{ p: 2 }}>
                   <Stack spacing={1.5}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center">
                       <Typography variant="h6">响应列表</Typography>
@@ -2443,6 +2444,14 @@ function OrdersPage() {
                     ]} />
                   </>
                 )}
+                <Stack direction="row" spacing={1} flexWrap="wrap">
+                  <Button variant="outlined" onClick={() => navigate(`/orders/${selectedOrder.orderId}/delivery`)}>
+                    查看交付
+                  </Button>
+                  <Button variant="outlined" onClick={() => navigate(`/orders/${selectedOrder.orderId}/reviews`)}>
+                    D 线评价
+                  </Button>
+                </Stack>
                 {action && canShowOrderNormalActions(selectedOrder) ? (
                   <Button
                     variant="contained"
@@ -4320,7 +4329,8 @@ function formatShortTime(value) {
 
 function SectionHeader({ title, subtitle }) {
   return (
-    <Stack spacing={0.5}>
+    <Stack className="portra-section-header" spacing={0.5}>
+      <Typography className="portra-section-kicker" variant="overline">PORTRA / CAMERA</Typography>
       <Typography variant="h5">{title}</Typography>
       <Typography color="text.secondary">{subtitle}</Typography>
     </Stack>
@@ -4374,10 +4384,28 @@ function ProfileMetrics({ stats, compact = false }) {
 }
 
 function ReviewList({ reviews, emptyText = '暂无历史评价' }) {
+  const navigate = useNavigate()
+  const { currentUser } = useAuth()
+
   return reviews.length ? (
     <Stack spacing={1.2}>
-      {reviews.map(review => (
-        <Paper key={review.reviewId || `${review.orderId}-${review.direction}-${review.createdAt}`} variant="outlined" sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
+      {reviews.map(review => {
+        const canOpenOrder = [review.reviewerId, review.targetUserId].some(userId => Number(userId) === Number(currentUser.userId))
+        return (
+        <Paper
+          key={review.reviewId || `${review.orderId}-${review.direction}-${review.createdAt}`}
+          variant="outlined"
+          role={canOpenOrder ? 'button' : undefined}
+          tabIndex={canOpenOrder ? 0 : undefined}
+          onClick={canOpenOrder ? () => navigate(`/orders?orderId=${review.orderId}`) : undefined}
+          onKeyDown={canOpenOrder ? event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              navigate(`/orders?orderId=${review.orderId}`)
+            }
+          } : undefined}
+          sx={{ p: 1.5, bgcolor: '#fbfdff', cursor: canOpenOrder ? 'pointer' : 'default' }}
+        >
           <Stack spacing={0.8}>
             <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
               <Typography fontWeight={800}>{directionLabel(review.direction)} · 订单 {review.orderId}</Typography>
@@ -4393,7 +4421,7 @@ function ReviewList({ reviews, emptyText = '暂无历史评价' }) {
             </Typography>
           </Stack>
         </Paper>
-      ))}
+      )})}
     </Stack>
   ) : <EmptyCard text={emptyText} />
 }
@@ -4589,7 +4617,7 @@ export {
   ProfilePage,
   PublicProfilePage,
   PublishPage,
-  RegisterPage
+  RegisterPage11不要恢复原版，本来个人主页前端
 }
 
 export default App

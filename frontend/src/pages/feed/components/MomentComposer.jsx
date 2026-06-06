@@ -1,28 +1,19 @@
-import { Box, Button, IconButton, Paper, Stack, TextField, Typography } from '@mui/material'
+import { useMemo } from 'react'
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Stack, TextField, Typography } from '@mui/material'
 import AddPhotoAlternateRoundedIcon from '@mui/icons-material/AddPhotoAlternateRounded'
-import AlternateEmailRoundedIcon from '@mui/icons-material/AlternateEmailRounded'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 
 function ImageGrid({ images, onRemove }) {
   if (!images.length) return null
   return (
-    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-      {images.map((src, i) => (
-        <Box key={i} sx={{ position: 'relative', width: 88, height: 88, flexShrink: 0 }}>
-          <Box
-            component="img"
-            src={src}
-            alt={`图片${i + 1}`}
-            sx={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 1, display: 'block' }}
-          />
+    <Box className="moment-composer__grid">
+      {images.map((src, index) => (
+        <Box key={src || index} className="moment-composer__thumb">
+          <Box component="img" src={src} alt={`照片 ${index + 1}`} />
           <IconButton
             size="small"
-            onClick={() => onRemove(i)}
-            sx={{
-              position: 'absolute', top: -8, right: -8,
-              bgcolor: 'grey.800', color: '#fff', p: 0.25,
-              '&:hover': { bgcolor: 'error.main' }
-            }}
+            className="moment-composer__remove"
+            onClick={() => onRemove(index)}
           >
             <CloseRoundedIcon sx={{ fontSize: 14 }} />
           </IconButton>
@@ -33,70 +24,66 @@ function ImageGrid({ images, onRemove }) {
 }
 
 export function MomentComposer({
+  open,
+  mode = 'create',
   draft,
-  mentionsText,
   imageDataList,
   onDraftChange,
-  onMentionsChange,
   onChooseImages,
   onRemoveImage,
   onCancel,
-  onPublish
+  onPublish,
+  submitting = false
 }) {
-  const count = imageDataList.length
-  const full = count >= 9
+  const title = mode === 'edit' ? '编辑动态' : '发布动态'
+  const submitLabel = mode === 'edit' ? '保存修改' : '发布动态'
+  const disabled = submitting || !draft.title.trim() || !draft.content.trim() || imageDataList.length === 0
+  const countText = useMemo(() => `${imageDataList.length}/9`, [imageDataList.length])
 
   return (
-    <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
-      <Stack spacing={2}>
-        <TextField
-          label="动态题目"
-          value={draft.title}
-          onChange={event => onDraftChange({ ...draft, title: event.target.value })}
-          required
-        />
-        <TextField
-          label="动态文案"
-          multiline
-          minRows={3}
-          value={draft.content}
-          onChange={event => onDraftChange({ ...draft, content: event.target.value })}
-        />
-        <TextField
-          label="@"
-          placeholder="输入昵称或编号，用逗号分隔"
-          value={mentionsText}
-          onChange={event => onMentionsChange(event.target.value)}
-          InputProps={{ startAdornment: <AlternateEmailRoundedIcon color="action" sx={{ mr: 1 }} /> }}
-        />
-
-        <ImageGrid images={imageDataList} onRemove={onRemoveImage} />
-
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between" alignItems={{ sm: 'center' }}>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Button
-              component="label"
-              variant="outlined"
-              startIcon={<AddPhotoAlternateRoundedIcon />}
-              disabled={full}
-            >
-              {full ? '已达上限' : '添加照片'}
-              <input hidden type="file" accept="image/*" multiple onChange={onChooseImages} />
-            </Button>
-            {count > 0 && (
-              <Typography variant="caption" color="text.secondary">
-                {count}/9
-              </Typography>
-            )}
+    <Dialog open={open} onClose={onCancel} maxWidth="md" fullWidth>
+      <DialogTitle className="moment-composer__title">
+        <span>{title}</span>
+        <span className="moment-composer__stamp">PORTRA FILE</span>
+      </DialogTitle>
+      <DialogContent className="moment-composer">
+        <Stack spacing={2}>
+          <Typography className="moment-composer__lead">
+            分享今天想留下来的画面，或者补一条没写完整的记录。
+          </Typography>
+          <TextField
+            label="标题"
+            value={draft.title}
+            onChange={event => onDraftChange({ ...draft, title: event.target.value })}
+            required
+            fullWidth
+          />
+          <TextField
+            label="正文"
+            multiline
+            minRows={4}
+            value={draft.content}
+            onChange={event => onDraftChange({ ...draft, content: event.target.value })}
+            fullWidth
+          />
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between" alignItems={{ sm: 'center' }}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Button component="label" variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />}>
+                添加照片
+                <input hidden type="file" accept="image/*" multiple onChange={onChooseImages} />
+              </Button>
+              <Typography variant="caption" color="text.secondary">{countText}</Typography>
+            </Stack>
           </Stack>
-          <Stack direction="row" spacing={1}>
-            <Button variant="text" color="inherit" onClick={onCancel}>取消</Button>
-            <Button variant="contained" onClick={onPublish} disabled={!draft.title.trim() || count === 0}>
-              发布
-            </Button>
-          </Stack>
+          <ImageGrid images={imageDataList} onRemove={onRemoveImage} />
         </Stack>
-      </Stack>
-    </Paper>
+      </DialogContent>
+      <DialogActions className="moment-composer__actions">
+        <Button onClick={onCancel} color="inherit">取消</Button>
+        <Button variant="contained" onClick={onPublish} disabled={disabled}>
+          {submitting ? '提交中...' : submitLabel}
+        </Button>
+      </DialogActions>
+    </Dialog>
   )
 }

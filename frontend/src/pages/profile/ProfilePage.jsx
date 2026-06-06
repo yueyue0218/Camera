@@ -133,11 +133,21 @@ export function ProfilePage() {
       userApi.followers(currentUser.userId, currentUser)
     ])
     if (myProfileRes.status === 'fulfilled' && myProfileRes.value) {
+      const role = myProfileRes.value.currentRole || myProfileRes.value.role || currentUser.role
+      const nickname = myProfileRes.value.nickname || currentUser.nickname
+      const bio = myProfileRes.value.bio || currentUser.bio || currentUser.description || ''
       updateProfile({
-        customerNickname: myProfileRes.value.customerNickname,
-        customerBio: myProfileRes.value.customerBio,
-        providerNickname: myProfileRes.value.providerNickname,
-        providerBio: myProfileRes.value.providerBio
+        userId: myProfileRes.value.userId || myProfileRes.value.id || currentUser.userId,
+        id: myProfileRes.value.userId || myProfileRes.value.id || currentUser.userId,
+        role,
+        nickname,
+        bio,
+        description: bio,
+        creditScore: myProfileRes.value.creditScore ?? currentUser.creditScore,
+        customerNickname: myProfileRes.value.customerNickname ?? (role === 'CUSTOMER' ? nickname : currentUser.customerNickname),
+        customerBio: myProfileRes.value.customerBio ?? (role === 'CUSTOMER' ? bio : currentUser.customerBio),
+        providerNickname: myProfileRes.value.providerNickname ?? (role === 'PROVIDER' ? nickname : currentUser.providerNickname),
+        providerBio: myProfileRes.value.providerBio ?? (role === 'PROVIDER' ? bio : currentUser.providerBio)
       })
     }
     setMoments(momRes.status === 'fulfilled' ? momRes.value : [])
@@ -325,7 +335,7 @@ export function ProfilePage() {
             <div className="id-label">Portra Credit File</div>
           </div>
           <div className="metric-grid">
-            <div className="metric"><b>{Number(creditScore).toFixed(1)}</b><span>信用评分</span></div>
+            <button className="metric metric-button" type="button" onClick={() => navigate('/profile/credit')}><b>{Number(creditScore).toFixed(1)}</b><span>信用评分</span></button>
             <div className="metric"><b>{completionRate}%</b><span>完成率</span></div>
             <div className="metric"><b>{historicalOrders}</b><span>历史约拍</span></div>
             <div className="metric"><b>{ongoingOrders}</b><span>进行中</span></div>
@@ -561,10 +571,10 @@ export function ProfilePage() {
           {/* Right: Side stack */}
           <aside className="side-stack" style={{height:'auto',minHeight:'var(--dashboard-left-card-height)',overflow:'visible'}}>
             <section className="panel-card">
-              <div className="credit-stamp">
+              <button className="credit-stamp credit-stamp-button" type="button" onClick={() => navigate('/profile/credit')}>
                 <b>{Number(creditScore).toFixed(1)}</b>
                 <span>Portra Credit</span>
-              </div>
+              </button>
               <div className="todo-list">
                 <div className="todo">
                   <div>

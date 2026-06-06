@@ -11,8 +11,6 @@ public class ReserveServicePackageResult {
 
     private Long conversationId;
 
-    private Long scheduleHoldId;
-
     private String status;
 
     private Boolean isAvailable;

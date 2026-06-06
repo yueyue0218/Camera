@@ -1,103 +1,343 @@
-import { useEffect, useState } from 'react'
-import { Box, Alert, Stack } from '@mui/material'
-import { useNavigate } from 'react-router-dom'
-import { USERS, useAuth } from '../../AuthContext.jsx'
-import { momentApi, compressImageToDataUrl, userApi } from '../../api.js'
+﻿import { useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Drawer, MenuItem, Paper, Stack, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material'
+import AddRoundedIcon from '@mui/icons-material/AddRounded'
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
+import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../AuthContext.jsx'
+import { momentApi, userApi, fileApi } from '../../api.js'
+import { compressImageToDataUrl } from '../../utils/index.js'
 import { EmptyFeedCard } from './components/EmptyFeedCard.jsx'
-import { FeedSectionHeader } from './components/FeedSectionHeader.jsx'
-import { FeedToolbar } from './components/FeedToolbar.jsx'
 import { MomentCard } from './components/MomentCard.jsx'
 import { MomentComposer } from './components/MomentComposer.jsx'
-import { parseMentions } from './utils/feedUtils.js'
+import { MomentDetailCard } from './components/MomentDetailCard.jsx'
+import './feed.css'
 
-const FOLLOW_STORAGE_KEY = 'camera-p4-follows'
-const USER_PROFILE_STORAGE_KEY = 'camera-p4-user-profiles'
-
-function readJsonStorage(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? JSON.parse(raw) : fallback
-  } catch {
-    return fallback
-  }
+const roleLabel = {
+  CUSTOMER: '鍗曚富',
+  PROVIDER: '鎽勫奖甯?'
 }
 
-function writeJsonStorage(key, value) {
-  localStorage.setItem(key, JSON.stringify(value))
+function emptyFollowState() {
+  return { CUSTOMER: new Set(), PROVIDER: new Set() }
 }
 
-function readFollows() {
-  return readJsonStorage(FOLLOW_STORAGE_KEY, [])
+function normalizeMoments(list) {
+  return Array.isArray(list) ? list.filter(Boolean) : []
 }
 
-function readUserProfiles() {
-  return readJsonStorage(USER_PROFILE_STORAGE_KEY, {})
-}
-
-function resolveMentionUserId(mention) {
-  const value = String(mention || '').replace(/^@+/, '').trim()
-  if (!value) return null
-  if (/^\d+$/.test(value)) return Number(value)
-  const profiles = readUserProfiles()
-  const storedMatch = Object.entries(profiles).find(([, profile]) => profile?.nickname === value)
-  if (storedMatch) return Number(storedMatch[0])
-  const demoMatch = Object.values(USERS).find(user => user.nickname === value || user.label === value)
-  return demoMatch?.userId || null
-}
-
-function isFollowing(authorId) {
-  return readFollows().some(follow => Number(follow.authorId) === Number(authorId))
-}
-
-function toggleFollow(authorId) {
-  const id = Number(authorId)
-  const follows = readFollows()
-  const exists = follows.some(follow => Number(follow.authorId) === id)
-  const nextFollows = exists
-    ? follows.filter(follow => Number(follow.authorId) !== id)
-    : [{ authorId: id, followedAt: new Date().toISOString() }, ...follows]
-  writeJsonStorage(FOLLOW_STORAGE_KEY, nextFollows)
-  return !exists
+function uniqueAuthorIds(list, currentUserId) {
+  return [...new Set(list.map(item => Number(item.authorId)).filter(id => Number.isFinite(id) && id !== currentUserId))]
 }
 
 export function FeedPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search])
   const { currentUser } = useAuth()
-
-  function openUserProfile(userId, authorRole) {
-    const id = Number(userId)
-    if (!id) return
-    if (id === currentUser.userId) navigate('/profile')
-    else navigate(`/users/${id}${authorRole ? `?role=${authorRole}` : ''}`)
-  }
-  const [moments, setMoments] = useState([])
-  const [query, setQuery] = useState('')
-  const [showComposer, setShowComposer] = useState(false)
-  const [draft, setDraft] = useState({ title: '', content: '' })
-  const [mentionsText, setMentionsText] = useState('')
-  const [imageDataList, setImageDataList] = useState([])
+  const currentRoleKey = String(currentUser.role || 'CUSTOMER').toUpperCase()
+  const avatarUrlsRef = useRef([])
+  const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState(null)
+  const [scope, setScope] = useState('latest')
+  const [viewMode, setViewMode] = useState('square')
+  const [moments, setMoments] = useState([])
+  const [authorProfiles, setAuthorProfiles] = useState({})
+  const [followingMap, setFollowingMap] = useState(emptyFollowState)
+  const [composerOpen, setComposerOpen] = useState(false)
+  const [composerMode, setComposerMode] = useState('create')
+  const [composerMomentId, setComposerMomentId] = useState(null)
+  const [composerDraft, setComposerDraft] = useState({ title: '', content: '' })
+  const [composerImages, setComposerImages] = useState([])
+  const [composerSubmitting, setComposerSubmitting] = useState(false)
+  const [drawerMomentId, setDrawerMomentId] = useState(null)
+  const [drawerLoading, setDrawerLoading] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [menuState, setMenuState] = useState({ momentId: null, anchorEl: null })
+  const initialView = searchParams.get('view')
+  const initialScope = searchParams.get('scope')
+
+  const myMoments = useMemo(
+    () => moments.filter(moment => Number(moment.authorId) === currentUser.userId),
+    [moments, currentUser.userId]
+  )
+  const activeMoments = viewMode === 'mine' ? myMoments : moments
+  const drawerMoment = useMemo(
+    () => moments.find(moment => Number(moment.momentId) === Number(drawerMomentId)) || null,
+    [moments, drawerMomentId]
+  )
 
   useEffect(() => {
-    loadMoments()
-  }, [currentUser.userId])
+    if (initialView === 'mine') {
+      setViewMode('mine')
+    }
+    if (initialScope && ['latest', 'hot', 'following'].includes(initialScope)) {
+      setScope(initialScope)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  async function loadMoments() {
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      setLoading(true)
+      setNotice(null)
+      const params = viewMode === 'mine'
+        ? { authorId: currentUser.userId }
+        : { scope }
+
+      const [momentsResult, customerFollowingResult, providerFollowingResult] = await Promise.allSettled([
+        momentApi.list(params, currentUser),
+        userApi.following(currentUser.userId, currentUser, 'CUSTOMER'),
+        userApi.following(currentUser.userId, currentUser, 'PROVIDER')
+      ])
+
+      if (cancelled) return
+
+      const nextMoments = normalizeMoments(momentsResult.status === 'fulfilled' ? momentsResult.value : [])
+      setMoments(nextMoments)
+      setNotice(momentsResult.status === 'rejected' ? { type: 'error', text: momentsResult.reason?.message || '鍔ㄦ€佸姞杞藉け璐?' } : null)
+
+      const nextFollowing = emptyFollowState()
+      if (customerFollowingResult.status === 'fulfilled') {
+        customerFollowingResult.value.forEach(item => nextFollowing.CUSTOMER.add(Number(item.userId)))
+      }
+      if (providerFollowingResult.status === 'fulfilled') {
+        providerFollowingResult.value.forEach(item => nextFollowing.PROVIDER.add(Number(item.userId)))
+      }
+      setFollowingMap(nextFollowing)
+
+      await loadAuthorProfiles(nextMoments, cancelled)
+      setLoading(false)
+    }
+
+    async function loadAuthorProfiles(list, cancelledFlag) {
+      avatarUrlsRef.current.forEach(url => URL.revokeObjectURL(url))
+      avatarUrlsRef.current = []
+      const ids = uniqueAuthorIds(list, currentUser.userId)
+      const entries = await Promise.all(ids.map(async id => {
+        try {
+          const brief = await userApi.brief(id, currentUser)
+          let avatarData = ''
+          if (brief.avatarFileId) {
+            try {
+              avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser)
+              avatarUrlsRef.current.push(avatarData)
+            } catch {
+              avatarData = ''
+            }
+          }
+          return [id, { nickname: brief.nickname, avatarData }]
+        } catch {
+          return [id, { nickname: `鐢ㄦ埛 ${id}`, avatarData: '' }]
+        }
+      }))
+      if (!cancelledFlag) {
+        const nextProfiles = {}
+        entries.forEach(([id, profile]) => {
+          nextProfiles[id] = profile
+        })
+        nextProfiles[currentUser.userId] = {
+          nickname: currentUser.nickname || currentUser.label || `鐢ㄦ埛 ${currentUser.userId}`,
+          avatarData: currentUser.avatarData || ''
+        }
+        setAuthorProfiles(nextProfiles)
+      }
+    }
+
+    load()
+    return () => {
+      cancelled = true
+      avatarUrlsRef.current.forEach(url => URL.revokeObjectURL(url))
+      avatarUrlsRef.current = []
+    }
+  }, [currentUser.userId, currentRoleKey, currentUser.nickname, currentUser.label, currentUser.avatarData, scope, viewMode])
+
+  useEffect(() => {
+    if (!drawerMomentId) return
+    const selected = moments.find(moment => Number(moment.momentId) === Number(drawerMomentId))
+    if (!selected) {
+      setDrawerMomentId(null)
+    }
+  }, [moments, drawerMomentId])
+
+  function authorProfileFor(moment) {
+    const stored = authorProfiles[Number(moment.authorId)]
+    return stored || {
+      nickname: Number(moment.authorId) === currentUser.userId
+        ? (currentUser.nickname || currentUser.label || `鐢ㄦ埛 ${currentUser.userId}`)
+        : `鐢ㄦ埛 ${moment.authorId}`,
+      avatarData: Number(moment.authorId) === currentUser.userId ? currentUser.avatarData || '' : ''
+    }
+  }
+
+  function isFollowing(authorId, authorRole) {
+    const roleKey = (authorRole || 'CUSTOMER').toUpperCase()
+    return followingMap[roleKey]?.has(Number(authorId)) || false
+  }
+
+  function mergeMoment(nextMoment) {
+    if (!nextMoment) return
+    setMoments(prev => {
+      const found = prev.some(moment => Number(moment.momentId) === Number(nextMoment.momentId))
+      const next = prev.map(moment => (
+        Number(moment.momentId) === Number(nextMoment.momentId)
+          ? { ...moment, ...nextMoment }
+          : moment
+      ))
+      if (!found) {
+        next.unshift(nextMoment)
+      }
+      return next
+    })
+    if (drawerMomentId && Number(drawerMomentId) === Number(nextMoment.momentId)) {
+      setDrawerMomentId(Number(nextMoment.momentId))
+    }
+  }
+
+  function removeMoment(momentId) {
+    setMoments(prev => prev.filter(moment => Number(moment.momentId) !== Number(momentId)))
+    if (drawerMomentId && Number(drawerMomentId) === Number(momentId)) {
+      setDrawerMomentId(null)
+    }
+  }
+
+  function syncFollowState(authorId, authorRole, followed) {
+    const roleKey = (authorRole || 'CUSTOMER').toUpperCase()
+    setFollowingMap(prev => {
+      const next = {
+        CUSTOMER: new Set(prev.CUSTOMER),
+        PROVIDER: new Set(prev.PROVIDER)
+      }
+      if (followed) {
+        next[roleKey].add(Number(authorId))
+      } else {
+        next[roleKey].delete(Number(authorId))
+      }
+      return next
+    })
+  }
+
+  async function refreshPage() {
+    setNotice(null)
+    const params = viewMode === 'mine'
+      ? { authorId: currentUser.userId }
+      : { scope }
+    setLoading(true)
+    const [momentsResult, customerFollowingResult, providerFollowingResult] = await Promise.allSettled([
+      momentApi.list(params, currentUser),
+      userApi.following(currentUser.userId, currentUser, 'CUSTOMER'),
+      userApi.following(currentUser.userId, currentUser, 'PROVIDER')
+    ])
+    const nextMoments = normalizeMoments(momentsResult.status === 'fulfilled' ? momentsResult.value : [])
+    setMoments(nextMoments)
+    if (momentsResult.status === 'rejected') {
+      setNotice({ type: 'error', text: momentsResult.reason?.message || '动态加载失败' })
+    }
+    const nextFollowing = emptyFollowState()
+    if (customerFollowingResult.status === 'fulfilled') {
+      customerFollowingResult.value.forEach(item => nextFollowing.CUSTOMER.add(Number(item.userId)))
+    }
+    if (providerFollowingResult.status === 'fulfilled') {
+      providerFollowingResult.value.forEach(item => nextFollowing.PROVIDER.add(Number(item.userId)))
+    }
+    setFollowingMap(nextFollowing)
+    await (async () => {
+      avatarUrlsRef.current.forEach(url => URL.revokeObjectURL(url))
+      avatarUrlsRef.current = []
+      const ids = uniqueAuthorIds(nextMoments, currentUser.userId)
+      const entries = await Promise.all(ids.map(async id => {
+        try {
+          const brief = await userApi.brief(id, currentUser)
+          let avatarData = ''
+          if (brief.avatarFileId) {
+            try {
+              avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser)
+              avatarUrlsRef.current.push(avatarData)
+            } catch {
+              avatarData = ''
+            }
+          }
+          return [id, { nickname: brief.nickname, avatarData }]
+        } catch {
+          return [id, { nickname: `鐢ㄦ埛 ${id}`, avatarData: '' }]
+        }
+      }))
+      const nextProfiles = {
+        [currentUser.userId]: {
+          nickname: currentUser.nickname || currentUser.label || `鐢ㄦ埛 ${currentUser.userId}`,
+          avatarData: currentUser.avatarData || ''
+        }
+      }
+      entries.forEach(([id, profile]) => {
+        nextProfiles[id] = profile
+      })
+      setAuthorProfiles(nextProfiles)
+    })()
+    if (drawerMomentId && !nextMoments.some(moment => Number(moment.momentId) === Number(drawerMomentId))) {
+      setDrawerMomentId(null)
+    }
+    setLoading(false)
+  }
+
+  function openComposer(moment = null) {
+    if (moment) {
+      setComposerMode('edit')
+      setComposerMomentId(moment.momentId)
+      setComposerDraft({ title: moment.title || '', content: moment.content || '' })
+      setComposerImages((moment.imageDataList?.length ? moment.imageDataList : moment.imageData ? [moment.imageData] : []).slice(0, 9))
+    } else {
+      setComposerMode('create')
+      setComposerMomentId(null)
+      setComposerDraft({ title: '', content: '' })
+      setComposerImages([])
+    }
+    setComposerOpen(true)
+  }
+
+  function openDrawer(momentId) {
+    setDrawerMomentId(momentId)
+  }
+
+  async function handleComposerSubmit() {
+    setComposerSubmitting(true)
     try {
-      setMoments(await momentApi.list({ keyword: query }, currentUser))
+      const payload = {
+        title: composerDraft.title,
+        content: composerDraft.content,
+        imageDataList: composerImages,
+        mentions: []
+      }
+      let savedMoment = null
+      if (composerMode === 'edit') {
+        savedMoment = await momentApi.update(composerMomentId, payload, currentUser)
+      } else {
+        savedMoment = await momentApi.create(payload, currentUser)
+      }
+      setComposerOpen(false)
+      setNotice({ type: 'success', text: composerMode === 'edit' ? '动态已保存' : '动态已发布' })
+      if (savedMoment) {
+        mergeMoment(savedMoment)
+      }
+      if (composerMode === 'create') {
+        await refreshPage()
+      }
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
+    } finally {
+      setComposerSubmitting(false)
     }
   }
 
   async function chooseImages(event) {
     const files = Array.from(event.target.files || [])
     if (!files.length) return
-    const slots = 9 - imageDataList.length
+    const slots = 9 - composerImages.length
     if (slots <= 0) return
     try {
-      const compressed = await Promise.all(files.slice(0, slots).map(f => compressImageToDataUrl(f)))
-      setImageDataList(prev => [...prev, ...compressed].slice(0, 9))
+      const compressed = await Promise.all(files.slice(0, slots).map(file => compressImageToDataUrl(file)))
+      setComposerImages(prev => [...prev, ...compressed].slice(0, 9))
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }
@@ -105,133 +345,227 @@ export function FeedPage() {
   }
 
   function removeImage(index) {
-    setImageDataList(prev => prev.filter((_, i) => i !== index))
+    setComposerImages(prev => prev.filter((_, i) => i !== index))
   }
 
-  async function publishMoment() {
-    setNotice(null)
+  async function toggleLike(momentId) {
     try {
-      await momentApi.create({
-        title: draft.title,
-        content: draft.content,
-        imageDataList,
-        mentions: parseMentions(mentionsText)
-      }, currentUser)
-      setDraft({ title: '', content: '' })
-      setMentionsText('')
-      setImageDataList([])
-      setShowComposer(false)
-      setNotice({ type: 'success', text: '动态已发布' })
-      await loadMoments()
+      const nextMoment = await momentApi.like(momentId, currentUser)
+      mergeMoment(nextMoment)
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }
   }
 
-  async function likeMoment(momentId) {
+  async function toggleFavorite(momentId) {
     try {
-      await momentApi.like(momentId, currentUser)
-      await loadMoments()
+      const nextMoment = await momentApi.favorite(momentId, currentUser)
+      mergeMoment(nextMoment)
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }
   }
 
-  async function favoriteMoment(momentId) {
+  async function toggleFollow(authorId, authorRole) {
+    const followed = isFollowing(authorId, authorRole)
     try {
-      await momentApi.favorite(momentId, currentUser)
-      await loadMoments()
+      if (followed) {
+        await userApi.unfollow(authorId, currentUser, authorRole)
+      } else {
+        await userApi.follow(authorId, currentUser, authorRole)
+      }
+      setNotice({ type: 'success', text: followed ? '已取消关注' : '已关注' })
+      syncFollowState(authorId, authorRole, !followed)
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }
   }
 
-  async function deleteMoment(momentId) {
+  function requestDelete(moment) {
+    setDeleteTarget(moment)
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return
     try {
-      await momentApi.delete(momentId, currentUser)
+      await momentApi.delete(deleteTarget.momentId, currentUser)
+      removeMoment(deleteTarget.momentId)
+      setDrawerMomentId(null)
+      setDeleteTarget(null)
+      await refreshPage()
       setNotice({ type: 'success', text: '动态已删除' })
-      await loadMoments()
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }
   }
 
-  async function followAuthor(authorId, authorRole) {
-    const id = Number(authorId)
-    const wasFollowing = isFollowing(id)
-    toggleFollow(id)
-    setNotice({ type: 'success', text: wasFollowing ? '已取消关注' : '已关注' })
-    try {
-      if (wasFollowing) await userApi.unfollow(id, currentUser, authorRole)
-      else await userApi.follow(id, currentUser, authorRole)
-    } catch {
-      toggleFollow(id)
-      setNotice({ type: 'warning', text: '网络异常，关注状态仅本地保存' })
-    }
-    setMoments(prev => [...prev])
-  }
-
-  function openMention(mention) {
-    const userId = resolveMentionUserId(mention)
-    return userId ? () => openUserProfile(userId) : undefined
-  }
+  const currentDrawerMoment = drawerMoment ? {
+    ...drawerMoment,
+    authorProfile: authorProfileFor(drawerMoment)
+  } : null
 
   return (
-    <Stack spacing={2.5}>
-      <FeedSectionHeader title="动态" subtitle="搜索动态标题和文案，发布带标题、文案和照片的动态。" />
-      {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
-      <FeedToolbar
-        query={query}
-        onQueryChange={setQuery}
-        onSearch={loadMoments}
-        onToggleComposer={() => setShowComposer(value => !value)}
-      />
+    <div className="moments-page">
+      <header className="moments-page__head">
+        <div>
+          <div className="moments-page__eyebrow">动态广场</div>
+          <h1>{viewMode === 'square' ? '动态广场' : '我的动态'}</h1>
+          <p>
+            {viewMode === 'square'
+              ? '记录光影、分享生活，也保留那些真正值得回看的片段。'
+              : '这里只显示你自己发布过的动态，编辑和删除都走真实接口。'}
+          </p>
+        </div>
+        <div className="moments-page__actions">
+          <Button variant="outlined" startIcon={<RefreshRoundedIcon />} onClick={refreshPage}>
+            刷新
+          </Button>
+          <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => openComposer()}>
+            发布动态
+          </Button>
+        </div>
+      </header>
 
-      {showComposer && (
-        <MomentComposer
-          draft={draft}
-          mentionsText={mentionsText}
-          imageDataList={imageDataList}
-          onDraftChange={setDraft}
-          onMentionsChange={setMentionsText}
-          onChooseImages={chooseImages}
-          onRemoveImage={removeImage}
-          onCancel={() => setShowComposer(false)}
-          onPublish={publishMoment}
-        />
+      <div className={`moments-page__manage${viewMode === 'mine' ? ' is-open' : ''}`}>
+        <div>
+          <strong>PORTRA POST ARCHIVE · 我的动态</strong>
+          <span>整理、更新或删除自己发布过的记录。</span>
+        </div>
+        <Button variant="text" onClick={() => setViewMode(prev => (prev === 'square' ? 'mine' : 'square'))}>
+          {viewMode === 'square' ? '查看我的动态' : '返回广场'}
+        </Button>
+      </div>
+
+      {viewMode === 'square' && (
+        <div className="moments-page__band">
+          <ToggleButtonGroup
+            exclusive
+            value={scope}
+            onChange={(_, value) => value && setScope(value)}
+            className="moments-page__scope"
+            size="small"
+          >
+            <ToggleButton value="latest">最新</ToggleButton>
+            <ToggleButton value="hot">热门</ToggleButton>
+            <ToggleButton value="following">关注</ToggleButton>
+          </ToggleButtonGroup>
+          <Button variant="text" onClick={() => setViewMode(prev => (prev === 'square' ? 'mine' : 'square'))}>
+            我的动态
+          </Button>
+        </div>
       )}
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-        {moments.map(moment => {
-          const isSelf = Number(moment.authorId) === currentUser.userId
-          const stored = readUserProfiles()[String(moment.authorId)] || {}
-          const authorProfile = {
-            nickname: isSelf
-              ? (currentUser.nickname || currentUser.label)
-              : (stored.nickname || moment.authorNickname),
-            avatarData: isSelf
-              ? currentUser.avatarData
-              : (stored.avatarData || moment.authorAvatarData)
-          }
-          return (
-            <MomentCard
-              key={moment.momentId}
-              moment={moment}
-              currentUser={currentUser}
-              authorProfile={authorProfile}
-              isFollowing={isFollowing}
-              onOpenMoment={momentId => navigate(`/moments/${momentId}`)}
-              onOpenProfile={(authorId) => openUserProfile(authorId, moment.authorRole)}
-              onOpenMention={openMention}
-              onLike={likeMoment}
-              onFavorite={favoriteMoment}
-              onFollow={(authorId) => followAuthor(authorId, moment.authorRole)}
-              onDelete={deleteMoment}
+      {notice && <Alert severity={notice.type} sx={{ mb: 2 }}>{notice.text}</Alert>}
+
+      {loading ? (
+        <Paper className="moments-empty" variant="outlined">
+          正在加载动态广场...
+        </Paper>
+      ) : activeMoments.length ? (
+        <Box className="moments-grid">
+          {activeMoments.map(moment => {
+            const author = authorProfileFor(moment)
+            const isSelf = Number(moment.authorId) === currentUser.userId
+            const menuOpen = menuState.momentId === moment.momentId
+            const followed = isFollowing(moment.authorId, moment.authorRole)
+            return (
+              <MomentCard
+                key={moment.momentId}
+                moment={moment}
+                authorName={author.nickname}
+                authorAvatar={author.avatarData}
+                isFollowing={followed}
+                isSelf={isSelf}
+                menuOpen={menuOpen}
+                menuAnchorEl={menuState.anchorEl}
+                onMenuOpen={(event, momentId) => setMenuState({ momentId, anchorEl: event.currentTarget })}
+                onMenuClose={() => setMenuState({ momentId: null, anchorEl: null })}
+                onOpenMoment={openDrawer}
+                onOpenProfile={(authorId, authorRole) => {
+                  if (Number(authorId) === currentUser.userId) navigate('/profile')
+                  else navigate(`/users/${authorId}${authorRole ? `?role=${String(authorRole).toUpperCase()}` : ''}`)
+                }}
+                onLike={toggleLike}
+                onFavorite={toggleFavorite}
+                onFollow={toggleFollow}
+                onEdit={openComposer}
+                onDelete={requestDelete}
+              />
+            )
+          })}
+        </Box>
+      ) : (
+        <EmptyFeedCard text={viewMode === 'square' ? '暂无动态' : '还没有发布过动态'} />
+      )}
+
+      <Drawer
+        anchor="right"
+        open={Boolean(drawerMoment)}
+        onClose={() => setDrawerMomentId(null)}
+        PaperProps={{ className: 'moment-drawer' }}
+      >
+        <div className="moment-drawer__head">
+          <div>
+            <div className="moment-drawer__eyebrow">动态详情</div>
+            <h3>{currentDrawerMoment ? `No. ${String(currentDrawerMoment.momentId).padStart(6, '0')}` : '动态详情'}</h3>
+          </div>
+          <Button onClick={() => setDrawerMomentId(null)} startIcon={<CloseRoundedIcon />}>关闭</Button>
+        </div>
+        <div className="moment-drawer__body">
+          {drawerLoading && !currentDrawerMoment ? (
+            <Paper variant="outlined" sx={{ p: 3 }}>鍔犺浇涓?..</Paper>
+          ) : currentDrawerMoment ? (
+            <MomentDetailCard
+              moment={currentDrawerMoment}
+              authorName={currentDrawerMoment.authorProfile.nickname}
+              authorAvatar={currentDrawerMoment.authorProfile.avatarData}
+              isFollowing={isFollowing(currentDrawerMoment.authorId, currentDrawerMoment.authorRole)}
+              isSelf={Number(currentDrawerMoment.authorId) === currentUser.userId}
+              menuOpen={menuState.momentId === currentDrawerMoment.momentId}
+              menuAnchorEl={menuState.anchorEl}
+              onMenuOpen={(event, momentId) => setMenuState({ momentId, anchorEl: event.currentTarget })}
+              onMenuClose={() => setMenuState({ momentId: null, anchorEl: null })}
+              onOpenProfile={(authorId, authorRole) => {
+                if (Number(authorId) === currentUser.userId) navigate('/profile')
+                else navigate(`/users/${authorId}${authorRole ? `?role=${String(authorRole).toUpperCase()}` : ''}`)
+              }}
+              onLike={toggleLike}
+              onFavorite={toggleFavorite}
+              onFollow={toggleFollow}
+              onEdit={openComposer}
+              onDelete={requestDelete}
             />
-          )
-        })}
-      </Box>
-      {!moments.length && <EmptyFeedCard text="暂无动态" />}
-    </Stack>
+          ) : null}
+        </div>
+      </Drawer>
+
+      <MomentComposer
+        open={composerOpen}
+        mode={composerMode}
+        draft={composerDraft}
+        imageDataList={composerImages}
+        onDraftChange={setComposerDraft}
+        onChooseImages={chooseImages}
+        onRemoveImage={removeImage}
+        onCancel={() => setComposerOpen(false)}
+        onPublish={handleComposerSubmit}
+        submitting={composerSubmitting}
+      />
+
+      <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)}>
+        <DialogTitle>删除动态</DialogTitle>
+        <DialogContent>
+          删除后，这条动态将不再显示。确认删除吗？
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteTarget(null)}>取消</Button>
+          <Button color="error" variant="contained" onClick={confirmDelete}>确认删除</Button>
+        </DialogActions>
+      </Dialog>
+    </div>
   )
 }
+
+
+
+
