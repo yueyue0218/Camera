@@ -12,6 +12,7 @@ import { ConversationActionDialogs } from './components/ConversationActionDialog
 import { QuoteDraftDialog } from './components/QuoteDraftDialog.jsx'
 import { MessageWorkbenchErrorBoundary } from './components/MessageWorkbenchErrorBoundary.jsx'
 import { StatusChip } from './components/StatusChip.jsx'
+import { OrderCompletionDialog } from '../../components/portra/index.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from './MessageVisualTokens.js'
 import {
   addLocalMessage,
@@ -70,6 +71,7 @@ export function ConversationDetailPage() {
   const [activeAction, setActiveAction] = useState(null)
   const [activeQuote, setActiveQuote] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('WECHAT')
+  const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
 
   useEffect(() => {
     const stored = findConversationRecord(conversationId)
@@ -367,7 +369,10 @@ export function ConversationDetailPage() {
     if (!currentOrder) return
     if (!window.confirm('确认接收后，订单将完成，平台托管资金会结算给摄影师。是否确认？')) return
     const result = await run(async () => orderApi.transition(currentOrder.orderId, 'COMPLETED', '客户确认接收作品', currentUser), '订单已完成')
-    if (result) await refreshConversationData(conversation, currentOrder.orderId)
+    if (result) {
+      await refreshConversationData(conversation, currentOrder.orderId)
+      setCompletionDialogOpen(true)
+    }
   }
 
   async function submitDelivery(event) {
@@ -691,6 +696,15 @@ export function ConversationDetailPage() {
         onSubmitDelivery={submitDelivery}
         onSubmitRework={submitRework}
         onSubmitPhotoAuthorization={submitPhotoAuthorizationRequest}
+      />
+      <OrderCompletionDialog
+        open={completionDialogOpen}
+        onClose={() => setCompletionDialogOpen(false)}
+        onReview={() => {
+          setCompletionDialogOpen(false)
+          openOrderArchive(currentOrder?.orderId)
+        }}
+        reviewDisabled={!currentOrder?.orderId}
       />
     </Stack>
     </MessageWorkbenchErrorBoundary>

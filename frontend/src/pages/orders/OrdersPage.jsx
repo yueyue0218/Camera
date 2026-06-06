@@ -57,6 +57,7 @@ import {
   PortraActionButton,
   PortraEmptyState,
   PortraInfoBanner,
+  OrderCompletionDialog,
   PortraStatusBadge,
   PortraTicketCard,
   PortraTicketSection,
@@ -282,6 +283,7 @@ export function OrdersPage() {
   const [deliveryForm, setDeliveryForm] = useState({ file: null, remark: '' })
   const [reworkRequirement, setReworkRequirement] = useState('')
   const [reworkDialogOpen, setReworkDialogOpen] = useState(false)
+  const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
   const [previewDelivery, setPreviewDelivery] = useState(null)
   const [previewUrl, setPreviewUrl] = useState('')
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -434,7 +436,15 @@ export function OrdersPage() {
     }, action.successText)
     if (result) {
       await loadOrders(selectedOrder.orderId)
+      if (action.kind === 'transition' && action.targetStatus === 'COMPLETED') {
+        setCompletionDialogOpen(true)
+      }
     }
+  }
+
+  function openReviewFromCompletion() {
+    setCompletionDialogOpen(false)
+    setShowReviewForm(true)
   }
 
   async function submitDelivery(event) {
@@ -1283,6 +1293,13 @@ export function OrdersPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <OrderCompletionDialog
+        open={completionDialogOpen}
+        onClose={() => setCompletionDialogOpen(false)}
+        onReview={openReviewFromCompletion}
+        reviewDisabled={!canReviewSelectedOrder || Boolean(myReview)}
+      />
 
       <Dialog open={reworkDialogOpen} onClose={() => setReworkDialogOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>提交返修要求</DialogTitle>

@@ -8,3 +8,4 @@ export {
   PortraTimeline
 } from './PortraBusinessPrimitives.jsx'
 
+export { OrderCompletionDialog } from './OrderCompletionDialog.jsx'
