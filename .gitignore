@@ -21,4 +21,5 @@ Thumbs.db
 
 # Editor
 .vscode/
-*.swp
+*.swpbackend_log.txt
+backend/*.txt
