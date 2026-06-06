@@ -6,6 +6,7 @@
 .credit-detail-page .credit-hero-surface {
   position: relative;
   isolation: isolate;
+  animation: creditPaperArrive 560ms cubic-bezier(.2, .72, .2, 1) both;
 }
 
 .credit-detail-page .credit-hero-surface .profile-photo-wrap {
@@ -28,6 +29,7 @@
   justify-content: center;
   text-align: center;
   color: var(--blue);
+  animation: creditScoreFocus 720ms 180ms cubic-bezier(.16, .72, .2, 1) both;
 }
 
 .credit-score-plain b {
@@ -56,6 +58,7 @@
   letter-spacing: -.06em;
   user-select: none;
   pointer-events: none;
+  animation: creditWatermarkSettle 900ms 100ms ease-out both;
 }
 
 .credit-stamp-ring {
@@ -69,6 +72,7 @@
     0 0 0 8px rgba(248, 243, 235, .85),
     0 18px 34px rgba(13, 47, 178, .12);
   pointer-events: none;
+  animation: creditStampPress 760ms 80ms cubic-bezier(.2, .82, .28, 1) both;
 }
 
 .credit-stamp-ring::before,
@@ -126,6 +130,8 @@
   box-shadow: 0 8px 18px rgba(21, 19, 24, .04);
   transform: translateZ(0);
   transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  animation: creditNoteFile 440ms cubic-bezier(.2, .72, .2, 1) both;
+  animation-delay: min(calc(var(--credit-note-index, 0) * 70ms + 160ms), 720ms);
 }
 
 .credit-note:hover {
@@ -179,6 +185,7 @@
   border-radius: 50%;
   background: rgba(248, 243, 235, .98);
   box-shadow: 0 8px 14px rgba(21, 19, 24, .08);
+  animation: creditPinDrop 360ms calc(min(var(--credit-note-index, 0) * 70ms, 560ms) + 420ms) ease-out both;
 }
 
 .credit-note--negative .credit-note-pin {
@@ -254,6 +261,38 @@
   white-space: nowrap;
 }
 
+@keyframes creditPaperArrive {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes creditStampPress {
+  0% { opacity: 0; transform: translateY(-18px) rotate(-8deg) scale(1.15); }
+  62% { opacity: .72; transform: translateY(2px) rotate(1deg) scale(.97); }
+  100% { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
+}
+
+@keyframes creditScoreFocus {
+  from { opacity: 0; filter: blur(5px); transform: scale(.9); }
+  to { opacity: 1; filter: blur(0); transform: scale(1); }
+}
+
+@keyframes creditWatermarkSettle {
+  from { opacity: 0; transform: translateX(28px); letter-spacing: .02em; }
+  to { opacity: 1; transform: translateX(0); letter-spacing: -.06em; }
+}
+
+@keyframes creditNoteFile {
+  from { opacity: 0; transform: translateY(14px) rotate(.45deg); }
+  to { opacity: 1; transform: translateY(0) rotate(0); }
+}
+
+@keyframes creditPinDrop {
+  0% { opacity: 0; transform: translateY(-9px) scale(1.35); }
+  70% { opacity: 1; transform: translateY(2px) scale(.92); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 @media (max-width: 760px) {
   .credit-note {
     grid-template-columns: 1fr;
@@ -289,5 +328,16 @@
   .credit-detail-page .credit-hero-surface .profile-photo-wrap {
     width: 172px;
     height: 172px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .credit-detail-page .credit-hero-surface,
+  .credit-score-plain,
+  .credit-hero-watermark,
+  .credit-stamp-ring,
+  .credit-note,
+  .credit-note-pin {
+    animation: none;
   }
 }

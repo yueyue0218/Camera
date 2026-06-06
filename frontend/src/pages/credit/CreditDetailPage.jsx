@@ -157,7 +157,7 @@ export function CreditDetailPage() {
           </div>
         ) : recordCount ? (
           <Stack spacing={1.35} className="credit-note-stack">
-            {records.map(record => {
+            {records.map((record, index) => {
               const delta = Number(record.appliedScoreChange ?? record.scoreChange ?? record.deltaScore ?? 0)
               const positive = delta >= 0
               const beforeScore = record.beforeScore != null ? formatScore(record.beforeScore) : '—'
@@ -172,6 +172,7 @@ export function CreditDetailPage() {
                   key={record.recordId || record.id || `${title}-${record.createdAt}`}
                   elevation={0}
                   className={`credit-note ${positive ? 'credit-note--positive' : 'credit-note--negative'}`}
+                  style={{ '--credit-note-index': index }}
                 >
                   <span className="credit-note-thread" aria-hidden="true" />
                   <span className="credit-note-pin" aria-hidden="true" />
