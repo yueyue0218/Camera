@@ -37,8 +37,8 @@ import {
   getCWorkbenchErrorText,
   getQuoteConfirmationErrorText,
   getQuoteEntryHint,
-  validateQuoteForm
 } from './utils/quoteUtils.js'
+import { validateQuoteFormModel } from './utils/quoteFormModel.js'
 
 const DETAIL_SHELL_HEIGHT = {
   xs: 'calc(100dvh - 212px)',
@@ -66,6 +66,7 @@ export function ConversationDetailPage() {
   const [showQuoteForm, setShowQuoteForm] = useState(false)
   const [editingQuotationId, setEditingQuotationId] = useState(null)
   const [quoteValidationErrors, setQuoteValidationErrors] = useState([])
+  const [quoteFieldErrors, setQuoteFieldErrors] = useState({})
   const [notice, setNotice] = useState(null)
   const [loading, setLoading] = useState(false)
   const [activeAction, setActiveAction] = useState(null)
@@ -226,10 +227,16 @@ export function ConversationDetailPage() {
 
   async function createQuote(event) {
     event.preventDefault()
-    const validationErrors = validateQuoteForm(quoteForm, conversation, currentUser, quotes, { editingQuotationId })
-    setQuoteValidationErrors(validationErrors)
-    if (validationErrors.length) {
-      setNotice({ type: 'warning', text: validationErrors[0] })
+    const validation = validateQuoteFormModel(quoteForm, {
+      conversation,
+      currentUser,
+      quotes,
+      editingQuotationId
+    })
+    setQuoteValidationErrors(validation.errors)
+    setQuoteFieldErrors(validation.fieldErrors)
+    if (validation.errors.length) {
+      setNotice({ type: 'warning', text: validation.errors[0] })
       return
     }
     const quotePayload = buildQuotePayload(quoteForm, conversation)
@@ -240,6 +247,7 @@ export function ConversationDetailPage() {
       setShowQuoteForm(false)
       setEditingQuotationId(null)
       setQuoteValidationErrors([])
+      setQuoteFieldErrors({})
       setQuoteForm(createDefaultQuoteForm())
       await loadConversationData()
     }
@@ -253,6 +261,7 @@ export function ConversationDetailPage() {
     setEditingQuotationId(quote.quotationId)
     setQuoteForm(createQuoteFormFromQuote(quote))
     setQuoteValidationErrors([])
+    setQuoteFieldErrors({})
     setShowQuoteForm(true)
     setNotice({ type: 'info', text: '正在编辑待确认报价，保存前客户仍看到原报价。' })
   }
@@ -261,7 +270,13 @@ export function ConversationDetailPage() {
     setShowQuoteForm(false)
     setEditingQuotationId(null)
     setQuoteValidationErrors([])
+    setQuoteFieldErrors({})
     setQuoteForm(createDefaultQuoteForm())
+  }
+
+  function updateQuoteForm(nextForm) {
+    setQuoteForm(nextForm)
+    if (Object.keys(quoteFieldErrors).length) setQuoteFieldErrors({})
   }
 
   function openQuoteForm() {
@@ -272,6 +287,7 @@ export function ConversationDetailPage() {
     setQuoteForm(createDefaultQuoteForm())
     setEditingQuotationId(null)
     setQuoteValidationErrors([])
+    setQuoteFieldErrors({})
     setShowQuoteForm(true)
   }
 
@@ -283,6 +299,7 @@ export function ConversationDetailPage() {
     setQuoteForm(createQuoteFormFromQuote(quote))
     setEditingQuotationId(null)
     setQuoteValidationErrors([])
+    setQuoteFieldErrors({})
     setShowQuoteForm(true)
     setActiveAction(null)
     setActiveQuote(null)
@@ -625,7 +642,7 @@ export function ConversationDetailPage() {
               setActiveAction('QUOTE_DETAIL')
             }}
             onOpenOrderArchive={openOrderArchive}
-            onQuoteFormChange={setQuoteForm}
+            onQuoteFormChange={updateQuoteForm}
             onSubmitQuote={createQuote}
             onContentChange={setContent}
             onSendMessage={sendMessage}
@@ -643,11 +660,12 @@ export function ConversationDetailPage() {
         <QuoteDraftDialog
           open={showQuoteForm && canSeeQuoteEntry}
           quoteForm={quoteForm}
-          onQuoteFormChange={setQuoteForm}
+          onQuoteFormChange={updateQuoteForm}
           onSubmit={createQuote}
           onClose={closeQuoteForm}
           editingQuotationId={editingQuotationId}
           quoteValidationErrors={quoteValidationErrors}
+          quoteFieldErrors={quoteFieldErrors}
           loading={loading}
           canSubmitQuoteForm={canSubmitQuoteForm}
         />
