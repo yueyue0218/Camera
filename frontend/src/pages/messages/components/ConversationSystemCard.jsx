@@ -14,6 +14,8 @@ import { formatTime } from '../utils/conversationUtils.js'
 import { getPhotoUsageScopeLabel, getQuoteStatusLabel } from '../utils/quoteUtils.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII } from '../MessageVisualTokens.js'
 import { EventAttachmentCard } from './EventAttachmentCard.jsx'
+import { DeliveryBatchCard } from '../../deliveries/components/DeliveryBatchCard.jsx'
+import { buildDeliveryBatches } from '../../deliveries/deliveryDisplay.js'
 
 export function ConversationSystemItem({
   event,
@@ -28,6 +30,7 @@ export function ConversationSystemItem({
   onPayOrder,
   onCancelOrder,
   onConfirmOrder,
+  onOpenDeliveryGallery,
   onOpenAction,
   onDecidePhotoAuthorization,
   onUnavailableTool
@@ -39,6 +42,7 @@ export function ConversationSystemItem({
   const quote = eventMeta.quote
   const order = eventMeta.order
   const authorization = eventMeta.authorization
+  const delivery = eventMeta.delivery
   const orderAction = buildOrderAction(order)
   const renderActionButton = action => (
     <EventActionButton
@@ -126,7 +130,12 @@ export function ConversationSystemItem({
       >
         {quote && <QuoteMeta quote={quote} />}
         {event.type === 'ORDER_CREATED' && eventMeta.order && <OrderMeta order={eventMeta.order} />}
-        {event.type === 'DELIVERY' && eventMeta.delivery && <DeliveryMeta event={event} />}
+        {event.type === 'DELIVERY' && delivery && (
+          <DeliveryMeta
+            event={event}
+            onOpenDeliveryGallery={onOpenDeliveryGallery}
+          />
+        )}
         {authorization && <AuthorizationMeta authorization={authorization} />}
       </EventAttachmentCard>
     </Box>
@@ -190,13 +199,21 @@ function OrderMeta({ order }) {
   return <Typography variant="body2" sx={attachmentMetaSx}>{centToYuan(order.amountCent)} · {formatTime(order.shootStartTime)}</Typography>
 }
 
-function DeliveryMeta({ event }) {
+function DeliveryMeta({ event, onOpenDeliveryGallery }) {
   const delivery = event?.meta?.delivery
   if (!delivery) return null
+  const batch = buildDeliveryBatches([delivery], event?.meta?.order)[0]
   return (
     <Stack spacing={0.4} sx={attachmentMetaSx}>
-      <Typography variant="body2">共 {event.meta?.deliveryCount || 1} 次交付 · 最近交付：{formatTime(delivery.uploadTime)}</Typography>
-      {delivery.fileName && <Chip size="small" label={getSafeDisplayText(delivery.fileName, '已交付作品')} sx={{ ...metaChipSx, alignSelf: 'flex-start' }} />}
+      <DeliveryBatchCard
+        batch={{
+          ...batch,
+          fileCount: event.meta?.deliveryCount || batch.fileCount
+        }}
+        variant="message"
+        onOpen={() => onOpenDeliveryGallery?.(delivery)}
+        disabled={!delivery.deliveryId && !delivery.fileId}
+      />
     </Stack>
   )
 }

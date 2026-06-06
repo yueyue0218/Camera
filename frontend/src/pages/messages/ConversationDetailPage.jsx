@@ -6,6 +6,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { conversationApi, deliveryApi, orderApi, photoAuthorizationApi, quoteApi, readFileAsDataUrl } from '../../api.js'
 import { goToOrder, goToUserProfile } from '../../utils/orderNavigation.js'
+import { goToDeliveryGallery } from '../../utils/deliveryNavigation.js'
 import { ConversationThread } from './components/ConversationThread.jsx'
 import { ConversationWorkbenchPanel } from './components/ConversationWorkbenchPanel.jsx'
 import { ConversationActionDialogs } from './components/ConversationActionDialogs.jsx'
@@ -478,6 +479,18 @@ export function ConversationDetailPage() {
     return true
   }
 
+  function openDeliveryGallery(delivery) {
+    const succeeded = goToDeliveryGallery(navigate, {
+      orderId: currentOrder?.orderId || delivery?.orderId,
+      deliveryId: delivery?.deliveryId || delivery?.fileId,
+      conversationId
+    })
+    if (!succeeded) {
+      setNotice({ type: 'warning', text: '交付记录暂不可查看，请刷新后重试。' })
+    }
+    return succeeded
+  }
+
   const currentUserId = getCurrentUserId(currentUser)
   const counterparty = getCounterpartyProfile(conversation, currentUser)
   const viewModel = buildConversationWorkbenchViewModel({
@@ -642,6 +655,7 @@ export function ConversationDetailPage() {
               setActiveAction('QUOTE_DETAIL')
             }}
             onOpenOrderArchive={openOrderArchive}
+            onOpenDeliveryGallery={openDeliveryGallery}
             onQuoteFormChange={updateQuoteForm}
             onSubmitQuote={createQuote}
             onContentChange={setContent}

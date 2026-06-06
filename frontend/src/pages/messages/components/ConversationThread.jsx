@@ -33,6 +33,7 @@ export function ConversationThread({
   onRejectQuote,
   onOpenQuoteDetail,
   onOpenOrderArchive,
+  onOpenDeliveryGallery,
   onContentChange,
   onSendMessage,
   onChooseMessageImage,
@@ -118,6 +119,7 @@ export function ConversationThread({
                   onPayOrder={onPayOrder}
                   onCancelOrder={onCancelOrder}
                   onConfirmOrder={onConfirmOrder}
+                  onOpenDeliveryGallery={onOpenDeliveryGallery}
                   onDecidePhotoAuthorization={onDecidePhotoAuthorization}
                   onUnavailableTool={onUnavailableTool}
                   onOpenAction={onOpenAction}

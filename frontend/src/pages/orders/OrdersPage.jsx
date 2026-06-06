@@ -43,6 +43,7 @@ import {
   reviewComplaintApi
 } from '../../api.js'
 import { normalizeOrderId } from '../../utils/orderNavigation.js'
+import { goToDeliveryGallery } from '../../utils/deliveryNavigation.js'
 import { centToYuan } from '../../utils/index.js'
 import {
   formatAuthorizationDescription,
@@ -78,6 +79,8 @@ import { EmptyOrderCard } from './components/EmptyOrderCard.jsx'
 import { InfoRows } from './components/InfoRows.jsx'
 import { OrdersSectionHeader } from './components/OrdersSectionHeader.jsx'
 import { ReviewList } from './components/ReviewList.jsx'
+import { DeliveryBatchCard } from '../deliveries/components/DeliveryBatchCard.jsx'
+import { buildDeliveryBatches } from '../deliveries/deliveryDisplay.js'
 import {
   addDays,
   complaintStatusMap,
@@ -666,6 +669,7 @@ export function OrdersPage() {
   const deliveryFileNameMap = useMemo(() => new Map(
     deliveryFileOptions.map(file => [Number(file.fileId), file.fileName])
   ), [deliveryFileOptions])
+  const deliveryBatches = useMemo(() => buildDeliveryBatches(deliveryRecords, selectedOrder), [deliveryRecords, selectedOrder])
   const latestDeliveryUploadTime = useMemo(() => getLatestDeliveryUploadTime(deliveryRecords), [deliveryRecords])
   const estimatedAutoConfirmTime = latestDeliveryUploadTime ? addDays(latestDeliveryUploadTime, 7) : null
   const fulfillmentNotice = selectedOrder
@@ -687,6 +691,16 @@ export function OrdersPage() {
     time: formatTime(log.createdAt),
     tone: log.toStatus === 'APPEALING' || log.toStatus === 'REWORK_REQUIRED' ? 'danger' : 'primary'
   }))
+
+  function openDeliveryBatch(batch) {
+    const succeeded = goToDeliveryGallery(navigate, {
+      orderId: selectedOrder?.orderId || batch?.orderId,
+      deliveryId: batch?.deliveryId
+    })
+    if (!succeeded) {
+      setNotice({ type: 'warning', text: '交付记录暂不可查看，请刷新后重试。' })
+    }
+  }
 
   return (
     <Stack spacing={2.5} sx={orderPageSx}>
@@ -935,49 +949,16 @@ export function OrdersPage() {
 
                 <Stack spacing={1}>
                   <Typography variant="overline" sx={overlineSx}>交付记录</Typography>
-                  {deliveryRecords.map((record, index) => {
-                    const isImage = isImageDelivery(record)
-                    return (
-                    <PortraTicketCard key={record.deliveryId || `${record.orderId}-${record.fileId}-${record.uploadTime}`} sx={{ p: 1.35, pl: 2.2 }}>
-                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.3}>
-                        <Box sx={{
-                          width: { xs: '100%', sm: 116 },
-                          height: 84,
-                          flexShrink: 0,
-                          borderRadius: PORTRA_RADIUS.control,
-                          bgcolor: PORTRA_SURFACE.paperMuted,
-                          border: `1px solid ${PORTRA_SURFACE.borderSubtle}`,
-                          display: 'grid',
-                          placeItems: 'center',
-                          color: PORTRA_SURFACE.muted,
-                          overflow: 'hidden'
-                        }}>
-                          {isImage ? <ImageRoundedIcon /> : <InsertDriveFileRoundedIcon />}
-                        </Box>
-                        <Stack spacing={0.7} sx={{ minWidth: 0, flex: 1 }}>
-                          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
-                            <Typography fontWeight={850} noWrap sx={{ color: PORTRA_SURFACE.ink }}>
-                              {formatDeliveryTitle(record, index)}
-                            </Typography>
-                            <PortraStatusBadge label={`第 ${record.deliveryRound || 1} 次交付${record.isLatest ? ' · 最新' : ''}`} tone="neutral" />
-                          </Stack>
-                          <Typography sx={{ color: PORTRA_SURFACE.muted }} variant="body2">
-                            文件编号 {record.fileId || '-'} · {deliveryStatusLabelMap[record.status] || '已交付'} · {formatTime(record.uploadTime)}
-                          </Typography>
-                          <Typography>{formatDeliveryDescription(record, '无交付说明')}</Typography>
-                          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                            <Button size="small" variant="outlined" startIcon={<VisibilityRoundedIcon />} onClick={() => openDeliveryPreview(record)} disabled={!record.fileId}>
-                              查看
-                            </Button>
-                            <Button size="small" variant="text" startIcon={<DownloadRoundedIcon />} onClick={() => downloadDeliveryFile(record)} disabled={!record.fileId}>
-                              下载
-                            </Button>
-                          </Stack>
-                        </Stack>
-                      </Stack>
-                    </PortraTicketCard>
-                  )})}
-                  {!deliveryRecords.length && <PortraEmptyState title="暂无交付记录" compact />}
+                  {deliveryBatches.map(batch => (
+                    <DeliveryBatchCard
+                      key={batch.id}
+                      batch={batch}
+                      variant="order"
+                      onOpen={() => openDeliveryBatch(batch)}
+                      disabled={!batch.deliveryId || !selectedOrder?.orderId}
+                    />
+                  ))}
+                  {!deliveryBatches.length && <PortraEmptyState title="暂无交付记录" compact />}
                 </Stack>
               </Stack>
             </Paper>
