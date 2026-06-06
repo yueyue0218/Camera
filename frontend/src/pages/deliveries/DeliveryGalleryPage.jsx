@@ -12,8 +12,7 @@ import { goToOrder } from '../../utils/orderNavigation.js'
 import {
   getExplicitReturnToConversation,
   getReturnToConversation,
-  navigateBackToConversation,
-  navigateToConversation
+  navigateBackToConversation
 } from '../../utils/conversationNavigation.js'
 import { formatOrderTitle } from '../../utils/displayFormatters.js'
 import { OrderCompletionDialog, PortraActionButton, PortraActionLink, PortraContextActionButton, PortraEmptyState, PortraInfoBanner, PortraStatusPill, PortraTicketSection, PortraWorkflowFrame } from '../../components/portra/index.js'
@@ -208,6 +207,7 @@ export function DeliveryGalleryPage() {
   const isProvider = Number(order?.providerUserId) === currentUserId
   const isReworkForProvider = isProvider && order?.status === 'REWORK_REQUIRED'
   const isCompleted = order?.status === 'COMPLETED'
+  const galleryMeta = [batch?.subtitle, formatOrderTitle(order)].filter(Boolean).join(' · ')
 
   if (loading) {
     return <PortraEmptyState title="作品记录加载中" description="正在读取订单和作品文件。" />
@@ -249,29 +249,17 @@ export function DeliveryGalleryPage() {
             </PortraContextActionButton>
             <Box>
               <Typography variant="h5" sx={{ fontWeight: 950 }}>{batch.title}</Typography>
-              <Typography sx={{ mt: 0.45, color: PORTRA_SURFACE.muted }}>{batch.subtitle}</Typography>
+              <Typography sx={{ mt: 0.45, color: PORTRA_SURFACE.muted }}>{galleryMeta}</Typography>
             </Box>
           </Stack>
-          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', justifyContent: { xs: 'flex-start', md: 'flex-end' }, alignItems: 'center' }}>
             <PortraStatusPill label={batch.statusLabel} />
-            <Typography sx={{ color: PORTRA_SURFACE.muted, fontSize: 13, fontWeight: 800 }}>
-              {formatOrderTitle(order)}
-            </Typography>
             {primaryBackIsConversation ? (
               <PortraActionLink
                 startIcon={<ReceiptLongRoundedIcon />}
                 onClick={() => goToOrder(navigate, orderId, { conversationId: associatedConversationId, returnTo: explicitReturnToConversation })}
-                sx={secondaryPillSx}
               >
                 查看订单
-              </PortraActionLink>
-            ) : associatedConversationId ? (
-              <PortraActionLink
-                startIcon={<ForumRoundedIcon />}
-                onClick={() => navigateToConversation(navigate, associatedConversationId)}
-                sx={secondaryPillSx}
-              >
-                联系对方
               </PortraActionLink>
             ) : null}
           </Stack>
@@ -460,8 +448,4 @@ const sidePanelSx = {
 
 const primaryBackButtonSx = {
   alignSelf: 'flex-start'
-}
-
-const secondaryPillSx = {
-  flexShrink: 0
 }
