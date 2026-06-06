@@ -24,7 +24,7 @@ import {
   addSavedPhoto,
   buildConversationFallback,
   findConversationRecord,
-  getCounterpartyProfile,
+  getConversationPeer,
   getLocalMessages,
   getOppositeUserId,
   updateConversationLastMessage
@@ -506,7 +506,7 @@ export function ConversationDetailPage() {
   }
 
   const currentUserId = getCurrentUserId(currentUser)
-  const counterparty = getCounterpartyProfile(conversation, currentUser)
+  const counterparty = getConversationPeer(conversation, currentUser)
   const viewModel = buildConversationWorkbenchViewModel({
     conversation,
     currentUser,
@@ -589,12 +589,8 @@ export function ConversationDetailPage() {
               {getSafeDisplayText(counterparty.initial, '对').slice(0, 1)}
             </Avatar>
             <Box sx={{ minWidth: 0 }}>
-              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                <Typography variant="h6" sx={{ color: PORTRA_COLORS.ink, fontSize: 17, fontWeight: 950 }} noWrap>{getSafeDisplayText(counterparty.nickname, '对方用户')}</Typography>
-                <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk }}>{actions.role === 'PROVIDER' ? '摄影师视角' : '客户视角'}</Typography>
-              </Stack>
-              <Typography sx={{ color: PORTRA_COLORS.mutedInk }} variant="body2" noWrap>
-                {getSafeDisplayText(viewModel.conversationTitle, '本次合作')} · {getSafeDisplayText(viewModel.conversationSubtitle, '校园约拍沟通')}
+              <Typography variant="h6" sx={{ color: PORTRA_COLORS.ink, fontSize: 17, fontWeight: 950 }} noWrap>
+                {getSafeDisplayText(counterparty.nickname, counterparty.userId ? `用户 ${counterparty.userId}` : '用户')}
               </Typography>
             </Box>
           </Stack>
