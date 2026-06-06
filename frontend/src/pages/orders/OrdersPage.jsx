@@ -682,8 +682,8 @@ export function OrdersPage() {
   const selectedOrderTitle = selectedOrder ? formatOrderTitle(selectedOrder, quoteSnapshot) : ''
   const statusTimelineItems = statusLogs.map(log => ({
     id: log.logId || `${log.orderId}-${log.createdAt}`,
-    title: `${log.fromStatus ? formatOrderStatus(log.fromStatus) : '创建'} → ${formatOrderStatus(log.toStatus)}`,
-    description: formatStatusLogText(log),
+    title: formatStatusLogText(log),
+    description: `${log.fromStatus ? formatOrderStatus(log.fromStatus) : '创建'} → ${formatOrderStatus(log.toStatus)}`,
     time: formatTime(log.createdAt),
     tone: log.toStatus === 'APPEALING' || log.toStatus === 'REWORK_REQUIRED' ? 'danger' : 'primary'
   }))

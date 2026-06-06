@@ -138,7 +138,11 @@ export function PortraInfoBanner({ tone = 'info', title, children, action, sx })
       </Box>
       <Box sx={{ minWidth: 0, flex: 1 }}>
         {title && <Typography sx={{ fontSize: 13, fontWeight: 850 }}>{title}</Typography>}
-        <Typography sx={{ color: PORTRA_SURFACE.muted, fontSize: 13, lineHeight: 1.55 }}>{children}</Typography>
+        {typeof children === 'string' ? (
+          <Typography sx={{ color: PORTRA_SURFACE.muted, fontSize: 13, lineHeight: 1.55 }}>{children}</Typography>
+        ) : (
+          <Box sx={{ color: PORTRA_SURFACE.muted, fontSize: 13, lineHeight: 1.55 }}>{children}</Box>
+        )}
       </Box>
       {action}
     </Box>
@@ -148,12 +152,24 @@ export function PortraInfoBanner({ tone = 'info', title, children, action, sx })
 export function PortraTimeline({ items = [], emptyText = '暂无状态日志', sx }) {
   if (!items.length) return <PortraEmptyState title={emptyText} compact />
   return (
-    <Stack sx={{ position: 'relative', pl: 2.2, ...sx }}>
-      <Box sx={{ position: 'absolute', top: 8, bottom: 8, left: 5, width: 1, bgcolor: 'rgba(13,47,178,.18)' }} />
+    <Stack sx={{ position: 'relative', gap: 0, ...sx }}>
       {items.map((item, index) => (
-        <Box key={item.id || `${item.title}-${index}`} sx={{ position: 'relative', pb: index === items.length - 1 ? 0 : 1.6 }}>
-          <Box sx={{ position: 'absolute', top: 6, left: -20, width: 10, height: 10, borderRadius: '50%', bgcolor: item.tone === 'danger' ? PORTRA_SURFACE.warmOrangeDeep : PORTRA_SURFACE.portraBlue, boxShadow: `0 0 0 4px ${PORTRA_SURFACE.paper}` }} />
-          <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', gap: 1 }}>
+        <Box
+          key={item.id || `${item.title}-${index}`}
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: '22px minmax(0, 1fr)',
+            columnGap: 1,
+            pb: index === items.length - 1 ? 0 : 1.55
+          }}
+        >
+          <Box sx={{ position: 'relative', minHeight: 34 }}>
+            {index !== items.length - 1 && (
+              <Box sx={{ position: 'absolute', top: 18, bottom: -12, left: 7, width: 1, bgcolor: 'rgba(13,47,178,.16)' }} />
+            )}
+            <Box sx={{ position: 'absolute', top: 5, left: 3, width: 10, height: 10, borderRadius: '50%', bgcolor: item.tone === 'danger' ? PORTRA_SURFACE.warmOrangeDeep : PORTRA_SURFACE.portraBlue, boxShadow: `0 0 0 4px ${PORTRA_SURFACE.paper}` }} />
+          </Box>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={0.75} sx={{ justifyContent: 'space-between', gap: 0.75, minWidth: 0 }}>
             <Box sx={{ minWidth: 0 }}>
               <Typography sx={{ fontSize: 14, fontWeight: 850, color: PORTRA_SURFACE.ink }}>{item.title}</Typography>
               {item.description && <Typography sx={{ mt: 0.2, color: PORTRA_SURFACE.muted, fontSize: 13, lineHeight: 1.55 }}>{item.description}</Typography>}
@@ -211,4 +227,3 @@ export function PortraActionButton({ children, tone = 'primary', sx, ...props })
     </Button>
   )
 }
-
