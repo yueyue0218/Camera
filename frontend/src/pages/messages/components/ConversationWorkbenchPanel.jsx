@@ -9,7 +9,7 @@ import { buildOrderAction } from '../../../utils/orderNavigation.js'
 import { PortraActionButton, PortraStatusBadge, PortraTicketCard } from '../../../components/portra/index.js'
 import { formatTime } from '../utils/conversationUtils.js'
 import { getPhotoUsageScopeLabel, getQuoteStatusLabel } from '../utils/quoteUtils.js'
-import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
+import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII } from '../MessageVisualTokens.js'
 import { WorkbenchSection } from './WorkbenchSection.jsx'
 
 function getLatestQuote(quotes) {
@@ -38,11 +38,10 @@ export function ConversationWorkbenchPanel({
       variant="outlined"
       sx={{
         p: { xs: 1.3, md: 1.5 },
-        bgcolor: PORTRA_COLORS.paperMuted,
+        bgcolor: PORTRA_COLORS.paper,
         borderColor: PORTRA_COLORS.borderMuted,
         borderRadius: PORTRA_RADII.panel,
-        boxShadow: PORTRA_SHADOWS.subtle,
-        borderTop: `3px solid ${PORTRA_COLORS.blue}`,
+        boxShadow: 'none',
         display: { xs: 'none', lg: 'block' },
         height: '100%',
         minHeight: 0,
@@ -53,7 +52,7 @@ export function ConversationWorkbenchPanel({
     >
       <Stack spacing={1.35}>
         <Box sx={{ pb: 0.1 }}>
-          <Typography variant="overline" sx={{ color: PORTRA_COLORS.faintInk, fontWeight: 900 }}>当前进展</Typography>
+          <Typography variant="overline" sx={{ color: PORTRA_COLORS.faintInk, fontWeight: 850, letterSpacing: 0 }}>当前进展</Typography>
           <Typography sx={{ color: PORTRA_COLORS.ink, fontSize: 17, fontWeight: 900 }}>{summary.progressTitle || actions.stage.title}</Typography>
           <Typography variant="body2" sx={{ mt: 0.35, color: PORTRA_COLORS.mutedInk, lineHeight: 1.55 }}>{summary.nextStep || actions.stage.description}</Typography>
         </Box>

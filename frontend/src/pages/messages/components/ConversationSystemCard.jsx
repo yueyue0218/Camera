@@ -80,26 +80,25 @@ export function ConversationSystemItem({
   if (event.actorRole === 'PLATFORM') {
     const noticeText = getSafeDisplayText(event.summary || event.title, '合作进展已更新')
     return (
-      <Box id={event.type === 'AUTHORIZATION' ? 'conversation-authorization-action' : undefined} sx={{ display: 'flex', justifyContent: 'center', px: 2 }}>
+      <Box id={event.type === 'AUTHORIZATION' ? 'conversation-authorization-action' : undefined} sx={{ display: 'flex', justifyContent: 'center', px: { xs: 1, md: 2 } }}>
         <Box
           data-message-system-strip="true"
           sx={{
-            maxWidth: 'min(74%, 660px)',
-            minHeight: 32,
-            px: 1.25,
-            py: 0.35,
+            maxWidth: { xs: 'min(92%, 520px)', md: 520 },
+            minHeight: 30,
+            px: 1.15,
+            py: 0.3,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: 'rgba(248, 246, 241, 0.82)',
-            borderColor: PORTRA_COLORS.borderMuted,
-            border: `1px solid ${PORTRA_COLORS.borderMuted}`,
+            bgcolor: 'rgba(239, 236, 230, 0.78)',
+            border: 0,
             borderRadius: 999,
-            boxShadow: '0 1px 0 rgba(255, 255, 255, 0.68) inset'
+            boxShadow: 'none'
           }}
         >
-          <Stack direction="row" spacing={0.9} sx={{ minWidth: 0, alignItems: 'center', justifyContent: 'center' }}>
-            <Typography variant="body2" noWrap sx={{ minWidth: 0, color: PORTRA_COLORS.mutedInk, fontSize: 12.5, fontWeight: 800 }}>
+          <Stack direction="row" spacing={0.75} sx={{ minWidth: 0, alignItems: 'center', justifyContent: 'center' }}>
+            <Typography variant="body2" noWrap sx={{ minWidth: 0, color: PORTRA_COLORS.mutedInk, fontSize: 12.5, fontWeight: 750 }}>
               {noticeText}
             </Typography>
             <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk, flexShrink: 0, fontSize: 11 }}>{formatTime(event.timestamp)}</Typography>

@@ -78,7 +78,7 @@ export function PortraTicketSection({ title, eyebrow, action, children, sx }) {
       }}
     >
       <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-        <Box sx={{ minWidth: 0, borderLeft: `3px solid ${PORTRA_SURFACE.portraBlue}`, pl: 1.1 }}>
+        <Box sx={{ minWidth: 0 }}>
           {eyebrow && (
             <Typography sx={{ color: PORTRA_SURFACE.muted, fontSize: 11, fontWeight: 800, textTransform: 'uppercase' }}>
               {eyebrow}
