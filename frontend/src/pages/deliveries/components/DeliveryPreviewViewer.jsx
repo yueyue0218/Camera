@@ -19,7 +19,7 @@ export function DeliveryPreviewViewer({
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg">
       <DialogTitle>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-          <Typography fontWeight={900}>{file?.fileName || '作品文件'}</Typography>
+          <Typography fontWeight={900}>{file?.fileName || '作品'}</Typography>
           <Typography variant="body2" sx={{ color: PORTRA_SURFACE.muted }}>{total ? `${index + 1}/${total}` : ''}</Typography>
         </Stack>
       </DialogTitle>
@@ -28,7 +28,7 @@ export function DeliveryPreviewViewer({
           <ChevronLeftRoundedIcon />
         </IconButton>
         {previewUrl ? (
-          <Box component="img" src={previewUrl} alt={file?.fileName || '作品文件'} sx={{ maxWidth: '100%', maxHeight: '74vh', objectFit: 'contain', display: 'block' }} />
+          <Box component="img" src={previewUrl} alt={file?.fileName || '作品'} sx={{ maxWidth: '100%', maxHeight: '74vh', objectFit: 'contain', display: 'block' }} />
         ) : (
           <Typography sx={{ color: '#fff' }}>该文件暂不支持预览。</Typography>
         )}

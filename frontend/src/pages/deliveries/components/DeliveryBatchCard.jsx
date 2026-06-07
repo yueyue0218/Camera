@@ -3,6 +3,7 @@ import CollectionsRoundedIcon from '@mui/icons-material/CollectionsRounded'
 import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded'
 import { PortraStatusBadge, PortraTicketCard } from '../../../components/portra/index.js'
 import { PORTRA_SURFACE } from '../../../theme/portraSurfaceTokens.js'
+import { formatFileUnit } from '../../../utils/productCopy.js'
 import { DeliveryThumbnailStrip } from './DeliveryThumbnailStrip.jsx'
 
 export function DeliveryBatchCard({
@@ -76,7 +77,7 @@ export function DeliveryBatchCard({
         <DeliveryThumbnailStrip files={batch.files} previewUrls={previewUrls} variant={variant} />
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
           <Typography variant="body2" sx={{ color: PORTRA_SURFACE.muted, minWidth: 0 }}>
-            共 {batch.fileCount || batch.files?.length || 0} {message ? '张作品' : '个文件'}
+            共 {formatFileUnit(batch.fileCount || batch.files?.length || 0, message ? '张作品' : '份作品')}
           </Typography>
           <Button size="small" variant="outlined" startIcon={<OpenInNewRoundedIcon />} disabled={!clickable} onClick={event => {
             event.stopPropagation()

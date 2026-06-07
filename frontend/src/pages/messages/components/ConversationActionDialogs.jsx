@@ -61,7 +61,7 @@ export function ConversationActionDialogs({
     .filter(record => record.fileId)
     .map(record => ({
       fileId: Number(record.fileId),
-      fileName: formatFileDisplayName(record, '作品文件')
+      fileName: formatFileDisplayName(record, '作品')
     }))
 
   async function submitAndClose(handler, event) {
@@ -157,13 +157,13 @@ export function ConversationActionDialogs({
         <DialogContent sx={dialogContentSx}>
           <Stack component="form" id="delivery-dialog-form" spacing={2} sx={{ pt: 1 }} onSubmit={event => submitAndClose(onSubmitDelivery, event)}>
             <DialogContentText>
-              {activeAction === 'REUPLOAD_DELIVERY' ? '请根据客户的返修要求上传调整后的作品。' : '选择本次作品文件，并补充必要的作品说明。'}
+              {activeAction === 'REUPLOAD_DELIVERY' ? '请根据客户的返修要求上传调整后的作品。' : '选择本次作品，并补充必要的作品说明。'}
             </DialogContentText>
             <Button component="label" variant="outlined" sx={{ alignSelf: 'flex-start' }}>
-              选择作品文件
+              选择作品
               <input hidden type="file" onChange={event => onDeliveryFileChange(event.target.files?.[0] || null)} />
             </Button>
-            <Typography color="text.secondary" variant="body2">{safeDeliveryForm.file ? getSafeDisplayText(safeDeliveryForm.file.name, '已选择作品文件') : '尚未选择文件'}</Typography>
+            <Typography color="text.secondary" variant="body2">{safeDeliveryForm.file ? getSafeDisplayText(safeDeliveryForm.file.name, '已选择作品') : '尚未选择作品'}</Typography>
             <TextField
               label="作品说明"
               value={safeDeliveryForm.remark}
@@ -219,7 +219,7 @@ export function ConversationActionDialogs({
                   const value = event.target.value
                   onPhotoAuthorizationFileIdsChange((typeof value === 'string' ? value.split(',') : value).map(Number))
                 }}
-                renderValue={selected => selected.map(fileId => deliveryFiles.find(file => file.fileId === Number(fileId))?.fileName || '作品文件').join('、')}
+                renderValue={selected => selected.map(fileId => deliveryFiles.find(file => file.fileId === Number(fileId))?.fileName || '作品').join('、')}
               >
                 {deliveryFiles.map(file => <MenuItem key={file.fileId} value={file.fileId}>{file.fileName}</MenuItem>)}
               </Select>

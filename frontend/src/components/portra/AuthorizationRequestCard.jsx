@@ -159,7 +159,7 @@ export function AuthorizationRequestCard({
                         key={file.id || file.fileId || `${model.id}-file-${index}`}
                         size="small"
                         icon={<CollectionsRoundedIcon />}
-                        label={formatFileDisplayName(file, `作品文件 ${index + 1}`)}
+                        label={formatFileDisplayName(file, `作品 ${index + 1}`)}
                         sx={{ borderRadius: PORTRA_RADIUS.compact, fontWeight: 800 }}
                       />
                     ))}
@@ -167,7 +167,7 @@ export function AuthorizationRequestCard({
                 </>
               ) : (
                 <Typography variant="body2" sx={{ color: PORTRA_SURFACE.muted }}>
-                  当前接口未返回作品文件列表，可从订单作品记录进入查看。
+                  当前接口未返回具体照片，可从订单作品记录进入查看。
                 </Typography>
               )}
               {canOpenDelivery && (

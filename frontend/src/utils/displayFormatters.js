@@ -1,3 +1,5 @@
+import { normalizeProductCopy } from './productCopy.js'
+
 const UNKNOWN_STATUS_LABEL = '状态待确认'
 
 export const ORDER_STATUS_LABELS = {
@@ -182,6 +184,7 @@ export function sanitizeSeedText(value, fallback = '校园约拍服务') {
     .replace(/\s{2,}/g, ' ')
     .replace(/待客户付款/gi, '')
     .trim()
+  text = normalizeProductCopy(text, '')
 
   if (!text || /^UI_REVIEW_SEED/i.test(text) || /^UIO/i.test(text) || /^Demo\s+\d+/i.test(text)) {
     return fallback
@@ -207,7 +210,7 @@ export function formatOrderSubtitle(order, quote) {
   return [location, time].filter(Boolean).join(' · ') || '订单已创建，等待双方继续履约'
 }
 
-export function formatFileDisplayName(fileOrName, fallback = '作品文件') {
+export function formatFileDisplayName(fileOrName, fallback = '作品') {
   const rawName = typeof fileOrName === 'object'
     ? fileOrName?.fileName || fileOrName?.name || fileOrName?.originalName
     : fileOrName
@@ -223,14 +226,14 @@ export function formatFileDisplayName(fileOrName, fallback = '作品文件') {
     .trim()
 
   if (!cleaned || /^UI_REVIEW_SEED/i.test(cleaned) || /^UIO/i.test(cleaned)) return fallback
-  return cleaned
+  return normalizeProductCopy(cleaned, fallback)
 }
 
 export function formatDeliveryTitle(delivery, index = 0) {
   const fileName = formatFileDisplayName(delivery, '')
   if (fileName) return fileName
   const round = Number(delivery?.deliveryRound || index + 1)
-  return `作品文件 ${round}`
+  return `作品 ${round}`
 }
 
 export function formatDeliveryDescription(delivery, fallback = '摄影师已上传作品，等待客户确认。') {

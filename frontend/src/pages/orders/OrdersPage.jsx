@@ -45,6 +45,7 @@ import {
 } from '../../api.js'
 import { buildOrderNavigationTarget, goToOrderConversation, normalizeOrderId } from '../../utils/orderNavigation.js'
 import { goToDeliveryGallery } from '../../utils/deliveryNavigation.js'
+import { PRODUCT_ACTION_COPY } from '../../utils/productCopy.js'
 import {
   getExplicitReturnToConversation,
   navigateBackToConversation
@@ -124,20 +125,20 @@ function getOrderAction(order, currentUser) {
   if (canCustomerPay(order, currentUser)) {
     return {
       kind: 'pay',
-      label: '模拟支付',
+      label: PRODUCT_ACTION_COPY.payOrder,
       icon: <PaidRoundedIcon />,
       allowed: true,
-      successText: '模拟支付成功，资金已进入平台担保'
+      successText: '支付成功，资金已进入平台担保'
     }
   }
   if (canCustomerConfirm(order, currentUser)) {
     return {
       kind: 'transition',
       targetStatus: 'COMPLETED',
-      label: '确认完成',
+      label: PRODUCT_ACTION_COPY.confirmDelivery,
       icon: <CheckCircleRoundedIcon />,
       allowed: true,
-      reason: '需求方确认完成',
+      reason: '客户确认接收作品',
       successText: '订单已完成'
     }
   }
@@ -427,7 +428,10 @@ export function OrdersPage() {
       if (action.kind === 'pay') {
         return orderApi.mockPay(selectedOrder.orderId, selectedOrder.amountCent, currentUser)
       }
-      return orderApi.transition(selectedOrder.orderId, action.targetStatus, action.reason, currentUser)
+      if (action.kind === 'transition' && action.targetStatus === 'COMPLETED' && canCustomerConfirm(selectedOrder, currentUser)) {
+        return orderApi.transition(selectedOrder.orderId, 'COMPLETED', action.reason, currentUser)
+      }
+      throw new Error('当前状态不支持这个操作。')
     }, action.successText)
     if (result) {
       await loadOrders(selectedOrder.orderId)
@@ -807,7 +811,7 @@ export function OrdersPage() {
                         onClick={canReturnToConversation ? returnToConversation : continueConversation}
                         sx={returnLinkSx}
                       >
-                        {canReturnToConversation ? '返回沟通' : '联系对方'}
+                        {canReturnToConversation ? PRODUCT_ACTION_COPY.returnConversation : PRODUCT_ACTION_COPY.goConversation}
                       </PortraActionLink>
                     )}
                     <Typography variant="h5" sx={{ fontSize: { xs: 20, md: 24 }, color: PORTRA_SURFACE.ink, fontWeight: 950 }}>{selectedOrderTitle}</Typography>
@@ -956,7 +960,7 @@ export function OrdersPage() {
                     <Stack direction="row" spacing={1} sx={{ mt: 0.8, flexWrap: 'wrap' }}>
                       {canAcceptDelivery && action && (
                         <PortraActionButton startIcon={<CheckCircleRoundedIcon />} onClick={() => operateOrder(action)} disabled={loading || !action.allowed}>
-                          确认接收作品
+                          {PRODUCT_ACTION_COPY.confirmDelivery}
                         </PortraActionButton>
                       )}
                       {canRequestRework && (
