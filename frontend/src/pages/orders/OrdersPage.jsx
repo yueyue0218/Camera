@@ -470,6 +470,7 @@ export function OrdersPage() {
   function openReviewFromCompletion() {
     setCompletionDialogOpen(false)
     setShowReviewForm(true)
+    feedback.info('评价功能入口已打开')
   }
 
   async function submitDelivery(event) {
@@ -741,6 +742,12 @@ export function OrdersPage() {
     time: formatTime(log.createdAt),
     tone: log.toStatus === 'APPEALING' || log.toStatus === 'REWORK_REQUIRED' ? 'danger' : 'primary'
   }))
+
+  useEffect(() => {
+    if (!location.state?.openReview || !selectedOrder?.orderId || !canReviewSelectedOrder || myReview) return
+    setShowReviewForm(true)
+    feedback.info('评价功能入口已打开')
+  }, [location.state, selectedOrder?.orderId, canReviewSelectedOrder, myReview, feedback])
 
   function openDeliveryBatch(batch) {
     const succeeded = goToDeliveryGallery(navigate, {

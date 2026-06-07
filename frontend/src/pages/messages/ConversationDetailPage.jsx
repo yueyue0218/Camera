@@ -504,11 +504,11 @@ export function ConversationDetailPage() {
     goToUserProfile(navigate, userId, currentUser)
   }
 
-  function openOrderArchive(orderId = currentOrder?.orderId) {
+  function openOrderArchive(orderId = currentOrder?.orderId, options = {}) {
     const succeeded = navigateToOrderFromConversation(navigate, {
       orderId: orderId || currentOrder?.orderId,
       conversationId
-    })
+    }, options)
     if (!succeeded) {
       setNotice({ type: 'warning', text: '订单信息暂时不可用，请稍后刷新后再查看。' })
       feedback.warning('订单信息暂时不可用，请稍后刷新后再查看。')
@@ -785,7 +785,8 @@ export function ConversationDetailPage() {
         onClose={() => setCompletionDialogOpen(false)}
         onReview={() => {
           setCompletionDialogOpen(false)
-          openOrderArchive(currentOrder?.orderId)
+          const opened = openOrderArchive(currentOrder?.orderId, { state: { openReview: true } })
+          if (opened) feedback.info('评价功能入口已打开')
         }}
         reviewDisabled={!currentOrder?.orderId}
       />
