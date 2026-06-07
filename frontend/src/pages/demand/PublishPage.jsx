@@ -113,6 +113,7 @@ export function PublishPage() {
       }))
       setNotice({ type: 'success', text: selectedFiles.length > remaining ? `已上传前 ${remaining} 张，最多支持 ${MAX_UPLOAD_IMAGES} 张` : '参考图已上传' })
     } catch (error) {
+      console.error('demand reference image upload failed', { error })
       setNotice({ type: 'error', text: error.message })
     } finally {
       setUploading(false)

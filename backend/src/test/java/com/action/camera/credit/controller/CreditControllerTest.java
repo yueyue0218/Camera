@@ -51,7 +51,12 @@ class CreditControllerTest {
         UserContext.setUserId(OTHER_USER_ID);
         UserContext.setCurrentRole(UserRole.CUSTOMER);
 
-        assertThat(creditController.getCreditSummary(USER_ID).getData().userId()).isEqualTo(USER_ID);
+        var summary = creditController.getCreditSummary(USER_ID).getData();
+
+        assertThat(summary.userId()).isEqualTo(USER_ID);
+        assertThat(summary.creditScore()).isNull();
+        assertThat(summary.creditLevel()).isEqualTo("新用户");
+        assertThat(summary.effectiveOrderCount()).isZero();
     }
 
     @Test

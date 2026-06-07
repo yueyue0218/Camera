@@ -20,6 +20,7 @@ const ORDER_EVENTS = ['ORDER_', 'DEMAND_RESPONSE_', 'CONVERSATION_STARTED', 'DEL
 const REVIEW_EVENTS = ['REVIEW_']
 const APPEAL_EVENTS = ['REVIEW_COMPLAINT_', 'DISPUTE']
 const DYNAMIC_EVENTS = ['MOMENT_LIKED', 'FOLLOWED']
+const PORTRA_STATE_EVENT = 'portra-preview-state'
 
 function normalizeText(value) {
   return String(value || '').trim().toUpperCase()
@@ -256,7 +257,7 @@ export function NotificationListPage() {
       try {
         const data = await notificationApi.listMine(currentUser)
         if (!alive) return
-        setItems(Array.isArray(data) ? data : [])
+        setItems(data)
         setFeedback({})
       } catch (error) {
         if (alive) setFeedback({ error: error.message })
@@ -295,6 +296,7 @@ export function NotificationListPage() {
       const updated = await notificationApi.markRead(notificationId, currentUser)
       setItems(current => current.map(item => (item.notificationId === notificationId ? updated : item)))
       setFeedback({ success: '通知已读' })
+      window.dispatchEvent(new Event(PORTRA_STATE_EVENT))
       return updated
     } catch (error) {
       setFeedback({ error: error.message })
@@ -305,8 +307,9 @@ export function NotificationListPage() {
   async function markAllRead() {
     try {
       const updated = await notificationApi.markAllRead(currentUser)
-      setItems(Array.isArray(updated) ? updated : [])
+      setItems(updated)
       setFeedback({ success: '全部通知已读' })
+      window.dispatchEvent(new Event(PORTRA_STATE_EVENT))
     } catch (error) {
       setFeedback({ error: error.message })
     }

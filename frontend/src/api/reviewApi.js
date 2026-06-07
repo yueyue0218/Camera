@@ -1,6 +1,9 @@
 import { request } from './client.js'
 
 export const reviewApi = {
+  detail(reviewId, currentUser) {
+    return request(`/reviews/${reviewId}`, {}, currentUser)
+  },
   listByOrder(orderId, currentUser) {
     return request(`/orders/${orderId}/reviews`, {}, currentUser)
   },

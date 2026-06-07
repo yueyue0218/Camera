@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Chip, Paper, Stack, Typography } from '@mui/material'
 import { useNavigate, useParams } from 'react-router-dom'
+import { Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, Typography } from '@mui/material'
 import { useAuth } from '../../AuthContext.jsx'
 import { creditApi } from '../../api/index.js'
 import '../profile/profile.css'
@@ -14,25 +14,76 @@ function formatTime(value) {
 
 function formatScore(value) {
   const numeric = Number(value)
-  return Number.isFinite(numeric) ? numeric.toFixed(1) : '--'
+  return Number.isFinite(numeric) ? numeric.toFixed(1) : '暂无'
 }
 
 function formatMetric(value) {
   return value === null || value === undefined || value === '' ? '--' : value
 }
 
+function formatPercent(value) {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? `${numeric.toFixed(1)}%` : '--'
+}
+
 function creditLevel(score, summaryLevel) {
-  if (summaryLevel) return String(summaryLevel).startsWith('信用') ? summaryLevel : `信用${summaryLevel}`
+  const label = String(summaryLevel || '').trim()
+  if (label) {
+    return label.startsWith('信用') || ['新用户', '待积累', '待提升'].includes(label) ? label : `信用${label}`
+  }
   const numeric = Number(score)
-  if (!Number.isFinite(numeric)) return '信用概览'
+  if (!Number.isFinite(numeric)) return '新用户'
   if (numeric >= 90) return '信用优秀'
-  if (numeric >= 70) return '信用良好'
+  if (numeric >= 75) return '信用良好'
+  if (numeric >= 60) return '待提升'
   return '信用较差'
 }
 
 function normalizeRecords(value) {
   if (Array.isArray(value)) return value
   return Array.isArray(value?.items) ? value.items : []
+}
+
+function getRecordOrderId(record) {
+  if (record.orderId) return record.orderId
+  const sourceType = String(record.sourceType || '').toUpperCase()
+  return sourceType.includes('ORDER') ? record.sourceId : null
+}
+
+function recordMetaLabel(record, orderId) {
+  if (orderId) return '关联订单'
+  const sourceType = String(record.sourceType || '').toUpperCase()
+  const eventType = String(record.eventType || '').toUpperCase()
+  if (sourceType.includes('REVIEW') || eventType.includes('REVIEW')) return '评价记录'
+  if (sourceType.includes('ORDER') || eventType.includes('ORDER')) return '订单记录'
+  if (sourceType.includes('REFUND') || eventType.includes('REFUND')) return '退款记录'
+  return '信用记录'
+}
+
+function recordTitle(record, delta) {
+  const text = `${record.eventType || ''} ${record.reason || ''} ${record.sourceType || ''}`.toUpperCase()
+  if (text.includes('REVIEW')) return delta < 0 ? '收到低分评价' : '收到订单评价'
+  if (text.includes('REFUND')) return '退款责任记录'
+  if (text.includes('CANCEL')) return '订单取消记录'
+  if (text.includes('ORDER')) return delta < 0 ? '订单履约异常' : '订单履约记录'
+  if (delta < 0) return '信用扣分'
+  if (delta > 0) return '信用加分'
+  return '信用记录更新'
+}
+
+function recordDetail(record, delta) {
+  const text = `${record.eventType || ''} ${record.reason || ''} ${record.sourceType || ''}`.toUpperCase()
+  if (text.includes('REVIEW')) {
+    if (delta < 0) return '低分评价会拉低信用表现，后续稳定履约和好评会逐步修复。'
+    if (delta > 0) return '评价表现较好，已计入信用表现。'
+    return '评价已记录，本次未造成分数变化。'
+  }
+  if (text.includes('REFUND')) return '该退款记录已计入风险记录。'
+  if (text.includes('CANCEL')) return '该订单取消记录已计入履约表现。'
+  if (text.includes('ORDER')) return '该订单结果已计入履约表现。'
+  if (delta < 0) return '该记录会影响信用分，请留意后续履约和评价。'
+  if (delta > 0) return '该记录提升了信用表现。'
+  return '该记录已纳入信用档案。'
 }
 
 export function CreditDetailPage() {
@@ -44,6 +95,7 @@ export function CreditDetailPage() {
   const [records, setRecords] = useState([])
   const [notice, setNotice] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [rulesOpen, setRulesOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -69,17 +121,20 @@ export function CreditDetailPage() {
   }, [targetUserId, currentUser])
 
   const score = useMemo(
-    () => formatScore(summary?.creditScore ?? currentUser.creditScore),
-    [summary?.creditScore, currentUser.creditScore]
+    () => formatScore(summary?.creditScore),
+    [summary?.creditScore]
   )
   const level = useMemo(
-    () => creditLevel(summary?.creditScore ?? currentUser.creditScore, summary?.creditLevel),
-    [summary?.creditScore, currentUser.creditScore, summary?.creditLevel]
+    () => creditLevel(summary?.creditScore, summary?.creditLevel),
+    [summary?.creditScore, summary?.creditLevel]
   )
 
-  const completedOrders = formatMetric(summary?.completedOrderCount ?? summary?.completedOrders)
-  const reviewCount = formatMetric(summary?.receivedReviewCount ?? summary?.reviewCount)
-  const averageRating = formatMetric(summary?.averageRating)
+  const effectiveOrders = formatMetric(summary?.effectiveOrderCount)
+  const completedOrders = formatMetric(summary?.completedOrderCount)
+  const reviewCount = formatMetric(summary?.receivedReviewCount)
+  const goodReviewRate = formatPercent(summary?.goodReviewRate)
+  const fulfillmentRate = formatPercent(summary?.fulfillmentRate)
+  const riskRecords = formatMetric(summary?.riskRecordCount)
   const recordCount = records.length
   const lastUpdated = summary?.lastUpdatedAt || records[0]?.createdAt || null
 
@@ -116,14 +171,23 @@ export function CreditDetailPage() {
           </div>
           <p className="profile-uid">最近更新：{formatTime(lastUpdated)}</p>
           <p className="profile-signature">
-            保留与你个人主页一致的视觉语言，集中展示信用评分、履约概览和信用变化记录。
+            信用分参考有效订单、好评率、履约率和风险记录；新用户需要完成订单或收到评价后开始积累。
           </p>
           <div className="profile-meta-line">
-            <span>记录 {recordCount}</span>
+            <span>有效订单 {effectiveOrders}</span>
             <span>完成订单 {completedOrders}</span>
             <span>收到评价 {reviewCount}</span>
-            <span>平均评价 {averageRating}</span>
+            <span>信用记录 {recordCount}</span>
           </div>
+          <Button
+            type="button"
+            className="credit-rules-entry"
+            variant="outlined"
+            size="small"
+            onClick={() => setRulesOpen(true)}
+          >
+            信用规则说明
+          </Button>
         </div>
 
         <div className="hero-side">
@@ -132,10 +196,10 @@ export function CreditDetailPage() {
             <div className="id-number">{score}</div>
           </div>
           <div className="metric-grid">
-            <div className="metric"><b>{completedOrders}</b><span>完成订单</span></div>
-            <div className="metric"><b>{reviewCount}</b><span>收到评价</span></div>
-            <div className="metric"><b>{averageRating}</b><span>平均评价</span></div>
-            <div className="metric"><b>{recordCount}</b><span>信用记录</span></div>
+            <div className="metric"><b>{effectiveOrders}</b><span>有效订单</span></div>
+            <div className="metric"><b>{goodReviewRate}</b><span>好评率</span></div>
+            <div className="metric"><b>{fulfillmentRate}</b><span>履约率</span></div>
+            <div className="metric"><b>{riskRecords}</b><span>风险记录</span></div>
           </div>
         </div>
       </section>
@@ -144,7 +208,7 @@ export function CreditDetailPage() {
         <div className="section-head">
           <div>
             <h2>信用记录</h2>
-            <p>按时间倒序排列，保留每一次信用变化的来源和结果。</p>
+            <p>按时间倒序查看每一次信用变化，记录只展示用户能理解的原因。</p>
           </div>
           <div className="section-mark">{recordCount}</div>
         </div>
@@ -152,26 +216,37 @@ export function CreditDetailPage() {
         {loading ? (
           <div className="pp-empty">
             <h3>正在加载信用记录</h3>
-            <p>请稍等，系统正在拉取最新的信用摘要和变更历史。</p>
+            <p>正在更新信用分和记录。</p>
           </div>
         ) : recordCount ? (
           <Stack spacing={1.35} className="credit-note-stack">
             {records.map((record, index) => {
               const delta = Number(record.appliedScoreChange ?? record.scoreChange ?? record.deltaScore ?? 0)
-              const positive = delta >= 0
-              const beforeScore = record.beforeScore != null ? formatScore(record.beforeScore) : '--'
-              const afterScore = record.scoreAfter != null ? formatScore(record.scoreAfter) : '--'
-              const title = record.reason || record.eventType || '信用变更'
-              const detail = record.sourceType || record.sourceId
-                ? `来源：${record.sourceType || '系统'}${record.sourceId ? ` · ${record.sourceId}` : ''}`
-                : record.description || record.remark || '系统记录'
+              const positive = delta > 0
+              const negative = delta < 0
+              const orderId = getRecordOrderId(record)
+              const beforeScore = record.beforeScore != null ? formatScore(record.beforeScore) : '暂无'
+              const afterScore = record.scoreAfter != null ? formatScore(record.scoreAfter) : '暂无'
+              const title = recordTitle(record, delta)
+              const detail = recordDetail(record, delta)
+              const metaLabel = recordMetaLabel(record, orderId)
+              const toneClass = negative ? 'credit-note--negative' : positive ? 'credit-note--positive' : 'credit-note--neutral'
 
               return (
                 <Paper
-                  key={record.recordId || record.id || `${title}-${record.createdAt}`}
+                  key={record.recordId || record.id || `${title}-${record.createdAt}-${index}`}
                   elevation={0}
-                  className={`credit-note ${positive ? 'credit-note--positive' : 'credit-note--negative'}`}
-                  style={{ animationDelay: `${index * 48}ms` }}
+                  className={`credit-note ${toneClass}`}
+                  style={{ '--credit-note-index': index }}
+                  role={orderId ? 'button' : undefined}
+                  tabIndex={orderId ? 0 : undefined}
+                  onClick={orderId ? () => navigate(`/orders?orderId=${orderId}`) : undefined}
+                  onKeyDown={orderId ? event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      navigate(`/orders?orderId=${orderId}`)
+                    }
+                  } : undefined}
                 >
                   <span className="credit-note-thread" aria-hidden="true" />
                   <span className="credit-note-pin" aria-hidden="true" />
@@ -184,12 +259,12 @@ export function CreditDetailPage() {
                       <Typography className="credit-note-title">{title}</Typography>
                       <Chip
                         size="small"
-                        label={positive ? '加分' : '扣分'}
+                        label={positive ? '加分' : negative ? '扣分' : '记录'}
                         sx={{
                           height: 26,
                           fontWeight: 800,
-                          bgcolor: positive ? 'rgba(13,47,178,.08)' : 'rgba(248,81,4,.08)',
-                          color: positive ? 'primary.main' : '#c53b05'
+                          bgcolor: negative ? 'rgba(248,81,4,.08)' : positive ? 'rgba(13,47,178,.08)' : 'rgba(91,96,106,.08)',
+                          color: negative ? '#c53b05' : positive ? 'primary.main' : '#5f6670'
                         }}
                       />
                     </Stack>
@@ -200,7 +275,7 @@ export function CreditDetailPage() {
                   </div>
                   <div className="credit-note-meta">
                     <div>{formatTime(record.createdAt)}</div>
-                    <div>{record.sourceType || '系统事件'}</div>
+                    <div>{metaLabel}</div>
                   </div>
                 </Paper>
               )
@@ -209,10 +284,27 @@ export function CreditDetailPage() {
         ) : (
           <div className="pp-empty">
             <h3>暂无信用记录</h3>
-            <p>订单完成、评价变化或平台规则更新后，这里会显示最新记录。</p>
+            <p>完成订单或收到评价后，这里会更新记录。</p>
           </div>
         )}
       </section>
+
+      <Dialog open={rulesOpen} onClose={() => setRulesOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>信用规则说明</DialogTitle>
+        <DialogContent>
+          <div className="credit-rules-copy">
+            <p>信用分参考有效订单、好评率、履约率和风险记录。新用户不会直接显示 100 分，需要完成订单或收到评价后开始积累。</p>
+            <p><strong>信用优秀：</strong>90-100，样本充足且履约稳定。</p>
+            <p><strong>信用良好：</strong>75-89，整体可靠，近期记录正常。</p>
+            <p><strong>待提升：</strong>60-74，仍需积累更多好评或改善履约表现。</p>
+            <p><strong>信用较差：</strong>60 以下，存在较多风险记录、低分评价或履约问题。</p>
+            <p><strong>新用户 / 待积累：</strong>记录不足时会先展示积累状态，分数会随着真实订单和评价逐步稳定。</p>
+          </div>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRulesOpen(false)}>知道了</Button>
+        </DialogActions>
+      </Dialog>
     </div>
   )
 }

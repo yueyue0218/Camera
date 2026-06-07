@@ -9,15 +9,22 @@ import { useAuth } from '../../AuthContext.jsx'
 import { EmptyState, Feedback, PageHeader, formatDateTime, panelSx, portra } from '../dline/shared.jsx'
 import './reviews.css'
 
-function ReviewScore({ value }) {
+export function reviewDirectionLabel(direction) {
+  const value = String(direction || '').trim().toUpperCase()
+  if (value === 'CUSTOMER_TO_PROVIDER') return '来自单主的评价'
+  if (value === 'PROVIDER_TO_CUSTOMER') return '来自摄影师的评价'
+  return '评价记录'
+}
+
+export function ReviewScore({ value }) {
   const numeric = Number(value)
   const score = Number.isFinite(numeric) ? numeric : 0
   const filled = Math.max(0, Math.min(5, Math.round(score)))
 
   return (
     <Stack direction="row" spacing={1} alignItems="center" className="review-score-wrap">
-      <Typography className="review-score-pill">{score ? score.toFixed(1) : '--'} 分</Typography>
-      <Box className="review-score-meter" aria-label={`评分 ${score.toFixed(1)}`}>
+      <Typography className="review-score-pill">{Number.isFinite(numeric) ? score.toFixed(1) : '--'} 分</Typography>
+      <Box className="review-score-meter" aria-label={`评分 ${Number.isFinite(numeric) ? score.toFixed(1) : '暂无'}`}>
         {Array.from({ length: 5 }).map((_, index) => (
           <span key={index} className={index < filled ? 'filled' : ''} />
         ))}
@@ -26,18 +33,38 @@ function ReviewScore({ value }) {
   )
 }
 
-function ReviewItem({ item, index = 0, onOpenOrder }) {
+function ReviewItem({ item, index = 0, onOpenOrder, onOpenReview }) {
   const avatarText = String(item.reviewerId || item.targetUserId || 'U').slice(-2)
   const orderId = item.orderId || item.targetOrderId
+  const directionLabel = reviewDirectionLabel(item.direction)
+
+  const openReview = () => {
+    if (item.reviewId != null) {
+      onOpenReview?.(item.reviewId)
+    }
+  }
 
   return (
-    <Paper className="review-ticket" style={{ '--review-index': index }} sx={{ ...panelSx, p: 2 }}>
+    <Paper
+      className="review-ticket"
+      role="button"
+      tabIndex={0}
+      onClick={openReview}
+      onKeyDown={event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          openReview()
+        }
+      }}
+      style={{ '--review-index': index }}
+      sx={{ ...panelSx, p: 2, cursor: 'pointer' }}
+    >
       <Stack spacing={1.5}>
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
           <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0 }}>
             <Avatar sx={{ bgcolor: portra.primary, width: 40, height: 40 }}>{avatarText}</Avatar>
             <Box sx={{ minWidth: 0 }}>
-              <Typography fontWeight={900}>{item.direction || '评价'}</Typography>
+              <Typography fontWeight={900}>{directionLabel}</Typography>
               <Typography variant="body2" className="review-order-line">
                 订单 #{item.orderId || item.targetOrderId || '-'}
               </Typography>
@@ -50,21 +77,27 @@ function ReviewItem({ item, index = 0, onOpenOrder }) {
             </Typography>
           </Box>
         </Stack>
+
         <Typography className="review-content" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.9 }}>
           {item.content || '暂无评价正文'}
         </Typography>
+
         {item.replyContent ? (
           <Box className="review-reply">
             <span>追评</span>
             <p>{item.replyContent}</p>
           </Box>
         ) : null}
+
         {orderId ? (
           <Button
             size="small"
             variant="text"
             startIcon={<ReceiptLongRoundedIcon />}
-            onClick={() => onOpenOrder(orderId)}
+            onClick={event => {
+              event.stopPropagation()
+              onOpenOrder(orderId)
+            }}
             sx={{ alignSelf: 'flex-start', fontWeight: 900 }}
           >
             查看关联订单
@@ -101,6 +134,7 @@ export function ReviewPage() {
 
   useEffect(() => {
     let alive = true
+
     async function load() {
       setLoading(true)
       try {
@@ -120,6 +154,7 @@ export function ReviewPage() {
         if (alive) setLoading(false)
       }
     }
+
     load()
     return () => { alive = false }
   }, [currentUser, orderId])
@@ -129,10 +164,10 @@ export function ReviewPage() {
     setSubmitting(true)
     try {
       await reviewApi.create(orderId, { rating: form.rating, content: form.content.trim() }, currentUser)
-      setForm({ rating: 5, content: '' })
-      setFeedback({ success: '评价已提交' })
       const reviews = await reviewApi.listByOrder(orderId, currentUser)
       setItems(Array.isArray(reviews) ? reviews : [])
+      setForm({ rating: 5, content: '' })
+      setFeedback({ success: '评价已提交' })
     } catch (error) {
       setFeedback({ error: error.message })
     } finally {
@@ -162,7 +197,7 @@ export function ReviewPage() {
       <PageHeader
         eyebrow="PORTRA REVIEW"
         title={`订单 ${orderId} 评价`}
-        description="订单完成后双方可进行评价，评价会影响信用分。"
+        description="订单完成后双方可以进行评价，评价会影响信用分。"
       />
       <Feedback {...feedback} />
 
@@ -212,7 +247,7 @@ export function ReviewPage() {
         <Paper sx={{ ...panelSx, p: 2 }}>
           <Typography variant="h6" fontWeight={900}>对收到的评价发起申诉</Typography>
           <Typography color="text.secondary" mb={1.5}>
-            仅被评价方可申诉，管理端会进行仲裁。
+            仅被评价方可以申诉，管理端会进行处理。
           </Typography>
           <Stack spacing={1.5}>
             <TextField label="申诉原因" value={complaintReason} onChange={event => setComplaintReason(event.target.value)} />
@@ -228,7 +263,13 @@ export function ReviewPage() {
       {!loading && items.length ? (
         <Stack gap={1.5}>
           {items.map((item, index) => (
-            <ReviewItem key={item.reviewId} item={item} index={index} onOpenOrder={id => navigate(`/orders?orderId=${id}`)} />
+            <ReviewItem
+              key={item.reviewId}
+              item={item}
+              index={index}
+              onOpenOrder={id => navigate(`/orders?orderId=${id}`)}
+              onOpenReview={id => navigate(`/reviews/${id}`)}
+            />
           ))}
         </Stack>
       ) : null}
@@ -247,6 +288,7 @@ export function UserReviewsPage() {
 
   useEffect(() => {
     let alive = true
+
     async function load() {
       setLoading(true)
       try {
@@ -260,6 +302,7 @@ export function UserReviewsPage() {
         if (alive) setLoading(false)
       }
     }
+
     load()
     return () => { alive = false }
   }, [currentUser, userId])
@@ -277,7 +320,13 @@ export function UserReviewsPage() {
       {!loading && items.length ? (
         <Stack gap={1.5}>
           {items.map((item, index) => (
-            <ReviewItem key={item.reviewId} item={item} index={index} onOpenOrder={id => navigate(`/orders?orderId=${id}`)} />
+            <ReviewItem
+              key={item.reviewId}
+              item={item}
+              index={index}
+              onOpenOrder={id => navigate(`/orders?orderId=${id}`)}
+              onOpenReview={id => navigate(`/reviews/${id}`)}
+            />
           ))}
         </Stack>
       ) : null}

@@ -1,5 +1,5 @@
 import { yuanToCent } from '../../../utils/index.js'
-import { API_BASE } from '../../../api/client.js'
+import { fileIdsFromValues } from '../../../api/fileApi.js'
 import {
   DEFAULT_BUDGET_MAX_YUAN,
   DEFAULT_BUDGET_MIN_YUAN,
@@ -23,6 +23,10 @@ function splitIds(value) {
 function centToYuan(value, fallback = '') {
   const number = Number(value)
   return Number.isFinite(number) ? Math.round(number / 100) : fallback
+}
+
+function uniqueIds(values) {
+  return Array.from(new Set(values.map(value => Number(value)).filter(Number.isFinite)))
 }
 
 function normalizeYuan(value) {
@@ -91,18 +95,21 @@ export function buildServicePackagePayload(form) {
     form.scene,
     ...splitList(form.styleTagsText)
   ].filter(Boolean))
-  const portfolioIds = [
+  const manualImages = splitList(form.imagesText)
+  const portfolioIds = uniqueIds([
     ...(Array.isArray(form.portfolioIds) ? form.portfolioIds : []),
-    ...splitIds(form.portfolioIdsText)
-  ]
-  const imagePaths = portfolioIds.map(fileId => `${API_BASE}/files/${fileId}/download`)
+    ...splitIds(form.portfolioIdsText),
+    ...fileIdsFromValues(manualImages)
+  ])
+  const publicImages = manualImages.filter(image => !fileIdsFromValues(image).length)
   return {
     title: form.title.trim(),
     cityCode: form.cityCode.trim(),
     serviceArea: form.serviceArea.trim() || null,
     scene: form.scene.trim(),
     styleTags: Array.from(styleTags),
-    images: [...splitList(form.imagesText), ...imagePaths],
+    // Persist uploaded portfolio fileIds in portfolioIds; protected download URLs must not be saved in images.
+    images: publicImages,
     basePriceCent: yuanToCent(form.basePriceYuan),
     priceRange: buildPriceRange(form.basePriceYuan, form.maxPriceYuan),
     durationMinutes: Number(form.durationMinutes),
@@ -118,8 +125,12 @@ export function buildServicePackagePayload(form) {
 }
 
 export function servicePackageDetailToForm(service = {}) {
-  const portfolioIds = Array.isArray(service.portfolioIds) ? service.portfolioIds : []
-  const images = Array.isArray(service.images) ? service.images.filter(image => !String(image).includes('/files/')) : []
+  const rawImages = Array.isArray(service.images) ? service.images : []
+  const portfolioIds = uniqueIds([
+    ...(Array.isArray(service.portfolioIds) ? service.portfolioIds : []),
+    ...fileIdsFromValues(rawImages)
+  ])
+  const images = rawImages.filter(image => !fileIdsFromValues(image).length)
   const basePriceYuan = centToYuan(service.basePriceCent, DEFAULT_BUDGET_MIN_YUAN)
   const maxPriceYuan = maxPriceFromRange(service.priceRange, DEFAULT_BUDGET_MAX_YUAN)
   return {

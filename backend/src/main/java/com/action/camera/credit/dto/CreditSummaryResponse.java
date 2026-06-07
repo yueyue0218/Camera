@@ -8,6 +8,13 @@ public record CreditSummaryResponse(
         BigDecimal creditScore,
         String creditLevel,
         Long recordCount,
-        LocalDateTime lastUpdatedAt
+        LocalDateTime lastUpdatedAt,
+        Long effectiveOrderCount,
+        Long completedOrderCount,
+        BigDecimal goodReviewRate,
+        BigDecimal fulfillmentRate,
+        Long riskRecordCount,
+        Long receivedReviewCount,
+        BigDecimal averageRating
 ) {
 }

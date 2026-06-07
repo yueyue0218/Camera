@@ -8,7 +8,7 @@ import com.action.camera.domain.User;
 import com.action.camera.message.model.CreateConversationCommand;
 import com.action.camera.message.model.CreateConversationResult;
 import com.action.camera.message.service.ConversationService;
-import com.action.camera.repository.FileRepository;
+import com.action.camera.provider.mapper.ProviderProfileMapper;
 import com.action.camera.repository.UserRepository;
 import com.action.camera.servicepackage.domain.ServicePackage;
 import com.action.camera.servicepackage.domain.ServicePackageInterest;
@@ -66,7 +66,7 @@ class ServicePackageServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private FileRepository fileRepository;
+    private ProviderProfileMapper providerProfileMapper;
 
     private ServicePackageService servicePackageService;
 
@@ -77,7 +77,7 @@ class ServicePackageServiceTest {
                 interestRepository,
                 conversationService,
                 userRepository,
-                fileRepository
+                providerProfileMapper
         );
     }
 

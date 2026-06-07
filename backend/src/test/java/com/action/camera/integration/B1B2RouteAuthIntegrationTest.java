@@ -114,6 +114,29 @@ class B1B2RouteAuthIntegrationTest {
     }
 
     @Test
+    void publicHallGetAcceptsDemoHeadersEvenWhenDemoTokenIsPresent() {
+        Long serviceId = numberValue(data(rest.exchange("/service-packages", HttpMethod.POST,
+                userEntity("2001", "PROVIDER", servicePackageBody()), Map.class)), "serviceId");
+        Long demandId = numberValue(data(rest.exchange("/demands", HttpMethod.POST,
+                userEntity("1001", "CUSTOMER", demandBody()), Map.class)), "demandId");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-User-Id", "1001");
+        headers.set("X-User-Role", "CUSTOMER");
+        headers.setBearerAuth("demo-token-customer-1001");
+        HttpEntity<String> demoEntity = new HttpEntity<>(null, headers);
+
+        assertThat(rest.exchange("/service-packages", HttpMethod.GET, demoEntity, Map.class)
+                .getBody().get("code")).isEqualTo(200);
+        assertThat(rest.exchange("/service-packages/" + serviceId, HttpMethod.GET, demoEntity, Map.class)
+                .getBody().get("code")).isEqualTo(200);
+        assertThat(rest.exchange("/demands", HttpMethod.GET, demoEntity, Map.class)
+                .getBody().get("code")).isEqualTo(200);
+        assertThat(rest.exchange("/demands/" + demandId, HttpMethod.GET, demoEntity, Map.class)
+                .getBody().get("code")).isEqualTo(200);
+    }
+
+    @Test
     void ownerHistoryRoutesRequireExpectedRoles() {
         ResponseEntity<Map> customerCreate =
                 rest.exchange("/demands", HttpMethod.POST, userEntity("1001", "CUSTOMER", demandBody()), Map.class);

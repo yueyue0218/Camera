@@ -13,6 +13,11 @@ import {
 } from './utils/profileUtils.js'
 import './profile.css'
 
+function formatCreditScore(value) {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric.toFixed(1) : '暂无'
+}
+
 export function PublicProfilePage() {
   const { userId } = useParams()
   const [searchParams] = useSearchParams()
@@ -171,7 +176,7 @@ export function PublicProfilePage() {
   const gender = publicProfile?.gender
   const genderText = gender === 'MALE' ? '男' : gender === 'FEMALE' ? '女' : '保密'
   const bio = publicProfile?.bio || storedProfile.bio || ''
-  const creditScore = creditSummary?.creditScore ?? publicProfile?.creditScore ?? storedProfile.creditScore ?? null
+  const creditScore = creditSummary?.creditScore ?? null
   const cityPin = pp?.cityCode || publicProfile?.school || publicProfile?.cityCode || storedProfile.school || 'Portra'
   const cityMeta = pp?.cityCode || publicProfile?.cityCode || '未知城市'
 
@@ -216,7 +221,7 @@ export function PublicProfilePage() {
         <span>
           {isProvider
             ? `FRAME ${pp?.completedOrders ?? 0} · ${pp?.cityCode || 'Portra'}`
-            : `CREDIT ${creditScore ?? 100} · Portra`}
+            : `${creditScore != null ? `CREDIT ${formatCreditScore(creditScore)}` : '暂无信用'} · Portra`}
         </span>
       </div>
 
@@ -261,7 +266,7 @@ export function PublicProfilePage() {
             </div>
           ) : (
             <div className="metric-grid">
-              <button className="metric metric-button" type="button" onClick={() => navigate(`/users/${profileUserId}/credit`)}><b>{creditScore ?? '—'}</b><span>信用评分</span></button>
+              <button className="metric metric-button" type="button" onClick={() => navigate(`/users/${profileUserId}/credit`)}><b>{formatCreditScore(creditScore)}</b><span>信用评分</span></button>
               <div className="metric"><b>{publicProfile?.followerCount ?? '—'}</b><span>粉丝</span></div>
               <div className="metric"><b>{publicProfile?.followingCount ?? '—'}</b><span>关注</span></div>
               <div className="metric"><b>{publicProfile?.momentCount ?? moments.length}</b><span>动态数</span></div>

@@ -13,6 +13,7 @@ import { DeliveryPage } from './pages/delivery/DeliveryPage.jsx'
 import { CreditDetailPage } from './pages/credit/index.jsx'
 import { NotificationListPage } from './pages/notifications/NotificationListPage.jsx'
 import { ReviewPage, UserReviewsPage } from './pages/reviews/ReviewPage.jsx'
+import { ReviewDetailPage } from './pages/reviews/ReviewDetailPage.jsx'
 import { ReviewComplaintDetailPage } from './pages/review-complaints/ReviewComplaintDetailPage.jsx'
 import { PortraRouteTransition } from './components/portra/index.js'
 
@@ -39,6 +40,7 @@ export function AppRoutes() {
       <Route path="/orders/:orderId/deliveries/:deliveryId" element={<PortraRouteTransition><DeliveryGalleryPage /></PortraRouteTransition>} />
       <Route path="/orders/:orderId/delivery" element={<DeliveryPage />} />
       <Route path="/orders/:orderId/reviews" element={<ReviewPage />} />
+      <Route path="/reviews/:reviewId" element={<ReviewDetailPage />} />
       <Route path="/reviews" element={<ReviewPage />} />
       <Route path="/review-complaints/:complaintId" element={<ReviewComplaintDetailPage />} />
       <Route path="/notifications" element={<NotificationListPage />} />

@@ -43,6 +43,11 @@ function orderStatusLabel(status) {
     DELIVERING:'交付中', COMPLETED:'已完成', REVIEWED:'已评价', CANCELLED:'已取消' }[status] || status
 }
 
+function formatCreditScore(value) {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric.toFixed(1) : '暂无'
+}
+
 export function ProfilePage() {
   const navigate = useNavigate()
   const { currentUser, updateProfile, logout, switchRole } = useAuth()
@@ -61,6 +66,7 @@ export function ProfilePage() {
 
   const [moments, setMoments] = useState([])
   const [invitations, setInvitations] = useState([])
+  const [providerInfoMap, setProviderInfoMap] = useState({})
   const [profileOrders, setProfileOrders] = useState([])
   const [receivedReviews, setReceivedReviews] = useState([])
   const [creditSummary, setCreditSummary] = useState(null)
@@ -177,8 +183,22 @@ export function ProfilePage() {
     setPortfolioItems(readPortfolioItems(currentUser.userId))
     setMyFollowers(followersRes.status === 'fulfilled' ? followersRes.value : [])
     if (!isProvider) {
-      try { setInvitations(await demandApi.invitations(currentUser)) }
-      catch { setInvitations([]) }
+      try {
+        const invs = await demandApi.responsesReceived(currentUser)
+        setInvitations(invs)
+        const uniqueProviderIds = [...new Set(invs.map(i => i.providerId).filter(Boolean))]
+        const infoEntries = await Promise.all(uniqueProviderIds.map(async pid => {
+          try {
+            const brief = await userApi.brief(pid, currentUser)
+            let avatarData = ''
+            if (brief?.avatarFileId) {
+              try { avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser) } catch { /**/ }
+            }
+            return [pid, { nickname: brief?.nickname || `摄影师${pid}`, avatarData }]
+          } catch { return [pid, { nickname: `摄影师${pid}`, avatarData: '' }] }
+        }))
+        setProviderInfoMap(Object.fromEntries(infoEntries))
+      } catch { setInvitations([]) }
     }
   }
 
@@ -242,23 +262,21 @@ export function ProfilePage() {
   }
 
   async function acceptInvitation(inv) {
-    setActioningId(inv.invitationId)
+    setActioningId(inv.responseId)
     try {
-      const accepted = await demandApi.acceptInvitation(inv.invitationId, currentUser)
-      const conversation = await conversationApi.createFromResponse(accepted, currentUser)
-      const record = saveConversationRecord(conversation, {
-        demandId: inv.demandId, scene: inv.demandScene,
-        customerId: inv.customerId, providerUserId: inv.providerId, lastMessage: inv.message
-      })
-      await loadProfileData()
-      navigate(`/messages/${record.conversationId}`)
+      const accepted = await demandApi.accept(inv.demandId, inv.responseId, currentUser)
+      saveConversationRecord(
+        { conversationId: accepted.conversationId },
+        { customerId: accepted.customerId, providerId: accepted.providerId, demandId: accepted.demandId }
+      )
+      window.location.href = `/messages/${accepted.conversationId}`
     } catch (err) { setNotice({ type: 'err', text: err.message }) }
     finally { setActioningId(null) }
   }
 
   async function rejectInvitation(inv) {
-    setActioningId(inv.invitationId)
-    try { await demandApi.rejectInvitation(inv.invitationId, currentUser); await loadProfileData() }
+    setActioningId(inv.responseId)
+    try { await demandApi.reject(inv.demandId, inv.responseId, currentUser); await loadProfileData() }
     catch (err) { setNotice({ type: 'err', text: err.message }) }
     finally { setActioningId(null) }
   }
@@ -275,12 +293,13 @@ export function ProfilePage() {
     [myFollowers]
   )
 
+  const TERMINAL_STATUSES = ['COMPLETED','REVIEWED','CANCELLED','REFUNDED','APPEALING']
   const historicalOrders = profileOrders.filter(o => ['COMPLETED','REVIEWED'].includes(o.status)).length
-  const ongoingOrders = profileOrders.filter(o => !['COMPLETED','REVIEWED','CANCELLED'].includes(o.status)).length
-  const pendingInvitations = invitations.filter(i => (i.status || 'PENDING') === 'PENDING').length
-  const creditScore = creditSummary?.creditScore ?? currentUser.creditScore ?? 100
-  const totalOrders = profileOrders.length
-  const completionRate = totalOrders > 0 ? Math.round((historicalOrders / totalOrders) * 100) : 100
+  const ongoingOrders = profileOrders.filter(o => !TERMINAL_STATUSES.includes(o.status)).length
+  const pendingInvitations = invitations.filter(i => (i.status || 'PENDING_CUSTOMER_ACCEPT') === 'PENDING_CUSTOMER_ACCEPT').length
+  const creditScore = creditSummary?.creditScore ?? null
+  const billableOrders = profileOrders.filter(o => o.status !== 'REFUNDED').length
+  const completionRate = billableOrders > 0 ? Math.round((historicalOrders / billableOrders) * 100) : 100
   const genderText = currentUser.gender === 'MALE' ? '男' : currentUser.gender === 'FEMALE' ? '女' : '保密'
   const displayName = profileForm.nickname || currentUser.label || `用户${currentUser.userId}`
   const schoolPin = currentUser.school || 'Portra'
@@ -365,7 +384,7 @@ export function ProfilePage() {
             <div className="id-label">Portra Credit File</div>
           </div>
           <div className="metric-grid">
-            <button className="metric metric-button" type="button" onClick={() => navigate('/profile/credit')}><b>{Number(creditScore).toFixed(1)}</b><span>信用评分</span></button>
+            <button className="metric metric-button" type="button" onClick={() => navigate('/profile/credit')}><b>{formatCreditScore(creditScore)}</b><span>信用评分</span></button>
             <div className="metric"><b>{completionRate}%</b><span>完成率</span></div>
             <div className="metric"><b>{historicalOrders}</b><span>历史约拍</span></div>
             <div className="metric"><b>{ongoingOrders}</b><span>进行中</span></div>
@@ -374,7 +393,7 @@ export function ProfilePage() {
             <button className="primary-btn" onClick={() => setEditOpen(true)}>编辑资料</button>
             {isProvider
               ? <button className="secondary-btn" onClick={() => navigate('/publish/service-package')}>发布新橱窗</button>
-              : <button className="secondary-btn" onClick={() => navigate('/feed')}>管理我的动态</button>
+              : <button className="secondary-btn" onClick={() => navigate('/feed?view=mine')}>管理我的动态</button>
             }
             {isProvider ? (
               <button className="secondary-btn" onClick={() => handleSwitchRole('CUSTOMER')}>
@@ -481,15 +500,32 @@ export function ProfilePage() {
               ) : invitations.length ? (
                 <div className="order-list">
                   {invitations.map(inv => {
-                    const status = inv.status || 'PENDING'
-                    const isPending = status === 'PENDING'
-                    const busy = actioningId === inv.invitationId
+                    const status = inv.status || 'PENDING_CUSTOMER_ACCEPT'
+                    const isPending = status === 'PENDING_CUSTOMER_ACCEPT'
+                    const busy = actioningId === inv.responseId
                     return (
-                      <div key={inv.invitationId} className="order-slip" style={{cursor:'default'}}>
-                        <div className="order-num">P.</div>
+                      <div key={inv.responseId} className="order-slip" style={{cursor:'default'}}>
+                        <div
+                          style={{width:40,height:40,borderRadius:'50%',overflow:'hidden',flexShrink:0,cursor:'pointer',border:'2px solid var(--line)'}}
+                          onClick={() => navigate(`/users/${inv.providerId}`)}
+                          title="查看摄影师主页"
+                        >
+                          {providerInfoMap[inv.providerId]?.avatarData
+                            ? <img src={providerInfoMap[inv.providerId].avatarData} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} />
+                            : <div style={{width:'100%',height:'100%',background:'var(--line)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,color:'var(--ink-sub)'}}>P</div>
+                          }
+                        </div>
                         <div>
-                          <h4>{inv.demandScene || '约拍邀请'}</h4>
-                          <p>摄影师 {inv.providerId} · {formatShortTime(inv.createdAt)}</p>
+                          <h4>需求 #{inv.demandId}</h4>
+                          <p>
+                            <span
+                              style={{cursor:'pointer',textDecoration:'underline',textDecorationColor:'var(--line)'}}
+                              onClick={() => navigate(`/users/${inv.providerId}`)}
+                            >
+                              {providerInfoMap[inv.providerId]?.nickname || `摄影师${inv.providerId}`}
+                            </span>
+                            {' · '}{formatShortTime(inv.responseTime)}
+                          </p>
                         </div>
                         {isPending ? (
                           <div style={{display:'flex',gap:6}}>
@@ -497,7 +533,7 @@ export function ProfilePage() {
                             <button className="secondary-btn" style={{height:34,fontSize:12,padding:'0 10px'}} onClick={() => rejectInvitation(inv)} disabled={busy}>婉拒</button>
                           </div>
                         ) : (
-                          <span className={`status ${status === 'ACCEPTED' ? '' : 'orange'}`}>{status === 'ACCEPTED' ? '已接受' : '已婉拒'}</span>
+                          <span className={`status ${status === 'ACCEPTED' ? '' : 'orange'}`}>{status === 'ACCEPTED' ? '已接受' : status === 'REJECTED' ? '已婉拒' : status}</span>
                         )}
                       </div>
                     )
@@ -602,11 +638,11 @@ export function ProfilePage() {
           <aside className="side-stack" style={{height:'auto',minHeight:'var(--dashboard-left-card-height)',overflow:'visible'}}>
             <section className="panel-card">
               <button className="credit-stamp credit-stamp-button" type="button" onClick={() => navigate('/profile/credit')}>
-                <b>{Number(creditScore).toFixed(1)}</b>
+                <b>{formatCreditScore(creditScore)}</b>
                 <span>Portra Credit</span>
               </button>
               <div className="todo-list">
-                <div className="todo">
+                <div className="todo" style={{cursor:'pointer'}} onClick={() => handleTabClick('intent')}>
                   <div>
                     <strong>{isProvider ? '待响应需求' : '待确认邀请'}</strong>
                     <br /><small>今天需要处理</small>
@@ -636,7 +672,7 @@ export function ProfilePage() {
             </div>
             <button
               className="archive-all"
-              onClick={() => archiveSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              onClick={() => navigate('/feed?view=mine')}
             >
               全部帖子 →
             </button>

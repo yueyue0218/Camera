@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { cityName, firstText, latestTimeText, moneyRange, splitTags } from './hallUtils.js'
+import { cityName, firstText, gradientFor, latestTimeText, moneyRange, splitTags } from './hallUtils.js'
+import { publicImageUrls, useFileObjectUrl } from '../utils/fileObjectUrls.js'
 
 export const PORTRA_TIPS = [
   '拍摄前先确定主光方向，让脸微微转向光源，肤色会更干净。',
@@ -43,7 +44,14 @@ export function DemandAside({ selectedDemand, error, currentUser, onRespond, onH
   const [tipIndex, setTipIndex] = useState(0)
   const isDemandOwner = selectedDemand && currentUser.role === 'CUSTOMER' && sameId(selectedDemand.customerId, currentUser.userId)
   const publisherName = firstText(selectedDemand?.customerNickname, selectedDemand?.customerName) || '暂无'
-  const publisherAvatar = firstText(selectedDemand?.customerAvatarUrl, selectedDemand?.customerAvatar)
+  const uploadedPublisherAvatar = useFileObjectUrl(
+    [selectedDemand?.customerAvatarFileId, selectedDemand?.avatarFileId],
+    currentUser,
+    `demand ${selectedDemand?.demandId || 'selected'} aside publisher avatar`
+  )
+  const fallbackPublisherAvatar = publicImageUrls(selectedDemand?.customerAvatarUrl, selectedDemand?.customerAvatar)[0] || ''
+  const publisherAvatar = uploadedPublisherAvatar || fallbackPublisherAvatar
+  const publisherAvatarArt = publisherAvatar ? `url(${publisherAvatar})` : gradientFor(selectedDemand?.customerId || selectedDemand?.demandId)
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -78,7 +86,7 @@ export function DemandAside({ selectedDemand, error, currentUser, onRespond, onH
           <button className="aside-item aside-item-button" type="button" onClick={onOpenPublisher} disabled={!onOpenPublisher}>
             <strong>发布者</strong>
             <span className="aside-publisher-brief">
-              {publisherAvatar && <span className="publisher-avatar" style={{ '--avatar-art': `url(${publisherAvatar})` }} aria-hidden="true" />}
+              <span className="publisher-avatar" style={{ '--avatar-art': publisherAvatarArt }} aria-hidden="true" />
               {publisherName}
             </span>
           </button>
@@ -112,6 +120,14 @@ export function DemandAside({ selectedDemand, error, currentUser, onRespond, onH
 
 export function ShowcaseAside({ selectedService, currentUser, interests }) {
   const credit = selectedService?.photographerCreditScore ?? selectedService?.providerCreditScore ?? selectedService?.creditScore
+  const uploadedAvatar = useFileObjectUrl(
+    [selectedService?.photographerAvatarFileId, selectedService?.avatarFileId],
+    currentUser,
+    `service package ${selectedService?.serviceId || 'selected'} aside avatar`
+  )
+  const fallbackAvatar = publicImageUrls(selectedService?.photographerAvatarUrl, selectedService?.photographerAvatar)[0] || ''
+  const avatar = uploadedAvatar || fallbackAvatar
+  const avatarArt = avatar ? `url(${avatar})` : gradientFor(selectedService?.photographerId || selectedService?.providerId)
 
   return (
     <aside className="aside">
@@ -121,7 +137,7 @@ export function ShowcaseAside({ selectedService, currentUser, interests }) {
           <div className="profile-mini detail-provider-link">
             <div
               className="mini-avatar"
-              style={{ '--avatar-art': selectedService.photographerAvatarUrl ? `url(${selectedService.photographerAvatarUrl})` : undefined }}
+              style={{ '--avatar-art': avatarArt }}
               aria-hidden="true"
             />
             <div className="photographer-card-info">

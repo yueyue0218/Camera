@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
-import { fileApi } from '../../../api/fileApi.js'
-import { cityName, demandStatusText, firstText, fullDateTime, moneyRange, readableDate, splitTags, timeTagLabel } from './hallUtils.js'
+import { cityName, demandStatusText, firstText, fullDateTime, gradientFor, moneyRange, readableDate, splitTags, timeTagLabel } from './hallUtils.js'
+import { publicImageUrls, useFileObjectUrl } from '../utils/fileObjectUrls.js'
 
 export function DemandCard({
   demand,
@@ -16,36 +15,25 @@ export function DemandCard({
   const timeTags = splitTags(demand.timeTags)
   const title = firstText(demand.title, demand.scene)
   const customerName = firstText(demand.customerNickname, demand.customerName)
-  const customerAvatar = firstText(demand.customerAvatarUrl, demand.customerAvatar, demand.customerAvatarData)
+  const uploadedCustomerAvatar = useFileObjectUrl(
+    [demand.customerAvatarFileId, demand.avatarFileId],
+    currentUser,
+    `demand ${demand.demandId} publisher avatar`
+  )
+  const fallbackCustomerAvatar = publicImageUrls(demand.customerAvatarUrl, demand.customerAvatar, demand.customerAvatarData)[0] || ''
+  const customerAvatar = uploadedCustomerAvatar || fallbackCustomerAvatar
+  const customerAvatarArt = customerAvatar ? `url(${customerAvatar})` : gradientFor(demand.customerId || demand.demandId)
   const place = [cityName(demand.cityName || demand.cityCode), demand.location].filter(Boolean).join(' · ')
-  const firstReferenceFileId = Array.isArray(demand.referenceFileIds) ? demand.referenceFileIds[0] : null
-  const [coverUrl, setCoverUrl] = useState('')
-
-  useEffect(() => {
-    let objectUrl = ''
-    let ignored = false
-    async function loadCover() {
-      if (!firstReferenceFileId) {
-        setCoverUrl('')
-        return
-      }
-      try {
-        objectUrl = await fileApi.downloadObjectUrl(firstReferenceFileId, currentUser)
-        if (!ignored) setCoverUrl(objectUrl)
-      } catch {
-        if (!ignored) setCoverUrl('')
-      }
-    }
-    loadCover()
-    return () => {
-      ignored = true
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
-    }
-  }, [currentUser, firstReferenceFileId])
+  const coverUrl = useFileObjectUrl(
+    demand.referenceFileIds,
+    currentUser,
+    `demand ${demand.demandId} reference`
+  )
+  const coverArt = coverUrl ? `url(${coverUrl})` : gradientFor(demand.demandId)
 
   return (
-    <article className={`ticket-card ${coverUrl ? 'has-cover' : ''}`} onClick={onOpen}>
-      {coverUrl && <div className="ticket-cover" style={{ '--art': `url(${coverUrl})` }} aria-hidden="true" />}
+    <article className="ticket-card has-cover" onClick={onOpen}>
+      <div className="ticket-cover" style={{ '--art': coverArt }} aria-hidden="true" />
       <div className="ticket-top">
         <div className="ticket-heading">
           <h3 className="ticket-title">{title || '暂无标题'}</h3>
@@ -61,7 +49,7 @@ export function DemandCard({
         disabled={!onOpenPublisher}
         onClick={onOpenPublisher ? e => { e.stopPropagation(); onOpenPublisher() } : undefined}
       >
-        {customerAvatar && <span className="publisher-avatar" style={{ '--avatar-art': `url(${customerAvatar})` }} aria-hidden="true" />}
+        <span className="publisher-avatar" style={{ '--avatar-art': customerAvatarArt }} aria-hidden="true" />
         <span>{customerName || '暂无发布者'}</span>
       </button>
       <div className="ticket-meta" aria-label="需求关键信息">

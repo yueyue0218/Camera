@@ -40,6 +40,7 @@ import {
 import {
   buildConversationWorkbenchViewModel,
   getCurrentUserId,
+  getUserRoleInConversation,
   selectConversationOrder
 } from './utils/workbenchState.js'
 import {
@@ -62,7 +63,7 @@ export function ConversationDetailPage() {
   const { conversationId } = useParams()
   const navigate = useWorkflowNavigate()
   const rawNavigate = useNavigate()
-  const { currentUser } = useAuth()
+  const { currentUser, switchRole } = useAuth()
   const [conversation, setConversation] = useState(null)
   const [messages, setMessages] = useState([])
   const [quotes, setQuotes] = useState([])
@@ -598,9 +599,14 @@ export function ConversationDetailPage() {
   ])
   useEffect(() => {
     if (conversation && actions.roleMismatch) {
-      navigate('/messages', { replace: true, state: { roleMismatch: true } })
+      const correctRole = getUserRoleInConversation(conversation, currentUser)
+      if (correctRole) {
+        switchRole(correctRole)
+      } else {
+        navigate('/messages', { replace: true, state: { roleMismatch: true } })
+      }
     }
-  }, [actions.roleMismatch, conversation, currentUser.role, navigate])
+  }, [actions.roleMismatch, conversation, currentUser, navigate, switchRole])
   const editingQuote = editingQuotationId
     ? quotes.find(quote => String(quote.quotationId) === String(editingQuotationId))
     : null

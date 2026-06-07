@@ -21,6 +21,7 @@ import com.action.camera.message.model.CreateConversationResult;
 import com.action.camera.message.service.ConversationService;
 import com.action.camera.notification.dto.NotificationCreateRequest;
 import com.action.camera.notification.service.NotificationService;
+import com.action.camera.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,7 +38,7 @@ import java.util.stream.Collectors;
 public class DemandService {
 
     private static final int DEFAULT_EXPIRE_DAYS = 30;
-    private static final String DEFAULT_ACCEPT_INITIAL_MESSAGE = "Demand response accepted; conversation opened.";
+    private static final String DEFAULT_ACCEPT_INITIAL_MESSAGE = "已接受约拍响应，会话已开启。";
     private static final Set<String> SUPPORTED_TIME_TAGS = Set.of(
             "NEAR_3_DAYS",
             "NEAR_7_DAYS",
@@ -48,15 +49,18 @@ public class DemandService {
     private final DemandResponseRepository responseRepository;
     private final ConversationService conversationService;
     private final NotificationService notificationService;
+    private final UserRepository userRepository;
 
     public DemandService(DemandRepository demandRepository,
                          DemandResponseRepository responseRepository,
                          ConversationService conversationService,
-                         NotificationService notificationService) {
+                         NotificationService notificationService,
+                         UserRepository userRepository) {
         this.demandRepository = demandRepository;
         this.responseRepository = responseRepository;
         this.conversationService = conversationService;
         this.notificationService = notificationService;
+        this.userRepository = userRepository;
     }
 
     @Transactional
@@ -82,7 +86,7 @@ public class DemandService {
                 now.plusDays(DEFAULT_EXPIRE_DAYS)
         );
         Demand savedDemand = demandRepository.save(demand);
-        return DemandMapper.toDemandDto(savedDemand);
+        return toDemandDto(savedDemand);
     }
 
     @Transactional(readOnly = true)
@@ -133,7 +137,7 @@ public class DemandService {
                 .filter(demand -> matchesBudget(demand, minBudgetCent, maxBudgetCent))
                 .sorted(Comparator.comparing(Demand::getUpdatedAt,
                         Comparator.nullsFirst(Comparator.naturalOrder())).reversed())
-                .map(DemandMapper::toDemandDto)
+                .map(this::toDemandDto)
                 .collect(Collectors.toList());
         int fromIndex = Math.min((safePage - 1) * safeSize, filtered.size());
         int toIndex = Math.min(fromIndex + safeSize, filtered.size());
@@ -161,7 +165,7 @@ public class DemandService {
         }
         applyUpdate(demand, request);
         validateBudgetRange(demand.getBudgetMinCent(), demand.getBudgetMaxCent());
-        return DemandMapper.toDemandDto(demandRepository.save(demand));
+        return toDemandDto(demandRepository.save(demand));
     }
 
     @Transactional
@@ -169,7 +173,7 @@ public class DemandService {
         requireCustomer(user);
         Demand demand = findOwnedDemand(demandId, user);
         demand.close();
-        return DemandMapper.toDemandDto(demandRepository.save(demand));
+        return toDemandDto(demandRepository.save(demand));
     }
 
     @Transactional
@@ -187,7 +191,7 @@ public class DemandService {
             return toOwnerDemandDto(demand);
         }
         if (demand.getStatus() == DemandStatus.OPEN) {
-            return DemandMapper.toDemandDto(demand);
+            return toDemandDto(demand);
         }
         throw new BusinessException(ErrorCode.FORBIDDEN, "no permission to view this demand");
     }
@@ -238,6 +242,17 @@ public class DemandService {
     public List<DemandResponseDto> listMyResponses(CurrentUser user) {
         requireProvider(user);
         return responseRepository.findByProviderIdOrderByResponseTimeDesc(user.getUserId()).stream()
+                .map(DemandMapper::toResponseDto)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<DemandResponseDto> listReceivedResponses(CurrentUser user) {
+        requireCustomerOrAdmin(user);
+        return demandRepository.findOwnerHistory(user.getUserId(), List.of(DemandStatus.OPEN, DemandStatus.CLOSED))
+                .stream()
+                .flatMap(demand -> responseRepository.findByDemandId(demand.getId()).stream())
+                .filter(response -> response.getStatus() == DemandResponseStatus.PENDING_CUSTOMER_ACCEPT)
                 .map(DemandMapper::toResponseDto)
                 .collect(Collectors.toList());
     }
@@ -336,10 +351,24 @@ public class DemandService {
     private DemandDto toOwnerDemandDto(Demand demand) {
         return DemandMapper.toDemandDto(
                 demand,
+                customerInfo(demand.getCustomerId()),
                 countResponses(demand.getId(), DemandResponseStatus.PENDING_CUSTOMER_ACCEPT),
                 countResponses(demand.getId(), DemandResponseStatus.ACCEPTED),
                 countResponses(demand.getId(), DemandResponseStatus.REJECTED)
         );
+    }
+
+    private DemandDto toDemandDto(Demand demand) {
+        return DemandMapper.toDemandDto(demand, customerInfo(demand.getCustomerId()));
+    }
+
+    private CustomerInfo customerInfo(Long customerId) {
+        if (customerId == null || userRepository == null) {
+            return null;
+        }
+        return userRepository.findById(customerId)
+                .map(user -> new CustomerInfo(user.getNickname(), user.getAvatarFileId()))
+                .orElse(null);
     }
 
     private int countResponses(Long demandId, DemandResponseStatus status) {

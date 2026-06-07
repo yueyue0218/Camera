@@ -117,6 +117,12 @@ public class DemandController {
         return Result.success(demandService.listMyResponses(currentUser));
     }
 
+    @GetMapping("/responses/received")
+    public Result<List<DemandResponseDto>> listReceivedResponses(HttpServletRequest httpRequest) {
+        CurrentUser currentUser = currentUserProvider.getCurrentUser(httpRequest);
+        return Result.success(demandService.listReceivedResponses(currentUser));
+    }
+
     @PostMapping("/{demandId}/responses/{responseId}/accept")
     public Result<AcceptDemandResponseResult> acceptResponse(@PathVariable Long demandId,
                                                              @PathVariable Long responseId,

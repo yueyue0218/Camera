@@ -39,6 +39,12 @@ export const demandApi = {
   myResponses(currentUser) {
     return request('/demands/responses/me', {}, currentUser)
   },
+  responsesReceived(currentUser) {
+    return request('/demands/responses/received', {}, currentUser)
+  },
+  reject(demandId, responseId, currentUser) {
+    return request(`/demands/${demandId}/responses/${responseId}/reject`, { method: 'POST' }, currentUser)
+  },
   accept(demandId, responseId, currentUser) {
     return request(`/demands/${demandId}/responses/${responseId}/accept`, { method: 'POST' }, currentUser)
   },
