@@ -61,6 +61,7 @@ export function ProfilePage() {
 
   const [moments, setMoments] = useState([])
   const [invitations, setInvitations] = useState([])
+  const [providerInfoMap, setProviderInfoMap] = useState({})
   const [profileOrders, setProfileOrders] = useState([])
   const [receivedReviews, setReceivedReviews] = useState([])
   const [creditSummary, setCreditSummary] = useState(null)
@@ -177,8 +178,22 @@ export function ProfilePage() {
     setPortfolioItems(readPortfolioItems(currentUser.userId))
     setMyFollowers(followersRes.status === 'fulfilled' ? followersRes.value : [])
     if (!isProvider) {
-      try { setInvitations(await demandApi.responsesReceived(currentUser)) }
-      catch { setInvitations([]) }
+      try {
+        const invs = await demandApi.responsesReceived(currentUser)
+        setInvitations(invs)
+        const uniqueProviderIds = [...new Set(invs.map(i => i.providerId).filter(Boolean))]
+        const infoEntries = await Promise.all(uniqueProviderIds.map(async pid => {
+          try {
+            const brief = await userApi.brief(pid, currentUser)
+            let avatarData = ''
+            if (brief?.avatarFileId) {
+              try { avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser) } catch { /**/ }
+            }
+            return [pid, { nickname: brief?.nickname || `摄影师${pid}`, avatarData }]
+          } catch { return [pid, { nickname: `摄影师${pid}`, avatarData: '' }] }
+        }))
+        setProviderInfoMap(Object.fromEntries(infoEntries))
+      } catch { setInvitations([]) }
     }
   }
 
@@ -484,10 +499,27 @@ export function ProfilePage() {
                     const busy = actioningId === inv.responseId
                     return (
                       <div key={inv.responseId} className="order-slip" style={{cursor:'default'}}>
-                        <div className="order-num">P.</div>
+                        <div
+                          style={{width:40,height:40,borderRadius:'50%',overflow:'hidden',flexShrink:0,cursor:'pointer',border:'2px solid var(--line)'}}
+                          onClick={() => navigate(`/users/${inv.providerId}`)}
+                          title="查看摄影师主页"
+                        >
+                          {providerInfoMap[inv.providerId]?.avatarData
+                            ? <img src={providerInfoMap[inv.providerId].avatarData} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} />
+                            : <div style={{width:'100%',height:'100%',background:'var(--line)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,color:'var(--ink-sub)'}}>P</div>
+                          }
+                        </div>
                         <div>
                           <h4>需求 #{inv.demandId}</h4>
-                          <p>摄影师 {inv.providerId} · {formatShortTime(inv.responseTime)}</p>
+                          <p>
+                            <span
+                              style={{cursor:'pointer',textDecoration:'underline',textDecorationColor:'var(--line)'}}
+                              onClick={() => navigate(`/users/${inv.providerId}`)}
+                            >
+                              {providerInfoMap[inv.providerId]?.nickname || `摄影师${inv.providerId}`}
+                            </span>
+                            {' · '}{formatShortTime(inv.responseTime)}
+                          </p>
                         </div>
                         {isPending ? (
                           <div style={{display:'flex',gap:6}}>
