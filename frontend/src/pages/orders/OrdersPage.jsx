@@ -46,6 +46,7 @@ import {
 import { buildOrderNavigationTarget, goToOrderConversation, normalizeOrderId } from '../../utils/orderNavigation.js'
 import { goToDeliveryGallery } from '../../utils/deliveryNavigation.js'
 import { PRODUCT_ACTION_COPY } from '../../utils/productCopy.js'
+import { ORDER_SURFACES, WORKFLOW_SOURCES, buildOrderListTarget, isOrderListSurface } from '../../utils/workflowNavigation.js'
 import {
   getExplicitReturnToConversation,
   navigateBackToConversation
@@ -265,6 +266,7 @@ export function OrdersPage() {
     return normalizeOrderId(location.state?.orderId) || normalizeOrderId(value)
   }, [location.search, location.state])
   const explicitReturnToConversation = useMemo(() => getExplicitReturnToConversation(location), [location.search, location.state])
+  const orderListSurface = useMemo(() => isOrderListSurface(location), [location.search, location.state])
   const [orders, setOrders] = useState([])
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [statusLogs, setStatusLogs] = useState([])
@@ -296,7 +298,7 @@ export function OrdersPage() {
 
   useEffect(() => {
     loadOrders(focusOrderId)
-  }, [currentUser.userId, currentUser.role, statusFilter, focusOrderId])
+  }, [currentUser.userId, currentUser.role, statusFilter, focusOrderId, orderListSurface])
 
   useEffect(() => () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl)
@@ -340,7 +342,7 @@ export function OrdersPage() {
       if (focusOrderId && roleOrders.some(order => Number(order.orderId) === Number(focusOrderId))) {
         const focusedOrder = roleOrders.find(order => Number(order.orderId) === Number(focusOrderId))
         await openOrder(focusedOrder || focusOrderId, false)
-      } else if (roleOrders.length) {
+      } else if (roleOrders.length && !orderListSurface) {
         await openOrder(roleOrders[0], false)
       } else {
         setSelectedOrder(null)
@@ -409,7 +411,9 @@ export function OrdersPage() {
         const searchConversationId = new URLSearchParams(location.search).get('conversationId')
         const target = buildOrderNavigationTarget(orderId, {
           conversationId: detail.conversationId || location.state?.conversationId || searchConversationId,
-          returnTo: explicitReturnToConversation
+          returnTo: explicitReturnToConversation,
+          source: explicitReturnToConversation ? WORKFLOW_SOURCES.conversation : WORKFLOW_SOURCES.order,
+          orderSurface: ORDER_SURFACES.detail
         })
         if (target) navigate(target.to, { replace: true, state: target.state })
       }
@@ -701,7 +705,8 @@ export function OrdersPage() {
       orderId: selectedOrder?.orderId || batch?.orderId,
       deliveryId: batch?.deliveryId,
       conversationId: selectedOrderConversationId,
-      returnTo: explicitReturnToConversation
+      returnTo: explicitReturnToConversation,
+      source: explicitReturnToConversation ? WORKFLOW_SOURCES.conversation : WORKFLOW_SOURCES.order
     })
     if (!succeeded) {
       setNotice({ type: 'warning', text: '作品记录暂不可查看，请刷新后重试。' })
@@ -716,6 +721,17 @@ export function OrdersPage() {
   function continueConversation() {
     const succeeded = goToOrderConversation(navigate, selectedOrderConversationId)
     if (!succeeded) setNotice({ type: 'warning', text: '暂无可进入的沟通记录。' })
+  }
+
+  function returnToOrderList() {
+    const target = buildOrderListTarget()
+    setSelectedOrder(null)
+    setStatusLogs([])
+    setDeliveryRecords([])
+    setPhotoAuthorizations([])
+    setOrderReviews([])
+    setArbitrations([])
+    navigate(target.to, { state: target.state })
   }
 
   return (
@@ -805,15 +821,20 @@ export function OrdersPage() {
               <Stack spacing={2}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between' }}>
                   <Box>
-                    {(canReturnToConversation || canContactCounterparty) && (
+                    <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center', flexWrap: 'wrap', mb: 0.8 }}>
                       <PortraActionLink
-                        startIcon={canReturnToConversation ? <ArrowBackRoundedIcon /> : null}
-                        onClick={canReturnToConversation ? returnToConversation : continueConversation}
+                        startIcon={<ArrowBackRoundedIcon />}
+                        onClick={canReturnToConversation ? returnToConversation : returnToOrderList}
                         sx={returnLinkSx}
                       >
-                        {canReturnToConversation ? PRODUCT_ACTION_COPY.returnConversation : PRODUCT_ACTION_COPY.goConversation}
+                        {canReturnToConversation ? PRODUCT_ACTION_COPY.returnConversation : PRODUCT_ACTION_COPY.returnOrderList}
                       </PortraActionLink>
-                    )}
+                      {!canReturnToConversation && canContactCounterparty && (
+                        <PortraActionLink onClick={continueConversation} sx={returnLinkSx}>
+                          {PRODUCT_ACTION_COPY.goConversation}
+                        </PortraActionLink>
+                      )}
+                    </Stack>
                     <Typography variant="h5" sx={{ fontSize: { xs: 20, md: 24 }, color: PORTRA_SURFACE.ink, fontWeight: 950 }}>{selectedOrderTitle}</Typography>
                     <Typography sx={{ color: PORTRA_SURFACE.muted, mt: 0.4 }}>
                       订单 · {selectedCounterpartyLabel}
@@ -1268,11 +1289,13 @@ export function OrdersPage() {
 
 const orderPageSx = {
   color: PORTRA_SURFACE.ink,
-  overflowWrap: 'anywhere'
+  overflowWrap: 'anywhere',
+  overflowX: 'hidden'
 }
 
 const orderGridSx = {
   display: 'grid',
+  width: '100%',
   gridTemplateColumns: {
     xs: 'minmax(0, 1fr)',
     lg: `${PORTRA_LAYOUT.orderSidebarWidth.lg} minmax(0, 1fr)`,
@@ -1280,7 +1303,8 @@ const orderGridSx = {
   },
   gap: { xs: 1.6, lg: 2.75 },
   alignItems: 'start',
-  minWidth: 0
+  minWidth: 0,
+  overflowX: 'hidden'
 }
 
 const orderIndexPanelSx = {

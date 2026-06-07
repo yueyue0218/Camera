@@ -9,6 +9,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { deliveryApi, fileApi, orderApi } from '../../api.js'
 import { goToOrder } from '../../utils/orderNavigation.js'
+import { ORDER_SURFACES, WORKFLOW_SOURCES, getWorkflowSource } from '../../utils/workflowNavigation.js'
 import {
   getExplicitReturnToConversation,
   getReturnToConversation,
@@ -198,9 +199,10 @@ export function DeliveryGalleryPage() {
   const viewerFile = viewerIndex >= 0 ? files[viewerIndex] : null
   const viewerUrl = viewerFile ? previewUrls[viewerFile.id] || previewUrls[viewerFile.fileId] : ''
   const conversationId = location.state?.conversationId || new URLSearchParams(location.search).get('conversationId')
+  const workflowSource = getWorkflowSource(location)
   const explicitReturnToConversation = getExplicitReturnToConversation(location)
   const returnToConversation = getReturnToConversation(location, order?.conversationId || conversationId)
-  const primaryBackIsConversation = Boolean(explicitReturnToConversation)
+  const primaryBackIsConversation = workflowSource === WORKFLOW_SOURCES.conversation || Boolean(explicitReturnToConversation)
   const associatedConversationId = order?.conversationId || conversationId
   const currentUserId = Number(currentUser?.userId)
   const canCustomerAct = Number(order?.customerId) === currentUserId && order?.status === 'DELIVERED_PENDING_CONFIRM'
@@ -208,6 +210,12 @@ export function DeliveryGalleryPage() {
   const isReworkForProvider = isProvider && order?.status === 'REWORK_REQUIRED'
   const isCompleted = order?.status === 'COMPLETED'
   const galleryMeta = [batch?.subtitle, formatOrderTitle(order)].filter(Boolean).join(' · ')
+  const orderNavigationOptions = {
+    conversationId: associatedConversationId,
+    returnTo: explicitReturnToConversation,
+    source: primaryBackIsConversation ? WORKFLOW_SOURCES.conversation : WORKFLOW_SOURCES.order,
+    orderSurface: ORDER_SURFACES.detail
+  }
 
   if (loading) {
     return <PortraEmptyState title="作品记录加载中" description="正在读取订单和作品文件。" />
@@ -224,7 +232,7 @@ export function DeliveryGalleryPage() {
           startIcon={<ArrowBackRoundedIcon />}
           onClick={() => primaryBackIsConversation
             ? navigateBackToConversation(navigate, location, associatedConversationId)
-            : goToOrder(navigate, orderId, { conversationId: associatedConversationId })}
+            : goToOrder(navigate, orderId, orderNavigationOptions)}
         >
           {primaryBackIsConversation ? '返回沟通' : '返回订单'}
         </PortraContextActionButton>
@@ -243,7 +251,7 @@ export function DeliveryGalleryPage() {
               sx={primaryBackButtonSx}
               onClick={() => primaryBackIsConversation
                 ? navigateBackToConversation(navigate, location, associatedConversationId)
-                : goToOrder(navigate, orderId, { conversationId: associatedConversationId })}
+                : goToOrder(navigate, orderId, orderNavigationOptions)}
             >
               {primaryBackIsConversation ? '返回沟通' : '返回订单'}
             </PortraContextActionButton>
@@ -257,7 +265,7 @@ export function DeliveryGalleryPage() {
             {primaryBackIsConversation ? (
               <PortraActionLink
                 startIcon={<ReceiptLongRoundedIcon />}
-                onClick={() => goToOrder(navigate, orderId, { conversationId: associatedConversationId, returnTo: explicitReturnToConversation })}
+                onClick={() => goToOrder(navigate, orderId, orderNavigationOptions)}
               >
                 查看订单
               </PortraActionLink>
@@ -380,7 +388,10 @@ export function DeliveryGalleryPage() {
         onClose={() => setCompletionDialogOpen(false)}
         onReview={() => {
           setCompletionDialogOpen(false)
-          goToOrder(navigate, order?.orderId, { state: { orderId: order?.orderId, focusReview: true } })
+          goToOrder(navigate, order?.orderId, {
+            ...orderNavigationOptions,
+            state: { orderId: order?.orderId, focusReview: true }
+          })
         }}
       />
     </PortraWorkflowFrame>
@@ -416,6 +427,7 @@ const headerSx = {
 
 const galleryGridSx = {
   display: 'grid',
+  width: '100%',
   gridTemplateColumns: {
     xs: 'minmax(0, 1fr)',
     lg: `minmax(0, 1fr) ${PORTRA_LAYOUT.compactRightPanelWidth.lg}`,
@@ -423,7 +435,8 @@ const galleryGridSx = {
   },
   gap: { xs: 1.6, lg: 2.5 },
   alignItems: 'start',
-  minWidth: 0
+  minWidth: 0,
+  overflowX: 'hidden'
 }
 
 const galleryPanelSx = {
