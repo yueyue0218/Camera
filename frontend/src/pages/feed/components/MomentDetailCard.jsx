@@ -11,7 +11,7 @@ import MoreHorizRoundedIcon from '@mui/icons-material/MoreHorizRounded'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 function roleLabel(role) {
-  return role === 'PROVIDER' ? '摄影师' : '单主'
+  return role === 'PROVIDER' ? '摄影师' : '客户'
 }
 
 function formatTime(value) {
@@ -40,7 +40,8 @@ export function MomentDetailCard({
   onFavorite,
   onFollow,
   onEdit,
-  onDelete
+  onDelete,
+  canFollow = true
 }) {
   const images = useMemo(() => imageList(moment), [moment])
   const sliderRef = useRef(null)
@@ -85,11 +86,12 @@ export function MomentDetailCard({
           <strong>{authorName || `${roleLabel(moment.authorRole)} ${moment.authorId}`}</strong>
         </Box>
         <div className="moment-detail__meta-time">{formatTime(moment.createdAt)}</div>
-        {!isSelf && (
+        {canFollow && !isSelf && (
           <button
             type="button"
             className={`moment-detail__follow ${isFollowing ? 'is-following' : ''}`}
             onClick={() => onFollow(moment.authorId, moment.authorRole)}
+            aria-pressed={isFollowing}
           >
             {isFollowing ? '已关注' : '关注'}
           </button>

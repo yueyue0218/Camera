@@ -5,7 +5,7 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import ForumRoundedIcon from '@mui/icons-material/ForumRounded'
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { deliveryApi, fileApi, orderApi } from '../../api.js'
 import { goToOrder } from '../../utils/orderNavigation.js'
@@ -16,7 +16,7 @@ import {
   navigateBackToConversation
 } from '../../utils/conversationNavigation.js'
 import { formatOrderTitle } from '../../utils/displayFormatters.js'
-import { OrderCompletionDialog, PortraActionButton, PortraActionLink, PortraContextActionButton, PortraEmptyState, PortraInfoBanner, PortraStatusPill, PortraTicketSection, PortraWorkflowFrame } from '../../components/portra/index.js'
+import { OrderCompletionDialog, PortraActionButton, PortraActionLink, PortraContextActionButton, PortraEmptyState, PortraInfoBanner, PortraStatusPill, PortraTicketSection, PortraWorkflowFrame, usePortraFeedback } from '../../components/portra/index.js'
 import { PORTRA_LAYOUT, PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
 import { centToYuan } from '../../utils/index.js'
 import {
@@ -29,12 +29,15 @@ import {
 import { DeliveryActionBar } from './components/DeliveryActionBar.jsx'
 import { DeliveryFileGrid } from './components/DeliveryFileGrid.jsx'
 import { DeliveryPreviewViewer } from './components/DeliveryPreviewViewer.jsx'
+import { useWorkflowNavigate } from '../../hooks/useWorkflowNavigate.js'
+import { buildWorkflowCacheKey, readWorkflowViewState, writeWorkflowViewState } from '../../utils/workflowViewCache.js'
 
 export function DeliveryGalleryPage() {
   const { orderId, deliveryId } = useParams()
   const location = useLocation()
-  const navigate = useNavigate()
+  const navigate = useWorkflowNavigate()
   const { currentUser } = useAuth()
+  const feedback = usePortraFeedback()
   const [order, setOrder] = useState(null)
   const [deliveries, setDeliveries] = useState([])
   const [loading, setLoading] = useState(true)
@@ -47,11 +50,18 @@ export function DeliveryGalleryPage() {
   const [reworkDialogOpen, setReworkDialogOpen] = useState(false)
   const [reworkRequirement, setReworkRequirement] = useState('')
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
+  const viewCacheKey = buildWorkflowCacheKey('delivery-gallery', orderId, deliveryId, currentUser.role)
 
   useEffect(() => {
     let cancelled = false
+    const cached = readWorkflowViewState(viewCacheKey)
+    const hadCachedData = Boolean(cached?.order || cached?.deliveries?.length)
+    if (cached?.order) setOrder(cached.order)
+    if (Array.isArray(cached?.deliveries)) setDeliveries(cached.deliveries)
+    if (hadCachedData) setLoading(false)
+
     async function load() {
-      setLoading(true)
+      if (!hadCachedData) setLoading(true)
       setError('')
       try {
         const [nextOrder, nextDeliveries] = await Promise.all([
@@ -71,7 +81,12 @@ export function DeliveryGalleryPage() {
     return () => {
       cancelled = true
     }
-  }, [orderId, currentUser])
+  }, [orderId, deliveryId, currentUser, viewCacheKey])
+
+  useEffect(() => {
+    if (!order && !deliveries.length) return
+    writeWorkflowViewState(viewCacheKey, { order, deliveries })
+  }, [viewCacheKey, order, deliveries])
 
   const batches = useMemo(() => buildDeliveryBatches(deliveries, order), [deliveries, order])
   const batch = useMemo(() => findDeliveryBatch(batches, deliveryId), [batches, deliveryId])
@@ -128,7 +143,9 @@ export function DeliveryGalleryPage() {
       setTimeout(() => URL.revokeObjectURL(url), 1500)
       return true
     } catch (downloadError) {
-      setNotice({ type: 'error', text: downloadError.message || '作品下载失败。' })
+      const message = downloadError.message || '作品下载失败。'
+      setNotice({ type: 'error', text: message })
+      feedback.error(message)
       return false
     }
   }
@@ -137,12 +154,15 @@ export function DeliveryGalleryPage() {
     const downloadable = nextFiles.filter(file => file.fileId)
     if (!downloadable.length) {
       setNotice({ type: 'warning', text: '当前没有可下载作品。' })
+      feedback.warning('当前没有可下载作品。')
       return
     }
     for (const [index, file] of downloadable.entries()) {
       await downloadFile(file, index)
     }
-    setNotice({ type: 'info', text: downloadable.length > 1 ? '浏览器可能会逐个确认多个作品下载。' : '已开始下载。' })
+    const message = downloadable.length > 1 ? '浏览器可能会逐个确认多个作品下载。' : '已开始下载。'
+    setNotice({ type: 'info', text: message })
+    feedback.info(message)
   }
 
   async function reloadOrderAndDeliveries() {
@@ -161,9 +181,12 @@ export function DeliveryGalleryPage() {
     try {
       await orderApi.transition(order.orderId, 'COMPLETED', '客户确认接收作品', currentUser)
       await reloadOrderAndDeliveries()
+      feedback.success('订单已完成')
       setCompletionDialogOpen(true)
     } catch (actionError) {
-      setNotice({ type: 'error', text: actionError.message || '确认接收失败。' })
+      const message = actionError.message || '确认接收失败。'
+      setNotice({ type: 'error', text: message })
+      feedback.error(message)
     } finally {
       setActionLoading(false)
     }
@@ -188,8 +211,11 @@ export function DeliveryGalleryPage() {
       setReworkRequirement('')
       await reloadOrderAndDeliveries()
       setNotice({ type: 'success', text: '返修要求已提交。' })
+      feedback.success('返修要求已提交。')
     } catch (actionError) {
-      setNotice({ type: 'error', text: actionError.message || '返修要求提交失败。' })
+      const message = actionError.message || '返修要求提交失败。'
+      setNotice({ type: 'error', text: message })
+      feedback.error(message)
     } finally {
       setActionLoading(false)
     }

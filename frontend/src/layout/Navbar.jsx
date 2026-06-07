@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getMessageNavTarget } from '../utils/conversationNavigation.js'
+import { useWorkflowNavigate } from '../hooks/useWorkflowNavigate.js'
 import NotificationsNoneRoundedIcon from '@mui/icons-material/NotificationsNoneRounded'
 import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded'
 import { notificationApi } from '../api/index.js'
@@ -22,6 +23,7 @@ function activeKeyFromPath(pathname) {
 
 export function Navbar({ activePath, currentUser, logout }) {
   const navigate = useNavigate()
+  const workflowNavigate = useWorkflowNavigate()
   const [unreadCount, setUnreadCount] = useState(0)
   const [bellRinging, setBellRinging] = useState(false)
   const initializedRef = useRef(false)
@@ -88,7 +90,11 @@ export function Navbar({ activePath, currentUser, logout }) {
               key={item.key}
               className={`portra-nav-item ${activeKey === item.key ? 'active' : ''}`}
               type="button"
-              onClick={() => navigate(item.path === '/messages' ? getMessageNavTarget(activePath) : item.path)}
+              onClick={() => {
+                const target = item.path === '/messages' ? getMessageNavTarget(activePath) : item.path
+                if (item.path === '/messages') workflowNavigate(target)
+                else navigate(target)
+              }}
             >
               {item.label}
             </button>

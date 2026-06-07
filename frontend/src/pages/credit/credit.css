@@ -56,6 +56,7 @@
   letter-spacing: -.06em;
   user-select: none;
   pointer-events: none;
+  animation: creditWatermarkFloat 9s ease-in-out infinite;
 }
 
 .credit-stamp-ring {
@@ -69,6 +70,7 @@
     0 0 0 8px rgba(248, 243, 235, .85),
     0 18px 34px rgba(13, 47, 178, .12);
   pointer-events: none;
+  animation: creditStampFloat 6.5s ease-in-out infinite;
 }
 
 .credit-stamp-ring::before,
@@ -85,6 +87,22 @@
 
 .credit-stamp-ring::after {
   inset: 22px;
+}
+
+.credit-stamp-ring::before {
+  animation: creditStampBreath 4.8s ease-in-out infinite;
+}
+
+.credit-stamp-ring::after {
+  animation: creditStampBreath 5.6s ease-in-out infinite reverse;
+}
+
+.credit-score-plain {
+  animation: creditScoreRise 8s ease-in-out infinite;
+}
+
+.credit-score-plain b {
+  animation: creditScorePulse 4.8s ease-in-out infinite;
 }
 
 .credit-records-panel {
@@ -126,6 +144,7 @@
   box-shadow: 0 8px 18px rgba(21, 19, 24, .04);
   transform: translateZ(0);
   transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  animation: creditNoteEnter .55s ease both;
 }
 
 .credit-note:hover {
@@ -167,6 +186,7 @@
   background: repeating-linear-gradient(180deg, rgba(13, 47, 178, .24) 0 10px, transparent 10px 18px);
   transform: translateX(-50%);
   opacity: .65;
+  animation: creditThreadDrift 5.8s linear infinite;
 }
 
 .credit-note-pin {
@@ -179,6 +199,7 @@
   border-radius: 50%;
   background: rgba(248, 243, 235, .98);
   box-shadow: 0 8px 14px rgba(21, 19, 24, .08);
+  animation: creditPinPulse 3.8s ease-in-out infinite;
 }
 
 .credit-note--negative .credit-note-pin {
@@ -282,4 +303,50 @@
     justify-items: start;
     text-align: left;
   }
+}
+
+@keyframes creditWatermarkFloat {
+  0%, 100% { transform: translate3d(0, 0, 0); opacity: .92; }
+  50% { transform: translate3d(-4px, 6px, 0); opacity: 1; }
+}
+
+@keyframes creditStampFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-4px) rotate(-1.2deg); }
+}
+
+@keyframes creditStampBreath {
+  0%, 100% { opacity: .72; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.02); }
+}
+
+@keyframes creditScoreRise {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+@keyframes creditScorePulse {
+  0%, 100% { letter-spacing: 0; }
+  50% { letter-spacing: .01em; }
+}
+
+@keyframes creditNoteEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes creditThreadDrift {
+  0% { background-position-y: 0; }
+  100% { background-position-y: 28px; }
+}
+
+@keyframes creditPinPulse {
+  0%, 100% { box-shadow: 0 8px 14px rgba(21, 19, 24, .08), 0 0 0 0 rgba(13, 47, 178, .08); }
+  50% { box-shadow: 0 10px 16px rgba(21, 19, 24, .08), 0 0 0 8px rgba(13, 47, 178, .04); }
 }

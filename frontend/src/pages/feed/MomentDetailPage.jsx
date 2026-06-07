@@ -14,6 +14,7 @@ export function MomentDetailPage() {
   const { momentId } = useParams()
   const navigate = useNavigate()
   const { currentUser } = useAuth()
+  const currentRoleKey = String(currentUser.role || 'CUSTOMER').toUpperCase()
   const [moment, setMoment] = useState(null)
   const [authorProfile, setAuthorProfile] = useState(null)
   const [followingMap, setFollowingMap] = useState(emptyFollowState)
@@ -21,27 +22,6 @@ export function MomentDetailPage() {
 
   useEffect(() => {
     let cancelled = false
-
-    async function load() {
-      setNotice(null)
-      try {
-        const [detail, customerFollowing, providerFollowing] = await Promise.all([
-          momentApi.detail(momentId, currentUser),
-          userApi.following(currentUser.userId, currentUser, 'CUSTOMER'),
-          userApi.following(currentUser.userId, currentUser, 'PROVIDER')
-        ])
-        if (cancelled) return
-        setMoment(detail)
-        const profile = await loadAuthorProfile(detail)
-        if (!cancelled) setAuthorProfile(profile)
-        const nextFollowing = emptyFollowState()
-        customerFollowing.forEach(item => nextFollowing.CUSTOMER.add(Number(item.userId)))
-        providerFollowing.forEach(item => nextFollowing.PROVIDER.add(Number(item.userId)))
-        setFollowingMap(nextFollowing)
-      } catch (error) {
-        if (!cancelled) setNotice({ type: 'error', text: error.message })
-      }
-    }
 
     async function loadAuthorProfile(detail) {
       if (!detail) return null
@@ -51,25 +31,61 @@ export function MomentDetailPage() {
           avatarData: currentUser.avatarData || ''
         }
       }
+
+      const authorRole = String(detail.authorRole || currentRoleKey).toUpperCase()
       try {
-        const brief = await userApi.brief(detail.authorId, currentUser)
+        const profile = await userApi.publicProfile(detail.authorId, currentUser, authorRole)
         let avatarData = ''
-        if (brief.avatarFileId) {
+        if (profile?.avatarFileId) {
           try {
-            avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser)
+            avatarData = await fileApi.downloadObjectUrl(profile.avatarFileId, currentUser)
           } catch {
             avatarData = ''
           }
         }
-        return { nickname: brief.nickname, avatarData }
+        return { nickname: profile?.nickname || `用户 ${detail.authorId}`, avatarData }
       } catch {
-        return { nickname: `用户 ${detail.authorId}`, avatarData: '' }
+        try {
+          const brief = await userApi.brief(detail.authorId, currentUser)
+          let avatarData = ''
+          if (brief.avatarFileId) {
+            try {
+              avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser)
+            } catch {
+              avatarData = ''
+            }
+          }
+          return { nickname: brief.nickname || `用户 ${detail.authorId}`, avatarData }
+        } catch {
+          return { nickname: `用户 ${detail.authorId}`, avatarData: '' }
+        }
+      }
+    }
+
+    async function load() {
+      setNotice(null)
+      try {
+        const [detail, following] = await Promise.all([
+          momentApi.detail(momentId, currentUser),
+          userApi.following(currentUser.userId, currentUser, currentRoleKey)
+        ])
+        if (cancelled) return
+        setMoment(detail)
+        const profile = await loadAuthorProfile(detail)
+        if (!cancelled) setAuthorProfile(profile)
+        const nextFollowing = emptyFollowState()
+        if (Array.isArray(following)) {
+          following.forEach(item => nextFollowing[currentRoleKey].add(Number(item.userId)))
+        }
+        setFollowingMap(nextFollowing)
+      } catch (error) {
+        if (!cancelled) setNotice({ type: 'error', text: error.message })
       }
     }
 
     load()
     return () => { cancelled = true }
-  }, [momentId, currentUser])
+  }, [momentId, currentUser, currentRoleKey])
 
   async function toggleLike() {
     if (!moment) return
@@ -102,26 +118,32 @@ export function MomentDetailPage() {
   }
 
   async function toggleFollow(authorId, authorRole) {
-    const followed = followingMap[(authorRole || 'CUSTOMER').toUpperCase()]?.has(Number(authorId))
+    const roleKey = String(authorRole || 'CUSTOMER').toUpperCase()
+    if (roleKey !== currentRoleKey) {
+      setNotice({ type: 'error', text: '不同账号类型之间不能互相关注' })
+      return
+    }
+    const followed = followingMap[currentRoleKey]?.has(Number(authorId))
     try {
       if (followed) {
-        await userApi.unfollow(authorId, currentUser, authorRole)
+        await userApi.unfollow(authorId, currentUser, currentRoleKey)
       } else {
-        await userApi.follow(authorId, currentUser, authorRole)
+        await userApi.follow(authorId, currentUser, currentRoleKey)
       }
       setNotice({ type: 'success', text: followed ? '已取消关注' : '已关注' })
-      const customerFollowing = await userApi.following(currentUser.userId, currentUser, 'CUSTOMER')
-      const providerFollowing = await userApi.following(currentUser.userId, currentUser, 'PROVIDER')
+      const following = await userApi.following(currentUser.userId, currentUser, currentRoleKey)
       const nextFollowing = emptyFollowState()
-      customerFollowing.forEach(item => nextFollowing.CUSTOMER.add(Number(item.userId)))
-      providerFollowing.forEach(item => nextFollowing.PROVIDER.add(Number(item.userId)))
+      if (Array.isArray(following)) {
+        following.forEach(item => nextFollowing[currentRoleKey].add(Number(item.userId)))
+      }
       setFollowingMap(nextFollowing)
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }
   }
 
-  const followed = moment ? followingMap[(moment.authorRole || 'CUSTOMER').toUpperCase()]?.has(Number(moment.authorId)) : false
+  const canFollow = moment ? String(moment.authorRole || '').toUpperCase() === currentRoleKey : false
+  const followed = moment && canFollow ? followingMap[currentRoleKey]?.has(Number(moment.authorId)) : false
 
   return (
     <Stack spacing={2.5}>
@@ -129,7 +151,7 @@ export function MomentDetailPage() {
         <div>
           <div className="moments-page__eyebrow">动态详情</div>
           <h1>动态详情</h1>
-          <p>查看完整照片组，继续点赞、收藏或关注作者。</p>
+          <p>查看完整图片组，继续点赞、收藏或关注作者。</p>
         </div>
         <Button variant="text" onClick={() => navigate('/feed')}>返回广场</Button>
       </Box>
@@ -147,13 +169,14 @@ export function MomentDetailPage() {
           onMenuClose={() => {}}
           onOpenProfile={(authorId, authorRole) => {
             if (Number(authorId) === currentUser.userId) navigate('/profile')
-            else navigate(`/users/${authorId}${authorRole ? `?role=${authorRole}` : ''}`)
+            else navigate(`/users/${authorId}${authorRole ? `?role=${String(authorRole).toUpperCase()}` : ''}`)
           }}
           onLike={toggleLike}
           onFavorite={toggleFavorite}
           onFollow={toggleFollow}
           onEdit={() => navigate('/feed')}
           onDelete={deleteMoment}
+          canFollow={canFollow}
         />
       ) : (
         <FeedLoadingCard compact />

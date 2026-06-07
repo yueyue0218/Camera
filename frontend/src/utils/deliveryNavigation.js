@@ -34,7 +34,7 @@ export function buildDeliveryGalleryTarget({ orderId, deliveryId, conversationId
 export function goToDeliveryGallery(navigate, params, options = {}) {
   const target = buildDeliveryGalleryTarget(params)
   if (!target || typeof navigate !== 'function') return false
-  navigate(target.to, { state: target.state, ...options })
+  navigate(target.to, { ...options, state: { ...target.state, ...(options.state || {}) } })
   return true
 }
 

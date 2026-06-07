@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
 import { Chip, Paper, Stack, Typography } from '@mui/material'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { creditApi } from '../../api/index.js'
 import '../profile/profile.css'
@@ -116,7 +116,7 @@ export function CreditDetailPage() {
           </div>
           <p className="profile-uid">最近更新：{formatTime(lastUpdated)}</p>
           <p className="profile-signature">
-            保留与个人主页一致的视觉语言，集中展示信用评分、履约概览和信用变化记录。
+            保留与你个人主页一致的视觉语言，集中展示信用评分、履约概览和信用变化记录。
           </p>
           <div className="profile-meta-line">
             <span>记录 {recordCount}</span>
@@ -144,7 +144,7 @@ export function CreditDetailPage() {
         <div className="section-head">
           <div>
             <h2>信用记录</h2>
-            <p>按时间倒序排列，以便签串线的形式保留每一次信用变化。</p>
+            <p>按时间倒序排列，保留每一次信用变化的来源和结果。</p>
           </div>
           <div className="section-mark">{recordCount}</div>
         </div>
@@ -156,11 +156,11 @@ export function CreditDetailPage() {
           </div>
         ) : recordCount ? (
           <Stack spacing={1.35} className="credit-note-stack">
-            {records.map(record => {
+            {records.map((record, index) => {
               const delta = Number(record.appliedScoreChange ?? record.scoreChange ?? record.deltaScore ?? 0)
               const positive = delta >= 0
-              const beforeScore = record.beforeScore != null ? formatScore(record.beforeScore) : '—'
-              const afterScore = record.scoreAfter != null ? formatScore(record.scoreAfter) : '—'
+              const beforeScore = record.beforeScore != null ? formatScore(record.beforeScore) : '--'
+              const afterScore = record.scoreAfter != null ? formatScore(record.scoreAfter) : '--'
               const title = record.reason || record.eventType || '信用变更'
               const detail = record.sourceType || record.sourceId
                 ? `来源：${record.sourceType || '系统'}${record.sourceId ? ` · ${record.sourceId}` : ''}`
@@ -171,12 +171,13 @@ export function CreditDetailPage() {
                   key={record.recordId || record.id || `${title}-${record.createdAt}`}
                   elevation={0}
                   className={`credit-note ${positive ? 'credit-note--positive' : 'credit-note--negative'}`}
+                  style={{ animationDelay: `${index * 48}ms` }}
                 >
                   <span className="credit-note-thread" aria-hidden="true" />
                   <span className="credit-note-pin" aria-hidden="true" />
                   <div className="credit-note-delta">
                     <strong>{positive ? '+' : ''}{delta.toFixed(1)}</strong>
-                    <span>分变动</span>
+                    <span>分变化</span>
                   </div>
                   <div className="credit-note-body">
                     <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
