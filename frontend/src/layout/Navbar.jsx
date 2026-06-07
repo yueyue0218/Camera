@@ -43,15 +43,7 @@ export function Navbar({ activePath, currentUser, logout }) {
       }
 
       try {
-        const dnd = localStorage.getItem(DND_KEY) === '1'
-        const data = await notificationApi.listMine(currentUser)
-        const items = Array.isArray(data) ? data : []
-        const nextUnreadCount = items.filter(item => {
-          const type = String(item.type || '').toUpperCase()
-          const relatedType = String(item.relatedType || '').toUpperCase()
-          const isMessageNotice = type.includes('MESSAGE') || relatedType.includes('MESSAGE') || relatedType.includes('CONVERSATION')
-          return !item.isRead && !(dnd && isMessageNotice)
-        }).length
+        const nextUnreadCount = await notificationApi.unreadCount(currentUser)
         if (!alive) return
         setUnreadCount(previous => {
           if (initializedRef.current && nextUnreadCount > previous) {
