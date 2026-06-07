@@ -1080,6 +1080,7 @@ export function OrdersPage() {
                       key={batch.id}
                       batch={batch}
                       variant="orderSection"
+                      chrome="none"
                       onOpen={() => openDeliveryBatch(batch)}
                       disabled={!batch.deliveryId || !selectedOrder?.orderId}
                     />
@@ -1162,6 +1163,7 @@ export function OrdersPage() {
                       key={authorization.id || authorization.authorizationId}
                       authorization={authorization}
                       order={selectedOrder}
+                      chrome="none"
                       canReview={canCustomerReviewPhotoAuthorization(selectedOrder, currentUser, authorization)}
                       loading={loading}
                       onDecision={handlePhotoAuthorizationDecision}

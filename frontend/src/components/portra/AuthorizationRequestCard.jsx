@@ -106,6 +106,11 @@ export function AuthorizationRequestCard({
                   摄影师申请作品展示授权
                 </Typography>
               )}
+              {inline && !compact && (
+                <Typography sx={{ color: PORTRA_SURFACE.ink, fontWeight: 950, lineHeight: 1.36 }}>
+                  摄影师申请作品展示授权
+                </Typography>
+              )}
               <Typography variant="body2" sx={{ mt: 0.35, color: PORTRA_SURFACE.muted, lineHeight: 1.45 }}>
                 {model.summary}
               </Typography>
