@@ -79,11 +79,11 @@ export function ConversationActionDialogs({
           <Stack direction="row" spacing={1.2} sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <Box sx={{ minWidth: 0 }}>
               <Typography sx={{ color: 'rgba(255,255,255,.74)', fontSize: 12, fontWeight: 800, letterSpacing: 0 }}>报价详情</Typography>
-              <Typography sx={{ mt: 0.75, color: '#fff', fontSize: 34, fontWeight: 900, lineHeight: 1, letterSpacing: '-0.03em' }}>
+              <Typography sx={{ mt: 0.45, color: '#fff', fontSize: 34, fontWeight: 900, lineHeight: 1, letterSpacing: '-0.03em' }}>
                 {quoteDisplay ? quoteDisplay.amountText : '--'}
               </Typography>
               {quoteDisplay?.messageCreatedAtText && (
-                <Typography sx={{ mt: 0.8, color: 'rgba(255,255,255,.66)', fontSize: 12.5, lineHeight: 1.3 }}>
+                <Typography sx={{ mt: 0.35, color: 'rgba(255,255,255,.66)', fontSize: 12.5, lineHeight: 1.3 }}>
                   创建于 {quoteDisplay.messageCreatedAtText}
                 </Typography>
               )}
@@ -316,14 +316,14 @@ const quoteDialogPaperProps = {
 
 const quoteDialogTitleSx = {
   px: 3,
-  py: 2.1,
+  py: 1.7,
   bgcolor: PORTRA_COLORS.blue,
   borderBottom: '1px solid rgba(255,255,255,.16)'
 }
 
 const quoteDialogContentSx = {
   px: 3,
-  pt: 3.25,
+  pt: 4,
   pb: 2.2,
   '& .MuiDialogContentText-root': { color: PORTRA_COLORS.mutedInk, lineHeight: 1.7 },
   '& .MuiOutlinedInput-root': { bgcolor: PORTRA_COLORS.paperSoft, borderRadius: PORTRA_RADII.control }
