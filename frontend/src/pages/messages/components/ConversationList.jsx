@@ -80,12 +80,12 @@ export function ConversationList({ conversations, currentUser, onOpenConversatio
               </Box>
               <Stack spacing={0.5} sx={{ minWidth: 0 }}>
                 <Typography fontWeight={900} color={PORTRA_COLORS.ink} noWrap>
-                  {getSafeDisplayText(counterparty.nickname, '对方用户')}
+                  {getSafeDisplayText(counterparty.nickname, counterparty.userId ? `用户 ${counterparty.userId}` : '沟通对象')}
                 </Typography>
                 <Typography variant="body2" sx={{ color: needsMyAction ? PORTRA_COLORS.subInk : PORTRA_COLORS.mutedInk, fontWeight: needsMyAction ? 800 : 500 }} noWrap>
                   {activity}
                 </Typography>
-                <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk }} noWrap>{topic} · {getSafeDisplayText(getConversationSourceLabel(conversation), '本次合作')}</Typography>
+                <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk }} noWrap>{topic} · {getSafeDisplayText(getConversationSourceLabel(conversation), '约拍沟通')}</Typography>
               </Stack>
               <Stack spacing={0.7} sx={{ minWidth: 96, alignItems: 'flex-end' }}>
                 <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk }}>{formatShortTime(conversation.updatedAt)}</Typography>

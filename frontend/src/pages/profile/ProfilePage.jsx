@@ -71,6 +71,7 @@ export function ProfilePage() {
 
   const dashboardRowRef = useRef(null)
   const frameNavRef = useRef(null)
+  const archiveSectionRef = useRef(null)
 
   // Sync body class for CSS role switching
   useEffect(() => {
@@ -627,10 +628,16 @@ export function ProfilePage() {
               <h2>{isProvider ? '我的作品集' : '我的动态'}</h2>
               <p>{isProvider ? '这里只展示摄影师本人发布过的作品动态、拍摄花絮和档期说明。' : '这里只收纳我自己发布过的帖子：想拍记录、拍摄日记、成片分享。'}</p>
             </div>
-            <button className="archive-all" onClick={() => navigate('/feed')}>全部帖子 →</button>
+            <button
+              className="archive-all"
+              onClick={() => archiveSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            >
+              全部帖子 →
+            </button>
           </div>
 
-          {momentsByMonth.length === 0 ? (
+          <div ref={archiveSectionRef}>
+            {momentsByMonth.length === 0 ? (
             <div className="pp-empty"><h3>还没有发布过动态</h3><p>去动态页发布你的第一条帖子吧。</p></div>
           ) : (
             <div className="archive-drawer-layout">
@@ -679,6 +686,7 @@ export function ProfilePage() {
               </div>
             </div>
           )}
+          </div>
         </section>
       </section>
 

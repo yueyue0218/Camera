@@ -4,7 +4,7 @@ import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
-import { conversationApi, deliveryApi, orderApi, photoAuthorizationApi, quoteApi, readFileAsDataUrl } from '../../api.js'
+import { conversationApi, deliveryApi, orderApi, photoAuthorizationApi, quoteApi } from '../../api.js'
 import { goToUserProfile } from '../../utils/orderNavigation.js'
 import {
   navigateToDeliveryFromConversation,
@@ -25,11 +25,14 @@ import {
   addSavedPhoto,
   buildConversationFallback,
   findConversationRecord,
-  getConversationPeer,
   getLocalMessages,
   getOppositeUserId,
   updateConversationLastMessage
 } from './utils/conversationUtils.js'
+import {
+  loadConversationPeerProfile,
+  resolveConversationParticipants
+} from './utils/participantResolver.js'
 import {
   buildConversationWorkbenchViewModel,
   getCurrentUserId,
@@ -63,7 +66,6 @@ export function ConversationDetailPage() {
   const [deliveryRecords, setDeliveryRecords] = useState([])
   const [photoAuthorizations, setPhotoAuthorizations] = useState([])
   const [content, setContent] = useState('')
-  const [imageSending, setImageSending] = useState(false)
   const [quoteForm, setQuoteForm] = useState(() => createDefaultQuoteForm())
   const [deliveryForm, setDeliveryForm] = useState({ file: null, remark: '' })
   const [reworkRequirement, setReworkRequirement] = useState('')
@@ -79,6 +81,7 @@ export function ConversationDetailPage() {
   const [activeQuote, setActiveQuote] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('WECHAT')
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
+  const [peerProfile, setPeerProfile] = useState(null)
 
   useEffect(() => {
     rememberLastConversation(conversationId, {
@@ -93,6 +96,26 @@ export function ConversationDetailPage() {
     setConversation(fallback)
     loadConversationData(fallback)
   }, [conversationId, getCurrentUserId(currentUser), currentUser.role])
+
+  const participantModel = resolveConversationParticipants(conversation, currentUser, peerProfile)
+
+  useEffect(() => {
+    let cancelled = false
+    let objectUrl = ''
+    setPeerProfile(null)
+    if (!participantModel.peerUserId) return undefined
+    loadConversationPeerProfile(participantModel.peerUserId, participantModel.peerRole, currentUser)
+      .then(profile => {
+        if (cancelled || !profile) return
+        objectUrl = profile.avatarObjectUrl || ''
+        setPeerProfile(profile)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [participantModel.peerUserId, participantModel.peerRole, currentUser.token])
 
   async function run(action, successText) {
     setLoading(true)
@@ -194,40 +217,6 @@ export function ConversationDetailPage() {
     }
     setMessages(previous => previous.filter(message => message.messageId !== optimisticMessage.messageId))
     setContent(text)
-  }
-
-  async function chooseMessageImage(event) {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file || !conversation) return
-    setImageSending(true)
-    try {
-      const image = await readFileAsDataUrl(file)
-      if (conversation.isLocal) {
-        const nextMessages = addLocalMessage(conversation.conversationId, {
-          senderId: getCurrentUserId(currentUser),
-          messageType: 'IMAGE',
-          content: image
-        })
-        updateConversationLastMessage(conversation.conversationId, '[图片]')
-        setMessages(nextMessages)
-        return
-      }
-      const sent = await run(async () => conversationApi.sendMessage(
-        conversation.backendConversationId || conversation.conversationId,
-        image,
-        currentUser,
-        'IMAGE'
-      ), '图片已发送')
-      if (sent) {
-        updateConversationLastMessage(conversation.conversationId, '[图片]')
-        await loadConversationData()
-      }
-    } catch (error) {
-      setNotice({ type: 'error', text: getCWorkbenchErrorText(error) })
-    } finally {
-      setImageSending(false)
-    }
   }
 
   function saveSubmittedPhoto(message) {
@@ -482,7 +471,8 @@ export function ConversationDetailPage() {
 
   function showUnavailableTool(name) {
     const messages = {
-      附件: '附件发送能力暂未接入，可以先发送图片或在沟通中说明文件内容。',
+      图片: '当前接口暂不支持发送图片，作品请通过订单上传。',
+      附件: '附件发送能力暂未接入，作品请通过订单上传，普通资料可先用文字说明。',
       表情: '表情工具暂未接入，可以继续使用文字沟通。',
       补款: '补款能力暂未接入，双方可先在沟通中协商金额。',
       平台协助: '平台协助功能由仲裁模块处理，当前演示可在订单中查看争议状态。'
@@ -520,7 +510,7 @@ export function ConversationDetailPage() {
   }
 
   const currentUserId = getCurrentUserId(currentUser)
-  const counterparty = getConversationPeer(conversation, currentUser)
+  const counterparty = participantModel
   const viewModel = buildConversationWorkbenchViewModel({
     conversation,
     currentUser,
@@ -601,15 +591,18 @@ export function ConversationDetailPage() {
               </IconButton>
             </Tooltip>
             <Avatar
-              src={counterparty.avatarData || undefined}
+              src={counterparty.peerAvatarUrl || undefined}
               onClick={event => conversation && openUserProfile(getOppositeUserId(conversation, currentUserId), event)}
-              sx={{ width: 44, height: 44, bgcolor: PORTRA_COLORS.blue, color: PORTRA_COLORS.paper, cursor: conversation ? 'pointer' : 'default', fontWeight: 900, boxShadow: `0 0 0 3px ${PORTRA_COLORS.paperSoft}, 0 0 0 4px ${PORTRA_COLORS.border}` }}
+              sx={{ width: 44, height: 44, bgcolor: PORTRA_COLORS.blue, color: PORTRA_COLORS.paper, cursor: counterparty.peerProfilePath ? 'pointer' : 'default', fontWeight: 900, boxShadow: `0 0 0 3px ${PORTRA_COLORS.paperSoft}, 0 0 0 4px ${PORTRA_COLORS.border}` }}
             >
-              {getSafeDisplayText(counterparty.initial, '对').slice(0, 1)}
+              {getSafeDisplayText(counterparty.peerAvatarText, '对').slice(0, 1)}
             </Avatar>
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="h6" sx={{ color: PORTRA_COLORS.ink, fontSize: 17, fontWeight: 950 }} noWrap>
-                {getSafeDisplayText(counterparty.nickname, counterparty.userId ? `用户 ${counterparty.userId}` : '用户')}
+                {getSafeDisplayText(counterparty.peerDisplayName, counterparty.peerUserId ? `用户 ${counterparty.peerUserId}` : '用户')}
+              </Typography>
+              <Typography variant="caption" sx={{ color: PORTRA_COLORS.mutedInk, fontWeight: 850 }}>
+                {counterparty.peerRoleLabel}
               </Typography>
             </Box>
           </Stack>
@@ -638,6 +631,7 @@ export function ConversationDetailPage() {
             messages={messages}
             conversation={conversation}
             currentUser={currentUser}
+            participants={participantModel}
             quotes={quotes}
             order={currentOrder}
             actions={actions}
@@ -647,7 +641,7 @@ export function ConversationDetailPage() {
             timeline={viewModel.timeline}
             content={content}
             loading={loading}
-            imageSending={imageSending}
+            imageSending={false}
             canSeeQuoteEntry={canSeeQuoteEntry}
             canCreateQuote={canCreateQuote}
             showQuoteForm={showQuoteForm}
@@ -676,7 +670,7 @@ export function ConversationDetailPage() {
             onSubmitQuote={createQuote}
             onContentChange={setContent}
             onSendMessage={sendMessage}
-            onChooseMessageImage={chooseMessageImage}
+            onChooseMessageImage={() => showUnavailableTool('图片')}
             onSaveSubmittedPhoto={saveSubmittedPhoto}
             onPayOrder={openPaymentDialog}
             onCancelOrder={cancelCurrentOrder}

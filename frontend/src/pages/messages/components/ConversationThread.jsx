@@ -1,18 +1,19 @@
-import { useEffect, useRef } from 'react'
-import { Box, Paper, Stack, Typography } from '@mui/material'
+import { useEffect, useRef, useState } from 'react'
+import { Box, Button, Paper, Stack, Typography } from '@mui/material'
 import { ConversationComposer } from './ConversationComposer.jsx'
 import { ConversationSystemItem } from './ConversationSystemCard.jsx'
 import { MessageBubble } from './MessageBubble.jsx'
 import { MessageWorkbenchErrorBoundary } from './MessageWorkbenchErrorBoundary.jsx'
-import { getCounterpartyProfile } from '../utils/conversationUtils.js'
 import { getCurrentUserId } from '../utils/workbenchState.js'
 import { getMessageDirection } from '../utils/messageDirection.js'
+import { mergeActorDisplay } from '../utils/participantResolver.js'
 import { PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
 
 export function ConversationThread({
   messages,
   conversation,
   currentUser,
+  participants,
   quotes,
   order,
   actions,
@@ -48,29 +49,38 @@ export function ConversationThread({
 }) {
   const scrollRef = useRef(null)
   const stickToBottomRef = useRef(true)
+  const lastTimelineKeyRef = useRef('')
+  const lastConversationIdRef = useRef('')
+  const [hasNewMessages, setHasNewMessages] = useState(false)
   const currentUserId = getCurrentUserId(currentUser)
-  const counterparty = getCounterpartyProfile(conversation, currentUser)
   const safeTimeline = Array.isArray(timeline) ? timeline : []
   const resolveActorDisplay = actor => {
     if (!actor) return null
     const actorUserId = Number(actor.userId)
-    const mine = actorUserId && actorUserId === currentUserId
-    const other = actorUserId && Number(counterparty.userId) === actorUserId
-    return {
-      ...actor,
-      avatarData: mine ? currentUser?.avatarData : other ? counterparty.avatarData : '',
-      avatarText: mine
-        ? String(currentUser?.nickname || '我').slice(0, 1)
-        : other ? counterparty.initial : actor.avatarText,
-      displayName: mine ? currentUser?.nickname || actor.displayName : other ? counterparty.nickname : actor.displayName
-    }
+    const merged = mergeActorDisplay(actor, participants)
+    if (merged) return merged
+    return actorUserId === currentUserId
+      ? { ...actor, avatarData: currentUser?.avatarData || '', avatarText: String(currentUser?.nickname || '我').slice(0, 1), displayName: currentUser?.nickname || actor.displayName }
+      : actor
   }
+
+  const lastTimelineKey = safeTimeline[safeTimeline.length - 1]?.key || ''
 
   useEffect(() => {
     const node = scrollRef.current
     if (!node) return
-    if (stickToBottomRef.current) node.scrollTop = node.scrollHeight
-  }, [conversation?.conversationId, safeTimeline.length, safeTimeline[safeTimeline.length - 1]?.key])
+    const previousKey = lastTimelineKeyRef.current
+    const currentConversationKey = String(conversation?.conversationId || 'none')
+    const changedConversation = lastConversationIdRef.current !== currentConversationKey
+    if (stickToBottomRef.current || changedConversation) {
+      node.scrollTop = node.scrollHeight
+      setHasNewMessages(false)
+    } else if (lastTimelineKey && previousKey && lastTimelineKey !== previousKey) {
+      setHasNewMessages(true)
+    }
+    lastConversationIdRef.current = currentConversationKey
+    lastTimelineKeyRef.current = lastTimelineKey
+  }, [conversation?.conversationId, safeTimeline.length, lastTimelineKey])
 
   useEffect(() => {
     stickToBottomRef.current = true
@@ -80,6 +90,15 @@ export function ConversationThread({
     const node = scrollRef.current
     if (!node) return
     stickToBottomRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 120
+    if (stickToBottomRef.current) setHasNewMessages(false)
+  }
+
+  const scrollToLatest = () => {
+    const node = scrollRef.current
+    if (!node) return
+    node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' })
+    stickToBottomRef.current = true
+    setHasNewMessages(false)
   }
 
   return (
@@ -98,6 +117,7 @@ export function ConversationThread({
         borderRadius: PORTRA_RADII.panel,
         overflow: 'hidden',
         boxShadow: PORTRA_SHADOWS.subtle,
+        position: 'relative',
         backgroundImage: `linear-gradient(180deg, ${PORTRA_COLORS.paperSoft} 0%, ${PORTRA_COLORS.page} 100%)`
       }}
     >
@@ -160,12 +180,23 @@ export function ConversationThread({
           })}
           {!safeTimeline.length && (
             <Box sx={{ py: 8, textAlign: 'center' }}>
-              <Typography fontWeight={900} color={PORTRA_COLORS.subInk}>从一句问候开始本次合作</Typography>
+              <Typography fontWeight={900} color={PORTRA_COLORS.subInk}>从一句问候开始约拍沟通</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>可以先确认拍摄时间、地点和成片要求</Typography>
             </Box>
           )}
         </Stack>
       </Box>
+
+      {hasNewMessages && (
+        <Button
+          size="small"
+          variant="contained"
+          onClick={scrollToLatest}
+          sx={newMessagesButtonSx}
+        >
+          有新消息
+        </Button>
+      )}
 
       <Box data-message-composer="true" sx={{ flexShrink: 0, bgcolor: PORTRA_COLORS.paper }}>
         <ConversationComposer
@@ -198,4 +229,19 @@ export function ConversationThread({
     </Paper>
     </MessageWorkbenchErrorBoundary>
   )
+}
+
+const newMessagesButtonSx = {
+  position: 'absolute',
+  left: '50%',
+  bottom: 92,
+  transform: 'translateX(-50%)',
+  zIndex: 3,
+  minHeight: 30,
+  px: 1.45,
+  borderRadius: 999,
+  bgcolor: PORTRA_COLORS.blue,
+  color: PORTRA_COLORS.paper,
+  boxShadow: '0 10px 22px rgba(13, 47, 178, 0.18)',
+  '&:hover': { bgcolor: PORTRA_COLORS.blueDark }
 }

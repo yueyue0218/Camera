@@ -9,21 +9,21 @@ export function OrderCompletionDialog({ open, onClose, onReview, reviewDisabled 
       <DialogTitle sx={{ pb: 1 }}>
         <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center' }}>
           <TaskAltRoundedIcon color="success" />
-          <Typography component="span" fontWeight={900}>订单已完成</Typography>
+          <Typography component="span" fontWeight={900}>订单完成！</Typography>
         </Stack>
       </DialogTitle>
       <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
         <Stack spacing={1.1}>
           <Typography sx={{ color: PORTRA_SURFACE.ink }}>
-            本次约拍已进入完成状态，平台将按规则结算给摄影师。
+            作品已确认接收，可以去评价这次合作。
           </Typography>
           <Typography variant="body2" sx={{ color: PORTRA_SURFACE.muted, lineHeight: 1.8 }}>
-            可以现在评价这次合作，帮助双方积累信用。
+            评价会帮助双方积累信用，也能让下一次合作更顺畅。
           </Typography>
         </Stack>
       </DialogContent>
       <DialogActions sx={{ bgcolor: PORTRA_SURFACE.paperMuted, px: 2, py: 1.4 }}>
-        <Button color="inherit" onClick={onClose}>稍后</Button>
+        <Button color="inherit" onClick={onClose}>稍后再说</Button>
         <Button
           variant="contained"
           startIcon={<RateReviewRoundedIcon />}
