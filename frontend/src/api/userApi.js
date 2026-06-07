@@ -12,8 +12,8 @@ export const userApi = {
   me(currentUser) {
     return request('/users/me', {}, currentUser)
   },
-  brief(userId, currentUser) {
-    return request(`/users/${userId}/brief`, {}, currentUser)
+  brief(userId, currentUser, role) {
+    return request(`/users/${userId}/brief${qs({ role })}`, {}, currentUser)
   },
   publicProfile(userId, currentUser, role) {
     return request(`/users/${userId}/public-profile${qs({ role })}`, {}, currentUser)

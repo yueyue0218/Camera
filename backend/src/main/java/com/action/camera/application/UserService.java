@@ -134,8 +134,26 @@ public class UserService {
 
     /** GET /users/{id}/brief：返回任意用户简要信息 */
     public UserBriefResponse getUserBrief(Long userId) {
+        return getUserBrief(userId, null);
+    }
+
+    public UserBriefResponse getUserBrief(Long userId, String role) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_ERROR, "用户不存在"));
+        ProviderProfile providerProfile = providerProfileMapper.selectOne(
+                new LambdaQueryWrapper<ProviderProfile>().eq(ProviderProfile::getUserId, userId)
+        );
+        boolean providerRole = "PROVIDER".equalsIgnoreCase(role)
+                || (role == null && providerProfile != null && providerProfile.getProviderAvatarFileId() != null);
+        if (providerRole && providerProfile != null) {
+            Long avatarFileId = providerProfile.getProviderAvatarFileId() != null
+                    ? providerProfile.getProviderAvatarFileId()
+                    : user.getAvatarFileId();
+            String nickname = providerProfile.getDisplayName() != null && !providerProfile.getDisplayName().isBlank()
+                    ? providerProfile.getDisplayName()
+                    : user.getNickname();
+            return new UserBriefResponse(user.getId(), nickname, avatarFileId);
+        }
         return new UserBriefResponse(user.getId(), user.getNickname(), user.getAvatarFileId());
     }
 

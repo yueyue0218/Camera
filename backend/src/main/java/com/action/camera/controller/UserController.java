@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -49,8 +50,9 @@ public class UserController {
     }
 
     @GetMapping("/{id}/brief")
-    public Result<UserBriefResponse> getUserBrief(@PathVariable Long id) {
-        return Result.success(userService.getUserBrief(id));
+    public Result<UserBriefResponse> getUserBrief(@PathVariable Long id,
+                                                  @RequestParam(required = false) String role) {
+        return Result.success(userService.getUserBrief(id, role));
     }
 
     @PatchMapping("/me")
