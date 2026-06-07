@@ -44,7 +44,7 @@ const TECHNICAL_DISPLAY_PATTERNS = [
   /接口未返回|fallback/i
 ]
 
-export function getSafeDisplayText(value, fallback = '本次合作') {
+export function getSafeDisplayText(value, fallback = '约拍沟通') {
   const text = String(value || '').trim()
   if (!text || TECHNICAL_DISPLAY_PATTERNS.some(pattern => pattern.test(text))) return fallback
   return text

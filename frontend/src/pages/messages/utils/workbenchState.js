@@ -700,7 +700,7 @@ function buildOrderCreatedEvent(order, actions, visibleRole) {
       ? actions?.role === 'CUSTOMER'
         ? '平台会先担保资金，拍摄和作品确认后再结算给摄影师。'
         : '客户付款后，平台会担保资金。'
-      : '本次合作已经进入平台担保履约流程。',
+      : '订单已经进入平台担保履约流程。',
     meta: { order },
     actions: pendingPayment
       ? [actions?.canPay && 'PAY', actions?.cancelAction && 'CANCEL'].filter(Boolean)
@@ -861,14 +861,14 @@ function getConversationTitle(conversation) {
   if (scene && scene !== '约拍沟通' && scene !== '约拍需求沟通') return scene
   const location = String(conversation?.location || '').trim()
   if (location) return `${location}约拍`
-  return '本次合作'
+  return '约拍沟通'
 }
 
 function getConversationSubtitle(conversation) {
   const sourceType = String(conversation?.sourceType || '').toUpperCase()
   if (sourceType === 'DEMAND') return '来自拍摄需求'
   if (sourceType === 'SERVICE_PACKAGE') return '来自摄影服务橱窗'
-  return '校园约拍沟通'
+  return '约拍沟通'
 }
 
 function buildPanelSummary({ actions, quotes = [], order, deliveries = [], authorizations = [] }) {

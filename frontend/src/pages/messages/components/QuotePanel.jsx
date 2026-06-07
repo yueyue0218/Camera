@@ -115,7 +115,7 @@ export function QuotePanel({
                       {orderAction.label}
                     </Button>
                   ) : (
-                    <PortraInfoBanner>报价已确认，订单信息会在本次合作面板中同步。</PortraInfoBanner>
+                    <PortraInfoBanner>报价已确认，订单信息会在右侧面板中同步。</PortraInfoBanner>
                   )
                 )}
               </Stack>

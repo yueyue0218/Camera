@@ -185,9 +185,9 @@ function isOrderCustomer(order, currentUser) {
 
 function getOrderPerspective(order, currentUser) {
   if (!order || !currentUser) return ''
-  if (Number(order.customerId) === Number(currentUser.userId)) return '客户视角'
-  if (Number(order.providerUserId) === Number(currentUser.userId)) return '摄影师视角'
-  return '协作视角'
+  if (Number(order.customerId) === Number(currentUser.userId)) return '客户'
+  if (Number(order.providerUserId) === Number(currentUser.userId)) return '摄影师'
+  return '协作方'
 }
 
 function getCounterpartyLabel(order, currentUser) {
