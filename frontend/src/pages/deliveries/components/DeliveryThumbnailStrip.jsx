@@ -6,12 +6,13 @@ import { PORTRA_RADIUS, PORTRA_SURFACE } from '../../../theme/portraSurfaceToken
 import { getDeliveryFileId, isImageDeliveryFile } from '../deliveryDisplay.js'
 import { getPreviewKey, useDeliveryFilePreviews } from '../useDeliveryFilePreviews.js'
 
-export function DeliveryThumbnailStrip({ files = [], previewUrls = {}, variant = 'order' }) {
+export function DeliveryThumbnailStrip({ files = [], previewUrls = {}, variant = 'order', mode = 'cover' }) {
   const { currentUser } = useAuth()
   const visible = files.slice(0, 4)
   const extraCount = Math.max(0, files.length - visible.length)
-  const compact = variant === 'message'
-  const height = getStripHeight(visible.length, compact)
+  const compact = variant === 'message' || variant === 'sidePanel'
+  const gallery = variant === 'gallery'
+  const height = getStripHeight(visible.length, compact, gallery)
   const shouldLoadPreviews = !previewUrls || !Object.keys(previewUrls).length
   const loadedPreviews = useDeliveryFilePreviews(visible, currentUser, { enabled: shouldLoadPreviews })
 
@@ -19,8 +20,8 @@ export function DeliveryThumbnailStrip({ files = [], previewUrls = {}, variant =
     <Box
       sx={{
         display: 'grid',
-        gridTemplateColumns: visible.length === 1 ? '1fr' : 'repeat(2, 1fr)',
-        gridAutoRows: visible.length <= 1 ? '1fr' : compact ? 66 : 84,
+        gridTemplateColumns: getGridColumns(visible.length, compact),
+        gridAutoRows: getGridAutoRows(visible.length, compact, gallery),
         gap: 0.6,
         height,
         minHeight: 0,
@@ -35,6 +36,7 @@ export function DeliveryThumbnailStrip({ files = [], previewUrls = {}, variant =
           file={file}
           previewUrl={previewUrls[file.id] || previewUrls[file.fileId] || loadedPreviews.previewUrls[getPreviewKey(file)]}
           loading={loadedPreviews.loadingIds.has(getPreviewKey(file))}
+          mode={mode}
           overlay={index === 3 && extraCount > 0 ? `+${extraCount}` : ''}
         />
       )) : (
@@ -44,16 +46,16 @@ export function DeliveryThumbnailStrip({ files = [], previewUrls = {}, variant =
   )
 }
 
-function ThumbnailTile({ file, previewUrl, loading, overlay }) {
+function ThumbnailTile({ file, previewUrl, loading, mode, overlay }) {
   const imageFile = getDeliveryFileId(file) && isImageDeliveryFile(file)
   return (
     <Box sx={{ position: 'relative', minWidth: 0, minHeight: 0 }}>
       {previewUrl && isImageDeliveryFile(file) ? (
-        <Box component="img" src={previewUrl} alt={file.fileName} sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        <Box component="img" src={previewUrl} alt={file.fileName} sx={{ width: '100%', height: '100%', objectFit: mode === 'contain' ? 'contain' : 'cover', display: 'block', bgcolor: PORTRA_SURFACE.paper }} />
       ) : loading && imageFile ? (
         <ThumbnailLoading />
       ) : (
-        <ThumbnailPlaceholder label={imageFile ? '暂无缩略图' : '文件'} />
+        <ThumbnailPlaceholder label={imageFile ? '暂无缩略图' : '作品'} />
       )}
       {overlay && (
         <Box sx={{
@@ -109,14 +111,27 @@ function ThumbnailPlaceholder({ label }) {
       color: PORTRA_SURFACE.muted
     }}>
       <Box sx={{ textAlign: 'center' }}>
-        {label === '文件' ? <InsertDriveFileRoundedIcon /> : <ImageRoundedIcon />}
+        {label === '作品' ? <InsertDriveFileRoundedIcon /> : <ImageRoundedIcon />}
         <Typography variant="caption" sx={{ display: 'block', fontWeight: 800 }}>{label}</Typography>
       </Box>
     </Box>
   )
 }
 
-function getStripHeight(count, compact) {
-  if (count <= 1) return compact ? 132 : 162
-  return compact ? 136 : 176
+function getStripHeight(count, compact, gallery) {
+  if (gallery) return count <= 1 ? 260 : 276
+  if (count <= 1) return compact ? 180 : 220
+  return compact ? 184 : 228
+}
+
+function getGridColumns(count, compact) {
+  if (count <= 1) return '1fr'
+  if (compact) return 'repeat(2, minmax(0, 1fr))'
+  return 'repeat(2, minmax(0, 1fr))'
+}
+
+function getGridAutoRows(count, compact, gallery) {
+  if (count <= 1) return '1fr'
+  if (gallery) return 132
+  return compact ? 90 : 108
 }

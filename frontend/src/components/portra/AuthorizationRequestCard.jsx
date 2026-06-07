@@ -17,6 +17,7 @@ import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import CollectionsRoundedIcon from '@mui/icons-material/CollectionsRounded'
 import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded'
 import {
+  formatAuthorizationDescription,
   formatDateTime,
   formatFileDisplayName,
   formatPhotoUsageScope
@@ -40,6 +41,7 @@ export function AuthorizationRequestCard({
   loading = false,
   onDecision,
   onOpenDelivery,
+  chrome = 'card',
   sx
 }) {
   const [open, setOpen] = useState(false)
@@ -50,8 +52,10 @@ export function AuthorizationRequestCard({
   if (!authorization) return null
 
   const compact = variant === 'message'
+  const inline = chrome === 'none'
   const canOpenDelivery = Boolean(model.deliveryTarget && onOpenDelivery)
   const files = model.files
+  const Root = inline ? Box : PortraTicketCard
   const openDelivery = event => {
     event?.stopPropagation()
     if (canOpenDelivery) onOpenDelivery(model.deliveryTarget)
@@ -73,7 +77,7 @@ export function AuthorizationRequestCard({
 
   return (
     <>
-      <PortraTicketCard
+      <Root
         role="button"
         tabIndex={0}
         onClick={() => setOpen(true)}
@@ -83,12 +87,12 @@ export function AuthorizationRequestCard({
             setOpen(true)
           }
         }}
-        accent={model.status === 'REJECTED' ? PORTRA_SURFACE.warmOrange : PORTRA_SURFACE.portraBlue}
+        {...(!inline ? { accent: model.status === 'REJECTED' ? PORTRA_SURFACE.warmOrange : PORTRA_SURFACE.portraBlue } : {})}
         sx={{
           width: compact ? '100%' : 'auto',
-          px: compact ? 1.25 : 1.55,
-          py: compact ? 1.05 : 1.35,
-          pl: compact ? 2.1 : 2.5,
+          px: inline ? 0 : compact ? 1.25 : 1.55,
+          py: inline ? 0 : compact ? 1.05 : 1.35,
+          pl: inline ? 0 : compact ? 2.1 : 2.5,
           cursor: 'pointer',
           ...sx
         }}
@@ -96,18 +100,18 @@ export function AuthorizationRequestCard({
         <Stack spacing={0.9}>
           <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
             <Box sx={{ minWidth: 0 }}>
-              <Typography sx={{ color: PORTRA_SURFACE.ink, fontWeight: 950, lineHeight: 1.36 }}>
-                摄影师申请作品展示授权
-              </Typography>
+              {!inline && (
+                <Typography sx={{ color: PORTRA_SURFACE.ink, fontWeight: 950, lineHeight: 1.36 }}>
+                  摄影师申请作品展示授权
+                </Typography>
+              )}
               <Typography variant="body2" sx={{ mt: 0.35, color: PORTRA_SURFACE.muted, lineHeight: 1.45 }}>
                 {model.summary}
               </Typography>
             </Box>
             <PortraStatusPill label={model.statusLabel} />
           </Stack>
-          {files.length > 0 && (
-            <DeliveryThumbnailStrip files={files} variant="message" />
-          )}
+          {files.length > 0 && <DeliveryThumbnailStrip files={files} variant="message" mode="contain" />}
           <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
             <Typography variant="caption" sx={{ color: PORTRA_SURFACE.faint, fontWeight: 800 }}>
               点击查看授权详情
@@ -125,7 +129,7 @@ export function AuthorizationRequestCard({
             </Button>
           </Stack>
         </Stack>
-      </PortraTicketCard>
+      </Root>
 
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle sx={{ pb: 1 }}>
@@ -152,14 +156,14 @@ export function AuthorizationRequestCard({
               </Typography>
               {files.length > 0 ? (
                 <>
-                  <DeliveryThumbnailStrip files={files} variant="order" />
+                  <DeliveryThumbnailStrip files={files} variant="orderSection" mode="contain" />
                   <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap', rowGap: 0.75 }}>
                     {files.map((file, index) => (
                       <Chip
                         key={file.id || file.fileId || `${model.id}-file-${index}`}
                         size="small"
                         icon={<CollectionsRoundedIcon />}
-                        label={formatFileDisplayName(file, `作品文件 ${index + 1}`)}
+                        label={formatFileDisplayName(file, `作品 ${index + 1}`)}
                         sx={{ borderRadius: PORTRA_RADIUS.compact, fontWeight: 800 }}
                       />
                     ))}
@@ -167,7 +171,7 @@ export function AuthorizationRequestCard({
                 </>
               ) : (
                 <Typography variant="body2" sx={{ color: PORTRA_SURFACE.muted }}>
-                  当前接口未返回作品文件列表，可从订单作品记录进入查看。
+                  当前接口未返回具体照片，可从订单作品记录进入查看。
                 </Typography>
               )}
               {canOpenDelivery && (
@@ -258,7 +262,7 @@ function buildAuthorizationModel(authorization = {}, order) {
     usageLabel,
     applicantLabel: buildApplicantLabel(authorization, order),
     requestTime: formatDateTime(authorization.createdAt || authorization.requestedAt || authorization.authorizedAt || order?.updatedAt, '待同步'),
-    remark: String(authorization.remark || authorization.description || authorization.reason || '').trim(),
+    remark: formatAuthorizationDescription(authorization, ''),
     deliveryTarget: getAuthorizationDeliveryTarget(authorization, order, files)
   }
 }
@@ -277,8 +281,7 @@ function normalizeAuthorizationFiles(authorization = {}) {
 }
 
 function buildApplicantLabel(authorization = {}, order) {
-  const providerId = authorization.providerUserId || order?.providerUserId
-  return providerId ? `摄影师 ${providerId}` : '摄影师'
+  return '摄影师'
 }
 
 function getAuthorizationDeliveryTarget(authorization = {}, order, files = []) {

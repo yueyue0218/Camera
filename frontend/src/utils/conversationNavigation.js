@@ -44,6 +44,14 @@ export function setLastMessageSurface(surface) {
 export function getMessageNavTarget(currentPath = '') {
   const path = String(currentPath || '')
   if (/^\/messages\/\d+$/.test(path)) return path
+  if (typeof window === 'undefined') return '/messages'
+  try {
+    const surface = window.sessionStorage.getItem(MESSAGE_SURFACE_KEY)
+    const lastConversationPath = getLastConversationPath()
+    if (surface === 'detail' && lastConversationPath) return lastConversationPath
+  } catch {
+    return '/messages'
+  }
   return '/messages'
 }
 
@@ -104,10 +112,12 @@ export function buildOrderPathWithReturn(orderId, conversationId) {
   if (returnTo) {
     search.set('conversationId', String(normalizeConversationId(conversationId)))
     search.set('returnTo', returnTo)
+    search.set('source', 'conversation')
   }
   return {
     to: `/orders?${search.toString()}`,
     state: {
+      workflowSource: returnTo ? 'conversation' : undefined,
       orderId: normalizedOrderId,
       conversationId: normalizeConversationId(conversationId),
       returnTo
@@ -124,11 +134,13 @@ export function buildDeliveryPathWithReturn(orderId, deliveryId, conversationId)
   if (returnTo) {
     search.set('conversationId', String(normalizeConversationId(conversationId)))
     search.set('returnTo', returnTo)
+    search.set('source', 'conversation')
   }
   const suffix = search.toString() ? `?${search.toString()}` : ''
   return {
     to: `/orders/${normalizedOrderId}/deliveries/${normalizedDeliveryId}${suffix}`,
     state: {
+      workflowSource: returnTo ? 'conversation' : undefined,
       orderId: normalizedOrderId,
       deliveryId: normalizedDeliveryId,
       conversationId: normalizeConversationId(conversationId),

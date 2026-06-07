@@ -217,8 +217,8 @@ export function getArbitrationsByOrder(orderId) {
 }
 
 export function directionLabel(direction) {
-  if (direction === 'CUSTOMER_TO_PROVIDER') return '需求方评价服务方'
-  if (direction === 'PROVIDER_TO_CUSTOMER') return '服务方评价需求方'
+  if (direction === 'CUSTOMER_TO_PROVIDER') return '客户评价摄影师'
+  if (direction === 'PROVIDER_TO_CUSTOMER') return '摄影师评价客户'
   return '订单评价'
 }
 
@@ -262,7 +262,7 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
         ['订单金额', centToYuan(order.amountCent)],
         ...baseRows
       ],
-      note: '当前支付入口调用后端模拟支付接口；未支付前不应进入拍摄或上传作品。'
+      note: '支付完成前不应进入拍摄或上传作品。'
     }
   }
 
@@ -298,7 +298,7 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
 
   if (status === 'PENDING_DELIVERY') {
     return {
-      title: '等待服务方上传作品',
+      title: '等待摄影师上传作品',
       description: '摄影师需通过作品入口上传作品，上传成功后订单进入待客户确认。',
       color: 'secondary',
       severity: 'info',
@@ -307,7 +307,7 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
         ['已有作品记录', `${deliveryRecords.length} 条`],
         ...baseRows
       ],
-      note: '若超过成片截止时间且服务方未上传任何作品，系统将自动退款并结束订单。'
+      note: '若超过成片截止时间且摄影师未上传任何作品，系统将自动退款并结束订单。'
     }
   }
 
@@ -330,7 +330,7 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
   if (status === 'REWORK_REQUIRED') {
     return {
       title: '返修中',
-      description: '客户已提交返修要求，等待服务方重新上传作品。',
+      description: '客户已提交返修要求，等待摄影师重新上传作品。',
       color: 'warning',
       severity: 'warning',
       rows: [
@@ -339,14 +339,14 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
         ['已有作品记录', `${deliveryRecords.length} 条`],
         ...baseRows
       ],
-      note: '服务方必须通过作品入口重新上传作品；页面不会提供绕过上传的返修完成按钮。'
+      note: '摄影师必须通过作品入口重新上传作品；页面不会提供绕过上传的返修完成按钮。'
     }
   }
 
   if (status === 'COMPLETED') {
     return {
       title: '订单已完成',
-      description: '订单完成后，托管资金应释放给服务方，并进入结算完成状态。',
+      description: '订单完成后，托管资金应释放给摄影师，并进入结算完成状态。',
       color: 'success',
       severity: 'success',
       rows: [

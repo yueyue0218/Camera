@@ -26,6 +26,7 @@ export function PortraPageFrame({ children, maxWidth = 'page', topGap = true, sx
         mt: topGap ? `${PORTRA_LAYOUT.contentTopGap}px` : 0,
         boxSizing: 'border-box',
         minWidth: 0,
+        overflowX: 'hidden',
         maxWidth: {
           xs: 'calc(100vw - var(--portra-mobile-gutter-total))',
           md: 'min(var(--portra-page-max-width), calc(100vw - var(--portra-page-gutter-total)))'
@@ -70,6 +71,7 @@ export function PortraWorkbenchFrame({
       {...props}
       sx={{
         flex: 1,
+        width: '100%',
         minHeight: 0,
         minWidth: 0,
         display: 'grid',
