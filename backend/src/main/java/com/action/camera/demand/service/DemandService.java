@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
 public class DemandService {
 
     private static final int DEFAULT_EXPIRE_DAYS = 30;
-    private static final String DEFAULT_ACCEPT_INITIAL_MESSAGE = "Demand response accepted; conversation opened.";
+    private static final String DEFAULT_ACCEPT_INITIAL_MESSAGE = "已接受约拍响应，会话已开启。";
     private static final Set<String> SUPPORTED_TIME_TAGS = Set.of(
             "NEAR_3_DAYS",
             "NEAR_7_DAYS",

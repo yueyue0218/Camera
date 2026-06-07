@@ -245,8 +245,11 @@ export function ProfilePage() {
     setActioningId(inv.responseId)
     try {
       const accepted = await demandApi.accept(inv.demandId, inv.responseId, currentUser)
-      await loadProfileData()
-      navigate(`/messages/${accepted.conversationId}`)
+      saveConversationRecord(
+        { conversationId: accepted.conversationId },
+        { customerId: accepted.customerId, providerId: accepted.providerId, demandId: accepted.demandId }
+      )
+      window.location.href = `/messages/${accepted.conversationId}`
     } catch (err) { setNotice({ type: 'err', text: err.message }) }
     finally { setActioningId(null) }
   }
