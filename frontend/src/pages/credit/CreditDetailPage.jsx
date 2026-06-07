@@ -42,6 +42,14 @@ function getRecordOrderId(record) {
   return sourceType.includes('ORDER') ? record.sourceId : null
 }
 
+function recordMetaLabel(record, orderId) {
+  if (orderId) return '关联订单'
+  const sourceType = String(record.sourceType || '').toUpperCase()
+  if (sourceType.includes('REVIEW')) return '评价记录'
+  if (sourceType.includes('ORDER')) return '订单记录'
+  return '信用记录'
+}
+
 export function CreditDetailPage() {
   const { userId } = useParams()
   const navigate = useNavigate()
@@ -123,7 +131,7 @@ export function CreditDetailPage() {
           </div>
           <p className="profile-uid">最近更新：{formatTime(lastUpdated)}</p>
           <p className="profile-signature">
-            保留与个人主页一致的视觉语言，集中展示信用评分、履约概览和信用变化记录。
+            信用分会随订单履约、评价和平台记录更新。
           </p>
           <div className="profile-meta-line">
             <span>记录 {recordCount}</span>
@@ -151,7 +159,7 @@ export function CreditDetailPage() {
         <div className="section-head">
           <div>
             <h2>信用记录</h2>
-            <p>按时间倒序排列，以便签串线的形式保留每一次信用变化。</p>
+            <p>按时间倒序查看每一次信用分变化。</p>
           </div>
           <div className="section-mark">{recordCount}</div>
         </div>
@@ -159,7 +167,7 @@ export function CreditDetailPage() {
         {loading ? (
           <div className="pp-empty">
             <h3>正在加载信用记录</h3>
-            <p>请稍等，系统正在拉取最新的信用摘要和变更历史。</p>
+            <p>正在更新信用分和记录。</p>
           </div>
         ) : recordCount ? (
           <Stack spacing={1.35} className="credit-note-stack">
@@ -170,9 +178,8 @@ export function CreditDetailPage() {
               const beforeScore = record.beforeScore != null ? formatScore(record.beforeScore) : '—'
               const afterScore = record.scoreAfter != null ? formatScore(record.scoreAfter) : '—'
               const title = record.reason || record.eventType || '信用变更'
-              const detail = record.sourceType || record.sourceId
-                ? `来源：${record.sourceType || '系统'}${record.sourceId ? ` · ${record.sourceId}` : ''}`
-                : record.description || record.remark || '系统记录'
+              const detail = record.description || record.remark || (record.sourceId ? `关联记录：${record.sourceId}` : '信用记录已更新')
+              const metaLabel = recordMetaLabel(record, orderId)
 
               return (
                 <Paper
@@ -217,7 +224,7 @@ export function CreditDetailPage() {
                   </div>
                   <div className="credit-note-meta">
                     <div>{formatTime(record.createdAt)}</div>
-                    <div>{record.sourceType || '系统事件'}</div>
+                    <div>{metaLabel}</div>
                   </div>
                 </Paper>
               )
@@ -226,7 +233,7 @@ export function CreditDetailPage() {
         ) : (
           <div className="pp-empty">
             <h3>暂无信用记录</h3>
-            <p>订单完成、评价变化或平台规则更新后，这里会显示最新记录。</p>
+            <p>完成订单或收到评价后，这里会更新记录。</p>
           </div>
         )}
       </section>

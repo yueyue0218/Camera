@@ -59,8 +59,11 @@ export function FeedPage() {
   const initialScope = searchParams.get('scope')
 
   const myMoments = useMemo(
-    () => moments.filter(moment => Number(moment.authorId) === currentUser.userId),
-    [moments, currentUser.userId]
+    () => moments.filter(moment => (
+      Number(moment.authorId) === currentUser.userId &&
+      String(moment.authorRole || currentRoleKey).toUpperCase() === currentRoleKey
+    )),
+    [moments, currentUser.userId, currentRoleKey]
   )
   const activeMoments = viewMode === 'mine' ? myMoments : moments
   const drawerMoment = useMemo(
@@ -85,7 +88,7 @@ export function FeedPage() {
       setLoading(true)
       setNotice(null)
       const params = viewMode === 'mine'
-        ? { authorId: currentUser.userId }
+        ? { authorId: currentUser.userId, authorRole: currentRoleKey }
         : { scope }
 
       const [momentsResult, customerFollowingResult, providerFollowingResult] = await Promise.allSettled([
@@ -245,7 +248,7 @@ export function FeedPage() {
   async function refreshPage() {
     setNotice(null)
     const params = viewMode === 'mine'
-      ? { authorId: currentUser.userId }
+      ? { authorId: currentUser.userId, authorRole: currentRoleKey }
       : { scope }
     setLoading(true)
     const [momentsResult, customerFollowingResult, providerFollowingResult] = await Promise.allSettled([
