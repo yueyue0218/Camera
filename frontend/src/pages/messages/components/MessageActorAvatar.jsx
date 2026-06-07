@@ -34,12 +34,12 @@ export function MessageActorAvatar({
       src={avatarData || actor.avatarData || undefined}
       onClick={openProfile}
       sx={{
-        width: 32,
-        height: 32,
+        width: 38,
+        height: 38,
         flexShrink: 0,
         bgcolor: accent,
         color: PORTRA_COLORS.paper,
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: 900,
         cursor: canOpenProfile ? 'pointer' : 'default',
         ...sx

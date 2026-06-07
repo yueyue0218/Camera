@@ -20,6 +20,7 @@ import { buildDeliveryBatches } from '../../deliveries/deliveryDisplay.js'
 export function ConversationSystemItem({
   event,
   actor,
+  direction,
   loading,
   actions,
   onStartQuoteEditing,
@@ -107,6 +108,7 @@ export function ConversationSystemItem({
     <Box id={event.type === 'AUTHORIZATION' ? 'conversation-authorization-action' : undefined}>
       <EventAttachmentCard
         side={event.side}
+        direction={direction}
         actor={actor || event.actor}
         title={getSafeDisplayText(event.title, '合作进展已更新')}
         summary={getSafeDisplayText(event.summary, '')}
