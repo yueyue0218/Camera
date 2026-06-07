@@ -88,9 +88,10 @@ export function FeedPage() {
         ? { authorId: currentUser.userId }
         : { scope }
 
-      const [momentsResult, followingResult] = await Promise.allSettled([
+      const [momentsResult, customerFollowingResult, providerFollowingResult] = await Promise.allSettled([
         momentApi.list(params, currentUser),
-        userApi.following(currentUser.userId, currentUser, currentRoleKey)
+        userApi.following(currentUser.userId, currentUser, 'CUSTOMER'),
+        userApi.following(currentUser.userId, currentUser, 'PROVIDER')
       ])
 
       if (cancelled) return
@@ -100,8 +101,11 @@ export function FeedPage() {
       setNotice(momentsResult.status === 'rejected' ? { type: 'error', text: momentsResult.reason?.message || '动态加载失败' } : null)
 
       const nextFollowing = emptyFollowState()
-      if (followingResult.status === 'fulfilled') {
-        followingResult.value.forEach(item => nextFollowing[currentRoleKey].add(Number(item.userId)))
+      if (customerFollowingResult.status === 'fulfilled') {
+        customerFollowingResult.value.forEach(item => nextFollowing.CUSTOMER.add(Number(item.userId)))
+      }
+      if (providerFollowingResult.status === 'fulfilled') {
+        providerFollowingResult.value.forEach(item => nextFollowing.PROVIDER.add(Number(item.userId)))
       }
       setFollowingMap(nextFollowing)
 
@@ -193,8 +197,7 @@ export function FeedPage() {
 
   function isFollowing(authorId, authorRole) {
     const roleKey = (authorRole || 'CUSTOMER').toUpperCase()
-    if (roleKey !== currentRoleKey) return false
-    return followingMap[currentRoleKey]?.has(Number(authorId)) || false
+    return followingMap[roleKey]?.has(Number(authorId)) || false
   }
 
   function mergeMoment(nextMoment) {
@@ -225,16 +228,15 @@ export function FeedPage() {
 
   function syncFollowState(authorId, authorRole, followed) {
     const roleKey = (authorRole || 'CUSTOMER').toUpperCase()
-    if (roleKey !== currentRoleKey) return
     setFollowingMap(prev => {
       const next = {
         CUSTOMER: new Set(prev.CUSTOMER),
         PROVIDER: new Set(prev.PROVIDER)
       }
       if (followed) {
-        next[currentRoleKey].add(Number(authorId))
+        next[roleKey].add(Number(authorId))
       } else {
-        next[currentRoleKey].delete(Number(authorId))
+        next[roleKey].delete(Number(authorId))
       }
       return next
     })
@@ -246,9 +248,10 @@ export function FeedPage() {
       ? { authorId: currentUser.userId }
       : { scope }
     setLoading(true)
-    const [momentsResult, followingResult] = await Promise.allSettled([
+    const [momentsResult, customerFollowingResult, providerFollowingResult] = await Promise.allSettled([
       momentApi.list(params, currentUser),
-      userApi.following(currentUser.userId, currentUser, currentRoleKey)
+      userApi.following(currentUser.userId, currentUser, 'CUSTOMER'),
+      userApi.following(currentUser.userId, currentUser, 'PROVIDER')
     ])
     const nextMoments = normalizeMoments(momentsResult.status === 'fulfilled' ? momentsResult.value : [])
     setMoments(nextMoments)
@@ -256,8 +259,11 @@ export function FeedPage() {
       setNotice({ type: 'error', text: momentsResult.reason?.message || '动态加载失败' })
     }
     const nextFollowing = emptyFollowState()
-    if (followingResult.status === 'fulfilled') {
-      followingResult.value.forEach(item => nextFollowing[currentRoleKey].add(Number(item.userId)))
+    if (customerFollowingResult.status === 'fulfilled') {
+      customerFollowingResult.value.forEach(item => nextFollowing.CUSTOMER.add(Number(item.userId)))
+    }
+    if (providerFollowingResult.status === 'fulfilled') {
+      providerFollowingResult.value.forEach(item => nextFollowing.PROVIDER.add(Number(item.userId)))
     }
     setFollowingMap(nextFollowing)
     await (async () => {
@@ -407,16 +413,12 @@ export function FeedPage() {
 
   async function toggleFollow(authorId, authorRole) {
     const roleKey = (authorRole || 'CUSTOMER').toUpperCase()
-    if (roleKey !== currentRoleKey) {
-      setNotice({ type: 'error', text: '不同账号类型之间不能互相关注' })
-      return
-    }
     const followed = isFollowing(authorId, authorRole)
     try {
       if (followed) {
-        await userApi.unfollow(authorId, currentUser, currentRoleKey)
+        await userApi.unfollow(authorId, currentUser, roleKey)
       } else {
-        await userApi.follow(authorId, currentUser, currentRoleKey)
+        await userApi.follow(authorId, currentUser, roleKey)
       }
       setNotice({ type: 'success', text: followed ? '已取消关注' : '已关注' })
       syncFollowState(authorId, authorRole, !followed)
@@ -502,10 +504,7 @@ export function FeedPage() {
       {notice && <Alert severity={notice.type} sx={{ mb: 2 }}>{notice.text}</Alert>}
 
       {loading ? (
-        <Box className="moments-grid">
-          <FeedLoadingCard />
-          <FeedLoadingCard compact />
-        </Box>
+        <FeedLoadingCard />
       ) : activeMoments.length ? (
         <Box className="moments-grid">
           {activeMoments.map(moment => {
@@ -535,7 +534,6 @@ export function FeedPage() {
                 onFollow={toggleFollow}
                 onEdit={openComposer}
                 onDelete={requestDelete}
-                canFollow={String(moment.authorRole || '').toUpperCase() === currentRoleKey}
               />
             )
           })}
@@ -580,7 +578,6 @@ export function FeedPage() {
               onFollow={toggleFollow}
               onEdit={openComposer}
               onDelete={requestDelete}
-              canFollow={String(currentDrawerMoment.authorRole || '').toUpperCase() === currentRoleKey}
             />
           ) : null}
         </div>

@@ -65,17 +65,21 @@ export function MomentDetailPage() {
     async function load() {
       setNotice(null)
       try {
-        const [detail, following] = await Promise.all([
+        const [detail, customerFollowing, providerFollowing] = await Promise.all([
           momentApi.detail(momentId, currentUser),
-          userApi.following(currentUser.userId, currentUser, currentRoleKey)
+          userApi.following(currentUser.userId, currentUser, 'CUSTOMER'),
+          userApi.following(currentUser.userId, currentUser, 'PROVIDER')
         ])
         if (cancelled) return
         setMoment(detail)
         const profile = await loadAuthorProfile(detail)
         if (!cancelled) setAuthorProfile(profile)
         const nextFollowing = emptyFollowState()
-        if (Array.isArray(following)) {
-          following.forEach(item => nextFollowing[currentRoleKey].add(Number(item.userId)))
+        if (Array.isArray(customerFollowing)) {
+          customerFollowing.forEach(item => nextFollowing.CUSTOMER.add(Number(item.userId)))
+        }
+        if (Array.isArray(providerFollowing)) {
+          providerFollowing.forEach(item => nextFollowing.PROVIDER.add(Number(item.userId)))
         }
         setFollowingMap(nextFollowing)
       } catch (error) {
@@ -119,31 +123,29 @@ export function MomentDetailPage() {
 
   async function toggleFollow(authorId, authorRole) {
     const roleKey = String(authorRole || 'CUSTOMER').toUpperCase()
-    if (roleKey !== currentRoleKey) {
-      setNotice({ type: 'error', text: '不同账号类型之间不能互相关注' })
-      return
-    }
-    const followed = followingMap[currentRoleKey]?.has(Number(authorId))
+    const followed = followingMap[roleKey]?.has(Number(authorId))
     try {
       if (followed) {
-        await userApi.unfollow(authorId, currentUser, currentRoleKey)
+        await userApi.unfollow(authorId, currentUser, roleKey)
       } else {
-        await userApi.follow(authorId, currentUser, currentRoleKey)
+        await userApi.follow(authorId, currentUser, roleKey)
       }
       setNotice({ type: 'success', text: followed ? '已取消关注' : '已关注' })
-      const following = await userApi.following(currentUser.userId, currentUser, currentRoleKey)
+      const following = await userApi.following(currentUser.userId, currentUser, roleKey)
       const nextFollowing = emptyFollowState()
       if (Array.isArray(following)) {
-        following.forEach(item => nextFollowing[currentRoleKey].add(Number(item.userId)))
+        following.forEach(item => nextFollowing[roleKey].add(Number(item.userId)))
       }
-      setFollowingMap(nextFollowing)
+      setFollowingMap(prev => ({
+        CUSTOMER: roleKey === 'CUSTOMER' ? nextFollowing.CUSTOMER : new Set(prev.CUSTOMER),
+        PROVIDER: roleKey === 'PROVIDER' ? nextFollowing.PROVIDER : new Set(prev.PROVIDER)
+      }))
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }
   }
 
-  const canFollow = moment ? String(moment.authorRole || '').toUpperCase() === currentRoleKey : false
-  const followed = moment && canFollow ? followingMap[currentRoleKey]?.has(Number(moment.authorId)) : false
+  const followed = moment ? followingMap[String(moment.authorRole || 'CUSTOMER').toUpperCase()]?.has(Number(moment.authorId)) : false
 
   return (
     <Stack spacing={2.5}>
@@ -176,7 +178,6 @@ export function MomentDetailPage() {
           onFollow={toggleFollow}
           onEdit={() => navigate('/feed')}
           onDelete={deleteMoment}
-          canFollow={canFollow}
         />
       ) : (
         <FeedLoadingCard compact />
