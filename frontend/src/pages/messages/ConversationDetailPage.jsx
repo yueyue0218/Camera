@@ -7,6 +7,7 @@ import { useAuth } from '../../AuthContext.jsx'
 import { conversationApi, deliveryApi, orderApi, photoAuthorizationApi, quoteApi } from '../../api.js'
 import { goToUserProfile } from '../../utils/orderNavigation.js'
 import { getNextOrderWorkflowRefreshDelay } from '../../utils/orderWorkflowModel.js'
+import { useWorkflowNavigate } from '../../hooks/useWorkflowNavigate.js'
 import {
   navigateToDeliveryFromConversation,
   navigateToOrderFromConversation,
@@ -58,7 +59,8 @@ const DETAIL_SHELL_HEIGHT = {
 
 export function ConversationDetailPage() {
   const { conversationId } = useParams()
-  const navigate = useNavigate()
+  const navigate = useWorkflowNavigate()
+  const rawNavigate = useNavigate()
   const { currentUser } = useAuth()
   const [conversation, setConversation] = useState(null)
   const [messages, setMessages] = useState([])
@@ -501,7 +503,7 @@ export function ConversationDetailPage() {
 
   function openUserProfile(userId, event) {
     event?.stopPropagation()
-    goToUserProfile(navigate, userId, currentUser)
+    goToUserProfile(rawNavigate, userId, currentUser)
   }
 
   function openOrderArchive(orderId = currentOrder?.orderId, options = {}) {

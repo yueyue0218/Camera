@@ -5,7 +5,7 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import ForumRoundedIcon from '@mui/icons-material/ForumRounded'
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { deliveryApi, fileApi, orderApi } from '../../api.js'
 import { goToOrder } from '../../utils/orderNavigation.js'
@@ -29,11 +29,12 @@ import {
 import { DeliveryActionBar } from './components/DeliveryActionBar.jsx'
 import { DeliveryFileGrid } from './components/DeliveryFileGrid.jsx'
 import { DeliveryPreviewViewer } from './components/DeliveryPreviewViewer.jsx'
+import { useWorkflowNavigate } from '../../hooks/useWorkflowNavigate.js'
 
 export function DeliveryGalleryPage() {
   const { orderId, deliveryId } = useParams()
   const location = useLocation()
-  const navigate = useNavigate()
+  const navigate = useWorkflowNavigate()
   const { currentUser } = useAuth()
   const [order, setOrder] = useState(null)
   const [deliveries, setDeliveries] = useState([])

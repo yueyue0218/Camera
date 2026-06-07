@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Alert, Box, Stack } from '@mui/material'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { conversationApi, orderApi } from '../../api.js'
 import { navigateToConversation, setLastMessageSurface } from '../../utils/conversationNavigation.js'
+import { useWorkflowNavigate } from '../../hooks/useWorkflowNavigate.js'
 import { PortraPageFrame } from '../../components/portra/index.js'
 import { ConversationList } from './components/ConversationList.jsx'
 import { MessagesSectionHeader } from './components/MessagesSectionHeader.jsx'
@@ -22,7 +23,7 @@ import { PORTRA_COLORS, PORTRA_RADII } from './MessageVisualTokens.js'
 
 export function MessagesPage() {
   const location = useLocation()
-  const navigate = useNavigate()
+  const navigate = useWorkflowNavigate()
   const { currentUser } = useAuth()
   const [conversations, setConversations] = useState([])
   const [notice, setNotice] = useState(null)

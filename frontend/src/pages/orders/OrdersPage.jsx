@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import {
   Alert,
   Box,
@@ -50,6 +50,7 @@ import { PRODUCT_ACTION_COPY } from '../../utils/productCopy.js'
 import { ORDER_SURFACES, WORKFLOW_SOURCES, buildOrderListTarget, isOrderListSurface } from '../../utils/workflowNavigation.js'
 import { deriveOrderWorkflowState, getNextOrderWorkflowRefreshDelay } from '../../utils/orderWorkflowModel.js'
 import { getOrderActionVisibility } from '../../utils/orderActionVisibility.js'
+import { useWorkflowNavigate } from '../../hooks/useWorkflowNavigate.js'
 import {
   getExplicitReturnToConversation,
   navigateBackToConversation
@@ -260,7 +261,7 @@ function asArray(value) {
 
 export function OrdersPage() {
   const location = useLocation()
-  const navigate = useNavigate()
+  const navigate = useWorkflowNavigate()
   const { currentUser } = useAuth()
   const focusOrderId = useMemo(() => {
     const value = new URLSearchParams(location.search).get('orderId')
