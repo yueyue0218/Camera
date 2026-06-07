@@ -98,6 +98,28 @@
   margin-top: 16px;
 }
 
+.credit-rules-entry {
+  align-self: flex-start;
+  margin-top: 8px !important;
+  border-radius: 999px !important;
+  border-color: rgba(13, 47, 178, .26) !important;
+  color: var(--blue) !important;
+  font-weight: 800 !important;
+  letter-spacing: .08em !important;
+}
+
+.credit-rules-copy {
+  display: grid;
+  gap: 10px;
+  color: #333840;
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.credit-rules-copy p {
+  margin: 0;
+}
+
 .credit-detail-page .hero-side {
   overflow: hidden;
   border-color: rgba(13, 47, 178, .15);
@@ -223,6 +245,10 @@
   background: linear-gradient(180deg, rgba(248, 81, 4, .88), rgba(248, 81, 4, .56));
 }
 
+.credit-note--neutral::before {
+  background: linear-gradient(180deg, rgba(91, 96, 106, .72), rgba(91, 96, 106, .42));
+}
+
 .credit-note-thread {
   position: absolute;
   left: -16px;
@@ -276,6 +302,12 @@
   background: rgba(248, 81, 4, .06);
   color: #c53b05;
   box-shadow: inset 0 0 0 1px rgba(248, 81, 4, .08);
+}
+
+.credit-note--neutral .credit-note-delta {
+  background: rgba(91, 96, 106, .06);
+  color: #5f6670;
+  box-shadow: inset 0 0 0 1px rgba(91, 96, 106, .08);
 }
 
 .credit-note-delta strong {

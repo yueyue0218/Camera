@@ -118,7 +118,7 @@ public class CreditService {
 
     private BigDecimal normalizeScore(BigDecimal score) {
         if (score == null) {
-            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            return new BigDecimal("80.00");
         }
         return score.setScale(2, RoundingMode.HALF_UP);
     }

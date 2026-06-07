@@ -43,6 +43,11 @@ function orderStatusLabel(status) {
     DELIVERING:'交付中', COMPLETED:'已完成', REVIEWED:'已评价', CANCELLED:'已取消' }[status] || status
 }
 
+function formatCreditScore(value) {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric.toFixed(1) : '暂无'
+}
+
 export function ProfilePage() {
   const navigate = useNavigate()
   const { currentUser, updateProfile, logout, switchRole } = useAuth()
@@ -291,7 +296,7 @@ export function ProfilePage() {
   const historicalOrders = profileOrders.filter(o => ['COMPLETED','REVIEWED'].includes(o.status)).length
   const ongoingOrders = profileOrders.filter(o => !['COMPLETED','REVIEWED','CANCELLED'].includes(o.status)).length
   const pendingInvitations = invitations.filter(i => (i.status || 'PENDING_CUSTOMER_ACCEPT') === 'PENDING_CUSTOMER_ACCEPT').length
-  const creditScore = creditSummary?.creditScore ?? currentUser.creditScore ?? 100
+  const creditScore = creditSummary?.creditScore ?? null
   const totalOrders = profileOrders.length
   const completionRate = totalOrders > 0 ? Math.round((historicalOrders / totalOrders) * 100) : 100
   const genderText = currentUser.gender === 'MALE' ? '男' : currentUser.gender === 'FEMALE' ? '女' : '保密'
@@ -378,7 +383,7 @@ export function ProfilePage() {
             <div className="id-label">Portra Credit File</div>
           </div>
           <div className="metric-grid">
-            <button className="metric metric-button" type="button" onClick={() => navigate('/profile/credit')}><b>{Number(creditScore).toFixed(1)}</b><span>信用评分</span></button>
+            <button className="metric metric-button" type="button" onClick={() => navigate('/profile/credit')}><b>{formatCreditScore(creditScore)}</b><span>信用评分</span></button>
             <div className="metric"><b>{completionRate}%</b><span>完成率</span></div>
             <div className="metric"><b>{historicalOrders}</b><span>历史约拍</span></div>
             <div className="metric"><b>{ongoingOrders}</b><span>进行中</span></div>
@@ -632,7 +637,7 @@ export function ProfilePage() {
           <aside className="side-stack" style={{height:'auto',minHeight:'var(--dashboard-left-card-height)',overflow:'visible'}}>
             <section className="panel-card">
               <button className="credit-stamp credit-stamp-button" type="button" onClick={() => navigate('/profile/credit')}>
-                <b>{Number(creditScore).toFixed(1)}</b>
+                <b>{formatCreditScore(creditScore)}</b>
                 <span>Portra Credit</span>
               </button>
               <div className="todo-list">

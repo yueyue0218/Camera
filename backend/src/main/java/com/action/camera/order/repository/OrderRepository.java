@@ -27,6 +27,23 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     List<Order> findByStatus(OrderStatus status);
 
+    long countByCustomerIdAndStatusIn(Long customerId, Collection<OrderStatus> statuses);
+
+    long countByProviderUserIdAndStatusIn(Long providerUserId, Collection<OrderStatus> statuses);
+
+    long countByCustomerIdAndStatus(Long customerId, OrderStatus status);
+
+    long countByProviderUserIdAndStatus(Long providerUserId, OrderStatus status);
+
+    @Query("""
+            select count(o)
+            from Order o
+            where (o.customerId = :userId or o.providerUserId = :userId)
+              and o.status = :status
+              and upper(coalesce(o.refundStatus, '')) like '%FAULT%'
+            """)
+    long countFaultRefundsForUser(@Param("userId") Long userId, @Param("status") OrderStatus status);
+
     boolean existsByServicePackageId(Long servicePackageId);
 
     boolean existsByServicePackageIdAndStatusIn(Long servicePackageId, Collection<OrderStatus> statuses);
