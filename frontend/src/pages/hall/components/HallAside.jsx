@@ -39,9 +39,11 @@ function sameId(a, b) {
   return a !== undefined && a !== null && b !== undefined && b !== null && Number(a) === Number(b)
 }
 
-export function DemandAside({ selectedDemand, error, currentUser, onRespond, onHotStyleClick, onEditDemand, onCloseDemand }) {
+export function DemandAside({ selectedDemand, error, currentUser, onRespond, onHotStyleClick, onEditDemand, onCloseDemand, onOpenPublisher, responded = false, responding = false }) {
   const [tipIndex, setTipIndex] = useState(0)
   const isDemandOwner = selectedDemand && currentUser.role === 'CUSTOMER' && sameId(selectedDemand.customerId, currentUser.userId)
+  const publisherName = firstText(selectedDemand?.customerNickname, selectedDemand?.customerName) || '暂无'
+  const publisherAvatar = firstText(selectedDemand?.customerAvatarUrl, selectedDemand?.customerAvatar)
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -73,7 +75,13 @@ export function DemandAside({ selectedDemand, error, currentUser, onRespond, onH
         <div className="aside-card">
           <h3>{firstText(selectedDemand.title, selectedDemand.scene) || '需求详情'}</h3>
           <div className="detail-publish-time">{latestTimeText(selectedDemand)}</div>
-          <div className="aside-item"><strong>发布者</strong><span>{firstText(selectedDemand.customerNickname, selectedDemand.customerName) || '暂无'}</span></div>
+          <button className="aside-item aside-item-button" type="button" onClick={onOpenPublisher} disabled={!onOpenPublisher}>
+            <strong>发布者</strong>
+            <span className="aside-publisher-brief">
+              {publisherAvatar && <span className="publisher-avatar" style={{ '--avatar-art': `url(${publisherAvatar})` }} aria-hidden="true" />}
+              {publisherName}
+            </span>
+          </button>
           <div className="aside-item"><strong>地点</strong><span>{[cityName(selectedDemand.cityName || selectedDemand.cityCode), selectedDemand.location].filter(Boolean).join(' · ') || '暂无'}</span></div>
           <div className="aside-item"><strong>预算</strong><span>{moneyRange(selectedDemand.budgetMinCent, selectedDemand.budgetMaxCent)}</span></div>
           <div className="aside-item"><strong>标签</strong><span>{demandTags(selectedDemand).join(' / ') || '暂无'}</span></div>
@@ -92,7 +100,9 @@ export function DemandAside({ selectedDemand, error, currentUser, onRespond, onH
         <div className="photographer-only aside-card">
           <h3>操作</h3>
           <div className="side-actions">
-            <button className="primary-btn photographer-only" type="button" onClick={() => onRespond(selectedDemand)}>我要响应</button>
+            <button className="primary-btn photographer-only" type="button" disabled={responded || responding} onClick={() => onRespond(selectedDemand)}>
+              {responding ? '提交中' : responded ? '已响应' : '我要响应'}
+            </button>
           </div>
         </div>
       )}

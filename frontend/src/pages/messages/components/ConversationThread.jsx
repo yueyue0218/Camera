@@ -1,86 +1,201 @@
-import { Button, Divider, IconButton, Paper, Stack, TextField, Tooltip, Typography } from '@mui/material'
-import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
-import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded'
-import SendRoundedIcon from '@mui/icons-material/SendRounded'
+import { useEffect, useRef } from 'react'
+import { Box, Paper, Stack, Typography } from '@mui/material'
+import { ConversationComposer } from './ConversationComposer.jsx'
+import { ConversationSystemItem } from './ConversationSystemCard.jsx'
 import { MessageBubble } from './MessageBubble.jsx'
+import { MessageWorkbenchErrorBoundary } from './MessageWorkbenchErrorBoundary.jsx'
+import { getCounterpartyProfile } from '../utils/conversationUtils.js'
+import { getCurrentUserId } from '../utils/workbenchState.js'
+import { getMessageDirection } from '../utils/messageDirection.js'
+import { PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
 
 export function ConversationThread({
   messages,
   conversation,
   currentUser,
+  quotes,
+  order,
+  actions,
+  statusLogs,
+  deliveryRecords,
+  photoAuthorizations,
+  timeline = [],
   content,
   loading,
   imageSending,
   canSeeQuoteEntry,
   canCreateQuote,
   showQuoteForm,
-  editingQuotationId,
+  quoteEntryHint,
+  quoteActionLabel,
   onOpenQuoteForm,
+  onStartQuoteEditing,
+  onConfirmQuote,
+  onRejectQuote,
+  onOpenQuoteDetail,
+  onOpenOrderArchive,
+  onOpenDeliveryGallery,
   onContentChange,
   onSendMessage,
   onChooseMessageImage,
-  onSaveSubmittedPhoto
+  onSaveSubmittedPhoto,
+  onPayOrder,
+  onCancelOrder,
+  onConfirmOrder,
+  onDecidePhotoAuthorization,
+  onUnavailableTool,
+  onOpenAction
 }) {
-  return (
-    <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, minHeight: 520, display: 'flex', flexDirection: 'column' }}>
-      <Stack spacing={1.2} sx={{ flex: 1, overflowY: 'auto', pr: 0.5 }}>
-        {messages.map(message => {
-          const mine = message.senderId === currentUser.userId
-          const isImage = message.messageType === 'IMAGE'
-          const canSaveSubmittedPhoto = isImage && Number(message.senderId) === Number(conversation?.participantBId)
-          return (
-            <MessageBubble
-              key={message.messageId}
-              message={message}
-              mine={mine}
-              canSaveSubmittedPhoto={canSaveSubmittedPhoto}
-              onSaveSubmittedPhoto={() => onSaveSubmittedPhoto(message)}
-            />
-          )
-        })}
-        {!messages.length && <Typography color="text.secondary">还没有消息</Typography>}
-      </Stack>
+  const scrollRef = useRef(null)
+  const stickToBottomRef = useRef(true)
+  const currentUserId = getCurrentUserId(currentUser)
+  const counterparty = getCounterpartyProfile(conversation, currentUser)
+  const safeTimeline = Array.isArray(timeline) ? timeline : []
+  const resolveActorDisplay = actor => {
+    if (!actor) return null
+    const actorUserId = Number(actor.userId)
+    const mine = actorUserId && actorUserId === currentUserId
+    const other = actorUserId && Number(counterparty.userId) === actorUserId
+    return {
+      ...actor,
+      avatarData: mine ? currentUser?.avatarData : other ? counterparty.avatarData : '',
+      avatarText: mine
+        ? String(currentUser?.nickname || '我').slice(0, 1)
+        : other ? counterparty.initial : actor.avatarText,
+      displayName: mine ? currentUser?.nickname || actor.displayName : other ? counterparty.nickname : actor.displayName
+    }
+  }
 
-      <Divider sx={{ my: 1.5 }} />
-      <Stack direction="row" alignItems="center" spacing={1}>
-        {canSeeQuoteEntry && (
-          <Tooltip title="发起报价">
-            <span>
-              <IconButton
-                color={showQuoteForm ? 'primary' : 'default'}
-                onClick={onOpenQuoteForm}
-                disabled={!canCreateQuote}
-              >
-                <LocalOfferRoundedIcon />
-              </IconButton>
-            </span>
-          </Tooltip>
-        )}
-        <Tooltip title="发送图片">
-          <span>
-            <IconButton component="label" disabled={loading || imageSending}>
-              <ImageRoundedIcon />
-              <input hidden type="file" accept="image/*" onChange={onChooseMessageImage} />
-            </IconButton>
-          </span>
-        </Tooltip>
-        <TextField
-          fullWidth
-          size="small"
-          placeholder="输入消息"
-          value={content}
-          onChange={event => onContentChange(event.target.value)}
-          onKeyDown={event => {
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault()
-              onSendMessage()
+  useEffect(() => {
+    const node = scrollRef.current
+    if (!node) return
+    if (stickToBottomRef.current) node.scrollTop = node.scrollHeight
+  }, [conversation?.conversationId, safeTimeline.length, safeTimeline[safeTimeline.length - 1]?.key])
+
+  useEffect(() => {
+    stickToBottomRef.current = true
+  }, [conversation?.conversationId])
+
+  const updateStickToBottom = () => {
+    const node = scrollRef.current
+    if (!node) return
+    stickToBottomRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 120
+  }
+
+  return (
+    <MessageWorkbenchErrorBoundary resetKey={`${conversation?.conversationId || 'none'}-${currentUser?.role || 'role'}`}>
+    <Paper
+      data-message-thread="true"
+      variant="outlined"
+      sx={{
+        height: '100%',
+        width: '100%',
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        bgcolor: PORTRA_COLORS.paperSoft,
+        borderColor: PORTRA_COLORS.borderMuted,
+        borderRadius: PORTRA_RADII.panel,
+        overflow: 'hidden',
+        boxShadow: PORTRA_SHADOWS.subtle,
+        backgroundImage: `linear-gradient(180deg, ${PORTRA_COLORS.paperSoft} 0%, ${PORTRA_COLORS.page} 100%)`
+      }}
+    >
+      <Box
+        data-message-scroll="true"
+        ref={scrollRef}
+        onScroll={updateStickToBottom}
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          overscrollBehavior: 'contain',
+          px: { xs: 1.45, md: 2.35 },
+          py: { xs: 1.8, md: 2.35 },
+          scrollbarColor: `${PORTRA_COLORS.border} transparent`
+        }}
+      >
+        <Stack spacing={1.55}>
+          {safeTimeline.filter(Boolean).map(item => {
+            const direction = getMessageDirection(item, currentUser)
+            if (item.type !== 'MESSAGE') {
+              return (
+                <ConversationSystemItem
+                  key={item.key}
+                  event={item}
+                  actor={resolveActorDisplay(item.actor)}
+                  direction={direction}
+                  actions={actions}
+                  loading={loading}
+                  onStartQuoteEditing={onStartQuoteEditing}
+                  onConfirmQuote={onConfirmQuote}
+                  onRejectQuote={onRejectQuote}
+                  onOpenQuoteDetail={onOpenQuoteDetail}
+                  onPayOrder={onPayOrder}
+                  onCancelOrder={onCancelOrder}
+                  onConfirmOrder={onConfirmOrder}
+                  onOpenDeliveryGallery={onOpenDeliveryGallery}
+                  onDecidePhotoAuthorization={onDecidePhotoAuthorization}
+                  onUnavailableTool={onUnavailableTool}
+                  onOpenAction={onOpenAction}
+                  onOpenOrderArchive={onOpenOrderArchive}
+                />
+              )
             }
-          }}
+            const message = item.meta?.message
+            if (!message) return null
+            const mine = direction === 'self'
+            const isImage = message.messageType === 'IMAGE'
+            const canSaveSubmittedPhoto = isImage && Number(message.senderId) === Number(conversation?.participantBId)
+            return (
+              <MessageBubble
+                key={message.messageId || item.key}
+                message={message}
+                mine={mine}
+                actor={resolveActorDisplay(item.actor)}
+                canSaveSubmittedPhoto={canSaveSubmittedPhoto}
+                onSaveSubmittedPhoto={() => onSaveSubmittedPhoto(message)}
+              />
+            )
+          })}
+          {!safeTimeline.length && (
+            <Box sx={{ py: 8, textAlign: 'center' }}>
+              <Typography fontWeight={900} color={PORTRA_COLORS.subInk}>从一句问候开始本次合作</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>可以先确认拍摄时间、地点和成片要求</Typography>
+            </Box>
+          )}
+        </Stack>
+      </Box>
+
+      <Box data-message-composer="true" sx={{ flexShrink: 0, bgcolor: PORTRA_COLORS.paper }}>
+        <ConversationComposer
+          content={content}
+          loading={loading}
+          imageSending={imageSending}
+          canSeeQuoteEntry={canSeeQuoteEntry}
+          canCreateQuote={canCreateQuote}
+          showQuoteForm={showQuoteForm}
+          quoteActionLabel={quoteActionLabel}
+          quoteEntryHint={quoteEntryHint && canSeeQuoteEntry && !showQuoteForm ? quoteEntryHint : ''}
+          actions={actions}
+          orderId={order?.orderId}
+          onOpenQuoteForm={onOpenQuoteForm}
+          onStartQuoteEditing={onStartQuoteEditing}
+          onConfirmQuote={onConfirmQuote}
+          onRejectQuote={onRejectQuote}
+          onOpenQuoteDetail={onOpenQuoteDetail}
+          onPayOrder={onPayOrder}
+          onCancelOrder={onCancelOrder}
+          onConfirmOrder={onConfirmOrder}
+          onOpenOrderArchive={onOpenOrderArchive}
+          onContentChange={onContentChange}
+          onSendMessage={onSendMessage}
+          onChooseMessageImage={onChooseMessageImage}
+          onUnavailableTool={onUnavailableTool}
+          onOpenAction={onOpenAction}
         />
-        <Button variant="contained" endIcon={<SendRoundedIcon />} onClick={onSendMessage} disabled={!content.trim() || loading}>
-          发送
-        </Button>
-      </Stack>
+      </Box>
     </Paper>
+    </MessageWorkbenchErrorBoundary>
   )
 }

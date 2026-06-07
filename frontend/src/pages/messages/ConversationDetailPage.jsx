@@ -1,40 +1,54 @@
 import { useEffect, useState } from 'react'
-import { Alert, Avatar, Box, Button, Chip, Paper, Stack, Typography } from '@mui/material'
+import { Alert, Avatar, Box, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material'
+import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
+import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
-import { conversationApi, quoteApi, readFileAsDataUrl } from '../../api.js'
-import { ConversationSourceCard } from './components/ConversationSourceCard.jsx'
+import { conversationApi, deliveryApi, orderApi, photoAuthorizationApi, quoteApi, readFileAsDataUrl } from '../../api.js'
+import { goToUserProfile } from '../../utils/orderNavigation.js'
+import {
+  navigateToDeliveryFromConversation,
+  navigateToOrderFromConversation,
+  rememberLastConversation
+} from '../../utils/conversationNavigation.js'
 import { ConversationThread } from './components/ConversationThread.jsx'
-import { QuotePanel } from './components/QuotePanel.jsx'
+import { ConversationWorkbenchPanel } from './components/ConversationWorkbenchPanel.jsx'
+import { ConversationActionDialogs } from './components/ConversationActionDialogs.jsx'
+import { QuoteDraftDialog } from './components/QuoteDraftDialog.jsx'
+import { MessageWorkbenchErrorBoundary } from './components/MessageWorkbenchErrorBoundary.jsx'
+import { useConversationRealtime } from './hooks/useConversationRealtime.js'
+import { OrderCompletionDialog, PortraActionLink, PortraStatusPill, PortraWorkbenchFrame, PortraWorkflowFrame } from '../../components/portra/index.js'
+import { PORTRA_LAYOUT } from '../../theme/portraSurfaceTokens.js'
+import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from './MessageVisualTokens.js'
 import {
   addLocalMessage,
   addSavedPhoto,
   buildConversationFallback,
-  buildConversationSourceRows,
   findConversationRecord,
-  formatTime,
-  getConversationSourceHint,
-  getConversationSourceLabel,
+  getConversationPeer,
   getLocalMessages,
   getOppositeUserId,
   updateConversationLastMessage
 } from './utils/conversationUtils.js'
 import {
+  buildConversationWorkbenchViewModel,
+  getCurrentUserId,
+  selectConversationOrder
+} from './utils/workbenchState.js'
+import {
   buildQuotePayload,
   canEditQuote,
   createDefaultQuoteForm,
   createQuoteFormFromQuote,
-  getBackendConversationId,
+  getCWorkbenchErrorText,
   getQuoteConfirmationErrorText,
   getQuoteEntryHint,
-  hasPendingQuote,
-  validateQuoteForm
 } from './utils/quoteUtils.js'
+import { validateQuoteFormModel } from './utils/quoteFormModel.js'
 
-function openUserProfile(userId) {
-  const id = Number(userId)
-  if (!id) return
-  window.open(new URL(`/users/${id}`, window.location.origin).toString(), '_blank', 'noopener,noreferrer')
+const DETAIL_SHELL_HEIGHT = {
+  xs: 'calc(100dvh - 212px)',
+  md: 'calc(100dvh - 154px)'
 }
 
 export function ConversationDetailPage() {
@@ -44,21 +58,41 @@ export function ConversationDetailPage() {
   const [conversation, setConversation] = useState(null)
   const [messages, setMessages] = useState([])
   const [quotes, setQuotes] = useState([])
+  const [currentOrder, setCurrentOrder] = useState(null)
+  const [statusLogs, setStatusLogs] = useState([])
+  const [deliveryRecords, setDeliveryRecords] = useState([])
+  const [photoAuthorizations, setPhotoAuthorizations] = useState([])
   const [content, setContent] = useState('')
   const [imageSending, setImageSending] = useState(false)
   const [quoteForm, setQuoteForm] = useState(() => createDefaultQuoteForm())
+  const [deliveryForm, setDeliveryForm] = useState({ file: null, remark: '' })
+  const [reworkRequirement, setReworkRequirement] = useState('')
+  const [photoAuthorizationForm, setPhotoAuthorizationForm] = useState({ fileIds: [], remark: '' })
+  const [authorizationRemarks, setAuthorizationRemarks] = useState({})
   const [showQuoteForm, setShowQuoteForm] = useState(false)
   const [editingQuotationId, setEditingQuotationId] = useState(null)
   const [quoteValidationErrors, setQuoteValidationErrors] = useState([])
+  const [quoteFieldErrors, setQuoteFieldErrors] = useState({})
   const [notice, setNotice] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [activeAction, setActiveAction] = useState(null)
+  const [activeQuote, setActiveQuote] = useState(null)
+  const [paymentMethod, setPaymentMethod] = useState('WECHAT')
+  const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
+
+  useEffect(() => {
+    rememberLastConversation(conversationId, {
+      orderId: currentOrder?.orderId,
+      role: currentUser.role
+    })
+  }, [conversationId, currentOrder?.orderId, currentUser.role])
 
   useEffect(() => {
     const stored = findConversationRecord(conversationId)
     const fallback = stored || buildConversationFallback(conversationId)
     setConversation(fallback)
     loadConversationData(fallback)
-  }, [conversationId, currentUser.userId])
+  }, [conversationId, getCurrentUserId(currentUser), currentUser.role])
 
   async function run(action, successText) {
     setLoading(true)
@@ -68,7 +102,7 @@ export function ConversationDetailPage() {
       if (successText) setNotice({ type: 'success', text: successText })
       return result
     } catch (error) {
-      setNotice({ type: 'error', text: error.message })
+      setNotice({ type: 'error', text: getCWorkbenchErrorText(error) })
       return null
     } finally {
       setLoading(false)
@@ -80,6 +114,7 @@ export function ConversationDetailPage() {
     if (record.isLocal) {
       setMessages(getLocalMessages(record.conversationId))
       setQuotes([])
+      clearOrderWorkbench()
       return
     }
     await run(async () => {
@@ -87,14 +122,51 @@ export function ConversationDetailPage() {
     })
   }
 
-  async function refreshConversationData(record = conversation) {
+  async function refreshConversationData(record = conversation, preferredOrderId = null) {
     if (!record || record.isLocal) return
-    const [nextMessages, nextQuotes] = await Promise.all([
+    const [nextMessages, nextQuotes, nextOrders] = await Promise.all([
       conversationApi.messages(record.backendConversationId || record.conversationId, currentUser),
-      conversationApi.quotes(record.backendConversationId || record.conversationId, currentUser)
+      conversationApi.quotes(record.backendConversationId || record.conversationId, currentUser),
+      orderApi.list({}, currentUser)
     ])
     setMessages(nextMessages)
     setQuotes(nextQuotes)
+    const selectedOrder = preferredOrderId
+      ? { orderId: preferredOrderId }
+      : selectConversationOrder(nextOrders || [], record, nextQuotes || [])
+    if (selectedOrder?.orderId) {
+      await loadOrderWorkbench(selectedOrder.orderId)
+    } else {
+      clearOrderWorkbench()
+    }
+  }
+
+  function clearOrderWorkbench() {
+    setCurrentOrder(null)
+    setStatusLogs([])
+    setDeliveryRecords([])
+    setPhotoAuthorizations([])
+    setDeliveryForm({ file: null, remark: '' })
+    setReworkRequirement('')
+    setPhotoAuthorizationForm({ fileIds: [], remark: '' })
+    setAuthorizationRemarks({})
+  }
+
+  async function loadOrderWorkbench(orderId) {
+    const [detail, logs, deliveries, authorizations] = await Promise.all([
+      orderApi.detail(orderId, currentUser),
+      orderApi.statusLogs(orderId, currentUser),
+      deliveryApi.listByOrder(orderId, currentUser),
+      photoAuthorizationApi.listByOrder(orderId, currentUser)
+    ])
+    setCurrentOrder(detail)
+    setStatusLogs(logs || [])
+    setDeliveryRecords(deliveries || [])
+    setPhotoAuthorizations(authorizations || [])
+    setDeliveryForm({ file: null, remark: '' })
+    setReworkRequirement('')
+    setPhotoAuthorizationForm({ fileIds: [], remark: '' })
+    setAuthorizationRemarks({})
   }
 
   async function sendMessage() {
@@ -102,7 +174,7 @@ export function ConversationDetailPage() {
     const text = content.trim()
     if (conversation.isLocal) {
       const nextMessages = addLocalMessage(conversation.conversationId, {
-        senderId: currentUser.userId,
+        senderId: getCurrentUserId(currentUser),
         messageType: 'TEXT',
         content: text
       })
@@ -111,12 +183,17 @@ export function ConversationDetailPage() {
       setContent('')
       return
     }
+    const optimisticMessage = createOptimisticMessage(conversation, currentUser, text, 'TEXT')
+    setMessages(previous => [...previous, optimisticMessage])
+    setContent('')
+    updateConversationLastMessage(conversation.conversationId, text)
     const sent = await run(async () => conversationApi.sendMessage(conversation.backendConversationId || conversation.conversationId, text, currentUser, 'TEXT'))
     if (sent) {
-      updateConversationLastMessage(conversation.conversationId, text)
-      setContent('')
-      await loadConversationData()
+      await refreshConversationData(conversation, currentOrder?.orderId)
+      return
     }
+    setMessages(previous => previous.filter(message => message.messageId !== optimisticMessage.messageId))
+    setContent(text)
   }
 
   async function chooseMessageImage(event) {
@@ -128,7 +205,7 @@ export function ConversationDetailPage() {
       const image = await readFileAsDataUrl(file)
       if (conversation.isLocal) {
         const nextMessages = addLocalMessage(conversation.conversationId, {
-          senderId: currentUser.userId,
+          senderId: getCurrentUserId(currentUser),
           messageType: 'IMAGE',
           content: image
         })
@@ -147,7 +224,7 @@ export function ConversationDetailPage() {
         await loadConversationData()
       }
     } catch (error) {
-      setNotice({ type: 'error', text: error.message })
+      setNotice({ type: 'error', text: getCWorkbenchErrorText(error) })
     } finally {
       setImageSending(false)
     }
@@ -158,7 +235,7 @@ export function ConversationDetailPage() {
     addSavedPhoto({
       photoId: `message-${message.messageId}`,
       source: 'conversation-submission',
-      title: `${conversation.scene || '会话'} 提交照片`,
+      title: `${conversation.scene || '沟通'} 提交照片`,
       imageData: message.content,
       authorId: message.senderId,
       createdAt: message.createdAt
@@ -168,10 +245,16 @@ export function ConversationDetailPage() {
 
   async function createQuote(event) {
     event.preventDefault()
-    const validationErrors = validateQuoteForm(quoteForm, conversation, currentUser, quotes, { editingQuotationId })
-    setQuoteValidationErrors(validationErrors)
-    if (validationErrors.length) {
-      setNotice({ type: 'warning', text: validationErrors[0] })
+    const validation = validateQuoteFormModel(quoteForm, {
+      conversation,
+      currentUser,
+      quotes,
+      editingQuotationId
+    })
+    setQuoteValidationErrors(validation.errors)
+    setQuoteFieldErrors(validation.fieldErrors)
+    if (validation.errors.length) {
+      setNotice({ type: 'warning', text: validation.errors[0] })
       return
     }
     const quotePayload = buildQuotePayload(quoteForm, conversation)
@@ -182,15 +265,21 @@ export function ConversationDetailPage() {
       setShowQuoteForm(false)
       setEditingQuotationId(null)
       setQuoteValidationErrors([])
+      setQuoteFieldErrors({})
       setQuoteForm(createDefaultQuoteForm())
       await loadConversationData()
     }
   }
 
   function startQuoteEditing(quote) {
+    if (!quote) {
+      setNotice({ type: 'error', text: '报价详情暂时无法打开，请刷新后重试。' })
+      return
+    }
     setEditingQuotationId(quote.quotationId)
     setQuoteForm(createQuoteFormFromQuote(quote))
     setQuoteValidationErrors([])
+    setQuoteFieldErrors({})
     setShowQuoteForm(true)
     setNotice({ type: 'info', text: '正在编辑待确认报价，保存前客户仍看到原报价。' })
   }
@@ -199,7 +288,13 @@ export function ConversationDetailPage() {
     setShowQuoteForm(false)
     setEditingQuotationId(null)
     setQuoteValidationErrors([])
+    setQuoteFieldErrors({})
     setQuoteForm(createDefaultQuoteForm())
+  }
+
+  function updateQuoteForm(nextForm) {
+    setQuoteForm(nextForm)
+    if (Object.keys(quoteFieldErrors).length) setQuoteFieldErrors({})
   }
 
   function openQuoteForm() {
@@ -210,22 +305,42 @@ export function ConversationDetailPage() {
     setQuoteForm(createDefaultQuoteForm())
     setEditingQuotationId(null)
     setQuoteValidationErrors([])
+    setQuoteFieldErrors({})
     setShowQuoteForm(true)
   }
 
+  function resendQuote(quote) {
+    if (!quote) {
+      setNotice({ type: 'error', text: '报价详情暂时无法打开，请刷新后重试。' })
+      return
+    }
+    setQuoteForm(createQuoteFormFromQuote(quote))
+    setEditingQuotationId(null)
+    setQuoteValidationErrors([])
+    setQuoteFieldErrors({})
+    setShowQuoteForm(true)
+    setActiveAction(null)
+    setActiveQuote(null)
+    setNotice({ type: 'info', text: '已带入上次报价内容，请确认后重新发送给客户。' })
+  }
+
   async function confirmQuote(quote) {
+    if (!quote?.quotationId) {
+      setNotice({ type: 'error', text: '报价详情暂时无法打开，请刷新后重试。' })
+      return false
+    }
     setLoading(true)
     setNotice(null)
     try {
-      const result = await quoteApi.confirm(quote.quotationId, '需求方确认报价', currentUser)
+      const result = await quoteApi.confirm(quote.quotationId, '客户已确认本次报价', currentUser)
       setNotice({ type: 'success', text: '报价已确认，订单已生成' })
       if (result?.orderId) {
-        await refreshConversationData()
-        navigate(`/orders?orderId=${result.orderId}`)
+        await refreshConversationData(conversation, result.orderId)
       } else {
         await refreshConversationData()
-        setNotice({ type: 'success', text: '报价已确认，可在订单页查看关联订单。' })
+        setNotice({ type: 'error', text: '报价已确认，但暂时没有拿到订单信息，请刷新后再查看。' })
       }
+      return true
     } catch (error) {
       try {
         await refreshConversationData()
@@ -233,110 +348,434 @@ export function ConversationDetailPage() {
         // Keep the original quote confirmation error visible.
       }
       setNotice({ type: 'error', text: getQuoteConfirmationErrorText(error) })
+      return false
     } finally {
       setLoading(false)
     }
   }
 
   async function rejectQuote(quote) {
+    if (!quote?.quotationId) {
+      setNotice({ type: 'error', text: '报价详情暂时无法打开，请刷新后重试。' })
+      return false
+    }
     const result = await run(async () => quoteApi.reject(quote.quotationId, '本次暂不采用该报价', currentUser), '报价已拒绝')
-    if (result) await loadConversationData()
+    if (result) {
+      await loadConversationData()
+      return true
+    }
+    return false
   }
 
-  const isBackendConversation = Boolean(conversation && !conversation.isLocal && getBackendConversationId(conversation))
-  const isConversationProvider = conversation && currentUser.userId === Number(conversation.participantBId)
-  const isConversationCustomer = conversation && currentUser.userId === Number(conversation.participantAId)
-  const pendingQuote = hasPendingQuote(quotes)
+  async function confirmQuoteFromDialog(quote) {
+    const succeeded = await confirmQuote(quote)
+    if (succeeded) {
+      setActiveAction(null)
+      setActiveQuote(null)
+    }
+  }
+
+  async function rejectQuoteFromDialog(quote) {
+    const succeeded = await rejectQuote(quote)
+    if (succeeded) {
+      setActiveAction(null)
+      setActiveQuote(null)
+    }
+  }
+
+  async function payCurrentOrder() {
+    if (!currentOrder) return false
+    const result = await run(async () => orderApi.mockPay(currentOrder.orderId, currentOrder.amountCent, currentUser), '支付成功，资金已进入平台担保')
+    if (result) {
+      await refreshConversationData(conversation, currentOrder.orderId)
+      return true
+    }
+    return false
+  }
+
+  async function cancelCurrentOrder(cancelAction) {
+    if (!currentOrder || !cancelAction) return
+    if (!window.confirm(cancelAction.confirmText)) return
+    const result = await run(async () => orderApi.cancel(currentOrder.orderId, { reason: cancelAction.reason }, currentUser), '订单状态已更新')
+    if (result) await refreshConversationData(conversation, currentOrder.orderId)
+  }
+
+  async function confirmCurrentOrder() {
+    if (!currentOrder) return
+    if (!window.confirm('确认接收后，订单将完成，平台担保资金会结算给摄影师。是否确认？')) return
+    const result = await run(async () => orderApi.transition(currentOrder.orderId, 'COMPLETED', '客户确认接收作品', currentUser), '订单已完成')
+    if (result) {
+      await refreshConversationData(conversation, currentOrder.orderId)
+      setCompletionDialogOpen(true)
+    }
+  }
+
+  async function submitDelivery(event) {
+    event.preventDefault()
+    if (!currentOrder || !deliveryForm.file) return false
+    const result = await run(async () => deliveryApi.upload(currentOrder.orderId, deliveryForm.file, deliveryForm.remark.trim(), currentUser),
+      currentOrder.status === 'REWORK_REQUIRED' ? '返修作品已上传' : '作品已上传')
+    if (result) {
+      await refreshConversationData(conversation, currentOrder.orderId)
+      return true
+    }
+    return false
+  }
+
+  async function submitRework(event) {
+    event.preventDefault()
+    if (!currentOrder) return false
+    const reason = reworkRequirement.trim()
+    if (!reason) {
+      setNotice({ type: 'warning', text: '请填写返修要求' })
+      return false
+    }
+    const result = await run(async () => orderApi.requestRework(currentOrder.orderId, reason, currentUser), '返修请求已提交')
+    if (result) {
+      await refreshConversationData(conversation, currentOrder.orderId)
+      return true
+    }
+    return false
+  }
+
+  async function submitPhotoAuthorizationRequest(event) {
+    event.preventDefault()
+    if (!currentOrder || !photoAuthorizationForm.fileIds.length) return false
+    const result = await run(async () => photoAuthorizationApi.request(currentOrder.orderId, {
+      fileIds: photoAuthorizationForm.fileIds,
+      remark: photoAuthorizationForm.remark.trim()
+    }, currentUser), '展示授权申请已发送')
+    if (result) {
+      await refreshConversationData(conversation, currentOrder.orderId)
+      return true
+    }
+    return false
+  }
+
+  async function handlePhotoAuthorizationDecision(authorization, decision, decisionRemark = '') {
+    if (!currentOrder) return
+    const remark = (decisionRemark || authorizationRemarks[authorization.id] || '').trim()
+    if (decision === 'reject' && !remark) {
+      setNotice({ type: 'warning', text: '请填写拒绝原因' })
+      return false
+    }
+    const action = decision === 'approve' ? photoAuthorizationApi.approve : photoAuthorizationApi.reject
+    const successText = decision === 'approve' ? '已同意展示授权' : '已拒绝展示授权'
+    const result = await run(async () => action(authorization.id, { remark }, currentUser), successText)
+    if (result) {
+      setAuthorizationRemarks({ ...authorizationRemarks, [authorization.id]: '' })
+      await refreshConversationData(conversation, currentOrder.orderId)
+    }
+    return Boolean(result)
+  }
+
+  function openPaymentDialog() {
+    if (!currentOrder) return
+    setPaymentMethod('WECHAT')
+    setActiveAction('PAYMENT')
+  }
+
+  async function confirmPaymentFromDialog() {
+    const succeeded = await payCurrentOrder()
+    if (succeeded) setActiveAction(null)
+  }
+
+  function showUnavailableTool(name) {
+    const messages = {
+      附件: '附件发送能力暂未接入，可以先发送图片或在沟通中说明文件内容。',
+      表情: '表情工具暂未接入，可以继续使用文字沟通。',
+      补款: '补款能力暂未接入，双方可先在沟通中协商金额。',
+      平台协助: '平台协助功能由仲裁模块处理，当前演示可在订单中查看争议状态。'
+    }
+    setNotice({ type: 'info', text: messages[name] || '该能力暂未接入。' })
+  }
+
+  function openUserProfile(userId, event) {
+    event?.stopPropagation()
+    goToUserProfile(navigate, userId, currentUser)
+  }
+
+  function openOrderArchive(orderId = currentOrder?.orderId) {
+    const succeeded = navigateToOrderFromConversation(navigate, {
+      orderId: orderId || currentOrder?.orderId,
+      conversationId
+    })
+    if (!succeeded) {
+      setNotice({ type: 'warning', text: '订单信息暂时不可用，请稍后刷新后再查看。' })
+      return false
+    }
+    return true
+  }
+
+  function openDeliveryGallery(delivery) {
+    const succeeded = navigateToDeliveryFromConversation(navigate, {
+      orderId: currentOrder?.orderId || delivery?.orderId,
+      deliveryId: delivery?.deliveryId || delivery?.fileId,
+      conversationId
+    })
+    if (!succeeded) {
+      setNotice({ type: 'warning', text: '作品记录暂不可查看，请刷新后重试。' })
+    }
+    return succeeded
+  }
+
+  const currentUserId = getCurrentUserId(currentUser)
+  const counterparty = getConversationPeer(conversation, currentUser)
+  const viewModel = buildConversationWorkbenchViewModel({
+    conversation,
+    currentUser,
+    activeRole: currentUser.role,
+    messages,
+    quotes,
+    order: currentOrder,
+    statusLogs,
+    deliveries: deliveryRecords,
+    authorizations: photoAuthorizations,
+  })
+  const actions = viewModel.actions
+  useConversationRealtime({
+    enabled: Boolean(conversation && !conversation.isLocal && !actions.roleMismatch),
+    conversationId: conversation?.backendConversationId || conversation?.conversationId,
+    onRefresh: () => refreshConversationData(conversation, currentOrder?.orderId)
+  })
+  useEffect(() => {
+    if (conversation && actions.roleMismatch) {
+      navigate('/messages', { replace: true, state: { roleMismatch: true } })
+    }
+  }, [actions.roleMismatch, conversation, currentUser.role, navigate])
   const editingQuote = editingQuotationId
     ? quotes.find(quote => String(quote.quotationId) === String(editingQuotationId))
     : null
-  const canCreateQuote = conversation
-    && currentUser.role === 'PROVIDER'
-    && isConversationProvider
-    && isBackendConversation
-    && !pendingQuote
+  const canCreateQuote = actions.canSendQuote
   const canEditSelectedQuote = editingQuote
     && canEditQuote(editingQuote, conversation, currentUser)
   const canSubmitQuoteForm = editingQuotationId ? canEditSelectedQuote : canCreateQuote
-  const canSeeQuoteEntry = conversation && currentUser.role === 'PROVIDER' && isConversationProvider
-  const quoteEntryHint = getQuoteEntryHint(conversation, currentUser, quotes)
-  const sourceLabel = getConversationSourceLabel(conversation)
-  const sourceHint = getConversationSourceHint(conversation)
-  const sourceRows = buildConversationSourceRows(conversation, currentUser, sourceLabel, getBackendConversationId(conversation))
+  const canSeeQuoteEntry = !currentOrder && (actions.canSendQuote || actions.canEditQuote || showQuoteForm)
+  const quoteEntryHint = currentOrder ? '' : getQuoteEntryHint(conversation, currentUser, quotes)
+  const activeQuoteIsPending = activeQuote?.status === 'PENDING_CONFIRM' && String(activeQuote.quotationId) === String(actions.pendingQuote?.quotationId)
+  const activeQuoteCanConfirm = activeQuoteIsPending && actions.canConfirmQuote
+  const activeQuoteCanReject = activeQuoteIsPending && actions.canRejectQuote
+  const activeQuoteCanResend = activeQuote?.status === 'REJECTED' && actions.canSendQuote
 
   return (
-    <Stack spacing={2}>
-      <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 } }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1.5}>
-          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 0 }}>
-            <Button color="inherit" onClick={() => navigate('/messages')}>返回</Button>
+    <MessageWorkbenchErrorBoundary resetKey={`${conversationId}-${currentUser.role}`}>
+    <PortraWorkflowFrame
+      data-message-detail-shell="true"
+      spacing={1.2}
+      maxWidth="workflow"
+      height={DETAIL_SHELL_HEIGHT}
+      sx={{
+        minHeight: 0,
+        overflow: 'hidden'
+      }}
+    >
+      <Paper
+        variant="outlined"
+        sx={{
+          flexShrink: 0,
+          px: { xs: 1.35, md: 1.8 },
+          py: 1.15,
+          bgcolor: PORTRA_COLORS.paper,
+          borderColor: PORTRA_COLORS.borderMuted,
+          borderRadius: PORTRA_RADII.panel,
+          boxShadow: PORTRA_SHADOWS.subtle,
+          position: 'relative',
+          overflow: 'hidden',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            left: 18,
+            top: 0,
+            width: 54,
+            height: 3,
+            borderRadius: 999,
+            bgcolor: PORTRA_COLORS.blue
+          }
+        }}
+      >
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.15} sx={{ justifyContent: 'space-between', alignItems: { xs: 'stretch', md: 'center' } }}>
+          <Stack direction="row" spacing={1.5} sx={{ minWidth: 0, alignItems: 'center' }}>
+            <Tooltip title="全部沟通">
+              <IconButton onClick={() => navigate('/messages')} sx={{ border: `1px solid ${PORTRA_COLORS.border}`, borderRadius: PORTRA_RADII.control, bgcolor: PORTRA_COLORS.paperSoft }}>
+                <ArrowBackRoundedIcon />
+              </IconButton>
+            </Tooltip>
             <Avatar
-              onClick={() => conversation && openUserProfile(getOppositeUserId(conversation, currentUser.userId))}
-              sx={{ bgcolor: conversation?.isLocal ? 'secondary.main' : 'primary.main', cursor: conversation ? 'pointer' : 'default' }}
+              src={counterparty.avatarData || undefined}
+              onClick={event => conversation && openUserProfile(getOppositeUserId(conversation, currentUserId), event)}
+              sx={{ width: 44, height: 44, bgcolor: PORTRA_COLORS.blue, color: PORTRA_COLORS.paper, cursor: conversation ? 'pointer' : 'default', fontWeight: 900, boxShadow: `0 0 0 3px ${PORTRA_COLORS.paperSoft}, 0 0 0 4px ${PORTRA_COLORS.border}` }}
             >
-              {conversation?.scene?.slice(0, 1) || '会'}
+              {getSafeDisplayText(counterparty.initial, '对').slice(0, 1)}
             </Avatar>
             <Box sx={{ minWidth: 0 }}>
-              <Typography variant="h6" noWrap>{conversation?.scene || `会话 ${conversationId}`}</Typography>
-              <Typography color="text.secondary" noWrap>
-                {conversation?.location || '具体对话'} · 对方 {conversation ? getOppositeUserId(conversation, currentUser.userId) : '-'}
+              <Typography variant="h6" sx={{ color: PORTRA_COLORS.ink, fontSize: 17, fontWeight: 950 }} noWrap>
+                {getSafeDisplayText(counterparty.nickname, counterparty.userId ? `用户 ${counterparty.userId}` : '用户')}
               </Typography>
             </Box>
           </Stack>
-          <Chip size="small" label={conversation?.isLocal ? '本地对话' : 'C会话'} />
+          <Stack direction="row" spacing={0.8} sx={{ alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
+            <PortraStatusPill label={actions.stage.title} />
+            <PortraActionLink
+              startIcon={<ReceiptLongRoundedIcon />}
+              onClick={() => openOrderArchive(currentOrder?.orderId)}
+              disabled={!currentOrder?.orderId}
+            >
+              查看订单
+            </PortraActionLink>
+          </Stack>
         </Stack>
       </Paper>
 
-      {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
-      {conversation?.interfaceNote && <Alert severity="warning">{conversation.interfaceNote}</Alert>}
+      {notice && <Alert severity={notice.type} sx={noticeSx}>{notice.text}</Alert>}
 
-      <ConversationSourceCard
-        isBackendConversation={isBackendConversation}
-        currentUser={currentUser}
-        sourceRows={sourceRows}
-        sourceHint={sourceHint}
-      />
+      <PortraWorkbenchFrame
+        data-message-workbench-grid="true"
+        rightPanelWidth={PORTRA_LAYOUT.rightPanelWidth}
+        gap={{ xs: 1.25, lg: 2.5, xl: 2.5 }}
+      >
+        <Box sx={{ minHeight: 0, minWidth: 0, height: '100%', display: 'flex', overflow: 'hidden' }}>
+          <ConversationThread
+            messages={messages}
+            conversation={conversation}
+            currentUser={currentUser}
+            quotes={quotes}
+            order={currentOrder}
+            actions={actions}
+            statusLogs={statusLogs}
+            deliveryRecords={deliveryRecords}
+            photoAuthorizations={photoAuthorizations}
+            timeline={viewModel.timeline}
+            content={content}
+            loading={loading}
+            imageSending={imageSending}
+            canSeeQuoteEntry={canSeeQuoteEntry}
+            canCreateQuote={canCreateQuote}
+            showQuoteForm={showQuoteForm}
+            editingQuotationId={editingQuotationId}
+            quoteEntryHint={quoteEntryHint}
+            quoteActionLabel={quotes.some(quote => quote.status === 'REJECTED') ? '重新发送报价' : '发送报价'}
+            quoteForm={quoteForm}
+            quoteValidationErrors={quoteValidationErrors}
+            canSubmitQuoteForm={canSubmitQuoteForm}
+            onOpenQuoteForm={openQuoteForm}
+            onCloseQuoteForm={closeQuoteForm}
+            onStartQuoteEditing={startQuoteEditing}
+            onConfirmQuote={confirmQuote}
+            onRejectQuote={rejectQuote}
+            onOpenQuoteDetail={quote => {
+              if (!quote) {
+                setNotice({ type: 'error', text: '报价详情暂时无法打开，请刷新后重试。' })
+                return
+              }
+              setActiveQuote(quote)
+              setActiveAction('QUOTE_DETAIL')
+            }}
+            onOpenOrderArchive={openOrderArchive}
+            onOpenDeliveryGallery={openDeliveryGallery}
+            onQuoteFormChange={updateQuoteForm}
+            onSubmitQuote={createQuote}
+            onContentChange={setContent}
+            onSendMessage={sendMessage}
+            onChooseMessageImage={chooseMessageImage}
+            onSaveSubmittedPhoto={saveSubmittedPhoto}
+            onPayOrder={openPaymentDialog}
+            onCancelOrder={cancelCurrentOrder}
+            onConfirmOrder={confirmCurrentOrder}
+            onDecidePhotoAuthorization={handlePhotoAuthorizationDecision}
+            onUnavailableTool={showUnavailableTool}
+            onOpenAction={setActiveAction}
+          />
+        </Box>
 
-      <QuotePanel
-        quotes={quotes}
-        conversation={conversation}
-        currentUser={currentUser}
-        canSeeQuoteEntry={canSeeQuoteEntry}
-        canCreateQuote={canCreateQuote}
-        showQuoteForm={showQuoteForm}
-        editingQuotationId={editingQuotationId}
-        quoteEntryHint={quoteEntryHint}
-        quoteForm={quoteForm}
-        quoteValidationErrors={quoteValidationErrors}
+        <QuoteDraftDialog
+          open={showQuoteForm && canSeeQuoteEntry}
+          quoteForm={quoteForm}
+          onQuoteFormChange={updateQuoteForm}
+          onSubmit={createQuote}
+          onClose={closeQuoteForm}
+          editingQuotationId={editingQuotationId}
+          quoteValidationErrors={quoteValidationErrors}
+          quoteFieldErrors={quoteFieldErrors}
+          loading={loading}
+          canSubmitQuoteForm={canSubmitQuoteForm}
+        />
+
+        <ConversationWorkbenchPanel
+          quotes={quotes}
+          order={currentOrder}
+          actions={actions}
+          statusLogs={statusLogs}
+          deliveryRecords={deliveryRecords}
+          photoAuthorizations={photoAuthorizations}
+          panelSummary={viewModel.panelSummary}
+          onOpenOrderArchive={() => openOrderArchive(currentOrder?.orderId)}
+          onConfirmOrder={confirmCurrentOrder}
+          onUnavailableTool={showUnavailableTool}
+          onOpenAction={setActiveAction}
+        />
+      </PortraWorkbenchFrame>
+      <ConversationActionDialogs
+        activeAction={activeAction}
         loading={loading}
-        canSubmitQuoteForm={canSubmitQuoteForm}
-        onOpenQuoteForm={openQuoteForm}
-        onCloseQuoteForm={closeQuoteForm}
-        onStartQuoteEditing={startQuoteEditing}
-        onConfirmQuote={confirmQuote}
-        onRejectQuote={rejectQuote}
-        onOpenOrder={orderId => navigate(`/orders?orderId=${orderId}`)}
-        onQuoteFormChange={setQuoteForm}
-        onSubmitQuote={createQuote}
+        quote={activeQuote}
+        order={currentOrder}
+        paymentMethod={paymentMethod}
+        canConfirmQuote={activeQuoteCanConfirm}
+        canRejectQuote={activeQuoteCanReject}
+        canResendQuote={activeQuoteCanResend}
+        deliveryRecords={deliveryRecords}
+        deliveryForm={deliveryForm}
+        reworkRequirement={reworkRequirement}
+        photoAuthorizationForm={photoAuthorizationForm}
+        onClose={() => {
+          setActiveAction(null)
+          setActiveQuote(null)
+        }}
+        onPaymentMethodChange={setPaymentMethod}
+        onConfirmQuote={confirmQuoteFromDialog}
+        onRejectQuote={rejectQuoteFromDialog}
+        onResendQuote={resendQuote}
+        onConfirmPayment={confirmPaymentFromDialog}
+        onDeliveryFileChange={file => setDeliveryForm({ ...deliveryForm, file })}
+        onDeliveryRemarkChange={remark => setDeliveryForm({ ...deliveryForm, remark })}
+        onReworkRequirementChange={setReworkRequirement}
+        onPhotoAuthorizationFileIdsChange={fileIds => setPhotoAuthorizationForm({ ...photoAuthorizationForm, fileIds })}
+        onPhotoAuthorizationRemarkChange={remark => setPhotoAuthorizationForm({ ...photoAuthorizationForm, remark })}
+        onSubmitDelivery={submitDelivery}
+        onSubmitRework={submitRework}
+        onSubmitPhotoAuthorization={submitPhotoAuthorizationRequest}
       />
-
-      <ConversationThread
-        messages={messages}
-        conversation={conversation}
-        currentUser={currentUser}
-        content={content}
-        loading={loading}
-        imageSending={imageSending}
-        canSeeQuoteEntry={canSeeQuoteEntry}
-        canCreateQuote={canCreateQuote}
-        showQuoteForm={showQuoteForm}
-        editingQuotationId={editingQuotationId}
-        onOpenQuoteForm={openQuoteForm}
-        onContentChange={setContent}
-        onSendMessage={sendMessage}
-        onChooseMessageImage={chooseMessageImage}
-        onSaveSubmittedPhoto={saveSubmittedPhoto}
+      <OrderCompletionDialog
+        open={completionDialogOpen}
+        onClose={() => setCompletionDialogOpen(false)}
+        onReview={() => {
+          setCompletionDialogOpen(false)
+          openOrderArchive(currentOrder?.orderId)
+        }}
+        reviewDisabled={!currentOrder?.orderId}
       />
-    </Stack>
+    </PortraWorkflowFrame>
+    </MessageWorkbenchErrorBoundary>
   )
+}
+
+function createOptimisticMessage(conversation, currentUser, content, messageType) {
+  const conversationId = conversation?.backendConversationId || conversation?.conversationId
+  return {
+    messageId: `optimistic-${conversationId}-${Date.now()}`,
+    conversationId,
+    senderId: getCurrentUserId(currentUser),
+    messageType,
+    content,
+    createdAt: new Date().toISOString(),
+    optimistic: true
+  }
+}
+
+const noticeSx = {
+  py: 0.25,
+  borderRadius: PORTRA_RADII.control,
+  border: `1px solid ${PORTRA_COLORS.borderMuted}`,
+  bgcolor: PORTRA_COLORS.paper,
+  '& .MuiAlert-message': { py: 0.45 }
 }

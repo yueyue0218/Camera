@@ -28,15 +28,17 @@ export function FilterBar({ filters, onChange, onApplyFilters, onPublishClick, c
         />
       </label>
       <label className="filter-control">
-        <select className="filter-select" value={filters.cityCode} onChange={event => updateAndApply({ cityCode: event.target.value })}>
-          <option value="">城市</option>
+        <select className="filter-select" value={filters.cityCode || '__placeholder'} onChange={event => updateAndApply({ cityCode: event.target.value === '__all' ? '' : event.target.value })}>
+          <option value="__placeholder" hidden>地区</option>
+          <option value="__all">不限</option>
           {CITY_OPTIONS.map(option => <option key={`${option.label}-${option.value}`} value={option.value}>{option.label}</option>)}
         </select>
         {filters.cityCode && <button className="filter-clear" type="button" onClick={() => updateAndApply({ cityCode: '' })}>清空</button>}
       </label>
       <label className="filter-control">
-        <select className="filter-select" value={filters.type} onChange={event => updateAndApply({ type: event.target.value })}>
-          <option value="">类型</option>
+        <select className="filter-select" value={filters.type || '__placeholder'} onChange={event => updateAndApply({ type: event.target.value === '__all' ? '' : event.target.value })}>
+          <option value="__placeholder" hidden>类型</option>
+          <option value="__all">不限</option>
           {TYPE_OPTIONS.map(option => <option key={option.label} value={option.value}>{option.label}</option>)}
         </select>
         {filters.type && <button className="filter-clear" type="button" onClick={() => updateAndApply({ type: '' })}>清空</button>}

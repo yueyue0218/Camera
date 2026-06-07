@@ -16,7 +16,10 @@
 }
 
 .portra-app { min-height: 100vh; background: var(--portra-bg); color: var(--portra-ink); }
-.portra-main { width: min(1180px, calc(100vw - 48px)); margin: 0 auto; padding: 26px 0 56px; }
+.portra-main,
+.portra-main-shell { width: min(1180px, calc(100vw - 48px)); margin: 0 auto; padding: 26px 0 56px; }
+.portra-main-shell--fixed-workflow { height: calc(100dvh - 72px); padding: 18px 0 24px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; }
+.portra-main-shell--fixed-workflow > * { min-height: 0; }
 .portra-header { position: sticky; top: 0; z-index: 80; height: 72px; background: #f2ede6; border-bottom: 1px solid var(--portra-line); box-shadow: 0 1px 0 rgba(255,255,255,.55) inset; }
 .portra-header-inner { width: min(1180px, calc(100vw - 48px)); height: 72px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .portra-wordmark { display: flex; align-items: flex-end; gap: 12px; min-width: 168px; border: 0; background: transparent; padding: 0; color: inherit; text-align: left; }
@@ -41,7 +44,8 @@
 .portra-notification-bell { display: block; }
 .portra-notification-bell--ringing { animation: portraBellRing 620ms ease-out 1; transform-origin: 50% 10%; }
 .portra-notice-badge { position: absolute; right: 2px; top: 2px; width: 9px; height: 9px; border: 2px solid #f2ede6; border-radius: 999px; background: var(--portra-orange); }
-.portra-avatar { width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, var(--portra-blue), #3857c8 45%, var(--portra-orange)); border: 3px solid #f4efe8; box-shadow: 0 0 0 1px var(--portra-line); }
+.portra-avatar { width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, var(--portra-blue), #3857c8 45%, var(--portra-orange)); border: 3px solid #f4efe8; box-shadow: 0 0 0 1px var(--portra-line); background-size: cover; background-position: center; }
+.portra-avatar.has-image { background-image: var(--avatar-art); }
 .portra-toolbar { display: grid; grid-template-columns: minmax(260px, 1fr) 120px 120px 130px auto; gap: 12px; align-items: center; background: rgba(248,243,235,.86); border: 1px solid var(--portra-line); border-radius: 24px; padding: 14px; box-shadow: var(--portra-soft); }
 .portra-search { position: relative; }
 .portra-search input { width: 100%; height: 48px; border: 1px solid rgba(21,19,24,.14); border-radius: 999px; background: #fffaf2; padding: 0 18px 0 46px; outline: none; color: var(--portra-ink); }
@@ -208,7 +212,7 @@
 @keyframes creditSealBreath { 0%, 100% { opacity: .48; transform: scale(.98); } 50% { opacity: .84; transform: scale(1.04); } }
 @keyframes creditSealSweep { 0% { opacity: .0; transform: translateX(-28%); } 18% { opacity: .32; } 52% { opacity: .16; transform: translateX(10%); } 100% { opacity: 0; transform: translateX(30%); } }
 @media (max-width: 1040px) { .portra-toolbar { grid-template-columns: 1fr 1fr 1fr; } .portra-order-layout, .portra-detail-grid, .portra-profile-grid, .portra-feed-layout { grid-template-columns: 1fr; } .portra-aside { display: grid; grid-template-columns: 1fr 1fr; } }
-@media (max-width: 760px) { .portra-header { height: auto; } .portra-header-inner { width: min(calc(100vw - 28px), 1180px); height: auto; min-height: 72px; flex-wrap: wrap; padding: 14px 0; } .portra-main { width: min(calc(100vw - 28px), 1180px); } .portra-nav { order: 3; width: 100%; justify-content: space-between; gap: 10px; } .portra-nav-item { height: 38px; font-size: 13px; } .portra-toolbar, .portra-order-grid, .portra-info-grid { grid-template-columns: 1fr; } .portra-hall-head { flex-direction: column; align-items: flex-start; } .portra-tabs { width: 100%; } .portra-tab { min-width: 0; } .portra-aside { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .portra-header { height: auto; } .portra-header-inner { width: min(calc(100vw - 28px), 1180px); height: auto; min-height: 72px; flex-wrap: wrap; padding: 14px 0; } .portra-main, .portra-main-shell { width: min(calc(100vw - 28px), 1180px); } .portra-nav { order: 3; width: 100%; justify-content: space-between; gap: 10px; } .portra-nav-item { height: 38px; font-size: 13px; } .portra-toolbar, .portra-order-grid, .portra-info-grid { grid-template-columns: 1fr; } .portra-hall-head { flex-direction: column; align-items: flex-start; } .portra-tabs { width: 100%; } .portra-tab { min-width: 0; } .portra-aside { grid-template-columns: 1fr; } }
 @media (max-width: 520px) { .portra-wordmark-sub { display: none; } .portra-header-actions { min-width: 0; } .portra-role-btn { padding: 7px 10px; font-size: 12px; } .portra-score-card { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .portra-preview-grid { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .portra-notification-bell--ringing, .portra-modal-mask, .portra-modal, .portra-toast, .review-item, .appeared { animation: none; } .portra-notification-btn, .portra-score-card.clickable, .portra-stars button, .portra-notice, .review-item { transition: none; } .portra-notification-btn:hover, .portra-score-card.clickable:hover, .portra-ticket-card:active, .portra-score-card.clickable:active, .portra-notice:hover, .review-item:hover, .portra-notice:active, .portra-message-row:active { transform: none; } }

@@ -120,6 +120,7 @@ public class OrderService {
         Order order = getOrderOrThrow(orderId);
         OrderStatus fromStatus = order.getStatus();
         ensureCanChangeStatus(fromStatus, targetStatus);
+        ensureNotManualShootingTransition(fromStatus, targetStatus);
         if (fromStatus == OrderStatus.DELIVERED_PENDING_CONFIRM && targetStatus == OrderStatus.COMPLETED) {
             markCompletedAndReleaseEscrow(order, LocalDateTime.now(), false);
         } else if (targetStatus == OrderStatus.CANCELLED) {
@@ -562,6 +563,17 @@ public class OrderService {
         if (!OrderStatusMachine.canTransit(fromStatus, targetStatus)) {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT,
                     "Illegal order status transition from " + fromStatus + " to " + targetStatus);
+        }
+    }
+
+    private void ensureNotManualShootingTransition(OrderStatus fromStatus, OrderStatus targetStatus) {
+        boolean startsShooting = fromStatus == OrderStatus.PAID_PENDING_SHOOT
+                && targetStatus == OrderStatus.SHOOTING;
+        boolean finishesShooting = fromStatus == OrderStatus.SHOOTING
+                && targetStatus == OrderStatus.PENDING_DELIVERY;
+        if (startsShooting || finishesShooting) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                    "Shooting status is advanced by the system schedule, not manually");
         }
     }
 

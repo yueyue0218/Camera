@@ -85,9 +85,11 @@ function getOrderIdForItem(item) {
 }
 
 function resolveNotificationTarget(item) {
-  const type = normalizeText(item?.type)
+  if (item?.navigationPath?.startsWith('/')) return item.navigationPath
+
+  const type = normalizeText(item?.targetType || item?.relatedType || item?.sourceType || item?.type)
   const relatedType = normalizeText(item?.relatedType)
-  const relatedId = item?.relatedId ?? item?.targetId ?? item?.sourceId
+  const relatedId = item?.targetId ?? item?.relatedId ?? item?.sourceId
 
   if (isAppealNotification(item)) {
     if (relatedType.includes('REVIEW_COMPLAINT') || type.includes('REVIEW_COMPLAINT')) {
@@ -103,14 +105,26 @@ function resolveNotificationTarget(item) {
   }
 
   if (isReviewNotification(item)) {
-    return '/reviews'
+    return item?.orderId ? `/orders?orderId=${item.orderId}` : '/reviews'
   }
 
-  if (type === 'MOMENT_LIKED' || relatedType.includes('MOMENT')) {
+  if (type.includes('CONVERSATION') || type.includes('MESSAGE')) {
+    return relatedId ? `/messages/${relatedId}` : ''
+  }
+
+  if (type.includes('MOMENT')) {
     return relatedId ? `/moments/${relatedId}` : ''
   }
 
-  if (type === 'FOLLOWED' && item?.sourceId) {
+  if (type.includes('USER')) {
+    return relatedId ? `/users/${relatedId}` : ''
+  }
+
+  if (type.includes('CREDIT')) {
+    return '/profile/credit'
+  }
+
+  if (normalizeText(item?.type) === 'FOLLOWED' && item?.sourceId) {
     return `/users/${item.sourceId}/reviews`
   }
 

@@ -512,6 +512,20 @@ class QuoteOrderFlowServiceTest {
         verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
     }
 
+    @Test
+    void manualShootingStatusTransitionIsBlocked() {
+        Order order = pendingPaymentOrder();
+        order.setStatus(OrderStatus.PAID_PENDING_SHOOT);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+
+        assertThrows(BusinessException.class,
+                () -> orderService.changeStatus(ORDER_ID, PROVIDER_USER_ID, OrderStatus.SHOOTING, "开始拍摄"));
+
+        assertEquals(OrderStatus.PAID_PENDING_SHOOT, order.getStatus());
+        verify(orderRepository, never()).save(any(Order.class));
+        verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
+    }
+
     private Quote pendingQuote() {
         Quote quote = new Quote();
         quote.setId(QUOTE_ID);

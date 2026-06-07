@@ -1,11 +1,19 @@
-import { Alert, Box, Button, Chip, Paper, Stack, Typography } from '@mui/material'
+import { Alert, Box, Button, Paper, Stack, Typography } from '@mui/material'
 import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import { centToYuan } from '../../../utils/index.js'
+import { buildQuoteAction } from '../../../utils/orderNavigation.js'
+import { PortraInfoBanner, PortraStatusBadge, PortraTicketCard } from '../../../components/portra/index.js'
 import { formatTime } from '../utils/conversationUtils.js'
-import { canEditQuote, getQuoteOrderId, quoteStatusMap } from '../utils/quoteUtils.js'
+import {
+  canEditQuote,
+  getPhotoUsageScopeLabel,
+  getQuoteNextStepText,
+  getQuoteStatusLabel
+} from '../utils/quoteUtils.js'
 import { InfoRows } from './InfoRows.jsx'
 import { QuoteForm } from './QuoteForm.jsx'
+import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII } from '../MessageVisualTokens.js'
 
 export function QuotePanel({
   quotes,
@@ -30,12 +38,12 @@ export function QuotePanel({
   onSubmitQuote
 }) {
   return (
-    <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, bgcolor: '#fffaf8' }}>
+    <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, bgcolor: PORTRA_COLORS.paper, borderColor: PORTRA_COLORS.borderMuted, borderRadius: PORTRA_RADII.panel }}>
       <Stack spacing={1.5}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between' }}>
           <Box>
-            <Typography variant="h6">报价 / 订单协作区</Typography>
-            <Typography color="text.secondary">服务方发正式报价，顾客确认后生成订单，再进入托管和交付流程。</Typography>
+            <Typography variant="h6">报价与订单</Typography>
+            <Typography color="text.secondary">摄影师发送正式报价，客户确认后生成平台担保订单。</Typography>
           </Box>
           {canSeeQuoteEntry && (
             <Button
@@ -49,42 +57,47 @@ export function QuotePanel({
           )}
         </Stack>
 
-        {quoteEntryHint && canSeeQuoteEntry && <Alert severity={canCreateQuote ? 'info' : 'warning'}>{quoteEntryHint}</Alert>}
+        {quoteEntryHint && canSeeQuoteEntry && <PortraInfoBanner tone={canCreateQuote ? 'info' : 'warning'}>{quoteEntryHint}</PortraInfoBanner>}
 
         {quotes.map(quote => {
-          const orderId = getQuoteOrderId(quote)
+          const orderAction = buildQuoteAction(quote)
           return (
-            <Paper key={quote.quotationId} variant="outlined" sx={{ p: 1.6, bgcolor: '#fbfdff' }}>
+            <PortraTicketCard
+              key={quote.quotationId}
+              sx={{
+                p: { xs: 1.6, md: 2 },
+                pl: { xs: 2.5, md: 3 }
+              }}
+            >
               <Stack spacing={1.2}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
                   <Box>
-                    <Typography fontWeight={900}>{centToYuan(quote.amountCent)}</Typography>
+                    <Typography variant="overline" color="text.secondary">正式报价单</Typography>
+                    <Typography variant="h5" fontWeight={900}>{centToYuan(quote.amountCent)}</Typography>
                     <Typography color="text.secondary" variant="body2">
-                      报价 ID {quote.quotationId} · {quote.quoteNo || '当前接口未返回报价编号'}
+                      {quote.quoteNo ? `报价编号 ${getSafeDisplayText(quote.quoteNo, '本次报价')}` : '确认前可继续沟通调整'}
                     </Typography>
                   </Box>
-                  <Chip size="small" color={quote.status === 'PENDING_CONFIRM' ? 'warning' : quote.status === 'CONFIRMED' ? 'success' : 'default'} label={quoteStatusMap[quote.status] || quote.status} />
+                  <PortraStatusBadge label={getQuoteStatusLabel(quote.status)} />
                 </Stack>
                 <InfoRows rows={[
-                  ['拍摄地点', quote.location || '未填写'],
+                  ['拍摄地点', getSafeDisplayText(quote.location, '拍摄地点待确认')],
                   ['拍摄开始', formatTime(quote.shootStartTime)],
                   ['拍摄结束', formatTime(quote.shootEndTime)],
-                  ['最晚交付', formatTime(quote.deliveryDeadline)],
+                  ['最晚成片', formatTime(quote.deliveryDeadline)],
                   ['服务内容', quote.serviceContent || '未填写'],
                   ['原片/精修', `${quote.originalCount ?? 0} / ${quote.refinedCount ?? 0}`],
-                  ['照片使用范围', quote.photoUsageScope || '未填写'],
-                  ['条款', quote.terms || '当前报价接口未返回该字段'],
-                  ['合同条款', quote.contractTerms || '当前报价接口未返回该字段'],
-                  ['备注', quote.remark || '当前报价接口未返回该字段']
+                  ['照片使用范围', getPhotoUsageScopeLabel(quote.photoUsageScope)],
+                  ['下一步', getQuoteNextStepText(quote, currentUser)]
                 ]} />
                 {quote.status === 'PENDING_CONFIRM' && currentUser.role === 'CUSTOMER' && currentUser.userId === Number(conversation?.participantAId) && (
-                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                  <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                     <Button size="small" variant="contained" onClick={() => onConfirmQuote(quote)}>确认报价</Button>
                     <Button size="small" variant="outlined" color="inherit" onClick={() => onRejectQuote(quote)}>拒绝报价</Button>
                   </Stack>
                 )}
                 {canEditQuote(quote, conversation, currentUser) && (
-                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                  <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                     <Button
                       size="small"
                       variant={String(editingQuotationId) === String(quote.quotationId) ? 'contained' : 'outlined'}
@@ -97,19 +110,19 @@ export function QuotePanel({
                   </Stack>
                 )}
                 {quote.status === 'CONFIRMED' && (
-                  orderId ? (
-                    <Button size="small" variant="outlined" startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenOrder(orderId)} sx={{ alignSelf: 'flex-start' }}>
-                      查看订单
+                  orderAction ? (
+                    <Button size="small" variant="outlined" startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenOrder(orderAction.orderId)} sx={{ alignSelf: 'flex-start' }}>
+                      {orderAction.label}
                     </Button>
                   ) : (
-                    <Alert severity="info">报价已确认，可在订单页查看关联订单；当前报价列表接口未返回 orderId。</Alert>
+                    <PortraInfoBanner>报价已确认，订单信息会在本次合作面板中同步。</PortraInfoBanner>
                   )
                 )}
               </Stack>
-            </Paper>
+            </PortraTicketCard>
           )
         })}
-        {!quotes.length && <Typography color="text.secondary">当前会话还没有正式报价。</Typography>}
+        {!quotes.length && <Typography color="text.secondary">当前沟通还没有正式报价。</Typography>}
 
         {showQuoteForm && canSeeQuoteEntry && (
           <QuoteForm

@@ -1,0 +1,454 @@
+.credit-detail-page .credit-notice {
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+.credit-detail-page .credit-hero-surface {
+  position: relative;
+  isolation: isolate;
+  animation: creditPaperArrive 560ms cubic-bezier(.2, .72, .2, 1) both;
+}
+
+.credit-detail-page .credit-hero-surface .profile-photo-wrap {
+  position: relative;
+  width: 192px;
+  height: 192px;
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  align-self: center;
+  animation: creditStampFloat 4.8s 900ms ease-in-out infinite;
+}
+
+.credit-score-plain {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--blue);
+  animation: creditScoreFocus 720ms 180ms cubic-bezier(.16, .72, .2, 1) both;
+}
+
+.credit-score-plain b {
+  font-family: "Playfair Display", "Bodoni 72", Georgia, serif;
+  font-size: 46px;
+  line-height: 1;
+}
+
+.credit-score-plain span {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+.credit-hero-watermark {
+  position: absolute;
+  right: 12px;
+  top: 0;
+  z-index: 0;
+  color: rgba(13, 47, 178, .08);
+  font-family: "Playfair Display", "Bodoni 72", Georgia, serif;
+  font-size: 132px;
+  line-height: .8;
+  letter-spacing: -.06em;
+  user-select: none;
+  pointer-events: none;
+  animation: creditWatermarkSettle 900ms 100ms ease-out both;
+}
+
+.credit-stamp-ring {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 1.5px dashed rgba(13, 47, 178, .38);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 12px rgba(13, 47, 178, .025) inset,
+    0 0 0 8px rgba(248, 243, 235, .85),
+    0 18px 34px rgba(13, 47, 178, .12);
+  pointer-events: none;
+  animation: creditStampPress 760ms 80ms cubic-bezier(.2, .82, .28, 1) both, creditStampTurn 9s 900ms linear infinite;
+}
+
+.credit-stamp-ring::before,
+.credit-stamp-ring::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  border: 1px dashed rgba(13, 47, 178, .24);
+}
+
+.credit-stamp-ring::before {
+  inset: 12px;
+}
+
+.credit-stamp-ring::after {
+  inset: 22px;
+}
+
+.credit-records-panel {
+  position: relative;
+  overflow: hidden;
+  margin-top: 16px;
+}
+
+.credit-detail-page .hero-side {
+  overflow: hidden;
+  border-color: rgba(13, 47, 178, .15);
+  background:
+    radial-gradient(circle at 88% 8%, rgba(13, 47, 178, .12), transparent 34%),
+    rgba(235, 230, 221, .76);
+  animation: creditOverviewArrive 620ms 220ms cubic-bezier(.2, .72, .2, 1) both;
+}
+
+.credit-detail-page .hero-side::after {
+  content: "";
+  position: absolute;
+  width: 110px;
+  height: 210%;
+  top: -55%;
+  left: -50%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .52), transparent);
+  transform: rotate(18deg);
+  animation: creditOverviewSweep 6.8s 1.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.credit-detail-page .hero-side .id-number {
+  text-shadow: 0 8px 20px rgba(13, 47, 178, .14);
+  animation: creditOverviewNumber 3.8s 1s ease-in-out infinite;
+}
+
+.credit-detail-page .hero-side .metric {
+  position: relative;
+  overflow: hidden;
+  transition: transform .24s ease, border-color .24s ease, box-shadow .24s ease;
+  animation: creditMetricRise 520ms cubic-bezier(.2, .72, .2, 1) both;
+}
+
+.credit-detail-page .hero-side .metric:nth-child(1) { animation-delay: 300ms; }
+.credit-detail-page .hero-side .metric:nth-child(2) { animation-delay: 380ms; }
+.credit-detail-page .hero-side .metric:nth-child(3) { animation-delay: 460ms; }
+.credit-detail-page .hero-side .metric:nth-child(4) { animation-delay: 540ms; }
+
+.credit-detail-page .hero-side .metric:hover {
+  transform: translateY(-3px) rotate(-.5deg);
+  border-color: rgba(13, 47, 178, .25);
+  box-shadow: 0 12px 22px rgba(13, 47, 178, .1);
+}
+
+.credit-note-stack {
+  position: relative;
+  margin-top: 2px;
+  padding-top: 4px;
+}
+
+.credit-note-stack::before {
+  content: "";
+  position: absolute;
+  left: 31px;
+  top: 22px;
+  bottom: 22px;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(13, 47, 178, .15), rgba(13, 47, 178, .05));
+  opacity: .8;
+}
+
+.credit-note {
+  position: relative;
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) 120px;
+  gap: 14px;
+  align-items: center;
+  margin: 0 16px 0 46px;
+  padding: 16px 18px 16px 16px;
+  overflow: hidden;
+  border: 1px solid rgba(21, 19, 24, .08);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 250, 242, .98), rgba(249, 246, 238, .96));
+  box-shadow: 0 8px 18px rgba(21, 19, 24, .04);
+  transform: translateZ(0);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  cursor: default;
+  animation:
+    creditNoteFile 440ms cubic-bezier(.2, .72, .2, 1) both,
+    creditNoteSway 4.6s ease-in-out infinite alternate;
+  animation-delay:
+    min(calc(var(--credit-note-index, 0) * 70ms + 160ms), 720ms),
+    min(calc(var(--credit-note-index, 0) * 120ms + 920ms), 1800ms);
+}
+
+.credit-note[role="button"] {
+  cursor: pointer;
+}
+
+.credit-note:nth-child(even) {
+  animation-direction: normal, alternate-reverse;
+}
+
+.credit-note:hover {
+  animation-play-state: paused;
+  transform: translateY(-4px) rotate(0);
+  border-color: rgba(13, 47, 178, .16);
+  box-shadow: 0 14px 28px rgba(13, 47, 178, .08);
+}
+
+.credit-note::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 8px;
+  background: linear-gradient(180deg, rgba(13, 47, 178, .92), rgba(13, 47, 178, .64));
+}
+
+.credit-note::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  top: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, .55), rgba(255, 255, 255, 0));
+  opacity: .75;
+}
+
+.credit-note--negative::before {
+  background: linear-gradient(180deg, rgba(248, 81, 4, .88), rgba(248, 81, 4, .56));
+}
+
+.credit-note-thread {
+  position: absolute;
+  left: -16px;
+  top: -16px;
+  bottom: -16px;
+  width: 2px;
+  background: repeating-linear-gradient(180deg, rgba(13, 47, 178, .24) 0 10px, transparent 10px 18px);
+  opacity: .65;
+}
+
+.credit-note-pin {
+  position: absolute;
+  left: -24px;
+  top: 14px;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(13, 47, 178, .38);
+  border-radius: 50%;
+  background: rgba(248, 243, 235, .98);
+  box-shadow: 0 8px 14px rgba(21, 19, 24, .08);
+  animation: creditPinDrop 360ms calc(min(var(--credit-note-index, 0) * 70ms, 560ms) + 420ms) ease-out both;
+}
+
+.credit-note-pin::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: rgba(13, 47, 178, .7);
+}
+
+.credit-note--negative .credit-note-pin {
+  border-color: rgba(248, 81, 4, .34);
+}
+
+.credit-note-delta {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  justify-items: center;
+  min-height: 84px;
+  border-radius: 16px;
+  background: rgba(13, 47, 178, .06);
+  color: var(--blue);
+  box-shadow: inset 0 0 0 1px rgba(13, 47, 178, .06);
+}
+
+.credit-note--negative .credit-note-delta {
+  background: rgba(248, 81, 4, .06);
+  color: #c53b05;
+  box-shadow: inset 0 0 0 1px rgba(248, 81, 4, .08);
+}
+
+.credit-note-delta strong {
+  font-family: "Playfair Display", "Bodoni 72", Georgia, serif;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.credit-note-delta span {
+  font-size: 10px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.credit-note-body {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  padding-right: 8px;
+}
+
+.credit-note-title {
+  font-size: 15px !important;
+  font-weight: 900 !important;
+  letter-spacing: .08em !important;
+}
+
+.credit-note-detail {
+  margin: 6px 0 0 !important;
+  color: #5f6670;
+  font-size: 13px !important;
+  line-height: 1.7 !important;
+  letter-spacing: .04em !important;
+}
+
+.credit-note-meta {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  color: #727780;
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-align: right;
+}
+
+.credit-note-meta div {
+  white-space: nowrap;
+}
+
+@keyframes creditPaperArrive {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes creditStampPress {
+  0% { opacity: 0; transform: translateY(-18px) rotate(-8deg) scale(1.15); }
+  62% { opacity: .72; transform: translateY(2px) rotate(1deg) scale(.97); }
+  100% { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
+}
+
+@keyframes creditStampFloat {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-7px) rotate(1.4deg); }
+}
+
+@keyframes creditStampTurn {
+  from { rotate: 0deg; }
+  to { rotate: 360deg; }
+}
+
+@keyframes creditScoreFocus {
+  from { opacity: 0; filter: blur(5px); transform: scale(.9); }
+  to { opacity: 1; filter: blur(0); transform: scale(1); }
+}
+
+@keyframes creditWatermarkSettle {
+  from { opacity: 0; transform: translateX(28px); letter-spacing: .02em; }
+  to { opacity: 1; transform: translateX(0); letter-spacing: -.06em; }
+}
+
+@keyframes creditNoteFile {
+  from { opacity: 0; transform: translateY(14px) rotate(.45deg); }
+  to { opacity: 1; transform: translateY(0) rotate(0); }
+}
+
+@keyframes creditNoteSway {
+  0% { transform: translateY(0) rotate(-.35deg); }
+  100% { transform: translateY(-4px) rotate(.35deg); }
+}
+
+@keyframes creditOverviewArrive {
+  from { opacity: 0; transform: translateX(18px) rotate(.6deg); }
+  to { opacity: 1; transform: translateX(0) rotate(0); }
+}
+
+@keyframes creditOverviewSweep {
+  0%, 55% { left: -50%; opacity: 0; }
+  68% { opacity: .9; }
+  84%, 100% { left: 125%; opacity: 0; }
+}
+
+@keyframes creditOverviewNumber {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes creditMetricRise {
+  from { opacity: 0; transform: translateY(10px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes creditPinDrop {
+  0% { opacity: 0; transform: translateY(-9px) scale(1.35); }
+  70% { opacity: 1; transform: translateY(2px) scale(.92); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 760px) {
+  .credit-note {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin: 0 6px 0 34px;
+    padding: 16px 16px 15px 18px;
+  }
+
+  .credit-note::before {
+    width: 6px;
+  }
+
+  .credit-note-thread {
+    left: -12px;
+    transform: none;
+  }
+
+  .credit-note-pin {
+    left: -20px;
+  }
+
+  .credit-note-delta {
+    min-height: 70px;
+    justify-items: start;
+    padding: 10px 12px;
+  }
+
+  .credit-note-meta {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .credit-detail-page .credit-hero-surface .profile-photo-wrap {
+    width: 172px;
+    height: 172px;
+  }
+
+  .credit-note-stack::before {
+    left: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .credit-detail-page .credit-hero-surface,
+  .credit-score-plain,
+  .credit-hero-watermark,
+  .credit-stamp-ring,
+  .credit-note,
+  .credit-note-pin,
+  .credit-detail-page .credit-hero-surface .profile-photo-wrap,
+  .credit-detail-page .hero-side,
+  .credit-detail-page .hero-side::after,
+  .credit-detail-page .hero-side .id-number,
+  .credit-detail-page .hero-side .metric {
+    animation: none;
+  }
+}

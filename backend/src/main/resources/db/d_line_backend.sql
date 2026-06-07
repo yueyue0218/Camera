@@ -1,3 +1,9 @@
+-- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+-- WARNING: This script contains UPDATE backfill statements.
+-- BACKUP YOUR DATABASE before executing.
+-- This script is ONE-TIME ONLY for migrating legacy databases.
+-- Do NOT execute on a fresh database initialized from V1_baseline.sql.
+-- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 -- D-line backend persistence migration.
 -- Covers review, review complaint, credit, and notification integrity fields.
 

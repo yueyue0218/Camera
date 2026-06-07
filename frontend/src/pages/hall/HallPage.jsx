@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { demandApi } from '../../api/demandApi.js'
+import { fileApi } from '../../api/fileApi.js'
 import { servicePackageApi } from '../../api/servicePackageApi.js'
+import { userApi } from '../../api/userApi.js'
 import { useAuth } from '../../AuthContext.jsx'
 import { DemandCard } from './components/DemandCard.jsx'
 import { FilterBar } from './components/FilterBar.jsx'
@@ -10,7 +12,7 @@ import { EmptyState, ErrorState, LoadingState } from './components/HallState.jsx
 import { HallTabs } from './components/HallTabs.jsx'
 import { ServicePackageCard } from './components/ServicePackageCard.jsx'
 import { TIME_STYLE_OPTIONS, priceParamsFromBudget } from './components/hallUtils.js'
-import { promptAndRespondDemand } from './utils/respondDemand.js'
+import { submitDemandResponse } from './utils/respondDemand.js'
 import '../portraHall.css'
 
 const initialFilters = {
@@ -36,6 +38,49 @@ function panelFromSearch(search) {
   return view === 'demand' || view === 'demands' ? 'demands' : 'showcases'
 }
 
+async function enrichDemandPublisher(demand, currentUser) {
+  if (!demand?.customerId) return demand
+  try {
+    const brief = await userApi.brief(demand.customerId, currentUser)
+    let avatarUrl = ''
+    if (brief?.avatarFileId) {
+      try {
+        avatarUrl = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser)
+      } catch {
+        avatarUrl = ''
+      }
+    }
+    return {
+      ...demand,
+      customerNickname: brief?.nickname || demand.customerNickname,
+      customerName: brief?.nickname || demand.customerName,
+      customerAvatarFileId: brief?.avatarFileId || demand.customerAvatarFileId,
+      customerAvatarUrl: avatarUrl || demand.customerAvatarUrl
+    }
+  } catch {
+    return demand
+  }
+}
+
+async function enrichDemandPublishers(records, currentUser) {
+  const publisherCache = new Map()
+  return Promise.all((records || []).map(async demand => {
+    const customerId = demand?.customerId
+    if (!customerId) return demand
+    if (!publisherCache.has(customerId)) {
+      publisherCache.set(customerId, enrichDemandPublisher(demand, currentUser))
+    }
+    const enriched = await publisherCache.get(customerId)
+    return {
+      ...demand,
+      customerNickname: enriched.customerNickname,
+      customerName: enriched.customerName,
+      customerAvatarFileId: enriched.customerAvatarFileId,
+      customerAvatarUrl: enriched.customerAvatarUrl
+    }
+  }))
+}
+
 export function HallPage() {
   const { currentUser } = useAuth()
   const navigate = useNavigate()
@@ -49,6 +94,9 @@ export function HallPage() {
   const [selectedService, setSelectedService] = useState(null)
   const [demandStatus, setDemandStatus] = useState(createStatus)
   const [serviceStatus, setServiceStatus] = useState(createStatus)
+  const [notice, setNotice] = useState(null)
+  const [respondedDemandIds, setRespondedDemandIds] = useState(() => new Set())
+  const [respondingDemandIds, setRespondingDemandIds] = useState(() => new Set())
 
   const interestedIds = useMemo(() => new Set(interests.map(item => item.serviceId)), [interests])
 
@@ -56,6 +104,7 @@ export function HallPage() {
     loadDemands()
     loadServices()
     loadInterests()
+    loadMyResponses()
   }, [currentUser.userId, currentUser.role])
 
   useEffect(() => {
@@ -67,6 +116,12 @@ export function HallPage() {
   useEffect(() => {
     setActivePanel(panelFromSearch(location.search))
   }, [location.search])
+
+  useEffect(() => {
+    if (!notice) return undefined
+    const timer = window.setTimeout(() => setNotice(null), 3200)
+    return () => window.clearTimeout(timer)
+  }, [notice])
 
   function updateFilters(partial) {
     setFilters(current => ({ ...current, ...partial }))
@@ -129,7 +184,8 @@ export function HallPage() {
     setDemandStatus({ loading: true, error: '' })
     try {
       const page = await demandApi.list(demandParams(nextFilters), currentUser)
-      setDemands((page?.records || []).filter(record => matchesKeyword(record, nextFilters.keyword)))
+      const enrichedRecords = await enrichDemandPublishers(page?.records || [], currentUser)
+      setDemands(enrichedRecords.filter(record => matchesKeyword(record, nextFilters.keyword)))
       setDemandStatus({ loading: false, error: '' })
     } catch (error) {
       setDemands([])
@@ -160,6 +216,37 @@ export function HallPage() {
     } catch {
       setInterests([])
     }
+  }
+
+  async function loadMyResponses() {
+    if (currentUser.role !== 'PROVIDER') {
+      setRespondedDemandIds(new Set())
+      return
+    }
+    try {
+      const responses = await demandApi.myResponses(currentUser)
+      setRespondedDemandIds(new Set((responses || []).map(item => Number(item.demandId)).filter(Number.isFinite)))
+    } catch {
+      setRespondedDemandIds(new Set())
+    }
+  }
+
+  function hasResponded(demandId) {
+    return respondedDemandIds.has(Number(demandId))
+  }
+
+  function isResponding(demandId) {
+    return respondingDemandIds.has(Number(demandId))
+  }
+
+  function updateResponding(demandId, active) {
+    const id = Number(demandId)
+    setRespondingDemandIds(current => {
+      const next = new Set(current)
+      if (active) next.add(id)
+      else next.delete(id)
+      return next
+    })
   }
 
   function applyFilters(nextFilters = filters) {
@@ -204,12 +291,12 @@ export function HallPage() {
   }
 
   async function openDemand(demand) {
-    setSelectedDemand(demand)
+    setSelectedDemand(await enrichDemandPublisher(demand, currentUser))
     try {
       const detail = await demandApi.detail(demand.demandId, currentUser)
-      setSelectedDemand(detail || demand)
+      setSelectedDemand(await enrichDemandPublisher(detail || demand, currentUser))
     } catch {
-      setSelectedDemand(demand)
+      setSelectedDemand(await enrichDemandPublisher(demand, currentUser))
     }
   }
 
@@ -224,19 +311,26 @@ export function HallPage() {
   }
 
   async function respondDemand(demand) {
-    return promptAndRespondDemand({
+    if (hasResponded(demand.demandId) || isResponding(demand.demandId)) return null
+    updateResponding(demand.demandId, true)
+    return submitDemandResponse({
       demand,
       currentUser,
       demandApi,
       normalizeError,
       onSuccess: async () => {
+        setRespondedDemandIds(current => new Set(current).add(Number(demand.demandId)))
+        setNotice({ type: 'success', text: '响应已提交，等待单主确认后会开启会话。' })
         await loadDemands(filters)
         if (selectedDemand?.demandId === demand.demandId) {
           const detail = await demandApi.detail(demand.demandId, currentUser)
-          setSelectedDemand(detail || demand)
+          setSelectedDemand(await enrichDemandPublisher(detail || demand, currentUser))
         }
+      },
+      onError: message => {
+        setNotice({ type: 'error', text: message })
       }
-    })
+    }).finally(() => updateResponding(demand.demandId, false))
   }
 
   function editDemand(demand) {
@@ -295,6 +389,8 @@ export function HallPage() {
         onOpen={() => openDemand(demand)}
         onDetail={() => navigate(`/demands/${demand.demandId}`)}
         onRespond={() => respondDemand(demand)}
+        responded={hasResponded(demand.demandId)}
+        responding={isResponding(demand.demandId)}
         onOpenPublisher={demand.customerId ? () => navigate(`/users/${demand.customerId}?role=CUSTOMER`) : undefined}
       />
     ))
@@ -330,6 +426,12 @@ export function HallPage() {
         currentUserRole={currentUser.role}
       />
 
+      {notice && (
+        <div className={`hall-notice ${notice.type === 'error' ? 'error' : 'success'}`} role="status">
+          {notice.text}
+        </div>
+      )}
+
       <HallTabs
         activePanel={activePanel}
         demandCount={demands.length}
@@ -352,8 +454,11 @@ export function HallPage() {
               onRespond={respondDemand}
               onHotStyleClick={applyHotStyle}
               onEditDemand={editDemand}
-              onCloseDemand={closeDemand}
-            />
+        onCloseDemand={closeDemand}
+        onOpenPublisher={selectedDemand?.customerId ? () => navigate(`/users/${selectedDemand.customerId}?role=CUSTOMER`) : undefined}
+        responded={selectedDemand ? hasResponded(selectedDemand.demandId) : false}
+        responding={selectedDemand ? isResponding(selectedDemand.demandId) : false}
+      />
           </div>
         </section>
       ) : (

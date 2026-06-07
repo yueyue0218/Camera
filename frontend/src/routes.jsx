@@ -6,6 +6,7 @@ import { PublishPage, PublishServicePackagePage } from './pages/demand/index.js'
 import { FeedPage, MomentDetailPage } from './pages/feed/index.js'
 import { ConversationDetailPage, MessagesPage } from './pages/messages/index.js'
 import { OrdersPage } from './pages/orders/index.js'
+import { DeliveryGalleryPage } from './pages/deliveries/index.js'
 import { ProfilePage, PublicProfilePage } from './pages/profile/index.js'
 import { AdminPage } from './pages/admin/index.jsx'
 import { DeliveryPage } from './pages/delivery/DeliveryPage.jsx'
@@ -13,6 +14,7 @@ import { CreditDetailPage } from './pages/credit/index.jsx'
 import { NotificationListPage } from './pages/notifications/NotificationListPage.jsx'
 import { ReviewPage, UserReviewsPage } from './pages/reviews/ReviewPage.jsx'
 import { ReviewComplaintDetailPage } from './pages/review-complaints/ReviewComplaintDetailPage.jsx'
+import { PortraRouteTransition } from './components/portra/index.js'
 
 const DevDLineUiPreview = import.meta.env.DEV
   ? lazy(() => import('./pages/dev/index.jsx').then(module => ({ default: module.DLineUiPreview })))
@@ -31,9 +33,10 @@ export function AppRoutes() {
       <Route path="/publish/service-package" element={<PublishServicePackagePage />} />
       <Route path="/feed" element={<FeedPage />} />
       <Route path="/moments/:momentId" element={<MomentDetailPage />} />
-      <Route path="/messages" element={<MessagesPage />} />
-      <Route path="/messages/:conversationId" element={<ConversationDetailPage />} />
-      <Route path="/orders" element={<OrdersPage />} />
+      <Route path="/messages" element={<PortraRouteTransition><MessagesPage /></PortraRouteTransition>} />
+      <Route path="/messages/:conversationId" element={<PortraRouteTransition><ConversationDetailPage /></PortraRouteTransition>} />
+      <Route path="/orders" element={<PortraRouteTransition><OrdersPage /></PortraRouteTransition>} />
+      <Route path="/orders/:orderId/deliveries/:deliveryId" element={<PortraRouteTransition><DeliveryGalleryPage /></PortraRouteTransition>} />
       <Route path="/orders/:orderId/delivery" element={<DeliveryPage />} />
       <Route path="/orders/:orderId/reviews" element={<ReviewPage />} />
       <Route path="/reviews" element={<ReviewPage />} />

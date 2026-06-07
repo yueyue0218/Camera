@@ -1,0 +1,81 @@
+.review-ticket {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(13, 47, 178, .1);
+  background:
+    radial-gradient(circle at 100% 0, rgba(13, 47, 178, .08), transparent 30%),
+    linear-gradient(145deg, rgba(255, 253, 248, .98), rgba(247, 244, 237, .96));
+  box-shadow: 0 8px 22px rgba(21, 19, 24, .05);
+  animation: reviewTicketArrive 520ms cubic-bezier(.2, .72, .2, 1) both;
+  animation-delay: min(calc(var(--review-index, 0) * 80ms + 120ms), 700ms);
+  transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+}
+
+.review-ticket::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: linear-gradient(180deg, #0d2fb2, #efba31);
+}
+
+.review-ticket:hover {
+  transform: translateY(-3px) rotate(-.2deg);
+  border-color: rgba(13, 47, 178, .22);
+  box-shadow: 0 16px 30px rgba(13, 47, 178, .09);
+}
+
+.review-ticket .review-score-pill {
+  color: #0d2fb2;
+  font-weight: 900;
+}
+
+.review-ticket .review-score-meter {
+  display: flex;
+  gap: 4px;
+}
+
+.review-ticket .review-score-meter span {
+  width: 8px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(13, 47, 178, .1);
+}
+
+.review-ticket .review-score-meter .filled {
+  background: linear-gradient(180deg, #efba31, #0d2fb2);
+  animation: reviewMeterGlow 2.8s ease-in-out infinite alternate;
+}
+
+.review-ticket .review-content {
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .62);
+}
+
+.review-ticket .review-reply {
+  padding: 12px 14px;
+  border-left: 3px solid rgba(13, 47, 178, .35);
+  background: rgba(13, 47, 178, .045);
+}
+
+.review-ticket .review-reply p {
+  margin: 4px 0 0;
+}
+
+@keyframes reviewTicketArrive {
+  from { opacity: 0; transform: translateY(12px) rotate(.5deg); }
+  to { opacity: 1; transform: translateY(0) rotate(0); }
+}
+
+@keyframes reviewMeterGlow {
+  from { transform: scaleY(.86); filter: saturate(.8); }
+  to { transform: scaleY(1); filter: saturate(1.2); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .review-ticket,
+  .review-ticket .review-score-meter .filled {
+    animation: none;
+  }
+}

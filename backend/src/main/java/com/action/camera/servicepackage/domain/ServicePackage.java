@@ -101,9 +101,6 @@ public class ServicePackage {
     @Column(name = "is_available", nullable = false)
     private Boolean isAvailable = true;
 
-    @Column(name = "temporary_schedule_hold_id")
-    private Long temporaryScheduleHoldId;
-
     @Column(name = "hidden_by_provider", nullable = false)
     private Boolean hiddenByProvider = false;
 
@@ -115,12 +112,6 @@ public class ServicePackage {
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
-
-    public void markReserved(Long scheduleHoldId) {
-        this.isAvailable = false;
-        this.temporaryScheduleHoldId = scheduleHoldId;
-        this.updatedAt = LocalDateTime.now();
-    }
 
     public void markOffline() {
         this.status = ServicePackageStatus.OFFLINE;

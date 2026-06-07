@@ -1,34 +1,67 @@
 import { centToYuan } from '../../../utils/index.js'
-import { ORDER_STATUS_LABELS } from '../orderActions.js'
+import {
+  ESCROW_STATUS_LABELS,
+  ORDER_STATUS_LABELS,
+  SETTLEMENT_STATUS_LABELS,
+  formatDateTime,
+  formatEscrowStatus as formatDisplayEscrowStatus,
+  formatOrderStatus as formatDisplayOrderStatus,
+  formatOrderTitle as formatDisplayOrderTitle,
+  formatSettlementStatus as formatDisplaySettlementStatus,
+  sanitizeSeedText as sanitizeDisplaySeedText
+} from '../../../utils/displayFormatters.js'
 
 const LOCAL_REVIEW_STORAGE_KEY = 'camera-p4-local-reviews'
 const ARBITRATION_STORAGE_KEY = 'camera-p4-arbitrations'
 const ORDER_SNAPSHOT_STORAGE_KEY = 'camera-p4-order-snapshots'
 
 export const orderStatusMap = {
-  ...ORDER_STATUS_LABELS,
-  PENDING_PAYMENT: '待支付',
-  PAID_PENDING_SHOOT: '已支付待拍摄',
-  SHOOTING: '拍摄中',
-  PENDING_DELIVERY: '待交付',
-  DELIVERED_PENDING_CONFIRM: '已交付待确认',
-  COMPLETED: '已完成',
-  CANCELLED: '已取消',
-  REFUNDED: '已退款',
-  APPEALING: '申诉中',
-  REWORK_REQUIRED: '返修中'
+  ...ORDER_STATUS_LABELS
 }
 
 export const escrowStatusMap = {
-  NOT_PAID: '未支付',
-  HELD: '平台托管中',
-  RELEASED: '已结算',
-  REFUNDED: '已退款'
+  ...ESCROW_STATUS_LABELS
 }
 
 export const settlementStatusMap = {
-  NOT_SETTLED: '未结算',
-  SETTLED: '已结算'
+  ...SETTLEMENT_STATUS_LABELS
+}
+
+export const refundStatusMap = {
+  NONE: '暂无退款',
+  REQUESTED: '退款处理中',
+  REFUNDED: '已退款'
+}
+
+export const complaintStatusMap = {
+  PENDING: '待处理',
+  PROCESSING: '处理中',
+  RESOLVED: '已处理',
+  REJECTED: '已驳回'
+}
+
+export function formatOrderStatus(status, fallback = '状态已更新') {
+  return formatDisplayOrderStatus(status, fallback)
+}
+
+export function formatEscrowStatus(status, fallback = '托管状态待同步') {
+  return formatDisplayEscrowStatus(status, fallback)
+}
+
+export function formatSettlementStatus(status, fallback = '未结算') {
+  return formatDisplaySettlementStatus(status, fallback)
+}
+
+export function formatRefundStatus(status, fallback = '暂无退款') {
+  return refundStatusMap[status] || fallback
+}
+
+export function sanitizeSeedText(value, fallback = '校园约拍服务') {
+  return sanitizeDisplaySeedText(value, fallback)
+}
+
+export function formatOrderTitle(order, quoteSnapshot) {
+  return formatDisplayOrderTitle(order, quoteSnapshot)
 }
 
 export function readJsonStorage(key, fallback) {
@@ -190,8 +223,7 @@ export function directionLabel(direction) {
 }
 
 export function formatTime(value) {
-  if (!value) return '刚刚'
-  return new Date(value).toLocaleString('zh-CN', { hour12: false })
+  return formatDateTime(value, '刚刚')
 }
 
 export function parseQuoteSnapshot(raw) {
@@ -214,8 +246,8 @@ export function getLatestDeliveryUploadTime(records) {
 export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, latestDeliveryUploadTime, estimatedAutoConfirmTime) {
   const status = order.status
   const baseRows = [
-    ['托管状态', escrowStatusMap[order.escrowStatus] || order.escrowStatus || '当前接口未返回'],
-    ['结算状态', settlementStatusMap[order.settlementStatus] || order.settlementStatus || '当前接口未返回']
+    ['托管状态', formatEscrowStatus(order.escrowStatus)],
+    ['结算状态', formatSettlementStatus(order.settlementStatus)]
   ]
   const latestReworkLog = getLatestStatusLog(statusLogs, 'REWORK_REQUIRED')
   const latestCompletedLog = getLatestStatusLog(statusLogs, 'COMPLETED')
@@ -223,21 +255,21 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
   if (status === 'PENDING_PAYMENT') {
     return {
       title: '等待客户支付',
-      description: '客户支付后，资金进入平台托管，订单再进入待拍摄履约阶段。',
+      description: '客户支付后，资金进入平台担保，订单再进入待拍摄履约阶段。',
       color: 'warning',
       severity: 'info',
       rows: [
         ['订单金额', centToYuan(order.amountCent)],
         ...baseRows
       ],
-      note: '当前支付入口调用后端模拟支付接口；未支付前不应进入拍摄或交付。'
+      note: '当前支付入口调用后端模拟支付接口；未支付前不应进入拍摄或上传作品。'
     }
   }
 
   if (status === 'PAID_PENDING_SHOOT') {
     return {
       title: '已支付，等待拍摄',
-      description: '平台托管资金已建立，双方应按报价约定的拍摄时间履约。',
+      description: '平台担保资金已建立，双方应按报价约定的拍摄时间履约。',
       color: 'info',
       severity: 'warning',
       rows: [
@@ -252,7 +284,7 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
   if (status === 'SHOOTING') {
     return {
       title: '拍摄中',
-      description: '订单处于拍摄履约阶段，拍摄完成后才进入待交付。',
+      description: '订单处于拍摄履约阶段，拍摄完成后才进入待上传作品。',
       color: 'info',
       severity: 'warning',
       rows: [
@@ -267,31 +299,31 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
   if (status === 'PENDING_DELIVERY') {
     return {
       title: '等待服务方上传作品',
-      description: '摄影师需通过交付入口上传作品，上传成功后订单进入待客户确认。',
+      description: '摄影师需通过作品入口上传作品，上传成功后订单进入待客户确认。',
       color: 'secondary',
       severity: 'info',
       rows: [
-        ['最晚交付时间', formatTimeOrMissing(order.deliveryDeadline)],
-        ['已有交付记录', `${deliveryRecords.length} 条`],
+        ['成片截止时间', formatTimeOrMissing(order.deliveryDeadline)],
+        ['已有作品记录', `${deliveryRecords.length} 条`],
         ...baseRows
       ],
-      note: '若超过最晚交付时间且服务方未上传任何作品，系统将自动退款并结束订单。'
+      note: '若超过成片截止时间且服务方未上传任何作品，系统将自动退款并结束订单。'
     }
   }
 
   if (status === 'DELIVERED_PENDING_CONFIRM') {
     return {
-      title: '已交付，等待客户确认',
+      title: '作品已上传，等待客户确认',
       description: '客户需确认接收作品，或提交返修要求；未处理时由后端自动确认任务处理。',
       color: 'primary',
       severity: latestDeliveryUploadTime ? 'info' : 'warning',
       rows: [
-        ['最新交付时间', formatTimeOrMissing(latestDeliveryUploadTime)],
-        ['预计自动确认时间', estimatedAutoConfirmTime ? formatTime(estimatedAutoConfirmTime) : '当前接口未返回可靠交付时间'],
-        ['交付记录', `${deliveryRecords.length} 条`],
+        ['最新上传时间', formatTimeOrMissing(latestDeliveryUploadTime)],
+        ['预计自动确认时间', estimatedAutoConfirmTime ? formatTime(estimatedAutoConfirmTime) : '等待上传时间同步'],
+        ['作品记录', `${deliveryRecords.length} 条`],
         ...baseRows
       ],
-      note: '摄影师已交付作品。客户需在交付后 7 天内确认接收或提交返修要求；若 7 天内未处理，系统将自动确认订单完成并释放托管资金。前端仅展示规则，不模拟自动确认。'
+      note: '摄影师已上传作品。客户需在上传后 7 天内确认接收或提交返修要求；若 7 天内未处理，系统将自动确认订单完成并释放平台担保资金。前端仅展示规则，不模拟自动确认。'
     }
   }
 
@@ -302,12 +334,12 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
       color: 'warning',
       severity: 'warning',
       rows: [
-        ['最近返修要求', latestReworkLog?.reason || latestReworkLog?.remark || '当前接口未返回'],
+        ['最近返修要求', latestReworkLog?.reason || latestReworkLog?.remark || '等待返修说明同步'],
         ['返修状态时间', formatTimeOrMissing(latestReworkLog?.createdAt)],
-        ['已有交付记录', `${deliveryRecords.length} 条`],
+        ['已有作品记录', `${deliveryRecords.length} 条`],
         ...baseRows
       ],
-      note: '服务方必须通过交付入口重新上传作品；页面不会提供绕过上传的返修完成按钮。'
+      note: '服务方必须通过作品入口重新上传作品；页面不会提供绕过上传的返修完成按钮。'
     }
   }
 
@@ -344,7 +376,7 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
       color: 'default',
       severity: 'info',
       rows: [
-        ['退款状态', order.refundStatus || '当前接口未返回'],
+        ['退款状态', formatRefundStatus(order.refundStatus)],
         ...baseRows
       ],
       note: '退款/取消后的后续处理以状态日志和后端返回为准。'
@@ -368,7 +400,7 @@ function getLatestStatusLog(statusLogs, targetStatus) {
 }
 
 function formatTimeOrMissing(value) {
-  return value ? formatTime(value) : '当前接口未返回'
+  return value ? formatTime(value) : '待同步'
 }
 
 export function addDays(value, days) {

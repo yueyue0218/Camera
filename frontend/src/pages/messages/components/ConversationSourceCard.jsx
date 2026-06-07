@@ -1,18 +1,19 @@
 import { Alert, Box, Chip, Paper, Stack, Typography } from '@mui/material'
 import { InfoRows } from './InfoRows.jsx'
+import { PORTRA_COLORS, PORTRA_RADII } from '../MessageVisualTokens.js'
 
 export function ConversationSourceCard({ isBackendConversation, currentUser, sourceRows, sourceHint }) {
   return (
-    <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, bgcolor: '#fbfdff' }}>
+    <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, bgcolor: PORTRA_COLORS.paperMuted, borderColor: PORTRA_COLORS.borderMuted, borderRadius: PORTRA_RADII.panel }}>
       <Stack spacing={1.5}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between' }}>
           <Box>
-            <Typography variant="h6">会话工作台</Typography>
-            <Typography color="text.secondary">这里承载沟通、报价、订单入口和后续履约协作，不是普通私聊。</Typography>
+            <Typography variant="h6">约拍沟通工作台</Typography>
+            <Typography color="text.secondary">确认拍摄方案、报价和后续履约安排。</Typography>
           </Box>
-          <Stack direction="row" spacing={1} flexWrap="wrap">
-            <Chip size="small" color={isBackendConversation ? 'primary' : 'default'} label={isBackendConversation ? '真实 C 会话' : '本地 fallback 会话'} />
-            <Chip size="small" label={currentUser.role === 'PROVIDER' ? '当前身份：服务方' : '当前身份：顾客'} />
+          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+            <Chip size="small" color={isBackendConversation ? 'primary' : 'default'} label={isBackendConversation ? '正式沟通' : '先沟通'} />
+            <Chip size="small" label={currentUser.role === 'PROVIDER' ? '你是摄影师' : '你是客户'} />
           </Stack>
         </Stack>
         <InfoRows rows={sourceRows} />

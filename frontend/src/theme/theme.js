@@ -35,6 +35,23 @@ export const theme = createTheme({
   components: {
     MuiCssBaseline: {
       styleOverrides: {
+        ':root': {
+          '--bg-page': '#e6e2e0',
+          '--bg-card': '#f8f3eb',
+          '--bg-panel': '#ebe6dd',
+          '--bg-inset': '#f0ece5',
+          '--blue': '#0d2fb2',
+          '--blue-light': 'rgba(13,47,178,0.08)',
+          '--yellow': '#f7ce3a',
+          '--orange': '#f85104',
+          '--text-primary': '#111015',
+          '--text-secondary': '#5d6167',
+          '--text-muted': '#9a9da3',
+          '--border': 'rgba(21,19,24,0.10)',
+          '--border-dashed': 'rgba(13,47,178,0.15)',
+          '--shadow-card': '0 2px 12px rgba(21,19,24,0.07)',
+          '--shadow-hover': '0 6px 20px rgba(13,47,178,0.10)'
+        },
         body: {
           backgroundColor: portraTokens.background,
           backgroundImage: 'none'

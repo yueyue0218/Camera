@@ -1,3 +1,9 @@
+-- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+-- WARNING: This script contains UPDATE backfill statements.
+-- BACKUP YOUR DATABASE before executing.
+-- This script is ONE-TIME ONLY for migrating legacy databases.
+-- Do NOT execute on a fresh database initialized from V1_baseline.sql.
+-- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 -- B1/B2 persistence migration.
 -- Aligns ServicePackage, Demand, and DemandResponse JPA entities with real MySQL tables.
 
@@ -23,7 +29,6 @@ CREATE TABLE IF NOT EXISTS service_packages (
     time_tags TEXT NOT NULL,
     status VARCHAR(30) NOT NULL DEFAULT 'ONLINE',
     is_available BOOLEAN NOT NULL DEFAULT TRUE,
-    temporary_schedule_hold_id BIGINT NULL,
     hidden_by_provider BOOLEAN NOT NULL DEFAULT FALSE,
     hidden_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -219,7 +224,6 @@ CALL b1b2_add_column_if_missing('service_packages', 'portfolio_ids', 'portfolio_
 CALL b1b2_add_column_if_missing('service_packages', 'time_description', 'time_description TEXT NULL');
 CALL b1b2_add_column_if_missing('service_packages', 'time_tags', 'time_tags TEXT NULL');
 CALL b1b2_add_column_if_missing('service_packages', 'is_available', 'is_available BOOLEAN NULL');
-CALL b1b2_add_column_if_missing('service_packages', 'temporary_schedule_hold_id', 'temporary_schedule_hold_id BIGINT NULL');
 CALL b1b2_add_column_if_missing('service_packages', 'hidden_by_provider', 'hidden_by_provider BOOLEAN NULL');
 CALL b1b2_add_column_if_missing('service_packages', 'hidden_at', 'hidden_at DATETIME NULL');
 
@@ -327,7 +331,6 @@ CALL b1b2_exec_if_columns_exist(
     'demand_responses', 'expected_price_cent', 'expected_price', '',
     'UPDATE demand_responses SET expected_price_cent = ROUND(expected_price * 100) WHERE expected_price_cent IS NULL AND expected_price IS NOT NULL'
 );
-CALL b1b2_add_index_if_missing('demand_responses', 'idx_response_demand_status_time', 'INDEX idx_response_demand_status_time (demand_id, status, response_time)');
 
 DROP PROCEDURE IF EXISTS b1b2_exec_if_columns_exist;
 DROP PROCEDURE IF EXISTS b1b2_exec_if_tables_exist;
