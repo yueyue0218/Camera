@@ -81,6 +81,50 @@ async function enrichDemandPublishers(records, currentUser) {
   }))
 }
 
+async function enrichServiceProvider(service, currentUser) {
+  const providerId = service?.photographerId || service?.providerId
+  if (!providerId) return service
+  try {
+    const brief = await userApi.brief(providerId, currentUser)
+    let avatarUrl = ''
+    if (brief?.avatarFileId) {
+      try {
+        avatarUrl = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser)
+      } catch {
+        avatarUrl = ''
+      }
+    }
+    return {
+      ...service,
+      photographerId: brief?.userId || service.photographerId || service.providerId,
+      photographerNickname: brief?.nickname || service.photographerNickname,
+      photographerAvatarFileId: brief?.avatarFileId || service.photographerAvatarFileId,
+      photographerAvatarUrl: avatarUrl || service.photographerAvatarUrl
+    }
+  } catch {
+    return service
+  }
+}
+
+async function enrichServiceProviders(records, currentUser) {
+  const providerCache = new Map()
+  return Promise.all((records || []).map(async service => {
+    const providerId = service?.photographerId || service?.providerId
+    if (!providerId) return service
+    if (!providerCache.has(providerId)) {
+      providerCache.set(providerId, enrichServiceProvider(service, currentUser))
+    }
+    const enriched = await providerCache.get(providerId)
+    return {
+      ...service,
+      photographerId: enriched.photographerId,
+      photographerNickname: enriched.photographerNickname,
+      photographerAvatarFileId: enriched.photographerAvatarFileId,
+      photographerAvatarUrl: enriched.photographerAvatarUrl
+    }
+  }))
+}
+
 export function HallPage() {
   const { currentUser } = useAuth()
   const navigate = useNavigate()
@@ -197,7 +241,8 @@ export function HallPage() {
     setServiceStatus({ loading: true, error: '' })
     try {
       const page = await servicePackageApi.list(serviceParams(nextFilters), currentUser)
-      setServices((page?.records || []).filter(record => matchesKeyword(record, nextFilters.keyword)))
+      const enrichedRecords = await enrichServiceProviders(page?.records || [], currentUser)
+      setServices(enrichedRecords.filter(record => matchesKeyword(record, nextFilters.keyword)))
       setServiceStatus({ loading: false, error: '' })
     } catch (error) {
       setServices([])
@@ -304,9 +349,9 @@ export function HallPage() {
     setSelectedService(service)
     try {
       const detail = await servicePackageApi.detail(service.serviceId, currentUser)
-      setSelectedService(detail || service)
+      setSelectedService(await enrichServiceProvider(detail || service, currentUser))
     } catch {
-      setSelectedService(service)
+      setSelectedService(await enrichServiceProvider(service, currentUser))
     }
   }
 
