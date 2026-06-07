@@ -30,7 +30,7 @@ public class AuthInterceptor implements HandlerInterceptor {
             return true;
         }
         if (isPublicB1B2Get(request)) {
-            authenticateOptionalBearer(request);
+            authenticateOptionalDemoOrBearer(request);
             return true;
         }
 
@@ -199,8 +199,20 @@ public class AuthInterceptor implements HandlerInterceptor {
         return null;
     }
 
-    private void authenticateOptionalBearer(HttpServletRequest request) {
+    private void authenticateOptionalDemoOrBearer(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
+        String demoUserId = request.getHeader("X-User-Id");
+        if (authHeader != null && authHeader.startsWith("Bearer demo-token-")
+                && demoUserId != null && !demoUserId.isBlank()) {
+            try {
+                Long userId = parseUserId(demoUserId);
+                UserContext.setUserId(userId);
+                resolveDemoRole(request, userId, false);
+                return;
+            } catch (NumberFormatException e) {
+                throw new BusinessException(ErrorCode.UNAUTHORIZED);
+            }
+        }
         if (authHeader == null || authHeader.isBlank()) {
             return;
         }

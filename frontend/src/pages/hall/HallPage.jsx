@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { demandApi } from '../../api/demandApi.js'
-import { fileApi } from '../../api/fileApi.js'
 import { servicePackageApi } from '../../api/servicePackageApi.js'
 import { userApi } from '../../api/userApi.js'
 import { useAuth } from '../../AuthContext.jsx'
@@ -43,21 +42,13 @@ async function enrichDemandPublisher(demand, currentUser) {
   try {
     const brief = await userApi.brief(demand.customerId, currentUser)
     const avatarFileId = brief?.avatarFileId ?? demand.customerAvatarFileId
-    let avatarUrl = ''
-    if (avatarFileId) {
-      try {
-        avatarUrl = await fileApi.downloadObjectUrl(avatarFileId, currentUser)
-      } catch {
-        avatarUrl = ''
-      }
-    }
     return {
       ...demand,
       customerNickname: brief?.nickname || demand.customerNickname,
       customerName: brief?.nickname || demand.customerName,
       customerAvatarFileId: avatarFileId,
-      customerAvatarUrl: avatarUrl || demand.customerAvatarUrl,
-      customerAvatar: avatarUrl || demand.customerAvatar
+      customerAvatarUrl: demand.customerAvatarUrl,
+      customerAvatar: demand.customerAvatar
     }
   } catch {
     return demand
@@ -90,21 +81,13 @@ async function enrichServiceProvider(service, currentUser) {
   try {
     const brief = await userApi.brief(providerId, currentUser)
     const avatarFileId = brief?.avatarFileId ?? service.photographerAvatarFileId
-    let avatarUrl = ''
-    if (avatarFileId) {
-      try {
-        avatarUrl = await fileApi.downloadObjectUrl(avatarFileId, currentUser)
-      } catch {
-        avatarUrl = ''
-      }
-    }
     return {
       ...service,
       photographerId: brief?.userId || service.photographerId || service.providerId,
       photographerNickname: brief?.nickname || service.photographerNickname,
       photographerAvatarFileId: avatarFileId,
-      photographerAvatarUrl: avatarUrl || service.photographerAvatarUrl,
-      photographerAvatar: avatarUrl || service.photographerAvatar
+      photographerAvatarUrl: service.photographerAvatarUrl,
+      photographerAvatar: service.photographerAvatar
     }
   } catch {
     return service

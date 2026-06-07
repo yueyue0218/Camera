@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { demandApi } from '../../api/demandApi.js'
-import { fileApi } from '../../api/fileApi.js'
 import { servicePackageApi } from '../../api/servicePackageApi.js'
 import { userApi } from '../../api/userApi.js'
 import { useAuth } from '../../AuthContext.jsx'
 import { EmptyState, ErrorState, LoadingState } from './components/HallState.jsx'
 import { cityName, firstText, gradientFor, latestTimeText, money, moneyRange, readableDate, splitTags, timeTagLabel } from './components/hallUtils.js'
+import { publicImageUrls, useFileObjectUrl, useFileObjectUrls } from './utils/fileObjectUrls.js'
 import { submitDemandResponse } from './utils/respondDemand.js'
 import '../portraHall.css'
 
@@ -110,21 +110,13 @@ async function enrichDemandPublisher(demand, currentUser) {
   try {
     const brief = await userApi.brief(demand.customerId, currentUser)
     const avatarFileId = brief?.avatarFileId ?? demand.customerAvatarFileId
-    let avatarUrl = ''
-    if (avatarFileId) {
-      try {
-        avatarUrl = await fileApi.downloadObjectUrl(avatarFileId, currentUser)
-      } catch {
-        avatarUrl = ''
-      }
-    }
     return {
       ...demand,
       customerNickname: brief?.nickname || demand.customerNickname,
       customerName: brief?.nickname || demand.customerName,
       customerAvatarFileId: avatarFileId,
-      customerAvatarUrl: avatarUrl || demand.customerAvatarUrl,
-      customerAvatar: avatarUrl || demand.customerAvatar
+      customerAvatarUrl: demand.customerAvatarUrl,
+      customerAvatar: demand.customerAvatar
     }
   } catch {
     return demand
@@ -137,21 +129,13 @@ async function enrichServiceProvider(service, currentUser) {
   try {
     const brief = await userApi.brief(providerId, currentUser)
     const avatarFileId = brief?.avatarFileId ?? service.photographerAvatarFileId
-    let avatarUrl = ''
-    if (avatarFileId) {
-      try {
-        avatarUrl = await fileApi.downloadObjectUrl(avatarFileId, currentUser)
-      } catch {
-        avatarUrl = ''
-      }
-    }
     return {
       ...service,
       photographerId: brief?.userId || service.photographerId || service.providerId,
       photographerNickname: brief?.nickname || service.photographerNickname,
       photographerAvatarFileId: avatarFileId,
-      photographerAvatarUrl: avatarUrl || service.photographerAvatarUrl,
-      photographerAvatar: avatarUrl || service.photographerAvatar
+      photographerAvatarUrl: service.photographerAvatarUrl,
+      photographerAvatar: service.photographerAvatar
     }
   } catch {
     return service
@@ -163,35 +147,6 @@ function referenceSlots(referenceFileIds) {
   const slots = Array.from({ length: count }, (_, index) => `参考图 ${String(index + 1).padStart(2, '0')}`)
   while (slots.length < 4) slots.push('暂未上传')
   return slots.slice(0, 4)
-}
-
-function useFileObjectUrls(fileIds, currentUser) {
-  const [urls, setUrls] = useState([])
-
-  useEffect(() => {
-    let ignored = false
-    let objectUrls = []
-    async function loadUrls() {
-      const ids = Array.isArray(fileIds) ? fileIds.filter(Boolean) : []
-      if (!ids.length) {
-        setUrls([])
-        return
-      }
-      try {
-        objectUrls = await Promise.all(ids.map(fileId => fileApi.downloadObjectUrl(fileId, currentUser)))
-        if (!ignored) setUrls(objectUrls)
-      } catch {
-        if (!ignored) setUrls([])
-      }
-    }
-    loadUrls()
-    return () => {
-      ignored = true
-      objectUrls.forEach(url => URL.revokeObjectURL(url))
-    }
-  }, [currentUser, fileIds])
-
-  return urls
 }
 
 function UploadedGallery({ urls, emptyLabels }) {
@@ -223,7 +178,18 @@ export function DemandDetailPage() {
   const [notice, setNotice] = useState(null)
   const [responded, setResponded] = useState(false)
   const [responding, setResponding] = useState(false)
-  const referenceUrls = useFileObjectUrls(demand?.referenceFileIds, currentUser)
+  const referenceUrls = useFileObjectUrls(
+    demand?.referenceFileIds,
+    currentUser,
+    `demand ${demandId} reference`
+  )
+  const uploadedPublisherAvatar = useFileObjectUrl(
+    [demand?.customerAvatarFileId, demand?.avatarFileId],
+    currentUser,
+    `demand ${demandId} publisher avatar`
+  )
+  const fallbackPublisherAvatar = publicImageUrls(demand?.customerAvatarUrl, demand?.customerAvatar)[0] || ''
+  const publisherAvatar = uploadedPublisherAvatar || fallbackPublisherAvatar
   useBodyRole(currentUser.role)
 
   useEffect(() => {
@@ -282,7 +248,6 @@ export function DemandDetailPage() {
   const isDemandOwner = isSameOwner(currentUser, collectDemandOwnerIds(demand))
   const canRespond = currentUser.role === 'PROVIDER' && demand.status === 'OPEN'
   const publisherName = firstText(demand.customerNickname, demand.customerName) || '单主'
-  const publisherAvatar = firstText(demand.customerAvatarUrl, demand.customerAvatar)
 
   async function respondDemand() {
     if (responded || responding) return
@@ -401,7 +366,7 @@ export function DemandDetailPage() {
 }
 
 function galleryItems(service, uploadedUrls = []) {
-  const images = splitTags(service.images)
+  const images = publicImageUrls(service.images)
   const items = uploadedUrls.length
     ? uploadedUrls.map(image => `url(${image})`)
     : (images.length ? images.slice(0, 5).map(image => `url(${image})`) : [])
@@ -416,7 +381,18 @@ export function ServicePackageDetailPage() {
   const [service, setService] = useState(null)
   const [interested, setInterested] = useState(false)
   const [status, setStatus] = useState(createStatus)
-  const uploadedPortfolioUrls = useFileObjectUrls(service?.portfolioIds, currentUser)
+  const uploadedPortfolioUrls = useFileObjectUrls(
+    [service?.portfolioIds, service?.images],
+    currentUser,
+    `service package ${serviceId} portfolio`
+  )
+  const uploadedProviderAvatar = useFileObjectUrl(
+    [service?.photographerAvatarFileId, service?.avatarFileId],
+    currentUser,
+    `service package ${serviceId} avatar`
+  )
+  const fallbackProviderAvatar = publicImageUrls(service?.photographerAvatarUrl, service?.photographerAvatar)[0] || ''
+  const providerAvatar = uploadedProviderAvatar || fallbackProviderAvatar
   useBodyRole(currentUser.role)
 
   useEffect(() => {
@@ -558,7 +534,7 @@ export function ServicePackageDetailPage() {
             <div className="profile-mini detail-provider-link">
               <div
                 className="mini-avatar"
-                style={{ '--avatar-art': service.photographerAvatarUrl ? `url(${service.photographerAvatarUrl})` : gradientFor(service.photographerId || service.providerId) }}
+                style={{ '--avatar-art': providerAvatar ? `url(${providerAvatar})` : gradientFor(service.photographerId || service.providerId) }}
                 aria-hidden="true"
               />
               <div className="photographer-card-info">
