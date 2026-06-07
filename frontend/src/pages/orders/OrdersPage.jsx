@@ -47,6 +47,8 @@ import { buildOrderNavigationTarget, goToOrderConversation, normalizeOrderId } f
 import { goToDeliveryGallery } from '../../utils/deliveryNavigation.js'
 import { PRODUCT_ACTION_COPY } from '../../utils/productCopy.js'
 import { ORDER_SURFACES, WORKFLOW_SOURCES, buildOrderListTarget, isOrderListSurface } from '../../utils/workflowNavigation.js'
+import { deriveOrderWorkflowState, getNextOrderWorkflowRefreshDelay } from '../../utils/orderWorkflowModel.js'
+import { getOrderActionVisibility } from '../../utils/orderActionVisibility.js'
 import {
   getExplicitReturnToConversation,
   navigateBackToConversation
@@ -79,11 +81,7 @@ import { AuthorizationRequestCard } from '../../components/portra/AuthorizationR
 import { PORTRA_LAYOUT, PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
 import {
   canCustomerConfirm,
-  canCustomerPay,
-  canCustomerRequestRework,
   canCustomerReviewPhotoAuthorization,
-  canProviderRequestPhotoAuthorization,
-  canProviderUploadDelivery,
   canShowOrderNormalActions
 } from './orderActions.js'
 import { EmptyOrderCard } from './components/EmptyOrderCard.jsx'
@@ -124,8 +122,8 @@ function parseInputDate(value) {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
-function getOrderAction(order, currentUser) {
-  if (canCustomerPay(order, currentUser)) {
+function getOrderAction(order, currentUser, actionVisibility) {
+  if ((actionVisibility || getOrderActionVisibility(order, currentUser)).canPay) {
     return {
       kind: 'pay',
       label: PRODUCT_ACTION_COPY.payOrder,
@@ -134,7 +132,7 @@ function getOrderAction(order, currentUser) {
       successText: '支付成功，资金已进入平台担保'
     }
   }
-  if (canCustomerConfirm(order, currentUser)) {
+  if ((actionVisibility || getOrderActionVisibility(order, currentUser, { allowUnknownDeliveries: true })).canConfirmDelivery) {
     return {
       kind: 'transition',
       targetStatus: 'COMPLETED',
@@ -307,6 +305,27 @@ export function OrdersPage() {
     loadOrders(focusOrderId)
   }, [currentUser.userId, currentUser.role, statusFilter, focusOrderId, orderListSurface])
 
+  useEffect(() => {
+    if (!selectedOrder?.orderId) return undefined
+    const refreshCurrentOrder = () => loadOrders(selectedOrder.orderId)
+    const intervalId = window.setInterval(refreshCurrentOrder, 30000)
+    const refreshDelay = getNextOrderWorkflowRefreshDelay(selectedOrder)
+    const timeoutId = refreshDelay ? window.setTimeout(refreshCurrentOrder, refreshDelay) : null
+    return () => {
+      window.clearInterval(intervalId)
+      if (timeoutId) window.clearTimeout(timeoutId)
+    }
+  }, [
+    selectedOrder?.orderId,
+    selectedOrder?.status,
+    selectedOrder?.shootStartTime,
+    selectedOrder?.shootEndTime,
+    selectedOrder?.startTime,
+    selectedOrder?.endTime,
+    currentUser.userId,
+    currentUser.role
+  ])
+
   useEffect(() => () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl)
   }, [previewUrl])
@@ -435,7 +454,7 @@ export function OrdersPage() {
       if (action.kind === 'pay') {
         return orderApi.mockPay(selectedOrder.orderId, selectedOrder.amountCent, currentUser)
       }
-      if (action.kind === 'transition' && action.targetStatus === 'COMPLETED' && canCustomerConfirm(selectedOrder, currentUser)) {
+      if (action.kind === 'transition' && action.targetStatus === 'COMPLETED' && actionVisibility.canConfirmDelivery && canCustomerConfirm(selectedOrder, currentUser, { deliveries: deliveryRecords })) {
         return orderApi.transition(selectedOrder.orderId, 'COMPLETED', action.reason, currentUser)
       }
       throw new Error('当前状态不支持这个操作。')
@@ -656,12 +675,21 @@ export function OrdersPage() {
     }
   }
 
-  const action = selectedOrder ? getOrderAction(selectedOrder, currentUser) : null
+  const selectedOrderWorkflow = useMemo(() => deriveOrderWorkflowState(selectedOrder, {
+    currentUserRole: currentUser.role,
+    deliveries: deliveryRecords
+  }), [selectedOrder, currentUser.role, deliveryRecords])
+  const actionVisibility = useMemo(() => getOrderActionVisibility(selectedOrder, currentUser, {
+    deliveries: deliveryRecords,
+    authorizations: photoAuthorizations,
+    workflowState: selectedOrderWorkflow
+  }), [selectedOrder, currentUser, deliveryRecords, photoAuthorizations, selectedOrderWorkflow])
+  const action = selectedOrder ? getOrderAction(selectedOrder, currentUser, actionVisibility) : null
   const quoteSnapshot = parseQuoteSnapshot(selectedOrder?.quoteSnapshotJson)
-  const canUploadDelivery = selectedOrder && canProviderUploadDelivery(selectedOrder, currentUser)
-  const canAcceptDelivery = selectedOrder && canCustomerConfirm(selectedOrder, currentUser)
-  const canRequestRework = selectedOrder && canCustomerRequestRework(selectedOrder, currentUser)
-  const canRequestPhotoAuthorization = selectedOrder && canProviderRequestPhotoAuthorization(selectedOrder, currentUser)
+  const canUploadDelivery = selectedOrder && (actionVisibility.canUploadDelivery || actionVisibility.canReuploadDelivery)
+  const canAcceptDelivery = selectedOrder && actionVisibility.canConfirmDelivery
+  const canRequestRework = selectedOrder && actionVisibility.canRequestRework
+  const canRequestPhotoAuthorization = selectedOrder && actionVisibility.canRequestPhotoAuthorization
   const cancelAction = selectedOrder ? getCustomerCancelAction(selectedOrder, currentUser) : null
   const showShootStartedCancelNotice = selectedOrder
     && shouldShowShootStartedCancelNotice(selectedOrder, currentUser)
@@ -688,7 +716,11 @@ export function OrdersPage() {
   const latestDeliveryUploadTime = useMemo(() => getLatestDeliveryUploadTime(deliveryRecords), [deliveryRecords])
   const estimatedAutoConfirmTime = latestDeliveryUploadTime ? addDays(latestDeliveryUploadTime, 7) : null
   const fulfillmentNotice = selectedOrder
-    ? getOrderFulfillmentNotice(selectedOrder, statusLogs, deliveryRecords, latestDeliveryUploadTime, estimatedAutoConfirmTime)
+    ? {
+        ...getOrderFulfillmentNotice(selectedOrder, statusLogs, deliveryRecords, latestDeliveryUploadTime, estimatedAutoConfirmTime),
+        title: selectedOrderWorkflow.title,
+        description: selectedOrderWorkflow.description
+      }
     : null
   const canReviewSelectedOrder = selectedOrder?.status === 'COMPLETED' && isOrderParticipant(selectedOrder, currentUser.userId)
   const currentReviewDirection = selectedOrder ? getOrderReviewDirection(selectedOrder, currentUser.userId) : ''
@@ -855,7 +887,7 @@ export function OrdersPage() {
                   </Box>
                   <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                     <PortraStatusPill label={selectedOrderPerspective || '身份待确认'} tone="neutral" />
-                    <PortraStatusPill label={formatOrderStatus(selectedOrder.status)} />
+                    <PortraStatusPill label={selectedOrderWorkflow.title || formatOrderStatus(selectedOrder.status)} tone={selectedOrderWorkflow.tone} />
                     <PortraStatusPill label={formatEscrowStatus(selectedOrder.escrowStatus)} />
                   </Stack>
                 </Stack>

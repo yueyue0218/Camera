@@ -6,6 +6,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { conversationApi, deliveryApi, orderApi, photoAuthorizationApi, quoteApi } from '../../api.js'
 import { goToUserProfile } from '../../utils/orderNavigation.js'
+import { getNextOrderWorkflowRefreshDelay } from '../../utils/orderWorkflowModel.js'
 import {
   navigateToDeliveryFromConversation,
   navigateToOrderFromConversation,
@@ -548,6 +549,26 @@ export function ConversationDetailPage() {
     conversationId: conversation?.backendConversationId || conversation?.conversationId,
     onRefresh: () => refreshConversationData(conversation, currentOrder?.orderId)
   })
+  useEffect(() => {
+    if (!conversation || conversation.isLocal || !currentOrder?.orderId) return undefined
+    const refreshCurrentOrder = () => refreshConversationData(conversation, currentOrder.orderId)
+    const intervalId = window.setInterval(refreshCurrentOrder, 30000)
+    const refreshDelay = getNextOrderWorkflowRefreshDelay(currentOrder)
+    const timeoutId = refreshDelay ? window.setTimeout(refreshCurrentOrder, refreshDelay) : null
+    return () => {
+      window.clearInterval(intervalId)
+      if (timeoutId) window.clearTimeout(timeoutId)
+    }
+  }, [
+    conversation?.conversationId,
+    conversation?.isLocal,
+    currentOrder?.orderId,
+    currentOrder?.status,
+    currentOrder?.shootStartTime,
+    currentOrder?.shootEndTime,
+    currentOrder?.startTime,
+    currentOrder?.endTime
+  ])
   useEffect(() => {
     if (conversation && actions.roleMismatch) {
       navigate('/messages', { replace: true, state: { roleMismatch: true } })
