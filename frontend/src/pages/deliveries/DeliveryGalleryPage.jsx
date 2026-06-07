@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Paper, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Paper, Skeleton, Stack, TextField, Typography } from '@mui/material'
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import ForumRoundedIcon from '@mui/icons-material/ForumRounded'
@@ -218,7 +218,7 @@ export function DeliveryGalleryPage() {
   }
 
   if (loading) {
-    return <PortraEmptyState title="作品记录加载中" description="正在读取订单和作品。" />
+    return <DeliveryGallerySkeleton />
   }
 
   if (error) {
@@ -423,6 +423,27 @@ const headerSx = {
   borderColor: PORTRA_SURFACE.borderSubtle,
   borderRadius: PORTRA_RADIUS.card,
   boxShadow: PORTRA_SHADOW.soft
+}
+
+function DeliveryGallerySkeleton() {
+  return (
+    <PortraWorkflowFrame spacing={2.2} maxWidth="gallery" sx={{ color: PORTRA_SURFACE.ink }} aria-label="作品相册加载中">
+      <Paper variant="outlined" sx={headerSx}>
+        <Stack spacing={1}>
+          <Skeleton variant="rounded" width={96} height={34} sx={{ borderRadius: PORTRA_RADIUS.compact }} />
+          <Skeleton variant="text" width="34%" height={34} />
+          <Skeleton variant="text" width="52%" height={22} />
+        </Stack>
+      </Paper>
+      <Paper variant="outlined" sx={{ p: { xs: 1.2, md: 1.6 }, borderRadius: PORTRA_RADIUS.panel, borderColor: PORTRA_SURFACE.borderSoft, bgcolor: PORTRA_SURFACE.paper }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', md: 'repeat(3, minmax(0, 1fr))' }, gap: 1.2 }}>
+          {[0, 1, 2, 3, 4, 5].map(index => (
+            <Skeleton key={index} variant="rounded" height={180} sx={{ borderRadius: PORTRA_RADIUS.card }} />
+          ))}
+        </Box>
+      </Paper>
+    </PortraWorkflowFrame>
+  )
 }
 
 const galleryGridSx = {

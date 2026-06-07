@@ -16,6 +16,7 @@ import {
   Paper,
   Rating,
   Select,
+  Skeleton,
   Stack,
   TextField,
   Typography
@@ -807,6 +808,7 @@ export function OrdersPage() {
               </Select>
             </FormControl>
             <Stack spacing={1.2}>
+              {loading && !orders.length && <OrderIndexSkeleton />}
               {orders.map(order => {
                 const orderQuoteSnapshot = parseQuoteSnapshot(order.quoteSnapshotJson)
                 return (
@@ -829,7 +831,7 @@ export function OrdersPage() {
                   </PortraTicketCard>
                 )
               })}
-              {!orders.length && <PortraEmptyState title="暂无订单" description="当前还没有进入订单阶段的合作。" />}
+              {!loading && !orders.length && <PortraEmptyState title="暂无订单" description="当前还没有进入订单阶段的合作。" />}
             </Stack>
             {currentUser.role === 'PROVIDER' && (
               <>
@@ -862,7 +864,9 @@ export function OrdersPage() {
           </Stack>
         </Paper>
 
-        {!selectedOrder ? (
+        {loading && !selectedOrder ? (
+          <OrderDetailSkeleton />
+        ) : !selectedOrder ? (
           <EmptyOrderCard text="选择订单查看详情" />
         ) : (
           <Stack spacing={2} sx={orderDetailWorkspaceSx}>
@@ -1366,6 +1370,40 @@ const orderDetailWorkspaceSx = {
   width: '100%',
   maxWidth: '100%',
   overflowWrap: 'anywhere'
+}
+
+function OrderIndexSkeleton() {
+  return (
+    <Stack spacing={1.2} aria-label="订单索引加载中">
+      {[0, 1, 2].map(index => (
+        <Paper key={index} variant="outlined" sx={{ p: 1.4, borderRadius: PORTRA_RADIUS.card, borderColor: PORTRA_SURFACE.borderSoft, bgcolor: PORTRA_SURFACE.paper }}>
+          <Skeleton variant="text" width={`${72 - index * 8}%`} height={24} />
+          <Skeleton variant="text" width="54%" height={20} />
+          <Skeleton variant="text" width="36%" height={18} />
+        </Paper>
+      ))}
+    </Stack>
+  )
+}
+
+function OrderDetailSkeleton() {
+  return (
+    <Stack spacing={2} sx={orderDetailWorkspaceSx} aria-label="订单详情加载中">
+      <Paper variant="outlined" sx={orderArchiveHeroSx}>
+        <Stack spacing={2}>
+          <Skeleton variant="text" width="42%" height={34} />
+          <Skeleton variant="text" width="24%" height={44} />
+          <Divider sx={{ borderColor: PORTRA_SURFACE.borderSoft }} />
+          {[0, 1, 2].map(index => (
+            <Stack key={index} spacing={0.8}>
+              <Skeleton variant="text" width="22%" height={24} />
+              <Skeleton variant="rounded" width="100%" height={index === 1 ? 88 : 64} sx={{ borderRadius: PORTRA_RADIUS.control }} />
+            </Stack>
+          ))}
+        </Stack>
+      </Paper>
+    </Stack>
+  )
 }
 
 const filterControlSx = {
