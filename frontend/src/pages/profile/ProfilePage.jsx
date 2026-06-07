@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import {
-  creditApi, demandApi, momentApi, orderApi, reviewApi, userApi, conversationApi
+  creditApi, demandApi, fileApi, momentApi, orderApi, reviewApi, userApi, conversationApi
 } from '../../api.js'
 import {
   formatShortTime, formatTime,
@@ -54,6 +54,7 @@ export function ProfilePage() {
     bio: currentUser.bio || currentUser.description || '',
     availability: currentUser.availability || ''
   })
+  const [avatarFile, setAvatarFile] = useState(null)
   const [activeTab, setActiveTab] = useState('photos')
   const [activeMonth, setActiveMonth] = useState(0)
   const [editOpen, setEditOpen] = useState(false)
@@ -70,6 +71,7 @@ export function ProfilePage() {
 
   const dashboardRowRef = useRef(null)
   const frameNavRef = useRef(null)
+  const archiveSectionRef = useRef(null)
 
   // Sync body class for CSS role switching
   useEffect(() => {
@@ -136,11 +138,24 @@ export function ProfilePage() {
       const role = myProfileRes.value.currentRole || myProfileRes.value.role || currentUser.role
       const nickname = myProfileRes.value.nickname || currentUser.nickname
       const bio = myProfileRes.value.bio || currentUser.bio || currentUser.description || ''
+      const avatarFileId = role === 'PROVIDER'
+        ? (myProfileRes.value.providerAvatarFileId || myProfileRes.value.avatarFileId)
+        : (myProfileRes.value.customerAvatarFileId || myProfileRes.value.avatarFileId)
+      let avatarData = currentUser.avatarData || ''
+      if (avatarFileId) {
+        try {
+          avatarData = await fileApi.downloadObjectUrl(avatarFileId, currentUser)
+        } catch {
+          avatarData = currentUser.avatarData || ''
+        }
+      }
       updateProfile({
         userId: myProfileRes.value.userId || myProfileRes.value.id || currentUser.userId,
         id: myProfileRes.value.userId || myProfileRes.value.id || currentUser.userId,
         role,
         nickname,
+        avatarFileId,
+        avatarData,
         bio,
         description: bio,
         creditScore: myProfileRes.value.creditScore ?? currentUser.creditScore,
@@ -171,6 +186,7 @@ export function ProfilePage() {
     const file = e.target.files?.[0]; if (!file) return
     try {
       const avatarData = await imageFileToDataUrl(file)
+      setAvatarFile(file)
       setProfileForm(p => ({ ...p, avatarData }))
       updateProfile({ avatarData })
       setNotice({ type: 'ok', text: '头像已更新' })
@@ -187,8 +203,16 @@ export function ProfilePage() {
       role: currentUser.role
     }
     saveUserProfile(currentUser.userId, next)
-    updateProfile(next)
-    try { await userApi.updateMe({ nickname: next.nickname, bio: next.bio, role: currentUser.role }, currentUser) } catch {}
+    let avatarFileId = currentUser.avatarFileId || null
+    try {
+      if (avatarFile) {
+        const uploaded = await fileApi.upload(avatarFile, { bizType: 'AVATAR', visibility: 'PUBLIC' }, currentUser)
+        avatarFileId = uploaded?.fileId || avatarFileId
+      }
+      await userApi.updateMe({ nickname: next.nickname, bio: next.bio, role: currentUser.role, avatarFileId }, currentUser)
+      setAvatarFile(null)
+    } catch {}
+    updateProfile({ ...next, avatarFileId })
     setNotice({ type: 'ok', text: '个人资料已更新' })
   }
 
@@ -604,10 +628,16 @@ export function ProfilePage() {
               <h2>{isProvider ? '我的作品集' : '我的动态'}</h2>
               <p>{isProvider ? '这里只展示摄影师本人发布过的作品动态、拍摄花絮和档期说明。' : '这里只收纳我自己发布过的帖子：想拍记录、拍摄日记、成片分享。'}</p>
             </div>
-            <button className="archive-all" onClick={() => navigate('/feed')}>全部帖子 →</button>
+            <button
+              className="archive-all"
+              onClick={() => archiveSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            >
+              全部帖子 →
+            </button>
           </div>
 
-          {momentsByMonth.length === 0 ? (
+          <div ref={archiveSectionRef}>
+            {momentsByMonth.length === 0 ? (
             <div className="pp-empty"><h3>还没有发布过动态</h3><p>去动态页发布你的第一条帖子吧。</p></div>
           ) : (
             <div className="archive-drawer-layout">
@@ -656,6 +686,7 @@ export function ProfilePage() {
               </div>
             </div>
           )}
+          </div>
         </section>
       </section>
 

@@ -112,7 +112,7 @@ class OrderFlowIntegrationTest {
     }
 
     @Test
-    void statusTransition_paidToShooting_succeeds() {
+    void statusTransition_paidToShooting_returnsError() {
         Order order = createOrderInStatus(OrderStatus.PAID_PENDING_SHOOT);
 
         String body = "{\"targetStatus\":\"SHOOTING\",\"reason\":\"开始拍摄\"}";
@@ -120,9 +120,7 @@ class OrderFlowIntegrationTest {
                 "/orders/" + order.getId() + "/status-transitions",
                 HttpMethod.POST, asProvider(body), Map.class);
 
-        assertThat(resp.getBody().get("code")).isEqualTo(200);
-        Map<String, Object> data = (Map<String, Object>) resp.getBody().get("data");
-        assertThat(data.get("toStatus")).isEqualTo("SHOOTING");
+        assertThat(resp.getBody().get("code")).isNotEqualTo(200);
     }
 
     @Test
@@ -177,12 +175,12 @@ class OrderFlowIntegrationTest {
     }
 
     @Test
-    void statusLogs_afterTransition_containsLog() {
-        Order order = createOrderInStatus(OrderStatus.PAID_PENDING_SHOOT);
+    void statusLogs_afterCustomerCompletes_containsLog() {
+        Order order = createOrderInStatus(OrderStatus.DELIVERED_PENDING_CONFIRM);
 
-        String body = "{\"targetStatus\":\"SHOOTING\",\"reason\":\"开始拍摄\"}";
+        String body = "{\"targetStatus\":\"COMPLETED\",\"reason\":\"确认接收作品\"}";
         rest.exchange("/orders/" + order.getId() + "/status-transitions",
-                HttpMethod.POST, asProvider(body), Map.class);
+                HttpMethod.POST, asCustomer(body), Map.class);
 
         ResponseEntity<Map> resp = rest.exchange(
                 "/orders/" + order.getId() + "/status-logs",
@@ -191,9 +189,9 @@ class OrderFlowIntegrationTest {
         assertThat(resp.getBody().get("code")).isEqualTo(200);
         List<Map<String, Object>> logs = (List<Map<String, Object>>) resp.getBody().get("data");
         assertThat(logs).isNotEmpty();
-        boolean hasShootingLog = logs.stream()
-                .anyMatch(log -> "SHOOTING".equals(log.get("toStatus")));
-        assertThat(hasShootingLog).isTrue();
+        boolean hasCompletedLog = logs.stream()
+                .anyMatch(log -> "COMPLETED".equals(log.get("toStatus")));
+        assertThat(hasCompletedLog).isTrue();
     }
 
     // ───────────── Data helpers ─────────────

@@ -26,20 +26,13 @@ function creditLevel(score, summaryLevel) {
   const numeric = Number(score)
   if (!Number.isFinite(numeric)) return '信用概览'
   if (numeric >= 90) return '信用优秀'
-  if (numeric >= 80) return '信用良好'
-  if (numeric >= 60) return '信用待提升'
-  return '信用观察中'
+  if (numeric >= 70) return '信用良好'
+  return '信用较差'
 }
 
 function normalizeRecords(value) {
   if (Array.isArray(value)) return value
   return Array.isArray(value?.items) ? value.items : []
-}
-
-function getRecordOrderId(record) {
-  if (record.orderId) return record.orderId
-  const sourceType = String(record.sourceType || '').toUpperCase()
-  return sourceType.includes('ORDER') ? record.sourceId : null
 }
 
 export function CreditDetailPage() {
@@ -163,10 +156,9 @@ export function CreditDetailPage() {
           </div>
         ) : recordCount ? (
           <Stack spacing={1.35} className="credit-note-stack">
-            {records.map((record, index) => {
+            {records.map(record => {
               const delta = Number(record.appliedScoreChange ?? record.scoreChange ?? record.deltaScore ?? 0)
               const positive = delta >= 0
-              const orderId = getRecordOrderId(record)
               const beforeScore = record.beforeScore != null ? formatScore(record.beforeScore) : '—'
               const afterScore = record.scoreAfter != null ? formatScore(record.scoreAfter) : '—'
               const title = record.reason || record.eventType || '信用变更'
@@ -179,16 +171,6 @@ export function CreditDetailPage() {
                   key={record.recordId || record.id || `${title}-${record.createdAt}`}
                   elevation={0}
                   className={`credit-note ${positive ? 'credit-note--positive' : 'credit-note--negative'}`}
-                  style={{ '--credit-note-index': index }}
-                  role={orderId ? 'button' : undefined}
-                  tabIndex={orderId ? 0 : undefined}
-                  onClick={orderId ? () => navigate(`/orders?orderId=${orderId}`) : undefined}
-                  onKeyDown={orderId ? event => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      navigate(`/orders?orderId=${orderId}`)
-                    }
-                  } : undefined}
                 >
                   <span className="credit-note-thread" aria-hidden="true" />
                   <span className="credit-note-pin" aria-hidden="true" />

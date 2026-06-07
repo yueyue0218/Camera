@@ -7,6 +7,8 @@ import com.action.camera.common.security.UserRole;
 import com.action.camera.delivery.repository.DeliveryRepository;
 import com.action.camera.message.entity.Quote;
 import com.action.camera.message.enums.QuoteStatus;
+import com.action.camera.message.repository.ConversationRepository;
+import com.action.camera.message.service.ConversationService;
 import com.action.camera.notification.dto.NotificationCreateRequest;
 import com.action.camera.notification.service.NotificationService;
 import com.action.camera.order.entity.Order;
@@ -66,6 +68,9 @@ public class OrderService {
     private final DeliveryRepository deliveryRepository;
 
     @Autowired(required = false)
+    private ConversationRepository conversationRepository;
+
+    @Autowired(required = false)
     private NotificationService notificationService;
 
     @Transactional
@@ -74,13 +79,17 @@ public class OrderService {
 
         Optional<Order> existingOrder = orderRepository.findByQuoteId(quote.getId());
         if (existingOrder.isPresent()) {
-            return existingOrder.get();
+            Order order = existingOrder.get();
+            bindServicePackageConversationToOrder(order);
+            return order;
         }
         ensureProviderTimeAvailable(
                 quote.getProviderUserId(),
                 quote.getShootStartTime(),
                 quote.getShootEndTime());
-        return orderRepository.save(buildOrderFromQuote(quote));
+        Order savedOrder = orderRepository.save(buildOrderFromQuote(quote));
+        bindServicePackageConversationToOrder(savedOrder);
+        return savedOrder;
     }
 
     @Transactional
@@ -120,6 +129,7 @@ public class OrderService {
         Order order = getOrderOrThrow(orderId);
         OrderStatus fromStatus = order.getStatus();
         ensureCanChangeStatus(fromStatus, targetStatus);
+        ensureNotManualShootingTransition(fromStatus, targetStatus);
         if (fromStatus == OrderStatus.DELIVERED_PENDING_CONFIRM && targetStatus == OrderStatus.COMPLETED) {
             markCompletedAndReleaseEscrow(order, LocalDateTime.now(), false);
         } else if (targetStatus == OrderStatus.CANCELLED) {
@@ -504,6 +514,28 @@ public class OrderService {
         }
     }
 
+    private void bindServicePackageConversationToOrder(Order order) {
+        if (conversationRepository == null
+                || order == null
+                || order.getId() == null
+                || order.getConversationId() == null
+                || !SOURCE_TYPE_SERVICE_PACKAGE.equals(order.getSourceType())) {
+            return;
+        }
+        conversationRepository.findById(order.getConversationId())
+                .filter(conversation -> Objects.equals(conversation.getSourceType(), ConversationService.SOURCE_TYPE_SERVICE_PACKAGE))
+                .filter(conversation -> Objects.equals(conversation.getSourceId(), order.getServicePackageId()))
+                .filter(conversation -> Objects.equals(conversation.getParticipantAId(), order.getCustomerId()))
+                .filter(conversation -> Objects.equals(conversation.getParticipantBId(), order.getProviderUserId()))
+                .filter(conversation -> conversation.getOrderId() == null
+                        || Objects.equals(conversation.getOrderId(), ConversationService.PENDING_ORDER_ID)
+                        || Objects.equals(conversation.getOrderId(), order.getId()))
+                .ifPresent(conversation -> {
+                    conversation.setOrderId(order.getId());
+                    conversationRepository.save(conversation);
+                });
+    }
+
     private Order buildOrderFromQuote(Quote quote) {
         LocalDateTime now = LocalDateTime.now();
         Order order = new Order();
@@ -562,6 +594,17 @@ public class OrderService {
         if (!OrderStatusMachine.canTransit(fromStatus, targetStatus)) {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT,
                     "Illegal order status transition from " + fromStatus + " to " + targetStatus);
+        }
+    }
+
+    private void ensureNotManualShootingTransition(OrderStatus fromStatus, OrderStatus targetStatus) {
+        boolean startsShooting = fromStatus == OrderStatus.PAID_PENDING_SHOOT
+                && targetStatus == OrderStatus.SHOOTING;
+        boolean finishesShooting = fromStatus == OrderStatus.SHOOTING
+                && targetStatus == OrderStatus.PENDING_DELIVERY;
+        if (startsShooting || finishesShooting) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                    "Shooting status is advanced by the system schedule, not manually");
         }
     }
 

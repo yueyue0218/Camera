@@ -19,7 +19,7 @@ export function buildDeliveryBatches(deliveries = [], order) {
         orderId: delivery.orderId || order?.orderId,
         deliveryId: getDeliveryId(delivery),
         round,
-        title: Number(round) > 1 ? '摄影师重新上传了作品' : '摄影师上传了作品',
+        title: Number(round) > 1 ? `第 ${round} 次作品` : '作品记录',
         description: formatDeliveryDescription(delivery),
         latestUploadTime: delivery.uploadTime || delivery.createdAt,
         files: []
@@ -29,12 +29,20 @@ export function buildDeliveryBatches(deliveries = [], order) {
     batch.latestUploadTime = pickLatestTime(batch.latestUploadTime, delivery.uploadTime || delivery.createdAt)
     batch.files.push(normalizeDeliveryFile(delivery, batch.files.length))
   })
-  return Array.from(groups.values()).map((batch, index) => ({
-    ...batch,
-    fileCount: batch.files.length,
-    subtitle: `第 ${batch.round || index + 1} 次交付 · 最近交付：${formatTime(batch.latestUploadTime)}`,
-    statusLabel: getDeliveryBatchStatusLabel(order)
-  }))
+  return Array.from(groups.values()).map((batch, index) => {
+    const round = batch.round || index + 1
+    const count = batch.files.length
+    const latest = formatTime(batch.latestUploadTime)
+    return {
+      ...batch,
+      round,
+      fileCount: count,
+      subtitle: `最近上传：${latest} · 共 ${count} 张`,
+      orderSubtitle: `最近上传：${latest} · 共 ${count} 张`,
+      messageSubtitle: `最近上传：${latest} · 共 ${count} 张`,
+      statusLabel: getDeliveryBatchStatusLabel(order)
+    }
+  })
 }
 
 export function findDeliveryBatch(batches = [], deliveryId) {
@@ -46,7 +54,7 @@ export function findDeliveryBatch(batches = [], deliveryId) {
 }
 
 export function getDeliveryBatchStatusLabel(order) {
-  if (!order) return '已交付'
+  if (!order) return '已上传作品'
   if (order.status === 'DELIVERED_PENDING_CONFIRM') return '待客户确认'
   if (order.status === 'REWORK_REQUIRED') return '客户已要求返修'
   if (order.status === 'COMPLETED') return '订单已完成'
@@ -60,7 +68,7 @@ export function normalizeDeliveryFile(delivery, index = 0) {
     deliveryId: delivery.deliveryId,
     orderId: delivery.orderId,
     fileId,
-    fileName: formatFileDisplayName(delivery, `交付作品 ${index + 1}`),
+    fileName: formatFileDisplayName(delivery, `作品 ${index + 1}`),
     rawFileName: delivery.fileName || delivery.name || delivery.originalName || '',
     mimeType: delivery.mimeType || delivery.contentType || '',
     uploadTime: delivery.uploadTime || delivery.createdAt,
@@ -85,7 +93,7 @@ export function isImageDeliveryFile(file) {
 }
 
 export function getDeliveryDownloadName(file, index = 0) {
-  return formatFileDisplayName(file, `交付作品 ${index + 1}`)
+  return formatFileDisplayName(file, `作品 ${index + 1}`)
 }
 
 export function getDeliveryTitleForRecord(delivery, index = 0) {

@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getLastConversationPath } from '../utils/conversationNavigation.js'
+import { getMessageNavTarget } from '../utils/conversationNavigation.js'
 import NotificationsNoneRoundedIcon from '@mui/icons-material/NotificationsNoneRounded'
 import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded'
-import { useAuth } from '../AuthContext.jsx'
 import { notificationApi } from '../api/index.js'
 import { DND_KEY, PORTRA_STATE_EVENT } from '../pages/portra/PortraPages.jsx'
 
@@ -23,12 +22,10 @@ function activeKeyFromPath(pathname) {
 
 export function Navbar({ activePath, currentUser, logout }) {
   const navigate = useNavigate()
-  const { setUserKey, switchRole, session } = useAuth()
   const [unreadCount, setUnreadCount] = useState(0)
   const [bellRinging, setBellRinging] = useState(false)
   const initializedRef = useRef(false)
   const activeKey = activeKeyFromPath(activePath)
-  const isProvider = currentUser?.role === 'PROVIDER'
 
   useEffect(() => {
     let alive = true
@@ -91,7 +88,7 @@ export function Navbar({ activePath, currentUser, logout }) {
               key={item.key}
               className={`portra-nav-item ${activeKey === item.key ? 'active' : ''}`}
               type="button"
-              onClick={() => navigate(item.path === '/messages' ? getLastConversationPath() || '/messages' : item.path)}
+              onClick={() => navigate(item.path === '/messages' ? getMessageNavTarget(activePath) : item.path)}
             >
               {item.label}
             </button>
@@ -99,23 +96,6 @@ export function Navbar({ activePath, currentUser, logout }) {
         </nav>
 
         <div className="portra-header-actions">
-          <div className="portra-role-toggle" aria-label="身份切换">
-            <button
-              type="button"
-              className={`portra-role-btn ${!isProvider ? 'active' : ''}`}
-              onClick={() => session?.token?.startsWith('demo') ? setUserKey('customer') : switchRole('CUSTOMER')}
-            >
-              单主
-            </button>
-            <button
-              type="button"
-              className={`portra-role-btn ${isProvider ? 'active' : ''}`}
-              onClick={() => session?.token?.startsWith('demo') ? setUserKey('provider') : switchRole('PROVIDER')}
-            >
-              摄影师
-            </button>
-          </div>
-          <button className="portra-icon-btn" type="button" onClick={() => navigate('/hall')} aria-label="搜索">⌕</button>
           <button className="portra-notification-btn" type="button" onClick={() => navigate('/notifications')} aria-label="通知">
             {unreadCount ? (
               <NotificationsRoundedIcon className={`portra-notification-bell ${bellRinging ? 'portra-notification-bell--ringing' : ''}`} fontSize="small" />
@@ -124,7 +104,13 @@ export function Navbar({ activePath, currentUser, logout }) {
             )}
             {unreadCount ? <span className="portra-notice-badge" /> : null}
           </button>
-          <button className="portra-avatar" type="button" onClick={() => navigate('/profile')} aria-label="个人" />
+          <button
+            className={`portra-avatar ${currentUser?.avatarData ? 'has-image' : ''}`}
+            type="button"
+            onClick={() => navigate('/profile')}
+            aria-label="个人"
+            style={currentUser?.avatarData ? { '--avatar-art': `url(${currentUser.avatarData})` } : undefined}
+          />
           <button
             className="portra-mini-btn"
             type="button"

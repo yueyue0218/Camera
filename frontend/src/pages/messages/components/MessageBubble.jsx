@@ -17,12 +17,12 @@ export function MessageBubble({ message, mine, actor, canSaveSubmittedPhoto, onS
           fallbackText="对"
         />
       )}
-      <Stack spacing={0.38} sx={{ maxWidth: { xs: '86%', md: 'min(66%, 620px)' }, alignItems: mine ? 'flex-end' : 'flex-start' }}>
+      <Stack spacing={0.38} sx={{ maxWidth: { xs: '86%', md: 'min(64%, 620px)' }, alignItems: mine ? 'flex-end' : 'flex-start' }}>
         <Paper
           elevation={0}
           sx={{
-            px: isImage ? 0.75 : 1.55,
-            py: isImage ? 0.75 : 1.12,
+            px: isImage ? 0.75 : 1.75,
+            py: isImage ? 0.75 : 1.22,
             bgcolor: mine ? PORTRA_COLORS.blue : PORTRA_COLORS.paper,
             color: mine ? PORTRA_COLORS.paper : PORTRA_COLORS.subInk,
             border: mine ? `1px solid ${PORTRA_COLORS.blue}` : `1px solid ${PORTRA_COLORS.borderMuted}`,
@@ -46,10 +46,10 @@ export function MessageBubble({ message, mine, actor, canSaveSubmittedPhoto, onS
               )}
             </Stack>
           ) : (
-            <Typography variant="body2" sx={{ lineHeight: 1.68, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{getSafeDisplayText(message.content, '消息内容')}</Typography>
+            <Typography sx={{ fontSize: 15, lineHeight: 1.58, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{getSafeDisplayText(message.content, '消息内容')}</Typography>
           )}
         </Paper>
-        <Typography variant="caption" sx={{ px: 0.4, color: PORTRA_COLORS.faintInk, fontSize: 11 }}>{formatTime(message.createdAt)}</Typography>
+        <Typography variant="caption" sx={{ px: 0.4, color: PORTRA_COLORS.faintInk, fontSize: 12 }}>{formatTime(message.createdAt)}</Typography>
       </Stack>
       {mine && (
         <MessageActorAvatar

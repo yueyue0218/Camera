@@ -24,6 +24,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -82,6 +83,7 @@ class QuoteOrderFlowServiceTest {
     @BeforeEach
     void setUp() {
         orderService = new OrderService(orderRepository, paymentRecordRepository, orderStatusLogRepository, deliveryRepository);
+        ReflectionTestUtils.setField(orderService, "conversationRepository", conversationRepository);
         quoteService = new QuoteService(quoteRepository, conversationRepository, orderService);
     }
 
@@ -124,6 +126,8 @@ class QuoteOrderFlowServiceTest {
         Quote quote = pendingQuote();
         quote.setSourceType("SERVICE_PACKAGE");
         quote.setSourceId(SERVICE_PACKAGE_ID);
+        when(conversationRepository.findById(quote.getConversationId()))
+                .thenReturn(Optional.of(servicePackageConversation()));
         when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
         when(quoteRepository.save(any(Quote.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderRepository.findByQuoteId(QUOTE_ID)).thenReturn(Optional.empty());
@@ -138,6 +142,8 @@ class QuoteOrderFlowServiceTest {
 
         assertEquals(SERVICE_PACKAGE_ID, order.getServicePackageId());
         assertEquals(SERVICE_PACKAGE_ID, response.getServicePackageId());
+        verify(conversationRepository).save(org.mockito.ArgumentMatchers.argThat(conversation ->
+                ORDER_ID.equals(conversation.getOrderId())));
     }
 
     @Test
@@ -512,6 +518,20 @@ class QuoteOrderFlowServiceTest {
         verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
     }
 
+    @Test
+    void manualShootingStatusTransitionIsBlocked() {
+        Order order = pendingPaymentOrder();
+        order.setStatus(OrderStatus.PAID_PENDING_SHOOT);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+
+        assertThrows(BusinessException.class,
+                () -> orderService.changeStatus(ORDER_ID, PROVIDER_USER_ID, OrderStatus.SHOOTING, "开始拍摄"));
+
+        assertEquals(OrderStatus.PAID_PENDING_SHOOT, order.getStatus());
+        verify(orderRepository, never()).save(any(Order.class));
+        verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
+    }
+
     private Quote pendingQuote() {
         Quote quote = new Quote();
         quote.setId(QUOTE_ID);
@@ -594,6 +614,19 @@ class QuoteOrderFlowServiceTest {
         order.setUpdatedAt(LocalDateTime.now());
         assertNotNull(order.getId());
         return order;
+    }
+
+    private com.action.camera.message.entity.Conversation servicePackageConversation() {
+        com.action.camera.message.entity.Conversation conversation =
+                new com.action.camera.message.entity.Conversation();
+        conversation.setId(9001L);
+        conversation.setParticipantAId(CUSTOMER_ID);
+        conversation.setParticipantBId(PROVIDER_USER_ID);
+        conversation.setSourceType("SERVICE_PACKAGE");
+        conversation.setSourceId(SERVICE_PACKAGE_ID);
+        conversation.setOrderId(0L);
+        conversation.setCreatedAt(LocalDateTime.now());
+        return conversation;
     }
 
     private PaymentRecord paidPaymentRecord() {

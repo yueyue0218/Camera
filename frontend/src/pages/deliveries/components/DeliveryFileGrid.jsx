@@ -56,7 +56,9 @@ export function DeliveryFileGrid({
             </IconButton>
             <Box sx={{ px: 0.9, py: 0.75 }}>
               <Typography variant="body2" noWrap sx={{ color: PORTRA_SURFACE.ink, fontWeight: 800 }}>{file.fileName}</Typography>
-              <Typography variant="caption" sx={{ color: PORTRA_SURFACE.muted }}>{file.fileId ? `文件 ${file.fileId}` : '无文件 ID'}</Typography>
+              <Typography variant="caption" sx={{ color: PORTRA_SURFACE.muted }}>
+                {file.fileId ? '可下载原图' : '原图待同步'}
+              </Typography>
             </Box>
           </Box>
         )

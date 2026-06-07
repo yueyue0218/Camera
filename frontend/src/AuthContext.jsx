@@ -29,6 +29,7 @@ function saveStoredProfile(user) {
     userId: Number(user.userId),
     role: user.role,
     nickname: user.nickname,
+    avatarFileId: user.avatarFileId || null,
     avatarData: user.avatarData || '',
     bio: user.bio || user.description || '',
     description: user.description || user.bio || '',

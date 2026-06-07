@@ -28,7 +28,7 @@ export function DeliveryActionBar({
     >
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} sx={{ alignItems: { xs: 'stretch', md: 'center' }, justifyContent: 'space-between' }}>
         <Typography sx={{ color: PORTRA_SURFACE.ink, fontWeight: 850 }}>
-          {selectedCount ? `已选择 ${selectedCount} 项` : `共 ${downloadableCount} 个可下载文件`}
+          {selectedCount ? `已选择 ${selectedCount} 项` : `共 ${downloadableCount} 个可下载作品`}
         </Typography>
         <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1, justifyContent: 'flex-end' }}>
           {selectedCount > 0 ? (

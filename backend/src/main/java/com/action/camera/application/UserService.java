@@ -125,7 +125,9 @@ public class UserService {
         resp.setCustomerAvatarFileId(user.getAvatarFileId());
         resp.setCustomerBio(user.getBio());
         resp.setProviderNickname(pp != null ? pp.getDisplayName() : null);
-        resp.setProviderAvatarFileId(pp != null ? pp.getProviderAvatarFileId() : null);
+        resp.setProviderAvatarFileId(pp != null && pp.getProviderAvatarFileId() != null
+                ? pp.getProviderAvatarFileId()
+                : user.getAvatarFileId());
         resp.setProviderBio(pp != null ? pp.getBio() : null);
         return resp;
     }
@@ -162,6 +164,8 @@ public class UserService {
 
     @Transactional
     public void updateMyProfile(Long userId, UpdateProfileRequest req) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
         if ("PROVIDER".equals(req.getRole())) {
             ensureProviderProfile(userId);
             ProviderProfile pp = providerProfileMapper.selectOne(
@@ -175,11 +179,11 @@ public class UserService {
             }
             if (req.getAvatarFileId() != null) {
                 pp.setProviderAvatarFileId(req.getAvatarFileId());
+                user.setAvatarFileId(req.getAvatarFileId());
             }
             providerProfileMapper.updateById(pp);
+            userRepository.save(user);
         } else {
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
             if (req.getNickname() != null && !req.getNickname().isBlank()) {
                 user.setNickname(req.getNickname().trim());
             }

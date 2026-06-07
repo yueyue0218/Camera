@@ -25,11 +25,12 @@ export default function AppShell() {
         : ['/hall', '/publish', '/feed', '/messages', '/profile'].some(path => location.pathname.startsWith(path))
           ? location.pathname
           : '/hall'
+  const isFixedWorkflow = /^\/messages\/[^/]+/.test(location.pathname)
 
   return (
     <div className="portra-app">
       <Navbar activePath={activePath} currentUser={currentUser} logout={logout} />
-      <div className="portra-main-shell">
+      <div className={`portra-main-shell${isFixedWorkflow ? ' portra-main-shell--fixed-workflow' : ''}`}>
         <AppRoutes />
       </div>
     </div>

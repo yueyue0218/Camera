@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -36,6 +37,7 @@ public class CreditController {
         return Result.success(new CreditSummaryResponse(
                 userId,
                 user.getCreditScore(),
+                resolveCreditLevel(user.getCreditScore()),
                 (long) records.size(),
                 records.isEmpty() ? null : records.get(0).getCreatedAt()
         ));
@@ -76,5 +78,18 @@ public class CreditController {
             return;
         }
         throw new BusinessException(ErrorCode.FORBIDDEN, "只能查看自己的信用流水");
+    }
+
+    private String resolveCreditLevel(BigDecimal score) {
+        if (score == null) {
+            return "信用未知";
+        }
+        if (score.compareTo(new BigDecimal("90")) >= 0) {
+            return "信用优秀";
+        }
+        if (score.compareTo(new BigDecimal("70")) >= 0) {
+            return "信用良好";
+        }
+        return "信用较差";
     }
 }

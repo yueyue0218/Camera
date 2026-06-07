@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 public record CreditSummaryResponse(
         Long userId,
         BigDecimal creditScore,
+        String creditLevel,
         Long recordCount,
         LocalDateTime lastUpdatedAt
 ) {

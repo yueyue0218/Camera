@@ -13,9 +13,17 @@ export function buildOrderNavigationTarget(value, options = {}) {
   const search = new URLSearchParams({ orderId: String(orderId) })
   if (conversationId) search.set('conversationId', String(conversationId))
   if (returnTo) search.set('returnTo', returnTo)
+  if (options.source) search.set('source', String(options.source))
+  if (options.orderSurface) search.set('surface', String(options.orderSurface))
   return {
     to: `/orders?${search.toString()}`,
-    state: { orderId, conversationId, returnTo }
+    state: {
+      orderId,
+      conversationId,
+      returnTo,
+      ...(options.source ? { workflowSource: String(options.source) } : {}),
+      ...(options.orderSurface ? { orderSurface: String(options.orderSurface) } : {})
+    }
   }
 }
 
@@ -23,6 +31,13 @@ export function goToOrder(navigate, value, options = {}) {
   const target = buildOrderNavigationTarget(value, options)
   if (!target || typeof navigate !== 'function') return false
   navigate(target.to, { ...options, state: { ...target.state, ...(options.state || {}) } })
+  return true
+}
+
+export function goToOrderConversation(navigate, conversationId, options = {}) {
+  const normalizedConversationId = normalizeConversationId(conversationId)
+  if (!normalizedConversationId || typeof navigate !== 'function') return false
+  navigate(`/messages/${normalizedConversationId}`, options)
   return true
 }
 
