@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Chip, Paper, Stack, Typography } from '@mui/material'
 import { useNavigate, useParams } from 'react-router-dom'
+import { Chip, Paper, Stack, Typography } from '@mui/material'
 import { useAuth } from '../../AuthContext.jsx'
 import { creditApi } from '../../api/index.js'
 import '../profile/profile.css'
@@ -26,13 +26,20 @@ function creditLevel(score, summaryLevel) {
   const numeric = Number(score)
   if (!Number.isFinite(numeric)) return '信用概览'
   if (numeric >= 90) return '信用优秀'
-  if (numeric >= 70) return '信用良好'
-  return '信用较差'
+  if (numeric >= 80) return '信用良好'
+  if (numeric >= 60) return '信用待提升'
+  return '信用观察中'
 }
 
 function normalizeRecords(value) {
   if (Array.isArray(value)) return value
   return Array.isArray(value?.items) ? value.items : []
+}
+
+function getRecordOrderId(record) {
+  if (record.orderId) return record.orderId
+  const sourceType = String(record.sourceType || '').toUpperCase()
+  return sourceType.includes('ORDER') ? record.sourceId : null
 }
 
 export function CreditDetailPage() {
@@ -116,7 +123,7 @@ export function CreditDetailPage() {
           </div>
           <p className="profile-uid">最近更新：{formatTime(lastUpdated)}</p>
           <p className="profile-signature">
-            保留与你个人主页一致的视觉语言，集中展示信用评分、履约概览和信用变化记录。
+            保留与个人主页一致的视觉语言，集中展示信用评分、履约概览和信用变化记录。
           </p>
           <div className="profile-meta-line">
             <span>记录 {recordCount}</span>
@@ -144,7 +151,7 @@ export function CreditDetailPage() {
         <div className="section-head">
           <div>
             <h2>信用记录</h2>
-            <p>按时间倒序排列，保留每一次信用变化的来源和结果。</p>
+            <p>按时间倒序排列，以便签串线的形式保留每一次信用变化。</p>
           </div>
           <div className="section-mark">{recordCount}</div>
         </div>
@@ -159,8 +166,9 @@ export function CreditDetailPage() {
             {records.map((record, index) => {
               const delta = Number(record.appliedScoreChange ?? record.scoreChange ?? record.deltaScore ?? 0)
               const positive = delta >= 0
-              const beforeScore = record.beforeScore != null ? formatScore(record.beforeScore) : '--'
-              const afterScore = record.scoreAfter != null ? formatScore(record.scoreAfter) : '--'
+              const orderId = getRecordOrderId(record)
+              const beforeScore = record.beforeScore != null ? formatScore(record.beforeScore) : '—'
+              const afterScore = record.scoreAfter != null ? formatScore(record.scoreAfter) : '—'
               const title = record.reason || record.eventType || '信用变更'
               const detail = record.sourceType || record.sourceId
                 ? `来源：${record.sourceType || '系统'}${record.sourceId ? ` · ${record.sourceId}` : ''}`
@@ -171,13 +179,22 @@ export function CreditDetailPage() {
                   key={record.recordId || record.id || `${title}-${record.createdAt}`}
                   elevation={0}
                   className={`credit-note ${positive ? 'credit-note--positive' : 'credit-note--negative'}`}
-                  style={{ animationDelay: `${index * 48}ms` }}
+                  style={{ '--credit-note-index': index }}
+                  role={orderId ? 'button' : undefined}
+                  tabIndex={orderId ? 0 : undefined}
+                  onClick={orderId ? () => navigate(`/orders?orderId=${orderId}`) : undefined}
+                  onKeyDown={orderId ? event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      navigate(`/orders?orderId=${orderId}`)
+                    }
+                  } : undefined}
                 >
                   <span className="credit-note-thread" aria-hidden="true" />
                   <span className="credit-note-pin" aria-hidden="true" />
                   <div className="credit-note-delta">
                     <strong>{positive ? '+' : ''}{delta.toFixed(1)}</strong>
-                    <span>分变化</span>
+                    <span>分变动</span>
                   </div>
                   <div className="credit-note-body">
                     <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">

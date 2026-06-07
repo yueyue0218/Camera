@@ -502,10 +502,7 @@ export function FeedPage() {
       {notice && <Alert severity={notice.type} sx={{ mb: 2 }}>{notice.text}</Alert>}
 
       {loading ? (
-        <Box className="moments-grid">
-          <FeedLoadingCard />
-          <FeedLoadingCard compact />
-        </Box>
+        <FeedLoadingCard />
       ) : activeMoments.length ? (
         <Box className="moments-grid">
           {activeMoments.map(moment => {
