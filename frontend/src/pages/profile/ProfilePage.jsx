@@ -177,7 +177,7 @@ export function ProfilePage() {
     setPortfolioItems(readPortfolioItems(currentUser.userId))
     setMyFollowers(followersRes.status === 'fulfilled' ? followersRes.value : [])
     if (!isProvider) {
-      try { setInvitations(await demandApi.invitations(currentUser)) }
+      try { setInvitations(await demandApi.responsesReceived(currentUser)) }
       catch { setInvitations([]) }
     }
   }
@@ -242,23 +242,18 @@ export function ProfilePage() {
   }
 
   async function acceptInvitation(inv) {
-    setActioningId(inv.invitationId)
+    setActioningId(inv.responseId)
     try {
-      const accepted = await demandApi.acceptInvitation(inv.invitationId, currentUser)
-      const conversation = await conversationApi.createFromResponse(accepted, currentUser)
-      const record = saveConversationRecord(conversation, {
-        demandId: inv.demandId, scene: inv.demandScene,
-        customerId: inv.customerId, providerUserId: inv.providerId, lastMessage: inv.message
-      })
+      const accepted = await demandApi.accept(inv.demandId, inv.responseId, currentUser)
       await loadProfileData()
-      navigate(`/messages/${record.conversationId}`)
+      navigate(`/messages/${accepted.conversationId}`)
     } catch (err) { setNotice({ type: 'err', text: err.message }) }
     finally { setActioningId(null) }
   }
 
   async function rejectInvitation(inv) {
-    setActioningId(inv.invitationId)
-    try { await demandApi.rejectInvitation(inv.invitationId, currentUser); await loadProfileData() }
+    setActioningId(inv.responseId)
+    try { await demandApi.reject(inv.demandId, inv.responseId, currentUser); await loadProfileData() }
     catch (err) { setNotice({ type: 'err', text: err.message }) }
     finally { setActioningId(null) }
   }
@@ -277,7 +272,7 @@ export function ProfilePage() {
 
   const historicalOrders = profileOrders.filter(o => ['COMPLETED','REVIEWED'].includes(o.status)).length
   const ongoingOrders = profileOrders.filter(o => !['COMPLETED','REVIEWED','CANCELLED'].includes(o.status)).length
-  const pendingInvitations = invitations.filter(i => (i.status || 'PENDING') === 'PENDING').length
+  const pendingInvitations = invitations.filter(i => (i.status || 'PENDING_CUSTOMER_ACCEPT') === 'PENDING_CUSTOMER_ACCEPT').length
   const creditScore = creditSummary?.creditScore ?? currentUser.creditScore ?? 100
   const totalOrders = profileOrders.length
   const completionRate = totalOrders > 0 ? Math.round((historicalOrders / totalOrders) * 100) : 100
@@ -481,15 +476,15 @@ export function ProfilePage() {
               ) : invitations.length ? (
                 <div className="order-list">
                   {invitations.map(inv => {
-                    const status = inv.status || 'PENDING'
-                    const isPending = status === 'PENDING'
-                    const busy = actioningId === inv.invitationId
+                    const status = inv.status || 'PENDING_CUSTOMER_ACCEPT'
+                    const isPending = status === 'PENDING_CUSTOMER_ACCEPT'
+                    const busy = actioningId === inv.responseId
                     return (
-                      <div key={inv.invitationId} className="order-slip" style={{cursor:'default'}}>
+                      <div key={inv.responseId} className="order-slip" style={{cursor:'default'}}>
                         <div className="order-num">P.</div>
                         <div>
-                          <h4>{inv.demandScene || '约拍邀请'}</h4>
-                          <p>摄影师 {inv.providerId} · {formatShortTime(inv.createdAt)}</p>
+                          <h4>需求 #{inv.demandId}</h4>
+                          <p>摄影师 {inv.providerId} · {formatShortTime(inv.responseTime)}</p>
                         </div>
                         {isPending ? (
                           <div style={{display:'flex',gap:6}}>
@@ -497,7 +492,7 @@ export function ProfilePage() {
                             <button className="secondary-btn" style={{height:34,fontSize:12,padding:'0 10px'}} onClick={() => rejectInvitation(inv)} disabled={busy}>婉拒</button>
                           </div>
                         ) : (
-                          <span className={`status ${status === 'ACCEPTED' ? '' : 'orange'}`}>{status === 'ACCEPTED' ? '已接受' : '已婉拒'}</span>
+                          <span className={`status ${status === 'ACCEPTED' ? '' : 'orange'}`}>{status === 'ACCEPTED' ? '已接受' : status === 'REJECTED' ? '已婉拒' : status}</span>
                         )}
                       </div>
                     )
@@ -606,7 +601,7 @@ export function ProfilePage() {
                 <span>Portra Credit</span>
               </button>
               <div className="todo-list">
-                <div className="todo">
+                <div className="todo" style={{cursor:'pointer'}} onClick={() => handleTabClick('intent')}>
                   <div>
                     <strong>{isProvider ? '待响应需求' : '待确认邀请'}</strong>
                     <br /><small>今天需要处理</small>

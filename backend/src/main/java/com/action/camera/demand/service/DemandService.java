@@ -242,6 +242,17 @@ public class DemandService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public List<DemandResponseDto> listReceivedResponses(CurrentUser user) {
+        requireCustomerOrAdmin(user);
+        return demandRepository.findOwnerHistory(user.getUserId(), List.of(DemandStatus.OPEN, DemandStatus.CLOSED))
+                .stream()
+                .flatMap(demand -> responseRepository.findByDemandId(demand.getId()).stream())
+                .filter(response -> response.getStatus() == DemandResponseStatus.PENDING_CUSTOMER_ACCEPT)
+                .map(DemandMapper::toResponseDto)
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public AcceptDemandResponseResult acceptResponse(Long demandId, Long responseId, CurrentUser user) {
         AcceptedDemandResponseSnapshot snapshot = acceptResponseAndBuildSnapshot(demandId, responseId, user);
