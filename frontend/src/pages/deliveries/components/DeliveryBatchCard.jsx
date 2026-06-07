@@ -15,10 +15,14 @@ export function DeliveryBatchCard({
 }) {
   if (!batch) return null
   const message = variant === 'message'
+  const gallerySummary = variant === 'gallerySummary'
   const inline = chrome === 'none'
   const hasGalleryTarget = Boolean(batch.orderId && batch.deliveryId)
   const clickable = Boolean(onOpen) && hasGalleryTarget && !disabled
   const Root = inline ? Box : PortraTicketCard
+  const subtitle = message
+    ? batch.messageSubtitle || batch.subtitle
+    : gallerySummary ? batch.subtitle : batch.orderSubtitle || batch.subtitle
 
   return (
     <Root
@@ -32,7 +36,7 @@ export function DeliveryBatchCard({
         }
       }}
       sx={{
-        width: message ? { xs: 'min(100%, 540px)', md: 'min(600px, 100%)' } : '100%',
+        width: message ? { xs: 'min(100%, 540px)', md: 'min(540px, 100%)' } : '100%',
         px: inline ? 0 : message ? 1.35 : 1.6,
         py: inline ? 0 : message ? 1.2 : 1.45,
         pl: inline ? 0 : message ? 2.2 : 2.5,
@@ -42,10 +46,15 @@ export function DeliveryBatchCard({
     >
       <Stack spacing={1}>
         {inline ? (
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-            <Typography variant="body2" sx={{ color: PORTRA_SURFACE.muted, fontWeight: 800, minWidth: 0 }}>
-              {batch.subtitle}
-            </Typography>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ color: PORTRA_SURFACE.ink, fontSize: 16, fontWeight: 950, lineHeight: 1.36 }}>
+                {batch.title}
+              </Typography>
+              <Typography variant="body2" sx={{ mt: 0.2, color: PORTRA_SURFACE.muted, fontWeight: 750, minWidth: 0 }}>
+                {subtitle}
+              </Typography>
+            </Box>
             <PortraStatusBadge label={batch.statusLabel || '已上传作品'} />
           </Stack>
         ) : (
@@ -58,7 +67,7 @@ export function DeliveryBatchCard({
                 </Typography>
               </Stack>
               <Typography variant="body2" sx={{ mt: 0.35, color: PORTRA_SURFACE.muted }}>
-                {batch.subtitle}
+                {subtitle}
               </Typography>
             </Box>
             <PortraStatusBadge label={batch.statusLabel || '已上传作品'} />
@@ -67,7 +76,7 @@ export function DeliveryBatchCard({
         <DeliveryThumbnailStrip files={batch.files} previewUrls={previewUrls} variant={variant} />
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
           <Typography variant="body2" sx={{ color: PORTRA_SURFACE.muted, minWidth: 0 }}>
-            共 {batch.fileCount || batch.files?.length || 0} 个文件
+            共 {batch.fileCount || batch.files?.length || 0} {message ? '张作品' : '个文件'}
           </Typography>
           <Button size="small" variant="outlined" startIcon={<OpenInNewRoundedIcon />} disabled={!clickable} onClick={event => {
             event.stopPropagation()
