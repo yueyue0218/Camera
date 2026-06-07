@@ -551,33 +551,57 @@ public class DemandService {
     private void notifyResponseAccepted(AcceptedDemandResponseSnapshot snapshot) {
         notificationService.createNotification(new NotificationCreateRequest(
                 snapshot.getProviderId(),
-                "Demand response accepted",
-                "Your demand response was accepted.",
+                snapshot.getCustomerId(),
+                "约拍响应已接受",
+                "你的约拍响应已被接受。",
                 "DEMAND_RESPONSE_ACCEPTED",
                 "DEMAND_RESPONSE",
-                snapshot.getResponseId()
+                "DEMAND_RESPONSE",
+                snapshot.getResponseId(),
+                "DEMAND_RESPONSE",
+                snapshot.getResponseId(),
+                "DEMAND_RESPONSE",
+                snapshot.getResponseId(),
+                "demand:response:accepted:" + snapshot.getResponseId(),
+                String.format("{\"demandId\":%d,\"responseId\":%d}", snapshot.getDemandId(), snapshot.getResponseId())
         ));
     }
 
     private void notifyResponseRejected(DemandResponse response) {
         notificationService.createNotification(new NotificationCreateRequest(
                 response.getProviderId(),
-                "Demand response rejected",
-                "Your demand response was rejected.",
+                null,
+                "约拍响应已拒绝",
+                "你的约拍响应已被拒绝。",
                 "DEMAND_RESPONSE_REJECTED",
                 "DEMAND_RESPONSE",
-                response.getId()
+                "DEMAND_RESPONSE",
+                response.getId(),
+                "DEMAND_RESPONSE",
+                response.getId(),
+                "DEMAND_RESPONSE",
+                response.getId(),
+                "demand:response:rejected:" + response.getId(),
+                String.format("{\"demandId\":%d,\"responseId\":%d}", response.getDemandId(), response.getId())
         ));
     }
 
     private void notifyConversationStarted(AcceptedDemandResponseSnapshot snapshot, Long conversationId) {
         notificationService.createNotification(new NotificationCreateRequest(
                 snapshot.getProviderId(),
-                "Conversation started",
-                "A conversation was opened for your accepted demand response.",
+                snapshot.getCustomerId(),
+                "约拍会话已开启",
+                "你的约拍响应已开启会话。",
                 "CONVERSATION_STARTED",
                 "CONVERSATION",
-                conversationId
+                "CONVERSATION",
+                conversationId,
+                "CONVERSATION",
+                conversationId,
+                "CONVERSATION",
+                conversationId,
+                "demand:conversation:" + conversationId,
+                String.format("{\"demandId\":%d,\"responseId\":%d,\"conversationId\":%d}", snapshot.getDemandId(), snapshot.getResponseId(), conversationId)
         ));
     }
 }

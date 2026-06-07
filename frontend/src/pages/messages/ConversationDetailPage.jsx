@@ -7,6 +7,8 @@ import { useAuth } from '../../AuthContext.jsx'
 import { conversationApi, deliveryApi, orderApi, photoAuthorizationApi, quoteApi } from '../../api.js'
 import { goToUserProfile } from '../../utils/orderNavigation.js'
 import { getNextOrderWorkflowRefreshDelay } from '../../utils/orderWorkflowModel.js'
+import { useWorkflowNavigate } from '../../hooks/useWorkflowNavigate.js'
+import { buildWorkflowCacheKey, mergeWorkflowViewState, readWorkflowViewState, writeWorkflowViewState } from '../../utils/workflowViewCache.js'
 import {
   navigateToDeliveryFromConversation,
   navigateToOrderFromConversation,
@@ -58,7 +60,8 @@ const DETAIL_SHELL_HEIGHT = {
 
 export function ConversationDetailPage() {
   const { conversationId } = useParams()
-  const navigate = useNavigate()
+  const navigate = useWorkflowNavigate()
+  const rawNavigate = useNavigate()
   const { currentUser } = useAuth()
   const [conversation, setConversation] = useState(null)
   const [messages, setMessages] = useState([])
@@ -89,6 +92,8 @@ export function ConversationDetailPage() {
     errorMessage: getCWorkbenchErrorText
   })
   const loading = pageLoading || actionLoading
+  const viewCacheKey = buildWorkflowCacheKey('message-detail', conversationId, currentUser.role)
+  const cachedViewState = readWorkflowViewState(viewCacheKey) || {}
 
   useEffect(() => {
     rememberLastConversation(conversationId, {
@@ -100,9 +105,31 @@ export function ConversationDetailPage() {
   useEffect(() => {
     const stored = findConversationRecord(conversationId)
     const fallback = stored || buildConversationFallback(conversationId)
-    setConversation(fallback)
-    loadConversationData(fallback)
+    const cached = readWorkflowViewState(viewCacheKey)
+    const cachedConversation = cached?.conversation || fallback
+    setConversation(cachedConversation)
+    if (Array.isArray(cached?.messages)) setMessages(cached.messages)
+    if (Array.isArray(cached?.quotes)) setQuotes(cached.quotes)
+    if (cached?.currentOrder) setCurrentOrder(cached.currentOrder)
+    if (Array.isArray(cached?.statusLogs)) setStatusLogs(cached.statusLogs)
+    if (Array.isArray(cached?.deliveryRecords)) setDeliveryRecords(cached.deliveryRecords)
+    if (Array.isArray(cached?.photoAuthorizations)) setPhotoAuthorizations(cached.photoAuthorizations)
+    loadConversationData(cachedConversation)
   }, [conversationId, getCurrentUserId(currentUser), currentUser.role])
+
+  useEffect(() => {
+    if (!conversation) return
+    writeWorkflowViewState(viewCacheKey, {
+      ...(readWorkflowViewState(viewCacheKey) || {}),
+      conversation,
+      messages,
+      quotes,
+      currentOrder,
+      statusLogs,
+      deliveryRecords,
+      photoAuthorizations
+    })
+  }, [viewCacheKey, conversation, messages, quotes, currentOrder, statusLogs, deliveryRecords, photoAuthorizations])
 
   const participantModel = resolveConversationParticipants(conversation, currentUser, peerProfile)
 
@@ -501,7 +528,7 @@ export function ConversationDetailPage() {
 
   function openUserProfile(userId, event) {
     event?.stopPropagation()
-    goToUserProfile(navigate, userId, currentUser)
+    goToUserProfile(rawNavigate, userId, currentUser)
   }
 
   function openOrderArchive(orderId = currentOrder?.orderId, options = {}) {
@@ -719,6 +746,8 @@ export function ConversationDetailPage() {
             onDecidePhotoAuthorization={handlePhotoAuthorizationDecision}
             onUnavailableTool={showUnavailableTool}
             onOpenAction={setActiveAction}
+            initialScrollTop={cachedViewState.scrollTop}
+            onScrollPositionChange={scrollTop => mergeWorkflowViewState(viewCacheKey, { scrollTop })}
           />
         </Box>
 
@@ -743,6 +772,7 @@ export function ConversationDetailPage() {
           deliveryRecords={deliveryRecords}
           photoAuthorizations={photoAuthorizations}
           panelSummary={viewModel.panelSummary}
+          loading={loading}
           onOpenOrderArchive={() => openOrderArchive(currentOrder?.orderId)}
           onConfirmOrder={confirmCurrentOrder}
           onUnavailableTool={showUnavailableTool}

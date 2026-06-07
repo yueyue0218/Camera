@@ -24,7 +24,7 @@ export function EventAttachmentCard({ side, direction, actor, title, summary, ti
           actor={actor}
           dataKind="event"
           accent={accent}
-          fallbackText="对"
+          fallbackText={self ? '我' : '对'}
           sx={{ mt: 0.25, fontWeight: 950 }}
         />
         <PortraTicketCard

@@ -945,3 +945,19 @@
     opacity:1;
   }
 }
+
+.moment-card__follow:focus-visible,
+.moment-detail__follow:focus-visible{
+  outline:2px solid rgba(13,47,178,.34);
+  outline-offset:3px;
+}
+.moment-card__follow.is-following{
+  background:#fff !important;
+  color:var(--blue-deep) !important;
+  border-color:rgba(13,47,178,.26) !important;
+}
+.moment-detail__follow.is-following{
+  background:#fff !important;
+  color:var(--blue-deep) !important;
+  border-color:rgba(13,47,178,.26) !important;
+}

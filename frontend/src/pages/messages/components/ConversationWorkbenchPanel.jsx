@@ -1,4 +1,4 @@
-import { Box, Stack, Typography } from '@mui/material'
+import { Box, Skeleton, Stack, Typography } from '@mui/material'
 import AddPhotoAlternateRoundedIcon from '@mui/icons-material/AddPhotoAlternateRounded'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
@@ -23,6 +23,7 @@ export function ConversationWorkbenchPanel({
   statusLogs,
   deliveryRecords,
   photoAuthorizations,
+  loading = false,
   onOpenOrderArchive,
   onConfirmOrder,
   onOpenAction
@@ -36,6 +37,7 @@ export function ConversationWorkbenchPanel({
     || actions.canReuploadDelivery
     || actions.canRequestPhotoAuthorization
     || actions.canViewDispute
+  const hasCachedContent = Boolean(order || latestQuote || deliveryRecords.length || photoAuthorizations.length)
   return (
     <PortraWorkflowPanel
       data-message-panel="true"
@@ -48,6 +50,9 @@ export function ConversationWorkbenchPanel({
         alignSelf: 'stretch'
       }}
     >
+      {loading && !hasCachedContent ? (
+        <PanelSkeleton />
+      ) : (
       <Stack spacing={1.35}>
         <Box sx={{ pb: 0.1 }}>
           <Typography variant="overline" sx={{ color: PORTRA_COLORS.faintInk, fontWeight: 850, letterSpacing: 0 }}>当前进展</Typography>
@@ -134,6 +139,25 @@ export function ConversationWorkbenchPanel({
           </Stack>
         </WorkbenchSection>
       </Stack>
+      )}
     </PortraWorkflowPanel>
+  )
+}
+
+function PanelSkeleton() {
+  return (
+    <Stack spacing={1.35} aria-label="工作台摘要加载中">
+      <Box>
+        <Skeleton variant="text" width="34%" height={18} />
+        <Skeleton variant="text" width="68%" height={28} />
+        <Skeleton variant="text" width="88%" height={20} />
+      </Box>
+      {[0, 1, 2].map(index => (
+        <Box key={index} sx={{ py: 0.75 }}>
+          <Skeleton variant="text" width={`${42 + index * 12}%`} height={22} />
+          <Skeleton variant="rounded" width="100%" height={54} sx={{ mt: 0.6, borderRadius: 2 }} />
+        </Box>
+      ))}
+    </Stack>
   )
 }

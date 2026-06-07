@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import {
   Alert,
   Box,
@@ -50,6 +50,8 @@ import { PRODUCT_ACTION_COPY } from '../../utils/productCopy.js'
 import { ORDER_SURFACES, WORKFLOW_SOURCES, buildOrderListTarget, isOrderListSurface } from '../../utils/workflowNavigation.js'
 import { deriveOrderWorkflowState, getNextOrderWorkflowRefreshDelay } from '../../utils/orderWorkflowModel.js'
 import { getOrderActionVisibility } from '../../utils/orderActionVisibility.js'
+import { useWorkflowNavigate } from '../../hooks/useWorkflowNavigate.js'
+import { buildWorkflowCacheKey, readWorkflowViewState, writeWorkflowViewState } from '../../utils/workflowViewCache.js'
 import {
   getExplicitReturnToConversation,
   navigateBackToConversation
@@ -260,7 +262,7 @@ function asArray(value) {
 
 export function OrdersPage() {
   const location = useLocation()
-  const navigate = useNavigate()
+  const navigate = useWorkflowNavigate()
   const { currentUser } = useAuth()
   const focusOrderId = useMemo(() => {
     const value = new URLSearchParams(location.search).get('orderId')
@@ -301,10 +303,35 @@ export function OrdersPage() {
     errorMessage: error => error?.message || '操作失败，请稍后重试。'
   })
   const loading = pageLoading || actionLoading
+  const viewCacheKey = buildWorkflowCacheKey('orders', currentUser.userId, currentUser.role)
+
+  useEffect(() => {
+    const cached = readWorkflowViewState(viewCacheKey)
+    if (!cached) return
+    if (Array.isArray(cached.orders)) setOrders(cached.orders)
+    if (cached.selectedOrder) setSelectedOrder(cached.selectedOrder)
+    if (Array.isArray(cached.statusLogs)) setStatusLogs(cached.statusLogs)
+    if (Array.isArray(cached.deliveryRecords)) setDeliveryRecords(cached.deliveryRecords)
+    if (Array.isArray(cached.photoAuthorizations)) setPhotoAuthorizations(cached.photoAuthorizations)
+    if (Array.isArray(cached.orderReviews)) setOrderReviews(cached.orderReviews)
+    if (Array.isArray(cached.arbitrations)) setArbitrations(cached.arbitrations)
+  }, [viewCacheKey])
 
   useEffect(() => {
     loadOrders(focusOrderId)
   }, [currentUser.userId, currentUser.role, statusFilter, focusOrderId, orderListSurface])
+
+  useEffect(() => {
+    writeWorkflowViewState(viewCacheKey, {
+      orders,
+      selectedOrder,
+      statusLogs,
+      deliveryRecords,
+      photoAuthorizations,
+      orderReviews,
+      arbitrations
+    })
+  }, [viewCacheKey, orders, selectedOrder, statusLogs, deliveryRecords, photoAuthorizations, orderReviews, arbitrations])
 
   useEffect(() => {
     if (!selectedOrder?.orderId) return undefined
@@ -872,6 +899,11 @@ export function OrdersPage() {
           <Stack spacing={2} sx={orderDetailWorkspaceSx}>
             <Paper variant="outlined" sx={orderArchiveHeroSx}>
               <Stack spacing={2}>
+                {loading && selectedOrder && (
+                  <Typography variant="caption" sx={{ alignSelf: 'flex-start', color: PORTRA_SURFACE.muted, fontWeight: 850 }}>
+                    正在更新订单信息
+                  </Typography>
+                )}
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between' }}>
                   <Box>
                     <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center', flexWrap: 'wrap', mb: 0.8 }}>
@@ -1017,9 +1049,9 @@ export function OrdersPage() {
                         minRows={2}
                         placeholder="说明本次作品内容、返修修改点或注意事项"
                       />
-                      <Button type="submit" variant="contained" startIcon={<TaskAltRoundedIcon />} disabled={loading || !deliveryForm.file}>
+                      <PortraActionButton type="submit" startIcon={<TaskAltRoundedIcon />} disabled={loading || !deliveryForm.file}>
                         上传作品
-                      </Button>
+                      </PortraActionButton>
                     </Stack>
                   </Paper>
                 )}
@@ -1048,6 +1080,7 @@ export function OrdersPage() {
                       key={batch.id}
                       batch={batch}
                       variant="orderSection"
+                      chrome="none"
                       onOpen={() => openDeliveryBatch(batch)}
                       disabled={!batch.deliveryId || !selectedOrder?.orderId}
                     />
@@ -1107,14 +1140,13 @@ export function OrdersPage() {
                             minRows={2}
                             placeholder="说明希望展示这些照片的用途，例如作品集客片展示"
                           />
-                          <Button
+                          <PortraActionButton
                             type="submit"
-                            variant="contained"
                             startIcon={<ImageRoundedIcon />}
                             disabled={loading || !photoAuthorizationForm.fileIds.length}
                           >
                             发送授权申请
-                          </Button>
+                          </PortraActionButton>
                         </>
                       ) : (
                         <PortraInfoBanner>暂无可授权作品，请先上传作品。</PortraInfoBanner>
@@ -1130,6 +1162,7 @@ export function OrdersPage() {
                       key={authorization.id || authorization.authorizationId}
                       authorization={authorization}
                       order={selectedOrder}
+                      chrome="none"
                       canReview={canCustomerReviewPhotoAuthorization(selectedOrder, currentUser, authorization)}
                       loading={loading}
                       onDecision={handlePhotoAuthorizationDecision}

@@ -8,7 +8,7 @@ import BookmarkBorderRoundedIcon from '@mui/icons-material/BookmarkBorderRounded
 import MoreHorizRoundedIcon from '@mui/icons-material/MoreHorizRounded'
 
 function roleLabel(role) {
-  return role === 'PROVIDER' ? '摄影师' : '单主'
+  return role === 'PROVIDER' ? '摄影师' : '客户'
 }
 
 function formatTime(value) {
@@ -32,7 +32,8 @@ export function MomentCard({
   onFavorite,
   onFollow,
   onEdit,
-  onDelete
+  onDelete,
+  canFollow = true
 }) {
   const images = moment.imageDataList?.length
     ? moment.imageDataList
@@ -53,11 +54,12 @@ export function MomentCard({
           <strong>{authorName || `${roleLabel(moment.authorRole)} ${moment.authorId}`}</strong>
         </div>
         <div className="moment-card__meta-time">{formatTime(moment.createdAt)}</div>
-        {!isSelf && (
+        {canFollow && !isSelf && (
           <button
             type="button"
-            className={`moment-card__follow ${moment.followedByCurrentUser ? 'is-following' : ''}`}
+            className={`moment-card__follow ${isFollowing ? 'is-following' : ''}`}
             onClick={() => onFollow(moment.authorId, moment.authorRole)}
+            aria-pressed={isFollowing}
           >
             {isFollowing ? '已关注' : '关注'}
           </button>

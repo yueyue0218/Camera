@@ -52,6 +52,11 @@ export function DeliveryBatchCard({
         {inline ? (
           <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
             <Box sx={{ minWidth: 0 }}>
+              {!message && (
+                <Typography sx={{ color: PORTRA_SURFACE.ink, fontWeight: 950, lineHeight: 1.35 }}>
+                  {batch.title}
+                </Typography>
+              )}
               <Typography variant="body2" sx={{ color: PORTRA_SURFACE.muted, fontWeight: 750, minWidth: 0 }}>
                 {subtitle}
               </Typography>

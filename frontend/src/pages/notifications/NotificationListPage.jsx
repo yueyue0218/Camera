@@ -8,13 +8,18 @@ import { useAuth } from '../../AuthContext.jsx'
 import { EmptyState, Feedback, PageHeader, formatDateTime, portra } from '../dline/shared.jsx'
 
 const TAB_DEFINITIONS = [
-  { key: 'all', label: '\u5168\u90e8' },
-  { key: 'unread', label: '\u672a\u8bfb' },
-  { key: 'order', label: '\u8ba2\u5355' },
-  { key: 'appeal', label: '\u7533\u8bc9' },
-  { key: 'review', label: '\u8bc4\u4ef7' },
-  { key: 'dynamic', label: '\u52a8\u6001' }
+  { key: 'all', label: '全部' },
+  { key: 'unread', label: '未读' },
+  { key: 'order', label: '订单' },
+  { key: 'appeal', label: '申诉' },
+  { key: 'review', label: '评价' },
+  { key: 'dynamic', label: '动态' }
 ]
+
+const ORDER_EVENTS = ['ORDER_', 'DEMAND_RESPONSE_', 'CONVERSATION_STARTED', 'DELIVERY_UPLOADED']
+const REVIEW_EVENTS = ['REVIEW_']
+const APPEAL_EVENTS = ['REVIEW_COMPLAINT_', 'DISPUTE']
+const DYNAMIC_EVENTS = ['MOMENT_LIKED', 'FOLLOWED']
 
 function normalizeText(value) {
   return String(value || '').trim().toUpperCase()
@@ -29,46 +34,36 @@ function parseMetadata(metadataJson) {
   }
 }
 
+function typeTokens(item) {
+  return [
+    normalizeText(item?.type),
+    normalizeText(item?.eventType),
+    normalizeText(item?.relatedType),
+    normalizeText(item?.targetType),
+    normalizeText(item?.sourceType)
+  ]
+}
+
+function hasToken(item, tokens) {
+  const values = typeTokens(item)
+  return tokens.some(token => values.some(value => value.includes(token)))
+}
+
 function isAppealNotification(item) {
-  const type = normalizeText(item?.type)
-  const eventType = normalizeText(item?.eventType)
-  const relatedType = normalizeText(item?.relatedType)
-  return type.includes('REVIEW_COMPLAINT')
-    || eventType.includes('REVIEW_COMPLAINT')
-    || relatedType.includes('REVIEW_COMPLAINT')
-    || type.includes('DISPUTE')
-    || eventType.includes('DISPUTE')
-    || relatedType.includes('DISPUTE')
+  return hasToken(item, APPEAL_EVENTS)
 }
 
 function isOrderNotification(item) {
-  const type = normalizeText(item?.type)
-  const eventType = normalizeText(item?.eventType)
-  const relatedType = normalizeText(item?.relatedType)
-  return type.startsWith('ORDER_')
-    || eventType.startsWith('ORDER_')
-    || relatedType.includes('ORDER')
-    || type === 'DELIVERY_UPLOADED'
-    || eventType === 'DELIVERY_UPLOADED'
+  return hasToken(item, ORDER_EVENTS)
 }
 
 function isReviewNotification(item) {
-  const type = normalizeText(item?.type)
-  const eventType = normalizeText(item?.eventType)
-  const relatedType = normalizeText(item?.relatedType)
-  return type.startsWith('REVIEW_')
-    || eventType.startsWith('REVIEW_')
-    || relatedType.includes('REVIEW')
+  return hasToken(item, REVIEW_EVENTS) && !isAppealNotification(item)
 }
 
 function isDynamicNotification(item) {
-  const type = normalizeText(item?.type)
-  const eventType = normalizeText(item?.eventType)
-  const relatedType = normalizeText(item?.relatedType)
-  return type === 'MOMENT_LIKED'
-    || eventType === 'MOMENT_LIKED'
-    || relatedType.includes('MOMENT')
-    || type === 'FOLLOWED'
+  const values = typeTokens(item)
+  return values.some(value => DYNAMIC_EVENTS.includes(value) || value.includes('MOMENT'))
 }
 
 function getNotificationCategory(item) {
@@ -79,56 +74,23 @@ function getNotificationCategory(item) {
   return 'all'
 }
 
-function getOrderIdForItem(item) {
-  const metadata = parseMetadata(item?.metadataJson)
-  return metadata?.orderId ?? item?.targetId ?? item?.relatedId ?? null
+function getMetadata(item) {
+  return parseMetadata(item?.metadataJson) || {}
 }
 
-function resolveNotificationTarget(item) {
-  if (item?.navigationPath?.startsWith('/')) return item.navigationPath
-
-  const type = normalizeText(item?.targetType || item?.relatedType || item?.sourceType || item?.type)
+function resolveTypeLabel(item) {
+  const type = normalizeText(item?.type)
+  const eventType = normalizeText(item?.eventType)
   const relatedType = normalizeText(item?.relatedType)
-  const relatedId = item?.targetId ?? item?.relatedId ?? item?.sourceId
 
-  if (isAppealNotification(item)) {
-    if (relatedType.includes('REVIEW_COMPLAINT') || type.includes('REVIEW_COMPLAINT')) {
-      return relatedId ? `/review-complaints/${relatedId}` : ''
-    }
-    const orderId = getOrderIdForItem(item)
-    return orderId ? `/orders?orderId=${orderId}` : '/orders'
-  }
-
-  if (isOrderNotification(item)) {
-    const orderId = getOrderIdForItem(item)
-    return orderId ? `/orders?orderId=${orderId}` : '/orders'
-  }
-
-  if (isReviewNotification(item)) {
-    return item?.orderId ? `/orders?orderId=${item.orderId}` : '/reviews'
-  }
-
-  if (type.includes('CONVERSATION') || type.includes('MESSAGE')) {
-    return relatedId ? `/messages/${relatedId}` : ''
-  }
-
-  if (type.includes('MOMENT')) {
-    return relatedId ? `/moments/${relatedId}` : ''
-  }
-
-  if (type.includes('USER')) {
-    return relatedId ? `/users/${relatedId}` : ''
-  }
-
-  if (type.includes('CREDIT')) {
-    return '/profile/credit'
-  }
-
-  if (normalizeText(item?.type) === 'FOLLOWED' && item?.sourceId) {
-    return `/users/${item.sourceId}/reviews`
-  }
-
-  return ''
+  if (APPEAL_EVENTS.some(token => type.includes(token) || eventType.includes(token) || relatedType.includes(token))) return '申诉'
+  if (type.includes('DEMAND_RESPONSE') || eventType.includes('DEMAND_RESPONSE') || type.includes('CONVERSATION_STARTED')) return '约拍'
+  if (ORDER_EVENTS.some(token => type.includes(token) || eventType.includes(token) || relatedType.includes(token))) return '订单'
+  if (REVIEW_EVENTS.some(token => type.includes(token) || eventType.includes(token) || relatedType.includes(token))) return '评价'
+  if (DYNAMIC_EVENTS.some(token => type.includes(token) || eventType.includes(token) || relatedType.includes(token))) return '动态'
+  if (type.includes('CREDIT') || eventType.includes('CREDIT')) return '信用'
+  if (type.includes('FOLLOWED') || eventType.includes('FOLLOWED')) return '关注'
+  return item?.type ? String(item.type) : '通知'
 }
 
 function buildDynamicGroups(items) {
@@ -137,10 +99,11 @@ function buildDynamicGroups(items) {
 
   items.forEach(item => {
     const type = normalizeText(item?.type)
+    const eventType = normalizeText(item?.eventType)
     const relatedType = normalizeText(item?.relatedType)
-    const isFoldableMoment = (type === 'MOMENT_LIKED' || relatedType.includes('MOMENT')) && item?.relatedId != null
+    const isFoldableMomentLike = (type === 'MOMENT_LIKED' || eventType === 'MOMENT_LIKED' || relatedType.includes('MOMENT')) && item?.relatedId != null
 
-    if (!isFoldableMoment) {
+    if (!isFoldableMomentLike) {
       looseItems.push(item)
       return
     }
@@ -150,11 +113,12 @@ function buildDynamicGroups(items) {
       groups.set(key, {
         key,
         relatedId: item.relatedId,
-        title: item.title || '\u52a8\u6001\u4e92\u52a8',
+        title: item.title || '动态互动',
         preview: item.content || '',
         items: []
       })
     }
+
     const group = groups.get(key)
     group.items.push(item)
     if (!group.preview && item.content) {
@@ -171,7 +135,63 @@ function buildDynamicGroups(items) {
   }
 }
 
+function resolveNotificationTarget(item) {
+  if (item?.navigationPath?.startsWith('/')) return item.navigationPath
+
+  const metadata = getMetadata(item)
+  const type = normalizeText(item?.type)
+  const eventType = normalizeText(item?.eventType)
+  const relatedId = item?.relatedId ?? item?.targetId ?? item?.sourceId ?? null
+
+  if (isAppealNotification(item)) {
+    return relatedId ? `/review-complaints/${relatedId}` : '/reviews'
+  }
+
+  if (type.includes('DEMAND_RESPONSE') || eventType.includes('DEMAND_RESPONSE')) {
+    if (metadata.conversationId) return `/messages/${metadata.conversationId}`
+    if (metadata.demandId) return `/demands/${metadata.demandId}`
+    return '/hall?tab=demand'
+  }
+
+  if (type.includes('CONVERSATION_STARTED') || eventType.includes('CONVERSATION_STARTED')) {
+    if (metadata.conversationId) return `/messages/${metadata.conversationId}`
+    if (metadata.demandId) return `/demands/${metadata.demandId}`
+    return '/messages'
+  }
+
+  if (isOrderNotification(item)) {
+    const orderId = metadata.orderId ?? item?.targetId ?? item?.relatedId ?? item?.sourceId
+    return orderId ? `/orders?orderId=${orderId}` : '/orders'
+  }
+
+  if (isReviewNotification(item)) {
+    const orderId = metadata.orderId
+    return orderId ? `/orders/${orderId}/reviews` : '/reviews'
+  }
+
+  if (type.includes('CREDIT') || eventType.includes('CREDIT')) {
+    return '/profile/credit'
+  }
+
+  if (type.includes('FOLLOWED') || eventType.includes('FOLLOWED')) {
+    const userId = item?.sourceId ?? item?.actorUserId ?? item?.relatedId ?? null
+    return userId ? `/users/${userId}` : ''
+  }
+
+  if (type.includes('MOMENT') || eventType.includes('MOMENT')) {
+    return relatedId ? `/moments/${relatedId}` : ''
+  }
+
+  if (type.includes('USER') || eventType.includes('USER')) {
+    return relatedId ? `/users/${relatedId}` : ''
+  }
+
+  return ''
+}
+
 function NotificationCard({ item, compact = false, onClick }) {
+  const typeLabel = resolveTypeLabel(item)
+
   return (
     <Paper
       variant="outlined"
@@ -202,17 +222,17 @@ function NotificationCard({ item, compact = false, onClick }) {
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
             <Badge color="primary" variant="dot" invisible={item.isRead} />
             <Typography fontWeight={900}>{item.title}</Typography>
-            {compact ? <Chip size="small" label={normalizeText(item.type) || '\u901a\u77e5'} /> : null}
+            {compact ? <Chip size="small" label={typeLabel} sx={{ height: 22 }} /> : null}
           </Stack>
           <Typography mt={0.5} sx={{ lineHeight: 1.85, whiteSpace: 'pre-wrap' }}>
             {item.content}
           </Typography>
           <Typography variant="body2" color="text.secondary" mt={1}>
-            {item.type} · {formatDateTime(item.createdAt)}
+            {typeLabel} · {formatDateTime(item.createdAt)}
           </Typography>
         </Box>
         <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', alignSelf: { xs: 'flex-start', sm: 'center' } }}>
-          {item.isRead ? '\u5df2\u8bfb' : '\u70b9\u51fb\u5373\u8bfb'}
+          {item.isRead ? '已读' : '点击即读'}
         </Typography>
       </Stack>
     </Paper>
@@ -230,6 +250,7 @@ export function NotificationListPage() {
 
   useEffect(() => {
     let alive = true
+
     async function load() {
       setLoading(true)
       try {
@@ -243,6 +264,7 @@ export function NotificationListPage() {
         if (alive) setLoading(false)
       }
     }
+
     load()
     return () => { alive = false }
   }, [currentUser])
@@ -272,7 +294,7 @@ export function NotificationListPage() {
     try {
       const updated = await notificationApi.markRead(notificationId, currentUser)
       setItems(current => current.map(item => (item.notificationId === notificationId ? updated : item)))
-      setFeedback({ success: '\u901a\u77e5\u5df2\u8bfb' })
+      setFeedback({ success: '通知已读' })
       return updated
     } catch (error) {
       setFeedback({ error: error.message })
@@ -284,7 +306,7 @@ export function NotificationListPage() {
     try {
       const updated = await notificationApi.markAllRead(currentUser)
       setItems(Array.isArray(updated) ? updated : [])
-      setFeedback({ success: '\u5168\u90e8\u901a\u77e5\u5df2\u8bfb' })
+      setFeedback({ success: '全部通知已读' })
     } catch (error) {
       setFeedback({ error: error.message })
     }
@@ -312,20 +334,20 @@ export function NotificationListPage() {
   }
 
   const emptyText = activeTab === 'all'
-    ? (loading ? '\u6b63\u5728\u52a0\u8f7d\u901a\u77e5...' : '\u6682\u65e0\u901a\u77e5')
+    ? (loading ? '正在加载通知...' : '暂无通知')
     : activeTab === 'unread'
-      ? (loading ? '\u6b63\u5728\u52a0\u8f7d\u672a\u8bfb\u901a\u77e5...' : '\u6682\u65e0\u672a\u8bfb\u901a\u77e5')
+      ? (loading ? '正在加载未读通知...' : '暂无未读通知')
       : loading
-        ? '\u6b63\u5728\u52a0\u8f7d\u901a\u77e5...'
-        : `\u6682\u65e0${TAB_DEFINITIONS.find(tab => tab.key === activeTab)?.label || '\u901a\u77e5'}`
+        ? '正在加载通知...'
+        : `暂无${TAB_DEFINITIONS.find(tab => tab.key === activeTab)?.label || '通知'}`
 
   return (
     <Stack spacing={2}>
       <PageHeader
         eyebrow="PORTRA NOTICE"
-        title="\u901a\u77e5"
-        description={counts.unread ? `${counts.unread} \u6761\u672a\u8bfb\u901a\u77e5` : '\u5f53\u524d\u6ca1\u6709\u672a\u8bfb\u901a\u77e5'}
-        action={<Button startIcon={<DoneAllRoundedIcon />} onClick={markAllRead} disabled={!counts.unread}>\u5168\u90e8\u5df2\u8bfb</Button>}
+        title="通知"
+        description={counts.unread ? `${counts.unread} 条未读通知` : '当前没有未读通知'}
+        action={<Button startIcon={<DoneAllRoundedIcon />} onClick={markAllRead} disabled={!counts.unread}>全部已读</Button>}
       />
       <Feedback {...feedback} />
 
@@ -396,15 +418,15 @@ export function NotificationListPage() {
                       <Box sx={{ minWidth: 0 }}>
                         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                           <Typography fontWeight={900}>{group.title}</Typography>
-                          <Chip size="small" color={group.unreadCount ? 'primary' : 'default'} label={`${group.items.length} items`} />
+                          <Chip size="small" color={group.unreadCount ? 'primary' : 'default'} label={`${group.items.length} 条`} />
                         </Stack>
                         <Typography variant="body2" color="text.secondary" mt={0.75} sx={{ lineHeight: 1.75 }}>
-                          {group.preview || '\u52a8\u6001\u4e92\u52a8\u901a\u77e5'}
+                          {group.preview || '动态互动通知'}
                         </Typography>
                       </Box>
                       <Stack direction="row" spacing={1} alignItems="center">
                         <Typography variant="caption" color="text.secondary">
-                          {group.unreadCount ? `${group.unreadCount} unread` : 'all read'}
+                          {group.unreadCount ? `${group.unreadCount} 条未读` : '全部已读'}
                         </Typography>
                         <ExpandMoreRoundedIcon
                           sx={{
