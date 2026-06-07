@@ -603,9 +603,9 @@ CI 文件
 
 | Bug | 修改 commit | 构建结果 | 测试结果 | 回归结果 | 证据位置 | 最终结论 |
 |---|---|---|---|---|---|---|
-| Bug 1：状态推进冲突 |  |  |  |  |  |  |
-| Bug 2：Delivery 锁等待 |  |  |  |  |  |  |
-| Bug 3：CI/CD 缺口 |  |  |  |  |  |  |
+| Bug 1：状态推进冲突 | 450c5e4 | 通过 | OrderStatusMachineTest 全部断言通过 | 主流程回归通过 | GitHub Actions CI 绿色 | 已修复，接口层口径统一 |
+| Bug 2：Delivery 锁等待 | 65a2dca | 通过 | DeliveryServiceTest 通过 | 上传交付端到端验证通过 | 本地 mvn test 日志 | 已修复，独立事务提交后再回调 |
+| Bug 3：CI/CD 缺口 | 602e222 | 通过 | CI 流水线最新运行成功 | 推送后自动触发构建 | GitHub Actions 运行记录 | 已补全后端编译/测试/打包步骤 |
 
 ---
 

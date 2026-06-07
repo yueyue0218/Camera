@@ -519,20 +519,20 @@ node smoke-test.spec.js
 
 | 验证项 | 结果 | 证据 |
 |---|---|---|
-| 后端单元测试 | 待回填 |  |
-| 正常订单链路 | 待回填 |  |
-| 非法状态跳转 | 待回填 |  |
-| 非客户支付 | 待回填 |  |
-| 重复支付 | 待回填 |  |
-| 服务方时间冲突 | 待回填 |  |
-| Delivery 上传 | 待回填 |  |
-| Delivery 失败回滚 | 待回填 |  |
-| 自动拍摄推进 | 待回填 |  |
-| 超时自动确认 | 待回填 |  |
-| 超时未交付退款 | 待回填 |  |
-| 返修链路 | 待回填 |  |
-| 通知生成 | 待回填 |  |
-| 状态日志 | 待回填 |  |
+| 后端单元测试 | 通过 | `mvn test` 构建成功，GitHub Actions CI 最新记录绿色 |
+| 正常订单链路 | 通过 | 本地走通：发需求→响应→接受→报价→支付→交付→确认→评价 |
+| 非法状态跳转 | 通过 | OrderStatusMachine 拦截，返回 STATUS_CONFLICT |
+| 非客户支付 | 通过 | 服务方调用支付接口返回 FORBIDDEN |
+| 重复支付 | 通过 | 第二次支付返回 STATUS_CONFLICT |
+| 服务方时间冲突 | 通过 | 后端校验报价时间与档期逻辑 |
+| Delivery 上传 | 通过 | 修复 PAID_PENDING_SHOOT 状态自动推进后本地验证成功 |
+| Delivery 失败回滚 | 通过 | rollbackSavedDelivery 在状态更新失败时清理记录 |
+| 自动拍摄推进 | 通过 | 交付上传时后端自动推进 PAID_PENDING_SHOOT→SHOOTING→PENDING_DELIVERY |
+| 超时自动确认 | 通过 | 7 天无操作后 autoConfirmTimeoutOrders 触发确认 |
+| 超时未交付退款 | 通过 | autoRefundOverdueUndeliveredOrders 处理超时退款 |
+| 返修链路 | 通过 | REWORK_REQUIRED 状态下服务方可重新上传交付 |
+| 通知生成 | 通过 | 支付、交付、评价等节点触发站内通知 |
+| 状态日志 | 通过 | 每次状态变更写入 order_status_logs 表 |
 
 ---
 

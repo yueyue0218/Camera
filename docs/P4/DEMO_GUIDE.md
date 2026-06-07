@@ -51,8 +51,7 @@ Started CameraApplication in xx.xxx seconds
 
 后端运行在 `http://localhost:8080`。
 
-**邮件配置说明：** 后端已内置 QQ SMTP 配置（`smtp.qq.com:587`），注册时验证码会从 `1245758621@qq.com` 发出，直接查收即可，无需任何额外配置。
-
+**邮件配置说明：** 后端已内置 QQ SMTP 配置（`smtp.qq.com:587`），注册时验证码直接查收即可，无需任何额外配置。
 ---
 
 ## 四、启动前端
