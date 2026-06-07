@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   Alert,
@@ -44,13 +44,12 @@ function toPublicTimeline(records) {
 }
 
 function scoreLevel(score, summaryLevel) {
-  if (summaryLevel) return summaryLevel.startsWith('信用') ? summaryLevel : `信用${summaryLevel}`
+  if (summaryLevel) return summaryLevel
   const numeric = Number(score)
-  if (Number.isNaN(numeric)) return '信用暂无等级'
+  if (Number.isNaN(numeric)) return '信用未知'
   if (numeric >= 90) return '信用优秀'
-  if (numeric >= 80) return '信用良好'
-  if (numeric >= 60) return '信用待提升'
-  return '信用观察中'
+  if (numeric >= 70) return '信用良好'
+  return '信用较差'
 }
 
 function scoreProgress(score) {

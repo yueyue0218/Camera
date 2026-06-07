@@ -1,8 +1,8 @@
-export const demoCreditSummary = {
+﻿export const demoCreditSummary = {
   userId: 2001,
-  creditScore: 86,
-  creditLevel: '良好',
-  summary: '近期交易表现稳定',
+  creditScore: 100,
+  creditLevel: '信用优秀',
+  summary: 'Recent activity stays stable',
   completedOrderCount: 12,
   receivedReviewCount: 9,
   averageRating: 4.8,
@@ -18,8 +18,8 @@ export const demoCreditRecords = [
     relatedOrderId: 8106,
     eventType: 'ORDER_COMPLETED',
     scoreChange: 3,
-    scoreAfter: 86,
-    reason: '订单按时完成，双方确认交付',
+    scoreAfter: 100,
+    reason: 'Order completed on time and both sides confirmed the handoff.',
     createdAt: '2026-06-03T14:20:00'
   },
   {
@@ -27,9 +27,9 @@ export const demoCreditRecords = [
     userId: 2001,
     relatedOrderId: 8105,
     eventType: 'REVIEW_RECEIVED',
-    scoreChange: 2,
-    scoreAfter: 83,
-    reason: '收到五星评价',
+    scoreChange: 0,
+    scoreAfter: 97,
+    reason: 'Received a five-star review.',
     createdAt: '2026-05-30T19:10:00'
   },
   {
@@ -38,8 +38,8 @@ export const demoCreditRecords = [
     relatedOrderId: 8103,
     eventType: 'DELIVERY_ON_TIME',
     scoreChange: 1,
-    scoreAfter: 81,
-    reason: '交付记录稳定',
+    scoreAfter: 95,
+    reason: 'Delivery record stayed stable.',
     createdAt: '2026-05-24T16:35:00'
   },
   {
@@ -48,8 +48,9 @@ export const demoCreditRecords = [
     relatedOrderId: 8099,
     eventType: 'COMPLAINT_RESOLVED',
     scoreChange: -1,
-    scoreAfter: 80,
-    reason: '一次申诉处理完成，平台已记录',
+    scoreAfter: 94,
+    reason: 'A complaint was resolved by the platform.',
     createdAt: '2026-05-18T11:40:00'
   }
 ]
+

@@ -1,17 +1,218 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Badge, Box, Button, Paper, Stack, Typography } from '@mui/material'
+import { Badge, Box, Button, Chip, Collapse, Paper, Stack, Tab, Tabs, Typography } from '@mui/material'
 import DoneAllRoundedIcon from '@mui/icons-material/DoneAllRounded'
+import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded'
+import { useNavigate } from 'react-router-dom'
 import { notificationApi } from '../../api/index.js'
 import { useAuth } from '../../AuthContext.jsx'
 import { EmptyState, Feedback, PageHeader, formatDateTime, portra } from '../dline/shared.jsx'
 
+const TAB_DEFINITIONS = [
+  { key: 'all', label: '\u5168\u90e8' },
+  { key: 'unread', label: '\u672a\u8bfb' },
+  { key: 'order', label: '\u8ba2\u5355' },
+  { key: 'appeal', label: '\u7533\u8bc9' },
+  { key: 'review', label: '\u8bc4\u4ef7' },
+  { key: 'dynamic', label: '\u52a8\u6001' }
+]
+
+function normalizeText(value) {
+  return String(value || '').trim().toUpperCase()
+}
+
+function parseMetadata(metadataJson) {
+  if (!metadataJson) return null
+  try {
+    return JSON.parse(metadataJson)
+  } catch {
+    return null
+  }
+}
+
+function isAppealNotification(item) {
+  const type = normalizeText(item?.type)
+  const eventType = normalizeText(item?.eventType)
+  const relatedType = normalizeText(item?.relatedType)
+  return type.includes('REVIEW_COMPLAINT')
+    || eventType.includes('REVIEW_COMPLAINT')
+    || relatedType.includes('REVIEW_COMPLAINT')
+    || type.includes('DISPUTE')
+    || eventType.includes('DISPUTE')
+    || relatedType.includes('DISPUTE')
+}
+
+function isOrderNotification(item) {
+  const type = normalizeText(item?.type)
+  const eventType = normalizeText(item?.eventType)
+  const relatedType = normalizeText(item?.relatedType)
+  return type.startsWith('ORDER_')
+    || eventType.startsWith('ORDER_')
+    || relatedType.includes('ORDER')
+    || type === 'DELIVERY_UPLOADED'
+    || eventType === 'DELIVERY_UPLOADED'
+}
+
+function isReviewNotification(item) {
+  const type = normalizeText(item?.type)
+  const eventType = normalizeText(item?.eventType)
+  const relatedType = normalizeText(item?.relatedType)
+  return type.startsWith('REVIEW_')
+    || eventType.startsWith('REVIEW_')
+    || relatedType.includes('REVIEW')
+}
+
+function isDynamicNotification(item) {
+  const type = normalizeText(item?.type)
+  const eventType = normalizeText(item?.eventType)
+  const relatedType = normalizeText(item?.relatedType)
+  return type === 'MOMENT_LIKED'
+    || eventType === 'MOMENT_LIKED'
+    || relatedType.includes('MOMENT')
+    || type === 'FOLLOWED'
+}
+
+function getNotificationCategory(item) {
+  if (isAppealNotification(item)) return 'appeal'
+  if (isOrderNotification(item)) return 'order'
+  if (isReviewNotification(item)) return 'review'
+  if (isDynamicNotification(item)) return 'dynamic'
+  return 'all'
+}
+
+function getOrderIdForItem(item) {
+  const metadata = parseMetadata(item?.metadataJson)
+  return metadata?.orderId ?? item?.targetId ?? item?.relatedId ?? null
+}
+
+function resolveNotificationTarget(item) {
+  const type = normalizeText(item?.type)
+  const relatedType = normalizeText(item?.relatedType)
+  const relatedId = item?.relatedId ?? item?.targetId ?? item?.sourceId
+
+  if (isAppealNotification(item)) {
+    if (relatedType.includes('REVIEW_COMPLAINT') || type.includes('REVIEW_COMPLAINT')) {
+      return relatedId ? `/review-complaints/${relatedId}` : ''
+    }
+    const orderId = getOrderIdForItem(item)
+    return orderId ? `/orders?orderId=${orderId}` : '/orders'
+  }
+
+  if (isOrderNotification(item)) {
+    const orderId = getOrderIdForItem(item)
+    return orderId ? `/orders?orderId=${orderId}` : '/orders'
+  }
+
+  if (isReviewNotification(item)) {
+    return '/reviews'
+  }
+
+  if (type === 'MOMENT_LIKED' || relatedType.includes('MOMENT')) {
+    return relatedId ? `/moments/${relatedId}` : ''
+  }
+
+  if (type === 'FOLLOWED' && item?.sourceId) {
+    return `/users/${item.sourceId}/reviews`
+  }
+
+  return ''
+}
+
+function buildDynamicGroups(items) {
+  const groups = new Map()
+  const looseItems = []
+
+  items.forEach(item => {
+    const type = normalizeText(item?.type)
+    const relatedType = normalizeText(item?.relatedType)
+    const isFoldableMoment = (type === 'MOMENT_LIKED' || relatedType.includes('MOMENT')) && item?.relatedId != null
+
+    if (!isFoldableMoment) {
+      looseItems.push(item)
+      return
+    }
+
+    const key = `moment:${item.relatedId}`
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        relatedId: item.relatedId,
+        title: item.title || '\u52a8\u6001\u4e92\u52a8',
+        preview: item.content || '',
+        items: []
+      })
+    }
+    const group = groups.get(key)
+    group.items.push(item)
+    if (!group.preview && item.content) {
+      group.preview = item.content
+    }
+  })
+
+  return {
+    groups: [...groups.values()].map(group => ({
+      ...group,
+      unreadCount: group.items.filter(entry => !entry.isRead).length
+    })),
+    looseItems
+  }
+}
+
+function NotificationCard({ item, compact = false, onClick }) {
+  return (
+    <Paper
+      variant="outlined"
+      component="button"
+      type="button"
+      onClick={onClick}
+      sx={{
+        p: compact ? 1.5 : 2,
+        width: '100%',
+        textAlign: 'left',
+        font: 'inherit',
+        cursor: 'pointer',
+        bgcolor: item.isRead ? portra.surface : '#F0F4FF',
+        borderLeft: `5px solid ${item.isRead ? portra.muted : portra.primary}`,
+        transition: 'transform 180ms ease-out, box-shadow 180ms ease-out, border-color 180ms ease-out, background-color 180ms ease-out',
+        '&:hover': {
+          transform: 'translateY(-2px)',
+          borderColor: 'rgba(13,47,178,.18)',
+          boxShadow: '0 18px 32px rgba(13,47,178,.09)'
+        },
+        '&:active': {
+          transform: 'scale(.988)'
+        }
+      }}
+    >
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }}>
+        <Box sx={{ minWidth: 0, pr: 1, width: '100%' }}>
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+            <Badge color="primary" variant="dot" invisible={item.isRead} />
+            <Typography fontWeight={900}>{item.title}</Typography>
+            {compact ? <Chip size="small" label={normalizeText(item.type) || '\u901a\u77e5'} /> : null}
+          </Stack>
+          <Typography mt={0.5} sx={{ lineHeight: 1.85, whiteSpace: 'pre-wrap' }}>
+            {item.content}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" mt={1}>
+            {item.type} · {formatDateTime(item.createdAt)}
+          </Typography>
+        </Box>
+        <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', alignSelf: { xs: 'flex-start', sm: 'center' } }}>
+          {item.isRead ? '\u5df2\u8bfb' : '\u70b9\u51fb\u5373\u8bfb'}
+        </Typography>
+      </Stack>
+    </Paper>
+  )
+}
+
 export function NotificationListPage() {
+  const navigate = useNavigate()
   const { currentUser } = useAuth()
   const [items, setItems] = useState([])
+  const [activeTab, setActiveTab] = useState('all')
+  const [expandedGroups, setExpandedGroups] = useState(() => new Set())
   const [feedback, setFeedback] = useState({})
   const [loading, setLoading] = useState(false)
-
-  const unreadCount = useMemo(() => items.filter(item => !item.isRead).length, [items])
 
   useEffect(() => {
     let alive = true
@@ -32,13 +233,36 @@ export function NotificationListPage() {
     return () => { alive = false }
   }, [currentUser])
 
+  const counts = useMemo(() => {
+    const summary = { all: items.length, unread: items.filter(item => !item.isRead).length, order: 0, appeal: 0, review: 0, dynamic: 0 }
+    items.forEach(item => {
+      const category = getNotificationCategory(item)
+      if (category in summary) {
+        summary[category] += 1
+      }
+    })
+    return summary
+  }, [items])
+
+  const visibleItems = useMemo(() => {
+    return items.filter(item => {
+      if (activeTab === 'all') return true
+      if (activeTab === 'unread') return !item.isRead
+      return getNotificationCategory(item) === activeTab
+    })
+  }, [items, activeTab])
+
+  const dynamicView = useMemo(() => buildDynamicGroups(visibleItems), [visibleItems])
+
   async function markRead(notificationId) {
     try {
       const updated = await notificationApi.markRead(notificationId, currentUser)
       setItems(current => current.map(item => (item.notificationId === notificationId ? updated : item)))
-      setFeedback({ success: '通知已读' })
+      setFeedback({ success: '\u901a\u77e5\u5df2\u8bfb' })
+      return updated
     } catch (error) {
       setFeedback({ error: error.message })
+      return null
     }
   }
 
@@ -46,84 +270,174 @@ export function NotificationListPage() {
     try {
       const updated = await notificationApi.markAllRead(currentUser)
       setItems(Array.isArray(updated) ? updated : [])
-      setFeedback({ success: '全部通知已读' })
+      setFeedback({ success: '\u5168\u90e8\u901a\u77e5\u5df2\u8bfb' })
     } catch (error) {
       setFeedback({ error: error.message })
     }
   }
 
   async function openNotification(item) {
-    if (!item || item.isRead) return
-    await markRead(item.notificationId)
+    if (!item) return
+    if (!item.isRead) {
+      const updated = await markRead(item.notificationId)
+      if (!updated) return
+    }
+    const target = resolveNotificationTarget(item)
+    if (target) {
+      navigate(target)
+    }
   }
+
+  function toggleGroup(key) {
+    setExpandedGroups(current => {
+      const next = new Set(current)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  const emptyText = activeTab === 'all'
+    ? (loading ? '\u6b63\u5728\u52a0\u8f7d\u901a\u77e5...' : '\u6682\u65e0\u901a\u77e5')
+    : activeTab === 'unread'
+      ? (loading ? '\u6b63\u5728\u52a0\u8f7d\u672a\u8bfb\u901a\u77e5...' : '\u6682\u65e0\u672a\u8bfb\u901a\u77e5')
+      : loading
+        ? '\u6b63\u5728\u52a0\u8f7d\u901a\u77e5...'
+        : `\u6682\u65e0${TAB_DEFINITIONS.find(tab => tab.key === activeTab)?.label || '\u901a\u77e5'}`
 
   return (
     <Stack spacing={2}>
       <PageHeader
         eyebrow="PORTRA NOTICE"
-        title="通知"
-        description={unreadCount ? `${unreadCount} 条未读通知` : '当前没有未读通知'}
-        action={<Button startIcon={<DoneAllRoundedIcon />} onClick={markAllRead} disabled={!unreadCount}>全部已读</Button>}
+        title="\u901a\u77e5"
+        description={counts.unread ? `${counts.unread} \u6761\u672a\u8bfb\u901a\u77e5` : '\u5f53\u524d\u6ca1\u6709\u672a\u8bfb\u901a\u77e5'}
+        action={<Button startIcon={<DoneAllRoundedIcon />} onClick={markAllRead} disabled={!counts.unread}>\u5168\u90e8\u5df2\u8bfb</Button>}
       />
       <Feedback {...feedback} />
-      {items.length ? (
-        <Stack gap={1.5}>
-          {items.map(item => (
-            <Paper
-              key={item.notificationId}
-              variant="outlined"
-              component="button"
-              type="button"
-              onClick={() => openNotification(item)}
-              disabled={item.isRead}
-              sx={{
-                p: 2,
-                width: '100%',
-                textAlign: 'left',
-                font: 'inherit',
-                cursor: item.isRead ? 'default' : 'pointer',
-                bgcolor: item.isRead ? portra.surface : '#F0F4FF',
-                borderLeft: `5px solid ${item.isRead ? portra.muted : portra.primary}`,
-                transition: 'transform 180ms ease-out, box-shadow 180ms ease-out, border-color 180ms ease-out, background-color 180ms ease-out',
-                '&:hover': item.isRead
-                  ? {}
-                  : {
-                      transform: 'translateY(-2px)',
-                      borderColor: 'rgba(13,47,178,.18)',
-                      boxShadow: '0 18px 32px rgba(13,47,178,.09)'
-                    },
-                '&:active': item.isRead
-                  ? {}
-                  : {
-                      transform: 'scale(.988)'
-                    },
-                '&:disabled': {
-                  opacity: 0.98
-                }
-              }}
-            >
-              <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }}>
-                <Box sx={{ minWidth: 0, pr: 1 }}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Badge color="primary" variant="dot" invisible={item.isRead} />
-                    <Typography fontWeight={900}>{item.title}</Typography>
-                  </Stack>
-                  <Typography mt={0.5} sx={{ lineHeight: 1.85, whiteSpace: 'pre-wrap' }}>
-                    {item.content}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" mt={1}>
-                    {item.type} · {formatDateTime(item.createdAt)}
-                  </Typography>
-                </Box>
-                <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', alignSelf: { xs: 'flex-start', sm: 'center' } }}>
-                  {item.isRead ? '已读' : '点按即已读'}
-                </Typography>
-              </Stack>
-            </Paper>
+
+      <Paper variant="outlined" sx={{ borderRadius: 4, overflow: 'hidden', bgcolor: 'rgba(248,243,235,.9)' }}>
+        <Tabs
+          value={activeTab}
+          onChange={(_, value) => setActiveTab(value)}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{
+            px: 1,
+            pt: 1,
+            '& .MuiTab-root': {
+              minHeight: 60,
+              textTransform: 'none',
+              fontWeight: 800,
+              letterSpacing: '.04em'
+            }
+          }}
+        >
+          {TAB_DEFINITIONS.map(tab => (
+            <Tab
+              key={tab.key}
+              value={tab.key}
+              label={
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <span>{tab.label}</span>
+                  <Chip size="small" label={counts[tab.key] || 0} sx={{ height: 20 }} />
+                </Stack>
+              }
+            />
           ))}
-        </Stack>
+        </Tabs>
+      </Paper>
+
+      {visibleItems.length ? (
+        activeTab === 'dynamic' ? (
+          <Stack gap={1.5}>
+            {dynamicView.groups.map(group => {
+              const open = expandedGroups.has(group.key)
+              return (
+                <Paper
+                  key={group.key}
+                  variant="outlined"
+                  sx={{
+                    borderRadius: 3,
+                    overflow: 'hidden',
+                    bgcolor: portra.surface,
+                    borderColor: group.unreadCount ? 'rgba(13,47,178,.2)' : 'rgba(21,19,24,.12)'
+                  }}
+                >
+                  <Box
+                    component="button"
+                    type="button"
+                    onClick={() => toggleGroup(group.key)}
+                    sx={{
+                      width: '100%',
+                      textAlign: 'left',
+                      font: 'inherit',
+                      color: 'inherit',
+                      bgcolor: 'transparent',
+                      border: 0,
+                      p: 2,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                          <Typography fontWeight={900}>{group.title}</Typography>
+                          <Chip size="small" color={group.unreadCount ? 'primary' : 'default'} label={`${group.items.length} items`} />
+                        </Stack>
+                        <Typography variant="body2" color="text.secondary" mt={0.75} sx={{ lineHeight: 1.75 }}>
+                          {group.preview || '\u52a8\u6001\u4e92\u52a8\u901a\u77e5'}
+                        </Typography>
+                      </Box>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography variant="caption" color="text.secondary">
+                          {group.unreadCount ? `${group.unreadCount} unread` : 'all read'}
+                        </Typography>
+                        <ExpandMoreRoundedIcon
+                          sx={{
+                            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+                            transition: 'transform 160ms ease'
+                          }}
+                        />
+                      </Stack>
+                    </Stack>
+                  </Box>
+                  <Collapse in={open} timeout="auto" unmountOnExit>
+                    <Stack gap={1} sx={{ px: 2, pb: 2, pt: 0 }}>
+                      {group.items.map(item => (
+                        <NotificationCard
+                          key={item.notificationId}
+                          item={item}
+                          compact
+                          onClick={() => openNotification(item)}
+                        />
+                      ))}
+                    </Stack>
+                  </Collapse>
+                </Paper>
+              )
+            })}
+
+            {dynamicView.looseItems.map(item => (
+              <NotificationCard
+                key={item.notificationId}
+                item={item}
+                onClick={() => openNotification(item)}
+              />
+            ))}
+          </Stack>
+        ) : (
+          <Stack gap={1.5}>
+            {visibleItems.map(item => (
+              <NotificationCard
+                key={item.notificationId}
+                item={item}
+                onClick={() => openNotification(item)}
+              />
+            ))}
+          </Stack>
+        )
       ) : (
-        <EmptyState text={loading ? '正在加载通知...' : '暂无通知'} />
+        <EmptyState text={emptyText} />
       )}
     </Stack>
   )

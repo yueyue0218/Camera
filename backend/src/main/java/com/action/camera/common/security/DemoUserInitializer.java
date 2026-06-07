@@ -7,8 +7,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * Seeds the two demo users used by the local frontend so C module foreign keys
- * can create conversations, quotes and orders without manual database edits.
+ * Seeds the two demo users used by the local frontend.
  */
 @Component
 public class DemoUserInitializer implements ApplicationRunner {
@@ -30,10 +29,12 @@ public class DemoUserInitializer implements ApplicationRunner {
         if (!seedDemoUsers) {
             return;
         }
-        ensureUser(DEMO_CUSTOMER_ID, "需求方演示用户", UserRole.CUSTOMER.name());
-        ensureUser(DEMO_PROVIDER_ID, "服务方演示用户", UserRole.PROVIDER.name());
+        ensureUser(DEMO_CUSTOMER_ID, "闇€姹傛柟婕旂ず鐢ㄦ埛", UserRole.CUSTOMER.name());
+        ensureUser(DEMO_PROVIDER_ID, "鏈嶅姟鏂规紨绀虹敤鎴?", UserRole.PROVIDER.name());
         ensureRoleBinding(DEMO_CUSTOMER_ID, UserRole.CUSTOMER.name());
         ensureRoleBinding(DEMO_PROVIDER_ID, UserRole.PROVIDER.name());
+        normalizeDemoCreditScore(DEMO_CUSTOMER_ID);
+        normalizeDemoCreditScore(DEMO_PROVIDER_ID);
     }
 
     private void ensureUser(long userId, String nickname, String role) {
@@ -50,7 +51,7 @@ public class DemoUserInitializer implements ApplicationRunner {
                         insert into users
                             (id, nickname, current_role, status, credit_score, created_at, updated_at)
                         values
-                            (?, ?, ?, 'ACTIVE', 80.00, now(), now())
+                            (?, ?, ?, 'ACTIVE', 100.00, now(), now())
                         """,
                 userId,
                 nickname,
@@ -72,6 +73,13 @@ public class DemoUserInitializer implements ApplicationRunner {
                 "insert into user_role_bindings (user_id, role, granted_at) values (?, ?, now())",
                 userId,
                 role
+        );
+    }
+
+    private void normalizeDemoCreditScore(long userId) {
+        jdbcTemplate.update(
+                "update users set credit_score = 100.00, updated_at = now() where id = ? and credit_score < 100.00",
+                userId
         );
     }
 }

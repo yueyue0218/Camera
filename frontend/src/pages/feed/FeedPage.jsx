@@ -316,13 +316,13 @@ export function FeedPage() {
         savedMoment = await momentApi.create(payload, currentUser)
       }
       setComposerOpen(false)
-      setNotice({ type: 'success', text: composerMode === 'edit' ? '动态已保存' : '动态已发布' })
       if (savedMoment) {
         mergeMoment(savedMoment)
       }
       if (composerMode === 'create') {
         await refreshPage()
       }
+      setNotice({ type: 'success', text: composerMode === 'create' ? '发布成功' : '动态已保存' })
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     } finally {

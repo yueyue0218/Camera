@@ -4617,7 +4617,7 @@ export {
   ProfilePage,
   PublicProfilePage,
   PublishPage,
-  RegisterPage11不要恢复原版，本来个人主页前端
+  RegisterPage11不要恢复原版，本来个人主页前端1
 }
 
 export default App
