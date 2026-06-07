@@ -17,6 +17,7 @@ import { buildQuoteDisplayModel } from '../utils/quoteDisplayModel.js'
 import { getSafeDisplayText, PORTRA_COLORS, QUOTE_VISUAL } from '../MessageVisualTokens.js'
 import { EventAttachmentCard } from './EventAttachmentCard.jsx'
 import { MessageActorAvatar } from './MessageActorAvatar.jsx'
+import { QuoteMoneyText } from './QuoteMoneyText.jsx'
 import { DeliveryBatchCard } from '../../deliveries/components/DeliveryBatchCard.jsx'
 import { buildDeliveryBatches } from '../../deliveries/deliveryDisplay.js'
 
@@ -213,9 +214,7 @@ function QuoteAttachmentCard({ event, actor, direction, quote, onOpenQuoteDetail
             </Stack>
 
             <Stack direction="row" spacing={1.4} sx={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 1 }}>
-              <Typography sx={{ color: '#111827', fontSize: 30, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.03em' }}>
-                {model.amountText}
-              </Typography>
+              <QuoteMoneyText amountText={model.amountText} sx={{ color: '#111827', fontSize: 30, fontWeight: 800 }} />
               <QuoteStatusPill model={model} />
             </Stack>
 

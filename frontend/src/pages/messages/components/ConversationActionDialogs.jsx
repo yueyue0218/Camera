@@ -23,6 +23,7 @@ import { formatFileDisplayName } from '../../../utils/displayFormatters.js'
 import { PortraStatusBadge } from '../../../components/portra/index.js'
 import { formatTime } from '../utils/conversationUtils.js'
 import { buildQuoteDisplayModel } from '../utils/quoteDisplayModel.js'
+import { QuoteMoneyText } from './QuoteMoneyText.jsx'
 
 export function ConversationActionDialogs({
   activeAction,
@@ -79,11 +80,12 @@ export function ConversationActionDialogs({
           <Stack direction="row" spacing={1.2} sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <Box sx={{ minWidth: 0 }}>
               <Typography sx={{ color: 'rgba(255,255,255,.74)', fontSize: 12, fontWeight: 800, letterSpacing: 0 }}>报价详情</Typography>
-              <Typography sx={{ mt: 0.45, color: '#fff', fontSize: 34, fontWeight: 900, lineHeight: 1, letterSpacing: '-0.03em' }}>
-                {quoteDisplay ? quoteDisplay.amountText : '--'}
-              </Typography>
+              <QuoteMoneyText
+                amountText={quoteDisplay ? quoteDisplay.amountText : '--'}
+                sx={{ mt: 0.45, color: '#fff', fontSize: 34, fontWeight: 900 }}
+              />
               {quoteDisplay?.messageCreatedAtText && (
-                <Typography sx={{ mt: 0.35, color: 'rgba(255,255,255,.66)', fontSize: 12.5, lineHeight: 1.3 }}>
+                <Typography sx={{ mt: 0.75, color: 'rgba(255,255,255,.66)', fontSize: 12.5, lineHeight: 1.3 }}>
                   创建于 {quoteDisplay.messageCreatedAtText}
                 </Typography>
               )}
@@ -93,34 +95,36 @@ export function ConversationActionDialogs({
         </DialogTitle>
         <DialogContent sx={quoteDialogContentSx}>
           {quoteDisplay ? (
-            <Stack spacing={1.45} sx={{ pt: 0.4 }}>
-              <QuoteDetailSection
-                title="拍摄安排"
-                rows={[
-                  ['拍摄开始时间', quoteDisplay.shootStartTimeText],
-                  ['拍摄结束时间', quoteDisplay.shootEndTimeText],
-                  ['拍摄地点', quoteDisplay.shootLocationText]
-                ]}
-              />
-              <QuoteDetailSection
-                title="服务与交付"
-                rows={[
-                  ['原片 / 精修', quoteDisplay.originalRefinedText],
-                  ['最晚交付', quoteDisplay.deliveryDeadlineText],
-                  ['服务内容', quoteDisplay.serviceContentText, 'wide']
-                ]}
-              />
-              <QuoteDetailSection
-                title="使用与备注"
-                rows={[
-                  ['用途', quoteDisplay.photoUsageLabel],
-                  ['备注', quoteDisplay.remarkText, 'wide']
-                ]}
-              />
-              <Box sx={quoteNoticeSx}>
-                客户确认报价后将生成平台担保订单；付款后资金先进入平台担保，订单完成后再结算给摄影师。
-              </Box>
-            </Stack>
+            <Box sx={quoteDialogBodySx}>
+              <Stack spacing={1.45}>
+                <QuoteDetailSection
+                  title="拍摄安排"
+                  rows={[
+                    ['拍摄开始时间', quoteDisplay.shootStartTimeText],
+                    ['拍摄结束时间', quoteDisplay.shootEndTimeText],
+                    ['拍摄地点', quoteDisplay.shootLocationText]
+                  ]}
+                />
+                <QuoteDetailSection
+                  title="服务与交付"
+                  rows={[
+                    ['原片 / 精修', quoteDisplay.originalRefinedText],
+                    ['最晚交付', quoteDisplay.deliveryDeadlineText],
+                    ['服务内容', quoteDisplay.serviceContentText, 'wide']
+                  ]}
+                />
+                <QuoteDetailSection
+                  title="使用与备注"
+                  rows={[
+                    ['用途', quoteDisplay.photoUsageLabel],
+                    ['备注', quoteDisplay.remarkText, 'wide']
+                  ]}
+                />
+                <Box sx={quoteNoticeSx}>
+                  客户确认报价后将生成平台担保订单；付款后资金先进入平台担保，订单完成后再结算给摄影师。
+                </Box>
+              </Stack>
+            </Box>
           ) : (
             <DialogContentText sx={{ pt: 1 }}>
               报价详情暂时无法打开，请刷新后重试。
@@ -322,11 +326,15 @@ const quoteDialogTitleSx = {
 }
 
 const quoteDialogContentSx = {
-  px: 3,
-  pt: 4,
-  pb: 2.2,
+  p: 0,
   '& .MuiDialogContentText-root': { color: PORTRA_COLORS.mutedInk, lineHeight: 1.7 },
   '& .MuiOutlinedInput-root': { bgcolor: PORTRA_COLORS.paperSoft, borderRadius: PORTRA_RADII.control }
+}
+
+const quoteDialogBodySx = {
+  px: 3,
+  pt: 4,
+  pb: 2.2
 }
 
 const quoteSectionSx = {

@@ -10,6 +10,7 @@ import { PortraActionLink, PortraPrimaryAction, PortraSecondaryAction, PortraWor
 import { buildQuoteDisplayModel } from '../utils/quoteDisplayModel.js'
 import { PORTRA_COLORS, QUOTE_VISUAL } from '../MessageVisualTokens.js'
 import { WorkbenchSection } from './WorkbenchSection.jsx'
+import { QuoteMoneyText } from './QuoteMoneyText.jsx'
 
 function getLatestQuote(quotes) {
   return [...quotes].sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0))[0] || null
@@ -102,9 +103,7 @@ export function ConversationWorkbenchPanel({
         {latestQuote && (
           <WorkbenchSection title="当前报价">
             <Box sx={quoteSummaryCardSx}>
-              <Typography sx={{ color: QUOTE_VISUAL.ink, fontSize: 28, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.03em' }}>
-                {latestQuoteModel.amountText}
-              </Typography>
+              <QuoteMoneyText amountText={latestQuoteModel.amountText} sx={{ color: QUOTE_VISUAL.ink, fontSize: 28, fontWeight: 800 }} />
               <Typography sx={{ color: QUOTE_VISUAL.muted, fontSize: 14, lineHeight: 1.45 }}>
                 {latestQuoteModel.photoUsageLabel}
               </Typography>
