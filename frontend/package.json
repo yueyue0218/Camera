@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
+    "lint": "eslint src --ext .js,.jsx",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0"
   },
@@ -18,5 +19,10 @@
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.15.1",
     "vite": "^7.2.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.4.1",
+    "globals": "^17.6.0"
   }
 }
