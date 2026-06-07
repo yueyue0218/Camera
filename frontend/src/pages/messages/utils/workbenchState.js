@@ -353,7 +353,7 @@ export function buildConversationTimeline({
         timestamp: delivery.uploadTime,
         stageOrder: STAGE_ORDER.DELIVERY,
         title: delivery.deliveryRound > 1 ? '摄影师重新上传了作品' : '摄影师上传了作品',
-        summary: delivery.remark || `第 ${delivery.deliveryRound || index + 1} 次作品已上传。`,
+        summary: delivery.remark || '',
         meta: { delivery, deliveryCount: deliveries.length, order },
         actions: latest && order.status === 'DELIVERED_PENDING_CONFIRM'
           ? [

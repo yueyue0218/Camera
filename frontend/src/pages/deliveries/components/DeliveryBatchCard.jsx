@@ -52,14 +52,11 @@ export function DeliveryBatchCard({
         {inline ? (
           <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
             <Box sx={{ minWidth: 0 }}>
-              <Typography sx={{ color: PORTRA_SURFACE.ink, fontSize: 16, fontWeight: 950, lineHeight: 1.36 }}>
-                {batch.title}
-              </Typography>
-              <Typography variant="body2" sx={{ mt: 0.2, color: PORTRA_SURFACE.muted, fontWeight: 750, minWidth: 0 }}>
+              <Typography variant="body2" sx={{ color: PORTRA_SURFACE.muted, fontWeight: 750, minWidth: 0 }}>
                 {subtitle}
               </Typography>
             </Box>
-            <PortraStatusBadge label={batch.statusLabel || '已上传作品'} />
+            {!message && <PortraStatusBadge label={batch.statusLabel || '已上传作品'} />}
           </Stack>
         ) : (
           <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
@@ -77,7 +74,7 @@ export function DeliveryBatchCard({
             <PortraStatusBadge label={batch.statusLabel || '已上传作品'} />
           </Stack>
         )}
-        <DeliveryThumbnailStrip files={batch.files} previewUrls={previewUrls} variant={thumbnailVariant} />
+        <DeliveryThumbnailStrip files={batch.files} previewUrls={previewUrls} variant={thumbnailVariant} mode="contain" />
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
           <Typography variant="body2" sx={{ color: PORTRA_SURFACE.muted, minWidth: 0 }}>
             共 {formatFileUnit(batch.fileCount || batch.files?.length || 0, message ? '张作品' : '份作品')}

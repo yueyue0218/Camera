@@ -17,6 +17,7 @@ import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import CollectionsRoundedIcon from '@mui/icons-material/CollectionsRounded'
 import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded'
 import {
+  formatAuthorizationDescription,
   formatDateTime,
   formatFileDisplayName,
   formatPhotoUsageScope
@@ -99,18 +100,18 @@ export function AuthorizationRequestCard({
         <Stack spacing={0.9}>
           <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
             <Box sx={{ minWidth: 0 }}>
-              <Typography sx={{ color: PORTRA_SURFACE.ink, fontWeight: 950, lineHeight: 1.36 }}>
-                摄影师申请作品展示授权
-              </Typography>
+              {!inline && (
+                <Typography sx={{ color: PORTRA_SURFACE.ink, fontWeight: 950, lineHeight: 1.36 }}>
+                  摄影师申请作品展示授权
+                </Typography>
+              )}
               <Typography variant="body2" sx={{ mt: 0.35, color: PORTRA_SURFACE.muted, lineHeight: 1.45 }}>
                 {model.summary}
               </Typography>
             </Box>
             <PortraStatusPill label={model.statusLabel} />
           </Stack>
-          {files.length > 0 && (
-            <DeliveryThumbnailStrip files={files} variant="message" />
-          )}
+          {files.length > 0 && <DeliveryThumbnailStrip files={files} variant="message" mode="contain" />}
           <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
             <Typography variant="caption" sx={{ color: PORTRA_SURFACE.faint, fontWeight: 800 }}>
               点击查看授权详情
@@ -155,7 +156,7 @@ export function AuthorizationRequestCard({
               </Typography>
               {files.length > 0 ? (
                 <>
-                  <DeliveryThumbnailStrip files={files} variant="orderSection" />
+                  <DeliveryThumbnailStrip files={files} variant="orderSection" mode="contain" />
                   <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap', rowGap: 0.75 }}>
                     {files.map((file, index) => (
                       <Chip
@@ -261,7 +262,7 @@ function buildAuthorizationModel(authorization = {}, order) {
     usageLabel,
     applicantLabel: buildApplicantLabel(authorization, order),
     requestTime: formatDateTime(authorization.createdAt || authorization.requestedAt || authorization.authorizedAt || order?.updatedAt, '待同步'),
-    remark: String(authorization.remark || authorization.description || authorization.reason || '').trim(),
+    remark: formatAuthorizationDescription(authorization, ''),
     deliveryTarget: getAuthorizationDeliveryTarget(authorization, order, files)
   }
 }

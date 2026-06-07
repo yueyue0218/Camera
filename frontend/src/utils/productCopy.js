@@ -8,6 +8,7 @@ const PRODUCT_COPY_REPLACEMENTS = [
   [/\bPERSONAL_USE\b/g, '仅限个人留念'],
   [/\bCOMMERCIAL_USE\b/g, '商业使用'],
   [/\bPUBLIC_DISPLAY\b/g, '可公开展示'],
+  [/\bPORTFOLIO_DISPLAY\b/g, '可公开展示'],
   [/\bUI_REVIEW_SEED\b/g, ''],
   [/\bDemo\s+2002\b/gi, '']
 ]

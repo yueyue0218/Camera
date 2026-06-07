@@ -19,7 +19,7 @@ export function buildDeliveryBatches(deliveries = [], order) {
         orderId: delivery.orderId || order?.orderId,
         deliveryId: getDeliveryId(delivery),
         round,
-        title: Number(round) > 1 ? '摄影师重新上传了作品' : '摄影师上传了作品',
+        title: Number(round) > 1 ? `第 ${round} 次作品` : '作品记录',
         description: formatDeliveryDescription(delivery),
         latestUploadTime: delivery.uploadTime || delivery.createdAt,
         files: []
@@ -38,7 +38,7 @@ export function buildDeliveryBatches(deliveries = [], order) {
       round,
       fileCount: count,
       subtitle: `最近上传：${latest} · 共 ${count} 张`,
-      orderSubtitle: `第 ${round} 次上传 · 最近上传：${latest} · 共 ${count} 张`,
+      orderSubtitle: `最近上传：${latest} · 共 ${count} 张`,
       messageSubtitle: `最近上传：${latest} · 共 ${count} 张`,
       statusLabel: getDeliveryBatchStatusLabel(order)
     }
