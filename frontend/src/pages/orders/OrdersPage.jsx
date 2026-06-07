@@ -530,7 +530,7 @@ export function OrdersPage() {
       const url = await fileApi.downloadObjectUrl(record.fileId, currentUser)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = formatFileDisplayName(record, `作品文件-${record.fileId}`)
+      anchor.download = formatFileDisplayName(record, `作品-${record.fileId}`)
       anchor.click()
       setTimeout(() => URL.revokeObjectURL(url), 1000)
     } catch (error) {
@@ -664,7 +664,7 @@ export function OrdersPage() {
         if (!map.has(fileId)) {
           map.set(fileId, {
             fileId,
-            fileName: formatFileDisplayName(record, `作品文件 ${fileId}`),
+            fileName: formatFileDisplayName(record, `作品 ${fileId}`),
             uploadTime: record.uploadTime
           })
         }
@@ -950,7 +950,7 @@ export function OrdersPage() {
                     <Stack spacing={1.5}>
                       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.2} sx={{ alignItems: { xs: 'stretch', sm: 'center' } }}>
                         <Button variant="outlined" component="label" startIcon={<AddPhotoAlternateRoundedIcon />}>
-                          选择作品文件
+                          选择作品
                           <input
                             hidden
                             type="file"
@@ -958,7 +958,7 @@ export function OrdersPage() {
                           />
                         </Button>
                         <Typography sx={{ color: PORTRA_SURFACE.muted }} variant="body2">
-                          {deliveryForm.file ? deliveryForm.file.name : '尚未选择文件'}
+                          {deliveryForm.file ? deliveryForm.file.name : '尚未选择作品'}
                         </Typography>
                       </Stack>
                       <TextField
@@ -999,7 +999,7 @@ export function OrdersPage() {
                     <DeliveryBatchCard
                       key={batch.id}
                       batch={batch}
-                      variant="order"
+                      variant="orderSection"
                       onOpen={() => openDeliveryBatch(batch)}
                       disabled={!batch.deliveryId || !selectedOrder?.orderId}
                     />
@@ -1028,10 +1028,10 @@ export function OrdersPage() {
                       {deliveryFileOptions.length ? (
                         <>
                           <FormControl size="small">
-                            <InputLabel>选择作品文件</InputLabel>
+                            <InputLabel>选择作品</InputLabel>
                             <Select
                               multiple
-                              label="选择作品文件"
+                              label="选择作品"
                               value={photoAuthorizationForm.fileIds}
                               onChange={event => {
                                 const value = event.target.value
@@ -1041,7 +1041,7 @@ export function OrdersPage() {
                                 })
                               }}
                               renderValue={selected => selected
-                                .map(fileId => deliveryFileNameMap.get(Number(fileId)) || `文件 ${fileId}`)
+                                .map(fileId => deliveryFileNameMap.get(Number(fileId)) || `作品 ${fileId}`)
                                 .join('、')}
                             >
                               {deliveryFileOptions.map(file => (
@@ -1218,7 +1218,7 @@ export function OrdersPage() {
         )}
       </Box>
       <Dialog open={Boolean(previewDelivery)} onClose={closeDeliveryPreview} fullWidth maxWidth="md">
-        <DialogTitle>{previewDelivery ? formatDeliveryTitle(previewDelivery) : '作品文件'}</DialogTitle>
+        <DialogTitle>{previewDelivery ? formatDeliveryTitle(previewDelivery) : '作品'}</DialogTitle>
         <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
           <Stack spacing={1.5}>
             {previewLoading && <Typography sx={{ color: PORTRA_SURFACE.muted }}>作品预览加载中...</Typography>}
@@ -1226,14 +1226,14 @@ export function OrdersPage() {
               <Box
                 component="img"
                 src={previewUrl}
-                alt={previewDelivery ? formatDeliveryTitle(previewDelivery) : '作品文件'}
+                alt={previewDelivery ? formatDeliveryTitle(previewDelivery) : '作品'}
                 sx={{ width: '100%', maxHeight: '62vh', objectFit: 'contain', borderRadius: PORTRA_RADIUS.control, bgcolor: PORTRA_SURFACE.paperMuted }}
               />
             )}
             {!previewLoading && !previewUrl && (
               <PortraEmptyState
-                title={previewError || '该文件暂不支持预览'}
-                description="可以下载到本地后查看原文件。"
+                title={previewError || '该作品暂不支持预览'}
+                description="可以下载到本地后查看原图。"
               />
             )}
             {previewDelivery && (

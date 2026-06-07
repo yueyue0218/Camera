@@ -128,6 +128,7 @@ export function ConversationSystemItem({
             authorization={authorization}
             order={eventMeta.order}
             variant="message"
+            chrome="none"
             canReview={eventActions.includes('APPROVE_AUTHORIZATION') || eventActions.includes('REJECT_AUTHORIZATION')}
             loading={loading}
             onDecision={onDecidePhotoAuthorization}

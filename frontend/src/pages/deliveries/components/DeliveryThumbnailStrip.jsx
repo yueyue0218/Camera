@@ -10,8 +10,9 @@ export function DeliveryThumbnailStrip({ files = [], previewUrls = {}, variant =
   const { currentUser } = useAuth()
   const visible = files.slice(0, 4)
   const extraCount = Math.max(0, files.length - visible.length)
-  const compact = variant === 'message'
-  const height = getStripHeight(visible.length, compact)
+  const compact = variant === 'message' || variant === 'sidePanel'
+  const gallery = variant === 'gallery'
+  const height = getStripHeight(visible.length, compact, gallery)
   const shouldLoadPreviews = !previewUrls || !Object.keys(previewUrls).length
   const loadedPreviews = useDeliveryFilePreviews(visible, currentUser, { enabled: shouldLoadPreviews })
 
@@ -20,7 +21,7 @@ export function DeliveryThumbnailStrip({ files = [], previewUrls = {}, variant =
       sx={{
         display: 'grid',
         gridTemplateColumns: visible.length === 1 ? '1fr' : 'repeat(2, 1fr)',
-        gridAutoRows: visible.length <= 1 ? '1fr' : compact ? 66 : 84,
+        gridAutoRows: visible.length <= 1 ? '1fr' : compact ? 66 : gallery ? 112 : 84,
         gap: 0.6,
         height,
         minHeight: 0,
@@ -53,7 +54,7 @@ function ThumbnailTile({ file, previewUrl, loading, overlay }) {
       ) : loading && imageFile ? (
         <ThumbnailLoading />
       ) : (
-        <ThumbnailPlaceholder label={imageFile ? '暂无缩略图' : '文件'} />
+        <ThumbnailPlaceholder label={imageFile ? '暂无缩略图' : '作品'} />
       )}
       {overlay && (
         <Box sx={{
@@ -109,14 +110,15 @@ function ThumbnailPlaceholder({ label }) {
       color: PORTRA_SURFACE.muted
     }}>
       <Box sx={{ textAlign: 'center' }}>
-        {label === '文件' ? <InsertDriveFileRoundedIcon /> : <ImageRoundedIcon />}
+        {label === '作品' ? <InsertDriveFileRoundedIcon /> : <ImageRoundedIcon />}
         <Typography variant="caption" sx={{ display: 'block', fontWeight: 800 }}>{label}</Typography>
       </Box>
     </Box>
   )
 }
 
-function getStripHeight(count, compact) {
+function getStripHeight(count, compact, gallery) {
+  if (gallery) return count <= 1 ? 220 : 240
   if (count <= 1) return compact ? 132 : 162
   return compact ? 136 : 176
 }

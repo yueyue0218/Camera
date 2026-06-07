@@ -40,6 +40,7 @@ export function AuthorizationRequestCard({
   loading = false,
   onDecision,
   onOpenDelivery,
+  chrome = 'card',
   sx
 }) {
   const [open, setOpen] = useState(false)
@@ -50,8 +51,10 @@ export function AuthorizationRequestCard({
   if (!authorization) return null
 
   const compact = variant === 'message'
+  const inline = chrome === 'none'
   const canOpenDelivery = Boolean(model.deliveryTarget && onOpenDelivery)
   const files = model.files
+  const Root = inline ? Box : PortraTicketCard
   const openDelivery = event => {
     event?.stopPropagation()
     if (canOpenDelivery) onOpenDelivery(model.deliveryTarget)
@@ -73,7 +76,7 @@ export function AuthorizationRequestCard({
 
   return (
     <>
-      <PortraTicketCard
+      <Root
         role="button"
         tabIndex={0}
         onClick={() => setOpen(true)}
@@ -83,12 +86,12 @@ export function AuthorizationRequestCard({
             setOpen(true)
           }
         }}
-        accent={model.status === 'REJECTED' ? PORTRA_SURFACE.warmOrange : PORTRA_SURFACE.portraBlue}
+        {...(!inline ? { accent: model.status === 'REJECTED' ? PORTRA_SURFACE.warmOrange : PORTRA_SURFACE.portraBlue } : {})}
         sx={{
           width: compact ? '100%' : 'auto',
-          px: compact ? 1.25 : 1.55,
-          py: compact ? 1.05 : 1.35,
-          pl: compact ? 2.1 : 2.5,
+          px: inline ? 0 : compact ? 1.25 : 1.55,
+          py: inline ? 0 : compact ? 1.05 : 1.35,
+          pl: inline ? 0 : compact ? 2.1 : 2.5,
           cursor: 'pointer',
           ...sx
         }}
@@ -125,7 +128,7 @@ export function AuthorizationRequestCard({
             </Button>
           </Stack>
         </Stack>
-      </PortraTicketCard>
+      </Root>
 
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle sx={{ pb: 1 }}>
@@ -152,7 +155,7 @@ export function AuthorizationRequestCard({
               </Typography>
               {files.length > 0 ? (
                 <>
-                  <DeliveryThumbnailStrip files={files} variant="order" />
+                  <DeliveryThumbnailStrip files={files} variant="orderSection" />
                   <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap', rowGap: 0.75 }}>
                     {files.map((file, index) => (
                       <Chip
@@ -277,8 +280,7 @@ function normalizeAuthorizationFiles(authorization = {}) {
 }
 
 function buildApplicantLabel(authorization = {}, order) {
-  const providerId = authorization.providerUserId || order?.providerUserId
-  return providerId ? `摄影师 ${providerId}` : '摄影师'
+  return '摄影师'
 }
 
 function getAuthorizationDeliveryTarget(authorization = {}, order, files = []) {

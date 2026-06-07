@@ -68,7 +68,7 @@ export function normalizeDeliveryFile(delivery, index = 0) {
     deliveryId: delivery.deliveryId,
     orderId: delivery.orderId,
     fileId,
-    fileName: formatFileDisplayName(delivery, `作品文件 ${index + 1}`),
+    fileName: formatFileDisplayName(delivery, `作品 ${index + 1}`),
     rawFileName: delivery.fileName || delivery.name || delivery.originalName || '',
     mimeType: delivery.mimeType || delivery.contentType || '',
     uploadTime: delivery.uploadTime || delivery.createdAt,
@@ -93,7 +93,7 @@ export function isImageDeliveryFile(file) {
 }
 
 export function getDeliveryDownloadName(file, index = 0) {
-  return formatFileDisplayName(file, `作品文件 ${index + 1}`)
+  return formatFileDisplayName(file, `作品 ${index + 1}`)
 }
 
 export function getDeliveryTitleForRecord(delivery, index = 0) {

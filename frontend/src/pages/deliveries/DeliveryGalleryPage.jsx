@@ -218,7 +218,7 @@ export function DeliveryGalleryPage() {
   }
 
   if (loading) {
-    return <PortraEmptyState title="作品记录加载中" description="正在读取订单和作品文件。" />
+    return <PortraEmptyState title="作品记录加载中" description="正在读取订单和作品。" />
   }
 
   if (error) {
@@ -289,7 +289,7 @@ export function DeliveryGalleryPage() {
                 onOpenViewer={setViewerIndex}
               />
             ) : (
-              <PortraEmptyState title="暂无作品文件" description="该作品记录没有可展示的文件信息。" />
+              <PortraEmptyState title="暂无作品" description="该作品记录没有可展示的照片信息。" />
             )}
           </PortraTicketSection>
           <DeliveryActionBar
