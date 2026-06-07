@@ -129,6 +129,31 @@ async function enrichDemandPublisher(demand, currentUser) {
   }
 }
 
+async function enrichServiceProvider(service, currentUser) {
+  const providerId = service?.photographerId || service?.providerId
+  if (!providerId) return service
+  try {
+    const brief = await userApi.brief(providerId, currentUser)
+    let avatarUrl = ''
+    if (brief?.avatarFileId) {
+      try {
+        avatarUrl = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser)
+      } catch {
+        avatarUrl = ''
+      }
+    }
+    return {
+      ...service,
+      photographerId: brief?.userId || service.photographerId || service.providerId,
+      photographerNickname: brief?.nickname || service.photographerNickname,
+      photographerAvatarFileId: brief?.avatarFileId || service.photographerAvatarFileId,
+      photographerAvatarUrl: avatarUrl || service.photographerAvatarUrl
+    }
+  } catch {
+    return service
+  }
+}
+
 function referenceSlots(referenceFileIds) {
   const count = Math.max(3, Math.min(4, Number(referenceFileIds?.length) || 0))
   const slots = Array.from({ length: count }, (_, index) => `参考图 ${String(index + 1).padStart(2, '0')}`)
@@ -402,7 +427,7 @@ export function ServicePackageDetailPage() {
             : Promise.resolve(null)
         ])
         if (!ignored) {
-          setService(detail)
+          setService(await enrichServiceProvider(detail, currentUser))
           setInterested(Boolean(interestPage?.records?.some(item => Number(item.serviceId) === Number(serviceId))))
           setStatus({ loading: false, error: '' })
         }
