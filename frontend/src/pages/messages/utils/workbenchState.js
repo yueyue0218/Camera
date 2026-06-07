@@ -1,4 +1,6 @@
 import { buildUserProfileTarget } from '../../../utils/orderNavigation.js'
+import { getOrderActionVisibility } from '../../../utils/orderActionVisibility.js'
+import { deriveOrderWorkflowState } from '../../../utils/orderWorkflowModel.js'
 
 const ACTIVE_ORDER_STATUSES = new Set([
   'PENDING_PAYMENT',
@@ -113,6 +115,9 @@ export function deriveConversationStage({ conversation, quotes = [], order, curr
     }
   }
 
+  const workflowState = deriveOrderWorkflowState(order, {
+    currentUserRole: role
+  })
   const stages = {
     CUSTOMER: {
       PENDING_PAYMENT: ['等待你支付', '支付后资金将进入平台担保。'],
@@ -139,17 +144,18 @@ export function deriveConversationStage({ conversation, quotes = [], order, curr
       REFUNDED: ['订单已退款', '本次订单已退款结束。']
     }
   }
-  const [title, description] = stages[role]?.[order.status] || ['合作进展已更新', '可以继续在沟通中协商。']
+  const [fallbackTitle, fallbackDescription] = stages[role]?.[order.status] || ['合作进展已更新', '可以继续在沟通中协商。']
   return {
     key: order.status,
-    title,
-    description,
+    title: workflowState.title || fallbackTitle,
+    description: workflowState.description || fallbackDescription,
     role,
     visibleRole,
     roleMismatch,
     userOrderRole,
     pendingQuote,
-    hasOrder: true
+    hasOrder: true,
+    workflowState
   }
 }
 
@@ -168,6 +174,11 @@ export function deriveConversationActions({
   const pendingQuote = stage.pendingQuote
   const hasConfirmedQuote = quotes.some(quote => quote.status === 'CONFIRMED' || getQuoteOrderId(quote))
   const beforeShootStart = isBeforeShootStart(order)
+  const actionVisibility = getOrderActionVisibility(order, currentUser, {
+    deliveries,
+    authorizations,
+    workflowState: stage.workflowState
+  })
   const canUseFormalQuote = Boolean(conversation && !conversation.isLocal && getBackendConversationId(conversation))
   const hasOrderId = Boolean(normalizeActorId(order?.orderId))
   const cancelAction = role === 'CUSTOMER' && order?.status === 'PENDING_PAYMENT'
@@ -195,20 +206,14 @@ export function deriveConversationActions({
     canEditQuote: !stage.roleMismatch && !order && role === 'PROVIDER' && Boolean(pendingQuote) && !getQuoteOrderId(pendingQuote),
     canConfirmQuote: !stage.roleMismatch && !order && role === 'CUSTOMER' && Boolean(pendingQuote),
     canRejectQuote: !stage.roleMismatch && !order && role === 'CUSTOMER' && Boolean(pendingQuote),
-    canPay: !stage.roleMismatch && role === 'CUSTOMER' && order?.status === 'PENDING_PAYMENT',
+    canPay: !stage.roleMismatch && actionVisibility.canPay,
     cancelAction: stage.roleMismatch ? null : cancelAction,
-    canUploadDelivery: !stage.roleMismatch && role === 'PROVIDER' && order?.status === 'PENDING_DELIVERY',
-    canReuploadDelivery: !stage.roleMismatch && role === 'PROVIDER' && order?.status === 'REWORK_REQUIRED',
-    canConfirmDelivery: !stage.roleMismatch && role === 'CUSTOMER' && order?.status === 'DELIVERED_PENDING_CONFIRM',
-    canRequestRework: !stage.roleMismatch && role === 'CUSTOMER' && order?.status === 'DELIVERED_PENDING_CONFIRM',
-    canRequestPhotoAuthorization: !stage.roleMismatch
-      && role === 'PROVIDER'
-      && order?.status === 'COMPLETED'
-      && deliveries.some(delivery => delivery?.fileId)
-      && !authorizations.some(authorization => authorization?.status === 'PENDING'),
-    canReviewPhotoAuthorization: !stage.roleMismatch && role === 'CUSTOMER'
-      && order?.status === 'COMPLETED'
-      && authorizations.some(authorization => authorization?.status === 'PENDING'),
+    canUploadDelivery: !stage.roleMismatch && actionVisibility.canUploadDelivery,
+    canReuploadDelivery: !stage.roleMismatch && actionVisibility.canReuploadDelivery,
+    canConfirmDelivery: !stage.roleMismatch && actionVisibility.canConfirmDelivery,
+    canRequestRework: !stage.roleMismatch && actionVisibility.canRequestRework,
+    canRequestPhotoAuthorization: !stage.roleMismatch && actionVisibility.canRequestPhotoAuthorization,
+    canReviewPhotoAuthorization: !stage.roleMismatch && actionVisibility.canReviewPhotoAuthorization,
     canViewDispute: !stage.roleMismatch && order?.status === 'APPEALING',
     canAppeal: !stage.roleMismatch && Boolean(order) && !['CANCELLED', 'REFUNDED', 'APPEALING'].includes(order.status),
     canOpenOrder: !stage.roleMismatch && hasOrderId,

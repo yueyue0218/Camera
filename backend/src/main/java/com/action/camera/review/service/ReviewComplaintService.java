@@ -366,11 +366,11 @@ public class ReviewComplaintService {
 
     private int calculateReviewScoreChange(Integer rating) {
         return switch (rating) {
-            case 5 -> 2;
-            case 4 -> 1;
-            case 3 -> 0;
-            case 2 -> -2;
-            case 1 -> -5;
+            case 5 -> 0;
+            case 4 -> -1;
+            case 3 -> -2;
+            case 2 -> -3;
+            case 1 -> -4;
             default -> throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Rating must be between 1 and 5");
         };
     }

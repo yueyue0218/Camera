@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Box, Button, Paper, Stack, Typography } from '@mui/material'
+import { Box, Button, Paper, Skeleton, Stack, Typography } from '@mui/material'
 import { ConversationComposer } from './ConversationComposer.jsx'
 import { ConversationSystemItem } from './ConversationSystemCard.jsx'
 import { MessageBubble } from './MessageBubble.jsx'
@@ -136,6 +136,7 @@ export function ConversationThread({
         }}
       >
         <Stack spacing={1.55}>
+          {loading && !safeTimeline.length && <MessageThreadSkeleton />}
           {safeTimeline.filter(Boolean).map(item => {
             const direction = getMessageDirection(item, currentUser)
             if (item.type !== 'MESSAGE') {
@@ -178,7 +179,7 @@ export function ConversationThread({
               />
             )
           })}
-          {!safeTimeline.length && (
+          {!loading && !safeTimeline.length && (
             <Box sx={{ py: 8, textAlign: 'center' }}>
               <Typography fontWeight={900} color={PORTRA_COLORS.subInk}>从一句问候开始约拍沟通</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>可以先确认拍摄时间、地点和成片要求</Typography>
@@ -228,6 +229,28 @@ export function ConversationThread({
       </Box>
     </Paper>
     </MessageWorkbenchErrorBoundary>
+  )
+}
+
+function MessageThreadSkeleton() {
+  return (
+    <Stack spacing={1.35} aria-label="消息加载中">
+      {[0, 1, 2, 3].map(index => {
+        const mine = index % 2 === 1
+        return (
+          <Stack key={index} direction="row" spacing={1} sx={{ justifyContent: mine ? 'flex-end' : 'flex-start', alignItems: 'flex-end' }}>
+            {!mine && <Skeleton variant="circular" width={34} height={34} />}
+            <Skeleton
+              variant="rounded"
+              width={mine ? '42%' : '54%'}
+              height={index === 2 ? 76 : 42}
+              sx={{ borderRadius: PORTRA_RADII.control, bgcolor: 'rgba(21,19,24,.08)' }}
+            />
+            {mine && <Skeleton variant="circular" width={34} height={34} />}
+          </Stack>
+        )
+      })}
+    </Stack>
   )
 }
 

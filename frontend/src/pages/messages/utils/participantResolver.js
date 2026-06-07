@@ -13,7 +13,7 @@ export function resolveConversationParticipants(conversation, currentUser, profi
   const peerRole = peerUserId && peerUserId === participantBId ? 'PROVIDER' : 'CUSTOMER'
   const selfRole = currentUserId && currentUserId === participantBId ? 'PROVIDER' : 'CUSTOMER'
   const peerProfile = buildPeerProfile(conversation, peerUserId, peerRole, profileOverride)
-  const selfProfile = buildSelfProfile(currentUser, selfRole)
+  const selfProfile = buildSelfProfile(currentUser, selfRole, currentUserId)
 
   return {
     currentUserId,
@@ -139,14 +139,26 @@ function buildPeerProfile(conversation, peerUserId, peerRole, profileOverride) {
   }
 }
 
-function buildSelfProfile(currentUser, selfRole) {
+function buildSelfProfile(currentUser, selfRole, currentUserId) {
+  const storedProfile = readStoredProfile(currentUserId)
+  const demoProfile = Object.values(USERS).find(user => normalizeUserId(user.userId) === currentUserId) || {}
   const displayName = pickText(
     currentUser?.nickname,
     selfRole === 'PROVIDER' ? currentUser?.providerNickname : currentUser?.customerNickname,
     currentUser?.displayName,
+    storedProfile.nickname,
+    storedProfile.displayName,
+    demoProfile.nickname,
+    demoProfile.displayName,
     '我'
   )
-  const avatarUrl = pickText(currentUser?.avatarData, currentUser?.avatarUrl)
+  const avatarUrl = pickText(
+    currentUser?.avatarData,
+    currentUser?.avatarUrl,
+    storedProfile.avatarData,
+    storedProfile.avatarUrl,
+    demoProfile.avatarData
+  )
   return {
     displayName,
     avatarUrl,

@@ -207,12 +207,13 @@ export function PortraEmptyState({ title = '暂无内容', description = '', com
   )
 }
 
-export function PortraActionButton({ children, tone = 'primary', sx, ...props }) {
+export function PortraActionButton({ children, tone = 'primary', loading = false, disabled = false, sx, ...props }) {
   const primary = tone === 'primary'
   return (
     <Button
       size="small"
       variant={primary ? 'contained' : 'outlined'}
+      disabled={disabled || loading}
       {...props}
       sx={{
         borderRadius: PORTRA_RADIUS.compact,
@@ -230,7 +231,7 @@ export function PortraActionButton({ children, tone = 'primary', sx, ...props })
         ...sx
       }}
     >
-      {children}
+      {loading ? '处理中' : children}
     </Button>
   )
 }

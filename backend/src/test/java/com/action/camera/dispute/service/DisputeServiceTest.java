@@ -348,8 +348,8 @@ class DisputeServiceTest {
 
     private void insertConversation() {
         jdbcTemplate.update("""
-                INSERT INTO conversations (id, participant_a_id, participant_b_id, source_type, created_at)
-                VALUES (?, ?, ?, 'DIRECT', NOW())
+                INSERT INTO conversations (id, participant_a_id, participant_b_id, source_type, order_id, created_at)
+                VALUES (?, ?, ?, 'DIRECT', 0, NOW())
                 ON DUPLICATE KEY UPDATE participant_a_id = VALUES(participant_a_id)
                 """, CONV_ID, CUSTOMER_ID, PROVIDER_ID);
     }

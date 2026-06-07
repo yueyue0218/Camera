@@ -10,11 +10,12 @@ export function PortraRouteTransition({ children }) {
       data-portra-route-transition="true"
       sx={{
         minWidth: 0,
+        willChange: 'opacity, transform',
         '@media (prefers-reduced-motion: no-preference)': {
-          animation: 'portraWorkflowRouteIn 180ms ease-out both'
+          animation: 'portraWorkflowRouteIn 150ms ease-out both'
         },
         '@keyframes portraWorkflowRouteIn': {
-          from: { opacity: 0.96, transform: 'translateY(6px)' },
+          from: { opacity: 0.92, transform: 'translateY(4px)' },
           to: { opacity: 1, transform: 'translateY(0)' }
         }
       }}
