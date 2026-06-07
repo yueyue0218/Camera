@@ -1,4 +1,3 @@
-import { yuanToCent } from '../../../utils/index.js'
 import {
   DEFAULT_BUDGET_MAX_YUAN,
   DEFAULT_BUDGET_MIN_YUAN,
@@ -9,6 +8,12 @@ import {
 function centToYuan(value, fallback = '') {
   const number = Number(value)
   return Number.isFinite(number) ? Math.round(number / 100) : fallback
+}
+
+function yuanToValidCent(value) {
+  if (value === '' || value === null || value === undefined) return null
+  const number = Number(value)
+  return Number.isFinite(number) ? Math.round(number * 100) : null
 }
 
 export function createDefaultDemandForm() {
@@ -29,6 +34,18 @@ export function createDefaultDemandForm() {
     referencePreviewUrls: [],
     description: '想拍一组自然、不模板化的校园毕业照，偏生活感。'
   }
+}
+
+export function validateDemandForm(form) {
+  const errors = []
+  const min = yuanToValidCent(form.budgetMinYuan)
+  const max = yuanToValidCent(form.budgetMaxYuan)
+  if (form.budgetMinYuan !== '' && min === null) errors.push('budgetMinYuan must be a valid number')
+  if (form.budgetMaxYuan !== '' && max === null) errors.push('budgetMaxYuan must be a valid number')
+  if (min !== null && min < 0) errors.push('budgetMinYuan must not be negative')
+  if (max !== null && max < 0) errors.push('budgetMaxYuan must not be negative')
+  if (min !== null && max !== null && max < min) errors.push('budgetMaxYuan must not be below budgetMinYuan')
+  return errors
 }
 
 function generateTimeDescription(form) {
@@ -54,8 +71,8 @@ export function buildDemandPayload(form) {
     timeSlot: form.timeSlot,
     timeDescription: generateTimeDescription(form),
     timeTags: Array.isArray(form.timeTags) ? form.timeTags : [],
-    budgetMinCent: yuanToCent(form.budgetMinYuan),
-    budgetMaxCent: yuanToCent(form.budgetMaxYuan),
+    budgetMinCent: yuanToValidCent(form.budgetMinYuan),
+    budgetMaxCent: yuanToValidCent(form.budgetMaxYuan),
     styleTags: Array.from(styleTags),
     referenceFileIds: Array.isArray(form.referenceFileIds) ? form.referenceFileIds : [],
     description: [form.title, form.description].filter(value => String(value || '').trim()).join('\n')

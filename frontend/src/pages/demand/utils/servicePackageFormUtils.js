@@ -25,6 +25,21 @@ function centToYuan(value, fallback = '') {
   return Number.isFinite(number) ? Math.round(number / 100) : fallback
 }
 
+function normalizeYuan(value) {
+  if (value === '' || value === null || value === undefined) return null
+  const number = Number(value)
+  return Number.isFinite(number) ? number : null
+}
+
+function buildPriceRange(minYuan, maxYuan) {
+  const min = normalizeYuan(minYuan)
+  const max = normalizeYuan(maxYuan)
+  if (min !== null && max !== null) return `${min}-${max}`
+  if (min !== null) return `${min}`
+  if (max !== null) return `${max}`
+  return null
+}
+
 function maxPriceFromRange(priceRange, fallback) {
   const matches = String(priceRange || '').match(/\d+/g)
   if (!matches?.length) return fallback
@@ -89,7 +104,7 @@ export function buildServicePackagePayload(form) {
     styleTags: Array.from(styleTags),
     images: [...splitList(form.imagesText), ...imagePaths],
     basePriceCent: yuanToCent(form.basePriceYuan),
-    priceRange: form.priceRange?.trim() || `${form.basePriceYuan}-${form.maxPriceYuan}`,
+    priceRange: buildPriceRange(form.basePriceYuan, form.maxPriceYuan),
     durationMinutes: Number(form.durationMinutes),
     originalCount: Number(form.originalCount),
     refinedCount: Number(form.refinedCount),

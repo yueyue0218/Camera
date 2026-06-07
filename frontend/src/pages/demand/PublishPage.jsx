@@ -5,7 +5,7 @@ import { useAuth } from '../../AuthContext.jsx'
 import { demandApi } from '../../api.js'
 import { fileApi } from '../../api/fileApi.js'
 import { DemandForm } from './components/DemandForm.jsx'
-import { buildDemandPayload, createDefaultDemandForm, demandDetailToForm } from './utils/publishFormUtils.js'
+import { buildDemandPayload, createDefaultDemandForm, demandDetailToForm, validateDemandForm } from './utils/publishFormUtils.js'
 import '../portraHall.css'
 
 const MAX_UPLOAD_IMAGES = 9
@@ -61,6 +61,11 @@ export function PublishPage() {
   async function submit(event) {
     event.preventDefault()
     setNotice(null)
+    const errors = validateDemandForm(form)
+    if (errors.length) {
+      setNotice({ type: 'warning', text: errors.join('; ') })
+      return
+    }
     try {
       const payload = buildDemandPayload(form)
       const result = editMode
