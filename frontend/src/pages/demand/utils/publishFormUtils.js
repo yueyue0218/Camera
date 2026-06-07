@@ -74,6 +74,7 @@ export function buildDemandPayload(form) {
     budgetMinCent: yuanToValidCent(form.budgetMinYuan),
     budgetMaxCent: yuanToValidCent(form.budgetMaxYuan),
     styleTags: Array.from(styleTags),
+    // Persist fileIds only; protected download URLs are resolved to blob URLs when rendered.
     referenceFileIds: Array.isArray(form.referenceFileIds) ? form.referenceFileIds : [],
     description: [form.title, form.description].filter(value => String(value || '').trim()).join('\n')
   }

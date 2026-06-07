@@ -4,7 +4,6 @@ import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.page.PageResult;
 import com.action.camera.common.security.CurrentUser;
-import com.action.camera.domain.FileRecord;
 import com.action.camera.domain.User;
 import com.action.camera.message.model.CreateConversationCommand;
 import com.action.camera.message.model.CreateConversationResult;
@@ -26,7 +25,6 @@ import com.action.camera.servicepackage.mapper.PhotographerInfo;
 import com.action.camera.servicepackage.mapper.ServicePackageMapper;
 import com.action.camera.servicepackage.repository.ServicePackageInterestRepository;
 import com.action.camera.servicepackage.repository.ServicePackageRepository;
-import com.action.camera.repository.FileRepository;
 import com.action.camera.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,18 +54,15 @@ public class ServicePackageService {
     private final ServicePackageInterestRepository interestRepository;
     private final ConversationService conversationService;
     private final UserRepository userRepository;
-    private final FileRepository fileRepository;
 
     public ServicePackageService(ServicePackageRepository servicePackageRepository,
                                  ServicePackageInterestRepository interestRepository,
                                  ConversationService conversationService,
-                                 UserRepository userRepository,
-                                 FileRepository fileRepository) {
+                                 UserRepository userRepository) {
         this.servicePackageRepository = servicePackageRepository;
         this.interestRepository = interestRepository;
         this.conversationService = conversationService;
         this.userRepository = userRepository;
-        this.fileRepository = fileRepository;
     }
 
     @Transactional
@@ -639,19 +634,9 @@ public class ServicePackageService {
                         user.getId(),
                         user.getNickname(),
                         user.getAvatarFileId(),
-                        avatarUrl(user),
+                        null,
                         user.getCreditScore()))
                 .orElse(new PhotographerInfo(photographerId, null, null, null, null));
-    }
-
-    private String avatarUrl(User user) {
-        Long avatarFileId = user.getAvatarFileId();
-        if (avatarFileId == null) {
-            return null;
-        }
-        return fileRepository.findById(avatarFileId)
-                .map(FileRecord::getUrl)
-                .orElse(null);
     }
 
     private String trim(String value) {

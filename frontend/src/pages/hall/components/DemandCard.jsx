@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
-import { fileApi } from '../../../api/fileApi.js'
 import { cityName, demandStatusText, firstText, fullDateTime, moneyRange, readableDate, splitTags, timeTagLabel } from './hallUtils.js'
+import { publicImageUrls, useFileObjectUrl } from '../utils/fileObjectUrls.js'
 
 export function DemandCard({
   demand,
@@ -16,32 +15,19 @@ export function DemandCard({
   const timeTags = splitTags(demand.timeTags)
   const title = firstText(demand.title, demand.scene)
   const customerName = firstText(demand.customerNickname, demand.customerName)
-  const customerAvatar = firstText(demand.customerAvatarUrl, demand.customerAvatar, demand.customerAvatarData)
+  const uploadedCustomerAvatar = useFileObjectUrl(
+    [demand.customerAvatarFileId, demand.avatarFileId],
+    currentUser,
+    `demand ${demand.demandId} publisher avatar`
+  )
+  const fallbackCustomerAvatar = publicImageUrls(demand.customerAvatarUrl, demand.customerAvatar, demand.customerAvatarData)[0] || ''
+  const customerAvatar = uploadedCustomerAvatar || fallbackCustomerAvatar
   const place = [cityName(demand.cityName || demand.cityCode), demand.location].filter(Boolean).join(' · ')
-  const firstReferenceFileId = Array.isArray(demand.referenceFileIds) ? demand.referenceFileIds[0] : null
-  const [coverUrl, setCoverUrl] = useState('')
-
-  useEffect(() => {
-    let objectUrl = ''
-    let ignored = false
-    async function loadCover() {
-      if (!firstReferenceFileId) {
-        setCoverUrl('')
-        return
-      }
-      try {
-        objectUrl = await fileApi.downloadObjectUrl(firstReferenceFileId, currentUser)
-        if (!ignored) setCoverUrl(objectUrl)
-      } catch {
-        if (!ignored) setCoverUrl('')
-      }
-    }
-    loadCover()
-    return () => {
-      ignored = true
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
-    }
-  }, [currentUser, firstReferenceFileId])
+  const coverUrl = useFileObjectUrl(
+    demand.referenceFileIds,
+    currentUser,
+    `demand ${demand.demandId} reference`
+  )
 
   return (
     <article className={`ticket-card ${coverUrl ? 'has-cover' : ''}`} onClick={onOpen}>

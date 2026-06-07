@@ -102,8 +102,7 @@ class ServicePackageFlowTest {
                         "ServicePackageRepository",
                         "ServicePackageInterestRepository",
                         "ConversationService",
-                        "UserRepository",
-                        "FileRepository"
+                        "UserRepository"
                 )
                 .doesNotContain("ScheduleService", "OrderService", "PaymentService");
     }

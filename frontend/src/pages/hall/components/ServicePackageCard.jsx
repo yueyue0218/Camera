@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
-import { fileApi } from '../../../api/fileApi.js'
 import { cityName, countText, gradientFor, latestTimeText, money, splitTags, timeTagLabel } from './hallUtils.js'
+import { publicImageUrls, useFileObjectUrl } from '../utils/fileObjectUrls.js'
 
 function sameId(a, b) {
   return a !== undefined && a !== null && b !== undefined && b !== null && Number(a) === Number(b)
@@ -9,10 +8,20 @@ function sameId(a, b) {
 export function ServicePackageCard({ service, currentUser, onOpen, onDetail, onReserve, onEdit, onOffline, onOpenProvider }) {
   const styleTags = splitTags(service.styleTags)
   const timeTags = splitTags(service.timeTags)
-  const firstPortfolioId = Array.isArray(service.portfolioIds) ? service.portfolioIds[0] : null
-  const fallbackCover = service.coverImage || splitTags(service.images)[0]
-  const [uploadedCoverUrl, setUploadedCoverUrl] = useState('')
+  const uploadedCoverUrl = useFileObjectUrl(
+    [service.portfolioIds, service.coverPortfolioId, service.coverImage, service.images],
+    currentUser,
+    `service package ${service.serviceId} cover`
+  )
+  const fallbackCover = publicImageUrls(service.coverImage, service.images)[0] || ''
   const cover = uploadedCoverUrl || fallbackCover
+  const uploadedAvatarUrl = useFileObjectUrl(
+    [service.photographerAvatarFileId, service.avatarFileId],
+    currentUser,
+    `service package ${service.serviceId} avatar`
+  )
+  const fallbackAvatar = publicImageUrls(service.photographerAvatarUrl, service.photographerAvatar)[0] || ''
+  const avatar = uploadedAvatarUrl || fallbackAvatar
   const isCustomer = currentUser.role === 'CUSTOMER'
   const isProviderOwner = currentUser.role === 'PROVIDER' && (
     sameId(service.providerId, currentUser.userId) ||
@@ -23,28 +32,6 @@ export function ServicePackageCard({ service, currentUser, onOpen, onDetail, onR
     countText(service.orderCount, ' 单成交')
   ].filter(Boolean).join(' · ')
   const credit = service.photographerCreditScore ?? service.providerCreditScore ?? service.creditScore
-
-  useEffect(() => {
-    let objectUrl = ''
-    let ignored = false
-    async function loadCover() {
-      if (!firstPortfolioId) {
-        setUploadedCoverUrl('')
-        return
-      }
-      try {
-        objectUrl = await fileApi.downloadObjectUrl(firstPortfolioId, currentUser)
-        if (!ignored) setUploadedCoverUrl(objectUrl)
-      } catch {
-        if (!ignored) setUploadedCoverUrl('')
-      }
-    }
-    loadCover()
-    return () => {
-      ignored = true
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
-    }
-  }, [currentUser, firstPortfolioId])
 
   return (
     <article className="showcase-card" data-time={timeTags.join(',')} onClick={onOpen}>
@@ -60,7 +47,7 @@ export function ServicePackageCard({ service, currentUser, onOpen, onDetail, onR
         >
           <div
             className="provider-avatar"
-            style={{ '--avatar-art': service.photographerAvatarUrl ? `url(${service.photographerAvatarUrl})` : gradientFor(service.photographerId || service.providerId) }}
+            style={{ '--avatar-art': avatar ? `url(${avatar})` : gradientFor(service.photographerId || service.providerId) }}
             aria-hidden="true"
           />
           <div className="provider-text">

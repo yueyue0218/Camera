@@ -123,6 +123,7 @@ export function PublishServicePackagePage() {
       }))
       setNotice({ type: 'success', text: selectedFiles.length > remaining ? `已上传前 ${remaining} 张，最多支持 ${MAX_UPLOAD_IMAGES} 张` : '作品图已上传' })
     } catch (error) {
+      console.error('service package portfolio image upload failed', { error })
       setNotice({ type: 'error', text: error.message })
     } finally {
       setUploading(false)
