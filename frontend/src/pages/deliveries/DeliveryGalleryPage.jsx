@@ -128,7 +128,7 @@ export function DeliveryGalleryPage() {
       setTimeout(() => URL.revokeObjectURL(url), 1500)
       return true
     } catch (downloadError) {
-      setNotice({ type: 'error', text: downloadError.message || '文件下载失败。' })
+      setNotice({ type: 'error', text: downloadError.message || '作品下载失败。' })
       return false
     }
   }
@@ -136,13 +136,13 @@ export function DeliveryGalleryPage() {
   async function downloadFiles(nextFiles) {
     const downloadable = nextFiles.filter(file => file.fileId)
     if (!downloadable.length) {
-      setNotice({ type: 'warning', text: '当前没有可下载文件。' })
+      setNotice({ type: 'warning', text: '当前没有可下载作品。' })
       return
     }
     for (const [index, file] of downloadable.entries()) {
       await downloadFile(file, index)
     }
-    setNotice({ type: 'info', text: downloadable.length > 1 ? '浏览器可能会逐个确认多个文件下载。' : '已开始下载。' })
+    setNotice({ type: 'info', text: downloadable.length > 1 ? '浏览器可能会逐个确认多个作品下载。' : '已开始下载。' })
   }
 
   async function reloadOrderAndDeliveries() {
@@ -307,7 +307,7 @@ export function DeliveryGalleryPage() {
             <PortraTicketSection title="作品信息">
               <Stack spacing={0.85}>
                 <InfoLine label="订单金额" value={centToYuan(order?.amountCent)} />
-                <InfoLine label="文件数量" value={`${batch.fileCount} 个文件`} />
+                <InfoLine label="作品数量" value={`${batch.fileCount} 张作品`} />
                 <InfoBlock label="作品说明" value={batch.description || '摄影师已上传作品，等待客户确认。'} />
               </Stack>
             </PortraTicketSection>

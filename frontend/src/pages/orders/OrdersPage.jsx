@@ -493,11 +493,11 @@ export function OrdersPage() {
       setPreviewUrl('')
     }
     if (!record?.fileId) {
-      setPreviewError('当前文件暂未提供预览链接。')
+      setPreviewError('当前作品暂未提供预览链接。')
       return
     }
     if (!isImageDelivery(record)) {
-      setPreviewError('该文件暂不支持预览，可以先下载查看。')
+        setPreviewError('该作品暂不支持预览，可以先下载查看。')
       return
     }
     setPreviewLoading(true)
@@ -523,7 +523,7 @@ export function OrdersPage() {
 
   async function downloadDeliveryFile(record) {
     if (!record?.fileId) {
-      setNotice({ type: 'warning', text: '当前文件暂未提供下载链接。' })
+      setNotice({ type: 'warning', text: '当前作品暂未提供下载链接。' })
       return
     }
     try {
@@ -534,7 +534,7 @@ export function OrdersPage() {
       anchor.click()
       setTimeout(() => URL.revokeObjectURL(url), 1000)
     } catch (error) {
-      setNotice({ type: 'error', text: error.message || '文件下载失败，请稍后重试。' })
+      setNotice({ type: 'error', text: error.message || '作品下载失败，请稍后重试。' })
     }
   }
 
@@ -865,13 +865,8 @@ export function OrdersPage() {
                   ]} />
                 </PortraTicketSection>
                 {fulfillmentNotice && (
-                  <PortraInfoBanner tone={fulfillmentNotice.severity === 'warning' ? 'warning' : 'info'} title={fulfillmentNotice.title}>
-                    {fulfillmentNotice.description}
-                  </PortraInfoBanner>
-                )}
-                {fulfillmentNotice && (
-                  <PortraTicketCard sx={{ px: 2, py: 1.6, pl: 2.5 }}>
-                    <Stack spacing={1}>
+                  <PortraTicketSection title="当前待办">
+                    <Stack spacing={1.1}>
                       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
                         <Box>
                           <Typography fontWeight={900}>{fulfillmentNotice.title}</Typography>
@@ -886,7 +881,7 @@ export function OrdersPage() {
                         </PortraInfoBanner>
                       )}
                     </Stack>
-                  </PortraTicketCard>
+                  </PortraTicketSection>
                 )}
                 {quoteSnapshot && (
                   <PortraTicketSection title="报价快照">
@@ -1238,7 +1233,7 @@ export function OrdersPage() {
             )}
             {previewDelivery && (
               <InfoRows rows={[
-                ['文件名', formatDeliveryTitle(previewDelivery)],
+                ['作品', formatDeliveryTitle(previewDelivery)],
                 ['上传时间', formatTime(previewDelivery.uploadTime)],
                 ['作品说明', formatDeliveryDescription(previewDelivery, '无作品说明')]
               ]} />

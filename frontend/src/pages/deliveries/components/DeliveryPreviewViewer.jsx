@@ -30,7 +30,7 @@ export function DeliveryPreviewViewer({
         {previewUrl ? (
           <Box component="img" src={previewUrl} alt={file?.fileName || '作品'} sx={{ maxWidth: '100%', maxHeight: '74vh', objectFit: 'contain', display: 'block' }} />
         ) : (
-          <Typography sx={{ color: '#fff' }}>该文件暂不支持预览。</Typography>
+          <Typography sx={{ color: '#fff' }}>该作品暂不支持预览。</Typography>
         )}
         <IconButton onClick={onNext} disabled={total <= 1} sx={navButtonSx('right')}>
           <ChevronRightRoundedIcon />
