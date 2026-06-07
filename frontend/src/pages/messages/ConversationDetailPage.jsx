@@ -8,6 +8,7 @@ import { conversationApi, deliveryApi, orderApi, photoAuthorizationApi, quoteApi
 import { goToUserProfile } from '../../utils/orderNavigation.js'
 import { getNextOrderWorkflowRefreshDelay } from '../../utils/orderWorkflowModel.js'
 import { useWorkflowNavigate } from '../../hooks/useWorkflowNavigate.js'
+import { buildWorkflowCacheKey, mergeWorkflowViewState, readWorkflowViewState, writeWorkflowViewState } from '../../utils/workflowViewCache.js'
 import {
   navigateToDeliveryFromConversation,
   navigateToOrderFromConversation,
@@ -91,6 +92,8 @@ export function ConversationDetailPage() {
     errorMessage: getCWorkbenchErrorText
   })
   const loading = pageLoading || actionLoading
+  const viewCacheKey = buildWorkflowCacheKey('message-detail', conversationId, currentUser.role)
+  const cachedViewState = readWorkflowViewState(viewCacheKey) || {}
 
   useEffect(() => {
     rememberLastConversation(conversationId, {
@@ -102,9 +105,31 @@ export function ConversationDetailPage() {
   useEffect(() => {
     const stored = findConversationRecord(conversationId)
     const fallback = stored || buildConversationFallback(conversationId)
-    setConversation(fallback)
-    loadConversationData(fallback)
+    const cached = readWorkflowViewState(viewCacheKey)
+    const cachedConversation = cached?.conversation || fallback
+    setConversation(cachedConversation)
+    if (Array.isArray(cached?.messages)) setMessages(cached.messages)
+    if (Array.isArray(cached?.quotes)) setQuotes(cached.quotes)
+    if (cached?.currentOrder) setCurrentOrder(cached.currentOrder)
+    if (Array.isArray(cached?.statusLogs)) setStatusLogs(cached.statusLogs)
+    if (Array.isArray(cached?.deliveryRecords)) setDeliveryRecords(cached.deliveryRecords)
+    if (Array.isArray(cached?.photoAuthorizations)) setPhotoAuthorizations(cached.photoAuthorizations)
+    loadConversationData(cachedConversation)
   }, [conversationId, getCurrentUserId(currentUser), currentUser.role])
+
+  useEffect(() => {
+    if (!conversation) return
+    writeWorkflowViewState(viewCacheKey, {
+      ...(readWorkflowViewState(viewCacheKey) || {}),
+      conversation,
+      messages,
+      quotes,
+      currentOrder,
+      statusLogs,
+      deliveryRecords,
+      photoAuthorizations
+    })
+  }, [viewCacheKey, conversation, messages, quotes, currentOrder, statusLogs, deliveryRecords, photoAuthorizations])
 
   const participantModel = resolveConversationParticipants(conversation, currentUser, peerProfile)
 
@@ -721,6 +746,8 @@ export function ConversationDetailPage() {
             onDecidePhotoAuthorization={handlePhotoAuthorizationDecision}
             onUnavailableTool={showUnavailableTool}
             onOpenAction={setActiveAction}
+            initialScrollTop={cachedViewState.scrollTop}
+            onScrollPositionChange={scrollTop => mergeWorkflowViewState(viewCacheKey, { scrollTop })}
           />
         </Box>
 

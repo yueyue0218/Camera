@@ -51,6 +51,7 @@ import { ORDER_SURFACES, WORKFLOW_SOURCES, buildOrderListTarget, isOrderListSurf
 import { deriveOrderWorkflowState, getNextOrderWorkflowRefreshDelay } from '../../utils/orderWorkflowModel.js'
 import { getOrderActionVisibility } from '../../utils/orderActionVisibility.js'
 import { useWorkflowNavigate } from '../../hooks/useWorkflowNavigate.js'
+import { buildWorkflowCacheKey, readWorkflowViewState, writeWorkflowViewState } from '../../utils/workflowViewCache.js'
 import {
   getExplicitReturnToConversation,
   navigateBackToConversation
@@ -302,10 +303,35 @@ export function OrdersPage() {
     errorMessage: error => error?.message || '操作失败，请稍后重试。'
   })
   const loading = pageLoading || actionLoading
+  const viewCacheKey = buildWorkflowCacheKey('orders', currentUser.userId, currentUser.role)
+
+  useEffect(() => {
+    const cached = readWorkflowViewState(viewCacheKey)
+    if (!cached) return
+    if (Array.isArray(cached.orders)) setOrders(cached.orders)
+    if (cached.selectedOrder) setSelectedOrder(cached.selectedOrder)
+    if (Array.isArray(cached.statusLogs)) setStatusLogs(cached.statusLogs)
+    if (Array.isArray(cached.deliveryRecords)) setDeliveryRecords(cached.deliveryRecords)
+    if (Array.isArray(cached.photoAuthorizations)) setPhotoAuthorizations(cached.photoAuthorizations)
+    if (Array.isArray(cached.orderReviews)) setOrderReviews(cached.orderReviews)
+    if (Array.isArray(cached.arbitrations)) setArbitrations(cached.arbitrations)
+  }, [viewCacheKey])
 
   useEffect(() => {
     loadOrders(focusOrderId)
   }, [currentUser.userId, currentUser.role, statusFilter, focusOrderId, orderListSurface])
+
+  useEffect(() => {
+    writeWorkflowViewState(viewCacheKey, {
+      orders,
+      selectedOrder,
+      statusLogs,
+      deliveryRecords,
+      photoAuthorizations,
+      orderReviews,
+      arbitrations
+    })
+  }, [viewCacheKey, orders, selectedOrder, statusLogs, deliveryRecords, photoAuthorizations, orderReviews, arbitrations])
 
   useEffect(() => {
     if (!selectedOrder?.orderId) return undefined

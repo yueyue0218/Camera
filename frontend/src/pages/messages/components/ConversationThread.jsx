@@ -45,7 +45,9 @@ export function ConversationThread({
   onConfirmOrder,
   onDecidePhotoAuthorization,
   onUnavailableTool,
-  onOpenAction
+  onOpenAction,
+  initialScrollTop,
+  onScrollPositionChange
 }) {
   const scrollRef = useRef(null)
   const stickToBottomRef = useRef(true)
@@ -69,6 +71,12 @@ export function ConversationThread({
   useEffect(() => {
     const node = scrollRef.current
     if (!node) return
+    if (Number.isFinite(initialScrollTop) && lastConversationIdRef.current === '') {
+      node.scrollTop = initialScrollTop
+      stickToBottomRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 120
+      lastConversationIdRef.current = String(conversation?.conversationId || 'none')
+      return
+    }
     const previousKey = lastTimelineKeyRef.current
     const currentConversationKey = String(conversation?.conversationId || 'none')
     const changedConversation = lastConversationIdRef.current !== currentConversationKey
@@ -91,6 +99,7 @@ export function ConversationThread({
     if (!node) return
     stickToBottomRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 120
     if (stickToBottomRef.current) setHasNewMessages(false)
+    onScrollPositionChange?.(node.scrollTop)
   }
 
   const scrollToLatest = () => {

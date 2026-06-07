@@ -30,6 +30,7 @@ import { DeliveryActionBar } from './components/DeliveryActionBar.jsx'
 import { DeliveryFileGrid } from './components/DeliveryFileGrid.jsx'
 import { DeliveryPreviewViewer } from './components/DeliveryPreviewViewer.jsx'
 import { useWorkflowNavigate } from '../../hooks/useWorkflowNavigate.js'
+import { buildWorkflowCacheKey, readWorkflowViewState, writeWorkflowViewState } from '../../utils/workflowViewCache.js'
 
 export function DeliveryGalleryPage() {
   const { orderId, deliveryId } = useParams()
@@ -48,11 +49,18 @@ export function DeliveryGalleryPage() {
   const [reworkDialogOpen, setReworkDialogOpen] = useState(false)
   const [reworkRequirement, setReworkRequirement] = useState('')
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
+  const viewCacheKey = buildWorkflowCacheKey('delivery-gallery', orderId, deliveryId, currentUser.role)
 
   useEffect(() => {
     let cancelled = false
+    const cached = readWorkflowViewState(viewCacheKey)
+    const hadCachedData = Boolean(cached?.order || cached?.deliveries?.length)
+    if (cached?.order) setOrder(cached.order)
+    if (Array.isArray(cached?.deliveries)) setDeliveries(cached.deliveries)
+    if (hadCachedData) setLoading(false)
+
     async function load() {
-      setLoading(true)
+      if (!hadCachedData) setLoading(true)
       setError('')
       try {
         const [nextOrder, nextDeliveries] = await Promise.all([
@@ -72,7 +80,12 @@ export function DeliveryGalleryPage() {
     return () => {
       cancelled = true
     }
-  }, [orderId, currentUser])
+  }, [orderId, deliveryId, currentUser, viewCacheKey])
+
+  useEffect(() => {
+    if (!order && !deliveries.length) return
+    writeWorkflowViewState(viewCacheKey, { order, deliveries })
+  }, [viewCacheKey, order, deliveries])
 
   const batches = useMemo(() => buildDeliveryBatches(deliveries, order), [deliveries, order])
   const batch = useMemo(() => findDeliveryBatch(batches, deliveryId), [batches, deliveryId])
