@@ -1,8 +1,8 @@
 export const demoNotifications = [
   {
     notificationId: 301,
-    title: '收到一条新评价',
-    content: '对方留下了新的拍摄体验反馈。',
+    title: 'New review received',
+    content: 'The other side left new feedback about the shoot experience.',
     type: 'REVIEW_RECEIVED',
     relatedType: 'REVIEW',
     relatedId: 8106,
@@ -11,8 +11,8 @@ export const demoNotifications = [
   },
   {
     notificationId: 302,
-    title: '订单状态更新',
-    content: '校园毕业照订单已确认完成。',
+    title: 'Order updated',
+    content: 'Order #8106 has been marked complete.',
     type: 'ORDER_STATUS_CHANGED',
     relatedType: 'ORDER',
     relatedId: 8106,
@@ -21,8 +21,8 @@ export const demoNotifications = [
   },
   {
     notificationId: 303,
-    title: '评价申诉已受理',
-    content: '平台已收到你的评价申诉，处理结果会通过通知同步。',
+    title: 'Review complaint received',
+    content: 'The platform received your complaint and will sync the result here.',
     type: 'REVIEW_COMPLAINT_CREATED',
     relatedType: 'REVIEW_COMPLAINT',
     relatedId: 9001,
@@ -31,12 +31,42 @@ export const demoNotifications = [
   },
   {
     notificationId: 304,
-    title: '阿岚发来新消息',
-    content: '成片已确认，后续可以在订单里查看评价。',
+    title: 'New message',
+    content: 'The finished photos are confirmed and the review can be checked from the order.',
     type: 'MESSAGE_RECEIVED',
     relatedType: 'CONVERSATION',
     relatedId: 7001,
     isRead: false,
     createdAt: '2026-06-02T17:45:00'
+  },
+  {
+    notificationId: 305,
+    title: 'Order completed',
+    content: 'Order #8108 is complete and the credit record has been refreshed.',
+    type: 'ORDER_COMPLETED',
+    relatedType: 'ORDER',
+    relatedId: 8108,
+    isRead: false,
+    createdAt: '2026-06-02T16:28:00'
+  },
+  {
+    notificationId: 306,
+    title: 'Dynamic likes',
+    content: 'Your moment received 2 new likes.',
+    type: 'MOMENT_LIKED',
+    relatedType: 'MOMENT',
+    relatedId: 6101,
+    isRead: false,
+    createdAt: '2026-06-02T15:50:00'
+  },
+  {
+    notificationId: 307,
+    title: 'Dynamic likes',
+    content: 'Your moment received 1 new like.',
+    type: 'MOMENT_LIKED',
+    relatedType: 'MOMENT',
+    relatedId: 6101,
+    isRead: true,
+    createdAt: '2026-06-02T15:45:00'
   }
 ]

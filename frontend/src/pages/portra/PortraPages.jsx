@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { creditApi, notificationApi, reviewApi, reviewComplaintApi } from '../../api/index.js'
@@ -105,11 +105,10 @@ function formatNoticeTime(value) {
 
 function creditLevel(score) {
   const numeric = Number(score)
-  if (Number.isNaN(numeric)) return '暂无等级'
+  if (Number.isNaN(numeric)) return '信用未知'
   if (numeric >= 90) return '信用优秀'
-  if (numeric >= 80) return '信用良好'
-  if (numeric >= 60) return '需要关注'
-  return '待改善'
+  if (numeric >= 70) return '信用良好'
+  return '信用较差'
 }
 
 function Tag({ children, tone = '' }) {
@@ -187,7 +186,7 @@ function CreditCard({ userId, completedOrders, publicView = false }) {
     : null
   const score = summary?.creditScore
   const resolvedCompletedOrders = summary?.completedOrderCount ?? completedOrders
-  const resolvedLevel = summary?.creditLevel ? `??${summary.creditLevel}` : creditLevel(score)
+  const resolvedLevel = summary?.creditLevel || creditLevel(score)
   const detailPath = publicView
     ? `/users/${targetUserId}/credit${demoMode ? '?demo=1' : ''}`
     : `/profile/credit${demoMode ? '?demo=1' : ''}`

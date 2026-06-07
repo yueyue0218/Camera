@@ -41,6 +41,8 @@ public class ReviewComplaintService {
     private static final String TYPE_COMPLAINT_RESOLVED = "REVIEW_COMPLAINT_RESOLVED";
     private static final String RELATED_REVIEW_COMPLAINT = "REVIEW_COMPLAINT";
     private static final String CREDIT_EVENT_REVIEW_ARBITRATION = "REVIEW_ARBITRATION";
+    private static final String CREDIT_EVENT_REVIEW_ARBITRATION_PENALTY = "REVIEW_ARBITRATION_PENALTY";
+    private static final int ARBITRATION_RESPONSIBLE_PENALTY = -5;
     private static final int MAX_EVIDENCE_FILE_COUNT = 5;
 
     private final ReviewComplaintRepository complaintRepository;
@@ -217,6 +219,15 @@ public class ReviewComplaintService {
                     CREDIT_EVENT_REVIEW_ARBITRATION,
                     complaint.getId(),
                     calculateReviewScoreChange(review.getRating())
+            );
+            creditService.updateCreditScore(
+                    review.getReviewerId(),
+                    ARBITRATION_RESPONSIBLE_PENALTY,
+                    CREDIT_EVENT_REVIEW_ARBITRATION,
+                    review.getOrderId(),
+                    "Responsible party penalty for review arbitration",
+                    CREDIT_EVENT_REVIEW_ARBITRATION_PENALTY,
+                    complaint.getId()
             );
         }
 

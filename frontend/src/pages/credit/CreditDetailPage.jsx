@@ -1,235 +1,311 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { Chip, Paper, Stack, Typography } from '@mui/material'
+﻿import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import {
+  Alert,
+  Avatar,
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  Paper,
+  Stack,
+  Typography
+} from '@mui/material'
 import { useAuth } from '../../AuthContext.jsx'
-import { creditApi } from '../../api/index.js'
-import '../profile/profile.css'
-import './credit.css'
+import { creditApi, reviewApi } from '../../api/index.js'
+import { demoCreditRecords, demoCreditSummary } from '../../mocks/dline/creditFixtures.js'
+import { demoReviews } from '../../mocks/dline/reviewFixtures.js'
 
-function formatTime(value) {
-  if (!value) return '刚刚'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '刚刚' : date.toLocaleString('zh-CN', { hour12: false })
+function useCreditDemoMode() {
+  const [params] = useSearchParams()
+  return import.meta.env.DEV && params.get('demo') === '1'
 }
 
-function formatScore(value) {
-  const numeric = Number(value)
-  return Number.isFinite(numeric) ? numeric.toFixed(1) : '--'
+function formatDateTime(value) {
+  if (!value) return '-'
+  return new Date(value).toLocaleString('zh-CN', { hour12: false })
 }
 
-function formatMetric(value) {
-  return value === null || value === undefined || value === '' ? '--' : value
+function formatDate(value) {
+  if (!value) return '-'
+  return new Date(value).toLocaleDateString('zh-CN')
 }
 
-function creditLevel(score, summaryLevel) {
-  if (summaryLevel) return String(summaryLevel).startsWith('信用') ? summaryLevel : `信用${summaryLevel}`
+function toPublicTimeline(records) {
+  return records.slice(0, 3).map(record => ({
+    ...record,
+    reason: '信用变化已脱敏展示',
+    extra: record.eventType ? '近期履约情况稳定' : ''
+  }))
+}
+
+function scoreLevel(score, summaryLevel) {
+  if (summaryLevel) return summaryLevel
   const numeric = Number(score)
-  if (!Number.isFinite(numeric)) return '信用概览'
+  if (Number.isNaN(numeric)) return '信用未知'
   if (numeric >= 90) return '信用优秀'
-  if (numeric >= 80) return '信用良好'
-  if (numeric >= 60) return '信用待提升'
-  return '信用观察中'
+  if (numeric >= 70) return '信用良好'
+  return '信用较差'
 }
 
-function normalizeRecords(value) {
-  if (Array.isArray(value)) return value
-  return Array.isArray(value?.items) ? value.items : []
+function scoreProgress(score) {
+  const numeric = Number(score)
+  if (Number.isNaN(numeric)) return 0
+  return Math.max(0, Math.min(100, numeric))
 }
 
-function getRecordOrderId(record) {
-  if (record.orderId) return record.orderId
-  const sourceType = String(record.sourceType || '').toUpperCase()
-  return sourceType.includes('ORDER') ? record.sourceId : null
+function CreditAvatar({ userId, score }) {
+  const label = String(userId || '用户').slice(-2)
+  return (
+    <div className="credit-avatar">
+      <div className="credit-avatar-ring" style={{ '--credit-progress': `${scoreProgress(score)}%` }}>
+        <span>{Number.isFinite(Number(score)) ? score : '--'}</span>
+      </div>
+      <div className="credit-avatar-meta">
+        <strong>{label}</strong>
+        <span>当前信用分</span>
+      </div>
+    </div>
+  )
+}
+
+function SummaryCard({ label, value, detail, onClick, active = false }) {
+  const Component = onClick ? 'button' : 'div'
+  return (
+    <Component className={`credit-summary-card ${onClick ? 'clickable' : ''} ${active ? 'active' : ''}`} type={onClick ? 'button' : undefined} onClick={onClick}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      {detail ? <p>{detail}</p> : null}
+    </Component>
+  )
+}
+
+function TimelineItem({ record }) {
+  return (
+    <article className="credit-timeline-item">
+      <div className={`credit-timeline-score ${record.scoreChange >= 0 ? 'positive' : 'negative'}`}>
+        {record.scoreChange > 0 ? '+' : ''}{record.scoreChange}
+      </div>
+      <div className="credit-timeline-body">
+        <div className="credit-timeline-head">
+          <strong>{record.reason || '信用变化'}</strong>
+          <time>{formatDateTime(record.createdAt)}</time>
+        </div>
+        <p>{record.extra || `变动后分数：${record.scoreAfter ?? '-'}`}</p>
+      </div>
+    </article>
+  )
+}
+
+function ReviewCard({ review }) {
+  const avatarText = review.reviewerId ? String(review.reviewerId).slice(-2) : 'U'
+  return (
+    <article className="credit-review-card">
+      <div className="credit-review-head">
+        <div className="credit-review-user">
+          <Avatar className="credit-review-avatar">{avatarText}</Avatar>
+          <div>
+            <strong>用户 #{review.reviewerId || '-'}</strong>
+            <span>{formatDate(review.createdAt)}</span>
+          </div>
+        </div>
+        <span className="credit-rating-pill">{review.rating || '-'} 分</span>
+      </div>
+      <p className="credit-review-content">{review.content || '暂无评价内容'}</p>
+      {review.replyContent ? (
+        <div className="credit-review-reply">
+          <span>追评</span>
+          <p>{review.replyContent}</p>
+        </div>
+      ) : null}
+    </article>
+  )
 }
 
 export function CreditDetailPage() {
-  const { userId } = useParams()
   const navigate = useNavigate()
   const { currentUser } = useAuth()
-  const targetUserId = Number(userId || currentUser.userId)
+  const { userId } = useParams()
+  const demoMode = useCreditDemoMode()
+  const publicView = Boolean(userId)
+  const resolvedUserId = useMemo(() => {
+    if (publicView && userId === 'demo-user') return 2001
+    const numeric = Number(publicView ? userId : currentUser?.userId)
+    return Number.isNaN(numeric) ? null : numeric
+  }, [currentUser?.userId, publicView, userId])
+
   const [summary, setSummary] = useState(null)
   const [records, setRecords] = useState([])
-  const [notice, setNotice] = useState(null)
+  const [reviews, setReviews] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [ruleOpen, setRuleOpen] = useState(false)
 
   useEffect(() => {
-    let cancelled = false
-
+    let alive = true
     async function load() {
+      if (!resolvedUserId) {
+        setLoading(false)
+        setError('暂时无法加载信用数据')
+        return
+      }
       setLoading(true)
-      const [summaryResult, recordsResult] = await Promise.allSettled([
-        creditApi.summary(targetUserId, currentUser),
-        creditApi.records(targetUserId, currentUser)
-      ])
-
-      if (cancelled) return
-
-      setSummary(summaryResult.status === 'fulfilled' ? summaryResult.value : null)
-      setRecords(recordsResult.status === 'fulfilled' ? normalizeRecords(recordsResult.value) : [])
-      const failed = [summaryResult, recordsResult].find(result => result.status === 'rejected')
-      setNotice(failed ? failed.reason?.message || '信用数据暂时不可用' : null)
-      setLoading(false)
+      setError('')
+      try {
+        const [summaryData, recordData, reviewData] = demoMode
+          ? [demoCreditSummary, demoCreditRecords, demoReviews]
+          : await Promise.all([
+            creditApi.summary(resolvedUserId, currentUser),
+            creditApi.records(resolvedUserId, currentUser),
+            reviewApi.listByUser(resolvedUserId, currentUser)
+          ])
+        if (!alive) return
+        setSummary(summaryData || null)
+        setRecords(Array.isArray(recordData?.items) ? recordData.items : Array.isArray(recordData) ? recordData : [])
+        setReviews(Array.isArray(reviewData?.items) ? reviewData.items : Array.isArray(reviewData) ? reviewData : [])
+      } catch (loadError) {
+        if (!alive) return
+        setError(loadError.message || '暂时无法加载信用数据')
+      } finally {
+        if (alive) setLoading(false)
+      }
     }
-
     load()
-    return () => { cancelled = true }
-  }, [targetUserId, currentUser])
+    return () => { alive = false }
+  }, [currentUser, demoMode, resolvedUserId])
 
-  const score = useMemo(
-    () => formatScore(summary?.creditScore ?? currentUser.creditScore),
-    [summary?.creditScore, currentUser.creditScore]
-  )
-  const level = useMemo(
-    () => creditLevel(summary?.creditScore ?? currentUser.creditScore, summary?.creditLevel),
-    [summary?.creditScore, currentUser.creditScore, summary?.creditLevel]
-  )
-
-  const completedOrders = formatMetric(summary?.completedOrderCount ?? summary?.completedOrders)
-  const reviewCount = formatMetric(summary?.receivedReviewCount ?? summary?.reviewCount)
-  const averageRating = formatMetric(summary?.averageRating)
-  const recordCount = records.length
-  const lastUpdated = summary?.lastUpdatedAt || records[0]?.createdAt || null
+  const score = summary?.creditScore
+  const level = scoreLevel(score, summary?.creditLevel)
+  const completedOrders = summary?.completedOrderCount ?? summary?.completedOrders ?? null
+  const reviewCount = summary?.receivedReviewCount ?? reviews.length
+  const averageRating = summary?.averageRating ?? (reviews.length ? (reviews.reduce((sum, item) => sum + Number(item.rating || 0), 0) / reviews.length).toFixed(1) : null)
+  const onTimeRate = summary?.onTimeRate ?? null
+  const recentChange = records[0]
+  const visibleRecords = publicView ? toPublicTimeline(records) : records
+  const recentReviews = reviews.slice(0, 3)
+  const detailPath = publicView
+    ? `/users/${userId}/reviews${demoMode ? '?demo=1' : ''}`
+    : `/users/${resolvedUserId}/reviews${demoMode ? '?demo=1' : ''}`
 
   return (
-    <div className="pp-main credit-detail-page">
-      <div className="pp-crumb">
-        <span><strong>信用</strong> / UID {targetUserId}</span>
-        <button className="secondary-btn" type="button" onClick={() => navigate(-1)}>返回</button>
+    <section className="credit-page">
+      <div className="portra-crumb credit-crumb">
+        <button className="portra-back" type="button" onClick={() => navigate(-1)}>← 返回上一页</button>
+        <span>{publicView ? `公开主页信用详情 · 用户 #${userId || '-'}` : '我的信用详情'} {demoMode ? <span className="credit-demo-badge">开发预览数据</span> : null}</span>
       </div>
 
-      {notice && (
-        <div className="pp-empty credit-notice">
-          <h3>信用数据暂时不可用</h3>
-          <p>{notice}</p>
-        </div>
-      )}
-
-      <section className="profile-hero credit-hero-surface">
-        <div className="credit-hero-watermark" aria-hidden="true">CREDIT</div>
-
-        <div className="profile-photo-wrap">
-          <div className="credit-stamp-ring" aria-hidden="true" />
-          <div className="credit-score-plain">
-            <b>{score}</b>
-            <span>信用评分</span>
+      <Paper className="credit-hero" elevation={0}>
+        <div className="credit-hero-copy">
+          <Typography variant="overline" className="credit-kicker">信用评分模块</Typography>
+          <Typography variant="h3" className="credit-title">
+            {loading ? '信用数据加载中' : `信用分 ${score ?? '--'}`}
+          </Typography>
+          <Typography className="credit-subtitle">
+            {loading ? '正在获取最新信用与评价数据' : summary?.summary || '近期交易表现稳定'}
+          </Typography>
+          <div className="credit-hero-meta">
+            <span>{level}</span>
+            <span>已完成订单 {completedOrders ?? '暂无'}</span>
+            <span>收到评价 {reviewCount ?? '暂无'}</span>
+            <span>平均评价 {averageRating ?? '暂无'}</span>
+            {onTimeRate ? <span>按时履约率 {onTimeRate}%</span> : null}
           </div>
         </div>
-
-        <div className="hero-info">
-          <div className="ticket-kicker">Credit File</div>
-          <div className="hero-name-row">
-            <h1 className="hero-name">{level}</h1>
-            <span className="role-badge">UID {targetUserId}</span>
+        <div className="credit-hero-visual" style={{ '--credit-progress': `${scoreProgress(score)}%` }}>
+          <div className="credit-hero-ring">
+            <span>{Number.isFinite(Number(score)) ? score : '--'}</span>
           </div>
-          <p className="profile-uid">最近更新：{formatTime(lastUpdated)}</p>
-          <p className="profile-signature">
-            保留与个人主页一致的视觉语言，集中展示信用评分、履约概览和信用变化记录。
-          </p>
-          <div className="profile-meta-line">
-            <span>记录 {recordCount}</span>
-            <span>完成订单 {completedOrders}</span>
-            <span>收到评价 {reviewCount}</span>
-            <span>平均评价 {averageRating}</span>
+          <div className="credit-hero-note">
+            <strong>{level}</strong>
+            <p>{recentChange ? `${recentChange.scoreChange > 0 ? '+' : ''}${recentChange.scoreChange} · ${publicView ? '最近变化已脱敏' : recentChange.reason}` : '暂无最近信用变化'}</p>
           </div>
         </div>
+      </Paper>
 
-        <div className="hero-side">
-          <div>
-            <div className="id-label">信用概览</div>
-            <div className="id-number">{score}</div>
-          </div>
-          <div className="metric-grid">
-            <div className="metric"><b>{completedOrders}</b><span>完成订单</span></div>
-            <div className="metric"><b>{reviewCount}</b><span>收到评价</span></div>
-            <div className="metric"><b>{averageRating}</b><span>平均评价</span></div>
-            <div className="metric"><b>{recordCount}</b><span>信用记录</span></div>
-          </div>
+      {error ? (
+        <div className="credit-error-card">
+          <strong>暂时无法加载信用数据</strong>
+          <span>请稍后重试</span>
+          {import.meta.env.DEV ? <small>{error}</small> : null}
+          <button className="portra-secondary-btn" type="button" onClick={() => window.location.reload()}>重新加载</button>
+        </div>
+      ) : null}
+
+      <section className="credit-section">
+        <div className="credit-section-head">
+          <h2>数据概览</h2>
+          <span>点击评价数可直接进入评价列表</span>
+        </div>
+        <div className="credit-summary-grid">
+          <SummaryCard label="已完成订单数" value={loading ? '...' : (completedOrders ?? '暂无')} detail="反映履约稳定性" />
+          <SummaryCard
+            label="收到评价数"
+            value={loading ? '...' : (reviewCount ?? '暂无')}
+            detail="查看收到的真实反馈"
+            onClick={() => navigate(detailPath)}
+            active
+          />
+          <SummaryCard label="平均评价星级" value={loading ? '...' : (averageRating ?? '暂无')} detail="来自近期开单后的评价" />
+          {onTimeRate ? <SummaryCard label="按时履约率" value={`${onTimeRate}%`} detail="可选后端字段" /> : null}
         </div>
       </section>
 
-      <section className="panel-card credit-records-panel">
-        <div className="section-head">
-          <div>
-            <h2>信用记录</h2>
-            <p>按时间倒序排列，以便签串线的形式保留每一次信用变化。</p>
-          </div>
-          <div className="section-mark">{recordCount}</div>
+      <section className="credit-section">
+        <div className="credit-section-head">
+          <h2>{publicView ? '信用变化摘要' : '信用变化时间线'}</h2>
+          <span>{publicView ? '公开页仅显示脱敏摘要' : '最近 3 - 5 条变化记录'}</span>
         </div>
+        <div className="credit-timeline">
+          {loading ? (
+            <div className="credit-placeholder">信用变化加载中...</div>
+          ) : visibleRecords.length ? visibleRecords.map(record => <TimelineItem key={record.recordId} record={record} />) : (
+            <div className="credit-empty">暂无信用变化记录</div>
+          )}
+        </div>
+      </section>
 
-        {loading ? (
-          <div className="pp-empty">
-            <h3>正在加载信用记录</h3>
-            <p>请稍等，系统正在拉取最新的信用摘要和变更历史。</p>
-          </div>
-        ) : recordCount ? (
-          <Stack spacing={1.35} className="credit-note-stack">
-            {records.map((record, index) => {
-              const delta = Number(record.appliedScoreChange ?? record.scoreChange ?? record.deltaScore ?? 0)
-              const positive = delta >= 0
-              const orderId = getRecordOrderId(record)
-              const beforeScore = record.beforeScore != null ? formatScore(record.beforeScore) : '—'
-              const afterScore = record.scoreAfter != null ? formatScore(record.scoreAfter) : '—'
-              const title = record.reason || record.eventType || '信用变更'
-              const detail = record.sourceType || record.sourceId
-                ? `来源：${record.sourceType || '系统'}${record.sourceId ? ` · ${record.sourceId}` : ''}`
-                : record.description || record.remark || '系统记录'
+      <section className="credit-section">
+        <div className="credit-section-head">
+          <h2>近期评价预览</h2>
+          <button className="credit-link-btn" type="button" onClick={() => navigate(detailPath)}>查看全部评价 →</button>
+        </div>
+        <div className="credit-review-grid">
+          {loading ? (
+            <div className="credit-placeholder">评价加载中...</div>
+          ) : recentReviews.length ? recentReviews.map(review => <ReviewCard key={review.reviewId} review={review} />) : (
+            <div className="credit-empty">暂无评价预览</div>
+          )}
+        </div>
+      </section>
 
-              return (
-                <Paper
-                  key={record.recordId || record.id || `${title}-${record.createdAt}`}
-                  elevation={0}
-                  className={`credit-note ${positive ? 'credit-note--positive' : 'credit-note--negative'}`}
-                  style={{ '--credit-note-index': index }}
-                  role={orderId ? 'button' : undefined}
-                  tabIndex={orderId ? 0 : undefined}
-                  onClick={orderId ? () => navigate(`/orders?orderId=${orderId}`) : undefined}
-                  onKeyDown={orderId ? event => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      navigate(`/orders?orderId=${orderId}`)
-                    }
-                  } : undefined}
-                >
-                  <span className="credit-note-thread" aria-hidden="true" />
-                  <span className="credit-note-pin" aria-hidden="true" />
-                  <div className="credit-note-delta">
-                    <strong>{positive ? '+' : ''}{delta.toFixed(1)}</strong>
-                    <span>分变动</span>
-                  </div>
-                  <div className="credit-note-body">
-                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                      <Typography className="credit-note-title">{title}</Typography>
-                      <Chip
-                        size="small"
-                        label={positive ? '加分' : '扣分'}
-                        sx={{
-                          height: 26,
-                          fontWeight: 800,
-                          bgcolor: positive ? 'rgba(13,47,178,.08)' : 'rgba(248,81,4,.08)',
-                          color: positive ? 'primary.main' : '#c53b05'
-                        }}
-                      />
-                    </Stack>
-                    <Typography className="credit-note-detail">{detail}</Typography>
-                    <Typography className="credit-note-detail">
-                      变更前 {beforeScore} · 变更后 {afterScore}
-                    </Typography>
-                  </div>
-                  <div className="credit-note-meta">
-                    <div>{formatTime(record.createdAt)}</div>
-                    <div>{record.sourceType || '系统事件'}</div>
-                  </div>
-                </Paper>
-              )
-            })}
+      <section className="credit-footer">
+        <button className="credit-rule-link" type="button" onClick={() => setRuleOpen(true)}>了解信用分如何计算 →</button>
+      </section>
+
+      <Dialog open={ruleOpen} onClose={() => setRuleOpen(false)} fullWidth maxWidth="sm" className="credit-rule-dialog">
+        <DialogTitle>信用分如何计算</DialogTitle>
+        <DialogContent>
+          <Stack gap={1.5}>
+            <Alert severity="info">信用分综合参考履约表现、评价反馈、申诉处理结果与平台规则。</Alert>
+            <Divider />
+            <Typography variant="body2" className="credit-rule-text">
+              我们只展示当前账号可见的公开信息。公开主页不会展示内部备注，也不会展示敏感的信用变动细节。
+            </Typography>
+            <Stack gap={1} className="credit-rule-list">
+              <div><strong>履约记录</strong><span>按时完成、取消率与异常处理情况会影响分值。</span></div>
+              <div><strong>评价反馈</strong><span>收到的真实评价、追评与负面反馈都会纳入参考。</span></div>
+              <div><strong>申诉结果</strong><span>审核后成立的申诉会影响信用判断。</span></div>
+            </Stack>
           </Stack>
-        ) : (
-          <div className="pp-empty">
-            <h3>暂无信用记录</h3>
-            <p>订单完成、评价变化或平台规则更新后，这里会显示最新记录。</p>
-          </div>
-        )}
-      </section>
-    </div>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRuleOpen(false)}>关闭</Button>
+        </DialogActions>
+      </Dialog>
+    </section>
   )
 }
