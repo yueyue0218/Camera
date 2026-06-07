@@ -19,10 +19,10 @@ import {
 } from '@mui/material'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
 import { centToYuan } from '../../../utils/index.js'
-import { formatFileDisplayName, formatQuoteRemark, formatQuoteServiceContent } from '../../../utils/displayFormatters.js'
+import { formatFileDisplayName } from '../../../utils/displayFormatters.js'
 import { PortraStatusBadge } from '../../../components/portra/index.js'
-import { formatDate, formatTime } from '../utils/conversationUtils.js'
-import { getPhotoUsageScopeLabel, getQuoteStatusLabel } from '../utils/quoteUtils.js'
+import { formatTime } from '../utils/conversationUtils.js'
+import { buildQuoteDisplayModel } from '../utils/quoteDisplayModel.js'
 
 export function ConversationActionDialogs({
   activeAction,
@@ -57,6 +57,7 @@ export function ConversationActionDialogs({
     fileIds: Array.isArray(photoAuthorizationForm?.fileIds) ? photoAuthorizationForm.fileIds : [],
     remark: photoAuthorizationForm?.remark || ''
   }
+  const quoteDisplay = quote ? buildQuoteDisplayModel(quote) : null
   const deliveryFiles = (Array.isArray(deliveryRecords) ? deliveryRecords : [])
     .filter(record => record.fileId)
     .map(record => ({
@@ -78,22 +79,23 @@ export function ConversationActionDialogs({
           <Typography sx={{ color: 'rgba(255,255,255,.66)', fontSize: 10, fontWeight: 900, letterSpacing: '.15em', textTransform: 'uppercase' }}>报价详情</Typography>
           <Stack direction="row" spacing={1.2} sx={{ mt: 0.6, justifyContent: 'space-between', alignItems: 'flex-end' }}>
             <Typography sx={{ color: '#fff', fontSize: 32, fontWeight: 950, lineHeight: 1 }}>
-              {quote ? centToYuan(quote.amountCent) : '--'}
+              {quoteDisplay ? quoteDisplay.amountText : '--'}
             </Typography>
-            {quote && <PortraStatusBadge label={getQuoteStatusLabel(quote.status)} sx={{ bgcolor: 'rgba(255,255,255,.18)', color: '#fff' }} />}
+            {quoteDisplay && <PortraStatusBadge label={quoteDisplay.statusLabel} tone={quoteDisplay.statusTone} sx={{ bgcolor: 'rgba(255,255,255,.18)', color: '#fff' }} />}
           </Stack>
         </DialogTitle>
         <DialogContent sx={quoteDialogContentSx}>
-          {quote ? (
+          {quoteDisplay ? (
             <Stack spacing={1.4} sx={{ pt: 1 }}>
               <DetailRows rows={[
-                ['拍摄时间', `${formatTime(quote.shootStartTime)} - ${formatTime(quote.shootEndTime)}`],
-                ['拍摄地点', getSafeDisplayText(quote.location, '拍摄地点待确认')],
-                ['服务内容', formatQuoteServiceContent(quote, '按双方沟通内容执行')],
-                ['原片/精修', `${quote.originalCount ?? 0} / ${quote.refinedCount ?? 0}`],
-                ['照片用途', getPhotoUsageScopeLabel(quote.photoUsageScope)],
-                ['最晚成片', formatDate(quote.deliveryDeadline)],
-                ['备注', formatQuoteRemark(quote, '无额外备注')]
+                ['金额', quoteDisplay.amountText],
+                ['拍摄时间', quoteDisplay.shootTimeText],
+                ['拍摄地点', quoteDisplay.shootLocationText],
+                ['服务内容', quoteDisplay.serviceContentText],
+                ['原片/精修', quoteDisplay.originalRefinedText],
+                ['用途', quoteDisplay.photoUsageLabel],
+                ['最晚交付', quoteDisplay.deliveryDeadlineText],
+                ['备注', quoteDisplay.remarkText]
               ]} />
               <Box sx={{ p: 1, bgcolor: PORTRA_COLORS.paperMuted, borderRadius: PORTRA_RADII.control, color: PORTRA_COLORS.mutedInk, fontSize: 14, lineHeight: 1.7 }}>
                 客户确认报价后将生成平台担保订单；付款后资金先进入平台担保，订单完成后再结算给摄影师。

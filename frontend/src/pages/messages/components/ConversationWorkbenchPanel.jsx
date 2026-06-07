@@ -1,15 +1,14 @@
 import { Box, Skeleton, Stack, Typography } from '@mui/material'
 import AddPhotoAlternateRoundedIcon from '@mui/icons-material/AddPhotoAlternateRounded'
+import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
-import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
+import PlaceRoundedIcon from '@mui/icons-material/PlaceRounded'
 import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded'
-import { centToYuan } from '../../../utils/index.js'
-import { buildOrderAction } from '../../../utils/orderNavigation.js'
+import { buildOrderAction, buildQuoteAction } from '../../../utils/orderNavigation.js'
 import { PortraActionLink, PortraPrimaryAction, PortraSecondaryAction, PortraStatusPill, PortraWorkflowPanel } from '../../../components/portra/index.js'
-import { formatTime } from '../utils/conversationUtils.js'
-import { getPhotoUsageScopeLabel, getQuoteStatusLabel } from '../utils/quoteUtils.js'
-import { getSafeDisplayText, PORTRA_COLORS } from '../MessageVisualTokens.js'
+import { buildQuoteDisplayModel } from '../utils/quoteDisplayModel.js'
+import { PORTRA_COLORS } from '../MessageVisualTokens.js'
 import { WorkbenchSection } from './WorkbenchSection.jsx'
 
 function getLatestQuote(quotes) {
@@ -29,9 +28,11 @@ export function ConversationWorkbenchPanel({
   onOpenAction
 }) {
   const latestQuote = getLatestQuote(quotes)
+  const latestQuoteModel = latestQuote ? buildQuoteDisplayModel(latestQuote) : null
   const summary = panelSummary || {}
   const uploadLabel = actions.canReuploadDelivery ? '重新上传作品' : '上传作品'
   const orderAction = buildOrderAction(order, { label: '查看订单' })
+  const quoteOrderAction = latestQuote ? buildQuoteAction(latestQuote, { label: '查看订单' }) : null
   const hasActionBlock = actions.canConfirmDelivery
     || actions.canUploadDelivery
     || actions.canReuploadDelivery
@@ -100,29 +101,26 @@ export function ConversationWorkbenchPanel({
 
         {latestQuote && (
           <WorkbenchSection title="当前报价">
-            <Box sx={{ pl: 1.1, borderLeft: `3px solid ${PORTRA_COLORS.blue}`, minWidth: 0 }}>
-              <Stack spacing={0.55}>
-                <Typography sx={{ color: PORTRA_COLORS.ink, fontSize: 21, fontWeight: 950, lineHeight: 1 }}>{centToYuan(latestQuote.amountCent)}</Typography>
-                <Typography sx={{ color: PORTRA_COLORS.mutedInk, fontSize: 13.5, lineHeight: 1.45 }} variant="body2">
-                  {getSafeDisplayText(latestQuote.location, '拍摄地点待确认')}
-                </Typography>
-                <Typography sx={{ color: PORTRA_COLORS.mutedInk, fontSize: 13.5 }}>{getPhotoUsageScopeLabel(latestQuote.photoUsageScope)}</Typography>
-                <PortraStatusPill label={getQuoteStatusLabel(latestQuote.status)} sx={{ alignSelf: 'flex-start' }} />
-              </Stack>
-            </Box>
-          </WorkbenchSection>
-        )}
+            <Box sx={quoteSummaryCardSx}>
+              <Typography sx={{ color: PORTRA_COLORS.ink, fontSize: 28, fontWeight: 950, lineHeight: 1 }}>
+                {latestQuoteModel.amountText}
+              </Typography>
+              <Typography sx={{ color: PORTRA_COLORS.subInk, fontSize: 15, lineHeight: 1.45 }}>
+                {latestQuoteModel.photoUsageLabel}
+              </Typography>
 
-        {order && (
-          <WorkbenchSection title="订单">
-            <Typography sx={{ color: PORTRA_COLORS.mutedInk }} variant="body2">
-              {centToYuan(order.amountCent)} · {formatTime(order.shootStartTime)}
-            </Typography>
-            {orderAction && (
-              <PortraActionLink startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenOrderArchive(orderAction.orderId)} sx={{ alignSelf: 'flex-start' }}>
-                {orderAction.label}
-              </PortraActionLink>
-            )}
+              <Box sx={{ borderTop: '1px solid rgba(15,23,42,.10)', mt: 1.1, pt: 1.05 }}>
+                <CompactQuoteRow icon={<CalendarMonthRoundedIcon />} label="拍摄时间" value={latestQuoteModel.shootTimeText} />
+                <CompactQuoteRow icon={<PlaceRoundedIcon />} label="拍摄地点" value={latestQuoteModel.shootLocationText} />
+              </Box>
+
+              <PortraStatusPill label={latestQuoteModel.statusLabel} tone={latestQuoteModel.statusTone} sx={{ alignSelf: 'flex-start', mt: 0.3 }} />
+              {(orderAction || quoteOrderAction) && (
+                <PortraActionLink onClick={() => onOpenOrderArchive((orderAction || quoteOrderAction).orderId)} sx={quoteOrderLinkSx}>
+                  查看订单 &gt;
+                </PortraActionLink>
+              )}
+            </Box>
           </WorkbenchSection>
         )}
 
@@ -142,6 +140,42 @@ export function ConversationWorkbenchPanel({
       )}
     </PortraWorkflowPanel>
   )
+}
+
+function CompactQuoteRow({ icon, label, value }) {
+  return (
+    <Stack direction="row" spacing={0.95} sx={{ alignItems: 'flex-start', py: 0.75, minWidth: 0 }}>
+      <Box sx={{ color: PORTRA_COLORS.subInk, pt: 0.12, '& svg': { fontSize: 19 } }}>{icon}</Box>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography sx={{ color: PORTRA_COLORS.subInk, fontSize: 14.5, fontWeight: 760, lineHeight: 1.45 }}>
+          {label}
+        </Typography>
+        <Typography sx={{ color: PORTRA_COLORS.mutedInk, fontSize: 13.5, lineHeight: 1.7, overflowWrap: 'anywhere' }}>
+          {value}
+        </Typography>
+      </Box>
+    </Stack>
+  )
+}
+
+const quoteSummaryCardSx = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 0.72,
+  p: 0,
+  minWidth: 0,
+  bgcolor: 'transparent',
+  border: 0,
+  borderRadius: 0,
+  boxShadow: 'none'
+}
+
+const quoteOrderLinkSx = {
+  alignSelf: 'center',
+  mt: 0.65,
+  px: 0.5,
+  fontSize: 14.5,
+  fontWeight: 900
 }
 
 function PanelSkeleton() {
