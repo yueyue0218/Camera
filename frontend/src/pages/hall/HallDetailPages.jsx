@@ -109,10 +109,11 @@ async function enrichDemandPublisher(demand, currentUser) {
   if (!demand?.customerId) return demand
   try {
     const brief = await userApi.brief(demand.customerId, currentUser)
+    const avatarFileId = brief?.avatarFileId ?? demand.customerAvatarFileId
     let avatarUrl = ''
-    if (brief?.avatarFileId) {
+    if (avatarFileId) {
       try {
-        avatarUrl = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser)
+        avatarUrl = await fileApi.downloadObjectUrl(avatarFileId, currentUser)
       } catch {
         avatarUrl = ''
       }
@@ -121,8 +122,9 @@ async function enrichDemandPublisher(demand, currentUser) {
       ...demand,
       customerNickname: brief?.nickname || demand.customerNickname,
       customerName: brief?.nickname || demand.customerName,
-      customerAvatarFileId: brief?.avatarFileId || demand.customerAvatarFileId,
-      customerAvatarUrl: avatarUrl || demand.customerAvatarUrl
+      customerAvatarFileId: avatarFileId,
+      customerAvatarUrl: avatarUrl || demand.customerAvatarUrl,
+      customerAvatar: avatarUrl || demand.customerAvatar
     }
   } catch {
     return demand
@@ -134,10 +136,11 @@ async function enrichServiceProvider(service, currentUser) {
   if (!providerId) return service
   try {
     const brief = await userApi.brief(providerId, currentUser)
+    const avatarFileId = brief?.avatarFileId ?? service.photographerAvatarFileId
     let avatarUrl = ''
-    if (brief?.avatarFileId) {
+    if (avatarFileId) {
       try {
-        avatarUrl = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser)
+        avatarUrl = await fileApi.downloadObjectUrl(avatarFileId, currentUser)
       } catch {
         avatarUrl = ''
       }
@@ -146,8 +149,9 @@ async function enrichServiceProvider(service, currentUser) {
       ...service,
       photographerId: brief?.userId || service.photographerId || service.providerId,
       photographerNickname: brief?.nickname || service.photographerNickname,
-      photographerAvatarFileId: brief?.avatarFileId || service.photographerAvatarFileId,
-      photographerAvatarUrl: avatarUrl || service.photographerAvatarUrl
+      photographerAvatarFileId: avatarFileId,
+      photographerAvatarUrl: avatarUrl || service.photographerAvatarUrl,
+      photographerAvatar: avatarUrl || service.photographerAvatar
     }
   } catch {
     return service

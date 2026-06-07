@@ -188,8 +188,7 @@ export function ProfilePage() {
       const avatarData = await imageFileToDataUrl(file)
       setAvatarFile(file)
       setProfileForm(p => ({ ...p, avatarData }))
-      updateProfile({ avatarData })
-      setNotice({ type: 'ok', text: '头像已更新' })
+      setNotice({ type: 'ok', text: '头像已选择，保存资料后生效' })
     } catch (err) { setNotice({ type: 'err', text: err.message }) }
   }
 
@@ -202,18 +201,25 @@ export function ProfilePage() {
       availability: profileForm.availability.trim(),
       role: currentUser.role
     }
-    saveUserProfile(currentUser.userId, next)
     let avatarFileId = currentUser.avatarFileId || null
     try {
       if (avatarFile) {
         const uploaded = await fileApi.upload(avatarFile, { bizType: 'AVATAR', visibility: 'PUBLIC' }, currentUser)
-        avatarFileId = uploaded?.fileId || avatarFileId
+        if (!uploaded?.fileId) {
+          throw new Error('Avatar upload failed')
+        }
+        avatarFileId = uploaded.fileId
       }
       await userApi.updateMe({ nickname: next.nickname, bio: next.bio, role: currentUser.role, avatarFileId }, currentUser)
-      setAvatarFile(null)
-    } catch {}
+    } catch (err) {
+      setNotice({ type: 'err', text: err.message || 'Profile save failed' })
+      return false
+    }
+    saveUserProfile(currentUser.userId, next)
+    setAvatarFile(null)
     updateProfile({ ...next, avatarFileId })
     setNotice({ type: 'ok', text: '个人资料已更新' })
+    return true
   }
 
   async function handleSwitchRole(newRole) {
@@ -726,7 +732,7 @@ export function ProfilePage() {
               </div>
             </div>
             <div className="pp-modal-actions">
-              <button className="primary-btn" onClick={async () => { await saveProfile(); setEditOpen(false) }}>保存资料</button>
+              <button className="primary-btn" onClick={async () => { if (await saveProfile()) setEditOpen(false) }}>保存资料</button>
               <button className="secondary-btn" onClick={() => setEditOpen(false)}>取消</button>
               <button className="danger-btn" onClick={() => { logout(); navigate('/login', {replace:true}) }}>退出</button>
             </div>
