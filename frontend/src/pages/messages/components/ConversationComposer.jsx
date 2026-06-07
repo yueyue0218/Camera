@@ -12,6 +12,7 @@ import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
 import SendRoundedIcon from '@mui/icons-material/SendRounded'
 import SupportAgentRoundedIcon from '@mui/icons-material/SupportAgentRounded'
 import { buildOrderAction } from '../../../utils/orderNavigation.js'
+import { PortraActionLink, PortraPrimaryAction, PortraSecondaryAction } from '../../../components/portra/index.js'
 import { PORTRA_COLORS, PORTRA_RADII } from '../MessageVisualTokens.js'
 import { MessageToolbarButton } from './MessageToolbarButton.jsx'
 
@@ -89,75 +90,71 @@ export function ConversationComposer({
             </Stack>
             <Stack direction="row" spacing={0.65} sx={{ flexWrap: 'wrap', rowGap: 0.65 }}>
               {actions.canSendQuote && canSeeQuoteEntry && (
-                <Button
-                  size="small"
-                  variant={showQuoteForm ? 'contained' : 'outlined'}
+                <PortraSecondaryAction
                   startIcon={<LocalOfferRoundedIcon />}
                   onClick={onOpenQuoteForm}
                   disabled={!canCreateQuote && !showQuoteForm}
                 >
                   {showQuoteForm ? '收起报价单' : quoteActionLabel}
-                </Button>
+                </PortraSecondaryAction>
               )}
               {actions.canEditQuote && (
-                <Button size="small" variant="outlined" startIcon={<LocalOfferRoundedIcon />} onClick={() => onStartQuoteEditing(pendingQuote)} disabled={loading}>
+                <PortraSecondaryAction startIcon={<LocalOfferRoundedIcon />} onClick={() => onStartQuoteEditing(pendingQuote)} disabled={loading}>
                   编辑报价
-                </Button>
+                </PortraSecondaryAction>
               )}
               {actions.canConfirmQuote && pendingQuote && (
-                <Button size="small" variant="contained" startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenQuoteDetail(pendingQuote)} disabled={loading}>
+                <PortraPrimaryAction startIcon={<ReceiptLongRoundedIcon />} onClick={() => onOpenQuoteDetail(pendingQuote)} disabled={loading}>
                   查看报价详情
-                </Button>
+                </PortraPrimaryAction>
               )}
               {actions.canPay && (
-                <Button size="small" variant="contained" startIcon={<PaidRoundedIcon />} onClick={onPayOrder} disabled={loading}>
+                <PortraPrimaryAction startIcon={<PaidRoundedIcon />} onClick={onPayOrder} disabled={loading}>
                   去支付
-                </Button>
+                </PortraPrimaryAction>
               )}
               {actions.cancelAction && (
-                <Button size="small" variant="outlined" color="inherit" onClick={() => onCancelOrder(actions.cancelAction)} disabled={loading}>
+                <PortraSecondaryAction onClick={() => onCancelOrder(actions.cancelAction)} disabled={loading}>
                   {actions.cancelAction.label}
-                </Button>
+                </PortraSecondaryAction>
               )}
               {(actions.canUploadDelivery || actions.canReuploadDelivery) && (
-                <Button
-                  size="small"
-                  variant={actions.canReuploadDelivery ? 'contained' : 'outlined'}
+                <PortraPrimaryAction
                   startIcon={<AddPhotoAlternateRoundedIcon />}
                   onClick={() => onOpenAction(actions.canReuploadDelivery ? 'REUPLOAD_DELIVERY' : 'UPLOAD_DELIVERY')}
                 >
                   {actions.canReuploadDelivery ? '重新上传作品' : '上传作品'}
-                </Button>
+                </PortraPrimaryAction>
               )}
               {actions.canRequestRework && (
-                <Button size="small" variant="outlined" startIcon={<RefreshRoundedIcon />} onClick={() => onOpenAction('REQUEST_REWORK')}>
+                <PortraSecondaryAction startIcon={<RefreshRoundedIcon />} onClick={() => onOpenAction('REQUEST_REWORK')}>
                   提交返修
-                </Button>
+                </PortraSecondaryAction>
               )}
               {actions.canConfirmDelivery && (
-                <Button size="small" variant="contained" startIcon={<CheckCircleRoundedIcon />} onClick={onConfirmOrder} disabled={loading}>
+                <PortraPrimaryAction startIcon={<CheckCircleRoundedIcon />} onClick={onConfirmOrder} disabled={loading}>
                   确认接收
-                </Button>
+                </PortraPrimaryAction>
               )}
               {actions.canRequestPhotoAuthorization && (
-                <Button size="small" variant="outlined" startIcon={<ImageRoundedIcon />} onClick={() => onOpenAction('REQUEST_AUTHORIZATION')}>
+                <PortraSecondaryAction startIcon={<ImageRoundedIcon />} onClick={() => onOpenAction('REQUEST_AUTHORIZATION')}>
                   申请展示授权
-                </Button>
+                </PortraSecondaryAction>
               )}
               {actions.canReviewPhotoAuthorization && (
-                <Button size="small" variant="outlined" startIcon={<CheckCircleRoundedIcon />} href="#conversation-authorization-action">
+                <PortraSecondaryAction startIcon={<CheckCircleRoundedIcon />} href="#conversation-authorization-action">
                   处理授权
-                </Button>
+                </PortraSecondaryAction>
               )}
               {actions.canViewDispute && canOpenOrderArchive && (
-                <Button size="small" variant="outlined" color="inherit" onClick={openOrderArchive}>
+                <PortraActionLink onClick={openOrderArchive}>
                   查看争议进展
-                </Button>
+                </PortraActionLink>
               )}
               {actions.canOpenOrder && canOpenOrderArchive && (
-                <Button data-message-order-entry="composer-primary" size="small" variant="text" color="inherit" startIcon={<ReceiptLongRoundedIcon />} onClick={openOrderArchive}>
+                <PortraActionLink data-message-order-entry="composer-primary" startIcon={<ReceiptLongRoundedIcon />} onClick={openOrderArchive}>
                   查看订单
-                </Button>
+                </PortraActionLink>
               )}
             </Stack>
           </Stack>

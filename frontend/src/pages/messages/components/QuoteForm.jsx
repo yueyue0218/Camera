@@ -39,10 +39,10 @@ export function QuoteForm({
       <Stack spacing={1.5}>
         <Box>
           <Typography sx={{ color: PORTRA_COLORS.ink, fontSize: 18, fontWeight: 950 }}>报价单草稿</Typography>
-          <Typography sx={{ color: PORTRA_COLORS.mutedInk, fontSize: 13 }}>确认拍摄内容、时间和交付范围后发送给客户。</Typography>
+          <Typography sx={{ color: PORTRA_COLORS.mutedInk, fontSize: 13 }}>确认拍摄内容、时间和成片范围后发送给客户。</Typography>
         </Box>
         {editingQuotationId && (
-          <PortraInfoBanner>正在编辑一份待确认报价。客户确认生成订单后，金额、拍摄时间和交付范围会锁定。</PortraInfoBanner>
+          <PortraInfoBanner>正在编辑一份待确认报价。客户确认生成订单后，金额、拍摄时间和成片范围会锁定。</PortraInfoBanner>
         )}
         {!!quoteValidationErrors.length && (
           <PortraInfoBanner tone="warning">
@@ -56,7 +56,7 @@ export function QuoteForm({
           <TextField label="拍摄地点" size="small" value={quoteForm.location} onChange={event => updateField('location', event.target.value)} required />
           <PortraDateTimeField label="拍摄开始时间" date={quoteForm.shootStartDate} hour={quoteForm.shootStartHour} minute={quoteForm.shootStartMinute} onDateChange={value => updateField('shootStartDate', value)} onHourChange={value => updateField('shootStartHour', value)} onMinuteChange={value => updateField('shootStartMinute', value)} minYear={minYear} maxYear={maxYear} required />
           <PortraDateTimeField label="拍摄结束时间" date={quoteForm.shootEndDate} hour={quoteForm.shootEndHour} minute={quoteForm.shootEndMinute} onDateChange={value => updateField('shootEndDate', value)} onHourChange={value => updateField('shootEndHour', value)} onMinuteChange={value => updateField('shootEndMinute', value)} minYear={minYear} maxYear={maxYear} required />
-          <PortraDateField label="最晚交付日期" value={quoteForm.deliveryDeadlineDate} onChange={value => updateField('deliveryDeadlineDate', value)} minYear={minYear} maxYear={maxYear} required />
+          <PortraDateField label="最晚成片日期" value={quoteForm.deliveryDeadlineDate} onChange={value => updateField('deliveryDeadlineDate', value)} minYear={minYear} maxYear={maxYear} required />
           <TextField label="原片数量" type="number" size="small" value={quoteForm.originalCount} onChange={event => updateField('originalCount', event.target.value)} />
           <TextField label="精修数量" type="number" size="small" value={quoteForm.refinedCount} onChange={event => updateField('refinedCount', event.target.value)} />
           <TextField select label="照片使用范围" size="small" value={quoteForm.photoUsageScope} onChange={event => updateField('photoUsageScope', event.target.value)}>

@@ -134,25 +134,33 @@ export function getOppositeUserId(conversation, currentUserId) {
 }
 
 export function getCounterpartyProfile(conversation, currentUser) {
-  if (!conversation) return { userId: null, nickname: '对方用户', avatarData: '', initial: '对' }
+  if (!conversation) return { userId: null, nickname: '用户', avatarData: '', initial: '用' }
   const oppositeId = Number(getOppositeUserId(conversation, getCurrentUserId(currentUser)))
+  const isCustomer = Number(conversation.participantAId) === oppositeId
   const profiles = readJsonStorage(USER_PROFILE_STORAGE_KEY, {})
   const storedProfile = profiles[String(oppositeId)] || {}
   const demoProfile = Object.values(USERS).find(user => Number(user.userId) === oppositeId) || {}
   const nickname =
     conversation.counterpartyNickname ||
     conversation.otherUserNickname ||
-    conversation.providerNickname ||
-    conversation.customerNickname ||
+    (isCustomer ? conversation.customerNickname : conversation.providerNickname) ||
+    (isCustomer ? conversation.customerName : conversation.providerName) ||
+    (isCustomer ? conversation.customerDisplayName : conversation.providerDisplayName) ||
     storedProfile.nickname ||
+    storedProfile.displayName ||
     demoProfile.nickname ||
-    '对方用户'
+    demoProfile.displayName ||
+    (oppositeId ? `用户 ${oppositeId}` : '用户')
   return {
     userId: oppositeId || null,
     nickname,
     avatarData: storedProfile.avatarData || demoProfile.avatarData || '',
     initial: String(nickname).slice(0, 1) || '对'
   }
+}
+
+export function getConversationPeer(conversation, currentUser) {
+  return getCounterpartyProfile(conversation, currentUser)
 }
 
 function getLocalMessageStore() {
@@ -248,7 +256,7 @@ export function getConversationSourceHint(conversation) {
   if (conversation.sourceType === 'SERVICE_PACKAGE') {
     return '这次沟通来自摄影服务橱窗，确认拍摄时间和内容后再进入报价。'
   }
-  return '可以在这里继续沟通拍摄内容、时间和交付要求。'
+  return '可以在这里继续沟通拍摄内容、时间和成片要求。'
 }
 
 export function getCounterpartyLabel(conversation, currentUser) {

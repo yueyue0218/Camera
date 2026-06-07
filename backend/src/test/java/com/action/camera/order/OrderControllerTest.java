@@ -221,26 +221,32 @@ class OrderControllerTest {
     }
 
     @Test
-    void providerCanProgressMainShootingAndDeliveryStatuses() {
+    void providerCannotManuallyProgressShootingStatuses() {
         UserContext.setUserId(PROVIDER_USER_ID);
         Order order = order(OrderStatus.PAID_PENDING_SHOOT);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+
+        assertThrows(BusinessException.class,
+                () -> orderController.changeStatus(ORDER_ID, transitionRequest(OrderStatus.SHOOTING)));
+
+        order.setStatus(OrderStatus.SHOOTING);
+        assertThrows(BusinessException.class,
+                () -> orderController.changeStatus(ORDER_ID, transitionRequest(OrderStatus.PENDING_DELIVERY)));
+
+        verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
+    }
+
+    @Test
+    void providerCanMoveUploadedDeliveryToPendingConfirm() {
+        UserContext.setUserId(PROVIDER_USER_ID);
+        Order order = order(OrderStatus.PENDING_DELIVERY);
         prepareTransitionMocks(order);
-
-        StatusTransitionResponse shooting =
-                orderController.changeStatus(ORDER_ID, transitionRequest(OrderStatus.SHOOTING)).getData();
-        assertEquals(OrderStatus.PAID_PENDING_SHOOT, shooting.getFromStatus());
-        assertEquals(OrderStatus.SHOOTING, shooting.getToStatus());
-
-        StatusTransitionResponse pendingDelivery =
-                orderController.changeStatus(ORDER_ID, transitionRequest(OrderStatus.PENDING_DELIVERY)).getData();
-        assertEquals(OrderStatus.SHOOTING, pendingDelivery.getFromStatus());
-        assertEquals(OrderStatus.PENDING_DELIVERY, pendingDelivery.getToStatus());
 
         StatusTransitionResponse delivered =
                 orderController.changeStatus(ORDER_ID, transitionRequest(OrderStatus.DELIVERED_PENDING_CONFIRM)).getData();
         assertEquals(OrderStatus.PENDING_DELIVERY, delivered.getFromStatus());
         assertEquals(OrderStatus.DELIVERED_PENDING_CONFIRM, delivered.getToStatus());
-        verify(orderStatusLogRepository, times(3)).save(any(OrderStatusLog.class));
+        verify(orderStatusLogRepository, times(1)).save(any(OrderStatusLog.class));
     }
 
     @Test

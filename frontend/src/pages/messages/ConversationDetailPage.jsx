@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Alert, Avatar, Box, Button, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material'
+import { Alert, Avatar, Box, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material'
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -16,15 +16,15 @@ import { ConversationWorkbenchPanel } from './components/ConversationWorkbenchPa
 import { ConversationActionDialogs } from './components/ConversationActionDialogs.jsx'
 import { QuoteDraftDialog } from './components/QuoteDraftDialog.jsx'
 import { MessageWorkbenchErrorBoundary } from './components/MessageWorkbenchErrorBoundary.jsx'
-import { StatusChip } from './components/StatusChip.jsx'
-import { OrderCompletionDialog } from '../../components/portra/index.js'
+import { OrderCompletionDialog, PortraActionLink, PortraStatusPill, PortraWorkbenchFrame, PortraWorkflowFrame } from '../../components/portra/index.js'
+import { PORTRA_LAYOUT } from '../../theme/portraSurfaceTokens.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from './MessageVisualTokens.js'
 import {
   addLocalMessage,
   addSavedPhoto,
   buildConversationFallback,
   findConversationRecord,
-  getCounterpartyProfile,
+  getConversationPeer,
   getLocalMessages,
   getOppositeUserId,
   updateConversationLastMessage
@@ -500,13 +500,13 @@ export function ConversationDetailPage() {
       conversationId
     })
     if (!succeeded) {
-      setNotice({ type: 'warning', text: '交付记录暂不可查看，请刷新后重试。' })
+      setNotice({ type: 'warning', text: '作品记录暂不可查看，请刷新后重试。' })
     }
     return succeeded
   }
 
   const currentUserId = getCurrentUserId(currentUser)
-  const counterparty = getCounterpartyProfile(conversation, currentUser)
+  const counterparty = getConversationPeer(conversation, currentUser)
   const viewModel = buildConversationWorkbenchViewModel({
     conversation,
     currentUser,
@@ -540,18 +540,12 @@ export function ConversationDetailPage() {
 
   return (
     <MessageWorkbenchErrorBoundary resetKey={`${conversationId}-${currentUser.role}`}>
-    <Stack
+    <PortraWorkflowFrame
       data-message-detail-shell="true"
       spacing={1.2}
+      maxWidth="workflow"
+      height={DETAIL_SHELL_HEIGHT}
       sx={{
-        width: { xs: '100%', lg: 'min(1360px, calc(100vw - 48px))' },
-        maxWidth: { lg: 1360 },
-        mx: { xs: 0, lg: 'auto' },
-        position: { lg: 'relative' },
-        left: { lg: '50%' },
-        transform: { lg: 'translateX(-50%)' },
-        height: DETAIL_SHELL_HEIGHT,
-        maxHeight: DETAIL_SHELL_HEIGHT,
         minHeight: 0,
         overflow: 'hidden'
       }}
@@ -595,42 +589,31 @@ export function ConversationDetailPage() {
               {getSafeDisplayText(counterparty.initial, '对').slice(0, 1)}
             </Avatar>
             <Box sx={{ minWidth: 0 }}>
-              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                <Typography variant="h6" sx={{ color: PORTRA_COLORS.ink, fontSize: 17, fontWeight: 950 }} noWrap>{getSafeDisplayText(counterparty.nickname, '对方用户')}</Typography>
-                <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk }}>{actions.role === 'PROVIDER' ? '摄影师视角' : '客户视角'}</Typography>
-              </Stack>
-              <Typography sx={{ color: PORTRA_COLORS.mutedInk }} variant="body2" noWrap>
-                {getSafeDisplayText(viewModel.conversationTitle, '本次合作')} · {getSafeDisplayText(viewModel.conversationSubtitle, '校园约拍沟通')}
+              <Typography variant="h6" sx={{ color: PORTRA_COLORS.ink, fontSize: 17, fontWeight: 950 }} noWrap>
+                {getSafeDisplayText(counterparty.nickname, counterparty.userId ? `用户 ${counterparty.userId}` : '用户')}
               </Typography>
             </Box>
           </Stack>
           <Stack direction="row" spacing={0.8} sx={{ alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
-            <StatusChip label={actions.stage.title} emphasis />
-            <Button
-              size="small"
-              variant="outlined"
-              color="inherit"
+            <PortraStatusPill label={actions.stage.title} />
+            <PortraActionLink
               startIcon={<ReceiptLongRoundedIcon />}
               onClick={() => openOrderArchive(currentOrder?.orderId)}
               disabled={!currentOrder?.orderId}
             >
               查看订单
-            </Button>
+            </PortraActionLink>
           </Stack>
         </Stack>
       </Paper>
 
       {notice && <Alert severity={notice.type} sx={noticeSx}>{notice.text}</Alert>}
 
-      <Box sx={{
-        flex: 1,
-        minHeight: 0,
-        display: 'grid',
-        gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(720px, 1fr) 300px', xl: 'minmax(760px, 1fr) 312px' },
-        gap: { xs: 1.25, lg: 2.25, xl: 2.5 },
-        alignItems: 'stretch',
-        overflow: 'hidden'
-      }} data-message-workbench-grid="true">
+      <PortraWorkbenchFrame
+        data-message-workbench-grid="true"
+        rightPanelWidth={PORTRA_LAYOUT.rightPanelWidth}
+        gap={{ xs: 1.25, lg: 2.5, xl: 2.5 }}
+      >
         <Box sx={{ minHeight: 0, minWidth: 0, height: '100%', display: 'flex', overflow: 'hidden' }}>
           <ConversationThread
             messages={messages}
@@ -711,7 +694,7 @@ export function ConversationDetailPage() {
           onUnavailableTool={showUnavailableTool}
           onOpenAction={setActiveAction}
         />
-      </Box>
+      </PortraWorkbenchFrame>
       <ConversationActionDialogs
         activeAction={activeAction}
         loading={loading}
@@ -752,7 +735,7 @@ export function ConversationDetailPage() {
         }}
         reviewDisabled={!currentOrder?.orderId}
       />
-    </Stack>
+    </PortraWorkflowFrame>
     </MessageWorkbenchErrorBoundary>
   )
 }

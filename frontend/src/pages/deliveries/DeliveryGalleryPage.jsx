@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Paper, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Paper, Stack, TextField, Typography } from '@mui/material'
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import ForumRoundedIcon from '@mui/icons-material/ForumRounded'
@@ -12,12 +12,11 @@ import { goToOrder } from '../../utils/orderNavigation.js'
 import {
   getExplicitReturnToConversation,
   getReturnToConversation,
-  navigateBackToConversation,
-  navigateToConversation
+  navigateBackToConversation
 } from '../../utils/conversationNavigation.js'
 import { formatOrderTitle } from '../../utils/displayFormatters.js'
-import { OrderCompletionDialog, PortraActionButton, PortraEmptyState, PortraInfoBanner, PortraStatusBadge, PortraTicketSection } from '../../components/portra/index.js'
-import { PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
+import { OrderCompletionDialog, PortraActionButton, PortraActionLink, PortraContextActionButton, PortraEmptyState, PortraInfoBanner, PortraStatusPill, PortraTicketSection, PortraWorkflowFrame } from '../../components/portra/index.js'
+import { PORTRA_LAYOUT, PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
 import { centToYuan } from '../../utils/index.js'
 import {
   buildDeliveryBatches,
@@ -208,6 +207,7 @@ export function DeliveryGalleryPage() {
   const isProvider = Number(order?.providerUserId) === currentUserId
   const isReworkForProvider = isProvider && order?.status === 'REWORK_REQUIRED'
   const isCompleted = order?.status === 'COMPLETED'
+  const galleryMeta = [batch?.subtitle, formatOrderTitle(order)].filter(Boolean).join(' · ')
 
   if (loading) {
     return <PortraEmptyState title="作品记录加载中" description="正在读取订单和作品文件。" />
@@ -219,66 +219,48 @@ export function DeliveryGalleryPage() {
 
   if (!batch) {
     return (
-      <Stack spacing={1.5}>
-        <Button
+      <PortraWorkflowFrame spacing={1.5} maxWidth="gallery">
+        <PortraContextActionButton
           startIcon={<ArrowBackRoundedIcon />}
-          color="inherit"
           onClick={() => primaryBackIsConversation
             ? navigateBackToConversation(navigate, location, associatedConversationId)
             : goToOrder(navigate, orderId, { conversationId: associatedConversationId })}
         >
           {primaryBackIsConversation ? '返回沟通' : '返回订单'}
-        </Button>
+        </PortraContextActionButton>
         <PortraEmptyState title="作品记录不存在" description="该作品记录可能不属于当前订单，或已经被移除。" />
-      </Stack>
+      </PortraWorkflowFrame>
     )
   }
 
   return (
-    <Stack spacing={2.2} sx={{ width: '100%', maxWidth: 1280, mx: 'auto', color: PORTRA_SURFACE.ink }}>
+    <PortraWorkflowFrame spacing={2.2} maxWidth="gallery" sx={{ color: PORTRA_SURFACE.ink }}>
       <Paper variant="outlined" sx={headerSx}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.4} sx={{ justifyContent: 'space-between', alignItems: { xs: 'stretch', md: 'center' } }}>
           <Stack spacing={0.8}>
-            <Button
+            <PortraContextActionButton
               startIcon={<ArrowBackRoundedIcon />}
-              color="inherit"
               sx={primaryBackButtonSx}
               onClick={() => primaryBackIsConversation
                 ? navigateBackToConversation(navigate, location, associatedConversationId)
                 : goToOrder(navigate, orderId, { conversationId: associatedConversationId })}
             >
               {primaryBackIsConversation ? '返回沟通' : '返回订单'}
-            </Button>
+            </PortraContextActionButton>
             <Box>
               <Typography variant="h5" sx={{ fontWeight: 950 }}>{batch.title}</Typography>
-              <Typography sx={{ mt: 0.45, color: PORTRA_SURFACE.muted }}>{batch.subtitle}</Typography>
+              <Typography sx={{ mt: 0.45, color: PORTRA_SURFACE.muted }}>{galleryMeta}</Typography>
             </Box>
           </Stack>
-          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
-            <PortraStatusBadge label={batch.statusLabel} />
-            <Chip icon={<ReceiptLongIconShim />} label={formatOrderTitle(order)} />
+          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', justifyContent: { xs: 'flex-start', md: 'flex-end' }, alignItems: 'center' }}>
+            <PortraStatusPill label={batch.statusLabel} />
             {primaryBackIsConversation ? (
-              <Button
-                size="small"
-                variant="outlined"
-                color="inherit"
+              <PortraActionLink
                 startIcon={<ReceiptLongRoundedIcon />}
                 onClick={() => goToOrder(navigate, orderId, { conversationId: associatedConversationId, returnTo: explicitReturnToConversation })}
-                sx={secondaryPillSx}
               >
                 查看订单
-              </Button>
-            ) : associatedConversationId ? (
-              <Button
-                size="small"
-                variant="outlined"
-                color="inherit"
-                startIcon={<ForumRoundedIcon />}
-                onClick={() => navigateToConversation(navigate, associatedConversationId)}
-                sx={secondaryPillSx}
-              >
-                继续沟通
-              </Button>
+              </PortraActionLink>
             ) : null}
           </Stack>
         </Stack>
@@ -286,7 +268,7 @@ export function DeliveryGalleryPage() {
 
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
 
-      <Box sx={galleryGridSx}>
+      <Box data-delivery-gallery-grid="true" sx={galleryGridSx}>
         <Paper variant="outlined" sx={galleryPanelSx}>
           <Stack spacing={1.5} sx={{ minWidth: 0 }}>
           <PortraTicketSection title="作品相册">
@@ -401,7 +383,7 @@ export function DeliveryGalleryPage() {
           goToOrder(navigate, order?.orderId, { state: { orderId: order?.orderId, focusReview: true } })
         }}
       />
-    </Stack>
+    </PortraWorkflowFrame>
   )
 }
 
@@ -423,10 +405,6 @@ function InfoBlock({ label, value }) {
   )
 }
 
-function ReceiptLongIconShim() {
-  return <ReceiptLongRoundedIcon fontSize="small" />
-}
-
 const headerSx = {
   px: { xs: 1.5, md: 2 },
   py: 1.5,
@@ -438,9 +416,14 @@ const headerSx = {
 
 const galleryGridSx = {
   display: 'grid',
-  gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) 330px' },
-  gap: 2,
-  alignItems: 'start'
+  gridTemplateColumns: {
+    xs: 'minmax(0, 1fr)',
+    lg: `minmax(0, 1fr) ${PORTRA_LAYOUT.compactRightPanelWidth.lg}`,
+    xl: `minmax(0, 1fr) ${PORTRA_LAYOUT.compactRightPanelWidth.xl}`
+  },
+  gap: { xs: 1.6, lg: 2.5 },
+  alignItems: 'start',
+  minWidth: 0
 }
 
 const galleryPanelSx = {
@@ -454,6 +437,7 @@ const galleryPanelSx = {
 
 const sidePanelSx = {
   p: 1.5,
+  minWidth: 0,
   position: { lg: 'sticky' },
   top: { lg: 18 },
   bgcolor: PORTRA_SURFACE.paper,
@@ -463,26 +447,5 @@ const sidePanelSx = {
 }
 
 const primaryBackButtonSx = {
-  alignSelf: 'flex-start',
-  minHeight: 32,
-  px: 1,
-  borderRadius: 999,
-  color: PORTRA_SURFACE.portraBlue,
-  fontWeight: 850,
-  '&:hover': {
-    bgcolor: PORTRA_SURFACE.portraBlueSoft
-  }
-}
-
-const secondaryPillSx = {
-  minHeight: 32,
-  borderRadius: 999,
-  borderColor: PORTRA_SURFACE.borderSubtle,
-  bgcolor: 'rgba(248, 243, 235, 0.72)',
-  color: PORTRA_SURFACE.ink,
-  fontWeight: 800,
-  '&:hover': {
-    borderColor: PORTRA_SURFACE.portraBlue,
-    bgcolor: PORTRA_SURFACE.portraBlueSoft
-  }
+  alignSelf: 'flex-start'
 }

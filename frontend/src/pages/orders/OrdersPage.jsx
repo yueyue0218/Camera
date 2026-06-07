@@ -23,7 +23,6 @@ import {
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
-import ForumRoundedIcon from '@mui/icons-material/ForumRounded'
 import GavelRoundedIcon from '@mui/icons-material/GavelRounded'
 import AddPhotoAlternateRoundedIcon from '@mui/icons-material/AddPhotoAlternateRounded'
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded'
@@ -44,12 +43,11 @@ import {
   reviewApi,
   reviewComplaintApi
 } from '../../api.js'
-import { buildOrderNavigationTarget, normalizeOrderId } from '../../utils/orderNavigation.js'
+import { buildOrderNavigationTarget, goToOrderConversation, normalizeOrderId } from '../../utils/orderNavigation.js'
 import { goToDeliveryGallery } from '../../utils/deliveryNavigation.js'
 import {
   getExplicitReturnToConversation,
-  navigateBackToConversation,
-  navigateToConversation
+  navigateBackToConversation
 } from '../../utils/conversationNavigation.js'
 import { centToYuan } from '../../utils/index.js'
 import {
@@ -64,15 +62,18 @@ import {
 } from '../../utils/displayFormatters.js'
 import {
   PortraActionButton,
+  PortraActionLink,
   PortraEmptyState,
   PortraInfoBanner,
   OrderCompletionDialog,
+  PortraWorkflowFrame,
   PortraStatusBadge,
+  PortraStatusPill,
   PortraTicketCard,
   PortraTicketSection,
   PortraTimeline
 } from '../../components/portra/index.js'
-import { PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
+import { PORTRA_LAYOUT, PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
 import {
   canCustomerConfirm,
   canCustomerPay,
@@ -122,7 +123,6 @@ function parseInputDate(value) {
 }
 
 function getOrderAction(order, currentUser) {
-  const isProvider = Number(order.providerUserId) === currentUser.userId
   if (canCustomerPay(order, currentUser)) {
     return {
       kind: 'pay',
@@ -130,28 +130,6 @@ function getOrderAction(order, currentUser) {
       icon: <PaidRoundedIcon />,
       allowed: true,
       successText: '模拟支付成功，资金已进入平台担保'
-    }
-  }
-  if (order.status === 'PAID_PENDING_SHOOT') {
-    return {
-      kind: 'transition',
-      targetStatus: 'SHOOTING',
-      label: '开始拍摄',
-      icon: <CheckCircleRoundedIcon />,
-      allowed: isProvider,
-      reason: '服务方开始拍摄',
-      successText: '订单已进入拍摄中'
-    }
-  }
-  if (order.status === 'SHOOTING') {
-    return {
-      kind: 'transition',
-      targetStatus: 'PENDING_DELIVERY',
-      label: '进入待交付',
-      icon: <TaskAltRoundedIcon />,
-      allowed: isProvider,
-      reason: '拍摄完成，进入待交付',
-      successText: '订单已进入待交付'
     }
   }
   if (canCustomerConfirm(order, currentUser)) {
@@ -224,8 +202,8 @@ function getCounterpartyLabel(order, currentUser) {
 }
 
 const deliveryStatusLabelMap = {
-  DELIVERED: '已交付',
-  REWORKED: '返修交付'
+  DELIVERED: '已上传作品',
+  REWORKED: '返修作品'
 }
 
 function getSettlementRefundLabel(order) {
@@ -546,7 +524,7 @@ export function OrdersPage() {
       const url = await fileApi.downloadObjectUrl(record.fileId, currentUser)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = formatFileDisplayName(record, `交付作品-${record.fileId}`)
+      anchor.download = formatFileDisplayName(record, `作品文件-${record.fileId}`)
       anchor.click()
       setTimeout(() => URL.revokeObjectURL(url), 1000)
     } catch (error) {
@@ -675,7 +653,7 @@ export function OrdersPage() {
         if (!map.has(fileId)) {
           map.set(fileId, {
             fileId,
-            fileName: formatFileDisplayName(record, `交付作品 ${fileId}`),
+            fileName: formatFileDisplayName(record, `作品文件 ${fileId}`),
             uploadTime: record.uploadTime
           })
         }
@@ -702,7 +680,7 @@ export function OrdersPage() {
   const selectedOrderTitle = selectedOrder ? formatOrderTitle(selectedOrder, quoteSnapshot) : ''
   const selectedOrderConversationId = selectedOrder?.conversationId
   const canReturnToConversation = Boolean(explicitReturnToConversation)
-  const canContinueConversation = Boolean(selectedOrderConversationId)
+  const canContactCounterparty = !canReturnToConversation && Boolean(selectedOrderConversationId)
   const statusTimelineItems = statusLogs.map(log => ({
     id: log.logId || `${log.orderId}-${log.createdAt}`,
     title: formatStatusLogText(log),
@@ -729,16 +707,16 @@ export function OrdersPage() {
   }
 
   function continueConversation() {
-    const succeeded = navigateToConversation(navigate, selectedOrderConversationId)
+    const succeeded = goToOrderConversation(navigate, selectedOrderConversationId)
     if (!succeeded) setNotice({ type: 'warning', text: '暂无可进入的沟通记录。' })
   }
 
   return (
-    <Stack spacing={2.5} sx={orderPageSx}>
+    <PortraWorkflowFrame spacing={2.5} maxWidth="page" sx={orderPageSx}>
       <OrdersSectionHeader title="订单" subtitle="查看订单进展、平台担保状态和每次状态流转。" />
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
 
-      <Box sx={orderGridSx}>
+      <Box data-order-workspace="true" sx={orderGridSx}>
         <Paper variant="outlined" sx={orderIndexPanelSx}>
           <Stack spacing={2}>
             <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
@@ -815,22 +793,19 @@ export function OrdersPage() {
         {!selectedOrder ? (
           <EmptyOrderCard text="选择订单查看详情" />
         ) : (
-          <Stack spacing={2}>
+          <Stack spacing={2} sx={orderDetailWorkspaceSx}>
             <Paper variant="outlined" sx={orderArchiveHeroSx}>
               <Stack spacing={2}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between' }}>
                   <Box>
-                    {canReturnToConversation && (
-                      <Button
-                        size="small"
-                        variant="text"
-                        color="inherit"
-                        startIcon={<ArrowBackRoundedIcon />}
-                        onClick={returnToConversation}
+                    {(canReturnToConversation || canContactCounterparty) && (
+                      <PortraActionLink
+                        startIcon={canReturnToConversation ? <ArrowBackRoundedIcon /> : null}
+                        onClick={canReturnToConversation ? returnToConversation : continueConversation}
                         sx={returnLinkSx}
                       >
-                        返回沟通
-                      </Button>
+                        {canReturnToConversation ? '返回沟通' : '联系对方'}
+                      </PortraActionLink>
                     )}
                     <Typography variant="h5" sx={{ fontSize: { xs: 20, md: 24 }, color: PORTRA_SURFACE.ink, fontWeight: 950 }}>{selectedOrderTitle}</Typography>
                     <Typography sx={{ color: PORTRA_SURFACE.muted, mt: 0.4 }}>
@@ -841,12 +816,9 @@ export function OrdersPage() {
                     </Typography>
                   </Box>
                   <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                    <Button size="small" variant="outlined" color="inherit" startIcon={<ForumRoundedIcon />} onClick={continueConversation} disabled={!canContinueConversation}>
-                      继续沟通
-                    </Button>
-                    <PortraStatusBadge label={selectedOrderPerspective || '身份待确认'} tone="neutral" />
-                    <PortraStatusBadge label={formatOrderStatus(selectedOrder.status)} />
-                    <PortraStatusBadge label={formatEscrowStatus(selectedOrder.escrowStatus)} />
+                    <PortraStatusPill label={selectedOrderPerspective || '身份待确认'} tone="neutral" />
+                    <PortraStatusPill label={formatOrderStatus(selectedOrder.status)} />
+                    <PortraStatusPill label={formatEscrowStatus(selectedOrder.escrowStatus)} />
                   </Stack>
                 </Stack>
                 <Divider sx={{ borderColor: PORTRA_SURFACE.borderSoft }} />
@@ -861,7 +833,7 @@ export function OrdersPage() {
                   <InfoRows rows={[
                     ['拍摄时间', formatOrderTimeRange(selectedOrder)],
                     ['拍摄地点', selectedOrderLocation],
-                    ['交付截止', formatTime(selectedOrder.deliveryDeadline)]
+                    ['成片截止', formatTime(selectedOrder.deliveryDeadline)]
                   ]} />
                 </PortraTicketSection>
                 {fulfillmentNotice && (
@@ -1111,7 +1083,7 @@ export function OrdersPage() {
                                 key={file.id || file.fileId}
                                 size="small"
                                 icon={<ImageRoundedIcon />}
-                                label={deliveryFileNameMap.get(Number(file.fileId)) || formatFileDisplayName(file, `交付作品 ${file.fileId}`)}
+                                label={deliveryFileNameMap.get(Number(file.fileId)) || formatFileDisplayName(file, `作品文件 ${file.fileId}`)}
                               />
                             ))}
                             {!(authorization.files || []).length && (
@@ -1286,7 +1258,7 @@ export function OrdersPage() {
         )}
       </Box>
       <Dialog open={Boolean(previewDelivery)} onClose={closeDeliveryPreview} fullWidth maxWidth="md">
-        <DialogTitle>{previewDelivery ? formatDeliveryTitle(previewDelivery) : '交付作品'}</DialogTitle>
+        <DialogTitle>{previewDelivery ? formatDeliveryTitle(previewDelivery) : '作品文件'}</DialogTitle>
         <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
           <Stack spacing={1.5}>
             {previewLoading && <Typography sx={{ color: PORTRA_SURFACE.muted }}>作品预览加载中...</Typography>}
@@ -1294,7 +1266,7 @@ export function OrdersPage() {
               <Box
                 component="img"
                 src={previewUrl}
-                alt={previewDelivery ? formatDeliveryTitle(previewDelivery) : '交付作品'}
+                alt={previewDelivery ? formatDeliveryTitle(previewDelivery) : '作品文件'}
                 sx={{ width: '100%', maxHeight: '62vh', objectFit: 'contain', borderRadius: PORTRA_RADIUS.control, bgcolor: PORTRA_SURFACE.paperMuted }}
               />
             )}
@@ -1307,8 +1279,8 @@ export function OrdersPage() {
             {previewDelivery && (
               <InfoRows rows={[
                 ['文件名', formatDeliveryTitle(previewDelivery)],
-                ['交付时间', formatTime(previewDelivery.uploadTime)],
-                ['交付说明', formatDeliveryDescription(previewDelivery, '无交付说明')]
+                ['上传时间', formatTime(previewDelivery.uploadTime)],
+                ['作品说明', formatDeliveryDescription(previewDelivery, '无作品说明')]
               ]} />
             )}
           </Stack>
@@ -1351,28 +1323,42 @@ export function OrdersPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Stack>
+    </PortraWorkflowFrame>
   )
 }
 
 const orderPageSx = {
-  color: PORTRA_SURFACE.ink
+  color: PORTRA_SURFACE.ink,
+  overflowWrap: 'anywhere'
 }
 
 const orderGridSx = {
   display: 'grid',
-  gridTemplateColumns: { xs: '1fr', md: '330px minmax(0, 1fr)' },
-  gap: { xs: 1.6, md: 2.4 },
-  alignItems: 'start'
+  gridTemplateColumns: {
+    xs: 'minmax(0, 1fr)',
+    lg: `${PORTRA_LAYOUT.orderSidebarWidth.lg} minmax(0, 1fr)`,
+    xl: `${PORTRA_LAYOUT.orderSidebarWidth.xl} minmax(0, 1fr)`
+  },
+  gap: { xs: 1.6, lg: 2.75 },
+  alignItems: 'start',
+  minWidth: 0
 }
 
 const orderIndexPanelSx = {
   p: { xs: 1.6, md: 1.8 },
   alignSelf: 'start',
+  minWidth: 0,
   bgcolor: PORTRA_SURFACE.paper,
   borderColor: PORTRA_SURFACE.borderSubtle,
   borderRadius: PORTRA_RADIUS.panel,
   boxShadow: PORTRA_SHADOW.soft
+}
+
+const orderDetailWorkspaceSx = {
+  minWidth: 0,
+  width: '100%',
+  maxWidth: '100%',
+  overflowWrap: 'anywhere'
 }
 
 const filterControlSx = {
@@ -1456,14 +1442,6 @@ const statusChipSx = {
 const returnLinkSx = {
   alignSelf: 'flex-start',
   mb: 0.8,
-  ml: -0.8,
-  minHeight: 32,
-  px: 0.8,
-  borderRadius: 999,
-  color: PORTRA_SURFACE.portraBlue,
-  fontWeight: 850,
-  '&:hover': {
-    bgcolor: PORTRA_SURFACE.portraBlueSoft
-  }
+  ml: -0.4
 }
 

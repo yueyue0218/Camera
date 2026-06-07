@@ -262,7 +262,7 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
         ['订单金额', centToYuan(order.amountCent)],
         ...baseRows
       ],
-      note: '当前支付入口调用后端模拟支付接口；未支付前不应进入拍摄或交付。'
+      note: '当前支付入口调用后端模拟支付接口；未支付前不应进入拍摄或上传作品。'
     }
   }
 
@@ -284,7 +284,7 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
   if (status === 'SHOOTING') {
     return {
       title: '拍摄中',
-      description: '订单处于拍摄履约阶段，拍摄完成后才进入待交付。',
+      description: '订单处于拍摄履约阶段，拍摄完成后才进入待上传作品。',
       color: 'info',
       severity: 'warning',
       rows: [
@@ -299,31 +299,31 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
   if (status === 'PENDING_DELIVERY') {
     return {
       title: '等待服务方上传作品',
-      description: '摄影师需通过交付入口上传作品，上传成功后订单进入待客户确认。',
+      description: '摄影师需通过作品入口上传作品，上传成功后订单进入待客户确认。',
       color: 'secondary',
       severity: 'info',
       rows: [
-        ['最晚交付时间', formatTimeOrMissing(order.deliveryDeadline)],
-        ['已有交付记录', `${deliveryRecords.length} 条`],
+        ['成片截止时间', formatTimeOrMissing(order.deliveryDeadline)],
+        ['已有作品记录', `${deliveryRecords.length} 条`],
         ...baseRows
       ],
-      note: '若超过最晚交付时间且服务方未上传任何作品，系统将自动退款并结束订单。'
+      note: '若超过成片截止时间且服务方未上传任何作品，系统将自动退款并结束订单。'
     }
   }
 
   if (status === 'DELIVERED_PENDING_CONFIRM') {
     return {
-      title: '已交付，等待客户确认',
+      title: '作品已上传，等待客户确认',
       description: '客户需确认接收作品，或提交返修要求；未处理时由后端自动确认任务处理。',
       color: 'primary',
       severity: latestDeliveryUploadTime ? 'info' : 'warning',
       rows: [
-        ['最新交付时间', formatTimeOrMissing(latestDeliveryUploadTime)],
-        ['预计自动确认时间', estimatedAutoConfirmTime ? formatTime(estimatedAutoConfirmTime) : '等待交付时间同步'],
-        ['交付记录', `${deliveryRecords.length} 条`],
+        ['最新上传时间', formatTimeOrMissing(latestDeliveryUploadTime)],
+        ['预计自动确认时间', estimatedAutoConfirmTime ? formatTime(estimatedAutoConfirmTime) : '等待上传时间同步'],
+        ['作品记录', `${deliveryRecords.length} 条`],
         ...baseRows
       ],
-      note: '摄影师已交付作品。客户需在交付后 7 天内确认接收或提交返修要求；若 7 天内未处理，系统将自动确认订单完成并释放平台担保资金。前端仅展示规则，不模拟自动确认。'
+      note: '摄影师已上传作品。客户需在上传后 7 天内确认接收或提交返修要求；若 7 天内未处理，系统将自动确认订单完成并释放平台担保资金。前端仅展示规则，不模拟自动确认。'
     }
   }
 
@@ -336,10 +336,10 @@ export function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, la
       rows: [
         ['最近返修要求', latestReworkLog?.reason || latestReworkLog?.remark || '等待返修说明同步'],
         ['返修状态时间', formatTimeOrMissing(latestReworkLog?.createdAt)],
-        ['已有交付记录', `${deliveryRecords.length} 条`],
+        ['已有作品记录', `${deliveryRecords.length} 条`],
         ...baseRows
       ],
-      note: '服务方必须通过交付入口重新上传作品；页面不会提供绕过上传的返修完成按钮。'
+      note: '服务方必须通过作品入口重新上传作品；页面不会提供绕过上传的返修完成按钮。'
     }
   }
 
