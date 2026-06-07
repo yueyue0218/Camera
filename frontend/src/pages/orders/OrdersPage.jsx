@@ -1049,9 +1049,9 @@ export function OrdersPage() {
                         minRows={2}
                         placeholder="说明本次作品内容、返修修改点或注意事项"
                       />
-                      <Button type="submit" variant="contained" startIcon={<TaskAltRoundedIcon />} disabled={loading || !deliveryForm.file}>
+                      <PortraActionButton type="submit" startIcon={<TaskAltRoundedIcon />} disabled={loading || !deliveryForm.file}>
                         上传作品
-                      </Button>
+                      </PortraActionButton>
                     </Stack>
                   </Paper>
                 )}
@@ -1140,14 +1140,13 @@ export function OrdersPage() {
                             minRows={2}
                             placeholder="说明希望展示这些照片的用途，例如作品集客片展示"
                           />
-                          <Button
+                          <PortraActionButton
                             type="submit"
-                            variant="contained"
                             startIcon={<ImageRoundedIcon />}
                             disabled={loading || !photoAuthorizationForm.fileIds.length}
                           >
                             发送授权申请
-                          </Button>
+                          </PortraActionButton>
                         </>
                       ) : (
                         <PortraInfoBanner>暂无可授权作品，请先上传作品。</PortraInfoBanner>
