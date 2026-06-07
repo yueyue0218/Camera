@@ -16,10 +16,10 @@ const TAB_DEFINITIONS = [
   { key: 'dynamic', label: '动态' }
 ]
 
-const ORDER_EVENTS = new Set(['ORDER_PAID', 'ORDER_CANCELLED', 'ORDER_COMPLETED', 'DELIVERY_UPLOADED'])
-const REVIEW_EVENTS = new Set(['REVIEW_RECEIVED', 'REVIEW_FOLLOW_UP_RECEIVED'])
-const APPEAL_EVENTS = new Set(['REVIEW_COMPLAINT_CREATED', 'REVIEW_COMPLAINT_RESOLVED'])
-const DYNAMIC_EVENTS = new Set(['MOMENT_LIKED', 'FOLLOWED'])
+const ORDER_EVENTS = ['ORDER_', 'DEMAND_RESPONSE_', 'CONVERSATION_STARTED', 'DELIVERY_UPLOADED']
+const REVIEW_EVENTS = ['REVIEW_']
+const APPEAL_EVENTS = ['REVIEW_COMPLAINT_', 'DISPUTE']
+const DYNAMIC_EVENTS = ['MOMENT_LIKED', 'FOLLOWED']
 
 function normalizeText(value) {
   return String(value || '').trim().toUpperCase()
@@ -34,7 +34,7 @@ function parseMetadata(metadataJson) {
   }
 }
 
-function getTypeTokens(item) {
+function typeTokens(item) {
   return [
     normalizeText(item?.type),
     normalizeText(item?.eventType),
@@ -44,25 +44,26 @@ function getTypeTokens(item) {
   ]
 }
 
-function includesAny(item, values) {
-  const tokens = getTypeTokens(item)
-  return tokens.some(token => values.some(value => token.includes(value)))
+function hasToken(item, tokens) {
+  const values = typeTokens(item)
+  return tokens.some(token => values.some(value => value.includes(token)))
 }
 
 function isAppealNotification(item) {
-  return includesAny(item, ['REVIEW_COMPLAINT', 'DISPUTE'])
+  return hasToken(item, APPEAL_EVENTS)
 }
 
 function isOrderNotification(item) {
-  return includesAny(item, ['ORDER_']) || getTypeTokens(item).includes('DELIVERY_UPLOADED')
+  return hasToken(item, ORDER_EVENTS)
 }
 
 function isReviewNotification(item) {
-  return includesAny(item, ['REVIEW_']) && !isAppealNotification(item)
+  return hasToken(item, REVIEW_EVENTS) && !isAppealNotification(item)
 }
 
 function isDynamicNotification(item) {
-  return getTypeTokens(item).some(token => DYNAMIC_EVENTS.has(token) || token.includes('MOMENT'))
+  const values = typeTokens(item)
+  return values.some(value => DYNAMIC_EVENTS.includes(value) || value.includes('MOMENT'))
 }
 
 function getNotificationCategory(item) {
@@ -73,58 +74,8 @@ function getNotificationCategory(item) {
   return 'all'
 }
 
-function getOrderIdForItem(item) {
-  const metadata = parseMetadata(item?.metadataJson)
-  return metadata?.orderId ?? item?.targetId ?? item?.relatedId ?? item?.sourceId ?? null
-}
-
-function getUserIdForFollowTarget(item) {
-  return item?.sourceId ?? item?.actorUserId ?? item?.relatedId ?? item?.targetId ?? null
-}
-
-function resolveNotificationTarget(item) {
-  if (item?.navigationPath?.startsWith('/')) return item.navigationPath
-
-  const relatedId = item?.relatedId ?? item?.targetId ?? item?.sourceId
-  const type = normalizeText(item?.type)
-  const eventType = normalizeText(item?.eventType)
-
-  if (isAppealNotification(item)) {
-    if (type.includes('REVIEW_COMPLAINT') || eventType.includes('REVIEW_COMPLAINT')) {
-      return relatedId ? `/review-complaints/${relatedId}` : '/orders'
-    }
-    const orderId = getOrderIdForItem(item)
-    return orderId ? `/orders?orderId=${orderId}` : '/orders'
-  }
-
-  if (isOrderNotification(item)) {
-    const orderId = getOrderIdForItem(item)
-    return orderId ? `/orders?orderId=${orderId}` : '/orders'
-  }
-
-  if (isReviewNotification(item)) {
-    const orderId = getOrderIdForItem(item)
-    return orderId ? `/orders?orderId=${orderId}` : '/reviews'
-  }
-
-  if (type.includes('CREDIT') || eventType.includes('CREDIT')) {
-    return '/profile/credit'
-  }
-
-  if (type.includes('FOLLOWED') || eventType.includes('FOLLOWED')) {
-    const userId = getUserIdForFollowTarget(item)
-    return userId ? `/users/${userId}/reviews` : ''
-  }
-
-  if (type.includes('MOMENT') || eventType.includes('MOMENT')) {
-    return relatedId ? `/moments/${relatedId}` : ''
-  }
-
-  if (type.includes('USER') || eventType.includes('USER')) {
-    return relatedId ? `/users/${relatedId}` : ''
-  }
-
-  return ''
+function getMetadata(item) {
+  return parseMetadata(item?.metadataJson) || {}
 }
 
 function resolveTypeLabel(item) {
@@ -132,10 +83,11 @@ function resolveTypeLabel(item) {
   const eventType = normalizeText(item?.eventType)
   const relatedType = normalizeText(item?.relatedType)
 
-  if (APPEAL_EVENTS.has(type) || APPEAL_EVENTS.has(eventType) || relatedType.includes('REVIEW_COMPLAINT')) return '申诉'
-  if (ORDER_EVENTS.has(type) || ORDER_EVENTS.has(eventType) || relatedType.includes('ORDER')) return '订单'
-  if (REVIEW_EVENTS.has(type) || REVIEW_EVENTS.has(eventType) || relatedType.includes('REVIEW')) return '评价'
-  if (DYNAMIC_EVENTS.has(type) || DYNAMIC_EVENTS.has(eventType) || relatedType.includes('MOMENT')) return '动态'
+  if (APPEAL_EVENTS.some(token => type.includes(token) || eventType.includes(token) || relatedType.includes(token))) return '申诉'
+  if (type.includes('DEMAND_RESPONSE') || eventType.includes('DEMAND_RESPONSE') || type.includes('CONVERSATION_STARTED')) return '约拍'
+  if (ORDER_EVENTS.some(token => type.includes(token) || eventType.includes(token) || relatedType.includes(token))) return '订单'
+  if (REVIEW_EVENTS.some(token => type.includes(token) || eventType.includes(token) || relatedType.includes(token))) return '评价'
+  if (DYNAMIC_EVENTS.some(token => type.includes(token) || eventType.includes(token) || relatedType.includes(token))) return '动态'
   if (type.includes('CREDIT') || eventType.includes('CREDIT')) return '信用'
   if (type.includes('FOLLOWED') || eventType.includes('FOLLOWED')) return '关注'
   return item?.type ? String(item.type) : '通知'
@@ -181,6 +133,60 @@ function buildDynamicGroups(items) {
     })),
     looseItems
   }
+}
+
+function resolveNotificationTarget(item) {
+  if (item?.navigationPath?.startsWith('/')) return item.navigationPath
+
+  const metadata = getMetadata(item)
+  const type = normalizeText(item?.type)
+  const eventType = normalizeText(item?.eventType)
+  const relatedId = item?.relatedId ?? item?.targetId ?? item?.sourceId ?? null
+
+  if (isAppealNotification(item)) {
+    return relatedId ? `/review-complaints/${relatedId}` : '/reviews'
+  }
+
+  if (type.includes('DEMAND_RESPONSE') || eventType.includes('DEMAND_RESPONSE')) {
+    if (metadata.conversationId) return `/messages/${metadata.conversationId}`
+    if (metadata.demandId) return `/demands/${metadata.demandId}`
+    return '/hall?tab=demand'
+  }
+
+  if (type.includes('CONVERSATION_STARTED') || eventType.includes('CONVERSATION_STARTED')) {
+    if (metadata.conversationId) return `/messages/${metadata.conversationId}`
+    if (metadata.demandId) return `/demands/${metadata.demandId}`
+    return '/messages'
+  }
+
+  if (isOrderNotification(item)) {
+    const orderId = metadata.orderId ?? item?.targetId ?? item?.relatedId ?? item?.sourceId
+    return orderId ? `/orders?orderId=${orderId}` : '/orders'
+  }
+
+  if (isReviewNotification(item)) {
+    const orderId = metadata.orderId
+    return orderId ? `/orders/${orderId}/reviews` : '/reviews'
+  }
+
+  if (type.includes('CREDIT') || eventType.includes('CREDIT')) {
+    return '/profile/credit'
+  }
+
+  if (type.includes('FOLLOWED') || eventType.includes('FOLLOWED')) {
+    const userId = item?.sourceId ?? item?.actorUserId ?? item?.relatedId ?? null
+    return userId ? `/users/${userId}` : ''
+  }
+
+  if (type.includes('MOMENT') || eventType.includes('MOMENT')) {
+    return relatedId ? `/moments/${relatedId}` : ''
+  }
+
+  if (type.includes('USER') || eventType.includes('USER')) {
+    return relatedId ? `/users/${relatedId}` : ''
+  }
+
+  return ''
 }
 
 function NotificationCard({ item, compact = false, onClick }) {

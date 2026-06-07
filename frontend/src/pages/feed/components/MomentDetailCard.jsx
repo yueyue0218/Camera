@@ -40,7 +40,8 @@ export function MomentDetailCard({
   onFavorite,
   onFollow,
   onEdit,
-  onDelete
+  onDelete,
+  canFollow = true
 }) {
   const images = useMemo(() => imageList(moment), [moment])
   const sliderRef = useRef(null)
@@ -85,7 +86,7 @@ export function MomentDetailCard({
           <strong>{authorName || `${roleLabel(moment.authorRole)} ${moment.authorId}`}</strong>
         </Box>
         <div className="moment-detail__meta-time">{formatTime(moment.createdAt)}</div>
-        {!isSelf && (
+        {canFollow && !isSelf && (
           <button
             type="button"
             className={`moment-detail__follow ${isFollowing ? 'is-following' : ''}`}

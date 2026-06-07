@@ -90,8 +90,8 @@ public class ReviewService {
         notificationService.createNotification(new NotificationCreateRequest(
                 savedReview.getTargetUserId(),
                 savedReview.getReviewerId(),
-                "New review received",
-                "You have received a new order review.",
+                "收到新评价",
+                "你收到了一条新的订单评价。",
                 REVIEW_RECEIVED,
                 REVIEW_RECEIVED,
                 RELATED_REVIEW,
@@ -101,7 +101,7 @@ public class ReviewService {
                 RELATED_REVIEW,
                 savedReview.getId(),
                 "review:received:" + savedReview.getId(),
-                null
+                buildReviewMetadata(savedReview.getOrderId(), savedReview.getId())
         ));
 
         return toResponse(savedReview);
@@ -130,8 +130,8 @@ public class ReviewService {
         notificationService.createNotification(new NotificationCreateRequest(
                 savedReview.getTargetUserId(),
                 savedReview.getReviewerId(),
-                "Review follow-up received",
-                "You have received a follow-up to an order review.",
+                "收到追评",
+                "你收到了一条订单追评。",
                 REVIEW_FOLLOW_UP_RECEIVED,
                 REVIEW_FOLLOW_UP_RECEIVED,
                 RELATED_REVIEW,
@@ -141,7 +141,7 @@ public class ReviewService {
                 RELATED_REVIEW,
                 savedReview.getId(),
                 "review:follow-up:" + savedReview.getId(),
-                null
+                buildReviewMetadata(savedReview.getOrderId(), savedReview.getId())
         ));
         return toResponse(savedReview);
     }
@@ -328,6 +328,10 @@ public class ReviewService {
 
     private boolean isAdmin() {
         return UserContext.getCurrentRole() != null && UserContext.getCurrentRole().name().equals("ADMIN");
+    }
+
+    private String buildReviewMetadata(Long orderId, Long reviewId) {
+        return String.format("{\"orderId\":%d,\"reviewId\":%d}", orderId, reviewId);
     }
 
     private record ReviewTarget(Long targetUserId, String direction) {

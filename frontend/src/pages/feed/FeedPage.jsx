@@ -88,10 +88,9 @@ export function FeedPage() {
         ? { authorId: currentUser.userId }
         : { scope }
 
-      const [momentsResult, customerFollowingResult, providerFollowingResult] = await Promise.allSettled([
+      const [momentsResult, followingResult] = await Promise.allSettled([
         momentApi.list(params, currentUser),
-        userApi.following(currentUser.userId, currentUser, 'CUSTOMER'),
-        userApi.following(currentUser.userId, currentUser, 'PROVIDER')
+        userApi.following(currentUser.userId, currentUser, currentRoleKey)
       ])
 
       if (cancelled) return
@@ -101,11 +100,8 @@ export function FeedPage() {
       setNotice(momentsResult.status === 'rejected' ? { type: 'error', text: momentsResult.reason?.message || '动态加载失败' } : null)
 
       const nextFollowing = emptyFollowState()
-      if (customerFollowingResult.status === 'fulfilled') {
-        customerFollowingResult.value.forEach(item => nextFollowing.CUSTOMER.add(Number(item.userId)))
-      }
-      if (providerFollowingResult.status === 'fulfilled') {
-        providerFollowingResult.value.forEach(item => nextFollowing.PROVIDER.add(Number(item.userId)))
+      if (followingResult.status === 'fulfilled') {
+        followingResult.value.forEach(item => nextFollowing[currentRoleKey].add(Number(item.userId)))
       }
       setFollowingMap(nextFollowing)
 
@@ -117,21 +113,43 @@ export function FeedPage() {
       avatarUrlsRef.current.forEach(url => URL.revokeObjectURL(url))
       avatarUrlsRef.current = []
       const ids = uniqueAuthorIds(list, currentUser.userId)
+      const rolesById = new Map()
+      list.forEach(item => {
+        const authorId = Number(item.authorId)
+        if (!rolesById.has(authorId) && item.authorRole) {
+          rolesById.set(authorId, String(item.authorRole).toUpperCase())
+        }
+      })
       const entries = await Promise.all(ids.map(async id => {
+        const authorRole = rolesById.get(id) || currentRoleKey
         try {
-          const brief = await userApi.brief(id, currentUser)
+          const profile = await userApi.publicProfile(id, currentUser, authorRole)
           let avatarData = ''
-          if (brief.avatarFileId) {
+          if (profile?.avatarFileId) {
             try {
-              avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser)
+              avatarData = await fileApi.downloadObjectUrl(profile.avatarFileId, currentUser)
               avatarUrlsRef.current.push(avatarData)
             } catch {
               avatarData = ''
             }
           }
-          return [id, { nickname: brief.nickname, avatarData }]
+          return [id, { nickname: profile?.nickname || `用户 ${id}`, avatarData }]
         } catch {
-          return [id, { nickname: `用户 ${id}`, avatarData: '' }]
+          try {
+            const brief = await userApi.brief(id, currentUser)
+            let avatarData = ''
+            if (brief.avatarFileId) {
+              try {
+                avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser)
+                avatarUrlsRef.current.push(avatarData)
+              } catch {
+                avatarData = ''
+              }
+            }
+            return [id, { nickname: brief.nickname || `用户 ${id}`, avatarData }]
+          } catch {
+            return [id, { nickname: `用户 ${id}`, avatarData: '' }]
+          }
         }
       }))
       if (!cancelledFlag) {
@@ -140,7 +158,7 @@ export function FeedPage() {
           nextProfiles[id] = profile
         })
         nextProfiles[currentUser.userId] = {
-        nickname: currentUser.nickname || currentUser.label || `用户 ${currentUser.userId}`,
+          nickname: currentUser.nickname || currentUser.label || `用户 ${currentUser.userId}`,
           avatarData: currentUser.avatarData || ''
         }
         setAuthorProfiles(nextProfiles)
@@ -175,7 +193,8 @@ export function FeedPage() {
 
   function isFollowing(authorId, authorRole) {
     const roleKey = (authorRole || 'CUSTOMER').toUpperCase()
-    return followingMap[roleKey]?.has(Number(authorId)) || false
+    if (roleKey !== currentRoleKey) return false
+    return followingMap[currentRoleKey]?.has(Number(authorId)) || false
   }
 
   function mergeMoment(nextMoment) {
@@ -206,15 +225,16 @@ export function FeedPage() {
 
   function syncFollowState(authorId, authorRole, followed) {
     const roleKey = (authorRole || 'CUSTOMER').toUpperCase()
+    if (roleKey !== currentRoleKey) return
     setFollowingMap(prev => {
       const next = {
         CUSTOMER: new Set(prev.CUSTOMER),
         PROVIDER: new Set(prev.PROVIDER)
       }
       if (followed) {
-        next[roleKey].add(Number(authorId))
+        next[currentRoleKey].add(Number(authorId))
       } else {
-        next[roleKey].delete(Number(authorId))
+        next[currentRoleKey].delete(Number(authorId))
       }
       return next
     })
@@ -226,10 +246,9 @@ export function FeedPage() {
       ? { authorId: currentUser.userId }
       : { scope }
     setLoading(true)
-    const [momentsResult, customerFollowingResult, providerFollowingResult] = await Promise.allSettled([
+    const [momentsResult, followingResult] = await Promise.allSettled([
       momentApi.list(params, currentUser),
-      userApi.following(currentUser.userId, currentUser, 'CUSTOMER'),
-      userApi.following(currentUser.userId, currentUser, 'PROVIDER')
+      userApi.following(currentUser.userId, currentUser, currentRoleKey)
     ])
     const nextMoments = normalizeMoments(momentsResult.status === 'fulfilled' ? momentsResult.value : [])
     setMoments(nextMoments)
@@ -237,32 +256,51 @@ export function FeedPage() {
       setNotice({ type: 'error', text: momentsResult.reason?.message || '动态加载失败' })
     }
     const nextFollowing = emptyFollowState()
-    if (customerFollowingResult.status === 'fulfilled') {
-      customerFollowingResult.value.forEach(item => nextFollowing.CUSTOMER.add(Number(item.userId)))
-    }
-    if (providerFollowingResult.status === 'fulfilled') {
-      providerFollowingResult.value.forEach(item => nextFollowing.PROVIDER.add(Number(item.userId)))
+    if (followingResult.status === 'fulfilled') {
+      followingResult.value.forEach(item => nextFollowing[currentRoleKey].add(Number(item.userId)))
     }
     setFollowingMap(nextFollowing)
     await (async () => {
       avatarUrlsRef.current.forEach(url => URL.revokeObjectURL(url))
       avatarUrlsRef.current = []
       const ids = uniqueAuthorIds(nextMoments, currentUser.userId)
+      const rolesById = new Map()
+      nextMoments.forEach(item => {
+        const authorId = Number(item.authorId)
+        if (!rolesById.has(authorId) && item.authorRole) {
+          rolesById.set(authorId, String(item.authorRole).toUpperCase())
+        }
+      })
       const entries = await Promise.all(ids.map(async id => {
+        const authorRole = rolesById.get(id) || currentRoleKey
         try {
-          const brief = await userApi.brief(id, currentUser)
+          const profile = await userApi.publicProfile(id, currentUser, authorRole)
           let avatarData = ''
-          if (brief.avatarFileId) {
+          if (profile?.avatarFileId) {
             try {
-              avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser)
+              avatarData = await fileApi.downloadObjectUrl(profile.avatarFileId, currentUser)
               avatarUrlsRef.current.push(avatarData)
             } catch {
               avatarData = ''
             }
           }
-          return [id, { nickname: brief.nickname, avatarData }]
+          return [id, { nickname: profile?.nickname || `用户 ${id}`, avatarData }]
         } catch {
-          return [id, { nickname: `鐢ㄦ埛 ${id}`, avatarData: '' }]
+          try {
+            const brief = await userApi.brief(id, currentUser)
+            let avatarData = ''
+            if (brief.avatarFileId) {
+              try {
+                avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser)
+                avatarUrlsRef.current.push(avatarData)
+              } catch {
+                avatarData = ''
+              }
+            }
+            return [id, { nickname: brief.nickname || `用户 ${id}`, avatarData }]
+          } catch {
+            return [id, { nickname: `用户 ${id}`, avatarData: '' }]
+          }
         }
       }))
       const nextProfiles = {
@@ -368,12 +406,17 @@ export function FeedPage() {
   }
 
   async function toggleFollow(authorId, authorRole) {
+    const roleKey = (authorRole || 'CUSTOMER').toUpperCase()
+    if (roleKey !== currentRoleKey) {
+      setNotice({ type: 'error', text: '不同账号类型之间不能互相关注' })
+      return
+    }
     const followed = isFollowing(authorId, authorRole)
     try {
       if (followed) {
-        await userApi.unfollow(authorId, currentUser, authorRole)
+        await userApi.unfollow(authorId, currentUser, currentRoleKey)
       } else {
-        await userApi.follow(authorId, currentUser, authorRole)
+        await userApi.follow(authorId, currentUser, currentRoleKey)
       }
       setNotice({ type: 'success', text: followed ? '已取消关注' : '已关注' })
       syncFollowState(authorId, authorRole, !followed)
@@ -492,6 +535,7 @@ export function FeedPage() {
                 onFollow={toggleFollow}
                 onEdit={openComposer}
                 onDelete={requestDelete}
+                canFollow={String(moment.authorRole || '').toUpperCase() === currentRoleKey}
               />
             )
           })}
@@ -536,6 +580,7 @@ export function FeedPage() {
               onFollow={toggleFollow}
               onEdit={openComposer}
               onDelete={requestDelete}
+              canFollow={String(currentDrawerMoment.authorRole || '').toUpperCase() === currentRoleKey}
             />
           ) : null}
         </div>

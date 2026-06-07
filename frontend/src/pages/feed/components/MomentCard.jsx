@@ -32,7 +32,8 @@ export function MomentCard({
   onFavorite,
   onFollow,
   onEdit,
-  onDelete
+  onDelete,
+  canFollow = true
 }) {
   const images = moment.imageDataList?.length
     ? moment.imageDataList
@@ -53,7 +54,7 @@ export function MomentCard({
           <strong>{authorName || `${roleLabel(moment.authorRole)} ${moment.authorId}`}</strong>
         </div>
         <div className="moment-card__meta-time">{formatTime(moment.createdAt)}</div>
-        {!isSelf && (
+        {canFollow && !isSelf && (
           <button
             type="button"
             className={`moment-card__follow ${isFollowing ? 'is-following' : ''}`}
