@@ -293,12 +293,13 @@ export function ProfilePage() {
     [myFollowers]
   )
 
+  const TERMINAL_STATUSES = ['COMPLETED','REVIEWED','CANCELLED','REFUNDED','APPEALING']
   const historicalOrders = profileOrders.filter(o => ['COMPLETED','REVIEWED'].includes(o.status)).length
-  const ongoingOrders = profileOrders.filter(o => !['COMPLETED','REVIEWED','CANCELLED'].includes(o.status)).length
+  const ongoingOrders = profileOrders.filter(o => !TERMINAL_STATUSES.includes(o.status)).length
   const pendingInvitations = invitations.filter(i => (i.status || 'PENDING_CUSTOMER_ACCEPT') === 'PENDING_CUSTOMER_ACCEPT').length
   const creditScore = creditSummary?.creditScore ?? null
-  const totalOrders = profileOrders.length
-  const completionRate = totalOrders > 0 ? Math.round((historicalOrders / totalOrders) * 100) : 100
+  const billableOrders = profileOrders.filter(o => o.status !== 'REFUNDED').length
+  const completionRate = billableOrders > 0 ? Math.round((historicalOrders / billableOrders) * 100) : 100
   const genderText = currentUser.gender === 'MALE' ? '男' : currentUser.gender === 'FEMALE' ? '女' : '保密'
   const displayName = profileForm.nickname || currentUser.label || `用户${currentUser.userId}`
   const schoolPin = currentUser.school || 'Portra'
