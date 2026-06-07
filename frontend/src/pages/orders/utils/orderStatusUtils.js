@@ -3,7 +3,7 @@ import {
   ESCROW_STATUS_LABELS,
   ORDER_STATUS_LABELS,
   SETTLEMENT_STATUS_LABELS,
-  formatDateTime,
+  formatChineseDateTime,
   formatEscrowStatus as formatDisplayEscrowStatus,
   formatOrderStatus as formatDisplayOrderStatus,
   formatOrderTitle as formatDisplayOrderTitle,
@@ -223,7 +223,7 @@ export function directionLabel(direction) {
 }
 
 export function formatTime(value) {
-  return formatDateTime(value, '刚刚')
+  return formatChineseDateTime(value, '刚刚')
 }
 
 export function parseQuoteSnapshot(raw) {

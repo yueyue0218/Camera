@@ -323,7 +323,8 @@ const quoteDialogTitleSx = {
 
 const quoteDialogContentSx = {
   px: 3,
-  py: 2.2,
+  pt: 3.25,
+  pb: 2.2,
   '& .MuiDialogContentText-root': { color: PORTRA_COLORS.mutedInk, lineHeight: 1.7 },
   '& .MuiOutlinedInput-root': { bgcolor: PORTRA_COLORS.paperSoft, borderRadius: PORTRA_RADII.control }
 }

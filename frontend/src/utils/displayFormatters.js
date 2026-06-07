@@ -78,6 +78,16 @@ function normalizeDate(value) {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
+function padDatePart(value) {
+  return String(value).padStart(2, '0')
+}
+
+function formatChineseDateParts(date, includeTime = true) {
+  const dateText = `${date.getFullYear()}年${padDatePart(date.getMonth() + 1)}月${padDatePart(date.getDate())}日`
+  if (!includeTime) return dateText
+  return `${dateText} ${padDatePart(date.getHours())}:${padDatePart(date.getMinutes())}`
+}
+
 export function asArray(value) {
   if (Array.isArray(value)) return value
   if (value === null || value === undefined) return []
@@ -118,6 +128,25 @@ export function formatDateOnly(value, fallback = '待确认') {
     month: '2-digit',
     day: '2-digit'
   })
+}
+
+export function formatChineseDateTime(value, fallback = '待确认') {
+  const date = normalizeDate(value)
+  if (!date) return fallback
+  return formatChineseDateParts(date, true)
+}
+
+export function formatChineseDate(value, fallback = '待确认') {
+  const date = normalizeDate(value)
+  if (!date) return fallback
+  return formatChineseDateParts(date, false)
+}
+
+export function formatChineseDateTimeRange(start, end, fallback = '待确认') {
+  if (!start && !end) return fallback
+  const startText = formatChineseDateTime(start, start ? fallback : '未提供')
+  const endText = formatChineseDateTime(end, end ? fallback : '未提供')
+  return `${startText} 至 ${endText}`
 }
 
 export function formatShortDate(value, fallback = '') {

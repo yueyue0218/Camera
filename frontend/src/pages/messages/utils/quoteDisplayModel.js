@@ -1,6 +1,7 @@
 import {
-  formatDateOnly,
-  formatDateTime,
+  formatChineseDate,
+  formatChineseDateTime,
+  formatChineseDateTimeRange,
   formatMoney,
   formatPhotoUsageScope,
   formatQuoteRemark,
@@ -33,16 +34,16 @@ export function buildQuoteDisplayModel(quote, event = {}) {
     amountText: formatMoney(resolveAmountCent(quote), '报价待确认'),
     statusLabel: STATUS_LABEL[status] || '报价状态已更新',
     statusTone: STATUS_TONE[status] || 'neutral',
-    messageCreatedAtText: formatDateTime(event?.timestamp || quote?.createdAt, '刚刚'),
-    shootStartTimeText: formatDateTime(quote?.shootStartTime, '拍摄开始时间待确认'),
-    shootEndTimeText: formatDateTime(quote?.shootEndTime, '未提供'),
-    shootTimeText: formatDateTime(quote?.shootStartTime, '拍摄时间待确认'),
+    messageCreatedAtText: formatChineseDateTime(event?.timestamp || quote?.createdAt, '刚刚'),
+    shootStartTimeText: formatChineseDateTime(quote?.shootStartTime, '拍摄开始时间待确认'),
+    shootEndTimeText: formatChineseDateTime(quote?.shootEndTime, '未提供'),
+    shootTimeText: formatChineseDateTime(quote?.shootStartTime, '拍摄时间待确认'),
     shootPeriodText: resolveShootPeriodText(quote),
     shootLocationText: sanitizeSeedText(quote?.location || quote?.shootLocation, '拍摄地点待确认'),
     serviceContentText: formatQuoteServiceContent(quote, '按双方沟通内容执行'),
     photoUsageLabel: photoUsage && photoUsage !== '未填写' ? photoUsage : '按双方约定使用',
     originalRefinedText: `${normalizeCount(quote?.originalCount)} / ${normalizeCount(quote?.refinedCount)}`,
-    deliveryDeadlineText: formatDateOnly(quote?.deliveryDeadline, '交付时间待确认'),
+    deliveryDeadlineText: formatChineseDate(quote?.deliveryDeadline, '交付时间待确认'),
     remarkText: formatQuoteRemark(quote, '无额外备注'),
     orderNoticeText: resolveOrderNotice(status)
   }
@@ -77,7 +78,5 @@ function normalizeCount(value) {
 }
 
 function resolveShootPeriodText(quote) {
-  const start = formatDateTime(quote?.shootStartTime, '拍摄开始时间待确认')
-  const end = formatDateTime(quote?.shootEndTime, '未提供')
-  return `${start} - ${end}`
+  return formatChineseDateTimeRange(quote?.shootStartTime, quote?.shootEndTime, '拍摄时段待确认')
 }
