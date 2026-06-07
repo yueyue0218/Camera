@@ -1,4 +1,5 @@
 const LAST_CONVERSATION_KEY = 'portra:lastConversationId'
+const MESSAGE_SURFACE_KEY = 'portra:messageSurface'
 
 export function normalizeConversationId(value) {
   const id = Number(value)
@@ -15,6 +16,7 @@ export function rememberLastConversation(conversationId, meta = {}) {
   if (!path || typeof window === 'undefined') return false
   try {
     window.sessionStorage.setItem(LAST_CONVERSATION_KEY, String(normalizeConversationId(conversationId)))
+    setLastMessageSurface('detail')
     if (meta && Object.keys(meta).length) {
       window.sessionStorage.setItem(`${LAST_CONVERSATION_KEY}:meta`, JSON.stringify({
         ...meta,
@@ -26,6 +28,23 @@ export function rememberLastConversation(conversationId, meta = {}) {
   } catch {
     return false
   }
+}
+
+export function setLastMessageSurface(surface) {
+  if (typeof window === 'undefined') return false
+  const normalized = surface === 'detail' ? 'detail' : 'list'
+  try {
+    window.sessionStorage.setItem(MESSAGE_SURFACE_KEY, normalized)
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function getMessageNavTarget(currentPath = '') {
+  const path = String(currentPath || '')
+  if (/^\/messages\/\d+$/.test(path)) return path
+  return '/messages'
 }
 
 export function getLastConversationId() {
