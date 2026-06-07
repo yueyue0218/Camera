@@ -8,6 +8,8 @@ import com.action.camera.domain.User;
 import com.action.camera.message.model.CreateConversationCommand;
 import com.action.camera.message.model.CreateConversationResult;
 import com.action.camera.message.service.ConversationService;
+import com.action.camera.provider.entity.ProviderProfile;
+import com.action.camera.provider.mapper.ProviderProfileMapper;
 import com.action.camera.servicepackage.domain.ServicePackage;
 import com.action.camera.servicepackage.domain.ServicePackageInterest;
 import com.action.camera.servicepackage.domain.ServicePackageStatus;
@@ -26,6 +28,7 @@ import com.action.camera.servicepackage.mapper.ServicePackageMapper;
 import com.action.camera.servicepackage.repository.ServicePackageInterestRepository;
 import com.action.camera.servicepackage.repository.ServicePackageRepository;
 import com.action.camera.repository.UserRepository;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,15 +57,18 @@ public class ServicePackageService {
     private final ServicePackageInterestRepository interestRepository;
     private final ConversationService conversationService;
     private final UserRepository userRepository;
+    private final ProviderProfileMapper providerProfileMapper;
 
     public ServicePackageService(ServicePackageRepository servicePackageRepository,
-                                 ServicePackageInterestRepository interestRepository,
-                                 ConversationService conversationService,
-                                 UserRepository userRepository) {
+                                  ServicePackageInterestRepository interestRepository,
+                                  ConversationService conversationService,
+                                  UserRepository userRepository,
+                                  ProviderProfileMapper providerProfileMapper) {
         this.servicePackageRepository = servicePackageRepository;
         this.interestRepository = interestRepository;
         this.conversationService = conversationService;
         this.userRepository = userRepository;
+        this.providerProfileMapper = providerProfileMapper;
     }
 
     @Transactional
@@ -630,12 +636,25 @@ public class ServicePackageService {
             return null;
         }
         return userRepository.findById(photographerId)
-                .map(user -> new PhotographerInfo(
-                        user.getId(),
-                        user.getNickname(),
-                        user.getAvatarFileId(),
-                        null,
-                        user.getCreditScore()))
+                .map(user -> {
+                    ProviderProfile providerProfile = providerProfileMapper == null ? null : providerProfileMapper.selectOne(
+                            new LambdaQueryWrapper<ProviderProfile>().eq(ProviderProfile::getUserId, photographerId)
+                    );
+                    Long avatarFileId = providerProfile != null && providerProfile.getProviderAvatarFileId() != null
+                            ? providerProfile.getProviderAvatarFileId()
+                            : user.getAvatarFileId();
+                    String nickname = providerProfile != null
+                            && providerProfile.getDisplayName() != null
+                            && !providerProfile.getDisplayName().isBlank()
+                            ? providerProfile.getDisplayName()
+                            : user.getNickname();
+                    return new PhotographerInfo(
+                            user.getId(),
+                            nickname,
+                            avatarFileId,
+                            null,
+                            user.getCreditScore());
+                })
                 .orElse(new PhotographerInfo(photographerId, null, null, null, null));
     }
 

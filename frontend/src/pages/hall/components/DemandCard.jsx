@@ -1,4 +1,4 @@
-import { cityName, demandStatusText, firstText, fullDateTime, moneyRange, readableDate, splitTags, timeTagLabel } from './hallUtils.js'
+import { cityName, demandStatusText, firstText, fullDateTime, gradientFor, moneyRange, readableDate, splitTags, timeTagLabel } from './hallUtils.js'
 import { publicImageUrls, useFileObjectUrl } from '../utils/fileObjectUrls.js'
 
 export function DemandCard({
@@ -22,16 +22,18 @@ export function DemandCard({
   )
   const fallbackCustomerAvatar = publicImageUrls(demand.customerAvatarUrl, demand.customerAvatar, demand.customerAvatarData)[0] || ''
   const customerAvatar = uploadedCustomerAvatar || fallbackCustomerAvatar
+  const customerAvatarArt = customerAvatar ? `url(${customerAvatar})` : gradientFor(demand.customerId || demand.demandId)
   const place = [cityName(demand.cityName || demand.cityCode), demand.location].filter(Boolean).join(' · ')
   const coverUrl = useFileObjectUrl(
     demand.referenceFileIds,
     currentUser,
     `demand ${demand.demandId} reference`
   )
+  const coverArt = coverUrl ? `url(${coverUrl})` : gradientFor(demand.demandId)
 
   return (
-    <article className={`ticket-card ${coverUrl ? 'has-cover' : ''}`} onClick={onOpen}>
-      {coverUrl && <div className="ticket-cover" style={{ '--art': `url(${coverUrl})` }} aria-hidden="true" />}
+    <article className="ticket-card has-cover" onClick={onOpen}>
+      <div className="ticket-cover" style={{ '--art': coverArt }} aria-hidden="true" />
       <div className="ticket-top">
         <div className="ticket-heading">
           <h3 className="ticket-title">{title || '暂无标题'}</h3>
@@ -47,7 +49,7 @@ export function DemandCard({
         disabled={!onOpenPublisher}
         onClick={onOpenPublisher ? e => { e.stopPropagation(); onOpenPublisher() } : undefined}
       >
-        {customerAvatar && <span className="publisher-avatar" style={{ '--avatar-art': `url(${customerAvatar})` }} aria-hidden="true" />}
+        <span className="publisher-avatar" style={{ '--avatar-art': customerAvatarArt }} aria-hidden="true" />
         <span>{customerName || '暂无发布者'}</span>
       </button>
       <div className="ticket-meta" aria-label="需求关键信息">

@@ -11,16 +11,30 @@ final class DemandMapper {
     }
 
     static DemandDto toDemandDto(Demand demand) {
-        return toDemandDto(demand, null, null, null);
+        return toDemandDto(demand, null, null, null, null);
+    }
+
+    static DemandDto toDemandDto(Demand demand, CustomerInfo customerInfo) {
+        return toDemandDto(demand, customerInfo, null, null, null);
     }
 
     static DemandDto toDemandDto(Demand demand,
                                  Integer pendingCount,
                                  Integer acceptedCount,
                                  Integer rejectedCount) {
+        return toDemandDto(demand, null, pendingCount, acceptedCount, rejectedCount);
+    }
+
+    static DemandDto toDemandDto(Demand demand,
+                                 CustomerInfo customerInfo,
+                                 Integer pendingCount,
+                                 Integer acceptedCount,
+                                 Integer rejectedCount) {
         return new DemandDto(
                 demand.getId(),
                 demand.getCustomerId(),
+                customerInfo == null ? null : customerInfo.nickname(),
+                customerInfo == null ? null : customerInfo.avatarFileId(),
                 demand.getScene(),
                 demand.getStyleTags(),
                 demand.getExpectedDate(),
@@ -56,4 +70,7 @@ final class DemandMapper {
                 response.getResponseTime()
         );
     }
+}
+
+record CustomerInfo(String nickname, Long avatarFileId) {
 }

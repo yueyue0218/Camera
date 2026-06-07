@@ -8,6 +8,8 @@ public class DemandDto {
 
     private final Long demandId;
     private final Long customerId;
+    private final String customerNickname;
+    private final Long customerAvatarFileId;
     private final String scene;
     private final List<String> styleTags;
     private final LocalDate expectedDate;
@@ -46,9 +48,34 @@ public class DemandDto {
                      List<Long> referenceFileIds,
                      LocalDateTime createdAt,
                      LocalDateTime updatedAt) {
-        this(demandId, customerId, scene, styleTags, expectedDate, timeSlot, timeDescription, timeTags,
+        this(demandId, customerId, null, null, scene, styleTags, expectedDate, timeSlot, timeDescription, timeTags,
                 cityCode, location, budgetMinCent, budgetMaxCent, description, status, responseCount,
                 null, null, null, referenceFileIds, createdAt, updatedAt);
+    }
+
+    public DemandDto(Long demandId,
+                     Long customerId,
+                     String customerNickname,
+                     Long customerAvatarFileId,
+                     String scene,
+                     List<String> styleTags,
+                     LocalDate expectedDate,
+                     String timeSlot,
+                     String timeDescription,
+                     List<String> timeTags,
+                     String cityCode,
+                     String location,
+                     Integer budgetMinCent,
+                     Integer budgetMaxCent,
+                     String description,
+                     String status,
+                     int responseCount,
+                     List<Long> referenceFileIds,
+                     LocalDateTime createdAt,
+                     LocalDateTime updatedAt) {
+        this(demandId, customerId, customerNickname, customerAvatarFileId, scene, styleTags, expectedDate,
+                timeSlot, timeDescription, timeTags, cityCode, location, budgetMinCent, budgetMaxCent,
+                description, status, responseCount, null, null, null, referenceFileIds, createdAt, updatedAt);
     }
 
     public DemandDto(Long demandId,
@@ -74,6 +101,56 @@ public class DemandDto {
                      LocalDateTime updatedAt) {
         this.demandId = demandId;
         this.customerId = customerId;
+        this.customerNickname = null;
+        this.customerAvatarFileId = null;
+        this.scene = scene;
+        this.styleTags = styleTags;
+        this.expectedDate = expectedDate;
+        this.timeSlot = timeSlot;
+        this.timeDescription = timeDescription;
+        this.timeTags = timeTags;
+        this.cityCode = cityCode;
+        this.location = location;
+        this.budgetMinCent = budgetMinCent;
+        this.budgetMaxCent = budgetMaxCent;
+        this.description = description;
+        this.status = status;
+        this.responseCount = responseCount;
+        this.pendingCount = pendingCount;
+        this.acceptedCount = acceptedCount;
+        this.rejectedCount = rejectedCount;
+        this.referenceFileIds = referenceFileIds;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+    }
+
+    public DemandDto(Long demandId,
+                     Long customerId,
+                     String customerNickname,
+                     Long customerAvatarFileId,
+                     String scene,
+                     List<String> styleTags,
+                     LocalDate expectedDate,
+                     String timeSlot,
+                     String timeDescription,
+                     List<String> timeTags,
+                     String cityCode,
+                     String location,
+                     Integer budgetMinCent,
+                     Integer budgetMaxCent,
+                     String description,
+                     String status,
+                     int responseCount,
+                     Integer pendingCount,
+                     Integer acceptedCount,
+                     Integer rejectedCount,
+                     List<Long> referenceFileIds,
+                     LocalDateTime createdAt,
+                     LocalDateTime updatedAt) {
+        this.demandId = demandId;
+        this.customerId = customerId;
+        this.customerNickname = customerNickname;
+        this.customerAvatarFileId = customerAvatarFileId;
         this.scene = scene;
         this.styleTags = styleTags;
         this.expectedDate = expectedDate;
@@ -101,6 +178,14 @@ public class DemandDto {
 
     public Long getCustomerId() {
         return customerId;
+    }
+
+    public String getCustomerNickname() {
+        return customerNickname;
+    }
+
+    public Long getCustomerAvatarFileId() {
+        return customerAvatarFileId;
     }
 
     public String getScene() {

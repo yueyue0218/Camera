@@ -40,8 +40,8 @@ function panelFromSearch(search) {
 async function enrichDemandPublisher(demand, currentUser) {
   if (!demand?.customerId) return demand
   try {
-    const brief = await userApi.brief(demand.customerId, currentUser)
-    const avatarFileId = brief?.avatarFileId ?? demand.customerAvatarFileId
+    const brief = await userApi.brief(demand.customerId, currentUser, 'CUSTOMER')
+    const avatarFileId = demand.customerAvatarFileId ?? brief?.avatarFileId
     return {
       ...demand,
       customerNickname: brief?.nickname || demand.customerNickname,
@@ -50,7 +50,8 @@ async function enrichDemandPublisher(demand, currentUser) {
       customerAvatarUrl: demand.customerAvatarUrl,
       customerAvatar: demand.customerAvatar
     }
-  } catch {
+  } catch (error) {
+    console.warn('demand publisher brief load failed', { demandId: demand.demandId, customerId: demand.customerId, error })
     return demand
   }
 }
@@ -79,8 +80,8 @@ async function enrichServiceProvider(service, currentUser) {
   const providerId = service?.photographerId || service?.providerId
   if (!providerId) return service
   try {
-    const brief = await userApi.brief(providerId, currentUser)
-    const avatarFileId = brief?.avatarFileId ?? service.photographerAvatarFileId
+    const brief = await userApi.brief(providerId, currentUser, 'PROVIDER')
+    const avatarFileId = service.photographerAvatarFileId ?? brief?.avatarFileId
     return {
       ...service,
       photographerId: brief?.userId || service.photographerId || service.providerId,
@@ -89,7 +90,8 @@ async function enrichServiceProvider(service, currentUser) {
       photographerAvatarUrl: service.photographerAvatarUrl,
       photographerAvatar: service.photographerAvatar
     }
-  } catch {
+  } catch (error) {
+    console.warn('service provider brief load failed', { serviceId: service.serviceId, providerId, error })
     return service
   }
 }
