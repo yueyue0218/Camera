@@ -1,17 +1,64 @@
+import { useEffect, useRef, useState } from 'react'
 import { Avatar, Box, Paper, Stack, Typography } from '@mui/material'
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded'
-import { formatShortTime, getCounterpartyProfile, getConversationSourceLabel } from '../utils/conversationUtils.js'
+import { formatShortTime, getConversationSourceLabel } from '../utils/conversationUtils.js'
 import { deriveConversationActions } from '../utils/workbenchState.js'
+import { loadConversationPeerProfile, resolveConversationParticipants } from '../utils/participantResolver.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
 import { EmptyMessageCard } from './EmptyMessageCard.jsx'
 import { StatusChip } from './StatusChip.jsx'
 
 export function ConversationList({ conversations, currentUser, onOpenConversation }) {
+  const [peerProfiles, setPeerProfiles] = useState({})
+  const avatarObjectUrlsRef = useRef([])
+
+  useEffect(() => {
+    if (!currentUser || !conversations.length) return undefined
+
+    let isCancelled = false
+    const targets = new Map()
+    conversations.forEach(conversation => {
+      const participant = resolveConversationParticipants(conversation, currentUser)
+      if (participant.peerUserId && !Object.prototype.hasOwnProperty.call(peerProfiles, participant.peerUserId)) {
+        targets.set(participant.peerUserId, participant.peerRole)
+      }
+    })
+
+    if (!targets.size) return undefined
+
+    Promise.all(Array.from(targets.entries()).map(async ([peerUserId, peerRole]) => {
+      try {
+        const profile = await loadConversationPeerProfile(peerUserId, peerRole, currentUser)
+        if (profile?.avatarObjectUrl) avatarObjectUrlsRef.current.push(profile.avatarObjectUrl)
+        return [peerUserId, profile]
+      } catch (error) {
+        console.debug('[messages] failed to load conversation list peer profile', { peerUserId, error })
+        return [peerUserId, null]
+      }
+    })).then(entries => {
+      if (isCancelled) return
+      setPeerProfiles(previous => entries.reduce((next, [peerUserId, profile]) => {
+        next[peerUserId] = profile || null
+        return next
+      }, { ...previous }))
+    })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [conversations, currentUser, peerProfiles])
+
+  useEffect(() => () => {
+    avatarObjectUrlsRef.current.forEach(url => URL.revokeObjectURL(url))
+    avatarObjectUrlsRef.current = []
+  }, [])
+
   return (
     <Paper variant="outlined" sx={{ p: 1, overflow: 'hidden', bgcolor: PORTRA_COLORS.paperMuted, borderColor: PORTRA_COLORS.borderMuted, borderRadius: PORTRA_RADII.panel, boxShadow: PORTRA_SHADOWS.subtle }}>
       <Stack spacing={1}>
         {conversations.map(conversation => {
-          const counterparty = getCounterpartyProfile(conversation, currentUser)
+          const baseParticipant = resolveConversationParticipants(conversation, currentUser)
+          const participant = resolveConversationParticipants(conversation, currentUser, peerProfiles[baseParticipant.peerUserId])
           const actions = deriveConversationActions({
             conversation,
             order: conversation.activeOrder,
@@ -63,24 +110,24 @@ export function ConversationList({ conversations, currentUser, onOpenConversatio
             >
               <Box sx={{ position: 'relative', width: 46, height: 46 }}>
                 <Avatar
-                  src={counterparty.avatarData || undefined}
+                  src={participant.peerAvatarUrl || undefined}
                   sx={{
                     width: 46,
                     height: 46,
-                    bgcolor: needsMyAction ? PORTRA_COLORS.blue : PORTRA_COLORS.subInk,
-                    color: PORTRA_COLORS.paper,
+                    bgcolor: needsMyAction ? PORTRA_COLORS.blue : PORTRA_COLORS.blueSoft,
+                    color: needsMyAction ? PORTRA_COLORS.paper : PORTRA_COLORS.blue,
                     border: `2px solid ${PORTRA_COLORS.paper}`,
                     boxShadow: `0 0 0 1px ${PORTRA_COLORS.border}`,
                     fontWeight: 900
                   }}
                 >
-                  {getSafeDisplayText(counterparty.initial, '对').slice(0, 1)}
+                  {getSafeDisplayText(participant.peerAvatarText, '对').slice(0, 1)}
                 </Avatar>
                 {needsMyAction && <Box sx={{ position: 'absolute', right: -1, top: -1, width: 10, height: 10, bgcolor: PORTRA_COLORS.orange, border: `2px solid ${PORTRA_COLORS.paper}`, borderRadius: '50%' }} />}
               </Box>
               <Stack spacing={0.5} sx={{ minWidth: 0 }}>
                 <Typography fontWeight={900} color={PORTRA_COLORS.ink} noWrap>
-                  {getSafeDisplayText(counterparty.nickname, counterparty.userId ? `用户 ${counterparty.userId}` : '沟通对象')}
+                  {getSafeDisplayText(participant.peerDisplayName, participant.peerUserId ? `用户 ${participant.peerUserId}` : '沟通对象')}
                 </Typography>
                 <Typography variant="body2" sx={{ color: needsMyAction ? PORTRA_COLORS.subInk : PORTRA_COLORS.mutedInk, fontWeight: needsMyAction ? 800 : 500 }} noWrap>
                   {activity}

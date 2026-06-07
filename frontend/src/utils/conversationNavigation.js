@@ -153,7 +153,7 @@ export function navigateToOrderFromConversation(navigate, { orderId, conversatio
   const target = buildOrderPathWithReturn(orderId, conversationId)
   if (!target || typeof navigate !== 'function') return false
   if (conversationId) rememberLastConversation(conversationId)
-  navigate(target.to, { state: target.state, ...options })
+  navigate(target.to, { ...options, state: { ...target.state, ...(options.state || {}) } })
   return true
 }
 
