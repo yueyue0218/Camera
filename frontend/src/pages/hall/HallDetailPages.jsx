@@ -435,6 +435,7 @@ export function ServicePackageDetailPage() {
   const price = service.priceRange || `${money(service.basePriceCent)} 起`
   const isServiceOwner = isSameOwner(currentUser, collectServiceOwnerIds(service))
   const isCustomerViewer = currentUser.role === 'CUSTOMER'
+  const providerProfileId = service.photographerId || service.providerId
 
   async function startChat(message = `我想预约「${service.title || '这个橱窗'}」，想进一步确认时间与服务内容。`) {
     try {
@@ -533,10 +534,15 @@ export function ServicePackageDetailPage() {
           </div>
           <div className="aside-card photographer-mini-card">
             <h3>摄影师信息</h3>
-            <div className="profile-mini detail-provider-link">
+            <button
+              className="profile-mini detail-provider-link profile-link-button"
+              type="button"
+              onClick={() => providerProfileId && navigate(`/users/${providerProfileId}?role=PROVIDER`)}
+              disabled={!providerProfileId}
+            >
               <div
                 className="mini-avatar"
-                style={{ '--avatar-art': providerAvatar ? `url(${providerAvatar})` : gradientFor(service.photographerId || service.providerId) }}
+                style={{ '--avatar-art': providerAvatar ? `url(${providerAvatar})` : gradientFor(providerProfileId) }}
                 aria-hidden="true"
               />
               <div className="photographer-card-info">
@@ -544,7 +550,7 @@ export function ServicePackageDetailPage() {
                 <div className="photographer-card-location"><span>{city}</span></div>
                 <div className="photographer-card-credit">{credit ? `信用评分：${credit}` : '暂无信用评分'}</div>
               </div>
-            </div>
+            </button>
             <button className="secondary-btn" style={{ width: '100%' }} type="button" onClick={followProvider}>关注摄影师</button>
           </div>
           {isCustomerViewer && (
