@@ -24,7 +24,7 @@ import java.time.LocalDateTime;
 @Table(name = "conversations",
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_conversation_source_pair",
-                columnNames = {"source_type", "source_id", "participant_a_id", "participant_b_id"}))
+                columnNames = {"source_type", "source_id", "participant_a_id", "participant_b_id", "order_id"}))
 public class Conversation {
 
     @Id
@@ -43,6 +43,9 @@ public class Conversation {
     @Column(name = "source_id")
     private Long sourceId;
 
+    @Column(name = "order_id", nullable = false)
+    private Long orderId = 0L;
+
     @Column(name = "last_message_time")
     private LocalDateTime lastMessageTime;
 
@@ -53,6 +56,9 @@ public class Conversation {
     void prePersist() {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
+        }
+        if (orderId == null) {
+            orderId = 0L;
         }
     }
 

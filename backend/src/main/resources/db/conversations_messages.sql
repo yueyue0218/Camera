@@ -7,9 +7,10 @@ CREATE TABLE IF NOT EXISTS conversations (
     participant_b_id BIGINT NOT NULL,
     source_type VARCHAR(40) NOT NULL,
     source_id BIGINT NULL,
+    order_id BIGINT NOT NULL DEFAULT 0,
     last_message_time DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_conversation_source_pair (source_type, source_id, participant_a_id, participant_b_id),
+    UNIQUE KEY uk_conversation_source_pair (source_type, source_id, participant_a_id, participant_b_id, order_id),
     KEY idx_conversation_a_time (participant_a_id, last_message_time),
     KEY idx_conversation_b_time (participant_b_id, last_message_time),
     CONSTRAINT fk_conversation_a FOREIGN KEY (participant_a_id) REFERENCES users(id),
@@ -49,6 +50,27 @@ CREATE TABLE IF NOT EXISTS conversation_hidden_by_user (
 
 DELIMITER //
 
+DROP PROCEDURE IF EXISTS c_add_column_if_missing//
+CREATE PROCEDURE c_add_column_if_missing(
+    IN p_table_name VARCHAR(64),
+    IN p_column_name VARCHAR(64),
+    IN p_column_definition TEXT
+)
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = p_table_name
+          AND column_name = p_column_name
+    ) THEN
+        SET @ddl = CONCAT('ALTER TABLE `', p_table_name, '` ADD COLUMN ', p_column_definition);
+        PREPARE stmt FROM @ddl;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    END IF;
+END//
+
 DROP PROCEDURE IF EXISTS c_add_index_if_missing//
 CREATE PROCEDURE c_add_index_if_missing(
     IN p_table_name VARCHAR(64),
@@ -70,12 +92,38 @@ BEGIN
     END IF;
 END//
 
+DROP PROCEDURE IF EXISTS c_drop_index_if_exists//
+CREATE PROCEDURE c_drop_index_if_exists(
+    IN p_table_name VARCHAR(64),
+    IN p_index_name VARCHAR(64)
+)
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE()
+          AND table_name = p_table_name
+          AND index_name = p_index_name
+    ) THEN
+        SET @ddl = CONCAT('ALTER TABLE `', p_table_name, '` DROP INDEX `', p_index_name, '`');
+        PREPARE stmt FROM @ddl;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    END IF;
+END//
+
 DELIMITER ;
 
+CALL c_add_column_if_missing(
+    'conversations',
+    'order_id',
+    'order_id BIGINT NOT NULL DEFAULT 0 AFTER source_id'
+);
+CALL c_drop_index_if_exists('conversations', 'uk_conversation_source_pair');
 CALL c_add_index_if_missing(
     'conversations',
     'uk_conversation_source_pair',
-    'UNIQUE KEY uk_conversation_source_pair (source_type, source_id, participant_a_id, participant_b_id)'
+    'UNIQUE KEY uk_conversation_source_pair (source_type, source_id, participant_a_id, participant_b_id, order_id)'
 );
 CALL c_add_index_if_missing(
     'conversations',
@@ -118,4 +166,6 @@ CALL c_add_index_if_missing(
     'INDEX idx_conversation_hidden_conversation (conversation_id)'
 );
 
+DROP PROCEDURE IF EXISTS c_add_column_if_missing;
 DROP PROCEDURE IF EXISTS c_add_index_if_missing;
+DROP PROCEDURE IF EXISTS c_drop_index_if_exists;
