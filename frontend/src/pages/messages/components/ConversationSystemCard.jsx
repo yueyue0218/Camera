@@ -163,8 +163,8 @@ function QuoteAttachmentCard({ event, actor, direction, quote, onOpenQuoteDetail
         sx={{
           alignItems: 'flex-start',
           width: { xs: '100%', md: '62%' },
-          minWidth: { xs: 0, md: 410 },
-          maxWidth: { xs: 'min(92vw, 540px)', md: 560 },
+          minWidth: { xs: 0, md: 390 },
+          maxWidth: { xs: 'min(92vw, 500px)', md: 520 },
           flexDirection: self ? 'row-reverse' : 'row'
         }}
       >
@@ -181,10 +181,10 @@ function QuoteAttachmentCard({ event, actor, direction, quote, onOpenQuoteDetail
             flex: 1,
             width: '100%',
             minWidth: { xs: 0, md: 360 },
-            maxWidth: 500,
-            px: 2.5,
-            py: 2.25,
-            pl: 2.7,
+            maxWidth: 480,
+            px: 2.25,
+            py: 2,
+            pl: 2.45,
             bgcolor: self ? QUOTE_VISUAL.selfBg : QUOTE_VISUAL.peerBg,
             borderColor: self ? QUOTE_VISUAL.selfBorder : QUOTE_VISUAL.peerBorder,
             borderRadius: '16px',
@@ -202,7 +202,7 @@ function QuoteAttachmentCard({ event, actor, direction, quote, onOpenQuoteDetail
             }
           }}
         >
-          <Stack spacing={1.35}>
+          <Stack spacing={1.15}>
             <Stack direction="row" spacing={1.5} sx={{ justifyContent: 'space-between', alignItems: 'flex-start', minWidth: 0 }}>
               <Typography sx={{ color: QUOTE_VISUAL.ink, fontSize: 16, fontWeight: 700, lineHeight: 1.35 }}>
                 {model.title}
@@ -213,7 +213,7 @@ function QuoteAttachmentCard({ event, actor, direction, quote, onOpenQuoteDetail
             </Stack>
 
             <Stack direction="row" spacing={1.4} sx={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 1 }}>
-              <Typography sx={{ color: '#111827', fontSize: 32, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.03em' }}>
+              <Typography sx={{ color: '#111827', fontSize: 30, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.03em' }}>
                 {model.amountText}
               </Typography>
               <QuoteStatusPill model={model} />
@@ -233,8 +233,8 @@ function QuoteAttachmentCard({ event, actor, direction, quote, onOpenQuoteDetail
                   width: 'auto',
                   maxWidth: 220,
                   minWidth: 160,
-                  minHeight: 36,
-                  px: 2.25,
+                  minHeight: 34,
+                  px: 2,
                   borderRadius: '12px',
                   fontSize: 14,
                   fontWeight: 700,
@@ -259,8 +259,8 @@ function QuoteInfoRow({ icon, label, value, multiline = false, last = false }) {
       direction="row"
       spacing={1.35}
       sx={{
-        minHeight: 34,
-        py: 1,
+        minHeight: 32,
+        py: 0.75,
         alignItems: 'flex-start',
         borderBottom: last ? 0 : `1px dashed ${QUOTE_VISUAL.divider}`,
         minWidth: 0
@@ -307,7 +307,7 @@ function QuoteStatusPill({ model }) {
       sx={{
         alignItems: 'center',
         px: 1.25,
-        height: 28,
+        height: 24,
         py: 0,
         borderRadius: 999,
         bgcolor: completed ? QUOTE_VISUAL.greenSoft : danger ? QUOTE_VISUAL.coralSoft : waiting ? QUOTE_VISUAL.waitingSoft : 'rgba(160,167,179,.14)',

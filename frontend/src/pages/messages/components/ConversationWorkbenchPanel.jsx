@@ -110,7 +110,7 @@ export function ConversationWorkbenchPanel({
               </Typography>
 
               <Box sx={{ borderTop: `1px solid ${QUOTE_VISUAL.divider}`, mt: 1, pt: 0.85 }}>
-                <CompactQuoteRow icon={<CalendarMonthRoundedIcon />} label="拍摄时间" value={latestQuoteModel.shootTimeText} />
+                <CompactQuoteRow icon={<CalendarMonthRoundedIcon />} label="拍摄时段" value={latestQuoteModel.shootPeriodText} />
                 <CompactQuoteRow icon={<PlaceRoundedIcon />} label="拍摄地点" value={latestQuoteModel.shootLocationText} />
               </Box>
 

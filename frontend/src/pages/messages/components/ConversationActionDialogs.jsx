@@ -17,7 +17,7 @@ import {
   TextField,
   Typography
 } from '@mui/material'
-import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
+import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS, QUOTE_VISUAL } from '../MessageVisualTokens.js'
 import { centToYuan } from '../../../utils/index.js'
 import { formatFileDisplayName } from '../../../utils/displayFormatters.js'
 import { PortraStatusBadge } from '../../../components/portra/index.js'
@@ -76,28 +76,48 @@ export function ConversationActionDialogs({
     <>
       <Dialog open={activeAction === 'QUOTE_DETAIL' && Boolean(quote)} onClose={onClose} fullWidth maxWidth="sm" PaperProps={quoteDialogPaperProps}>
         <DialogTitle sx={quoteDialogTitleSx}>
-          <Typography sx={{ color: 'rgba(255,255,255,.66)', fontSize: 10, fontWeight: 900, letterSpacing: '.15em', textTransform: 'uppercase' }}>报价详情</Typography>
-          <Stack direction="row" spacing={1.2} sx={{ mt: 0.6, justifyContent: 'space-between', alignItems: 'flex-end' }}>
-            <Typography sx={{ color: '#fff', fontSize: 32, fontWeight: 950, lineHeight: 1 }}>
-              {quoteDisplay ? quoteDisplay.amountText : '--'}
-            </Typography>
-            {quoteDisplay && <PortraStatusBadge label={quoteDisplay.statusLabel} tone={quoteDisplay.statusTone} sx={{ bgcolor: 'rgba(255,255,255,.18)', color: '#fff' }} />}
+          <Stack direction="row" spacing={1.2} sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ color: 'rgba(255,255,255,.74)', fontSize: 12, fontWeight: 800, letterSpacing: 0 }}>报价详情</Typography>
+              <Typography sx={{ mt: 0.75, color: '#fff', fontSize: 34, fontWeight: 900, lineHeight: 1, letterSpacing: '-0.03em' }}>
+                {quoteDisplay ? quoteDisplay.amountText : '--'}
+              </Typography>
+              {quoteDisplay?.messageCreatedAtText && (
+                <Typography sx={{ mt: 0.8, color: 'rgba(255,255,255,.66)', fontSize: 12.5, lineHeight: 1.3 }}>
+                  创建于 {quoteDisplay.messageCreatedAtText}
+                </Typography>
+              )}
+            </Box>
+            {quoteDisplay && <PortraStatusBadge label={quoteDisplay.statusLabel} tone={quoteDisplay.statusTone} sx={{ mt: 0.2, bgcolor: 'rgba(255,255,255,.18)', color: '#fff' }} />}
           </Stack>
         </DialogTitle>
         <DialogContent sx={quoteDialogContentSx}>
           {quoteDisplay ? (
-            <Stack spacing={1.4} sx={{ pt: 1 }}>
-              <DetailRows rows={[
-                ['金额', quoteDisplay.amountText],
-                ['拍摄时间', quoteDisplay.shootTimeText],
-                ['拍摄地点', quoteDisplay.shootLocationText],
-                ['服务内容', quoteDisplay.serviceContentText],
-                ['原片/精修', quoteDisplay.originalRefinedText],
-                ['用途', quoteDisplay.photoUsageLabel],
-                ['最晚交付', quoteDisplay.deliveryDeadlineText],
-                ['备注', quoteDisplay.remarkText]
-              ]} />
-              <Box sx={{ p: 1, bgcolor: PORTRA_COLORS.paperMuted, borderRadius: PORTRA_RADII.control, color: PORTRA_COLORS.mutedInk, fontSize: 14, lineHeight: 1.7 }}>
+            <Stack spacing={1.45} sx={{ pt: 0.4 }}>
+              <QuoteDetailSection
+                title="拍摄安排"
+                rows={[
+                  ['拍摄开始时间', quoteDisplay.shootStartTimeText],
+                  ['拍摄结束时间', quoteDisplay.shootEndTimeText],
+                  ['拍摄地点', quoteDisplay.shootLocationText]
+                ]}
+              />
+              <QuoteDetailSection
+                title="服务与交付"
+                rows={[
+                  ['原片 / 精修', quoteDisplay.originalRefinedText],
+                  ['最晚交付', quoteDisplay.deliveryDeadlineText],
+                  ['服务内容', quoteDisplay.serviceContentText, 'wide']
+                ]}
+              />
+              <QuoteDetailSection
+                title="使用与备注"
+                rows={[
+                  ['用途', quoteDisplay.photoUsageLabel],
+                  ['备注', quoteDisplay.remarkText, 'wide']
+                ]}
+              />
+              <Box sx={quoteNoticeSx}>
                 客户确认报价后将生成平台担保订单；付款后资金先进入平台担保，订单完成后再结算给摄影师。
               </Box>
             </Stack>
@@ -109,15 +129,6 @@ export function ConversationActionDialogs({
         </DialogContent>
         <DialogActions sx={dialogActionsSx}>
           <Button color="inherit" variant="text" onClick={onClose}>关闭</Button>
-          {quote && (canConfirmQuote || canRejectQuote) && (
-            <>
-              {canRejectQuote && <Button variant="outlined" color="inherit" disabled={loading} onClick={() => onRejectQuote(quote)}>拒绝报价</Button>}
-              {canConfirmQuote && <Button variant="contained" disabled={loading} onClick={() => onConfirmQuote(quote)}>确认报价</Button>}
-            </>
-          )}
-          {quote && canResendQuote && (
-            <Button variant="contained" disabled={loading} onClick={() => onResendQuote(quote)}>重新发送报价</Button>
-          )}
         </DialogActions>
       </Dialog>
 
@@ -258,6 +269,22 @@ function DetailRows({ rows = [] }) {
   )
 }
 
+function QuoteDetailSection({ title, rows = [] }) {
+  return (
+    <Box sx={quoteSectionSx}>
+      <Typography sx={quoteSectionTitleSx}>{title}</Typography>
+      <Box sx={quoteDetailGridSx}>
+        {rows.map(([label, value, span]) => (
+          <Box key={label} sx={{ minWidth: 0, gridColumn: span === 'wide' ? '1 / -1' : 'auto' }}>
+            <Typography sx={quoteDetailLabelSx}>{label}</Typography>
+            <Typography sx={quoteDetailValueSx}>{value}</Typography>
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  )
+}
+
 const dialogPaperProps = {
   sx: {
     bgcolor: PORTRA_COLORS.paper,
@@ -280,29 +307,75 @@ const dialogPaperProps = {
 const quoteDialogPaperProps = {
   sx: {
     bgcolor: PORTRA_COLORS.paper,
-    borderRadius: '14px',
+    borderRadius: '16px',
     border: `1px solid ${PORTRA_COLORS.border}`,
     overflow: 'hidden',
-    boxShadow: '0 20px 60px rgba(13,47,178,.12), 0 2px 8px rgba(0,0,0,.08)'
+    boxShadow: '0 22px 56px rgba(13,47,178,.14), 0 2px 8px rgba(0,0,0,.08)'
   }
 }
 
 const quoteDialogTitleSx = {
-  px: 2.5,
-  py: 1.8,
-  bgcolor: PORTRA_COLORS.blue
+  px: 3,
+  py: 2.1,
+  bgcolor: PORTRA_COLORS.blue,
+  borderBottom: '1px solid rgba(255,255,255,.16)'
 }
 
 const quoteDialogContentSx = {
-  pt: 2,
+  px: 3,
+  py: 2.2,
   '& .MuiDialogContentText-root': { color: PORTRA_COLORS.mutedInk, lineHeight: 1.7 },
-  '& .MuiOutlinedInput-root': { bgcolor: PORTRA_COLORS.paperSoft, borderRadius: PORTRA_RADII.control },
-  '&::after': {
-    content: '""',
-    display: 'block',
-    borderTop: '1px dashed rgba(13,47,178,.18)',
-    mt: 2
+  '& .MuiOutlinedInput-root': { bgcolor: PORTRA_COLORS.paperSoft, borderRadius: PORTRA_RADII.control }
+}
+
+const quoteSectionSx = {
+  pb: 1.25,
+  borderBottom: `1px solid ${QUOTE_VISUAL.divider}`,
+  '&:last-of-type': {
+    borderBottom: 0,
+    pb: 0
   }
+}
+
+const quoteSectionTitleSx = {
+  mb: 0.95,
+  color: QUOTE_VISUAL.ink,
+  fontSize: 14,
+  fontWeight: 700,
+  lineHeight: 1.35
+}
+
+const quoteDetailGridSx = {
+  display: 'grid',
+  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+  columnGap: 2.2,
+  rowGap: 1.15
+}
+
+const quoteDetailLabelSx = {
+  color: QUOTE_VISUAL.muted,
+  fontSize: 13,
+  fontWeight: 600,
+  lineHeight: 1.35
+}
+
+const quoteDetailValueSx = {
+  mt: 0.28,
+  color: QUOTE_VISUAL.ink,
+  fontSize: 15.5,
+  fontWeight: 500,
+  lineHeight: 1.55,
+  overflowWrap: 'anywhere'
+}
+
+const quoteNoticeSx = {
+  p: 1.25,
+  bgcolor: 'rgba(238,243,255,.62)',
+  border: `1px solid ${QUOTE_VISUAL.divider}`,
+  borderRadius: '12px',
+  color: QUOTE_VISUAL.muted,
+  fontSize: 13,
+  lineHeight: 1.7
 }
 
 const dialogTitleSx = {

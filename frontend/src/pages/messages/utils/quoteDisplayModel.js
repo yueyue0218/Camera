@@ -34,8 +34,10 @@ export function buildQuoteDisplayModel(quote, event = {}) {
     statusLabel: STATUS_LABEL[status] || '报价状态已更新',
     statusTone: STATUS_TONE[status] || 'neutral',
     messageCreatedAtText: formatDateTime(event?.timestamp || quote?.createdAt, '刚刚'),
+    shootStartTimeText: formatDateTime(quote?.shootStartTime, '拍摄开始时间待确认'),
+    shootEndTimeText: formatDateTime(quote?.shootEndTime, '未提供'),
     shootTimeText: formatDateTime(quote?.shootStartTime, '拍摄时间待确认'),
-    shootEndTimeText: formatDateTime(quote?.shootEndTime, ''),
+    shootPeriodText: resolveShootPeriodText(quote),
     shootLocationText: sanitizeSeedText(quote?.location || quote?.shootLocation, '拍摄地点待确认'),
     serviceContentText: formatQuoteServiceContent(quote, '按双方沟通内容执行'),
     photoUsageLabel: photoUsage && photoUsage !== '未填写' ? photoUsage : '按双方约定使用',
@@ -72,4 +74,10 @@ function resolveOrderNotice(status) {
 function normalizeCount(value) {
   const count = Number(value)
   return Number.isFinite(count) && count >= 0 ? `${count}` : '0'
+}
+
+function resolveShootPeriodText(quote) {
+  const start = formatDateTime(quote?.shootStartTime, '拍摄开始时间待确认')
+  const end = formatDateTime(quote?.shootEndTime, '未提供')
+  return `${start} - ${end}`
 }
