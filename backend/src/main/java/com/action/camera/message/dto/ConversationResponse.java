@@ -15,6 +15,7 @@ public class ConversationResponse {
     private Long participantBId;
     private String sourceType;
     private Long sourceId;
+    private Long orderId;
     private LocalDateTime lastMessageTime;
     private LocalDateTime createdAt;
 
@@ -25,6 +26,7 @@ public class ConversationResponse {
                 conversation.getParticipantBId(),
                 conversation.getSourceType(),
                 conversation.getSourceId(),
+                conversation.getOrderId(),
                 conversation.getLastMessageTime(),
                 conversation.getCreatedAt()
         );

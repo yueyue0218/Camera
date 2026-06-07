@@ -16,6 +16,7 @@ public class ConversationListItemResponse {
     private Long otherUserId;
     private String sourceType;
     private Long sourceId;
+    private Long orderId;
     private LocalDateTime lastMessageTime;
     private LocalDateTime createdAt;
 
@@ -30,6 +31,7 @@ public class ConversationListItemResponse {
                 otherUserId,
                 conversation.getSourceType(),
                 conversation.getSourceId(),
+                conversation.getOrderId(),
                 conversation.getLastMessageTime(),
                 conversation.getCreatedAt()
         );

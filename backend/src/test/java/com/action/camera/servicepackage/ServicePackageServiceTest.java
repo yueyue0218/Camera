@@ -290,6 +290,7 @@ class ServicePackageServiceTest {
         verify(conversationService).createConversationWithInitialMessage(commandCaptor.capture());
         assertThat(commandCaptor.getValue().getSourceType()).isEqualTo(ConversationService.SOURCE_TYPE_SERVICE_PACKAGE);
         assertThat(commandCaptor.getValue().getSourceId()).isEqualTo(SERVICE_ID);
+        assertThat(commandCaptor.getValue().getOrderId()).isNull();
     }
 
     private CurrentUser customer() {
