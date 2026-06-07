@@ -14,7 +14,7 @@ import { buildOrderAction } from '../../../utils/orderNavigation.js'
 import { AuthorizationRequestCard, PortraActionLink, PortraPrimaryAction, PortraSecondaryAction, PortraSystemNotice, PortraTicketCard } from '../../../components/portra/index.js'
 import { formatTime } from '../utils/conversationUtils.js'
 import { buildQuoteDisplayModel } from '../utils/quoteDisplayModel.js'
-import { getSafeDisplayText, PORTRA_COLORS } from '../MessageVisualTokens.js'
+import { getSafeDisplayText, PORTRA_COLORS, QUOTE_VISUAL } from '../MessageVisualTokens.js'
 import { EventAttachmentCard } from './EventAttachmentCard.jsx'
 import { MessageActorAvatar } from './MessageActorAvatar.jsx'
 import { DeliveryBatchCard } from '../../deliveries/components/DeliveryBatchCard.jsx'
@@ -153,6 +153,7 @@ export function ConversationSystemItem({
 function QuoteAttachmentCard({ event, actor, direction, quote, onOpenQuoteDetail }) {
   const self = (direction || event.side) === 'self'
   const model = buildQuoteDisplayModel(quote, event)
+  const accent = self ? QUOTE_VISUAL.blue : QUOTE_VISUAL.coral
 
   return (
     <Box sx={{ display: 'flex', justifyContent: self ? 'flex-end' : 'flex-start' }}>
@@ -162,63 +163,63 @@ function QuoteAttachmentCard({ event, actor, direction, quote, onOpenQuoteDetail
         sx={{
           alignItems: 'flex-start',
           width: { xs: '100%', md: '62%' },
-          minWidth: { xs: 0, md: 470 },
-          maxWidth: { xs: '100%', md: 620 },
+          minWidth: { xs: 0, md: 410 },
+          maxWidth: { xs: 'min(92vw, 540px)', md: 560 },
           flexDirection: self ? 'row-reverse' : 'row'
         }}
       >
         <MessageActorAvatar
           actor={actor || event.actor}
           dataKind="quote"
-          accent={PORTRA_COLORS.blue}
+          accent={accent}
           fallbackText={self ? '我' : '对'}
           sx={{ mt: 0.25, fontWeight: 950 }}
         />
         <PortraTicketCard
-          accent={PORTRA_COLORS.blue}
+          accent={accent}
           sx={{
             flex: 1,
             width: '100%',
-            minWidth: { xs: 0, md: 420 },
-            maxWidth: 560,
-            px: { xs: 2, md: 2.75 },
-            py: { xs: 1.85, md: 2.5 },
-            pl: { xs: 2.1, md: 2.9 },
-            bgcolor: PORTRA_COLORS.paper,
-            borderColor: 'rgba(15,23,42,.12)',
-            borderRadius: '18px',
-            boxShadow: '0 6px 18px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.05)',
+            minWidth: { xs: 0, md: 360 },
+            maxWidth: 500,
+            px: 2.5,
+            py: 2.25,
+            pl: 2.7,
+            bgcolor: self ? QUOTE_VISUAL.selfBg : QUOTE_VISUAL.peerBg,
+            borderColor: self ? QUOTE_VISUAL.selfBorder : QUOTE_VISUAL.peerBorder,
+            borderRadius: '16px',
+            boxShadow: '0 5px 14px rgba(18,22,34,.055), 0 1px 2px rgba(18,22,34,.045)',
             '&::before': {
               inset: '0 auto 0 0',
               width: 4,
-              bgcolor: PORTRA_COLORS.blue
+              bgcolor: accent
             },
             '&::after': { display: 'none' },
             '&:hover': {
               transform: 'none',
-              boxShadow: '0 8px 22px rgba(15,23,42,.075), 0 1px 2px rgba(15,23,42,.05)',
-              borderColor: 'rgba(15,23,42,.16)'
+              boxShadow: '0 6px 16px rgba(18,22,34,.07), 0 1px 2px rgba(18,22,34,.045)',
+              borderColor: self ? QUOTE_VISUAL.selfBorder : QUOTE_VISUAL.peerBorder
             }
           }}
         >
-          <Stack spacing={1.65}>
+          <Stack spacing={1.35}>
             <Stack direction="row" spacing={1.5} sx={{ justifyContent: 'space-between', alignItems: 'flex-start', minWidth: 0 }}>
-              <Typography sx={{ color: PORTRA_COLORS.ink, fontSize: 18, fontWeight: 800, lineHeight: 1.35 }}>
+              <Typography sx={{ color: QUOTE_VISUAL.ink, fontSize: 16, fontWeight: 700, lineHeight: 1.35 }}>
                 {model.title}
               </Typography>
-              <Typography sx={{ color: PORTRA_COLORS.faintInk, fontSize: 13, lineHeight: 1.55, whiteSpace: 'nowrap' }}>
+              <Typography sx={{ color: '#7B8190', fontSize: 12, fontWeight: 400, lineHeight: 1.55, whiteSpace: 'nowrap' }}>
                 {model.messageCreatedAtText}
               </Typography>
             </Stack>
 
             <Stack direction="row" spacing={1.4} sx={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 1 }}>
-              <Typography sx={{ color: '#0f172a', fontSize: { xs: 34, md: 36 }, fontWeight: 900, lineHeight: 1, letterSpacing: 0 }}>
+              <Typography sx={{ color: '#111827', fontSize: 32, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.03em' }}>
                 {model.amountText}
               </Typography>
               <QuoteStatusPill model={model} />
             </Stack>
 
-            <Stack sx={{ borderTop: '1px solid rgba(15,23,42,.10)', borderBottom: '1px solid rgba(15,23,42,.08)' }}>
+            <Stack sx={{ borderTop: `1px solid ${QUOTE_VISUAL.divider}`, borderBottom: `1px solid ${QUOTE_VISUAL.divider}` }}>
               <QuoteInfoRow icon={<CalendarMonthRoundedIcon />} label="拍摄时间" value={model.shootTimeText} />
               <QuoteInfoRow icon={<PlaceRoundedIcon />} label="拍摄地点" value={model.shootLocationText} />
               <QuoteInfoRow icon={<DescriptionRoundedIcon />} label="服务内容" value={model.serviceContentText} multiline last />
@@ -229,14 +230,17 @@ function QuoteAttachmentCard({ event, actor, direction, quote, onOpenQuoteDetail
                 startIcon={<ReceiptLongRoundedIcon />}
                 onClick={() => onOpenQuoteDetail?.(quote)}
                 sx={{
-                  width: { xs: '100%', sm: 232 },
-                  minHeight: 38,
-                  borderRadius: '8px',
-                  fontSize: 14.5,
-                  fontWeight: 900,
-                  color: PORTRA_COLORS.blue,
-                  borderColor: 'rgba(13,47,178,.48)',
-                  bgcolor: PORTRA_COLORS.paper
+                  width: 'auto',
+                  maxWidth: 220,
+                  minWidth: 160,
+                  minHeight: 36,
+                  px: 2.25,
+                  borderRadius: '12px',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: QUOTE_VISUAL.blue,
+                  borderColor: 'rgba(18,61,204,.36)',
+                  bgcolor: self ? 'rgba(255,255,255,.5)' : 'rgba(255,255,255,.72)'
                 }}
               >
                 查看报价详情
@@ -255,23 +259,24 @@ function QuoteInfoRow({ icon, label, value, multiline = false, last = false }) {
       direction="row"
       spacing={1.35}
       sx={{
-        py: 0.85,
+        minHeight: 34,
+        py: 1,
         alignItems: 'flex-start',
-        borderBottom: last ? 0 : '1px dashed rgba(15,23,42,.12)',
+        borderBottom: last ? 0 : `1px dashed ${QUOTE_VISUAL.divider}`,
         minWidth: 0
       }}
     >
-      <Box sx={{ pt: 0.12, color: PORTRA_COLORS.blue, '& svg': { fontSize: 20 } }}>{icon}</Box>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '128px minmax(0, 1fr)' }, columnGap: 1.2, rowGap: 0.25, flex: 1, minWidth: 0 }}>
-        <Typography sx={{ color: PORTRA_COLORS.mutedInk, fontSize: 14, fontWeight: 700, lineHeight: 1.55 }}>
+      <Box sx={{ pt: 0.12, color: QUOTE_VISUAL.blue, '& svg': { fontSize: 18 } }}>{icon}</Box>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '92px minmax(0, 1fr)' }, columnGap: 1.05, rowGap: 0.2, flex: 1, minWidth: 0 }}>
+        <Typography sx={{ color: QUOTE_VISUAL.muted, fontSize: 13, fontWeight: 600, lineHeight: 1.45 }}>
           {label}
         </Typography>
         <Typography
           sx={{
-            color: PORTRA_COLORS.ink,
-            fontSize: 15,
-            fontWeight: 650,
-            lineHeight: 1.55,
+            color: QUOTE_VISUAL.ink,
+            fontSize: 14,
+            fontWeight: 500,
+            lineHeight: 1.45,
             minWidth: 0,
             overflowWrap: 'anywhere',
             ...(multiline
@@ -294,24 +299,25 @@ function QuoteInfoRow({ icon, label, value, multiline = false, last = false }) {
 function QuoteStatusPill({ model }) {
   const completed = model.statusTone === 'completed'
   const danger = model.statusTone === 'danger'
+  const waiting = model.statusTone === 'waiting'
   return (
     <Stack
       direction="row"
       spacing={0.55}
       sx={{
         alignItems: 'center',
-        px: 1.15,
+        px: 1.25,
         height: 28,
         py: 0,
         borderRadius: 999,
-        bgcolor: completed ? 'rgba(30,119,88,.11)' : danger ? 'rgba(248,81,4,.10)' : 'rgba(93,97,103,.10)',
-        color: completed ? '#14704f' : danger ? PORTRA_COLORS.orange : PORTRA_COLORS.mutedInk,
-        fontSize: 15,
-        fontWeight: 900,
+        bgcolor: completed ? QUOTE_VISUAL.greenSoft : danger ? QUOTE_VISUAL.coralSoft : waiting ? QUOTE_VISUAL.waitingSoft : 'rgba(160,167,179,.14)',
+        color: completed ? QUOTE_VISUAL.green : danger ? QUOTE_VISUAL.coral : waiting ? QUOTE_VISUAL.waiting : QUOTE_VISUAL.muted,
+        fontSize: 13,
+        fontWeight: 600,
         lineHeight: 1
       }}
     >
-      {completed && <CheckCircleRoundedIcon sx={{ fontSize: 18 }} />}
+      {completed && <CheckCircleRoundedIcon sx={{ fontSize: 16 }} />}
       <Box component="span">{model.statusLabel}</Box>
     </Stack>
   )
@@ -340,7 +346,7 @@ function EventActionButton({
   if (action === 'CONFIRM_QUOTE' && quote && typeof onConfirmQuote === 'function') return <PortraPrimaryAction {...common} onClick={() => onConfirmQuote(quote)}>确认报价</PortraPrimaryAction>
   if (action === 'REJECT_QUOTE' && quote && typeof onRejectQuote === 'function') return <PortraSecondaryAction {...common} onClick={() => onRejectQuote(quote)}>拒绝报价</PortraSecondaryAction>
   if (action === 'PAY' && typeof onPayOrder === 'function') return <PortraPrimaryAction {...common} startIcon={<PaidRoundedIcon />} onClick={onPayOrder}>去支付</PortraPrimaryAction>
-  if (action === 'CANCEL' && cancelAction && typeof onCancelOrder === 'function') return <PortraSecondaryAction {...common} onClick={() => onCancelOrder(cancelAction)} sx={{ color: PORTRA_COLORS.orange, borderColor: PORTRA_COLORS.orange }}>{cancelAction?.label || '取消订单'}</PortraSecondaryAction>
+  if (action === 'CANCEL' && cancelAction && typeof onCancelOrder === 'function') return <PortraSecondaryAction {...common} onClick={() => onCancelOrder(cancelAction)} sx={{ color: QUOTE_VISUAL.coral, borderColor: QUOTE_VISUAL.coral }}>{cancelAction?.label || '取消订单'}</PortraSecondaryAction>
   if (action === 'CONFIRM_DELIVERY' && typeof onConfirmOrder === 'function') return <PortraPrimaryAction {...common} startIcon={<CheckCircleRoundedIcon />} onClick={onConfirmOrder}>确认接收</PortraPrimaryAction>
   if (action === 'REQUEST_REWORK' && typeof onOpenAction === 'function') return <PortraSecondaryAction {...common} startIcon={<RefreshRoundedIcon />} onClick={() => onOpenAction('REQUEST_REWORK')}>提交返修</PortraSecondaryAction>
   if (action === 'UPLOAD_DELIVERY' || action === 'REUPLOAD_DELIVERY') {

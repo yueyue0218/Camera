@@ -12,8 +12,8 @@ export const PORTRA_COLORS = {
   blueSoft: PORTRA_SURFACE.portraBlueSoft,
   yellow: PORTRA_SURFACE.filmYellow,
   yellowSoft: PORTRA_SURFACE.filmYellowSoft,
-  orange: PORTRA_SURFACE.warmOrangeDeep,
-  orangeSoft: PORTRA_SURFACE.warmOrangeSoft,
+  orange: '#FF6B3D',
+  orangeSoft: '#FFE7DC',
   ink: PORTRA_SURFACE.ink,
   subInk: PORTRA_SURFACE.subInk,
   mutedInk: PORTRA_SURFACE.muted,
@@ -32,6 +32,24 @@ export const PORTRA_RADII = {
   compact: PORTRA_RADIUS.compact,
   control: PORTRA_RADIUS.control,
   panel: PORTRA_RADIUS.panel
+}
+
+export const QUOTE_VISUAL = {
+  selfBg: '#EEF3FF',
+  peerBg: '#FFFDF7',
+  selfBorder: '#9DB7FF',
+  peerBorder: '#E7DED2',
+  blue: '#123DCC',
+  ink: '#121622',
+  muted: '#6B7280',
+  subtle: '#A0A7B3',
+  divider: 'rgba(18, 22, 34, 0.08)',
+  coral: '#FF6B3D',
+  coralSoft: '#FFE7DC',
+  green: '#167A55',
+  greenSoft: '#DFF3EA',
+  waiting: '#7A5B00',
+  waitingSoft: '#FFF3CC'
 }
 
 const TECHNICAL_DISPLAY_PATTERNS = [

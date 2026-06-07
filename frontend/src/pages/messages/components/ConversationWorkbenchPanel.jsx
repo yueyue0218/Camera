@@ -6,9 +6,9 @@ import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
 import PlaceRoundedIcon from '@mui/icons-material/PlaceRounded'
 import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded'
 import { buildOrderAction, buildQuoteAction } from '../../../utils/orderNavigation.js'
-import { PortraActionLink, PortraPrimaryAction, PortraSecondaryAction, PortraStatusPill, PortraWorkflowPanel } from '../../../components/portra/index.js'
+import { PortraActionLink, PortraPrimaryAction, PortraSecondaryAction, PortraWorkflowPanel } from '../../../components/portra/index.js'
 import { buildQuoteDisplayModel } from '../utils/quoteDisplayModel.js'
-import { PORTRA_COLORS } from '../MessageVisualTokens.js'
+import { PORTRA_COLORS, QUOTE_VISUAL } from '../MessageVisualTokens.js'
 import { WorkbenchSection } from './WorkbenchSection.jsx'
 
 function getLatestQuote(quotes) {
@@ -102,19 +102,19 @@ export function ConversationWorkbenchPanel({
         {latestQuote && (
           <WorkbenchSection title="当前报价">
             <Box sx={quoteSummaryCardSx}>
-              <Typography sx={{ color: PORTRA_COLORS.ink, fontSize: 28, fontWeight: 950, lineHeight: 1 }}>
+              <Typography sx={{ color: QUOTE_VISUAL.ink, fontSize: 28, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.03em' }}>
                 {latestQuoteModel.amountText}
               </Typography>
-              <Typography sx={{ color: PORTRA_COLORS.subInk, fontSize: 15, lineHeight: 1.45 }}>
+              <Typography sx={{ color: QUOTE_VISUAL.muted, fontSize: 14, lineHeight: 1.45 }}>
                 {latestQuoteModel.photoUsageLabel}
               </Typography>
 
-              <Box sx={{ borderTop: '1px solid rgba(15,23,42,.10)', mt: 1.1, pt: 1.05 }}>
+              <Box sx={{ borderTop: `1px solid ${QUOTE_VISUAL.divider}`, mt: 1, pt: 0.85 }}>
                 <CompactQuoteRow icon={<CalendarMonthRoundedIcon />} label="拍摄时间" value={latestQuoteModel.shootTimeText} />
                 <CompactQuoteRow icon={<PlaceRoundedIcon />} label="拍摄地点" value={latestQuoteModel.shootLocationText} />
               </Box>
 
-              <PortraStatusPill label={latestQuoteModel.statusLabel} tone={latestQuoteModel.statusTone} sx={{ alignSelf: 'flex-start', mt: 0.3 }} />
+              <PanelQuoteStatusPill model={latestQuoteModel} />
               {(orderAction || quoteOrderAction) && (
                 <PortraActionLink onClick={() => onOpenOrderArchive((orderAction || quoteOrderAction).orderId)} sx={quoteOrderLinkSx}>
                   查看订单 &gt;
@@ -131,7 +131,7 @@ export function ConversationWorkbenchPanel({
               <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk }}>作品 {summary.deliveryCount ?? deliveryRecords.length}</Typography>
             </Stack>
             <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-              <ImageRoundedIcon sx={{ fontSize: 17, color: PORTRA_COLORS.orange }} />
+              <ImageRoundedIcon sx={{ fontSize: 17, color: QUOTE_VISUAL.coral }} />
               <Typography variant="body2" sx={{ color: PORTRA_COLORS.mutedInk }}>授权 {summary.authorizationCount ?? photoAuthorizations.length}</Typography>
             </Stack>
           </Stack>
@@ -144,13 +144,13 @@ export function ConversationWorkbenchPanel({
 
 function CompactQuoteRow({ icon, label, value }) {
   return (
-    <Stack direction="row" spacing={0.95} sx={{ alignItems: 'flex-start', py: 0.75, minWidth: 0 }}>
-      <Box sx={{ color: PORTRA_COLORS.subInk, pt: 0.12, '& svg': { fontSize: 19 } }}>{icon}</Box>
+    <Stack direction="row" spacing={0.85} sx={{ alignItems: 'flex-start', py: 0.65, minWidth: 0 }}>
+      <Box sx={{ color: QUOTE_VISUAL.muted, pt: 0.12, '& svg': { fontSize: 18 } }}>{icon}</Box>
       <Box sx={{ minWidth: 0 }}>
-        <Typography sx={{ color: PORTRA_COLORS.subInk, fontSize: 14.5, fontWeight: 760, lineHeight: 1.45 }}>
+        <Typography sx={{ color: QUOTE_VISUAL.muted, fontSize: 13, fontWeight: 600, lineHeight: 1.45 }}>
           {label}
         </Typography>
-        <Typography sx={{ color: PORTRA_COLORS.mutedInk, fontSize: 13.5, lineHeight: 1.7, overflowWrap: 'anywhere' }}>
+        <Typography sx={{ color: QUOTE_VISUAL.ink, fontSize: 14, fontWeight: 500, lineHeight: 1.55, overflowWrap: 'anywhere' }}>
           {value}
         </Typography>
       </Box>
@@ -158,10 +158,36 @@ function CompactQuoteRow({ icon, label, value }) {
   )
 }
 
+function PanelQuoteStatusPill({ model }) {
+  const completed = model.statusTone === 'completed'
+  const danger = model.statusTone === 'danger'
+  const waiting = model.statusTone === 'waiting'
+  return (
+    <Box
+      sx={{
+        alignSelf: 'flex-start',
+        mt: 0.2,
+        px: 1.15,
+        height: 26,
+        display: 'inline-flex',
+        alignItems: 'center',
+        borderRadius: 999,
+        bgcolor: completed ? QUOTE_VISUAL.greenSoft : danger ? QUOTE_VISUAL.coralSoft : waiting ? QUOTE_VISUAL.waitingSoft : 'rgba(160,167,179,.14)',
+        color: completed ? QUOTE_VISUAL.green : danger ? QUOTE_VISUAL.coral : waiting ? QUOTE_VISUAL.waiting : QUOTE_VISUAL.muted,
+        fontSize: 13,
+        fontWeight: 600,
+        lineHeight: 1
+      }}
+    >
+      {model.statusLabel}
+    </Box>
+  )
+}
+
 const quoteSummaryCardSx = {
   display: 'flex',
   flexDirection: 'column',
-  gap: 0.72,
+  gap: 1,
   p: 0,
   minWidth: 0,
   bgcolor: 'transparent',
@@ -172,10 +198,11 @@ const quoteSummaryCardSx = {
 
 const quoteOrderLinkSx = {
   alignSelf: 'center',
-  mt: 0.65,
+  mt: 0.4,
   px: 0.5,
-  fontSize: 14.5,
-  fontWeight: 900
+  fontSize: 14,
+  fontWeight: 700,
+  color: QUOTE_VISUAL.blue
 }
 
 function PanelSkeleton() {
