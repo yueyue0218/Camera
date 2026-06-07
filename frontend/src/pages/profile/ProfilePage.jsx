@@ -164,7 +164,7 @@ export function ProfilePage() {
         avatarData,
         bio,
         description: bio,
-        creditScore: myProfileRes.value.creditScore ?? currentUser.creditScore,
+        creditScore: myProfileRes.value.creditScore ?? null,
         customerNickname: myProfileRes.value.customerNickname ?? (role === 'CUSTOMER' ? nickname : currentUser.customerNickname),
         customerBio: myProfileRes.value.customerBio ?? (role === 'CUSTOMER' ? bio : currentUser.customerBio),
         providerNickname: myProfileRes.value.providerNickname ?? (role === 'PROVIDER' ? nickname : currentUser.providerNickname),

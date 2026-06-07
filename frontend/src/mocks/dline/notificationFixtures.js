@@ -1,8 +1,8 @@
 export const demoNotifications = [
   {
     notificationId: 301,
-    title: 'New review received',
-    content: 'The other side left new feedback about the shoot experience.',
+    title: '收到新评价',
+    content: '对方留下了新的拍摄体验评价。',
     type: 'REVIEW_RECEIVED',
     relatedType: 'REVIEW',
     relatedId: 8106,
@@ -11,8 +11,8 @@ export const demoNotifications = [
   },
   {
     notificationId: 302,
-    title: 'Order updated',
-    content: 'Order #8106 has been marked complete.',
+    title: '订单已更新',
+    content: '订单 #8106 已标记为完成。',
     type: 'ORDER_STATUS_CHANGED',
     relatedType: 'ORDER',
     relatedId: 8106,
@@ -21,8 +21,8 @@ export const demoNotifications = [
   },
   {
     notificationId: 303,
-    title: 'Review complaint received',
-    content: 'The platform received your complaint and will sync the result here.',
+    title: '评价申诉已收到',
+    content: '平台已收到你的申诉，结果会同步到这里。',
     type: 'REVIEW_COMPLAINT_CREATED',
     relatedType: 'REVIEW_COMPLAINT',
     relatedId: 9001,
@@ -31,8 +31,8 @@ export const demoNotifications = [
   },
   {
     notificationId: 304,
-    title: 'New message',
-    content: 'The finished photos are confirmed and the review can be checked from the order.',
+    title: '收到新消息',
+    content: '成片已确认，评价可在订单中查看。',
     type: 'MESSAGE_RECEIVED',
     relatedType: 'CONVERSATION',
     relatedId: 7001,
@@ -41,8 +41,8 @@ export const demoNotifications = [
   },
   {
     notificationId: 305,
-    title: 'Order completed',
-    content: 'Order #8108 is complete and the credit record has been refreshed.',
+    title: '订单已完成',
+    content: '订单 #8108 已完成，信用记录已刷新。',
     type: 'ORDER_COMPLETED',
     relatedType: 'ORDER',
     relatedId: 8108,
@@ -51,8 +51,8 @@ export const demoNotifications = [
   },
   {
     notificationId: 306,
-    title: 'Dynamic likes',
-    content: 'Your moment received 2 new likes.',
+    title: '动态点赞',
+    content: '你的动态收到了 2 个新赞。',
     type: 'MOMENT_LIKED',
     relatedType: 'MOMENT',
     relatedId: 6101,
@@ -61,8 +61,8 @@ export const demoNotifications = [
   },
   {
     notificationId: 307,
-    title: 'Dynamic likes',
-    content: 'Your moment received 1 new like.',
+    title: '动态点赞',
+    content: '你的动态收到了 1 个新赞。',
     type: 'MOMENT_LIKED',
     relatedType: 'MOMENT',
     relatedId: 6101,

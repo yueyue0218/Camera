@@ -966,3 +966,40 @@
   color:var(--blue-deep) !important;
   border-color:rgba(13,47,178,.26) !important;
 }
+
+.moment-card__follow,
+.moment-detail__follow{
+  background:#0d2fb2;
+  color:#fff;
+  border-color:#0d2fb2;
+}
+
+.moment-card__follow:hover,
+.moment-detail__follow:hover{
+  background:#1547d1;
+  color:#fff;
+  border-color:#1547d1;
+}
+
+.moment-card__follow.is-following,
+.moment-detail__follow.is-following{
+  background:#0d2fb2 !important;
+  color:#fff !important;
+  border-color:#0d2fb2 !important;
+}
+
+.moment-action.like,
+.moment-action.like svg{
+  color:inherit;
+  fill:currentColor;
+}
+
+.moment-action.like:hover,
+.moment-action.like.active{
+  color:var(--red);
+}
+
+.moment-action.like:hover svg,
+.moment-action.like.active svg{
+  fill:currentColor;
+}
