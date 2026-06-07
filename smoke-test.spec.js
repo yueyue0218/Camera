@@ -377,30 +377,13 @@ async function runSmokeTest() {
   }
 
   // ────────────────────────────────────────────────
-  // Step 11 开始拍摄 PAID_PENDING_SHOOT → SHOOTING
+  // Step 11 & 12：已移除手动推进
+  // PAID_PENDING_SHOOT → SHOOTING → PENDING_DELIVERY
+  // 由 DeliveryService.upload() 在 Step 13 内部自动完成，
+  // 不再通过 status-transitions 接口手动推进。
   // ────────────────────────────────────────────────
-  log(11, `开始拍摄 → SHOOTING (摄影师 X-User-Id: ${PROVIDER_ID})`);
-  {
-    const r = await api('POST', `/orders/${orderId}/status-transitions`, {
-      userId: PROVIDER_ID,
-      body: { targetStatus: 'SHOOTING', reason: '冒烟测试：开始拍摄' },
-    });
-    if (bizOk(r)) ok('状态 → SHOOTING');
-    else recordIssue('StepFailed', 'Step11/开始拍摄', `bizCode=${r.bizCode} "${r.message}"`);
-  }
-
-  // ────────────────────────────────────────────────
-  // Step 12 拍摄完成 SHOOTING → PENDING_DELIVERY
-  // ────────────────────────────────────────────────
-  log(12, '拍摄完成 → PENDING_DELIVERY (摄影师)');
-  {
-    const r = await api('POST', `/orders/${orderId}/status-transitions`, {
-      userId: PROVIDER_ID,
-      body: { targetStatus: 'PENDING_DELIVERY', reason: '冒烟测试：拍摄完成' },
-    });
-    if (bizOk(r)) ok('状态 → PENDING_DELIVERY');
-    else recordIssue('StepFailed', 'Step12/拍摄完成', `bizCode=${r.bizCode} "${r.message}"`);
-  }
+  log(11, '跳过（拍摄状态由系统在交付上传时自动推进，见 Step 13）');
+  log(12, '跳过（同上）');
 
   // ────────────────────────────────────────────────
   // Step 13 上传交付照片
