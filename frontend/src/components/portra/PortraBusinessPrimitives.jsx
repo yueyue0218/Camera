@@ -360,20 +360,20 @@ export function PortraSystemNotice({ children, time, action, sx }) {
         direction="row"
         spacing={0.75}
         sx={{
-          maxWidth: { xs: 'min(94%, 520px)', md: 520 },
-          minHeight: 26,
-          px: 0.75,
-          py: 0.15,
+          maxWidth: { xs: 'min(92%, 500px)', md: 500 },
+          minHeight: 28,
+          px: 1,
+          py: 0.18,
           alignItems: 'center',
           justifyContent: 'center',
           flexWrap: 'wrap',
           rowGap: 0.15,
-          bgcolor: 'rgba(248,243,235,.38)',
+          bgcolor: 'rgba(248,243,235,.46)',
           borderRadius: PORTRA_RADIUS.compact,
           boxShadow: 'none'
         }}
       >
-        <Typography sx={{ color: PORTRA_SURFACE.muted, fontSize: 12.5, fontWeight: 700, lineHeight: 1.35 }}>
+        <Typography sx={{ color: PORTRA_SURFACE.muted, fontSize: 12.5, fontWeight: 750, lineHeight: 1.35 }}>
           {children}
         </Typography>
         {time && <Typography sx={{ color: PORTRA_SURFACE.faint, fontSize: 11.5, lineHeight: 1.2 }}>{time}</Typography>}
