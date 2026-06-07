@@ -446,13 +446,21 @@ export function ConversationDetailPage() {
     return false
   }
 
-  async function handlePhotoAuthorizationDecision(authorization, decision) {
+  async function handlePhotoAuthorizationDecision(authorization, decision, decisionRemark = '') {
     if (!currentOrder) return
-    const remark = (authorizationRemarks[authorization.id] || '').trim()
+    const remark = (decisionRemark || authorizationRemarks[authorization.id] || '').trim()
+    if (decision === 'reject' && !remark) {
+      setNotice({ type: 'warning', text: '请填写拒绝原因' })
+      return false
+    }
     const action = decision === 'approve' ? photoAuthorizationApi.approve : photoAuthorizationApi.reject
     const successText = decision === 'approve' ? '已同意展示授权' : '已拒绝展示授权'
     const result = await run(async () => action(authorization.id, { remark }, currentUser), successText)
-    if (result) await refreshConversationData(conversation, currentOrder.orderId)
+    if (result) {
+      setAuthorizationRemarks({ ...authorizationRemarks, [authorization.id]: '' })
+      await refreshConversationData(conversation, currentOrder.orderId)
+    }
+    return Boolean(result)
   }
 
   function openPaymentDialog() {

@@ -1,4 +1,4 @@
-import { Box, Chip, Stack, Typography } from '@mui/material'
+import { Box, Stack, Typography } from '@mui/material'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded'
@@ -7,13 +7,12 @@ import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
 import UploadRoundedIcon from '@mui/icons-material/UploadRounded'
 import { centToYuan } from '../../../utils/index.js'
-import { formatFileDisplayName, formatQuoteServiceContent } from '../../../utils/displayFormatters.js'
+import { formatQuoteServiceContent } from '../../../utils/displayFormatters.js'
 import { buildOrderAction } from '../../../utils/orderNavigation.js'
-import { PortraActionLink, PortraPrimaryAction, PortraSecondaryAction, PortraStatusPill, PortraSystemNotice } from '../../../components/portra/index.js'
-import { PHOTO_AUTHORIZATION_STATUS_LABELS } from '../../orders/orderActions.js'
+import { AuthorizationRequestCard, PortraActionLink, PortraPrimaryAction, PortraSecondaryAction, PortraStatusPill, PortraSystemNotice } from '../../../components/portra/index.js'
 import { formatTime } from '../utils/conversationUtils.js'
 import { getPhotoUsageScopeLabel, getQuoteStatusLabel } from '../utils/quoteUtils.js'
-import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII } from '../MessageVisualTokens.js'
+import { getSafeDisplayText, PORTRA_COLORS } from '../MessageVisualTokens.js'
 import { EventAttachmentCard } from './EventAttachmentCard.jsx'
 import { DeliveryBatchCard } from '../../deliveries/components/DeliveryBatchCard.jsx'
 import { buildDeliveryBatches } from '../../deliveries/deliveryDisplay.js'
@@ -122,7 +121,17 @@ export function ConversationSystemItem({
             onOpenDeliveryGallery={onOpenDeliveryGallery}
           />
         )}
-        {authorization && <AuthorizationMeta authorization={authorization} />}
+        {authorization && (
+          <AuthorizationRequestCard
+            authorization={authorization}
+            order={eventMeta.order}
+            variant="message"
+            canReview={eventActions.includes('APPROVE_AUTHORIZATION') || eventActions.includes('REJECT_AUTHORIZATION')}
+            loading={loading}
+            onDecision={onDecidePhotoAuthorization}
+            onOpenDelivery={onOpenDeliveryGallery}
+          />
+        )}
       </EventAttachmentCard>
     </Box>
   )
@@ -206,25 +215,6 @@ function DeliveryMeta({ event, onOpenDeliveryGallery }) {
       />
     </Stack>
   )
-}
-
-function AuthorizationMeta({ authorization }) {
-  if (!authorization) return null
-  return (
-    <Stack direction="row" spacing={0.8} sx={{ flexWrap: 'wrap' }}>
-      <PortraStatusPill label={PHOTO_AUTHORIZATION_STATUS_LABELS[authorization.status] || '授权状态已更新'} />
-      {(authorization.files || []).map(file => <Chip key={file.id || file.fileId} size="small" label={formatFileDisplayName(file, '已选作品文件')} sx={metaChipSx} />)}
-    </Stack>
-  )
-}
-
-const metaChipSx = {
-  height: 24,
-  borderRadius: PORTRA_RADII.compact,
-  bgcolor: PORTRA_COLORS.paperMuted,
-  border: `1px solid ${PORTRA_COLORS.borderMuted}`,
-  color: PORTRA_COLORS.mutedInk,
-  fontWeight: 700
 }
 
 const attachmentMetaSx = {

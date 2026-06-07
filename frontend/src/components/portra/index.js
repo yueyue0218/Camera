@@ -22,6 +22,7 @@ export {
 } from './PortraLayoutFrames.jsx'
 
 export { OrderCompletionDialog } from './OrderCompletionDialog.jsx'
+export { AuthorizationRequestCard } from './AuthorizationRequestCard.jsx'
 export { PortraCompactSelect } from './PortraCompactSelect.jsx'
 export { PortraDateField } from './PortraDateField.jsx'
 export { PortraDateTimeField } from './PortraDateTimeField.jsx'
