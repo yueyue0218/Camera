@@ -11,7 +11,7 @@ import MoreHorizRoundedIcon from '@mui/icons-material/MoreHorizRounded'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 function roleLabel(role) {
-  return role === 'PROVIDER' ? '摄影师' : '单主'
+  return role === 'PROVIDER' ? '摄影师' : '客户'
 }
 
 function formatTime(value) {
@@ -90,6 +90,7 @@ export function MomentDetailCard({
             type="button"
             className={`moment-detail__follow ${isFollowing ? 'is-following' : ''}`}
             onClick={() => onFollow(moment.authorId, moment.authorRole)}
+            aria-pressed={isFollowing}
           >
             {isFollowing ? '已关注' : '关注'}
           </button>

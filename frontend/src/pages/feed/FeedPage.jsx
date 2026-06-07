@@ -8,14 +8,15 @@ import { useAuth } from '../../AuthContext.jsx'
 import { momentApi, userApi, fileApi } from '../../api.js'
 import { compressImageToDataUrl } from '../../utils/index.js'
 import { EmptyFeedCard } from './components/EmptyFeedCard.jsx'
+import { FeedLoadingCard } from './components/FeedLoadingCard.jsx'
 import { MomentCard } from './components/MomentCard.jsx'
 import { MomentComposer } from './components/MomentComposer.jsx'
 import { MomentDetailCard } from './components/MomentDetailCard.jsx'
 import './feed.css'
 
 const roleLabel = {
-  CUSTOMER: '鍗曚富',
-  PROVIDER: '鎽勫奖甯?'
+  CUSTOMER: '客户',
+  PROVIDER: '摄影师'
 }
 
 function emptyFollowState() {
@@ -97,7 +98,7 @@ export function FeedPage() {
 
       const nextMoments = normalizeMoments(momentsResult.status === 'fulfilled' ? momentsResult.value : [])
       setMoments(nextMoments)
-      setNotice(momentsResult.status === 'rejected' ? { type: 'error', text: momentsResult.reason?.message || '鍔ㄦ€佸姞杞藉け璐?' } : null)
+      setNotice(momentsResult.status === 'rejected' ? { type: 'error', text: momentsResult.reason?.message || '动态加载失败' } : null)
 
       const nextFollowing = emptyFollowState()
       if (customerFollowingResult.status === 'fulfilled') {
@@ -130,7 +131,7 @@ export function FeedPage() {
           }
           return [id, { nickname: brief.nickname, avatarData }]
         } catch {
-          return [id, { nickname: `鐢ㄦ埛 ${id}`, avatarData: '' }]
+          return [id, { nickname: `用户 ${id}`, avatarData: '' }]
         }
       }))
       if (!cancelledFlag) {
@@ -139,7 +140,7 @@ export function FeedPage() {
           nextProfiles[id] = profile
         })
         nextProfiles[currentUser.userId] = {
-          nickname: currentUser.nickname || currentUser.label || `鐢ㄦ埛 ${currentUser.userId}`,
+        nickname: currentUser.nickname || currentUser.label || `用户 ${currentUser.userId}`,
           avatarData: currentUser.avatarData || ''
         }
         setAuthorProfiles(nextProfiles)
@@ -166,8 +167,8 @@ export function FeedPage() {
     const stored = authorProfiles[Number(moment.authorId)]
     return stored || {
       nickname: Number(moment.authorId) === currentUser.userId
-        ? (currentUser.nickname || currentUser.label || `鐢ㄦ埛 ${currentUser.userId}`)
-        : `鐢ㄦ埛 ${moment.authorId}`,
+        ? (currentUser.nickname || currentUser.label || `用户 ${currentUser.userId}`)
+        : `用户 ${moment.authorId}`,
       avatarData: Number(moment.authorId) === currentUser.userId ? currentUser.avatarData || '' : ''
     }
   }
@@ -458,9 +459,10 @@ export function FeedPage() {
       {notice && <Alert severity={notice.type} sx={{ mb: 2 }}>{notice.text}</Alert>}
 
       {loading ? (
-        <Paper className="moments-empty" variant="outlined">
-          正在加载动态广场...
-        </Paper>
+        <Box className="moments-grid">
+          <FeedLoadingCard />
+          <FeedLoadingCard compact />
+        </Box>
       ) : activeMoments.length ? (
         <Box className="moments-grid">
           {activeMoments.map(moment => {
@@ -513,7 +515,7 @@ export function FeedPage() {
         </div>
         <div className="moment-drawer__body">
           {drawerLoading && !currentDrawerMoment ? (
-            <Paper variant="outlined" sx={{ p: 3 }}>鍔犺浇涓?..</Paper>
+            <Paper variant="outlined" sx={{ p: 3 }}>加载中...</Paper>
           ) : currentDrawerMoment ? (
             <MomentDetailCard
               moment={currentDrawerMoment}
@@ -555,7 +557,7 @@ export function FeedPage() {
       <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)}>
         <DialogTitle>删除动态</DialogTitle>
         <DialogContent>
-          删除后，这条动态将不再显示。确认删除吗？
+          删除后不可恢复，确认删除吗？
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteTarget(null)}>取消</Button>
