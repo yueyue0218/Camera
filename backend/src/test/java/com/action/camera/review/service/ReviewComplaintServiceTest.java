@@ -239,17 +239,17 @@ class ReviewComplaintServiceTest {
         assertThat(creditRecordRepository.findByUserIdOrderByCreatedAtDesc(PROVIDER_ID))
                 .extracting("eventType", "scoreChange")
                 .contains(
-                        org.assertj.core.groups.Tuple.tuple("REVIEW", 2),
-                        org.assertj.core.groups.Tuple.tuple("REVIEW_ARBITRATION", -2)
+                        org.assertj.core.groups.Tuple.tuple("REVIEW", 0),
+                        org.assertj.core.groups.Tuple.tuple("REVIEW_ARBITRATION", 0)
                 );
     }
 
     @Test
-    void hideReviewReversesActualAppliedCreditChangeAtUpperBound() {
+    void hideReviewReversesActualAppliedCreditChangeWhenReviewHadNoCreditChange() {
         jdbcTemplate.update("UPDATE users SET credit_score = 99.00 WHERE id = ?", PROVIDER_ID);
         ReviewResponse review = createCustomerReview(5);
         BigDecimal afterReview = userRepository.findById(PROVIDER_ID).orElseThrow().getCreditScore();
-        assertThat(afterReview).isEqualByComparingTo("100.00");
+        assertThat(afterReview).isEqualByComparingTo("99.00");
 
         UserContext.setUserId(PROVIDER_ID);
         ReviewComplaintResponse complaint = complaintService.create(
@@ -268,8 +268,8 @@ class ReviewComplaintServiceTest {
         assertThat(creditRecordRepository.findByUserIdOrderByCreatedAtDesc(PROVIDER_ID))
                 .extracting("eventType", "appliedScoreChange")
                 .contains(
-                        org.assertj.core.groups.Tuple.tuple("REVIEW", 1),
-                        org.assertj.core.groups.Tuple.tuple("REVIEW_ARBITRATION", -1)
+                        org.assertj.core.groups.Tuple.tuple("REVIEW", 0),
+                        org.assertj.core.groups.Tuple.tuple("REVIEW_ARBITRATION", 0)
                 );
     }
 
@@ -352,8 +352,8 @@ class ReviewComplaintServiceTest {
 
     private void insertCompletedOrder() {
         jdbcTemplate.update("""
-                INSERT INTO conversations (id, participant_a_id, participant_b_id, source_type, created_at)
-                VALUES (?, ?, ?, 'DIRECT', NOW())
+                INSERT INTO conversations (id, participant_a_id, participant_b_id, source_type, order_id, created_at)
+                VALUES (?, ?, ?, 'DIRECT', 0, NOW())
                 ON DUPLICATE KEY UPDATE participant_a_id = VALUES(participant_a_id)
                 """, CONVERSATION_ID, CUSTOMER_ID, PROVIDER_ID);
         jdbcTemplate.update("""

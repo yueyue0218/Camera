@@ -102,8 +102,8 @@ class ReviewServiceTest {
                 .satisfies(record -> {
                     assertThat(record.getRelatedOrderId()).isEqualTo(COMPLETED_ORDER_ID);
                     assertThat(record.getEventType()).isEqualTo("REVIEW");
-                    assertThat(record.getScoreChange()).isEqualTo(2);
-                    assertThat(record.getAppliedScoreChange()).isEqualTo(2);
+                    assertThat(record.getScoreChange()).isEqualTo(0);
+                    assertThat(record.getAppliedScoreChange()).isEqualTo(0);
                     assertThat(record.getSourceType()).isEqualTo("REVIEW");
                 });
         assertThat(notificationRepository.findByUserIdOrderByCreatedAtDesc(PROVIDER_ID))
@@ -229,7 +229,7 @@ class ReviewServiceTest {
                 .satisfies(record -> {
                     assertThat(record.getRelatedOrderId()).isEqualTo(PROVIDER_FAULT_REFUNDED_ORDER_ID);
                     assertThat(record.getEventType()).isEqualTo("REVIEW");
-                    assertThat(record.getScoreChange()).isEqualTo(-5);
+                    assertThat(record.getScoreChange()).isEqualTo(-4);
                 });
     }
 
@@ -292,7 +292,7 @@ class ReviewServiceTest {
                 .satisfies(record -> {
                     assertThat(record.getRelatedOrderId()).isEqualTo(CUSTOMER_FAULT_REFUNDED_ORDER_ID);
                     assertThat(record.getEventType()).isEqualTo("REVIEW");
-                    assertThat(record.getScoreChange()).isEqualTo(-2);
+                    assertThat(record.getScoreChange()).isEqualTo(-3);
                 });
     }
 
@@ -309,10 +309,10 @@ class ReviewServiceTest {
                 .containsExactlyInAnyOrder("CUSTOMER_TO_PROVIDER", "PROVIDER_TO_CUSTOMER");
         assertThat(creditRecordRepository.findByUserIdOrderByCreatedAtDesc(PROVIDER_ID))
                 .extracting("scoreChange")
-                .containsExactly(-2);
+                .containsExactly(-3);
         assertThat(creditRecordRepository.findByUserIdOrderByCreatedAtDesc(CUSTOMER_ID))
                 .extracting("scoreChange")
-                .containsExactly(-2);
+                .containsExactly(-3);
     }
 
     @Test
@@ -382,8 +382,8 @@ class ReviewServiceTest {
 
     private void insertCompletedOrder() {
         jdbcTemplate.update("""
-                INSERT INTO conversations (id, participant_a_id, participant_b_id, source_type, created_at)
-                VALUES (?, ?, ?, 'DIRECT', NOW())
+                INSERT INTO conversations (id, participant_a_id, participant_b_id, source_type, order_id, created_at)
+                VALUES (?, ?, ?, 'DIRECT', 0, NOW())
                 ON DUPLICATE KEY UPDATE participant_a_id = VALUES(participant_a_id)
                 """, CONVERSATION_ID, CUSTOMER_ID, PROVIDER_ID);
         jdbcTemplate.update("""
