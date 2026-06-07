@@ -82,8 +82,9 @@ class ConversationMessageQuoteServiceTest {
     @Test
     void acceptedResponseCanCreateConversation() {
         AcceptedResponseSnapshot snapshot = acceptedSnapshot();
-        when(conversationRepository.findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBId(
-                ConversationService.SOURCE_TYPE_DEMAND_RESPONSE, RESPONSE_ID, CUSTOMER_ID, PROVIDER_USER_ID))
+        when(conversationRepository.findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBIdAndOrderId(
+                ConversationService.SOURCE_TYPE_DEMAND_RESPONSE, RESPONSE_ID, CUSTOMER_ID, PROVIDER_USER_ID,
+                ConversationService.PENDING_ORDER_ID))
                 .thenReturn(Optional.empty());
         when(conversationRepository.save(any(Conversation.class))).thenAnswer(invocation -> {
             Conversation conversation = invocation.getArgument(0);
@@ -105,8 +106,9 @@ class ConversationMessageQuoteServiceTest {
     @Test
     void repeatedAcceptedResponseReturnsExistingConversation() {
         Conversation existing = conversation();
-        when(conversationRepository.findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBId(
-                ConversationService.SOURCE_TYPE_DEMAND_RESPONSE, RESPONSE_ID, CUSTOMER_ID, PROVIDER_USER_ID))
+        when(conversationRepository.findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBIdAndOrderId(
+                ConversationService.SOURCE_TYPE_DEMAND_RESPONSE, RESPONSE_ID, CUSTOMER_ID, PROVIDER_USER_ID,
+                ConversationService.PENDING_ORDER_ID))
                 .thenReturn(Optional.of(existing));
 
         Conversation conversation = conversationService.createFromAcceptedResponse(acceptedSnapshot(), CUSTOMER_ID);
@@ -119,8 +121,9 @@ class ConversationMessageQuoteServiceTest {
     void createConversationWithInitialMessageSavesFirstMessage() {
         when(transactionManager.getTransaction(any(TransactionDefinition.class)))
                 .thenReturn(new SimpleTransactionStatus());
-        when(conversationRepository.findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBId(
-                ConversationService.SOURCE_TYPE_SERVICE_PACKAGE, 9101L, CUSTOMER_ID, PROVIDER_USER_ID))
+        when(conversationRepository.findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBIdAndOrderId(
+                ConversationService.SOURCE_TYPE_SERVICE_PACKAGE, 9101L, CUSTOMER_ID, PROVIDER_USER_ID,
+                ConversationService.PENDING_ORDER_ID))
                 .thenReturn(Optional.empty());
         when(conversationRepository.saveAndFlush(any(Conversation.class))).thenAnswer(invocation -> {
             Conversation conversation = invocation.getArgument(0);

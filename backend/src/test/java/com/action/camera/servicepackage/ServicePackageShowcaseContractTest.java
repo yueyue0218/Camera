@@ -194,6 +194,23 @@ class ServicePackageShowcaseContractTest {
         assertThat(conversationRepository.count()).isEqualTo(conversationsBefore + 1);
         assertThat(messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId)).hasSize(1);
 
+        conversationRepository.findById(conversationId).ifPresent(conversation -> {
+            conversation.setOrderId(8801L);
+            conversationRepository.save(conversation);
+        });
+        ResponseEntity<Map> third = rest.exchange(
+                "/service-packages/" + serviceId + "/start-chat",
+                HttpMethod.POST,
+                customerEntity(CUSTOMER_ID, "{\"initialMessage\":\"Second reservation\"}"),
+                Map.class);
+
+        assertThat(third.getBody().get("code")).isEqualTo(200);
+        Long nextConversationId = numberValue(data(third), "conversationId");
+        assertThat(nextConversationId).isNotEqualTo(conversationId);
+        assertThat(conversationRepository.count()).isEqualTo(conversationsBefore + 2);
+        assertThat(conversationRepository.findById(nextConversationId).orElseThrow().getOrderId()).isZero();
+        assertThat(messageRepository.findByConversationIdOrderByCreatedAtAsc(nextConversationId)).hasSize(1);
+
         ServicePackage saved = servicePackageRepository.findById(serviceId).orElseThrow();
         assertThat(saved.getStatus()).isEqualTo(ServicePackageStatus.ONLINE);
         assertThat(saved.getIsAvailable()).isTrue();

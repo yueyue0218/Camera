@@ -33,6 +33,7 @@ public class ConversationService {
     public static final String SOURCE_TYPE_PORTFOLIO = "PORTFOLIO";
     public static final String SOURCE_TYPE_DIRECT = "DIRECT";
     public static final String RESPONSE_STATUS_ACCEPTED = "ACCEPTED";
+    public static final Long PENDING_ORDER_ID = 0L;
     private static final Set<String> SUPPORTED_SOURCE_TYPES = Set.of(
             SOURCE_TYPE_DEMAND_RESPONSE,
             SOURCE_TYPE_SERVICE_PACKAGE,
@@ -67,11 +68,12 @@ public class ConversationService {
         validateAcceptedSnapshot(snapshot, operatorId);
 
         return conversationRepository
-                .findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBId(
+                .findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBIdAndOrderId(
                         SOURCE_TYPE_DEMAND_RESPONSE,
                         snapshot.getResponseId(),
                         snapshot.getCustomerId(),
-                        snapshot.getProviderUserId())
+                        snapshot.getProviderUserId(),
+                        PENDING_ORDER_ID)
                 .orElseGet(() -> conversationRepository.save(buildConversation(
                         new CreateConversationCommand(
                                 snapshot.getCustomerId(),
@@ -85,12 +87,14 @@ public class ConversationService {
 
     public CreateConversationResult createConversationWithInitialMessage(CreateConversationCommand command) {
         String sourceType = validateCreateCommand(command);
+        Long orderId = normalizeOrderId(command.getOrderId());
         CreateConversationResult result = executeInNewTransaction(status -> conversationRepository
-                .findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBId(
+                .findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBIdAndOrderId(
                         sourceType,
                         command.getSourceId(),
                         command.getCustomerId(),
-                        command.getProviderId())
+                        command.getProviderId(),
+                        orderId)
                 .map(conversation -> new CreateConversationResult(conversation.getId()))
                 .orElseGet(() -> createConversationOrMarkRollback(command, sourceType, status)));
         if (result != null) {
@@ -249,11 +253,12 @@ public class ConversationService {
 
     private java.util.Optional<Conversation> findExistingConversation(CreateConversationCommand command,
                                                                       String sourceType) {
-        return conversationRepository.findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBId(
+        return conversationRepository.findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBIdAndOrderId(
                 sourceType,
                 command.getSourceId(),
                 command.getCustomerId(),
-                command.getProviderId());
+                command.getProviderId(),
+                normalizeOrderId(command.getOrderId()));
     }
 
     private String normalizeMessage(String value) {
@@ -269,7 +274,12 @@ public class ConversationService {
         conversation.setParticipantBId(command.getProviderId());
         conversation.setSourceType(sourceType);
         conversation.setSourceId(command.getSourceId());
+        conversation.setOrderId(normalizeOrderId(command.getOrderId()));
         conversation.setCreatedAt(LocalDateTime.now());
         return conversation;
+    }
+
+    private Long normalizeOrderId(Long orderId) {
+        return orderId == null ? PENDING_ORDER_ID : orderId;
     }
 }

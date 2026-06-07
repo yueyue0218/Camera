@@ -99,8 +99,9 @@ class ConversationQuoteControllerTest {
     @Test
     void createConversationEndpointUsesCurrentCustomer() {
         UserContext.setUserId(CUSTOMER_ID);
-        when(conversationRepository.findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBId(
-                ConversationService.SOURCE_TYPE_DEMAND_RESPONSE, RESPONSE_ID, CUSTOMER_ID, PROVIDER_USER_ID))
+        when(conversationRepository.findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBIdAndOrderId(
+                ConversationService.SOURCE_TYPE_DEMAND_RESPONSE, RESPONSE_ID, CUSTOMER_ID, PROVIDER_USER_ID,
+                ConversationService.PENDING_ORDER_ID))
                 .thenReturn(Optional.empty());
         when(conversationRepository.save(any(Conversation.class))).thenAnswer(invocation -> {
             Conversation conversation = invocation.getArgument(0);
@@ -131,8 +132,9 @@ class ConversationQuoteControllerTest {
     void repeatedConversationEndpointReturnsExistingConversation() {
         UserContext.setUserId(CUSTOMER_ID);
         Conversation existing = conversation();
-        when(conversationRepository.findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBId(
-                ConversationService.SOURCE_TYPE_DEMAND_RESPONSE, RESPONSE_ID, CUSTOMER_ID, PROVIDER_USER_ID))
+        when(conversationRepository.findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBIdAndOrderId(
+                ConversationService.SOURCE_TYPE_DEMAND_RESPONSE, RESPONSE_ID, CUSTOMER_ID, PROVIDER_USER_ID,
+                ConversationService.PENDING_ORDER_ID))
                 .thenReturn(Optional.of(existing));
 
         Result<ConversationResponse> result =

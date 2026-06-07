@@ -8,8 +8,8 @@ import java.util.Optional;
 
 public interface ConversationRepository extends JpaRepository<Conversation, Long> {
 
-    Optional<Conversation> findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBId(
-            String sourceType, Long sourceId, Long participantAId, Long participantBId);
+    Optional<Conversation> findBySourceTypeAndSourceIdAndParticipantAIdAndParticipantBIdAndOrderId(
+            String sourceType, Long sourceId, Long participantAId, Long participantBId, Long orderId);
 
     List<Conversation> findByParticipantAIdOrParticipantBId(Long participantAId, Long participantBId);
 }
