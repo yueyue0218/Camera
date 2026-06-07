@@ -4,6 +4,8 @@ import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.domain.User;
 import com.action.camera.dto.LoginResponse;
+import com.action.camera.dto.UpdateProfileRequest;
+import com.action.camera.dto.UserBriefResponse;
 import com.action.camera.dto.UserProfileResponse;
 import com.action.camera.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -155,6 +157,38 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.getMyProfile(99999L))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("用户不存在");
+    }
+
+    @Test
+    @DisplayName("更新单主头像后，brief 返回最新头像")
+    void updateCustomerAvatar_returnsLatestAvatarInBrief() {
+        User user = createTestUser("241880166", "test123456", "ACTIVE");
+        UpdateProfileRequest request = new UpdateProfileRequest();
+        request.setRole("CUSTOMER");
+        request.setAvatarFileId(501L);
+
+        userService.updateMyProfile(user.getId(), request);
+
+        UserBriefResponse brief = userService.getUserBrief(user.getId());
+        UserProfileResponse profile = userService.getMyProfile(user.getId());
+        assertThat(brief.getAvatarFileId()).isEqualTo(501L);
+        assertThat(profile.getCustomerAvatarFileId()).isEqualTo(501L);
+    }
+
+    @Test
+    @DisplayName("更新摄影师头像后，brief 返回最新头像")
+    void updateProviderAvatar_returnsLatestAvatarInBrief() {
+        User user = createTestUser("241880167", "test123456", "ACTIVE");
+        UpdateProfileRequest request = new UpdateProfileRequest();
+        request.setRole("PROVIDER");
+        request.setAvatarFileId(777L);
+
+        userService.updateMyProfile(user.getId(), request);
+
+        UserBriefResponse brief = userService.getUserBrief(user.getId());
+        UserProfileResponse profile = userService.getMyProfile(user.getId());
+        assertThat(brief.getAvatarFileId()).isEqualTo(777L);
+        assertThat(profile.getProviderAvatarFileId()).isEqualTo(777L);
     }
 
     private User createTestUser(String studentNo, String password, String status) {
