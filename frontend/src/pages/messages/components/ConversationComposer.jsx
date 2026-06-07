@@ -162,13 +162,12 @@ export function ConversationComposer({
 
         <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center', flexWrap: 'wrap', minHeight: 30 }}>
           <Typography variant="caption" sx={{ mr: 0.5, color: PORTRA_COLORS.faintInk, fontWeight: 750 }}>沟通工具</Typography>
-          <MessageToolbarButton title={imageSending ? '图片发送中' : '发送图片'} component="label" disabled={loading || imageSending}>
+          <MessageToolbarButton title="当前接口暂不支持发送图片，作品请通过订单上传" unavailable onClick={() => onUnavailableTool('图片')}>
             <ImageRoundedIcon fontSize="small" />
-            <input hidden type="file" accept="image/*" onChange={onChooseMessageImage} />
           </MessageToolbarButton>
-          <MessageToolbarButton title="附件发送需要消息附件接口支持" disabled><AttachFileRoundedIcon fontSize="small" /></MessageToolbarButton>
-          <MessageToolbarButton title="表情面板暂未接入" disabled><EmojiEmotionsRoundedIcon fontSize="small" /></MessageToolbarButton>
-          <MessageToolbarButton title="补款能力暂未接入" disabled><AccountBalanceWalletRoundedIcon fontSize="small" /></MessageToolbarButton>
+          <MessageToolbarButton title="附件发送需要消息附件接口支持" unavailable onClick={() => onUnavailableTool('附件')}><AttachFileRoundedIcon fontSize="small" /></MessageToolbarButton>
+          <MessageToolbarButton title="表情面板暂未接入" unavailable onClick={() => onUnavailableTool('表情')}><EmojiEmotionsRoundedIcon fontSize="small" /></MessageToolbarButton>
+          <MessageToolbarButton title="补款能力暂未接入" unavailable onClick={() => onUnavailableTool('补款')}><AccountBalanceWalletRoundedIcon fontSize="small" /></MessageToolbarButton>
           {actions.canOpenOrder && canOpenOrderArchive && (
             <MessageToolbarButton title="查看订单" data-message-order-entry="composer-toolbar" onClick={openOrderArchive}><ReceiptLongRoundedIcon fontSize="small" /></MessageToolbarButton>
           )}
