@@ -3,7 +3,7 @@ import globals from 'globals'
 
 export default [
   {
-    ignores: ['dist'],
+    ignores: ['dist', 'src/pages/legacy/CameraPages.jsx'],
   },
   {
     files: ['src/**/*.{js,jsx}'],

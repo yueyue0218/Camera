@@ -78,7 +78,6 @@ export function FeedPage() {
     if (initialScope && ['latest', 'hot', 'following'].includes(initialScope)) {
       setScope(initialScope)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {

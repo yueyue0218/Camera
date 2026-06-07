@@ -152,6 +152,7 @@ export function ProfilePage() {
         try {
           avatarData = await fileApi.downloadObjectUrl(avatarFileId, currentUser)
         } catch {
+          // ignore avatar download fallback
           avatarData = currentUser.avatarData || ''
         }
       }
@@ -258,7 +259,9 @@ export function ProfilePage() {
       const imageData = await imageFileToDataUrl(file)
       const nextItems = addPortfolioItem(currentUser.userId, { title: file.name.replace(/\.[^.]+$/, '') || '作品', imageData })
       setPortfolioItems(nextItems)
-    } catch {}
+    } catch {
+      // ignore portfolio image additions that fail validation or readback
+    }
   }
 
   async function acceptInvitation(inv) {

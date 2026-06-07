@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import {
@@ -145,58 +145,58 @@ const theme = createTheme({
 })
 
 const navItems = [
-  { label: '大厅', path: '/hall', icon: <HomeRoundedIcon /> },
-  { label: '发布', path: '/publish', icon: <PublishRoundedIcon /> },
-  { label: '动态', path: '/feed', icon: <DynamicFeedRoundedIcon /> },
-  { label: '会话', path: '/messages', icon: <ChatRoundedIcon /> },
-  { label: '个人', path: '/profile', icon: <PersonRoundedIcon /> }
+  { label: '澶у巺', path: '/hall', icon: <HomeRoundedIcon /> },
+  { label: '鍙戝竷', path: '/publish', icon: <PublishRoundedIcon /> },
+  { label: '鍔ㄦ€?', path: '/feed', icon: <DynamicFeedRoundedIcon /> },
+  { label: '浼氳瘽', path: '/messages', icon: <ChatRoundedIcon /> },
+  { label: '涓汉', path: '/profile', icon: <PersonRoundedIcon /> }
 ]
 
 const demandStatusMap = {
-  OPEN: '开放中',
-  MATCHED: '已匹配',
-  CLOSED: '已关闭'
+  OPEN: '寮€鏀句腑',
+  MATCHED: '宸插尮閰?',
+  CLOSED: '宸插叧闂?',
 }
 
 const responseStatusMap = {
-  PENDING_CUSTOMER_ACCEPT: '待需求方接受',
-  ACCEPTED: '已接受',
-  REJECTED: '已婉拒'
+  PENDING_CUSTOMER_ACCEPT: '寰呴渶姹傛柟鎺ュ彈',
+  ACCEPTED: '宸叉帴鍙?',
+  REJECTED: '宸插鎷?',
 }
 
 const roleMap = {
-  CUSTOMER: '需求方',
-  PROVIDER: '服务方',
-  ADMIN: '管理员'
+  CUSTOMER: '闇€姹傛柟',
+  PROVIDER: '鏈嶅姟鏂?',
+  ADMIN: '绠＄悊鍛?',
 }
 
 const quoteStatusMap = {
-  PENDING_CONFIRM: '待确认',
-  CONFIRMED: '已确认',
-  REJECTED: '已拒绝',
-  EXPIRED: '已过期',
-  CANCELLED: '已取消'
+  PENDING_CONFIRM: '寰呯‘璁?',
+  CONFIRMED: '宸茬‘璁?',
+  REJECTED: '宸叉嫆缁?',
+  EXPIRED: '宸茶繃鏈?',
+  CANCELLED: '宸插彇娑?',
 }
 
 const orderStatusMap = {
   ...ORDER_STATUS_LABELS,
-  PENDING_PAYMENT: '待支付',
-  PAID_PENDING_SHOOT: '已支付待拍摄',
-  SHOOTING: '拍摄中',
-  PENDING_DELIVERY: '待交付',
-  DELIVERED_PENDING_CONFIRM: '已交付待确认',
-  COMPLETED: '已完成',
-  CANCELLED: '已取消',
-  REFUNDED: '已退款',
-  APPEALING: '申诉中',
-  REWORK_REQUIRED: '返修中'
+  PENDING_PAYMENT: '寰呮敮浠?',
+  PAID_PENDING_SHOOT: '宸叉敮浠樺緟鎷嶆憚',
+  SHOOTING: '鎷嶆憚涓?',
+  PENDING_DELIVERY: '寰呬氦浠?',
+  DELIVERED_PENDING_CONFIRM: '宸蹭氦浠樺緟纭',
+  COMPLETED: '宸插畬鎴?',
+  CANCELLED: '宸插彇娑?',
+  REFUNDED: '宸查€€娆?',
+  APPEALING: '鐢宠瘔涓?',
+  REWORK_REQUIRED: '杩斾慨涓?',
 }
 
 const escrowStatusMap = {
-  NOT_PAID: '未支付',
-  HELD: '平台托管中',
-  RELEASED: '已结算',
-  REFUNDED: '已退款'
+  NOT_PAID: '鏈敮浠?',
+  HELD: '骞冲彴鎵樼涓?',
+  RELEASED: '宸茬粨绠?',
+  REFUNDED: '宸查€€娆?',
 }
 
 function BrandLockup({ hero = false }) {
@@ -313,7 +313,7 @@ function Shell() {
           </Tabs>
 
           <Chip
-            label={`当前：${roleMap[currentUser.role]}`}
+            label={`褰撳墠锛?{roleMap[currentUser.role]}`}
             color={currentUser.role === 'CUSTOMER' ? 'primary' : 'secondary'}
             variant="outlined"
             sx={{ display: { xs: 'none', sm: 'inline-flex' } }}
@@ -328,7 +328,7 @@ function Shell() {
             }}
             sx={{ display: { xs: 'none', md: 'inline-flex' } }}
           >
-            退出
+            閫€鍑?
           </Button>
         </Toolbar>
       </AppBar>
@@ -391,7 +391,7 @@ function LoginChoicePage() {
           onClick={() => navigate('/login/sign-in')}
           sx={{ minHeight: 60, fontSize: { xs: '1.16rem', sm: '1.28rem' }, fontWeight: 900 }}
         >
-          登录
+          鐧诲綍
         </Button>
         <Button
           className="login-entry-button login-entry-button-late"
@@ -401,7 +401,7 @@ function LoginChoicePage() {
           onClick={() => navigate('/login/register')}
           sx={{ minHeight: 60, fontSize: { xs: '1.16rem', sm: '1.28rem' }, fontWeight: 900 }}
         >
-          注册
+          娉ㄥ唽
         </Button>
       </Stack>
       <Typography className="filmstrip-title">Looking for beauty.</Typography>
@@ -492,30 +492,30 @@ function LoginInfoPage() {
             <Stack direction="row" alignItems="center" spacing={1.5}>
               <Box component="img" className="brand-logo brand-logo-form" src={cameraLogoUrl} alt="" aria-hidden="true" />
               <Box>
-                <Typography variant="h5">登录</Typography>
-                <Typography color="text.secondary">当前后端登录接口使用手机号和验证码。</Typography>
+                <Typography variant="h5">鐧诲綍</Typography>
+                <Typography color="text.secondary">褰撳墠鍚庣鐧诲綍鎺ュ彛浣跨敤鎵嬫満鍙峰拰楠岃瘉鐮併€?/Typography>
               </Box>
             </Stack>
 
             {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
 
             <Box>
-              <Typography fontWeight={800} sx={{ mb: 1 }}>本次登录身份</Typography>
+              <Typography fontWeight={800} sx={{ mb: 1 }}>鏈鐧诲綍韬唤</Typography>
               <ToggleButtonGroup exclusive value={role} onChange={(_, value) => value && setRole(value)}>
-                <ToggleButton value="CUSTOMER">需求方</ToggleButton>
-                <ToggleButton value="PROVIDER">服务方</ToggleButton>
+                <ToggleButton value="CUSTOMER">闇€姹傛柟</ToggleButton>
+                <ToggleButton value="PROVIDER">鏈嶅姟鏂?/ToggleButton>
               </ToggleButtonGroup>
             </Box>
 
             <TextField
-              label="手机号"
+              label="鎵嬫満鍙?
               value={form.mobile}
               onChange={event => setForm({ ...form, mobile: event.target.value })}
               inputProps={{ inputMode: 'tel', maxLength: 11 }}
               required
             />
             <TextField
-              label="验证码"
+              label="楠岃瘉鐮?
               value={form.verifyCode}
               onChange={event => setForm({ ...form, verifyCode: event.target.value })}
               inputProps={{ inputMode: 'numeric', maxLength: 6 }}
@@ -529,10 +529,10 @@ function LoginInfoPage() {
               startIcon={<LoginRoundedIcon />}
               disabled={loading || !form.mobile.trim() || !form.verifyCode.trim()}
             >
-              {loading ? '登录中' : '登录'}
+              {loading ? '鐧诲綍涓? : '鐧诲綍'}
             </Button>
             <Button variant="text" color="inherit" onClick={() => navigate('/login')}>
-              返回选择身份
+              杩斿洖閫夋嫨韬唤
             </Button>
           </Stack>
         </Paper>
@@ -544,7 +544,7 @@ function LoginInfoPage() {
 function RegisterPage() {
   const navigate = useNavigate()
   const [form, setForm] = useState({
-    nickname: '南大同学',
+    nickname: '鍗楀ぇ鍚屽',
     email: '221000001@smail.nju.edu.cn',
     verifyCode: '123456',
     password: 'camera123'
@@ -557,7 +557,7 @@ function RegisterPage() {
     setLoading(true)
     try {
       await authApi.sendCode(form.email.trim())
-      setNotice({ type: 'success', text: '南大邮箱验证码已发送' })
+      setNotice({ type: 'success', text: '鍗楀ぇ閭楠岃瘉鐮佸凡鍙戦€? })
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     } finally {
@@ -576,10 +576,10 @@ function RegisterPage() {
         code: form.verifyCode.trim(),
         password: form.password
       })
-      navigate('/login/sign-in', { replace: true, state: { notice: '注册成功，请登录' } })
+      navigate('/login/sign-in', { replace: true, state: { notice: '娉ㄥ唽鎴愬姛锛岃鐧诲綍' } })
     } catch (error) {
       if (error.canUseDemoRegister) {
-        navigate('/login/sign-in', { replace: true, state: { notice: '演示注册成功，请登录' } })
+        navigate('/login/sign-in', { replace: true, state: { notice: '婕旂ず娉ㄥ唽鎴愬姛锛岃鐧诲綍' } })
         return
       }
       setNotice({ type: 'error', text: error.message })
@@ -596,13 +596,13 @@ function RegisterPage() {
             <Stack direction="row" alignItems="center" spacing={1.5}>
               <Box component="img" className="brand-logo brand-logo-form" src={cameraLogoUrl} alt="" aria-hidden="true" />
               <Box>
-                <Typography variant="h5">注册</Typography>
-                <Typography color="text.secondary">使用南大邮箱验证码完成 A3 注册。</Typography>
+                <Typography variant="h5">娉ㄥ唽</Typography>
+                <Typography color="text.secondary">浣跨敤鍗楀ぇ閭楠岃瘉鐮佸畬鎴?A3 娉ㄥ唽銆?/Typography>
               </Box>
             </Stack>
             {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
             <TextField
-              label="昵称"
+              label="鏄电О"
               value={form.nickname}
               onChange={event => setForm({ ...form, nickname: event.target.value })}
               required
@@ -610,7 +610,7 @@ function RegisterPage() {
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
               <TextField
                 fullWidth
-                label="南大邮箱"
+                label="鍗楀ぇ閭"
                 value={form.email}
                 onChange={event => setForm({ ...form, email: event.target.value })}
                 placeholder="221000001@smail.nju.edu.cn"
@@ -623,28 +623,28 @@ function RegisterPage() {
                 disabled={loading || !form.email.trim()}
                 sx={{ minWidth: 132 }}
               >
-                发送验证码
+                鍙戦€侀獙璇佺爜
               </Button>
             </Stack>
             <TextField
-              label="验证码"
+              label="楠岃瘉鐮?
               value={form.verifyCode}
               onChange={event => setForm({ ...form, verifyCode: event.target.value })}
               inputProps={{ inputMode: 'numeric', maxLength: 6 }}
               required
             />
             <TextField
-              label="密码"
+              label="瀵嗙爜"
               type="password"
               value={form.password}
               onChange={event => setForm({ ...form, password: event.target.value })}
               required
             />
             <Button type="submit" variant="contained" size="large" disabled={loading}>
-              {loading ? '注册中' : '注册并返回登录'}
+              {loading ? '娉ㄥ唽涓? : '娉ㄥ唽骞惰繑鍥炵櫥褰?}
             </Button>
             <Button variant="text" color="inherit" onClick={() => navigate('/login/sign-in')}>
-              已有账号，去登录
+              宸叉湁璐﹀彿锛屽幓鐧诲綍
             </Button>
           </Stack>
         </Paper>
@@ -667,7 +667,7 @@ function HallPage() {
   const [demands, setDemands] = useState([])
   const [selectedDemand, setSelectedDemand] = useState(null)
   const [responses, setResponses] = useState([])
-  const [inviteForm, setInviteForm] = useState({ expectedPriceYuan: 399, message: '你好，我很适合这个需求，想邀请你进一步沟通拍摄方案。' })
+  const [inviteForm, setInviteForm] = useState({ expectedPriceYuan: 399, message: '浣犲ソ锛屾垜寰堥€傚悎杩欎釜闇€姹傦紝鎯抽個璇蜂綘杩涗竴姝ユ矡閫氭媿鎽勬柟妗堛€? })
   const [snapshot, setSnapshot] = useState(null)
   const [notice, setNotice] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -728,7 +728,7 @@ function HallPage() {
     await run(async () => demandApi.invite(selectedDemand.demandId, {
       expectedPriceCent: yuanToCent(inviteForm.expectedPriceYuan),
       message: inviteForm.message
-    }, currentUser), '邀请已发送')
+    }, currentUser), '閭€璇峰凡鍙戦€?)
   }
 
   async function deleteDemand(demand) {
@@ -736,7 +736,7 @@ function HallPage() {
     const deleted = await run(async () => {
       await demandApi.delete(demand.demandId, currentUser)
       return true
-    }, '需求已删除')
+    }, '闇€姹傚凡鍒犻櫎')
     if (deleted) {
       setSelectedDemand(null)
       setResponses([])
@@ -750,7 +750,7 @@ function HallPage() {
       const accepted = await demandApi.accept(selectedDemand.demandId, response.responseId, currentUser)
       const conversation = await conversationApi.createFromResponse(accepted, currentUser)
       return { ...accepted, conversation }
-    }, '已接受响应并创建会话')
+    }, '宸叉帴鍙楀搷搴斿苟鍒涘缓浼氳瘽')
     if (result) {
       setSnapshot(result)
       saveConversationRecord(result.conversation, {
@@ -781,39 +781,39 @@ function HallPage() {
 
   return (
     <Stack spacing={2.5}>
-      <SectionHeader title="需求大厅" subtitle="浏览约拍需求，服务方可响应，需求方可接受响应。" />
+      <SectionHeader title="闇€姹傚ぇ鍘? subtitle="娴忚绾︽媿闇€姹傦紝鏈嶅姟鏂瑰彲鍝嶅簲锛岄渶姹傛柟鍙帴鍙楀搷搴斻€? />
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
 
       <Paper className="portra-toolbar" variant="outlined" sx={{ p: 2 }}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'flex-end' }}>
           <Stack spacing={0.5} sx={{ minWidth: { md: 108 }, justifyContent: 'flex-end' }}>
             <Typography component="label" htmlFor="hall-filter-city" variant="caption" color="text.secondary" fontWeight={800}>
-              城市
+              鍩庡競
             </Typography>
             <TextField
               id="hall-filter-city"
               value={filters.cityCode}
               onChange={event => setFilters({ ...filters, cityCode: event.target.value })}
               size="small"
-              inputProps={{ 'aria-label': '城市' }}
+              inputProps={{ 'aria-label': '鍩庡競' }}
             />
           </Stack>
           <Stack spacing={0.5} sx={{ minWidth: { md: 140 }, justifyContent: 'flex-end' }}>
             <Typography component="label" htmlFor="hall-filter-tag" variant="caption" color="text.secondary" fontWeight={800}>
-              标签
+              鏍囩
             </Typography>
             <TextField
               id="hall-filter-tag"
-              placeholder="自然抓拍"
+              placeholder="鑷劧鎶撴媿"
               value={filters.styleTag}
               onChange={event => setFilters({ ...filters, styleTag: event.target.value })}
               size="small"
-              inputProps={{ 'aria-label': '标签' }}
+              inputProps={{ 'aria-label': '鏍囩' }}
             />
           </Stack>
           <Stack spacing={0.5} sx={{ minWidth: { md: 156 }, justifyContent: 'flex-end' }}>
             <Typography component="label" htmlFor="hall-filter-date" variant="caption" color="text.secondary" fontWeight={800}>
-              日期
+              鏃ユ湡
             </Typography>
             <TextField
               id="hall-filter-date"
@@ -821,12 +821,12 @@ function HallPage() {
               value={filters.expectedDate}
               onChange={event => setFilters({ ...filters, expectedDate: event.target.value })}
               size="small"
-              inputProps={{ 'aria-label': '日期' }}
+              inputProps={{ 'aria-label': '鏃ユ湡' }}
             />
           </Stack>
           <Stack spacing={0.5} sx={{ minWidth: { md: 108 }, justifyContent: 'flex-end' }}>
             <Typography component="label" htmlFor="hall-filter-min-price" variant="caption" color="text.secondary" fontWeight={800}>
-              最低价
+              鏈€浣庝环
             </Typography>
             <TextField
               id="hall-filter-min-price"
@@ -834,12 +834,12 @@ function HallPage() {
               value={filters.minBudgetYuan}
               onChange={event => setFilters({ ...filters, minBudgetYuan: event.target.value })}
               size="small"
-              inputProps={{ 'aria-label': '最低价' }}
+              inputProps={{ 'aria-label': '鏈€浣庝环' }}
             />
           </Stack>
           <Stack spacing={0.5} sx={{ minWidth: { md: 108 }, justifyContent: 'flex-end' }}>
             <Typography component="label" htmlFor="hall-filter-max-price" variant="caption" color="text.secondary" fontWeight={800}>
-              最高价
+              鏈€楂樹环
             </Typography>
             <TextField
               id="hall-filter-max-price"
@@ -847,32 +847,32 @@ function HallPage() {
               value={filters.maxBudgetYuan}
               onChange={event => setFilters({ ...filters, maxBudgetYuan: event.target.value })}
               size="small"
-              inputProps={{ 'aria-label': '最高价' }}
+              inputProps={{ 'aria-label': '鏈€楂樹环' }}
             />
           </Stack>
           <Stack spacing={0.5} sx={{ minWidth: { md: 140 }, justifyContent: 'flex-end' }}>
             <Typography component="label" htmlFor="hall-filter-status" variant="caption" color="text.secondary" fontWeight={800}>
-              状态
+              鐘舵€?
             </Typography>
             <FormControl size="small">
               <Select
                 id="hall-filter-status"
                 value={filters.status}
                 onChange={event => setFilters({ ...filters, status: event.target.value })}
-                inputProps={{ 'aria-label': '状态' }}
+                inputProps={{ 'aria-label': '鐘舵€? }}
               >
-                <MenuItem value="OPEN">开放中</MenuItem>
-                <MenuItem value="MATCHED">已匹配</MenuItem>
-                <MenuItem value="">全部</MenuItem>
+                <MenuItem value="OPEN">寮€鏀句腑</MenuItem>
+                <MenuItem value="MATCHED">宸插尮閰?/MenuItem>
+                <MenuItem value="">鍏ㄩ儴</MenuItem>
               </Select>
             </FormControl>
           </Stack>
           <Stack spacing={0.5} sx={{ justifyContent: 'flex-end' }}>
             <Typography variant="caption" color="transparent" fontWeight={800} aria-hidden="true">
-              操作
+              鎿嶄綔
             </Typography>
             <Button variant="contained" startIcon={<RefreshRoundedIcon />} onClick={loadDemands} disabled={loading} sx={{ minHeight: 40 }}>
-              刷新
+              鍒锋柊
             </Button>
           </Stack>
         </Stack>
@@ -894,25 +894,25 @@ function HallPage() {
                     <Typography variant="h6">{demand.scene}</Typography>
                     <Chip size="small" label={demandStatusMap[demand.status] || demand.status} />
                   </Stack>
-                  <Typography color="text.secondary">{demand.cityCode} · {demand.location}</Typography>
-                  <Typography>{centToYuan(demand.budgetMinCent)} 至 {centToYuan(demand.budgetMaxCent)}</Typography>
-                  <Typography color="text.secondary">{demand.responseCount} 个响应</Typography>
+                  <Typography color="text.secondary">{demand.cityCode} 路 {demand.location}</Typography>
+                  <Typography>{centToYuan(demand.budgetMinCent)} 鑷?{centToYuan(demand.budgetMaxCent)}</Typography>
+                  <Typography color="text.secondary">{demand.responseCount} 涓搷搴?/Typography>
                 </Stack>
               </CardContent>
             </Card>
           ))}
-          {!demands.length && <EmptyCard text="暂无需求" />}
+          {!demands.length && <EmptyCard text="鏆傛棤闇€姹? />}
         </Stack>
 
         <Paper className="portra-detail-ticket" variant="outlined" sx={{ p: { xs: 2, md: 2.5 }, minHeight: 420 }}>
           {!selectedDemand ? (
-            <EmptyCard text="选择一条需求查看详情" />
+            <EmptyCard text="閫夋嫨涓€鏉￠渶姹傛煡鐪嬭鎯? />
           ) : (
             <Stack spacing={2.2}>
               <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2}>
                 <Box>
                   <Typography variant="h5">{selectedDemand.scene}</Typography>
-                  <Typography color="text.secondary">{selectedDemand.cityCode} · {selectedDemand.location}</Typography>
+                  <Typography color="text.secondary">{selectedDemand.cityCode} 路 {selectedDemand.location}</Typography>
                 </Box>
                 <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                   <Chip color="primary" label={demandStatusMap[selectedDemand.status] || selectedDemand.status} />
@@ -925,51 +925,51 @@ function HallPage() {
                       onClick={() => deleteDemand(selectedDemand)}
                       disabled={loading || selectedDemandInProgress}
                     >
-                      删除需求
+                      鍒犻櫎闇€姹?
                     </Button>
                   )}
                 </Stack>
               </Stack>
               {isSelectedDemandOwner && selectedDemandInProgress && (
-                <Alert severity="info">需求交易正在进行，暂时不能删除。</Alert>
+                <Alert severity="info">闇€姹備氦鏄撴鍦ㄨ繘琛岋紝鏆傛椂涓嶈兘鍒犻櫎銆?/Alert>
               )}
               <Divider />
               <InfoRows rows={[
-                ['需求方编号', selectedDemand.customerId],
-                ['时间', `${selectedDemand.expectedDate || '未定日期'} ${selectedDemand.timeSlot || ''}`],
-                ['预算', `${centToYuan(selectedDemand.budgetMinCent)} 至 ${centToYuan(selectedDemand.budgetMaxCent)}`],
-                ['风格', selectedDemand.styleTags?.length ? selectedDemand.styleTags.join(' / ') : '未填写'],
-                ['描述', selectedDemand.description || '未填写']
+                ['闇€姹傛柟缂栧彿', selectedDemand.customerId],
+                ['鏃堕棿', `${selectedDemand.expectedDate || '鏈畾鏃ユ湡'} ${selectedDemand.timeSlot || ''}`],
+                ['棰勭畻', `${centToYuan(selectedDemand.budgetMinCent)} 鑷?${centToYuan(selectedDemand.budgetMaxCent)}`],
+                ['椋庢牸', selectedDemand.styleTags?.length ? selectedDemand.styleTags.join(' / ') : '鏈～鍐?],
+                ['鎻忚堪', selectedDemand.description || '鏈～鍐?]
               ]} />
 
               {canInvite && (
                 <Paper className="portra-system-card" variant="outlined" sx={{ p: 2 }}>
                   <Stack spacing={1.5}>
                     <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
-                      <Typography variant="h6">发起邀请</Typography>
+                      <Typography variant="h6">鍙戣捣閭€璇?/Typography>
                       <Button
                         variant="contained"
                         startIcon={<SendRoundedIcon />}
                         onClick={sendInvitation}
                         disabled={loading}
                       >
-                        发起邀请
+                        鍙戣捣閭€璇?
                       </Button>
                     </Stack>
                     <TextField
-                      label="邀请报价"
+                      label="閭€璇锋姤浠?
                       type="number"
                       value={inviteForm.expectedPriceYuan}
                       onChange={event => setInviteForm({ ...inviteForm, expectedPriceYuan: event.target.value })}
                     />
                     <TextField
-                      label="邀请说明"
+                      label="閭€璇疯鏄?
                       multiline
                       minRows={2}
                       value={inviteForm.message}
                       onChange={event => setInviteForm({ ...inviteForm, message: event.target.value })}
                     />
-                    <Alert severity="info">服务方需要先发起邀请；需求方接受后才会创建会话。</Alert>
+                    <Alert severity="info">鏈嶅姟鏂归渶瑕佸厛鍙戣捣閭€璇凤紱闇€姹傛柟鎺ュ彈鍚庢墠浼氬垱寤轰細璇濄€?/Alert>
                   </Stack>
                 </Paper>
               )}
@@ -978,26 +978,26 @@ function HallPage() {
                 <Paper className="portra-system-card" variant="outlined" sx={{ p: 2 }}>
                   <Stack spacing={1.5}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center">
-                      <Typography variant="h6">响应列表</Typography>
-                      <Button size="small" onClick={() => openDemand(selectedDemand)}>刷新响应</Button>
+                      <Typography variant="h6">鍝嶅簲鍒楄〃</Typography>
+                      <Button size="small" onClick={() => openDemand(selectedDemand)}>鍒锋柊鍝嶅簲</Button>
                     </Stack>
                     {responses.map(response => (
                       <Paper key={response.responseId} variant="outlined" sx={{ p: 1.5 }}>
                         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
                           <Box>
-                            <Typography fontWeight={700}>服务方 {response.providerId}</Typography>
+                            <Typography fontWeight={700}>鏈嶅姟鏂?{response.providerId}</Typography>
                             <Typography>{response.message}</Typography>
                             <Typography color="text.secondary">
-                              {centToYuan(response.expectedPriceCent)} · {responseStatusMap[response.status] || response.status}
+                              {centToYuan(response.expectedPriceCent)} 路 {responseStatusMap[response.status] || response.status}
                             </Typography>
                           </Box>
                           {response.status === 'PENDING_CUSTOMER_ACCEPT' && selectedDemand.status === 'OPEN' && (
-                            <Button variant="contained" onClick={() => acceptResponse(response)}>接受</Button>
+                            <Button variant="contained" onClick={() => acceptResponse(response)}>鎺ュ彈</Button>
                           )}
                         </Stack>
                       </Paper>
                     ))}
-                    {!responses.length && <Typography color="text.secondary">暂无响应</Typography>}
+                    {!responses.length && <Typography color="text.secondary">鏆傛棤鍝嶅簲</Typography>}
                   </Stack>
                 </Paper>
               )}
@@ -1012,12 +1012,12 @@ function HallPage() {
                         size="small"
                         onClick={() => navigate(`/messages?conversationId=${snapshot.conversation.conversationId}`)}
                       >
-                        进入会话
+                        杩涘叆浼氳瘽
                       </Button>
                     ) : null
                   }
                 >
-                  已创建 C 模块会话：响应 {snapshot.responseId}，会话 {snapshot.conversation?.conversationId || '待生成'}。
+                  宸插垱寤?C 妯″潡浼氳瘽锛氬搷搴?{snapshot.responseId}锛屼細璇?{snapshot.conversation?.conversationId || '寰呯敓鎴?}銆?
                 </Alert>
               )}
             </Stack>
@@ -1033,15 +1033,15 @@ function PublishPage() {
   const { currentUser } = useAuth()
   const [notice, setNotice] = useState(null)
   const [form, setForm] = useState({
-    scene: '毕业照',
+    scene: '姣曚笟鐓?,
     cityCode: 'NJU',
-    location: '南京大学鼓楼校区',
+    location: '鍗椾含澶у榧撴ゼ鏍″尯',
     expectedDate: '',
     timeSlot: '14:00-16:00',
     budgetMinYuan: 199,
     budgetMaxYuan: 399,
-    styleTagsText: '自然抓拍,校园,生活感',
-    description: '想拍一组自然、不模板化的校园毕业照，偏生活感。'
+    styleTagsText: '鑷劧鎶撴媿,鏍″洯,鐢熸椿鎰?,
+    description: '鎯虫媿涓€缁勮嚜鐒躲€佷笉妯℃澘鍖栫殑鏍″洯姣曚笟鐓э紝鍋忕敓娲绘劅銆?
   })
 
   async function submit(event) {
@@ -1059,7 +1059,7 @@ function PublishPage() {
         styleTags: form.styleTagsText.split(',').map(tag => tag.trim()).filter(Boolean),
         description: form.description
       }, currentUser)
-      setNotice({ type: 'success', text: '需求已发布' })
+      setNotice({ type: 'success', text: '闇€姹傚凡鍙戝竷' })
       navigate('/hall')
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
@@ -1069,28 +1069,28 @@ function PublishPage() {
   if (currentUser.role !== 'CUSTOMER') {
     return (
       <Stack spacing={2}>
-        <SectionHeader title="发布" subtitle="发布约拍需求需要使用需求方身份。" />
-        <Alert severity="info">请到个人页切换为需求方。</Alert>
+        <SectionHeader title="鍙戝竷" subtitle="鍙戝竷绾︽媿闇€姹傞渶瑕佷娇鐢ㄩ渶姹傛柟韬唤銆? />
+        <Alert severity="info">璇峰埌涓汉椤靛垏鎹负闇€姹傛柟銆?/Alert>
       </Stack>
     )
   }
 
   return (
     <Stack spacing={2.5}>
-      <SectionHeader title="发布" subtitle="填写约拍需求，服务方会在大厅中响应。" />
+      <SectionHeader title="鍙戝竷" subtitle="濉啓绾︽媿闇€姹傦紝鏈嶅姟鏂逛細鍦ㄥぇ鍘呬腑鍝嶅簲銆? />
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
       <Paper component="form" variant="outlined" onSubmit={submit} sx={{ p: { xs: 2, md: 3 } }}>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-          <TextField label="场景" value={form.scene} onChange={event => setForm({ ...form, scene: event.target.value })} required />
-          <TextField label="城市" value={form.cityCode} onChange={event => setForm({ ...form, cityCode: event.target.value })} required />
-          <TextField label="地点" value={form.location} onChange={event => setForm({ ...form, location: event.target.value })} required />
-          <TextField label="日期" value={form.expectedDate} onChange={event => setForm({ ...form, expectedDate: event.target.value })} placeholder="2026-06-01" inputProps={{ inputMode: 'numeric' }} />
-          <TextField label="时间段" value={form.timeSlot} onChange={event => setForm({ ...form, timeSlot: event.target.value })} />
-          <TextField label="风格标签" value={form.styleTagsText} onChange={event => setForm({ ...form, styleTagsText: event.target.value })} />
-          <TextField label="最低预算" type="number" value={form.budgetMinYuan} onChange={event => setForm({ ...form, budgetMinYuan: event.target.value })} />
-          <TextField label="最高预算" type="number" value={form.budgetMaxYuan} onChange={event => setForm({ ...form, budgetMaxYuan: event.target.value })} />
+          <TextField label="鍦烘櫙" value={form.scene} onChange={event => setForm({ ...form, scene: event.target.value })} required />
+          <TextField label="鍩庡競" value={form.cityCode} onChange={event => setForm({ ...form, cityCode: event.target.value })} required />
+          <TextField label="鍦扮偣" value={form.location} onChange={event => setForm({ ...form, location: event.target.value })} required />
+          <TextField label="鏃ユ湡" value={form.expectedDate} onChange={event => setForm({ ...form, expectedDate: event.target.value })} placeholder="2026-06-01" inputProps={{ inputMode: 'numeric' }} />
+          <TextField label="鏃堕棿娈? value={form.timeSlot} onChange={event => setForm({ ...form, timeSlot: event.target.value })} />
+          <TextField label="椋庢牸鏍囩" value={form.styleTagsText} onChange={event => setForm({ ...form, styleTagsText: event.target.value })} />
+          <TextField label="鏈€浣庨绠? type="number" value={form.budgetMinYuan} onChange={event => setForm({ ...form, budgetMinYuan: event.target.value })} />
+          <TextField label="鏈€楂橀绠? type="number" value={form.budgetMaxYuan} onChange={event => setForm({ ...form, budgetMaxYuan: event.target.value })} />
           <TextField
-            label="需求描述"
+            label="闇€姹傛弿杩?
             multiline
             minRows={4}
             value={form.description}
@@ -1099,7 +1099,7 @@ function PublishPage() {
           />
         </Box>
         <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-          <Button type="submit" variant="contained" size="large">发布需求</Button>
+          <Button type="submit" variant="contained" size="large">鍙戝竷闇€姹?/Button>
         </Stack>
       </Paper>
     </Stack>
@@ -1152,7 +1152,7 @@ function FeedPage() {
       setMentionsText('')
       setImageData('')
       setShowComposer(false)
-      setNotice({ type: 'success', text: '动态已发布' })
+      setNotice({ type: 'success', text: '鍔ㄦ€佸凡鍙戝竷' })
       await loadMoments()
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
@@ -1180,7 +1180,7 @@ function FeedPage() {
   async function deleteMoment(momentId) {
     try {
       await momentApi.delete(momentId, currentUser)
-      setNotice({ type: 'success', text: '动态已删除' })
+      setNotice({ type: 'success', text: '鍔ㄦ€佸凡鍒犻櫎' })
       await loadMoments()
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
@@ -1189,19 +1189,19 @@ function FeedPage() {
 
   function followAuthor(authorId) {
     toggleFollow(authorId)
-    setNotice({ type: 'success', text: '关注列表已更新' })
+    setNotice({ type: 'success', text: '鍏虫敞鍒楄〃宸叉洿鏂? })
   }
 
   return (
     <Stack spacing={2.5}>
-      <SectionHeader title="动态" subtitle="搜索动态标题和文案，发布带标题、文案和照片的动态。" />
+      <SectionHeader title="鍔ㄦ€? subtitle="鎼滅储鍔ㄦ€佹爣棰樺拰鏂囨锛屽彂甯冨甫鏍囬銆佹枃妗堝拰鐓х墖鐨勫姩鎬併€? />
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
       <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
           <TextField
             fullWidth
-            label="搜索动态"
-            placeholder="输入标题或文案"
+            label="鎼滅储鍔ㄦ€?
+            placeholder="杈撳叆鏍囬鎴栨枃妗?
             value={query}
             onChange={event => setQuery(event.target.value)}
             onKeyDown={event => {
@@ -1209,10 +1209,10 @@ function FeedPage() {
             }}
           />
           <Button variant="outlined" startIcon={<RefreshRoundedIcon />} onClick={loadMoments}>
-            搜索
+            鎼滅储
           </Button>
           <Button variant="contained" startIcon={<PublishRoundedIcon />} onClick={() => setShowComposer(value => !value)}>
-            发布动态
+            鍙戝竷鍔ㄦ€?
           </Button>
         </Stack>
       </Paper>
@@ -1221,13 +1221,13 @@ function FeedPage() {
         <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
           <Stack spacing={2}>
             <TextField
-              label="动态题目"
+              label="鍔ㄦ€侀鐩?
               value={draft.title}
               onChange={event => setDraft({ ...draft, title: event.target.value })}
               required
             />
             <TextField
-              label="动态文案"
+              label="鍔ㄦ€佹枃妗?
               multiline
               minRows={3}
               value={draft.content}
@@ -1235,20 +1235,20 @@ function FeedPage() {
             />
             <TextField
               label="@"
-              placeholder="输入昵称或编号，用逗号分隔"
+              placeholder="杈撳叆鏄电О鎴栫紪鍙凤紝鐢ㄩ€楀彿鍒嗛殧"
               value={mentionsText}
               onChange={event => setMentionsText(event.target.value)}
               InputProps={{ startAdornment: <AlternateEmailRoundedIcon color="action" sx={{ mr: 1 }} /> }}
             />
-            {imageData && <img className="feed-image" src={imageData} alt="待发布照片" />}
+            {imageData && <img className="feed-image" src={imageData} alt="寰呭彂甯冪収鐗? />}
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between">
               <Button component="label" variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />}>
-                选择照片
+                閫夋嫨鐓х墖
                 <input hidden type="file" accept="image/*" onChange={chooseImage} />
               </Button>
               <Stack direction="row" spacing={1}>
-                <Button variant="text" color="inherit" onClick={() => setShowComposer(false)}>取消</Button>
-                <Button variant="contained" onClick={publishMoment} disabled={!draft.title.trim()}>发布</Button>
+                <Button variant="text" color="inherit" onClick={() => setShowComposer(false)}>鍙栨秷</Button>
+                <Button variant="contained" onClick={publishMoment} disabled={!draft.title.trim()}>鍙戝竷</Button>
               </Stack>
             </Stack>
           </Stack>
@@ -1263,7 +1263,7 @@ function FeedPage() {
                 component="img"
                 className="feed-image"
                 src={moment.imageData}
-                alt="动态照片"
+                alt="鍔ㄦ€佺収鐗?
                 onClick={() => navigate(`/moments/${moment.momentId}`)}
                 sx={{ cursor: 'pointer' }}
               />
@@ -1275,10 +1275,10 @@ function FeedPage() {
                     onClick={() => openUserProfile(moment.authorId)}
                     sx={{ cursor: 'pointer' }}
                   >
-                    {roleMap[moment.authorRole]?.slice(0, 1) || '用'}
+                    {roleMap[moment.authorRole]?.slice(0, 1) || '鐢?}
                   </Avatar>
                   <Box sx={{ cursor: 'pointer' }} onClick={() => openUserProfile(moment.authorId)}>
-                    <Typography fontWeight={800}>{roleMap[moment.authorRole] || '用户'} {moment.authorId}</Typography>
+                    <Typography fontWeight={800}>{roleMap[moment.authorRole] || '鐢ㄦ埛'} {moment.authorId}</Typography>
                     <Typography color="text.secondary" variant="body2">{formatTime(moment.createdAt)}</Typography>
                   </Box>
                 </Stack>
@@ -1287,9 +1287,9 @@ function FeedPage() {
                   onClick={() => navigate(`/moments/${moment.momentId}`)}
                   sx={{ cursor: 'pointer' }}
                 >
-                  {moment.title || '未命名动态'}
+                  {moment.title || '鏈懡鍚嶅姩鎬?}
                 </Typography>
-                <Typography>{moment.content || '分享了一张照片'}</Typography>
+                <Typography>{moment.content || '鍒嗕韩浜嗕竴寮犵収鐗?}</Typography>
                 {!!moment.mentions?.length && (
                   <Stack direction="row" spacing={1} flexWrap="wrap">
                     {moment.mentions.map(mention => <MentionChip key={mention} mention={mention} />)}
@@ -1301,24 +1301,24 @@ function FeedPage() {
               <IconButton color={moment.likedByCurrentUser ? 'secondary' : 'default'} onClick={() => likeMoment(moment.momentId)}>
                 {moment.likedByCurrentUser ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
               </IconButton>
-              <Typography color="text.secondary">{moment.likeCount} 个赞</Typography>
+              <Typography color="text.secondary">{moment.likeCount} 涓禐</Typography>
               <Button size="small" onClick={() => favoriteMoment(moment.momentId)}>
-                {moment.favoritedByCurrentUser ? '已收藏' : '收藏'} {moment.favoriteCount || 0}
+                {moment.favoritedByCurrentUser ? '宸叉敹钘? : '鏀惰棌'} {moment.favoriteCount || 0}
               </Button>
               <Button size="small" onClick={() => followAuthor(moment.authorId)}>
-                {isFollowing(moment.authorId) ? '已关注' : '关注作者'}
+                {isFollowing(moment.authorId) ? '宸插叧娉? : '鍏虫敞浣滆€?}
               </Button>
-              <Button size="small" onClick={() => navigate(`/moments/${moment.momentId}`)}>详情</Button>
+              <Button size="small" onClick={() => navigate(`/moments/${moment.momentId}`)}>璇︽儏</Button>
               {Number(moment.authorId) === currentUser.userId && (
                 <Button size="small" color="error" startIcon={<DeleteRoundedIcon />} onClick={() => deleteMoment(moment.momentId)}>
-                  删除
+                  鍒犻櫎
                 </Button>
               )}
             </CardActions>
           </Card>
         ))}
       </Box>
-      {!moments.length && <EmptyCard text="暂无动态" />}
+      {!moments.length && <EmptyCard text="鏆傛棤鍔ㄦ€? />}
     </Stack>
   )
 }
@@ -1347,7 +1347,7 @@ function MomentDetailPage() {
       const selected = detail || list.find(moment => Number(moment.momentId) === selectedId)
       setMoments(selected ? [selected, ...list.filter(moment => Number(moment.momentId) !== Number(selected.momentId))] : list)
       setNotice(null)
-      if (!selected) setNotice({ type: 'warning', text: '该动态不存在或已被删除，先展示最新动态。' })
+      if (!selected) setNotice({ type: 'warning', text: '璇ュ姩鎬佷笉瀛樺湪鎴栧凡琚垹闄わ紝鍏堝睍绀烘渶鏂板姩鎬併€? })
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }
@@ -1374,7 +1374,7 @@ function MomentDetailPage() {
   async function deleteMoment(id) {
     try {
       await momentApi.delete(id, currentUser)
-      setNotice({ type: 'success', text: '动态已删除' })
+      setNotice({ type: 'success', text: '鍔ㄦ€佸凡鍒犻櫎' })
       navigate('/feed')
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
@@ -1383,9 +1383,9 @@ function MomentDetailPage() {
 
   return (
     <Stack spacing={2.5}>
-      <SectionHeader title="动态详情" subtitle="查看完整动态，继续下滑浏览更多人的动态详情。" />
+      <SectionHeader title="鍔ㄦ€佽鎯? subtitle="鏌ョ湅瀹屾暣鍔ㄦ€侊紝缁х画涓嬫粦娴忚鏇村浜虹殑鍔ㄦ€佽鎯呫€? />
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
-      <Button variant="text" color="inherit" onClick={() => navigate('/feed')} sx={{ alignSelf: 'flex-start' }}>返回动态</Button>
+      <Button variant="text" color="inherit" onClick={() => navigate('/feed')} sx={{ alignSelf: 'flex-start' }}>杩斿洖鍔ㄦ€?/Button>
       <Stack spacing={2.5}>
         {moments.map(moment => (
           <MomentDetailCard
@@ -1399,7 +1399,7 @@ function MomentDetailPage() {
           />
         ))}
       </Stack>
-      {!moments.length && <EmptyCard text="暂无动态" />}
+      {!moments.length && <EmptyCard text="鏆傛棤鍔ㄦ€? />}
     </Stack>
   )
 }
@@ -1410,16 +1410,16 @@ function MomentDetailCard({ moment, currentUser, onProfile, onLike, onFavorite, 
       <Stack spacing={1.6}>
         <Stack direction="row" alignItems="center" spacing={1.2}>
           <Avatar onClick={onProfile} sx={{ cursor: 'pointer', bgcolor: moment.authorRole === 'PROVIDER' ? 'secondary.main' : 'primary.main' }}>
-            {roleMap[moment.authorRole]?.slice(0, 1) || '用'}
+            {roleMap[moment.authorRole]?.slice(0, 1) || '鐢?}
           </Avatar>
           <Box onClick={onProfile} sx={{ cursor: 'pointer', minWidth: 0 }}>
-            <Typography fontWeight={900}>{roleMap[moment.authorRole] || '用户'} {moment.authorId}</Typography>
+            <Typography fontWeight={900}>{roleMap[moment.authorRole] || '鐢ㄦ埛'} {moment.authorId}</Typography>
             <Typography color="text.secondary" variant="body2">{formatTime(moment.createdAt)}</Typography>
           </Box>
         </Stack>
-        <Typography variant="h5">{moment.title || '未命名动态'}</Typography>
-        <Typography sx={{ whiteSpace: 'pre-wrap' }}>{moment.content || '分享了一张照片'}</Typography>
-        {moment.imageData && <img className="feed-image" src={moment.imageData} alt={moment.title || '动态照片'} />}
+        <Typography variant="h5">{moment.title || '鏈懡鍚嶅姩鎬?}</Typography>
+        <Typography sx={{ whiteSpace: 'pre-wrap' }}>{moment.content || '鍒嗕韩浜嗕竴寮犵収鐗?}</Typography>
+        {moment.imageData && <img className="feed-image" src={moment.imageData} alt={moment.title || '鍔ㄦ€佺収鐗?} />}
         {!!moment.mentions?.length && (
           <Stack direction="row" spacing={1} flexWrap="wrap">
             {moment.mentions.map(mention => <MentionChip key={mention} mention={mention} />)}
@@ -1427,14 +1427,14 @@ function MomentDetailCard({ moment, currentUser, onProfile, onLike, onFavorite, 
         )}
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'stretch', sm: 'center' }}>
           <Button variant="outlined" startIcon={moment.likedByCurrentUser ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />} onClick={onLike}>
-            {moment.likeCount || 0} 个赞
+            {moment.likeCount || 0} 涓禐
           </Button>
           <Button variant="outlined" onClick={onFavorite}>
-            {moment.favoritedByCurrentUser ? '已收藏' : '收藏'} {moment.favoriteCount || 0}
+            {moment.favoritedByCurrentUser ? '宸叉敹钘? : '鏀惰棌'} {moment.favoriteCount || 0}
           </Button>
           {Number(moment.authorId) === currentUser.userId && (
             <Button variant="outlined" color="error" startIcon={<DeleteRoundedIcon />} onClick={onDelete}>
-              删除
+              鍒犻櫎
             </Button>
           )}
         </Stack>
@@ -1464,7 +1464,7 @@ function MessagesPage() {
         if (mounted) setConversations(mergeConversationRecords(remoteConversations || [], currentUser))
       } catch (error) {
         if (!mounted) return
-        setNotice({ type: 'warning', text: `${error.message} 已先显示本地会话记录。` })
+        setNotice({ type: 'warning', text: `${error.message} 宸插厛鏄剧ず鏈湴浼氳瘽璁板綍銆俙 })
         setConversations(getConversationRecordsForUser(currentUser))
       }
     }
@@ -1476,7 +1476,7 @@ function MessagesPage() {
 
   return (
     <Stack spacing={2.5}>
-      <SectionHeader title="会话" subtitle="消息列表页只展示对话入口，点击后进入具体聊天框。" />
+      <SectionHeader title="浼氳瘽" subtitle="娑堟伅鍒楄〃椤靛彧灞曠ず瀵硅瘽鍏ュ彛锛岀偣鍑诲悗杩涘叆鍏蜂綋鑱婂ぉ妗嗐€? />
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
       <Paper variant="outlined" sx={{ p: { xs: 1, md: 1.5 } }}>
         <Stack spacing={0.5}>
@@ -1498,25 +1498,25 @@ function MessagesPage() {
                 }}
               >
                 <Avatar sx={{ bgcolor: conversation.isLocal ? 'secondary.main' : 'primary.main' }}>
-                  {conversation.scene?.slice(0, 1) || '会'}
+                  {conversation.scene?.slice(0, 1) || '浼?}
                 </Avatar>
                 <Box sx={{ minWidth: 0 }}>
                   <Typography fontWeight={800} noWrap>
-                    {conversation.scene || `会话 ${conversation.conversationId}`}
+                    {conversation.scene || `浼氳瘽 ${conversation.conversationId}`}
                   </Typography>
                   <Typography color="text.secondary" noWrap>
-                    {conversation.lastMessage || `${roleMap[currentUser.role]}与用户 ${oppositeId} 的对话`}
+                    {conversation.lastMessage || `${roleMap[currentUser.role]}涓庣敤鎴?${oppositeId} 鐨勫璇漙}
                   </Typography>
                 </Box>
                 <Stack spacing={0.5} alignItems="flex-end">
                   <Typography variant="caption" color="text.secondary">{formatShortTime(conversation.updatedAt)}</Typography>
-                  <Chip size="small" label={conversation.isLocal ? '待接后端' : 'C接口'} />
+                  <Chip size="small" label={conversation.isLocal ? '寰呮帴鍚庣' : 'C鎺ュ彛'} />
                 </Stack>
               </Box>
             )
           })}
           {!conversations.length && (
-            <EmptyCard text={currentUser.role === 'PROVIDER' ? '暂无会话。到需求大厅选择具体需求后发起邀请，接受后会出现在这里。' : '暂无会话。接受服务方邀请后会出现在这里。'} />
+            <EmptyCard text={currentUser.role === 'PROVIDER' ? '鏆傛棤浼氳瘽銆傚埌闇€姹傚ぇ鍘呴€夋嫨鍏蜂綋闇€姹傚悗鍙戣捣閭€璇凤紝鎺ュ彈鍚庝細鍑虹幇鍦ㄨ繖閲屻€? : '鏆傛棤浼氳瘽銆傛帴鍙楁湇鍔℃柟閭€璇峰悗浼氬嚭鐜板湪杩欓噷銆?} />
           )}
         </Stack>
       </Paper>
@@ -1619,7 +1619,7 @@ function ConversationDetailPage() {
           messageType: 'IMAGE',
           content: image
         })
-        updateConversationLastMessage(conversation.conversationId, '[图片]')
+        updateConversationLastMessage(conversation.conversationId, '[鍥剧墖]')
         setMessages(nextMessages)
         return
       }
@@ -1628,9 +1628,9 @@ function ConversationDetailPage() {
         image,
         currentUser,
         'IMAGE'
-      ), '图片已发送')
+      ), '鍥剧墖宸插彂閫?)
       if (sent) {
-        updateConversationLastMessage(conversation.conversationId, '[图片]')
+        updateConversationLastMessage(conversation.conversationId, '[鍥剧墖]')
         await loadConversationData()
       }
     } catch (error) {
@@ -1645,12 +1645,12 @@ function ConversationDetailPage() {
     addSavedPhoto({
       photoId: `message-${message.messageId}`,
       source: 'conversation-submission',
-      title: `${conversation.scene || '会话'} 提交照片`,
+      title: `${conversation.scene || '浼氳瘽'} 鎻愪氦鐓х墖`,
       imageData: message.content,
       authorId: message.senderId,
       createdAt: message.createdAt
     })
-    setNotice({ type: 'success', text: '照片已保存到我的照片' })
+    setNotice({ type: 'success', text: '鐓х墖宸蹭繚瀛樺埌鎴戠殑鐓х墖' })
   }
 
   async function createQuote(event) {
@@ -1664,7 +1664,7 @@ function ConversationDetailPage() {
     const quotePayload = buildQuotePayload(quoteForm, conversation)
     const quote = await run(async () => editingQuotationId
       ? quoteApi.update(editingQuotationId, quotePayload, currentUser)
-      : quoteApi.create(quotePayload, currentUser), editingQuotationId ? '报价已更新' : '报价已发送')
+      : quoteApi.create(quotePayload, currentUser), editingQuotationId ? '鎶ヤ环宸叉洿鏂? : '鎶ヤ环宸插彂閫?)
     if (quote) {
       setShowQuoteForm(false)
       setEditingQuotationId(null)
@@ -1679,7 +1679,7 @@ function ConversationDetailPage() {
     setQuoteForm(createQuoteFormFromQuote(quote))
     setQuoteValidationErrors([])
     setShowQuoteForm(true)
-    setNotice({ type: 'info', text: '正在编辑待确认报价，保存前客户仍看到原报价。' })
+    setNotice({ type: 'info', text: '姝ｅ湪缂栬緫寰呯‘璁ゆ姤浠凤紝淇濆瓨鍓嶅鎴蜂粛鐪嬪埌鍘熸姤浠枫€? })
   }
 
   function closeQuoteForm() {
@@ -1693,14 +1693,14 @@ function ConversationDetailPage() {
     setLoading(true)
     setNotice(null)
     try {
-      const result = await quoteApi.confirm(quote.quotationId, '需求方确认报价', currentUser)
-      setNotice({ type: 'success', text: '报价已确认，订单已生成' })
+      const result = await quoteApi.confirm(quote.quotationId, '闇€姹傛柟纭鎶ヤ环', currentUser)
+      setNotice({ type: 'success', text: '鎶ヤ环宸茬‘璁わ紝璁㈠崟宸茬敓鎴? })
       if (result?.orderId) {
         await refreshConversationData()
         navigate(`/orders?orderId=${result.orderId}`)
       } else {
         await refreshConversationData()
-        setNotice({ type: 'success', text: '报价已确认，可在订单页查看关联订单。' })
+        setNotice({ type: 'success', text: '鎶ヤ环宸茬‘璁わ紝鍙湪璁㈠崟椤垫煡鐪嬪叧鑱旇鍗曘€? })
       }
     } catch (error) {
       try {
@@ -1715,7 +1715,7 @@ function ConversationDetailPage() {
   }
 
   async function rejectQuote(quote) {
-    const result = await run(async () => quoteApi.reject(quote.quotationId, '本次暂不采用该报价', currentUser), '报价已拒绝')
+    const result = await run(async () => quoteApi.reject(quote.quotationId, '鏈鏆備笉閲囩敤璇ユ姤浠?, currentUser), '鎶ヤ环宸叉嫆缁?)
     if (result) await loadConversationData()
   }
 
@@ -1748,21 +1748,21 @@ function ConversationDetailPage() {
       <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 } }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1.5}>
           <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 0 }}>
-            <Button color="inherit" onClick={() => navigate('/messages')}>返回</Button>
+            <Button color="inherit" onClick={() => navigate('/messages')}>杩斿洖</Button>
             <Avatar
               onClick={() => conversation && openUserProfile(getOppositeUserId(conversation, currentUser.userId))}
               sx={{ bgcolor: conversation?.isLocal ? 'secondary.main' : 'primary.main', cursor: conversation ? 'pointer' : 'default' }}
             >
-              {conversation?.scene?.slice(0, 1) || '会'}
+              {conversation?.scene?.slice(0, 1) || '浼?}
             </Avatar>
             <Box sx={{ minWidth: 0 }}>
-              <Typography variant="h6" noWrap>{conversation?.scene || `会话 ${conversationId}`}</Typography>
+              <Typography variant="h6" noWrap>{conversation?.scene || `浼氳瘽 ${conversationId}`}</Typography>
               <Typography color="text.secondary" noWrap>
-                {conversation?.location || '具体对话'} · 对方 {conversation ? getOppositeUserId(conversation, currentUser.userId) : '-'}
+                {conversation?.location || '鍏蜂綋瀵硅瘽'} 路 瀵规柟 {conversation ? getOppositeUserId(conversation, currentUser.userId) : '-'}
               </Typography>
             </Box>
           </Stack>
-          <Chip size="small" label={conversation?.isLocal ? '本地对话' : 'C会话'} />
+          <Chip size="small" label={conversation?.isLocal ? '鏈湴瀵硅瘽' : 'C浼氳瘽'} />
         </Stack>
       </Paper>
 
@@ -1773,12 +1773,12 @@ function ConversationDetailPage() {
         <Stack spacing={1.5}>
           <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
             <Box>
-              <Typography variant="h6">会话工作台</Typography>
-              <Typography color="text.secondary">这里承载沟通、报价、订单入口和后续履约协作，不是普通私聊。</Typography>
+              <Typography variant="h6">浼氳瘽宸ヤ綔鍙?/Typography>
+              <Typography color="text.secondary">杩欓噷鎵胯浇娌熼€氥€佹姤浠枫€佽鍗曞叆鍙ｅ拰鍚庣画灞ョ害鍗忎綔锛屼笉鏄櫘閫氱鑱娿€?/Typography>
             </Box>
             <Stack direction="row" spacing={1} flexWrap="wrap">
-              <Chip size="small" color={isBackendConversation ? 'primary' : 'default'} label={isBackendConversation ? '真实 C 会话' : '本地 fallback 会话'} />
-              <Chip size="small" label={currentUser.role === 'PROVIDER' ? '当前身份：服务方' : '当前身份：顾客'} />
+              <Chip size="small" color={isBackendConversation ? 'primary' : 'default'} label={isBackendConversation ? '鐪熷疄 C 浼氳瘽' : '鏈湴 fallback 浼氳瘽'} />
+              <Chip size="small" label={currentUser.role === 'PROVIDER' ? '褰撳墠韬唤锛氭湇鍔℃柟' : '褰撳墠韬唤锛氶【瀹?} />
             </Stack>
           </Stack>
           <InfoRows rows={sourceRows} />
@@ -1790,8 +1790,8 @@ function ConversationDetailPage() {
         <Stack spacing={1.5}>
           <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
             <Box>
-              <Typography variant="h6">报价 / 订单协作区</Typography>
-              <Typography color="text.secondary">服务方发正式报价，顾客确认后生成订单，再进入托管和交付流程。</Typography>
+              <Typography variant="h6">鎶ヤ环 / 璁㈠崟鍗忎綔鍖?/Typography>
+              <Typography color="text.secondary">鏈嶅姟鏂瑰彂姝ｅ紡鎶ヤ环锛岄【瀹㈢‘璁ゅ悗鐢熸垚璁㈠崟锛屽啀杩涘叆鎵樼鍜屼氦浠樻祦绋嬨€?/Typography>
             </Box>
             {canSeeQuoteEntry && (
               <Button
@@ -1809,7 +1809,7 @@ function ConversationDetailPage() {
                 }}
                 disabled={!canCreateQuote}
               >
-                发起报价
+                鍙戣捣鎶ヤ环
               </Button>
             )}
           </Stack>
@@ -1825,27 +1825,27 @@ function ConversationDetailPage() {
                     <Box>
                       <Typography fontWeight={900}>{centToYuan(quote.amountCent)}</Typography>
                       <Typography color="text.secondary" variant="body2">
-                        报价 ID {quote.quotationId} · {quote.quoteNo || '当前接口未返回报价编号'}
+                        鎶ヤ环 ID {quote.quotationId} 路 {quote.quoteNo || '褰撳墠鎺ュ彛鏈繑鍥炴姤浠风紪鍙?}
                       </Typography>
                     </Box>
                     <Chip size="small" color={quote.status === 'PENDING_CONFIRM' ? 'warning' : quote.status === 'CONFIRMED' ? 'success' : 'default'} label={quoteStatusMap[quote.status] || quote.status} />
                   </Stack>
                   <InfoRows rows={[
-                    ['拍摄地点', quote.location || '未填写'],
-                    ['拍摄开始', formatTime(quote.shootStartTime)],
-                    ['拍摄结束', formatTime(quote.shootEndTime)],
-                    ['最晚交付', formatTime(quote.deliveryDeadline)],
-                    ['服务内容', quote.serviceContent || '未填写'],
-                    ['原片/精修', `${quote.originalCount ?? 0} / ${quote.refinedCount ?? 0}`],
-                    ['照片使用范围', quote.photoUsageScope || '未填写'],
-                    ['条款', quote.terms || '当前报价接口未返回该字段'],
-                    ['合同条款', quote.contractTerms || '当前报价接口未返回该字段'],
-                    ['备注', quote.remark || '当前报价接口未返回该字段']
+                    ['鎷嶆憚鍦扮偣', quote.location || '鏈～鍐?],
+                    ['鎷嶆憚寮€濮?, formatTime(quote.shootStartTime)],
+                    ['鎷嶆憚缁撴潫', formatTime(quote.shootEndTime)],
+                    ['鏈€鏅氫氦浠?, formatTime(quote.deliveryDeadline)],
+                    ['鏈嶅姟鍐呭', quote.serviceContent || '鏈～鍐?],
+                    ['鍘熺墖/绮句慨', `${quote.originalCount ?? 0} / ${quote.refinedCount ?? 0}`],
+                    ['鐓х墖浣跨敤鑼冨洿', quote.photoUsageScope || '鏈～鍐?],
+                    ['鏉℃', quote.terms || '褰撳墠鎶ヤ环鎺ュ彛鏈繑鍥炶瀛楁'],
+                    ['鍚堝悓鏉℃', quote.contractTerms || '褰撳墠鎶ヤ环鎺ュ彛鏈繑鍥炶瀛楁'],
+                    ['澶囨敞', quote.remark || '褰撳墠鎶ヤ环鎺ュ彛鏈繑鍥炶瀛楁']
                   ]} />
                   {quote.status === 'PENDING_CONFIRM' && canConfirmQuote && (
                     <Stack direction="row" spacing={1} flexWrap="wrap">
-                      <Button size="small" variant="contained" onClick={() => confirmQuote(quote)}>确认报价</Button>
-                      <Button size="small" variant="outlined" color="inherit" onClick={() => rejectQuote(quote)}>拒绝报价</Button>
+                      <Button size="small" variant="contained" onClick={() => confirmQuote(quote)}>纭鎶ヤ环</Button>
+                      <Button size="small" variant="outlined" color="inherit" onClick={() => rejectQuote(quote)}>鎷掔粷鎶ヤ环</Button>
                     </Stack>
                   )}
                   {canEditQuote(quote, conversation, currentUser) && (
@@ -1857,30 +1857,30 @@ function ConversationDetailPage() {
                         onClick={() => startQuoteEditing(quote)}
                         disabled={loading}
                       >
-                        {String(editingQuotationId) === String(quote.quotationId) ? '正在编辑' : '编辑报价'}
+                        {String(editingQuotationId) === String(quote.quotationId) ? '姝ｅ湪缂栬緫' : '缂栬緫鎶ヤ环'}
                       </Button>
                     </Stack>
                   )}
                   {quote.status === 'CONFIRMED' && (
                     orderId ? (
                       <Button size="small" variant="outlined" startIcon={<ReceiptLongRoundedIcon />} onClick={() => navigate(`/orders?orderId=${orderId}`)} sx={{ alignSelf: 'flex-start' }}>
-                        查看订单
+                        鏌ョ湅璁㈠崟
                       </Button>
                     ) : (
-                      <Alert severity="info">报价已确认，可在订单页查看关联订单；当前报价列表接口未返回 orderId。</Alert>
+                      <Alert severity="info">鎶ヤ环宸茬‘璁わ紝鍙湪璁㈠崟椤垫煡鐪嬪叧鑱旇鍗曪紱褰撳墠鎶ヤ环鍒楄〃鎺ュ彛鏈繑鍥?orderId銆?/Alert>
                     )
                   )}
                 </Stack>
               </Paper>
             )
           })}
-          {!quotes.length && <Typography color="text.secondary">当前会话还没有正式报价。</Typography>}
+          {!quotes.length && <Typography color="text.secondary">褰撳墠浼氳瘽杩樻病鏈夋寮忔姤浠枫€?/Typography>}
 
           {showQuoteForm && canSeeQuoteEntry && (
             <Paper component="form" variant="outlined" onSubmit={createQuote} sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
               <Stack spacing={1.5}>
                 {editingQuotationId && (
-                  <Alert severity="info">当前正在编辑报价 {editingQuotationId}。仅待确认报价可编辑；客户确认生成订单后，订单核心条款会冻结。</Alert>
+                  <Alert severity="info">褰撳墠姝ｅ湪缂栬緫鎶ヤ环 {editingQuotationId}銆備粎寰呯‘璁ゆ姤浠峰彲缂栬緫锛涘鎴风‘璁ょ敓鎴愯鍗曞悗锛岃鍗曟牳蹇冩潯娆句細鍐荤粨銆?/Alert>
                 )}
                 {!!quoteValidationErrors.length && (
                   <Alert severity="warning">
@@ -1890,25 +1890,25 @@ function ConversationDetailPage() {
                   </Alert>
                 )}
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.5 }}>
-                  <TextField label="报价金额" type="number" size="small" value={quoteForm.amountYuan} onChange={event => setQuoteForm({ ...quoteForm, amountYuan: event.target.value })} required />
-                  <TextField label="拍摄地点" size="small" value={quoteForm.location} onChange={event => setQuoteForm({ ...quoteForm, location: event.target.value })} required />
-                  <TextField label="开始时间" type="datetime-local" size="small" value={quoteForm.shootStartTime} onChange={event => setQuoteForm({ ...quoteForm, shootStartTime: event.target.value })} InputLabelProps={{ shrink: true }} required />
-                  <TextField label="结束时间" type="datetime-local" size="small" value={quoteForm.shootEndTime} onChange={event => setQuoteForm({ ...quoteForm, shootEndTime: event.target.value })} InputLabelProps={{ shrink: true }} required />
-                  <TextField label="交付截止" type="datetime-local" size="small" value={quoteForm.deliveryDeadline} onChange={event => setQuoteForm({ ...quoteForm, deliveryDeadline: event.target.value })} InputLabelProps={{ shrink: true }} required />
-                  <TextField label="原片数量" type="number" size="small" value={quoteForm.originalCount} onChange={event => setQuoteForm({ ...quoteForm, originalCount: event.target.value })} />
-                  <TextField label="精修数量" type="number" size="small" value={quoteForm.refinedCount} onChange={event => setQuoteForm({ ...quoteForm, refinedCount: event.target.value })} />
-                  <TextField label="照片使用范围" size="small" value={quoteForm.photoUsageScope} onChange={event => setQuoteForm({ ...quoteForm, photoUsageScope: event.target.value })} />
-                  <TextField label="服务内容" multiline minRows={2} size="small" value={quoteForm.serviceContent} onChange={event => setQuoteForm({ ...quoteForm, serviceContent: event.target.value })} sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }} required />
-                  <TextField label="条款" multiline minRows={2} size="small" value={quoteForm.terms} onChange={event => setQuoteForm({ ...quoteForm, terms: event.target.value })} sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }} />
-                  <TextField label="合同条款" multiline minRows={2} size="small" value={quoteForm.contractTerms} onChange={event => setQuoteForm({ ...quoteForm, contractTerms: event.target.value })} sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }} />
-                  <TextField label="备注" multiline minRows={2} size="small" value={quoteForm.remark} onChange={event => setQuoteForm({ ...quoteForm, remark: event.target.value })} sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }} />
+                  <TextField label="鎶ヤ环閲戦" type="number" size="small" value={quoteForm.amountYuan} onChange={event => setQuoteForm({ ...quoteForm, amountYuan: event.target.value })} required />
+                  <TextField label="鎷嶆憚鍦扮偣" size="small" value={quoteForm.location} onChange={event => setQuoteForm({ ...quoteForm, location: event.target.value })} required />
+                  <TextField label="寮€濮嬫椂闂? type="datetime-local" size="small" value={quoteForm.shootStartTime} onChange={event => setQuoteForm({ ...quoteForm, shootStartTime: event.target.value })} InputLabelProps={{ shrink: true }} required />
+                  <TextField label="缁撴潫鏃堕棿" type="datetime-local" size="small" value={quoteForm.shootEndTime} onChange={event => setQuoteForm({ ...quoteForm, shootEndTime: event.target.value })} InputLabelProps={{ shrink: true }} required />
+                  <TextField label="浜や粯鎴" type="datetime-local" size="small" value={quoteForm.deliveryDeadline} onChange={event => setQuoteForm({ ...quoteForm, deliveryDeadline: event.target.value })} InputLabelProps={{ shrink: true }} required />
+                  <TextField label="鍘熺墖鏁伴噺" type="number" size="small" value={quoteForm.originalCount} onChange={event => setQuoteForm({ ...quoteForm, originalCount: event.target.value })} />
+                  <TextField label="绮句慨鏁伴噺" type="number" size="small" value={quoteForm.refinedCount} onChange={event => setQuoteForm({ ...quoteForm, refinedCount: event.target.value })} />
+                  <TextField label="鐓х墖浣跨敤鑼冨洿" size="small" value={quoteForm.photoUsageScope} onChange={event => setQuoteForm({ ...quoteForm, photoUsageScope: event.target.value })} />
+                  <TextField label="鏈嶅姟鍐呭" multiline minRows={2} size="small" value={quoteForm.serviceContent} onChange={event => setQuoteForm({ ...quoteForm, serviceContent: event.target.value })} sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }} required />
+                  <TextField label="鏉℃" multiline minRows={2} size="small" value={quoteForm.terms} onChange={event => setQuoteForm({ ...quoteForm, terms: event.target.value })} sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }} />
+                  <TextField label="鍚堝悓鏉℃" multiline minRows={2} size="small" value={quoteForm.contractTerms} onChange={event => setQuoteForm({ ...quoteForm, contractTerms: event.target.value })} sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }} />
+                  <TextField label="澶囨敞" multiline minRows={2} size="small" value={quoteForm.remark} onChange={event => setQuoteForm({ ...quoteForm, remark: event.target.value })} sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }} />
                 </Box>
-                <Alert severity="info">当前会话接口未返回明确档期开始/结束字段，因此本轮无法做档期范围校验，只校验报价时间顺序。</Alert>
+                <Alert severity="info">褰撳墠浼氳瘽鎺ュ彛鏈繑鍥炴槑纭。鏈熷紑濮?缁撴潫瀛楁锛屽洜姝ゆ湰杞棤娉曞仛妗ｆ湡鑼冨洿鏍￠獙锛屽彧鏍￠獙鎶ヤ环鏃堕棿椤哄簭銆?/Alert>
                 <Stack direction="row" spacing={1}>
                   <Button type="submit" variant="contained" disabled={loading || !canSubmitQuoteForm}>
-                    {editingQuotationId ? '保存报价修改' : '发送报价'}
+                    {editingQuotationId ? '淇濆瓨鎶ヤ环淇敼' : '鍙戦€佹姤浠?}
                   </Button>
-                  <Button variant="text" color="inherit" onClick={closeQuoteForm}>收起</Button>
+                  <Button variant="text" color="inherit" onClick={closeQuoteForm}>鏀惰捣</Button>
                 </Stack>
               </Stack>
             </Paper>
@@ -1939,12 +1939,12 @@ function ConversationDetailPage() {
                       <Box
                         component="img"
                         src={message.content}
-                        alt="会话图片"
+                        alt="浼氳瘽鍥剧墖"
                         sx={{ display: 'block', maxWidth: '100%', maxHeight: 260, borderRadius: 1, objectFit: 'cover' }}
                       />
                       {canSaveSubmittedPhoto && (
                         <Button size="small" variant="contained" color="inherit" onClick={() => saveSubmittedPhoto(message)}>
-                          保存提交照片
+                          淇濆瓨鎻愪氦鐓х墖
                         </Button>
                       )}
                     </Stack>
@@ -1956,13 +1956,13 @@ function ConversationDetailPage() {
               </Box>
             )
           })}
-          {!messages.length && <Typography color="text.secondary">还没有消息</Typography>}
+          {!messages.length && <Typography color="text.secondary">杩樻病鏈夋秷鎭?/Typography>}
         </Stack>
 
         <Divider sx={{ my: 1.5 }} />
         <Stack direction="row" alignItems="center" spacing={1}>
           {canSeeQuoteEntry && (
-            <Tooltip title="发起报价">
+            <Tooltip title="鍙戣捣鎶ヤ环">
               <span>
                 <IconButton
                   color={showQuoteForm ? 'primary' : 'default'}
@@ -1983,7 +1983,7 @@ function ConversationDetailPage() {
               </span>
             </Tooltip>
           )}
-          <Tooltip title="发送图片">
+          <Tooltip title="鍙戦€佸浘鐗?>
             <span>
               <IconButton component="label" disabled={loading || imageSending}>
                 <ImageRoundedIcon />
@@ -1994,7 +1994,7 @@ function ConversationDetailPage() {
           <TextField
             fullWidth
             size="small"
-            placeholder="输入消息"
+            placeholder="杈撳叆娑堟伅"
             value={content}
             onChange={event => setContent(event.target.value)}
             onKeyDown={event => {
@@ -2005,7 +2005,7 @@ function ConversationDetailPage() {
             }}
           />
           <Button variant="contained" endIcon={<SendRoundedIcon />} onClick={sendMessage} disabled={!content.trim() || loading}>
-            发送
+            鍙戦€?
           </Button>
         </Stack>
       </Paper>
@@ -2031,11 +2031,11 @@ function OrdersPage() {
   const [photoAuthorizationForm, setPhotoAuthorizationForm] = useState({ fileIds: [], remark: '' })
   const [authorizationRemarks, setAuthorizationRemarks] = useState({})
   const [orderReviews, setOrderReviews] = useState([])
-  const [reviewForm, setReviewForm] = useState({ rating: 5, content: '沟通顺畅，履约体验很好。' })
+  const [reviewForm, setReviewForm] = useState({ rating: 5, content: '娌熼€氶『鐣咃紝灞ョ害浣撻獙寰堝ソ銆? })
   const [showReviewForm, setShowReviewForm] = useState(false)
   const [arbitrations, setArbitrations] = useState([])
   const [arbitrationForm, setArbitrationForm] = useState({
-    reason: '评价内容不实',
+    reason: '璇勪环鍐呭涓嶅疄',
     description: ''
   })
   const [showArbitrationForm, setShowArbitrationForm] = useState(false)
@@ -2151,7 +2151,7 @@ function OrdersPage() {
       deliveryForm.file,
       deliveryForm.remark.trim(),
       currentUser
-    ), selectedOrder.status === 'REWORK_REQUIRED' ? '返修交付已上传' : '交付文件已上传')
+    ), selectedOrder.status === 'REWORK_REQUIRED' ? '杩斾慨浜や粯宸蹭笂浼? : '浜や粯鏂囦欢宸蹭笂浼?)
     if (result) {
       setDeliveryForm({ file: null, remark: '' })
       await loadOrders(selectedOrder.orderId)
@@ -2163,14 +2163,14 @@ function OrdersPage() {
     if (!selectedOrder) return
     const trimmedRequirement = reworkRequirement.trim()
     if (!trimmedRequirement) {
-      setNotice({ type: 'warning', text: '请填写返修要求' })
+      setNotice({ type: 'warning', text: '璇峰～鍐欒繑淇姹? })
       return
     }
     const result = await run(async () => orderApi.requestRework(
       selectedOrder.orderId,
       trimmedRequirement,
       currentUser
-    ), '返修请求已提交')
+    ), '杩斾慨璇锋眰宸叉彁浜?)
     if (result) {
       setReworkRequirement('')
       await loadOrders(selectedOrder.orderId)
@@ -2196,7 +2196,7 @@ function OrdersPage() {
     const result = await run(async () => photoAuthorizationApi.request(selectedOrder.orderId, {
       fileIds: photoAuthorizationForm.fileIds,
       remark: photoAuthorizationForm.remark.trim()
-    }, currentUser), '照片展示授权申请已发送')
+    }, currentUser), '鐓х墖灞曠ず鎺堟潈鐢宠宸插彂閫?)
     if (result) {
       setPhotoAuthorizationForm({ fileIds: [], remark: '' })
       setPhotoAuthorizations(await photoAuthorizationApi.listByOrder(selectedOrder.orderId, currentUser))
@@ -2207,7 +2207,7 @@ function OrdersPage() {
     if (!selectedOrder) return
     const remark = (authorizationRemarks[authorization.id] || '').trim()
     const action = decision === 'approve' ? photoAuthorizationApi.approve : photoAuthorizationApi.reject
-    const successText = decision === 'approve' ? '已同意照片展示授权' : '已拒绝照片展示授权'
+    const successText = decision === 'approve' ? '宸插悓鎰忕収鐗囧睍绀烘巿鏉? : '宸叉嫆缁濈収鐗囧睍绀烘巿鏉?
     const result = await run(async () => action(authorization.id, { remark }, currentUser), successText)
     if (result) {
       setAuthorizationRemarks({ ...authorizationRemarks, [authorization.id]: '' })
@@ -2239,18 +2239,18 @@ function OrdersPage() {
           content: reviewForm.content.trim()
         })
       }
-    }, '评价已提交')
+    }, '璇勪环宸叉彁浜?)
     if (result) {
       setOrderReviews(mergeReviewLists([result], orderReviews, getLocalReviewsByOrder(selectedOrder.orderId)))
       setShowReviewForm(false)
-      setReviewForm({ rating: 5, content: '沟通顺畅，履约体验很好。' })
+      setReviewForm({ rating: 5, content: '娌熼€氶『鐣咃紝灞ョ害浣撻獙寰堝ソ銆? })
     }
   }
 
   async function submitArbitration(event) {
     event.preventDefault()
     if (!selectedOrder) return
-    const reason = `${arbitrationForm.reason}${arbitrationForm.description.trim() ? `：${arbitrationForm.description.trim()}` : ''}`
+    const reason = `${arbitrationForm.reason}${arbitrationForm.description.trim() ? `锛?{arbitrationForm.description.trim()}` : ''}`
     const localRecord = {
       orderId: selectedOrder.orderId,
       reviewId: reviewToComplain?.reviewId,
@@ -2272,11 +2272,11 @@ function OrdersPage() {
         }
       }
       return saveLocalArbitration(localRecord)
-    }, '仲裁申请已提交')
+    }, '浠茶鐢宠宸叉彁浜?)
     if (result) {
       setArbitrations(mergeComplaints([result], arbitrations, getArbitrationsByOrder(selectedOrder.orderId)))
       setShowArbitrationForm(false)
-      setArbitrationForm({ reason: '评价内容不实', description: '' })
+      setArbitrationForm({ reason: '璇勪环鍐呭涓嶅疄', description: '' })
     }
   }
 
@@ -2297,7 +2297,7 @@ function OrdersPage() {
         if (!map.has(fileId)) {
           map.set(fileId, {
             fileId,
-            fileName: record.fileName || `文件 ${fileId}`,
+            fileName: record.fileName || `鏂囦欢 ${fileId}`,
             uploadTime: record.uploadTime
           })
         }
@@ -2319,22 +2319,22 @@ function OrdersPage() {
 
   return (
     <Stack spacing={2.5}>
-      <SectionHeader title="订单" subtitle="查看成单订单、平台托管状态和每次状态流转日志。" />
+      <SectionHeader title="璁㈠崟" subtitle="鏌ョ湅鎴愬崟璁㈠崟銆佸钩鍙版墭绠＄姸鎬佸拰姣忔鐘舵€佹祦杞棩蹇椼€? />
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '350px 1fr' }, gap: 2 }}>
         <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 }, alignSelf: 'start' }}>
           <Stack spacing={2}>
             <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Typography variant="h6">我的订单</Typography>
+              <Typography variant="h6">鎴戠殑璁㈠崟</Typography>
               <Button size="small" startIcon={<RefreshRoundedIcon />} onClick={() => loadOrders()} disabled={loading}>
-                刷新
+                鍒锋柊
               </Button>
             </Stack>
             <FormControl size="small">
-              <InputLabel>状态</InputLabel>
-              <Select label="状态" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
-                <MenuItem value="">全部</MenuItem>
+              <InputLabel>鐘舵€?/InputLabel>
+              <Select label="鐘舵€? value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
+                <MenuItem value="">鍏ㄩ儴</MenuItem>
                 {Object.entries(orderStatusMap).map(([value, label]) => (
                   <MenuItem key={value} value={value}>{label}</MenuItem>
                 ))}
@@ -2351,22 +2351,22 @@ function OrdersPage() {
                   <CardContent>
                     <Stack spacing={1}>
                       <Stack direction="row" justifyContent="space-between" alignItems="center">
-                        <Typography fontWeight={800}>{order.orderNo || `订单 ${order.orderId}`}</Typography>
+                        <Typography fontWeight={800}>{order.orderNo || `璁㈠崟 ${order.orderId}`}</Typography>
                         <Chip size="small" label={orderStatusMap[order.status] || order.status} />
                       </Stack>
-                      <Typography color="text.secondary">{centToYuan(order.amountCent)} · 对方 {currentUser.role === 'CUSTOMER' ? order.providerUserId : order.customerId}</Typography>
+                      <Typography color="text.secondary">{centToYuan(order.amountCent)} 路 瀵规柟 {currentUser.role === 'CUSTOMER' ? order.providerUserId : order.customerId}</Typography>
                       <Typography color="text.secondary" variant="body2">{formatTime(order.updatedAt)}</Typography>
                     </Stack>
                   </CardContent>
                 </Card>
               ))}
-              {!orders.length && <EmptyCard text="暂无订单" />}
+              {!orders.length && <EmptyCard text="鏆傛棤璁㈠崟" />}
             </Stack>
             {currentUser.role === 'PROVIDER' && (
               <>
                 <Divider />
                 <Stack spacing={1}>
-                  <Typography variant="overline" color="text.secondary">邀请状态</Typography>
+                  <Typography variant="overline" color="text.secondary">閭€璇风姸鎬?/Typography>
                   {sentInvitations.map(invitation => {
                     const status = invitation.status || 'PENDING'
                     return (
@@ -2379,14 +2379,14 @@ function OrdersPage() {
                             <Chip
                               size="small"
                               color={status === 'ACCEPTED' ? 'success' : status === 'REJECTED' ? 'default' : 'warning'}
-                              label={status === 'ACCEPTED' ? '已接受，可在会话中沟通' : status === 'REJECTED' ? '已被婉拒' : '待处理'}
+                              label={status === 'ACCEPTED' ? '宸叉帴鍙楋紝鍙湪浼氳瘽涓矡閫? : status === 'REJECTED' ? '宸茶濠夋嫆' : '寰呭鐞?}
                             />
                           </Stack>
                         </Stack>
                       </Paper>
                     )
                   })}
-                  {!sentInvitations.length && <Typography color="text.secondary">还没有发起过邀请</Typography>}
+                  {!sentInvitations.length && <Typography color="text.secondary">杩樻病鏈夊彂璧疯繃閭€璇?/Typography>}
                 </Stack>
               </>
             )}
@@ -2394,15 +2394,15 @@ function OrdersPage() {
         </Paper>
 
         {!selectedOrder ? (
-          <EmptyCard text="选择订单查看详情" />
+          <EmptyCard text="閫夋嫨璁㈠崟鏌ョ湅璇︽儏" />
         ) : (
           <Stack spacing={2}>
             <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 } }}>
               <Stack spacing={2}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
                   <Box>
-                    <Typography variant="h6">{selectedOrder.orderNo || `订单 ${selectedOrder.orderId}`}</Typography>
-                    <Typography color="text.secondary">报价 {selectedOrder.quoteId} · 会话 {selectedOrder.conversationId}</Typography>
+                    <Typography variant="h6">{selectedOrder.orderNo || `璁㈠崟 ${selectedOrder.orderId}`}</Typography>
+                    <Typography color="text.secondary">鎶ヤ环 {selectedOrder.quoteId} 路 浼氳瘽 {selectedOrder.conversationId}</Typography>
                   </Box>
                   <Stack direction="row" spacing={1} flexWrap="wrap">
                     <Chip color="primary" label={orderStatusMap[selectedOrder.status] || selectedOrder.status} />
@@ -2411,12 +2411,12 @@ function OrdersPage() {
                 </Stack>
                 <Divider />
                 <InfoRows rows={[
-                  ['金额', centToYuan(selectedOrder.amountCent)],
-                  ['需求方', selectedOrder.customerId],
-                  ['服务方', selectedOrder.providerUserId],
-                  ['拍摄时间', `${formatTime(selectedOrder.shootStartTime)} 至 ${formatTime(selectedOrder.shootEndTime)}`],
-                  ['交付截止', formatTime(selectedOrder.deliveryDeadline)],
-                  ['结算/退款', `${selectedOrder.settlementStatus || 'NOT_SETTLED'} / ${selectedOrder.refundStatus || 'NONE'}`]
+                  ['閲戦', centToYuan(selectedOrder.amountCent)],
+                  ['闇€姹傛柟', selectedOrder.customerId],
+                  ['鏈嶅姟鏂?, selectedOrder.providerUserId],
+                  ['鎷嶆憚鏃堕棿', `${formatTime(selectedOrder.shootStartTime)} 鑷?${formatTime(selectedOrder.shootEndTime)}`],
+                  ['浜や粯鎴', formatTime(selectedOrder.deliveryDeadline)],
+                  ['缁撶畻/閫€娆?, `${selectedOrder.settlementStatus || 'NOT_SETTLED'} / ${selectedOrder.refundStatus || 'NONE'}`]
                 ]} />
                 {fulfillmentNotice && (
                   <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
@@ -2437,19 +2437,19 @@ function OrdersPage() {
                   <>
                     <Divider />
                     <InfoRows rows={[
-                      ['拍摄地点', quoteSnapshot.location || '未填写'],
-                      ['服务内容', quoteSnapshot.serviceContent || '未填写'],
-                      ['原片/精修', `${quoteSnapshot.originalCount || 0} / ${quoteSnapshot.refinedCount || 0}`],
-                      ['照片用途', quoteSnapshot.photoUsageScope || '未填写']
+                      ['鎷嶆憚鍦扮偣', quoteSnapshot.location || '鏈～鍐?],
+                      ['鏈嶅姟鍐呭', quoteSnapshot.serviceContent || '鏈～鍐?],
+                      ['鍘熺墖/绮句慨', `${quoteSnapshot.originalCount || 0} / ${quoteSnapshot.refinedCount || 0}`],
+                      ['鐓х墖鐢ㄩ€?, quoteSnapshot.photoUsageScope || '鏈～鍐?]
                     ]} />
                   </>
                 )}
                 <Stack direction="row" spacing={1} flexWrap="wrap">
                   <Button variant="outlined" onClick={() => navigate(`/orders/${selectedOrder.orderId}/delivery`)}>
-                    查看交付
+                    鏌ョ湅浜や粯
                   </Button>
                   <Button variant="outlined" onClick={() => navigate(`/orders/${selectedOrder.orderId}/reviews`)}>
-                    D 线评价
+                    D 绾胯瘎浠?
                   </Button>
                 </Stack>
                 {action && canShowOrderNormalActions(selectedOrder) ? (
@@ -2463,7 +2463,7 @@ function OrdersPage() {
                     {action.label}
                   </Button>
                 ) : (
-                  <Chip icon={<TaskAltRoundedIcon />} label="当前没有可执行操作" sx={{ alignSelf: 'flex-start' }} />
+                  <Chip icon={<TaskAltRoundedIcon />} label="褰撳墠娌℃湁鍙墽琛屾搷浣? sx={{ alignSelf: 'flex-start' }} />
                 )}
                 {cancelAction && (
                   <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#fffaf8' }}>
@@ -2484,7 +2484,7 @@ function OrdersPage() {
                   </Paper>
                 )}
                 {showShootStartedCancelNotice && (
-                  <Alert severity="warning">拍摄开始后不可直接取消，如有争议请走申诉或联系平台处理。</Alert>
+                  <Alert severity="warning">鎷嶆憚寮€濮嬪悗涓嶅彲鐩存帴鍙栨秷锛屽鏈変簤璁璧扮敵璇夋垨鑱旂郴骞冲彴澶勭悊銆?/Alert>
                 )}
               </Stack>
             </Paper>
@@ -2493,11 +2493,11 @@ function OrdersPage() {
               <Stack spacing={2}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
                   <Box>
-                    <Typography variant="h6">交付作品</Typography>
-                    <Typography color="text.secondary">摄影师必须通过上传交付文件推进待确认状态，返修也从这里重新上传。</Typography>
+                    <Typography variant="h6">浜や粯浣滃搧</Typography>
+                    <Typography color="text.secondary">鎽勫奖甯堝繀椤婚€氳繃涓婁紶浜や粯鏂囦欢鎺ㄨ繘寰呯‘璁ょ姸鎬侊紝杩斾慨涔熶粠杩欓噷閲嶆柊涓婁紶銆?/Typography>
                   </Box>
                   {canUploadDelivery && (
-                    <Chip color="secondary" label={selectedOrder.status === 'REWORK_REQUIRED' ? '可上传返修交付' : '可上传交付'} />
+                    <Chip color="secondary" label={selectedOrder.status === 'REWORK_REQUIRED' ? '鍙笂浼犺繑淇氦浠? : '鍙笂浼犱氦浠?} />
                   )}
                 </Stack>
 
@@ -2506,7 +2506,7 @@ function OrdersPage() {
                     <Stack spacing={1.5}>
                       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.2} alignItems={{ xs: 'stretch', sm: 'center' }}>
                         <Button variant="outlined" component="label" startIcon={<AddPhotoAlternateRoundedIcon />}>
-                          选择交付文件
+                          閫夋嫨浜や粯鏂囦欢
                           <input
                             hidden
                             type="file"
@@ -2514,19 +2514,19 @@ function OrdersPage() {
                           />
                         </Button>
                         <Typography color="text.secondary" variant="body2">
-                          {deliveryForm.file ? deliveryForm.file.name : '尚未选择文件'}
+                          {deliveryForm.file ? deliveryForm.file.name : '灏氭湭閫夋嫨鏂囦欢'}
                         </Typography>
                       </Stack>
                       <TextField
-                        label="交付说明"
+                        label="浜や粯璇存槑"
                         value={deliveryForm.remark}
                         onChange={event => setDeliveryForm({ ...deliveryForm, remark: event.target.value })}
                         multiline
                         minRows={2}
-                        placeholder="说明本次交付内容、返修修改点或注意事项"
+                        placeholder="璇存槑鏈浜や粯鍐呭銆佽繑淇慨鏀圭偣鎴栨敞鎰忎簨椤?
                       />
                       <Button type="submit" variant="contained" startIcon={<TaskAltRoundedIcon />} disabled={loading || !deliveryForm.file}>
-                        上传交付
+                        涓婁紶浜や粯
                       </Button>
                     </Stack>
                   </Paper>
@@ -2535,42 +2535,42 @@ function OrdersPage() {
                 {canRequestRework && (
                   <Paper component="form" variant="outlined" onSubmit={submitRework} sx={{ p: 1.5, bgcolor: '#fffaf0' }}>
                     <Stack spacing={1.5}>
-                      <Typography fontWeight={800}>请写出后续返修要求</Typography>
+                      <Typography fontWeight={800}>璇峰啓鍑哄悗缁繑淇姹?/Typography>
                       <TextField
-                        label="返修要求"
+                        label="杩斾慨瑕佹眰"
                         value={reworkRequirement}
                         onChange={event => setReworkRequirement(event.target.value)}
                         multiline
                         minRows={3}
-                        placeholder="请说明需要返修的照片、问题和期望修改方向"
+                        placeholder="璇疯鏄庨渶瑕佽繑淇殑鐓х墖銆侀棶棰樺拰鏈熸湜淇敼鏂瑰悜"
                         required
                       />
                       <Button type="submit" variant="contained" color="warning" startIcon={<RefreshRoundedIcon />} disabled={loading}>
-                        请求返修
+                        璇锋眰杩斾慨
                       </Button>
                     </Stack>
                   </Paper>
                 )}
 
                 <Stack spacing={1}>
-                  <Typography variant="overline" color="text.secondary">交付记录</Typography>
+                  <Typography variant="overline" color="text.secondary">浜や粯璁板綍</Typography>
                   {deliveryRecords.map(record => (
                     <Paper key={record.deliveryId || `${record.orderId}-${record.fileId}-${record.uploadTime}`} variant="outlined" sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
                       <Stack spacing={0.7}>
                         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
                           <Typography fontWeight={800}>
-                            {record.fileName || `文件 ${record.fileId || '-'}`}
+                            {record.fileName || `鏂囦欢 ${record.fileId || '-'}`}
                           </Typography>
-                          <Chip size="small" label={`第 ${record.deliveryRound || 1} 次交付${record.isLatest ? ' · 最新' : ''}`} />
+                          <Chip size="small" label={`绗?${record.deliveryRound || 1} 娆′氦浠?{record.isLatest ? ' 路 鏈€鏂? : ''}`} />
                         </Stack>
                         <Typography color="text.secondary" variant="body2">
-                          fileId {record.fileId || '-'} · {record.status || 'DELIVERED'} · {formatTime(record.uploadTime)}
+                          fileId {record.fileId || '-'} 路 {record.status || 'DELIVERED'} 路 {formatTime(record.uploadTime)}
                         </Typography>
-                        <Typography>{record.remark || '无交付说明'}</Typography>
+                        <Typography>{record.remark || '鏃犱氦浠樿鏄?}</Typography>
                       </Stack>
                     </Paper>
                   ))}
-                  {!deliveryRecords.length && <Typography color="text.secondary">暂无交付记录</Typography>}
+                  {!deliveryRecords.length && <Typography color="text.secondary">鏆傛棤浜や粯璁板綍</Typography>}
                 </Stack>
               </Stack>
             </Paper>
@@ -2579,25 +2579,25 @@ function OrdersPage() {
               <Stack spacing={2}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
                   <Box>
-                    <Typography variant="h6">照片展示授权</Typography>
-                    <Typography color="text.secondary">客户同意后，摄影师才能把本订单交付照片作为真实客片展示。</Typography>
+                    <Typography variant="h6">鐓х墖灞曠ず鎺堟潈</Typography>
+                    <Typography color="text.secondary">瀹㈡埛鍚屾剰鍚庯紝鎽勫奖甯堟墠鑳芥妸鏈鍗曚氦浠樼収鐗囦綔涓虹湡瀹炲鐗囧睍绀恒€?/Typography>
                   </Box>
                   {selectedOrder.status === 'COMPLETED' && (
-                    <Chip color="success" label="订单已完成，可处理授权" />
+                    <Chip color="success" label="璁㈠崟宸插畬鎴愶紝鍙鐞嗘巿鏉? />
                   )}
                 </Stack>
 
                 {canRequestPhotoAuthorization && (
                   <Paper component="form" variant="outlined" onSubmit={submitPhotoAuthorizationRequest} sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
                     <Stack spacing={1.5}>
-                      <Typography fontWeight={800}>发起展示授权申请</Typography>
+                      <Typography fontWeight={800}>鍙戣捣灞曠ず鎺堟潈鐢宠</Typography>
                       {deliveryFileOptions.length ? (
                         <>
                           <FormControl size="small">
-                            <InputLabel>选择交付文件</InputLabel>
+                            <InputLabel>閫夋嫨浜や粯鏂囦欢</InputLabel>
                             <Select
                               multiple
-                              label="选择交付文件"
+                              label="閫夋嫨浜や粯鏂囦欢"
                               value={photoAuthorizationForm.fileIds}
                               onChange={event => {
                                 const value = event.target.value
@@ -2607,23 +2607,23 @@ function OrdersPage() {
                                 })
                               }}
                               renderValue={selected => selected
-                                .map(fileId => deliveryFileNameMap.get(Number(fileId)) || `文件 ${fileId}`)
-                                .join('、')}
+                                .map(fileId => deliveryFileNameMap.get(Number(fileId)) || `鏂囦欢 ${fileId}`)
+                                .join('銆?)}
                             >
                               {deliveryFileOptions.map(file => (
                                 <MenuItem key={file.fileId} value={file.fileId}>
-                                  {file.fileName} · {formatTime(file.uploadTime)}
+                                  {file.fileName} 路 {formatTime(file.uploadTime)}
                                 </MenuItem>
                               ))}
                             </Select>
                           </FormControl>
                           <TextField
-                            label="申请说明"
+                            label="鐢宠璇存槑"
                             value={photoAuthorizationForm.remark}
                             onChange={event => setPhotoAuthorizationForm({ ...photoAuthorizationForm, remark: event.target.value })}
                             multiline
                             minRows={2}
-                            placeholder="说明希望展示这些照片的用途，例如作品集客片展示"
+                            placeholder="璇存槑甯屾湜灞曠ず杩欎簺鐓х墖鐨勭敤閫旓紝渚嬪浣滃搧闆嗗鐗囧睍绀?
                           />
                           <Button
                             type="submit"
@@ -2631,18 +2631,18 @@ function OrdersPage() {
                             startIcon={<ImageRoundedIcon />}
                             disabled={loading || !photoAuthorizationForm.fileIds.length}
                           >
-                            发送授权申请
+                            鍙戦€佹巿鏉冪敵璇?
                           </Button>
                         </>
                       ) : (
-                        <Alert severity="info">暂无可授权交付文件，请先完成交付。</Alert>
+                        <Alert severity="info">鏆傛棤鍙巿鏉冧氦浠樻枃浠讹紝璇峰厛瀹屾垚浜や粯銆?/Alert>
                       )}
                     </Stack>
                   </Paper>
                 )}
 
                 <Stack spacing={1}>
-                  <Typography variant="overline" color="text.secondary">授权申请记录</Typography>
+                  <Typography variant="overline" color="text.secondary">鎺堟潈鐢宠璁板綍</Typography>
                   {photoAuthorizations.map(authorization => {
                     const canReviewAuthorization = canCustomerReviewPhotoAuthorization(selectedOrder, currentUser, authorization)
                     const statusLabel = PHOTO_AUTHORIZATION_STATUS_LABELS[authorization.status] || authorization.status
@@ -2651,9 +2651,9 @@ function OrdersPage() {
                         <Stack spacing={1}>
                           <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
                             <Box>
-                              <Typography fontWeight={800}>授权申请 {authorization.id}</Typography>
+                              <Typography fontWeight={800}>鎺堟潈鐢宠 {authorization.id}</Typography>
                               <Typography color="text.secondary" variant="body2">
-                                服务方 {authorization.providerUserId} · 客户 {authorization.customerId}
+                                鏈嶅姟鏂?{authorization.providerUserId} 路 瀹㈡埛 {authorization.customerId}
                               </Typography>
                             </Box>
                             <Chip
@@ -2664,24 +2664,24 @@ function OrdersPage() {
                           </Stack>
                           <Typography color="text.secondary" variant="body2">
                             {authorization.status === 'GRANTED'
-                              ? '可用于作品集'
+                              ? '鍙敤浜庝綔鍝侀泦'
                               : authorization.status === 'REJECTED'
-                                ? '客户已拒绝'
-                                : '等待客户确认'}
-                            {authorization.authorizedAt ? ` · ${formatTime(authorization.authorizedAt)}` : ''}
+                                ? '瀹㈡埛宸叉嫆缁?
+                                : '绛夊緟瀹㈡埛纭'}
+                            {authorization.authorizedAt ? ` 路 ${formatTime(authorization.authorizedAt)}` : ''}
                           </Typography>
-                          <Typography>{authorization.remark || '无备注'}</Typography>
+                          <Typography>{authorization.remark || '鏃犲娉?}</Typography>
                           <Stack direction="row" spacing={1} flexWrap="wrap">
                             {(authorization.files || []).map(file => (
                               <Chip
                                 key={file.id || file.fileId}
                                 size="small"
                                 icon={<ImageRoundedIcon />}
-                                label={deliveryFileNameMap.get(Number(file.fileId)) || `文件 ${file.fileId}`}
+                                label={deliveryFileNameMap.get(Number(file.fileId)) || `鏂囦欢 ${file.fileId}`}
                               />
                             ))}
                             {!(authorization.files || []).length && (
-                              <Typography color="text.secondary" variant="body2">未返回授权文件信息</Typography>
+                              <Typography color="text.secondary" variant="body2">鏈繑鍥炴巿鏉冩枃浠朵俊鎭?/Typography>
                             )}
                           </Stack>
 
@@ -2689,7 +2689,7 @@ function OrdersPage() {
                             <Stack spacing={1.2}>
                               <TextField
                                 size="small"
-                                label="处理备注（可选）"
+                                label="澶勭悊澶囨敞锛堝彲閫夛級"
                                 value={authorizationRemarks[authorization.id] || ''}
                                 onChange={event => setAuthorizationRemarks({
                                   ...authorizationRemarks,
@@ -2704,7 +2704,7 @@ function OrdersPage() {
                                   onClick={() => handlePhotoAuthorizationDecision(authorization, 'approve')}
                                   disabled={loading}
                                 >
-                                  同意展示
+                                  鍚屾剰灞曠ず
                                 </Button>
                                 <Button
                                   variant="outlined"
@@ -2713,7 +2713,7 @@ function OrdersPage() {
                                   onClick={() => handlePhotoAuthorizationDecision(authorization, 'reject')}
                                   disabled={loading}
                                 >
-                                  拒绝展示
+                                  鎷掔粷灞曠ず
                                 </Button>
                               </Stack>
                             </Stack>
@@ -2722,7 +2722,7 @@ function OrdersPage() {
                       </Paper>
                     )
                   })}
-                  {!photoAuthorizations.length && <Typography color="text.secondary">暂无照片授权申请</Typography>}
+                  {!photoAuthorizations.length && <Typography color="text.secondary">鏆傛棤鐓х墖鎺堟潈鐢宠</Typography>}
                 </Stack>
               </Stack>
             </Paper>
@@ -2731,8 +2731,8 @@ function OrdersPage() {
               <Stack spacing={2}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
                   <Box>
-                    <Typography variant="h6">评价与仲裁</Typography>
-                    <Typography color="text.secondary">订单完成后双方都可以评价；被评价方可对不实评价发起投诉仲裁。</Typography>
+                    <Typography variant="h6">璇勪环涓庝徊瑁?/Typography>
+                    <Typography color="text.secondary">璁㈠崟瀹屾垚鍚庡弻鏂归兘鍙互璇勪环锛涜璇勪环鏂瑰彲瀵逛笉瀹炶瘎浠峰彂璧锋姇璇変徊瑁併€?/Typography>
                   </Box>
                   <Stack direction="row" spacing={1} flexWrap="wrap">
                     {canReviewSelectedOrder && !myReview && (
@@ -2741,7 +2741,7 @@ function OrdersPage() {
                         startIcon={<RateReviewRoundedIcon />}
                         onClick={() => setShowReviewForm(!showReviewForm)}
                       >
-                        评价
+                        璇勪环
                       </Button>
                     )}
                     <Button
@@ -2751,30 +2751,30 @@ function OrdersPage() {
                       onClick={() => setShowArbitrationForm(!showArbitrationForm)}
                       disabled={!reviewToComplain}
                     >
-                      申请仲裁
+                      鐢宠浠茶
                     </Button>
                   </Stack>
                 </Stack>
 
                 {myReview && (
-                  <Alert severity="success">你已评价过该订单，可以在历史评价中查看。</Alert>
+                  <Alert severity="success">浣犲凡璇勪环杩囪璁㈠崟锛屽彲浠ュ湪鍘嗗彶璇勪环涓煡鐪嬨€?/Alert>
                 )}
                 {!reviewToComplain && (
-                  <Alert severity="info">收到对方评价后，才可以对该评价发起仲裁。</Alert>
+                  <Alert severity="info">鏀跺埌瀵规柟璇勪环鍚庯紝鎵嶅彲浠ュ璇ヨ瘎浠峰彂璧蜂徊瑁併€?/Alert>
                 )}
 
                 {showReviewForm && (
                   <Paper component="form" variant="outlined" onSubmit={submitReview} sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
                     <Stack spacing={1.5}>
                       <Stack direction="row" spacing={1.2} alignItems="center">
-                        <Typography fontWeight={800}>评分</Typography>
+                        <Typography fontWeight={800}>璇勫垎</Typography>
                         <Rating
                           value={reviewForm.rating}
                           onChange={(_, value) => setReviewForm({ ...reviewForm, rating: value || 5 })}
                         />
                       </Stack>
                       <TextField
-                        label="评价内容"
+                        label="璇勪环鍐呭"
                         value={reviewForm.content}
                         onChange={event => setReviewForm({ ...reviewForm, content: event.target.value })}
                         multiline
@@ -2782,7 +2782,7 @@ function OrdersPage() {
                         required
                       />
                       <Button type="submit" variant="contained" startIcon={<RateReviewRoundedIcon />} disabled={loading}>
-                        提交评价
+                        鎻愪氦璇勪环
                       </Button>
                     </Stack>
                   </Paper>
@@ -2793,17 +2793,17 @@ function OrdersPage() {
                     <Stack spacing={1.5}>
                       <TextField
                         select
-                        label="仲裁原因"
+                        label="浠茶鍘熷洜"
                         value={arbitrationForm.reason}
                         onChange={event => setArbitrationForm({ ...arbitrationForm, reason: event.target.value })}
                       >
-                        <MenuItem value="评价内容不实">评价内容不实</MenuItem>
-                        <MenuItem value="评价包含攻击性表述">评价包含攻击性表述</MenuItem>
-                        <MenuItem value="评价与订单无关">评价与订单无关</MenuItem>
-                        <MenuItem value="其他评价争议">其他评价争议</MenuItem>
+                        <MenuItem value="璇勪环鍐呭涓嶅疄">璇勪环鍐呭涓嶅疄</MenuItem>
+                        <MenuItem value="璇勪环鍖呭惈鏀诲嚮鎬ц〃杩?>璇勪环鍖呭惈鏀诲嚮鎬ц〃杩?/MenuItem>
+                        <MenuItem value="璇勪环涓庤鍗曟棤鍏?>璇勪环涓庤鍗曟棤鍏?/MenuItem>
+                        <MenuItem value="鍏朵粬璇勪环浜夎">鍏朵粬璇勪环浜夎</MenuItem>
                       </TextField>
                       <TextField
-                        label="补充说明"
+                        label="琛ュ厖璇存槑"
                         value={arbitrationForm.description}
                         onChange={event => setArbitrationForm({ ...arbitrationForm, description: event.target.value })}
                         multiline
@@ -2811,27 +2811,27 @@ function OrdersPage() {
                         required
                       />
                       <Button type="submit" variant="contained" color="warning" startIcon={<GavelRoundedIcon />}>
-                        提交仲裁记录
+                        鎻愪氦浠茶璁板綍
                       </Button>
                     </Stack>
                   </Paper>
                 )}
 
-                <ReviewList reviews={orderReviews} emptyText="该订单还没有评价" />
+                <ReviewList reviews={orderReviews} emptyText="璇ヨ鍗曡繕娌℃湁璇勪环" />
 
                 {arbitrations.length > 0 && (
                   <Stack spacing={1}>
-                    <Typography variant="overline" color="text.secondary">仲裁记录</Typography>
+                    <Typography variant="overline" color="text.secondary">浠茶璁板綍</Typography>
                     {arbitrations.map(record => (
                       <Paper key={record.arbitrationId} variant="outlined" sx={{ p: 1.5, bgcolor: '#fffaf0' }}>
                         <Stack spacing={0.6}>
                           <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
                             <Typography fontWeight={800}>{record.reason}</Typography>
-                            <Chip size="small" color="warning" label={record.status === 'PENDING' ? '待处理' : record.status} />
+                            <Chip size="small" color="warning" label={record.status === 'PENDING' ? '寰呭鐞? : record.status} />
                           </Stack>
                           <Typography>{record.description}</Typography>
                           <Typography color="text.secondary" variant="body2">
-                            申请人 {record.applicantId} · 被申请人 {record.respondentId} · {formatTime(record.createdAt)}
+                            鐢宠浜?{record.applicantId} 路 琚敵璇蜂汉 {record.respondentId} 路 {formatTime(record.createdAt)}
                           </Typography>
                         </Stack>
                       </Paper>
@@ -2843,21 +2843,21 @@ function OrdersPage() {
 
             <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 } }}>
               <Stack spacing={2}>
-                <Typography variant="h6">状态日志</Typography>
+                <Typography variant="h6">鐘舵€佹棩蹇?/Typography>
                 {statusLogs.map(log => (
                   <Paper key={log.logId || `${log.orderId}-${log.createdAt}`} variant="outlined" sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
                     <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
                       <Box>
                         <Typography fontWeight={800}>
-                          {orderStatusMap[log.fromStatus] || log.fromStatus || '创建'} → {orderStatusMap[log.toStatus] || log.toStatus}
+                          {orderStatusMap[log.fromStatus] || log.fromStatus || '鍒涘缓'} 鈫?{orderStatusMap[log.toStatus] || log.toStatus}
                         </Typography>
-                        <Typography color="text.secondary">{log.reason || '状态流转'}</Typography>
+                        <Typography color="text.secondary">{log.reason || '鐘舵€佹祦杞?}</Typography>
                       </Box>
                       <Typography color="text.secondary" variant="body2">{formatTime(log.createdAt)}</Typography>
                     </Stack>
                   </Paper>
                 ))}
-                {!statusLogs.length && <Typography color="text.secondary">暂无状态日志</Typography>}
+                {!statusLogs.length && <Typography color="text.secondary">鏆傛棤鐘舵€佹棩蹇?/Typography>}
               </Stack>
             </Paper>
           </Stack>
@@ -2969,7 +2969,7 @@ function ProfilePage() {
           canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
           resolve(canvas.toDataURL('image/jpeg', 0.85))
         }
-        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片加载失败')) }
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('鍥剧墖鍔犺浇澶辫触')) }
         img.src = url
       })
       setProfileForm({ ...profileForm, avatarData: compressed })
@@ -2989,7 +2989,7 @@ function ProfilePage() {
     }
     saveUserProfile(currentUser.userId, nextProfile)
     updateProfile(nextProfile)
-    setNotice({ type: 'success', text: '个人资料已更新' })
+    setNotice({ type: 'success', text: '涓汉璧勬枡宸叉洿鏂? })
   }
 
   async function choosePortfolioImage(event) {
@@ -2998,10 +2998,10 @@ function ProfilePage() {
     if (!file) return
     try {
       const imageData = await readFileAsDataUrl(file)
-      const title = file.name?.replace(/\.[^.]+$/, '') || '作品图片'
+      const title = file.name?.replace(/\.[^.]+$/, '') || '浣滃搧鍥剧墖'
       const nextItems = addPortfolioItem(currentUser.userId, { title, imageData })
       setPortfolioItems(nextItems)
-      setNotice({ type: 'success', text: '作品集图片已上传' })
+      setNotice({ type: 'success', text: '浣滃搧闆嗗浘鐗囧凡涓婁紶' })
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }
@@ -3035,7 +3035,7 @@ function ProfilePage() {
     try {
       await demandApi.rejectInvitation(invitation.invitationId, currentUser)
       await loadProfileData()
-      setNotice({ type: 'success', text: '已暂不接受该邀请' })
+      setNotice({ type: 'success', text: '宸叉殏涓嶆帴鍙楄閭€璇? })
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     } finally {
@@ -3055,10 +3055,10 @@ function ProfilePage() {
   )
 
   const profileActions = [
-    { key: 'photos', label: '我的照片', icon: <ImageRoundedIcon /> },
-    { key: 'follows', label: '我的关注', icon: <FavoriteRoundedIcon /> },
-    { key: 'collections', label: '我的收藏', icon: <FavoriteBorderRoundedIcon /> },
-    { key: 'reviews', label: '历史评价', icon: <HistoryRoundedIcon /> }
+    { key: 'photos', label: '鎴戠殑鐓х墖', icon: <ImageRoundedIcon /> },
+    { key: 'follows', label: '鎴戠殑鍏虫敞', icon: <FavoriteRoundedIcon /> },
+    { key: 'collections', label: '鎴戠殑鏀惰棌', icon: <FavoriteBorderRoundedIcon /> },
+    { key: 'reviews', label: '鍘嗗彶璇勪环', icon: <HistoryRoundedIcon /> }
   ]
 
   function renderProfilePanel() {
@@ -3070,7 +3070,7 @@ function ProfilePage() {
               <Stack spacing={1}>
                 <img className="feed-image" src={photo.imageData} alt={photo.title} />
                 <Typography fontWeight={800}>{photo.title}</Typography>
-                <Typography color="text.secondary" variant="body2">作者 {photo.authorId} · {formatShortTime(photo.createdAt)}</Typography>
+                <Typography color="text.secondary" variant="body2">浣滆€?{photo.authorId} 路 {formatShortTime(photo.createdAt)}</Typography>
                 <Button
                   component="a"
                   href={photo.imageData}
@@ -3078,13 +3078,13 @@ function ProfilePage() {
                   size="small"
                   variant="outlined"
                 >
-                  下载
+                  涓嬭浇
                 </Button>
               </Stack>
             </Paper>
           ))}
         </Box>
-      ) : <EmptyCard text="还没有保存过照片" />
+      ) : <EmptyCard text="杩樻病鏈変繚瀛樿繃鐓х墖" />
     }
 
     if (profileView === 'follows') {
@@ -3095,14 +3095,14 @@ function ProfilePage() {
               <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
                 <Stack direction="row" alignItems="center" spacing={1} onClick={() => navigate(`/users/${follow.authorId}`)} sx={{ cursor: 'pointer' }}>
                   <Avatar sx={{ width: 36, height: 36 }}>{String(follow.authorId).slice(0, 1)}</Avatar>
-                  <Typography fontWeight={800}>用户 {follow.authorId}</Typography>
+                  <Typography fontWeight={800}>鐢ㄦ埛 {follow.authorId}</Typography>
                 </Stack>
-                <Typography color="text.secondary" variant="body2">{formatShortTime(follow.followedAt)} 关注</Typography>
+                <Typography color="text.secondary" variant="body2">{formatShortTime(follow.followedAt)} 鍏虫敞</Typography>
               </Stack>
             </Paper>
           ))}
         </Stack>
-      ) : <EmptyCard text="还没有关注任何人" />
+      ) : <EmptyCard text="杩樻病鏈夊叧娉ㄤ换浣曚汉" />
     }
 
     if (profileView === 'collections') {
@@ -3111,22 +3111,22 @@ function ProfilePage() {
           {favoriteMoments.map(moment => (
             <Paper key={moment.momentId} variant="outlined" sx={{ p: 1.5, cursor: 'pointer' }} onClick={() => navigate(`/moments/${moment.momentId}`)}>
               <Stack spacing={0.7}>
-                <Typography fontWeight={800}>{moment.title || '未命名动态'}</Typography>
-                <Typography>{moment.content || '分享了一张照片'}</Typography>
+                <Typography fontWeight={800}>{moment.title || '鏈懡鍚嶅姩鎬?}</Typography>
+                <Typography>{moment.content || '鍒嗕韩浜嗕竴寮犵収鐗?}</Typography>
                 <Typography color="text.secondary" variant="body2">
-                  作者 {moment.authorId} · {moment.favoriteCount || 0} 次收藏
+                  浣滆€?{moment.authorId} 路 {moment.favoriteCount || 0} 娆℃敹钘?
                 </Typography>
               </Stack>
             </Paper>
           ))}
         </Stack>
-      ) : <EmptyCard text="还没有收藏动态" />
+      ) : <EmptyCard text="杩樻病鏈夋敹钘忓姩鎬? />
     }
 
     if (profileView === 'reviews') {
       return (
         <Stack spacing={2}>
-          <SectionHeader title="历史评价" subtitle="这里展示别人给你的订单评价。" />
+          <SectionHeader title="鍘嗗彶璇勪环" subtitle="杩欓噷灞曠ず鍒汉缁欎綘鐨勮鍗曡瘎浠枫€? />
           <ReviewList reviews={receivedReviews} />
         </Stack>
       )
@@ -3138,7 +3138,7 @@ function ProfilePage() {
         <Stack spacing={2}>
           {currentUser.role === 'PROVIDER' && (
             <Button component="label" variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />} sx={{ alignSelf: 'flex-start' }}>
-              上传作品图片
+              涓婁紶浣滃搧鍥剧墖
               <input hidden type="file" accept="image/*" onChange={choosePortfolioImage} />
             </Button>
           )}
@@ -3152,20 +3152,20 @@ function ProfilePage() {
                   onClick={() => work.momentId && navigate(`/moments/${work.momentId}`)}
                 >
                   <Stack spacing={1}>
-                    <img className="feed-image" src={work.imageData} alt={work.title || '作品图片'} />
-                    <Typography fontWeight={800}>{work.title || '作品图片'}</Typography>
+                    <img className="feed-image" src={work.imageData} alt={work.title || '浣滃搧鍥剧墖'} />
+                    <Typography fontWeight={800}>{work.title || '浣滃搧鍥剧墖'}</Typography>
                   </Stack>
                 </Paper>
               ))}
             </Box>
-          ) : <EmptyCard text="作品集里还没有照片动态" />}
+          ) : <EmptyCard text="浣滃搧闆嗛噷杩樻病鏈夌収鐗囧姩鎬? />}
         </Stack>
       )
     }
 
     if (profileView === 'invitations') {
       if (currentUser.role !== 'CUSTOMER') {
-        return <EmptyCard text="切换到需求方身份后可以查看收到的邀请" />
+        return <EmptyCard text="鍒囨崲鍒伴渶姹傛柟韬唤鍚庡彲浠ユ煡鐪嬫敹鍒扮殑閭€璇? />
       }
       return invitations.length ? (
         <Stack spacing={1.5}>
@@ -3178,12 +3178,12 @@ function ProfilePage() {
                 <Stack spacing={1}>
                   <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
                     <Box sx={{ minWidth: 0 }}>
-                      <Typography fontWeight={800}>服务方 {invitation.providerId}</Typography>
+                      <Typography fontWeight={800}>鏈嶅姟鏂?{invitation.providerId}</Typography>
                       <Typography color="text.secondary" noWrap>{invitation.demandScene}</Typography>
                     </Box>
                     <Stack direction="row" spacing={0.8} alignItems="center">
                       <Chip size="small" label={centToYuan(invitation.expectedPriceCent)} />
-                      <Chip size="small" color={isPending ? 'warning' : status === 'ACCEPTED' ? 'success' : 'default'} label={status === 'ACCEPTED' ? '已接受' : status === 'REJECTED' ? '已婉拒' : '待处理'} />
+                      <Chip size="small" color={isPending ? 'warning' : status === 'ACCEPTED' ? 'success' : 'default'} label={status === 'ACCEPTED' ? '宸叉帴鍙? : status === 'REJECTED' ? '宸插鎷? : '寰呭鐞?} />
                     </Stack>
                   </Stack>
                   <Typography>{invitation.message}</Typography>
@@ -3191,16 +3191,16 @@ function ProfilePage() {
                   {isPending && (
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
                       <Button variant="contained" startIcon={<ChatRoundedIcon />} onClick={() => acceptInvitation(invitation)} disabled={busy}>
-                        接受并进入会话
+                        鎺ュ彈骞惰繘鍏ヤ細璇?
                       </Button>
                       <Button variant="outlined" color="inherit" onClick={() => rejectInvitation(invitation)} disabled={busy}>
-                        暂不接受
+                        鏆備笉鎺ュ彈
                       </Button>
                     </Stack>
                   )}
                   {status === 'ACCEPTED' && invitation.responseId && (
                     <Button variant="text" startIcon={<ChatRoundedIcon />} onClick={() => navigate('/messages')}>
-                      去会话列表
+                      鍘讳細璇濆垪琛?
                     </Button>
                   )}
                 </Stack>
@@ -3208,7 +3208,7 @@ function ProfilePage() {
             )
           })}
         </Stack>
-      ) : <EmptyCard text="还没有服务方对你的需求发起邀请" />
+      ) : <EmptyCard text="杩樻病鏈夋湇鍔℃柟瀵逛綘鐨勯渶姹傚彂璧烽個璇? />
     }
 
     return null
@@ -3218,7 +3218,7 @@ function ProfilePage() {
 
   return (
     <Stack spacing={2.5}>
-      <SectionHeader title="个人" subtitle="管理头像昵称、身份切换和需求方个人入口。" />
+      <SectionHeader title="涓汉" subtitle="绠＄悊澶村儚鏄电О銆佽韩浠藉垏鎹㈠拰闇€姹傛柟涓汉鍏ュ彛銆? />
       {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
       <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
         <Stack spacing={2.5}>
@@ -3234,37 +3234,37 @@ function ProfilePage() {
             </Stack>
             <Stack spacing={1} sx={{ flex: 1, width: '100%' }}>
               <TextField
-                label="昵称"
+                label="鏄电О"
                 value={profileForm.nickname}
                 onChange={event => setProfileForm({ ...profileForm, nickname: event.target.value })}
               />
               <TextField
-                label="简介"
+                label="绠€浠?
                 multiline
                 minRows={2}
                 value={profileForm.bio}
                 onChange={event => setProfileForm({ ...profileForm, bio: event.target.value })}
               />
               <TextField
-                label="档期"
+                label="妗ｆ湡"
                 value={profileForm.availability}
                 onChange={event => setProfileForm({ ...profileForm, availability: event.target.value })}
               />
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
                 <Button component="label" variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />}>
-                  更换头像
+                  鏇存崲澶村儚
                   <input hidden type="file" accept="image/*" onChange={chooseAvatar} />
                 </Button>
-                <Button variant="contained" onClick={saveProfile}>保存资料</Button>
+                <Button variant="contained" onClick={saveProfile}>淇濆瓨璧勬枡</Button>
               </Stack>
             </Stack>
           </Stack>
           <Divider />
           <Box>
-            <Typography fontWeight={800} sx={{ mb: 1 }}>切换身份</Typography>
+            <Typography fontWeight={800} sx={{ mb: 1 }}>鍒囨崲韬唤</Typography>
             <ToggleButtonGroup exclusive value={userKey} onChange={(_, value) => value && setUserKey(value)}>
-              <ToggleButton value="customer">需求方</ToggleButton>
-              <ToggleButton value="provider">服务方</ToggleButton>
+              <ToggleButton value="customer">闇€姹傛柟</ToggleButton>
+              <ToggleButton value="provider">鏈嶅姟鏂?/ToggleButton>
             </ToggleButtonGroup>
           </Box>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 1, width: '100%' }}>
@@ -3282,7 +3282,7 @@ function ProfilePage() {
           </Box>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, gap: 1, width: '100%' }}>
             <Button variant="outlined" startIcon={<ReceiptLongRoundedIcon />} onClick={() => navigate('/orders')} fullWidth>
-              订单
+              璁㈠崟
             </Button>
             {currentUser.role === 'PROVIDER' ? (
               <Button
@@ -3294,7 +3294,7 @@ function ProfilePage() {
                 }}
                 fullWidth
               >
-                作品集
+                浣滃搧闆?
               </Button>
             ) : (
               <Button
@@ -3306,7 +3306,7 @@ function ProfilePage() {
                 }}
                 fullWidth
               >
-                邀请
+                閭€璇?
               </Button>
             )}
           </Box>
@@ -3321,19 +3321,19 @@ function ProfilePage() {
                 navigate('/login', { replace: true })
               }}
             >
-              退出登录
+              閫€鍑虹櫥褰?
             </Button>
           </Stack>
         </Stack>
       </Paper>
       <Stack spacing={1.5}>
-        <Typography variant="overline" color="text.secondary">动态</Typography>
+        <Typography variant="overline" color="text.secondary">鍔ㄦ€?/Typography>
         {myMoments.map(moment => (
           <Paper key={moment.momentId} variant="outlined" sx={{ p: 1.5 }}>
             <Stack spacing={1}>
               <Stack direction="row" justifyContent="space-between" alignItems="center">
                 <Typography fontWeight={800} onClick={() => navigate(`/moments/${moment.momentId}`)} sx={{ cursor: 'pointer' }}>
-                  {moment.title || '未命名动态'}
+                  {moment.title || '鏈懡鍚嶅姩鎬?}
                 </Typography>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Typography color="text.secondary" variant="body2">{formatShortTime(moment.createdAt)}</Typography>
@@ -3342,15 +3342,15 @@ function ProfilePage() {
                   </IconButton>
                 </Stack>
               </Stack>
-              <Typography>{moment.content || '分享了一张照片'}</Typography>
-              {moment.imageData && <img className="feed-image" src={moment.imageData} alt={moment.title || '动态照片'} onClick={() => navigate(`/moments/${moment.momentId}`)} style={{ cursor: 'pointer' }} />}
+              <Typography>{moment.content || '鍒嗕韩浜嗕竴寮犵収鐗?}</Typography>
+              {moment.imageData && <img className="feed-image" src={moment.imageData} alt={moment.title || '鍔ㄦ€佺収鐗?} onClick={() => navigate(`/moments/${moment.momentId}`)} style={{ cursor: 'pointer' }} />}
               <Typography color="text.secondary" variant="body2">
-                {moment.likeCount || 0} 个赞 · {moment.favoriteCount || 0} 次收藏
+                {moment.likeCount || 0} 涓禐 路 {moment.favoriteCount || 0} 娆℃敹钘?
               </Typography>
             </Stack>
           </Paper>
         ))}
-        {!myMoments.length && <EmptyCard text="还没有发布过动态" />}
+        {!myMoments.length && <EmptyCard text="杩樻病鏈夊彂甯冭繃鍔ㄦ€? />}
       </Stack>
     </Stack>
   )
@@ -3403,7 +3403,7 @@ function PublicProfilePage() {
 
   function follow() {
     toggleFollow(profileUserId)
-    setNotice({ type: 'success', text: isFollowing(profileUserId) ? '已关注' : '已取消关注' })
+    setNotice({ type: 'success', text: isFollowing(profileUserId) ? '宸插叧娉? : '宸插彇娑堝叧娉? })
   }
 
   if (profileUserId === currentUser.userId) {
@@ -3416,22 +3416,22 @@ function PublicProfilePage() {
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'flex-start', sm: 'center' }}>
           <Stack spacing={1} alignItems="center">
             <Avatar src={profile.avatarData || undefined} sx={{ width: 76, height: 76, bgcolor: role === 'PROVIDER' ? 'secondary.main' : 'primary.main' }}>
-              {profile.nickname?.slice(0, 1) || roleMap[role]?.slice(0, 1) || '用'}
+              {profile.nickname?.slice(0, 1) || roleMap[role]?.slice(0, 1) || '鐢?}
             </Avatar>
             <ProfileMetrics stats={profileStats} compact />
           </Stack>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography variant="h5">{profile.nickname}</Typography>
-            <Typography color="text.secondary">{roleMap[role] || '用户'} {profileUserId} · 动态 {userMoments.length}{role === 'PROVIDER' ? ` · 作品 ${works.length}` : ''}</Typography>
+            <Typography color="text.secondary">{roleMap[role] || '鐢ㄦ埛'} {profileUserId} 路 鍔ㄦ€?{userMoments.length}{role === 'PROVIDER' ? ` 路 浣滃搧 ${works.length}` : ''}</Typography>
             <Typography sx={{ mt: 1 }}>{profile.bio}</Typography>
-            <Typography color="text.secondary" variant="body2" sx={{ mt: 0.5 }}>档期：{profile.availability}</Typography>
+            <Typography color="text.secondary" variant="body2" sx={{ mt: 0.5 }}>妗ｆ湡锛歿profile.availability}</Typography>
           </Box>
           <Stack direction={{ xs: 'row', sm: 'column' }} spacing={1}>
             <Button variant={isFollowing(profileUserId) ? 'contained' : 'outlined'} onClick={follow}>
-              {isFollowing(profileUserId) ? '已关注' : '关注'}
+              {isFollowing(profileUserId) ? '宸插叧娉? : '鍏虫敞'}
             </Button>
             <Button variant={showReviews ? 'contained' : 'outlined'} startIcon={<HistoryRoundedIcon />} onClick={() => setShowReviews(!showReviews)}>
-              历史评价
+              鍘嗗彶璇勪环
             </Button>
           </Stack>
         </Stack>
@@ -3440,14 +3440,14 @@ function PublicProfilePage() {
 
       {showReviews && (
         <Stack spacing={2}>
-          <SectionHeader title="历史评价" subtitle="这个用户收到过的订单评价。" />
+          <SectionHeader title="鍘嗗彶璇勪环" subtitle="杩欎釜鐢ㄦ埛鏀跺埌杩囩殑璁㈠崟璇勪环銆? />
           <ReviewList reviews={receivedReviews} />
         </Stack>
       )}
 
       {role === 'PROVIDER' && (
         <>
-          <SectionHeader title="作品集" subtitle="查看这个用户公开发布过的照片动态。" />
+          <SectionHeader title="浣滃搧闆? subtitle="鏌ョ湅杩欎釜鐢ㄦ埛鍏紑鍙戝竷杩囩殑鐓х墖鍔ㄦ€併€? />
           {works.length ? (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(3, 1fr)' }, gap: 1.5 }}>
           {works.map(work => (
@@ -3458,28 +3458,28 @@ function PublicProfilePage() {
               onClick={() => work.momentId && navigate(`/moments/${work.momentId}`)}
             >
               <Stack spacing={1}>
-                <img className="feed-image" src={work.imageData} alt={work.title || '作品图片'} />
-                <Typography fontWeight={800}>{work.title || '作品图片'}</Typography>
+                <img className="feed-image" src={work.imageData} alt={work.title || '浣滃搧鍥剧墖'} />
+                <Typography fontWeight={800}>{work.title || '浣滃搧鍥剧墖'}</Typography>
               </Stack>
             </Paper>
           ))}
         </Box>
-          ) : <EmptyCard text="还没有公开作品" />}
+          ) : <EmptyCard text="杩樻病鏈夊叕寮€浣滃搧" />}
         </>
       )}
 
-      <SectionHeader title="动态" subtitle="点击动态进入详情页继续浏览。" />
+      <SectionHeader title="鍔ㄦ€? subtitle="鐐瑰嚮鍔ㄦ€佽繘鍏ヨ鎯呴〉缁х画娴忚銆? />
       <Stack spacing={1.5}>
         {userMoments.map(moment => (
           <Paper key={moment.momentId} variant="outlined" sx={{ p: 1.5, cursor: 'pointer' }} onClick={() => navigate(`/moments/${moment.momentId}`)}>
             <Stack spacing={0.7}>
-              <Typography fontWeight={800}>{moment.title || '未命名动态'}</Typography>
-              <Typography>{moment.content || '分享了一张照片'}</Typography>
+              <Typography fontWeight={800}>{moment.title || '鏈懡鍚嶅姩鎬?}</Typography>
+              <Typography>{moment.content || '鍒嗕韩浜嗕竴寮犵収鐗?}</Typography>
               <Typography color="text.secondary" variant="body2">{formatTime(moment.createdAt)}</Typography>
             </Stack>
           </Paper>
         ))}
-        {!userMoments.length && <EmptyCard text="还没有公开动态" />}
+        {!userMoments.length && <EmptyCard text="杩樻病鏈夊叕寮€鍔ㄦ€? />}
       </Stack>
     </Stack>
   )
@@ -3500,14 +3500,14 @@ function createDefaultQuoteForm() {
     shootStartTime: toDateTimeInput(start),
     shootEndTime: toDateTimeInput(end),
     deliveryDeadline: toDateTimeInput(delivery),
-    location: '南京大学鼓楼校区',
-    serviceContent: '2 小时校园约拍，包含沟通、拍摄、基础调色和精修交付。',
+    location: '鍗椾含澶у榧撴ゼ鏍″尯',
+    serviceContent: '2 灏忔椂鏍″洯绾︽媿锛屽寘鍚矡閫氥€佹媿鎽勩€佸熀纭€璋冭壊鍜岀簿淇氦浠樸€?,
     originalCount: 60,
     refinedCount: 12,
     photoUsageScope: 'PERSONAL_ONLY',
-    terms: 'P4 演示报价',
-    contractTerms: '确认报价后生成订单，模拟支付后资金进入平台托管。',
-    remark: '可根据天气微调拍摄时间。'
+    terms: 'P4 婕旂ず鎶ヤ环',
+    contractTerms: '纭鎶ヤ环鍚庣敓鎴愯鍗曪紝妯℃嫙鏀粯鍚庤祫閲戣繘鍏ュ钩鍙版墭绠°€?,
+    remark: '鍙牴鎹ぉ姘斿井璋冩媿鎽勬椂闂淬€?
   }
 }
 
@@ -3575,53 +3575,53 @@ function getBackendConversationId(conversation) {
 
 function getConversationSourceLabel(conversation) {
   const sourceType = conversation?.sourceType
-  if (!sourceType) return '当前接口未返回该字段'
-  if (sourceType === 'DEMAND_RESPONSE') return '需求大厅沟通'
-  if (sourceType === 'SERVICE_PACKAGE') return '服务橱窗预订沟通'
-  if (sourceType.includes('SCHEDULE')) return '档期预约沟通'
+  if (!sourceType) return '褰撳墠鎺ュ彛鏈繑鍥炶瀛楁'
+  if (sourceType === 'DEMAND_RESPONSE') return '闇€姹傚ぇ鍘呮矡閫?
+  if (sourceType === 'SERVICE_PACKAGE') return '鏈嶅姟姗辩獥棰勮娌熼€?
+  if (sourceType.includes('SCHEDULE')) return '妗ｆ湡棰勭害娌熼€?
   return sourceType
 }
 
 function buildConversationSourceRows(conversation, currentUser, sourceLabel) {
   const rows = [
-    ['会话 ID', conversation?.conversationId || '未加载'],
-    ['后端 conversationId', getBackendConversationId(conversation) || '当前接口未返回该字段'],
-    ['对方用户 ID', conversation ? getOppositeUserId(conversation, currentUser.userId) : '未加载'],
-    ['来源类型', conversation?.sourceType || '当前接口未返回该字段'],
-    ['业务来源', sourceLabel]
+    ['浼氳瘽 ID', conversation?.conversationId || '鏈姞杞?],
+    ['鍚庣 conversationId', getBackendConversationId(conversation) || '褰撳墠鎺ュ彛鏈繑鍥炶瀛楁'],
+    ['瀵规柟鐢ㄦ埛 ID', conversation ? getOppositeUserId(conversation, currentUser.userId) : '鏈姞杞?],
+    ['鏉ユ簮绫诲瀷', conversation?.sourceType || '褰撳墠鎺ュ彛鏈繑鍥炶瀛楁'],
+    ['涓氬姟鏉ユ簮', sourceLabel]
   ]
 
   if (conversation?.sourceType === 'DEMAND_RESPONSE') {
-    rows.push(['响应 ID', conversation.sourceId || '当前接口未返回该字段'])
-    rows.push(['需求 ID', conversation.demandId || '当前接口未返回'])
+    rows.push(['鍝嶅簲 ID', conversation.sourceId || '褰撳墠鎺ュ彛鏈繑鍥炶瀛楁'])
+    rows.push(['闇€姹?ID', conversation.demandId || '褰撳墠鎺ュ彛鏈繑鍥?])
     return rows
   }
 
   if (conversation?.sourceType === 'SERVICE_PACKAGE') {
-    rows.push(['服务橱窗 ID', conversation.sourceId || '当前接口未返回该字段'])
-    rows.push(['档期 ID', conversation.scheduleId || '当前接口未返回'])
+    rows.push(['鏈嶅姟姗辩獥 ID', conversation.sourceId || '褰撳墠鎺ュ彛鏈繑鍥炶瀛楁'])
+    rows.push(['妗ｆ湡 ID', conversation.scheduleId || '褰撳墠鎺ュ彛鏈繑鍥?])
     return rows
   }
 
-  rows.push(['来源 ID', conversation?.sourceId || '当前接口未返回该字段'])
-  rows.push(['需求 ID', conversation?.demandId || '当前接口未返回该字段'])
-  rows.push(['服务橱窗 ID', conversation?.servicePackageId || '当前接口未返回该字段'])
-  rows.push(['档期 ID', conversation?.scheduleId || '当前接口未返回该字段'])
+  rows.push(['鏉ユ簮 ID', conversation?.sourceId || '褰撳墠鎺ュ彛鏈繑鍥炶瀛楁'])
+  rows.push(['闇€姹?ID', conversation?.demandId || '褰撳墠鎺ュ彛鏈繑鍥炶瀛楁'])
+  rows.push(['鏈嶅姟姗辩獥 ID', conversation?.servicePackageId || '褰撳墠鎺ュ彛鏈繑鍥炶瀛楁'])
+  rows.push(['妗ｆ湡 ID', conversation?.scheduleId || '褰撳墠鎺ュ彛鏈繑鍥炶瀛楁'])
   return rows
 }
 
 function getConversationSourceHint(conversation) {
-  if (!conversation) return '会话仍在加载。'
+  if (!conversation) return '浼氳瘽浠嶅湪鍔犺浇銆?
   if (conversation.isLocal) {
-    return '当前是本地 fallback 会话，只能聊天演示，不能创建真实报价或订单。'
+    return '褰撳墠鏄湰鍦?fallback 浼氳瘽锛屽彧鑳借亰澶╂紨绀猴紝涓嶈兘鍒涘缓鐪熷疄鎶ヤ环鎴栬鍗曘€?
   }
   if (conversation.sourceType === 'DEMAND_RESPONSE') {
-    return '该会话来自需求大厅响应接受，后续应在这里沟通、报价并生成托管订单。'
+    return '璇ヤ細璇濇潵鑷渶姹傚ぇ鍘呭搷搴旀帴鍙楋紝鍚庣画搴斿湪杩欓噷娌熼€氥€佹姤浠峰苟鐢熸垚鎵樼璁㈠崟銆?
   }
   if (conversation.sourceType === 'SERVICE_PACKAGE') {
-    return '该会话来自服务橱窗咨询或预约意向；当前前端只展示来源，不实现橱窗预订、锁档期或付款。'
+    return '璇ヤ細璇濇潵鑷湇鍔℃┍绐楀挩璇㈡垨棰勭害鎰忓悜锛涘綋鍓嶅墠绔彧灞曠ず鏉ユ簮锛屼笉瀹炵幇姗辩獥棰勮銆侀攣妗ｆ湡鎴栦粯娆俱€?
   }
-  return '当前来源类型不属于已明确的需求大厅或服务橱窗流程，本轮只做展示，不新增业务动作。'
+  return '褰撳墠鏉ユ簮绫诲瀷涓嶅睘浜庡凡鏄庣‘鐨勯渶姹傚ぇ鍘呮垨鏈嶅姟姗辩獥娴佺▼锛屾湰杞彧鍋氬睍绀猴紝涓嶆柊澧炰笟鍔″姩浣溿€?
 }
 
 function getQuoteOrderId(quote) {
@@ -3645,77 +3645,77 @@ function getQuoteEntryHint(conversation, currentUser, quotes) {
   if (!conversation) return ''
   if (currentUser.role !== 'PROVIDER') return ''
   if (currentUser.userId !== Number(conversation.participantBId)) {
-    return '只有该会话的服务方可以发起正式报价。'
+    return '鍙湁璇ヤ細璇濈殑鏈嶅姟鏂瑰彲浠ュ彂璧锋寮忔姤浠枫€?
   }
   if (conversation.isLocal || !getBackendConversationId(conversation)) {
-    return '当前不是后端真实会话，不能生成报价。'
+    return '褰撳墠涓嶆槸鍚庣鐪熷疄浼氳瘽锛屼笉鑳界敓鎴愭姤浠枫€?
   }
   if (hasPendingQuote(quotes)) {
-    return '已有待确认报价，需客户确认或拒绝后再发新报价。'
+    return '宸叉湁寰呯‘璁ゆ姤浠凤紝闇€瀹㈡埛纭鎴栨嫆缁濆悗鍐嶅彂鏂版姤浠枫€?
   }
-  return '可以基于本次沟通发起正式报价，顾客确认后会生成订单。'
+  return '鍙互鍩轰簬鏈娌熼€氬彂璧锋寮忔姤浠凤紝椤惧纭鍚庝細鐢熸垚璁㈠崟銆?
 }
 
 function validateQuoteForm(form, conversation, currentUser, quotes, options = {}) {
   const errors = []
   const editingQuotationId = options.editingQuotationId
   if (!conversation || conversation.isLocal || !getBackendConversationId(conversation)) {
-    errors.push('当前会话必须是真实后端会话，才能发起报价。')
+    errors.push('褰撳墠浼氳瘽蹇呴』鏄湡瀹炲悗绔細璇濓紝鎵嶈兘鍙戣捣鎶ヤ环銆?)
   }
   if (currentUser.role !== 'PROVIDER' || currentUser.userId !== Number(conversation?.participantBId)) {
-    errors.push('只有该会话的服务方可以发起报价。')
+    errors.push('鍙湁璇ヤ細璇濈殑鏈嶅姟鏂瑰彲浠ュ彂璧锋姤浠枫€?)
   }
   const hasOtherPendingQuote = quotes.some(quote =>
     quote.status === 'PENDING_CONFIRM'
     && (!editingQuotationId || String(quote.quotationId) !== String(editingQuotationId))
   )
   if (hasOtherPendingQuote) {
-    errors.push('已有待确认报价，需客户确认或拒绝后再发新报价。')
+    errors.push('宸叉湁寰呯‘璁ゆ姤浠凤紝闇€瀹㈡埛纭鎴栨嫆缁濆悗鍐嶅彂鏂版姤浠枫€?)
   }
 
   const amountCent = yuanToCent(form.amountYuan)
   if (!hasAtMostTwoDecimalPlaces(form.amountYuan)) {
-    errors.push('金额最多保留两位小数。')
+    errors.push('閲戦鏈€澶氫繚鐣欎袱浣嶅皬鏁般€?)
   }
   if (!Number.isInteger(amountCent) || amountCent <= 0) {
-    errors.push('报价金额必须大于 0，且转换成分后必须是有效整数。')
+    errors.push('鎶ヤ环閲戦蹇呴』澶т簬 0锛屼笖杞崲鎴愬垎鍚庡繀椤绘槸鏈夋晥鏁存暟銆?)
   }
 
   const shootStart = parseInputDate(form.shootStartTime)
   const shootEnd = parseInputDate(form.shootEndTime)
   const deliveryDeadline = parseInputDate(form.deliveryDeadline)
   const now = new Date()
-  if (!shootStart) errors.push('拍摄开始时间必填。')
-  if (!shootEnd) errors.push('拍摄结束时间必填。')
-  if (!deliveryDeadline) errors.push('最晚交付时间必填。')
+  if (!shootStart) errors.push('鎷嶆憚寮€濮嬫椂闂村繀濉€?)
+  if (!shootEnd) errors.push('鎷嶆憚缁撴潫鏃堕棿蹇呭～銆?)
+  if (!deliveryDeadline) errors.push('鏈€鏅氫氦浠樻椂闂村繀濉€?)
   if (shootStart && shootStart <= now) {
-    errors.push('拍摄开始时间必须晚于当前时间。')
+    errors.push('鎷嶆憚寮€濮嬫椂闂村繀椤绘櫄浜庡綋鍓嶆椂闂淬€?)
   }
   if (shootStart && shootEnd && shootEnd <= shootStart) {
-    errors.push('拍摄结束时间必须晚于拍摄开始时间。')
+    errors.push('鎷嶆憚缁撴潫鏃堕棿蹇呴』鏅氫簬鎷嶆憚寮€濮嬫椂闂淬€?)
   }
   if (shootEnd && deliveryDeadline && deliveryDeadline <= shootEnd) {
-    errors.push('最晚交付时间必须晚于拍摄结束时间。')
+    errors.push('鏈€鏅氫氦浠樻椂闂村繀椤绘櫄浜庢媿鎽勭粨鏉熸椂闂淬€?)
   }
 
   if (!String(form.location || '').trim()) {
-    errors.push('拍摄地点不能为空。')
+    errors.push('鎷嶆憚鍦扮偣涓嶈兘涓虹┖銆?)
   }
   if (!String(form.serviceContent || '').trim()) {
-    errors.push('服务内容不能为空。')
+    errors.push('鏈嶅姟鍐呭涓嶈兘涓虹┖銆?)
   }
   if (!isNonNegativeInteger(form.originalCount)) {
-    errors.push('原片数量必须是非负整数。')
+    errors.push('鍘熺墖鏁伴噺蹇呴』鏄潪璐熸暣鏁般€?)
   }
   if (!isNonNegativeInteger(form.refinedCount)) {
-    errors.push('精修数量必须是非负整数。')
+    errors.push('绮句慨鏁伴噺蹇呴』鏄潪璐熸暣鏁般€?)
   }
 
   if (conversation?.scheduleStartTime && conversation?.scheduleEndTime && shootStart && shootEnd) {
     const scheduleStart = parseInputDate(conversation.scheduleStartTime)
     const scheduleEnd = parseInputDate(conversation.scheduleEndTime)
     if (scheduleStart && scheduleEnd && (shootStart < scheduleStart || shootEnd > scheduleEnd)) {
-      errors.push('拍摄时间必须落在该会话明确返回的档期范围内。')
+      errors.push('鎷嶆憚鏃堕棿蹇呴』钀藉湪璇ヤ細璇濇槑纭繑鍥炵殑妗ｆ湡鑼冨洿鍐呫€?)
     }
   }
   return errors
@@ -3724,12 +3724,12 @@ function validateQuoteForm(form, conversation, currentUser, quotes, options = {}
 function getQuoteConfirmationErrorText(error) {
   const message = error?.message || ''
   if (message.includes('Quote has expired')) {
-    return '该报价已过期，请摄影师重新发起报价。'
+    return '璇ユ姤浠峰凡杩囨湡锛岃鎽勫奖甯堥噸鏂板彂璧锋姤浠枫€?
   }
   if (message.includes('Provider already has an active order in this shoot time range')) {
-    return '该摄影师在所选拍摄时间已有订单，请重新协商时间。'
+    return '璇ユ憚褰卞笀鍦ㄦ墍閫夋媿鎽勬椂闂村凡鏈夎鍗曪紝璇烽噸鏂板崗鍟嗘椂闂淬€?
   }
-  return message || '报价确认失败'
+  return message || '鎶ヤ环纭澶辫触'
 }
 
 function hasAtMostTwoDecimalPlaces(value) {
@@ -3754,43 +3754,43 @@ function getOrderAction(order, currentUser) {
   if (canCustomerPay(order, currentUser)) {
     return {
       kind: 'pay',
-      label: '模拟支付',
+      label: '妯℃嫙鏀粯',
       icon: <PaidRoundedIcon />,
       allowed: true,
-      successText: '模拟支付成功，资金已进入平台托管'
+      successText: '妯℃嫙鏀粯鎴愬姛锛岃祫閲戝凡杩涘叆骞冲彴鎵樼'
     }
   }
   if (order.status === 'PAID_PENDING_SHOOT') {
     return {
       kind: 'transition',
       targetStatus: 'SHOOTING',
-      label: '开始拍摄',
+      label: '寮€濮嬫媿鎽?,
       icon: <CheckCircleRoundedIcon />,
       allowed: isProvider,
-      reason: '服务方开始拍摄',
-      successText: '订单已进入拍摄中'
+      reason: '鏈嶅姟鏂瑰紑濮嬫媿鎽?,
+      successText: '璁㈠崟宸茶繘鍏ユ媿鎽勪腑'
     }
   }
   if (order.status === 'SHOOTING') {
     return {
       kind: 'transition',
       targetStatus: 'PENDING_DELIVERY',
-      label: '进入待交付',
+      label: '杩涘叆寰呬氦浠?,
       icon: <TaskAltRoundedIcon />,
       allowed: isProvider,
-      reason: '拍摄完成，进入待交付',
-      successText: '订单已进入待交付'
+      reason: '鎷嶆憚瀹屾垚锛岃繘鍏ュ緟浜や粯',
+      successText: '璁㈠崟宸茶繘鍏ュ緟浜や粯'
     }
   }
   if (canCustomerConfirm(order, currentUser)) {
     return {
       kind: 'transition',
       targetStatus: 'COMPLETED',
-      label: '确认完成',
+      label: '纭瀹屾垚',
       icon: <CheckCircleRoundedIcon />,
       allowed: true,
-      reason: '需求方确认完成',
-      successText: '订单已完成'
+      reason: '闇€姹傛柟纭瀹屾垚',
+      successText: '璁㈠崟宸插畬鎴?
     }
   }
   return null
@@ -3800,22 +3800,22 @@ function getCustomerCancelAction(order, currentUser) {
   if (!isOrderCustomer(order, currentUser)) return null
   if (order.status === 'PENDING_PAYMENT') {
     return {
-      label: '取消待支付订单',
-      title: '取消待支付订单',
-      description: '该订单尚未支付，取消后订单结束，不涉及退款。',
-      confirmText: '确定取消这个待支付订单吗？该操作不涉及退款。',
-      reason: '客户取消未支付订单',
-      successText: '待支付订单已取消'
+      label: '鍙栨秷寰呮敮浠樿鍗?,
+      title: '鍙栨秷寰呮敮浠樿鍗?,
+      description: '璇ヨ鍗曞皻鏈敮浠橈紝鍙栨秷鍚庤鍗曠粨鏉燂紝涓嶆秹鍙婇€€娆俱€?,
+      confirmText: '纭畾鍙栨秷杩欎釜寰呮敮浠樿鍗曞悧锛熻鎿嶄綔涓嶆秹鍙婇€€娆俱€?,
+      reason: '瀹㈡埛鍙栨秷鏈敮浠樿鍗?,
+      successText: '寰呮敮浠樿鍗曞凡鍙栨秷'
     }
   }
   if (order.status === 'PAID_PENDING_SHOOT' && isBeforeShootStart(order)) {
     return {
-      label: '取消并申请退款',
-      title: '拍摄前取消并退款',
-      description: '订单已支付且拍摄尚未开始，取消后平台托管资金将退回客户。',
-      confirmText: '确定取消订单并申请退款吗？平台托管资金将退回客户。',
-      reason: '客户拍摄前取消，申请退回托管款',
-      successText: '订单已取消，退款状态已更新'
+      label: '鍙栨秷骞剁敵璇烽€€娆?,
+      title: '鎷嶆憚鍓嶅彇娑堝苟閫€娆?,
+      description: '璁㈠崟宸叉敮浠樹笖鎷嶆憚灏氭湭寮€濮嬶紝鍙栨秷鍚庡钩鍙版墭绠¤祫閲戝皢閫€鍥炲鎴枫€?,
+      confirmText: '纭畾鍙栨秷璁㈠崟骞剁敵璇烽€€娆惧悧锛熷钩鍙版墭绠¤祫閲戝皢閫€鍥炲鎴枫€?,
+      reason: '瀹㈡埛鎷嶆憚鍓嶅彇娑堬紝鐢宠閫€鍥炴墭绠℃',
+      successText: '璁㈠崟宸插彇娑堬紝閫€娆剧姸鎬佸凡鏇存柊'
     }
   }
   return null
@@ -3914,7 +3914,7 @@ function normalizeComplaint(record) {
     orderId: Number(record.orderId),
     applicantId: Number(record.applicantId ?? record.complainantId),
     respondentId: Number(record.respondentId),
-    reason: record.reason || '评价争议',
+    reason: record.reason || '璇勪环浜夎',
     description: record.description || record.arbitrationComment || record.evidenceFileIds || '',
     status: record.status || 'PENDING',
     arbitrationResult: record.arbitrationResult,
@@ -4041,9 +4041,9 @@ function buildProfileStats(userId, reviews = [], orders = []) {
 }
 
 function directionLabel(direction) {
-  if (direction === 'CUSTOMER_TO_PROVIDER') return '需求方评价服务方'
-  if (direction === 'PROVIDER_TO_CUSTOMER') return '服务方评价需求方'
-  return '订单评价'
+  if (direction === 'CUSTOMER_TO_PROVIDER') return '闇€姹傛柟璇勪环鏈嶅姟鏂?
+  if (direction === 'PROVIDER_TO_CUSTOMER') return '鏈嶅姟鏂硅瘎浠烽渶姹傛柟'
+  return '璁㈠崟璇勪环'
 }
 
 async function complaintApiSafeList(reviewId, currentUser) {
@@ -4074,9 +4074,9 @@ function saveConversationRecord(conversation, meta = {}) {
     sourceType: conversation.sourceType || previous?.sourceType || 'DEMAND_RESPONSE',
     sourceId: conversation.sourceId ?? previous?.sourceId ?? meta.demandId,
     demandId: meta.demandId ?? previous?.demandId ?? conversation.sourceId,
-    scene: meta.scene || previous?.scene || `需求 ${meta.demandId || conversation.sourceId || ''}`,
+    scene: meta.scene || previous?.scene || `闇€姹?${meta.demandId || conversation.sourceId || ''}`,
     location: meta.location || previous?.location || '',
-    lastMessage: meta.lastMessage || previous?.lastMessage || '点击进入对话',
+    lastMessage: meta.lastMessage || previous?.lastMessage || '鐐瑰嚮杩涘叆瀵硅瘽',
     interfaceNote: meta.interfaceNote || previous?.interfaceNote || '',
     updatedAt: conversation.lastMessageTime || conversation.updatedAt || conversation.createdAt || now
   }
@@ -4105,9 +4105,9 @@ function mergeConversationRecords(remoteConversations, currentUser) {
     const previous = merged.get(conversationId)
     const record = saveConversationRecord(conversation, {
       demandId: previous?.demandId,
-      scene: previous?.scene || `会话 ${conversationId}`,
+      scene: previous?.scene || `浼氳瘽 ${conversationId}`,
       location: previous?.location || '',
-      lastMessage: previous?.lastMessage || (conversation.lastMessageTime ? '最近有新消息' : '点击进入对话')
+      lastMessage: previous?.lastMessage || (conversation.lastMessageTime ? '鏈€杩戞湁鏂版秷鎭? : '鐐瑰嚮杩涘叆瀵硅瘽')
     })
     merged.set(conversationId, record)
   })
@@ -4133,7 +4133,7 @@ function buildConversationFallback(conversationId) {
     participantBId: USERS.provider.userId,
     sourceType: isLocal ? 'DEMAND_CONTACT' : 'DEMAND_RESPONSE',
     sourceId: null,
-    scene: `会话 ${conversationId}`,
+    scene: `浼氳瘽 ${conversationId}`,
     lastMessage: ''
   }
 }
@@ -4219,8 +4219,8 @@ function getUserProfile(userId, role, moments = []) {
   const stored = profiles[String(id)] || {}
   const demoUser = Object.values(USERS).find(user => Number(user.userId) === id)
   const inferredRole = role || stored.role || demoUser?.role || moments.find(moment => Number(moment.authorId) === id)?.authorRole || 'CUSTOMER'
-  const nickname = stored.nickname || demoUser?.nickname || `${roleMap[inferredRole] || '用户'} ${id}`
-  const bio = stored.bio || stored.description || demoUser?.bio || demoUser?.description || '这个人还没有填写简介。'
+  const nickname = stored.nickname || demoUser?.nickname || `${roleMap[inferredRole] || '鐢ㄦ埛'} ${id}`
+  const bio = stored.bio || stored.description || demoUser?.bio || demoUser?.description || '杩欎釜浜鸿繕娌℃湁濉啓绠€浠嬨€?
   return {
     userId: id,
     role: inferredRole,
@@ -4228,7 +4228,7 @@ function getUserProfile(userId, role, moments = []) {
     avatarData: stored.avatarData || demoUser?.avatarData || '',
     bio,
     description: bio,
-    availability: stored.availability || demoUser?.availability || '暂未填写档期'
+    availability: stored.availability || demoUser?.availability || '鏆傛湭濉啓妗ｆ湡'
   }
 }
 
@@ -4254,7 +4254,7 @@ function buildPortfolioWorks(userId, moments, portfolioItems = readPortfolioItem
   const uploaded = portfolioItems.map(item => ({
     ...item,
     key: item.portfolioId,
-    title: item.title || '作品图片',
+    title: item.title || '浣滃搧鍥剧墖',
     imageData: item.imageData,
     createdAt: item.createdAt
   }))
@@ -4263,7 +4263,7 @@ function buildPortfolioWorks(userId, moments, portfolioItems = readPortfolioItem
     .map(moment => ({
       key: `moment-${moment.momentId}`,
       momentId: moment.momentId,
-      title: moment.title || '动态作品',
+      title: moment.title || '鍔ㄦ€佷綔鍝?,
       imageData: moment.imageData,
       createdAt: moment.createdAt
     }))
@@ -4278,7 +4278,7 @@ function openUserProfile(userId) {
 
 function parseMentions(text) {
   return String(text || '')
-    .split(/[,\n，\s]+/)
+    .split(/[,\n锛孿s]+/)
     .map(value => value.replace(/^@+/, '').trim())
     .filter(Boolean)
 }
@@ -4366,24 +4366,24 @@ function ProfileMetrics({ stats, compact = false }) {
       <Stack direction="row" spacing={0.7} alignItems="center">
         <StarRoundedIcon fontSize="small" color="warning" />
         <Typography fontWeight={800}>
-          {rating ? rating.toFixed(1) : '暂无评分'}
+          {rating ? rating.toFixed(1) : '鏆傛棤璇勫垎'}
         </Typography>
       </Stack>
       {rating ? (
         <Rating value={rating} precision={0.1} readOnly size="small" />
       ) : (
-        <Typography color="text.secondary" variant="body2">等待首条评价</Typography>
+        <Typography color="text.secondary" variant="body2">绛夊緟棣栨潯璇勪环</Typography>
       )}
       <Chip
         size="small"
         color={completionRate === null ? 'default' : completionRate >= 80 ? 'success' : 'warning'}
-        label={`完成率 ${completionRate === null ? '暂无' : `${completionRate}%`}`}
+        label={`瀹屾垚鐜?${completionRate === null ? '鏆傛棤' : `${completionRate}%`}`}
       />
     </Stack>
   )
 }
 
-function ReviewList({ reviews, emptyText = '暂无历史评价' }) {
+function ReviewList({ reviews, emptyText = '鏆傛棤鍘嗗彶璇勪环' }) {
   const navigate = useNavigate()
   const { currentUser } = useAuth()
 
@@ -4408,16 +4408,16 @@ function ReviewList({ reviews, emptyText = '暂无历史评价' }) {
         >
           <Stack spacing={0.8}>
             <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
-              <Typography fontWeight={800}>{directionLabel(review.direction)} · 订单 {review.orderId}</Typography>
+              <Typography fontWeight={800}>{directionLabel(review.direction)} 路 璁㈠崟 {review.orderId}</Typography>
               <Typography color="text.secondary" variant="body2">{formatTime(review.createdAt)}</Typography>
             </Stack>
             <Stack direction="row" spacing={1} alignItems="center">
               <Rating value={Number(review.rating || 0)} readOnly size="small" />
               <Typography fontWeight={800}>{Number(review.rating || 0).toFixed(1)}</Typography>
             </Stack>
-            <Typography>{review.content || '对方没有留下文字评价'}</Typography>
+            <Typography>{review.content || '瀵规柟娌℃湁鐣欎笅鏂囧瓧璇勪环'}</Typography>
             <Typography color="text.secondary" variant="body2">
-              评价人 {review.reviewerId} · 被评价人 {review.targetUserId}
+              璇勪环浜?{review.reviewerId} 路 琚瘎浠蜂汉 {review.targetUserId}
             </Typography>
           </Stack>
         </Paper>
@@ -4427,7 +4427,7 @@ function ReviewList({ reviews, emptyText = '暂无历史评价' }) {
 }
 
 function formatTime(value) {
-  if (!value) return '刚刚'
+  if (!value) return '鍒氬垰'
   return new Date(value).toLocaleString('zh-CN', { hour12: false })
 }
 
@@ -4442,146 +4442,146 @@ function getLatestDeliveryUploadTime(records) {
 function getOrderFulfillmentNotice(order, statusLogs, deliveryRecords, latestDeliveryUploadTime, estimatedAutoConfirmTime) {
   const status = order.status
   const baseRows = [
-    ['托管状态', escrowStatusMap[order.escrowStatus] || order.escrowStatus || '当前接口未返回'],
-    ['结算状态', settlementStatusMap[order.settlementStatus] || order.settlementStatus || '当前接口未返回']
+    ['鎵樼鐘舵€?, escrowStatusMap[order.escrowStatus] || order.escrowStatus || '褰撳墠鎺ュ彛鏈繑鍥?],
+    ['缁撶畻鐘舵€?, settlementStatusMap[order.settlementStatus] || order.settlementStatus || '褰撳墠鎺ュ彛鏈繑鍥?]
   ]
   const latestReworkLog = getLatestStatusLog(statusLogs, 'REWORK_REQUIRED')
   const latestCompletedLog = getLatestStatusLog(statusLogs, 'COMPLETED')
 
   if (status === 'PENDING_PAYMENT') {
     return {
-      title: '等待客户支付',
-      description: '客户支付后，资金进入平台托管，订单再进入待拍摄履约阶段。',
+      title: '绛夊緟瀹㈡埛鏀粯',
+      description: '瀹㈡埛鏀粯鍚庯紝璧勯噾杩涘叆骞冲彴鎵樼锛岃鍗曞啀杩涘叆寰呮媿鎽勫饱绾﹂樁娈点€?,
       color: 'warning',
       severity: 'info',
       rows: [
-        ['订单金额', centToYuan(order.amountCent)],
+        ['璁㈠崟閲戦', centToYuan(order.amountCent)],
         ...baseRows
       ],
-      note: '当前支付入口调用后端模拟支付接口；未支付前不应进入拍摄或交付。'
+      note: '褰撳墠鏀粯鍏ュ彛璋冪敤鍚庣妯℃嫙鏀粯鎺ュ彛锛涙湭鏀粯鍓嶄笉搴旇繘鍏ユ媿鎽勬垨浜や粯銆?
     }
   }
 
   if (status === 'PAID_PENDING_SHOOT') {
     return {
-      title: '已支付，等待拍摄',
-      description: '平台托管资金已建立，双方应按报价约定的拍摄时间履约。',
+      title: '宸叉敮浠橈紝绛夊緟鎷嶆憚',
+      description: '骞冲彴鎵樼璧勯噾宸插缓绔嬶紝鍙屾柟搴旀寜鎶ヤ环绾﹀畾鐨勬媿鎽勬椂闂村饱绾︺€?,
       color: 'info',
       severity: 'warning',
       rows: [
-        ['拍摄开始', formatTimeOrMissing(order.shootStartTime)],
-        ['拍摄结束', formatTimeOrMissing(order.shootEndTime)],
+        ['鎷嶆憚寮€濮?, formatTimeOrMissing(order.shootStartTime)],
+        ['鎷嶆憚缁撴潫', formatTimeOrMissing(order.shootEndTime)],
         ...baseRows
       ],
-      note: '当前状态推进由后端状态接口完成；按拍摄时间自动推进仍待后端定时任务或接口接入。'
+      note: '褰撳墠鐘舵€佹帹杩涚敱鍚庣鐘舵€佹帴鍙ｅ畬鎴愶紱鎸夋媿鎽勬椂闂磋嚜鍔ㄦ帹杩涗粛寰呭悗绔畾鏃朵换鍔℃垨鎺ュ彛鎺ュ叆銆?
     }
   }
 
   if (status === 'SHOOTING') {
     return {
-      title: '拍摄中',
-      description: '订单处于拍摄履约阶段，拍摄完成后才进入待交付。',
+      title: '鎷嶆憚涓?,
+      description: '璁㈠崟澶勪簬鎷嶆憚灞ョ害闃舵锛屾媿鎽勫畬鎴愬悗鎵嶈繘鍏ュ緟浜や粯銆?,
       color: 'info',
       severity: 'warning',
       rows: [
-        ['拍摄开始', formatTimeOrMissing(order.shootStartTime)],
-        ['拍摄结束', formatTimeOrMissing(order.shootEndTime)],
+        ['鎷嶆憚寮€濮?, formatTimeOrMissing(order.shootStartTime)],
+        ['鎷嶆憚缁撴潫', formatTimeOrMissing(order.shootEndTime)],
         ...baseRows
       ],
-      note: '当前状态推进由后端状态接口完成；按拍摄时间自动推进仍待后端定时任务或接口接入。'
+      note: '褰撳墠鐘舵€佹帹杩涚敱鍚庣鐘舵€佹帴鍙ｅ畬鎴愶紱鎸夋媿鎽勬椂闂磋嚜鍔ㄦ帹杩涗粛寰呭悗绔畾鏃朵换鍔℃垨鎺ュ彛鎺ュ叆銆?
     }
   }
 
   if (status === 'PENDING_DELIVERY') {
     return {
-      title: '等待服务方上传作品',
-      description: '摄影师需通过交付入口上传作品，上传成功后订单进入待客户确认。',
+      title: '绛夊緟鏈嶅姟鏂逛笂浼犱綔鍝?,
+      description: '鎽勫奖甯堥渶閫氳繃浜や粯鍏ュ彛涓婁紶浣滃搧锛屼笂浼犳垚鍔熷悗璁㈠崟杩涘叆寰呭鎴风‘璁ゃ€?,
       color: 'secondary',
       severity: 'info',
       rows: [
-        ['最晚交付时间', formatTimeOrMissing(order.deliveryDeadline)],
-        ['已有交付记录', `${deliveryRecords.length} 条`],
+        ['鏈€鏅氫氦浠樻椂闂?, formatTimeOrMissing(order.deliveryDeadline)],
+        ['宸叉湁浜や粯璁板綍', `${deliveryRecords.length} 鏉],
         ...baseRows
       ],
-      note: '超时未交付退款规则待后端接口确认/接入；前端本轮不会触发退款。'
+      note: '瓒呮椂鏈氦浠橀€€娆捐鍒欏緟鍚庣鎺ュ彛纭/鎺ュ叆锛涘墠绔湰杞笉浼氳Е鍙戦€€娆俱€?
     }
   }
 
   if (status === 'DELIVERED_PENDING_CONFIRM') {
     return {
-      title: '已交付，等待客户确认',
-      description: '客户需确认接收作品，或提交返修要求；未处理时由后端自动确认任务处理。',
+      title: '宸蹭氦浠橈紝绛夊緟瀹㈡埛纭',
+      description: '瀹㈡埛闇€纭鎺ユ敹浣滃搧锛屾垨鎻愪氦杩斾慨瑕佹眰锛涙湭澶勭悊鏃剁敱鍚庣鑷姩纭浠诲姟澶勭悊銆?,
       color: 'primary',
       severity: latestDeliveryUploadTime ? 'info' : 'warning',
       rows: [
-        ['最新交付时间', formatTimeOrMissing(latestDeliveryUploadTime)],
-        ['预计自动确认时间', estimatedAutoConfirmTime ? formatTime(estimatedAutoConfirmTime) : '当前接口未返回可靠交付时间'],
-        ['交付记录', `${deliveryRecords.length} 条`],
+        ['鏈€鏂颁氦浠樻椂闂?, formatTimeOrMissing(latestDeliveryUploadTime)],
+        ['棰勮鑷姩纭鏃堕棿', estimatedAutoConfirmTime ? formatTime(estimatedAutoConfirmTime) : '褰撳墠鎺ュ彛鏈繑鍥炲彲闈犱氦浠樻椂闂?],
+        ['浜や粯璁板綍', `${deliveryRecords.length} 鏉],
         ...baseRows
       ],
-      note: '摄影师已交付作品。客户需在交付后 7 天内确认接收或提交返修要求；若 7 天内未处理，系统将自动确认订单完成并释放托管资金。前端仅展示规则，不模拟自动确认。'
+      note: '鎽勫奖甯堝凡浜や粯浣滃搧銆傚鎴烽渶鍦ㄤ氦浠樺悗 7 澶╁唴纭鎺ユ敹鎴栨彁浜よ繑淇姹傦紱鑻?7 澶╁唴鏈鐞嗭紝绯荤粺灏嗚嚜鍔ㄧ‘璁よ鍗曞畬鎴愬苟閲婃斁鎵樼璧勯噾銆傚墠绔粎灞曠ず瑙勫垯锛屼笉妯℃嫙鑷姩纭銆?
     }
   }
 
   if (status === 'REWORK_REQUIRED') {
     return {
-      title: '返修中',
-      description: '客户已提交返修要求，等待服务方重新上传作品。',
+      title: '杩斾慨涓?,
+      description: '瀹㈡埛宸叉彁浜よ繑淇姹傦紝绛夊緟鏈嶅姟鏂归噸鏂颁笂浼犱綔鍝併€?,
       color: 'warning',
       severity: 'warning',
       rows: [
-        ['最近返修要求', latestReworkLog?.reason || latestReworkLog?.remark || '当前接口未返回'],
-        ['返修状态时间', formatTimeOrMissing(latestReworkLog?.createdAt)],
-        ['已有交付记录', `${deliveryRecords.length} 条`],
+        ['鏈€杩戣繑淇姹?, latestReworkLog?.reason || latestReworkLog?.remark || '褰撳墠鎺ュ彛鏈繑鍥?],
+        ['杩斾慨鐘舵€佹椂闂?, formatTimeOrMissing(latestReworkLog?.createdAt)],
+        ['宸叉湁浜や粯璁板綍', `${deliveryRecords.length} 鏉],
         ...baseRows
       ],
-      note: '服务方必须通过交付入口重新上传作品；页面不会提供绕过上传的返修完成按钮。'
+      note: '鏈嶅姟鏂瑰繀椤婚€氳繃浜や粯鍏ュ彛閲嶆柊涓婁紶浣滃搧锛涢〉闈笉浼氭彁渚涚粫杩囦笂浼犵殑杩斾慨瀹屾垚鎸夐挳銆?
     }
   }
 
   if (status === 'COMPLETED') {
     return {
-      title: '订单已完成',
-      description: '订单完成后，托管资金应释放给服务方，并进入结算完成状态。',
+      title: '璁㈠崟宸插畬鎴?,
+      description: '璁㈠崟瀹屾垚鍚庯紝鎵樼璧勯噾搴旈噴鏀剧粰鏈嶅姟鏂癸紝骞惰繘鍏ョ粨绠楀畬鎴愮姸鎬併€?,
       color: 'success',
       severity: 'success',
       rows: [
-        ['完成记录时间', formatTimeOrMissing(latestCompletedLog?.createdAt || order.completeTime)],
-        ['自动确认时间', formatTimeOrMissing(order.autoConfirmTime)],
+        ['瀹屾垚璁板綍鏃堕棿', formatTimeOrMissing(latestCompletedLog?.createdAt || order.completeTime)],
+        ['鑷姩纭鏃堕棿', formatTimeOrMissing(order.autoConfirmTime)],
         ...baseRows
       ],
-      note: '完成后的评价入口和照片授权入口在下方展示；若订单由 7 天规则自动确认，可通过状态日志查看系统完成记录。'
+      note: '瀹屾垚鍚庣殑璇勪环鍏ュ彛鍜岀収鐗囨巿鏉冨叆鍙ｅ湪涓嬫柟灞曠ず锛涜嫢璁㈠崟鐢?7 澶╄鍒欒嚜鍔ㄧ‘璁わ紝鍙€氳繃鐘舵€佹棩蹇楁煡鐪嬬郴缁熷畬鎴愯褰曘€?
     }
   }
 
   if (status === 'APPEALING') {
     return {
-      title: '订单申诉中',
-      description: '订单处于争议处理阶段，正常履约动作应暂停。',
+      title: '璁㈠崟鐢宠瘔涓?,
+      description: '璁㈠崟澶勪簬浜夎澶勭悊闃舵锛屾甯稿饱绾﹀姩浣滃簲鏆傚仠銆?,
       color: 'error',
       severity: 'warning',
       rows: baseRows,
-      note: '申诉/仲裁结果、退款或结算裁定仍待后端正式接口接入，本轮不假实现。'
+      note: '鐢宠瘔/浠茶缁撴灉銆侀€€娆炬垨缁撶畻瑁佸畾浠嶅緟鍚庣姝ｅ紡鎺ュ彛鎺ュ叆锛屾湰杞笉鍋囧疄鐜般€?
     }
   }
 
   if (status === 'REFUNDED' || status === 'CANCELLED') {
     return {
-      title: status === 'REFUNDED' ? '订单已退款' : '订单已取消',
-      description: '订单已结束，不再展示正常履约动作。',
+      title: status === 'REFUNDED' ? '璁㈠崟宸查€€娆? : '璁㈠崟宸插彇娑?,
+      description: '璁㈠崟宸茬粨鏉燂紝涓嶅啀灞曠ず姝ｅ父灞ョ害鍔ㄤ綔銆?,
       color: 'default',
       severity: 'info',
       rows: [
-        ['退款状态', order.refundStatus || '当前接口未返回'],
+        ['閫€娆剧姸鎬?, order.refundStatus || '褰撳墠鎺ュ彛鏈繑鍥?],
         ...baseRows
       ],
-      note: '退款/取消后的后续处理以状态日志和后端返回为准。'
+      note: '閫€娆?鍙栨秷鍚庣殑鍚庣画澶勭悊浠ョ姸鎬佹棩蹇楀拰鍚庣杩斿洖涓哄噯銆?
     }
   }
 
   return {
-    title: '订单履约状态',
-    description: '当前状态暂无专门提示。',
+    title: '璁㈠崟灞ョ害鐘舵€?,
+    description: '褰撳墠鐘舵€佹殏鏃犱笓闂ㄦ彁绀恒€?,
     color: 'default',
     severity: 'info',
     rows: baseRows,
@@ -4596,7 +4596,7 @@ function getLatestStatusLog(statusLogs, targetStatus) {
 }
 
 function formatTimeOrMissing(value) {
-  return value ? formatTime(value) : '当前接口未返回'
+  return value ? formatTime(value) : '褰撳墠鎺ュ彛鏈繑鍥?
 }
 
 function addDays(value, days) {
@@ -4617,7 +4617,8 @@ export {
   ProfilePage,
   PublicProfilePage,
   PublishPage,
-  RegisterPage11不要恢复原版，本来个人主页前端1
+    RegisterPage,
 }
 
 export default App
+
