@@ -4,7 +4,7 @@ export function FeedLoadingCard({ compact = false }) {
       <div className="feed-developing__copy">
         <span>PORTRA CONTACT SHEET</span>
         <strong>正在显影动态广场</strong>
-        <p>整理照片、作者与新鲜片段</p>
+        <p>整理照片、作者与最新片段</p>
       </div>
       <div className="feed-developing__film" aria-hidden="true">
         <div className="feed-developing__perforations feed-developing__perforations--top" />
