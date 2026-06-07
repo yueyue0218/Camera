@@ -20,11 +20,11 @@ spring:
       hibernate:
         format_sql: true
   mail:
-    host: ${SPRING_MAIL_HOST:smtp.gmail.com}
+    host: ${SPRING_MAIL_HOST:smtp.qq.com}
     port: ${SPRING_MAIL_PORT:587}
     default-encoding: UTF-8
-    username: ${SPRING_MAIL_USERNAME:}
-    password: ${SPRING_MAIL_PASSWORD:}
+    username: ${SPRING_MAIL_USERNAME:1245758621@qq.com}
+    password: ${SPRING_MAIL_PASSWORD:rdcszuvjubeejajb}
     properties:
       mail:
         smtp:
