@@ -16,6 +16,7 @@ import { ConversationWorkbenchPanel } from './components/ConversationWorkbenchPa
 import { ConversationActionDialogs } from './components/ConversationActionDialogs.jsx'
 import { QuoteDraftDialog } from './components/QuoteDraftDialog.jsx'
 import { MessageWorkbenchErrorBoundary } from './components/MessageWorkbenchErrorBoundary.jsx'
+import { useConversationRealtime } from './hooks/useConversationRealtime.js'
 import { OrderCompletionDialog, PortraActionLink, PortraStatusPill, PortraWorkbenchFrame, PortraWorkflowFrame } from '../../components/portra/index.js'
 import { PORTRA_LAYOUT } from '../../theme/portraSurfaceTokens.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from './MessageVisualTokens.js'
@@ -182,12 +183,17 @@ export function ConversationDetailPage() {
       setContent('')
       return
     }
+    const optimisticMessage = createOptimisticMessage(conversation, currentUser, text, 'TEXT')
+    setMessages(previous => [...previous, optimisticMessage])
+    setContent('')
+    updateConversationLastMessage(conversation.conversationId, text)
     const sent = await run(async () => conversationApi.sendMessage(conversation.backendConversationId || conversation.conversationId, text, currentUser, 'TEXT'))
     if (sent) {
-      updateConversationLastMessage(conversation.conversationId, text)
-      setContent('')
-      await loadConversationData()
+      await refreshConversationData(conversation, currentOrder?.orderId)
+      return
     }
+    setMessages(previous => previous.filter(message => message.messageId !== optimisticMessage.messageId))
+    setContent(text)
   }
 
   async function chooseMessageImage(event) {
@@ -527,6 +533,11 @@ export function ConversationDetailPage() {
     authorizations: photoAuthorizations,
   })
   const actions = viewModel.actions
+  useConversationRealtime({
+    enabled: Boolean(conversation && !conversation.isLocal && !actions.roleMismatch),
+    conversationId: conversation?.backendConversationId || conversation?.conversationId,
+    onRefresh: () => refreshConversationData(conversation, currentOrder?.orderId)
+  })
   useEffect(() => {
     if (conversation && actions.roleMismatch) {
       navigate('/messages', { replace: true, state: { roleMismatch: true } })
@@ -746,6 +757,19 @@ export function ConversationDetailPage() {
     </PortraWorkflowFrame>
     </MessageWorkbenchErrorBoundary>
   )
+}
+
+function createOptimisticMessage(conversation, currentUser, content, messageType) {
+  const conversationId = conversation?.backendConversationId || conversation?.conversationId
+  return {
+    messageId: `optimistic-${conversationId}-${Date.now()}`,
+    conversationId,
+    senderId: getCurrentUserId(currentUser),
+    messageType,
+    content,
+    createdAt: new Date().toISOString(),
+    optimistic: true
+  }
 }
 
 const noticeSx = {

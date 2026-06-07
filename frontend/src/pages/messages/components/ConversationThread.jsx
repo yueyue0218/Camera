@@ -47,6 +47,7 @@ export function ConversationThread({
   onOpenAction
 }) {
   const scrollRef = useRef(null)
+  const stickToBottomRef = useRef(true)
   const currentUserId = getCurrentUserId(currentUser)
   const counterparty = getCounterpartyProfile(conversation, currentUser)
   const safeTimeline = Array.isArray(timeline) ? timeline : []
@@ -68,8 +69,18 @@ export function ConversationThread({
   useEffect(() => {
     const node = scrollRef.current
     if (!node) return
-    node.scrollTop = node.scrollHeight
+    if (stickToBottomRef.current) node.scrollTop = node.scrollHeight
   }, [conversation?.conversationId, safeTimeline.length, safeTimeline[safeTimeline.length - 1]?.key])
+
+  useEffect(() => {
+    stickToBottomRef.current = true
+  }, [conversation?.conversationId])
+
+  const updateStickToBottom = () => {
+    const node = scrollRef.current
+    if (!node) return
+    stickToBottomRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 120
+  }
 
   return (
     <MessageWorkbenchErrorBoundary resetKey={`${conversation?.conversationId || 'none'}-${currentUser?.role || 'role'}`}>
@@ -93,6 +104,7 @@ export function ConversationThread({
       <Box
         data-message-scroll="true"
         ref={scrollRef}
+        onScroll={updateStickToBottom}
         sx={{
           flex: 1,
           minHeight: 0,
