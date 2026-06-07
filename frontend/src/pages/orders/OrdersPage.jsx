@@ -51,8 +51,6 @@ import {
 } from '../../utils/conversationNavigation.js'
 import { centToYuan } from '../../utils/index.js'
 import {
-  formatAuthorizationDescription,
-  formatAuthorizationTitle,
   formatDateOnly,
   formatDeliveryDescription,
   formatDeliveryTitle,
@@ -73,6 +71,7 @@ import {
   PortraTicketSection,
   PortraTimeline
 } from '../../components/portra/index.js'
+import { AuthorizationRequestCard } from '../../components/portra/AuthorizationRequestCard.jsx'
 import { PORTRA_LAYOUT, PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
 import {
   canCustomerConfirm,
@@ -81,8 +80,7 @@ import {
   canCustomerReviewPhotoAuthorization,
   canProviderRequestPhotoAuthorization,
   canProviderUploadDelivery,
-  canShowOrderNormalActions,
-  PHOTO_AUTHORIZATION_STATUS_LABELS
+  canShowOrderNormalActions
 } from './orderActions.js'
 import { EmptyOrderCard } from './components/EmptyOrderCard.jsx'
 import { InfoRows } from './components/InfoRows.jsx'
@@ -558,9 +556,13 @@ export function OrdersPage() {
     }
   }
 
-  async function handlePhotoAuthorizationDecision(authorization, decision) {
+  async function handlePhotoAuthorizationDecision(authorization, decision, decisionRemark = '') {
     if (!selectedOrder) return
-    const remark = (authorizationRemarks[authorization.id] || '').trim()
+    const remark = (decisionRemark || authorizationRemarks[authorization.id] || '').trim()
+    if (decision === 'reject' && !remark) {
+      setNotice({ type: 'warning', text: '请填写拒绝原因' })
+      return false
+    }
     const action = decision === 'approve' ? photoAuthorizationApi.approve : photoAuthorizationApi.reject
     const successText = decision === 'approve' ? '已同意展示授权' : '已拒绝展示授权'
     const result = await run(async () => action(authorization.id, { remark }, currentUser), successText)
@@ -568,6 +570,7 @@ export function OrdersPage() {
       setAuthorizationRemarks({ ...authorizationRemarks, [authorization.id]: '' })
       setPhotoAuthorizations(await photoAuthorizationApi.listByOrder(selectedOrder.orderId, currentUser))
     }
+    return Boolean(result)
   }
 
   async function submitReview(event) {
@@ -1049,85 +1052,17 @@ export function OrdersPage() {
 
                 <Stack spacing={1}>
                   <Typography variant="overline" sx={overlineSx}>授权申请记录</Typography>
-                  {photoAuthorizations.map((authorization, index) => {
-                    const canReviewAuthorization = canCustomerReviewPhotoAuthorization(selectedOrder, currentUser, authorization)
-                    const statusLabel = PHOTO_AUTHORIZATION_STATUS_LABELS[authorization.status] || '授权状态已更新'
-                    return (
-                      <Paper key={authorization.id} variant="outlined" sx={subCardSx}>
-                        <Stack spacing={1}>
-                          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
-                            <Box>
-                              <Typography fontWeight={800}>{formatAuthorizationTitle(authorization, index)}</Typography>
-                              <Typography sx={{ color: PORTRA_SURFACE.muted }} variant="body2">
-                                摄影师 · 客户
-                              </Typography>
-                            </Box>
-                            <Chip
-                              size="small"
-                              color={authorization.status === 'GRANTED' ? 'success' : authorization.status === 'REJECTED' ? 'default' : 'warning'}
-                              label={statusLabel}
-                            />
-                          </Stack>
-                          <Typography sx={{ color: PORTRA_SURFACE.muted }} variant="body2">
-                            {authorization.status === 'GRANTED'
-                              ? '可用于作品集'
-                              : authorization.status === 'REJECTED'
-                                ? '客户已拒绝'
-                                : '等待客户确认'}
-                            {authorization.authorizedAt ? ` · ${formatTime(authorization.authorizedAt)}` : ''}
-                          </Typography>
-                          <Typography>{formatAuthorizationDescription(authorization, '无备注')}</Typography>
-                          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                            {(authorization.files || []).map(file => (
-                              <Chip
-                                key={file.id || file.fileId}
-                                size="small"
-                                icon={<ImageRoundedIcon />}
-                                label={deliveryFileNameMap.get(Number(file.fileId)) || formatFileDisplayName(file, `作品文件 ${file.fileId}`)}
-                              />
-                            ))}
-                            {!(authorization.files || []).length && (
-                              <Typography sx={{ color: PORTRA_SURFACE.muted }} variant="body2">暂无授权文件信息</Typography>
-                            )}
-                          </Stack>
-
-                          {canReviewAuthorization && (
-                            <Stack spacing={1.2}>
-                              <TextField
-                                size="small"
-                                label="处理备注（可选）"
-                                value={authorizationRemarks[authorization.id] || ''}
-                                onChange={event => setAuthorizationRemarks({
-                                  ...authorizationRemarks,
-                                  [authorization.id]: event.target.value
-                                })}
-                              />
-                              <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                                <Button
-                                  variant="contained"
-                                  color="success"
-                                  startIcon={<CheckCircleRoundedIcon />}
-                                  onClick={() => handlePhotoAuthorizationDecision(authorization, 'approve')}
-                                  disabled={loading}
-                                >
-                                  同意展示
-                                </Button>
-                                <Button
-                                  variant="outlined"
-                                  color="inherit"
-                                  startIcon={<CloseRoundedIcon />}
-                                  onClick={() => handlePhotoAuthorizationDecision(authorization, 'reject')}
-                                  disabled={loading}
-                                >
-                                  拒绝展示
-                                </Button>
-                              </Stack>
-                            </Stack>
-                          )}
-                        </Stack>
-                      </Paper>
-                    )
-                  })}
+                  {photoAuthorizations.map(authorization => (
+                    <AuthorizationRequestCard
+                      key={authorization.id || authorization.authorizationId}
+                      authorization={authorization}
+                      order={selectedOrder}
+                      canReview={canCustomerReviewPhotoAuthorization(selectedOrder, currentUser, authorization)}
+                      loading={loading}
+                      onDecision={handlePhotoAuthorizationDecision}
+                      onOpenDelivery={openDeliveryBatch}
+                    />
+                  ))}
                   {!photoAuthorizations.length && <PortraEmptyState title="暂无照片授权申请" compact />}
                 </Stack>
               </Stack>

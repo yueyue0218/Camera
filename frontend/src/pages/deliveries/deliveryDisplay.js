@@ -29,12 +29,20 @@ export function buildDeliveryBatches(deliveries = [], order) {
     batch.latestUploadTime = pickLatestTime(batch.latestUploadTime, delivery.uploadTime || delivery.createdAt)
     batch.files.push(normalizeDeliveryFile(delivery, batch.files.length))
   })
-  return Array.from(groups.values()).map((batch, index) => ({
-    ...batch,
-    fileCount: batch.files.length,
-    subtitle: `第 ${batch.round || index + 1} 次上传 · 最近上传：${formatTime(batch.latestUploadTime)}`,
-    statusLabel: getDeliveryBatchStatusLabel(order)
-  }))
+  return Array.from(groups.values()).map((batch, index) => {
+    const round = batch.round || index + 1
+    const count = batch.files.length
+    const latest = formatTime(batch.latestUploadTime)
+    return {
+      ...batch,
+      round,
+      fileCount: count,
+      subtitle: `最近上传：${latest} · 共 ${count} 张`,
+      orderSubtitle: `第 ${round} 次上传 · 最近上传：${latest} · 共 ${count} 张`,
+      messageSubtitle: `最近上传：${latest} · 共 ${count} 张`,
+      statusLabel: getDeliveryBatchStatusLabel(order)
+    }
+  })
 }
 
 export function findDeliveryBatch(batches = [], deliveryId) {

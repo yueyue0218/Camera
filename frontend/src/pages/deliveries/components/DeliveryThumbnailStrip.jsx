@@ -20,7 +20,7 @@ export function DeliveryThumbnailStrip({ files = [], previewUrls = {}, variant =
       sx={{
         display: 'grid',
         gridTemplateColumns: visible.length === 1 ? '1fr' : 'repeat(2, 1fr)',
-        gridAutoRows: visible.length <= 1 ? '1fr' : compact ? 48 : 72,
+        gridAutoRows: visible.length <= 1 ? '1fr' : compact ? 66 : 84,
         gap: 0.6,
         height,
         minHeight: 0,
@@ -117,6 +117,6 @@ function ThumbnailPlaceholder({ label }) {
 }
 
 function getStripHeight(count, compact) {
-  if (count <= 1) return compact ? 86 : 126
-  return compact ? 108 : 148
+  if (count <= 1) return compact ? 132 : 162
+  return compact ? 136 : 176
 }

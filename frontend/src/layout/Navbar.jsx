@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { getMessageNavTarget } from '../utils/conversationNavigation.js'
 import NotificationsNoneRoundedIcon from '@mui/icons-material/NotificationsNoneRounded'
 import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded'
 import { notificationApi } from '../api/index.js'
 import { DND_KEY, PORTRA_STATE_EVENT } from '../pages/portra/PortraPages.jsx'
-import { getLastConversationPath } from '../utils/conversationNavigation.js'
 
 const navItems = [
   { label: '约拍大厅', path: '/hall', key: 'hall' },
@@ -88,7 +88,7 @@ export function Navbar({ activePath, currentUser, logout }) {
               key={item.key}
               className={`portra-nav-item ${activeKey === item.key ? 'active' : ''}`}
               type="button"
-              onClick={() => navigate(item.path === '/messages' ? getLastConversationPath() || '/messages' : item.path)}
+              onClick={() => navigate(item.path === '/messages' ? getMessageNavTarget(activePath) : item.path)}
             >
               {item.label}
             </button>

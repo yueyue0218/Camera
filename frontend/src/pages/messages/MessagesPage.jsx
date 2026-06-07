@@ -3,7 +3,7 @@ import { Alert, Box, Stack } from '@mui/material'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { conversationApi, orderApi } from '../../api.js'
-import { navigateToConversation } from '../../utils/conversationNavigation.js'
+import { navigateToConversation, setLastMessageSurface } from '../../utils/conversationNavigation.js'
 import { PortraPageFrame } from '../../components/portra/index.js'
 import { ConversationList } from './components/ConversationList.jsx'
 import { MessagesSectionHeader } from './components/MessagesSectionHeader.jsx'
@@ -33,6 +33,7 @@ export function MessagesPage() {
       navigate(`/messages/${value}`, { replace: true })
       return
     }
+    setLastMessageSurface('list')
     let mounted = true
     async function loadConversations() {
       setNotice(null)

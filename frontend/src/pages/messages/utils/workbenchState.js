@@ -385,11 +385,11 @@ export function buildConversationTimeline({
           actorRole: 'PROVIDER',
           actorId: authorization.providerUserId || order.providerUserId,
           visibleRole,
-          timestamp: authorization.authorizedAt || order.updatedAt,
+          timestamp: authorization.createdAt || authorization.requestedAt || authorization.authorizedAt || order.updatedAt,
           stageOrder: STAGE_ORDER.AUTHORIZATION,
-          title: '摄影师申请将部分作品用于展示',
+          title: '摄影师申请作品展示授权',
           summary: authorization.remark || '请确认是否同意展示所选作品。',
-          meta: { authorization },
+          meta: { authorization, order },
           actions: authorization.status === 'PENDING' && actions?.canReviewPhotoAuthorization
             ? ['APPROVE_AUTHORIZATION', 'REJECT_AUTHORIZATION']
             : []

@@ -6,6 +6,7 @@ import { MessageBubble } from './MessageBubble.jsx'
 import { MessageWorkbenchErrorBoundary } from './MessageWorkbenchErrorBoundary.jsx'
 import { getCounterpartyProfile } from '../utils/conversationUtils.js'
 import { getCurrentUserId } from '../utils/workbenchState.js'
+import { getMessageDirection } from '../utils/messageDirection.js'
 import { PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
 
 export function ConversationThread({
@@ -46,6 +47,7 @@ export function ConversationThread({
   onOpenAction
 }) {
   const scrollRef = useRef(null)
+  const stickToBottomRef = useRef(true)
   const currentUserId = getCurrentUserId(currentUser)
   const counterparty = getCounterpartyProfile(conversation, currentUser)
   const safeTimeline = Array.isArray(timeline) ? timeline : []
@@ -67,8 +69,18 @@ export function ConversationThread({
   useEffect(() => {
     const node = scrollRef.current
     if (!node) return
-    node.scrollTop = node.scrollHeight
+    if (stickToBottomRef.current) node.scrollTop = node.scrollHeight
   }, [conversation?.conversationId, safeTimeline.length, safeTimeline[safeTimeline.length - 1]?.key])
+
+  useEffect(() => {
+    stickToBottomRef.current = true
+  }, [conversation?.conversationId])
+
+  const updateStickToBottom = () => {
+    const node = scrollRef.current
+    if (!node) return
+    stickToBottomRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 120
+  }
 
   return (
     <MessageWorkbenchErrorBoundary resetKey={`${conversation?.conversationId || 'none'}-${currentUser?.role || 'role'}`}>
@@ -92,6 +104,7 @@ export function ConversationThread({
       <Box
         data-message-scroll="true"
         ref={scrollRef}
+        onScroll={updateStickToBottom}
         sx={{
           flex: 1,
           minHeight: 0,
@@ -104,12 +117,14 @@ export function ConversationThread({
       >
         <Stack spacing={1.55}>
           {safeTimeline.filter(Boolean).map(item => {
+            const direction = getMessageDirection(item, currentUser)
             if (item.type !== 'MESSAGE') {
               return (
                 <ConversationSystemItem
                   key={item.key}
                   event={item}
                   actor={resolveActorDisplay(item.actor)}
+                  direction={direction}
                   actions={actions}
                   loading={loading}
                   onStartQuoteEditing={onStartQuoteEditing}
@@ -129,7 +144,7 @@ export function ConversationThread({
             }
             const message = item.meta?.message
             if (!message) return null
-            const mine = Number(message.senderId) === currentUserId
+            const mine = direction === 'self'
             const isImage = message.messageType === 'IMAGE'
             const canSaveSubmittedPhoto = isImage && Number(message.senderId) === Number(conversation?.participantBId)
             return (

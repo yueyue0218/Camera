@@ -64,16 +64,16 @@ export function ConversationComposer({
     || actions.canViewDispute
   )
   return (
-    <Box sx={{ px: { xs: 1.15, md: 1.45 }, pt: 0.85, pb: 0.75, bgcolor: PORTRA_COLORS.paper, borderTop: `1px solid ${PORTRA_COLORS.borderMuted}`, boxShadow: '0 -1px 0 rgba(255, 255, 255, 0.62) inset' }}>
-      <Stack spacing={0.7}>
+    <Box sx={{ px: { xs: 1.1, md: 1.35 }, pt: 0.68, pb: 0.72, bgcolor: PORTRA_COLORS.paper, borderTop: `1px solid ${PORTRA_COLORS.borderMuted}`, boxShadow: '0 -1px 0 rgba(255, 255, 255, 0.62) inset' }}>
+      <Stack spacing={0.62}>
         {hasQuickActions && (
           <Stack
             direction={{ xs: 'column', md: 'row' }}
             spacing={0.75}
             sx={{
               alignItems: { xs: 'stretch', md: 'center' },
-              py: 0.48,
-              px: 0.85,
+              py: 0.28,
+              px: 0.55,
               bgcolor: 'transparent',
               borderRadius: PORTRA_RADII.control,
               border: 0,
@@ -88,7 +88,7 @@ export function ConversationComposer({
                 </Typography>
               )}
             </Stack>
-            <Stack direction="row" spacing={0.65} sx={{ flexWrap: 'wrap', rowGap: 0.65 }}>
+            <Stack direction="row" spacing={0.55} sx={{ flexWrap: 'wrap', rowGap: 0.55 }}>
               {actions.canSendQuote && canSeeQuoteEntry && (
                 <PortraSecondaryAction
                   startIcon={<LocalOfferRoundedIcon />}
@@ -160,7 +160,7 @@ export function ConversationComposer({
           </Stack>
         )}
 
-        <Stack direction="row" spacing={0.3} sx={{ alignItems: 'center', flexWrap: 'wrap', minHeight: 32 }}>
+        <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center', flexWrap: 'wrap', minHeight: 30 }}>
           <Typography variant="caption" sx={{ mr: 0.5, color: PORTRA_COLORS.faintInk, fontWeight: 750 }}>沟通工具</Typography>
           <MessageToolbarButton title="发送图片" component="label" disabled={loading || imageSending}>
             <ImageRoundedIcon fontSize="small" />
@@ -194,7 +194,7 @@ export function ConversationComposer({
             }}
             sx={{
               '& .MuiOutlinedInput-root': {
-                minHeight: 44,
+                minHeight: 42,
                 bgcolor: PORTRA_COLORS.page,
                 borderRadius: PORTRA_RADII.control,
                 '& fieldset': { borderColor: PORTRA_COLORS.border },
