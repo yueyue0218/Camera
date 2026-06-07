@@ -71,8 +71,10 @@ import {
   PortraStatusPill,
   PortraTicketCard,
   PortraTicketSection,
-  PortraTimeline
+  PortraTimeline,
+  usePortraFeedback
 } from '../../components/portra/index.js'
+import { usePortraAsyncAction } from '../../hooks/usePortraAsyncAction.js'
 import { AuthorizationRequestCard } from '../../components/portra/AuthorizationRequestCard.jsx'
 import { PORTRA_LAYOUT, PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
 import {
@@ -294,7 +296,12 @@ export function OrdersPage() {
   const [sentInvitations, setSentInvitations] = useState([])
   const [statusFilter, setStatusFilter] = useState('')
   const [notice, setNotice] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [pageLoading, setPageLoading] = useState(false)
+  const feedback = usePortraFeedback()
+  const { run: runWorkflowAction, loading: actionLoading } = usePortraAsyncAction({
+    errorMessage: error => error?.message || '操作失败，请稍后重试。'
+  })
+  const loading = pageLoading || actionLoading
 
   useEffect(() => {
     loadOrders(focusOrderId)
@@ -305,18 +312,14 @@ export function OrdersPage() {
   }, [previewUrl])
 
   async function run(action, successText) {
-    setLoading(true)
     setNotice(null)
-    try {
-      const result = await action()
-      if (successText) setNotice({ type: 'success', text: successText })
-      return result
-    } catch (error) {
-      setNotice({ type: 'error', text: error.message })
-      return null
-    } finally {
-      setLoading(false)
-    }
+    return runWorkflowAction(action, {
+      successMessage: successText,
+      onSuccess: () => {
+        if (successText) setNotice({ type: 'success', text: successText })
+      },
+      onError: (_error, message) => setNotice({ type: 'error', text: message })
+    })
   }
 
   async function loadOrders(focusOrderId = selectedOrder?.orderId) {
@@ -362,7 +365,7 @@ export function OrdersPage() {
       setNotice({ type: 'warning', text: '订单信息暂时不可用，请刷新后重试。' })
       return false
     }
-    setLoading(true)
+    setPageLoading(true)
     setNotice(null)
     try {
       let detail = fallbackOrder || null
@@ -422,7 +425,7 @@ export function OrdersPage() {
       setNotice({ type: 'error', text: error.message || '订单详情暂时无法打开，请刷新后重试。' })
       return false
     } finally {
-      setLoading(false)
+      setPageLoading(false)
     }
   }
 
@@ -524,23 +527,30 @@ export function OrdersPage() {
   async function downloadDeliveryFile(record) {
     if (!record?.fileId) {
       setNotice({ type: 'warning', text: '当前作品暂未提供下载链接。' })
+      feedback.warning('当前作品暂未提供下载链接。')
       return
     }
-    try {
+    const result = await run(async () => {
       const url = await fileApi.downloadObjectUrl(record.fileId, currentUser)
       const anchor = document.createElement('a')
       anchor.href = url
       anchor.download = formatFileDisplayName(record, `作品-${record.fileId}`)
       anchor.click()
       setTimeout(() => URL.revokeObjectURL(url), 1000)
-    } catch (error) {
-      setNotice({ type: 'error', text: error.message || '作品下载失败，请稍后重试。' })
-    }
+      return true
+    }, '下载已开始')
+    return Boolean(result)
   }
 
   async function cancelSelectedOrder(cancelAction) {
     if (!selectedOrder || !cancelAction) return
-    if (!window.confirm(cancelAction.confirmText)) return
+    const confirmed = await feedback.confirm({
+      title: cancelAction.title || '确认取消订单',
+      message: cancelAction.confirmText,
+      confirmText: cancelAction.label || '确认取消',
+      tone: 'danger'
+    })
+    if (!confirmed) return
     const result = await run(async () => orderApi.cancel(
       selectedOrder.orderId,
       { reason: cancelAction.reason },

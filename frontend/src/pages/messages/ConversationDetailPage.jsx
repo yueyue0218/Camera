@@ -17,7 +17,8 @@ import { ConversationActionDialogs } from './components/ConversationActionDialog
 import { QuoteDraftDialog } from './components/QuoteDraftDialog.jsx'
 import { MessageWorkbenchErrorBoundary } from './components/MessageWorkbenchErrorBoundary.jsx'
 import { useConversationRealtime } from './hooks/useConversationRealtime.js'
-import { OrderCompletionDialog, PortraActionLink, PortraStatusPill, PortraWorkbenchFrame, PortraWorkflowFrame } from '../../components/portra/index.js'
+import { OrderCompletionDialog, PortraActionLink, PortraStatusPill, PortraWorkbenchFrame, PortraWorkflowFrame, usePortraFeedback } from '../../components/portra/index.js'
+import { usePortraAsyncAction } from '../../hooks/usePortraAsyncAction.js'
 import { PORTRA_LAYOUT } from '../../theme/portraSurfaceTokens.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from './MessageVisualTokens.js'
 import {
@@ -76,12 +77,17 @@ export function ConversationDetailPage() {
   const [quoteValidationErrors, setQuoteValidationErrors] = useState([])
   const [quoteFieldErrors, setQuoteFieldErrors] = useState({})
   const [notice, setNotice] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [pageLoading, setPageLoading] = useState(false)
   const [activeAction, setActiveAction] = useState(null)
   const [activeQuote, setActiveQuote] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('WECHAT')
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
   const [peerProfile, setPeerProfile] = useState(null)
+  const feedback = usePortraFeedback()
+  const { run: runWorkflowAction, loading: actionLoading } = usePortraAsyncAction({
+    errorMessage: getCWorkbenchErrorText
+  })
+  const loading = pageLoading || actionLoading
 
   useEffect(() => {
     rememberLastConversation(conversationId, {
@@ -118,18 +124,14 @@ export function ConversationDetailPage() {
   }, [participantModel.peerUserId, participantModel.peerRole, currentUser.token])
 
   async function run(action, successText) {
-    setLoading(true)
     setNotice(null)
-    try {
-      const result = await action()
-      if (successText) setNotice({ type: 'success', text: successText })
-      return result
-    } catch (error) {
-      setNotice({ type: 'error', text: getCWorkbenchErrorText(error) })
-      return null
-    } finally {
-      setLoading(false)
-    }
+    return runWorkflowAction(action, {
+      successMessage: successText,
+      onSuccess: () => {
+        if (successText) setNotice({ type: 'success', text: successText })
+      },
+      onError: (_error, message) => setNotice({ type: 'error', text: message })
+    })
   }
 
   async function loadConversationData(record = conversation) {
@@ -318,16 +320,18 @@ export function ConversationDetailPage() {
       setNotice({ type: 'error', text: '报价详情暂时无法打开，请刷新后重试。' })
       return false
     }
-    setLoading(true)
+    setPageLoading(true)
     setNotice(null)
     try {
       const result = await quoteApi.confirm(quote.quotationId, '客户已确认本次报价', currentUser)
       setNotice({ type: 'success', text: '报价已确认，订单已生成' })
+      feedback.success('报价已确认，订单已生成')
       if (result?.orderId) {
         await refreshConversationData(conversation, result.orderId)
       } else {
         await refreshConversationData()
         setNotice({ type: 'error', text: '报价已确认，但暂时没有拿到订单信息，请刷新后再查看。' })
+        feedback.error('报价已确认，但暂时没有拿到订单信息，请刷新后再查看。')
       }
       return true
     } catch (error) {
@@ -336,10 +340,12 @@ export function ConversationDetailPage() {
       } catch {
         // Keep the original quote confirmation error visible.
       }
-      setNotice({ type: 'error', text: getQuoteConfirmationErrorText(error) })
+      const message = getQuoteConfirmationErrorText(error)
+      setNotice({ type: 'error', text: message })
+      feedback.error(message)
       return false
     } finally {
-      setLoading(false)
+      setPageLoading(false)
     }
   }
 
@@ -384,14 +390,25 @@ export function ConversationDetailPage() {
 
   async function cancelCurrentOrder(cancelAction) {
     if (!currentOrder || !cancelAction) return
-    if (!window.confirm(cancelAction.confirmText)) return
+    const confirmed = await feedback.confirm({
+      title: cancelAction.title || '确认取消订单',
+      message: cancelAction.confirmText,
+      confirmText: cancelAction.label || '确认取消',
+      tone: 'danger'
+    })
+    if (!confirmed) return
     const result = await run(async () => orderApi.cancel(currentOrder.orderId, { reason: cancelAction.reason }, currentUser), '订单状态已更新')
     if (result) await refreshConversationData(conversation, currentOrder.orderId)
   }
 
   async function confirmCurrentOrder() {
     if (!currentOrder) return
-    if (!window.confirm('确认接收后，订单将完成，平台担保资金会结算给摄影师。是否确认？')) return
+    const confirmed = await feedback.confirm({
+      title: '确认接收作品',
+      message: '确认接收后，订单将完成，平台担保资金会结算给摄影师。是否确认？',
+      confirmText: '确认接收'
+    })
+    if (!confirmed) return
     const result = await run(async () => orderApi.transition(currentOrder.orderId, 'COMPLETED', '客户确认接收作品', currentUser), '订单已完成')
     if (result) {
       await refreshConversationData(conversation, currentOrder.orderId)
@@ -478,6 +495,7 @@ export function ConversationDetailPage() {
       平台协助: '平台协助功能由仲裁模块处理，当前演示可在订单中查看争议状态。'
     }
     setNotice({ type: 'info', text: messages[name] || '该能力暂未接入。' })
+    feedback.info(messages[name] || '该能力暂未接入。')
   }
 
   function openUserProfile(userId, event) {
@@ -492,6 +510,7 @@ export function ConversationDetailPage() {
     })
     if (!succeeded) {
       setNotice({ type: 'warning', text: '订单信息暂时不可用，请稍后刷新后再查看。' })
+      feedback.warning('订单信息暂时不可用，请稍后刷新后再查看。')
       return false
     }
     return true
@@ -505,6 +524,7 @@ export function ConversationDetailPage() {
     })
     if (!succeeded) {
       setNotice({ type: 'warning', text: '作品记录暂不可查看，请刷新后重试。' })
+      feedback.warning('作品记录暂不可查看，请刷新后重试。')
     }
     return succeeded
   }
