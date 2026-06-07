@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react'
-import { Box, Paper, Stack, Typography } from '@mui/material'
+import { useEffect, useRef, useState } from 'react'
+import { Box, Button, Paper, Stack, Typography } from '@mui/material'
 import { ConversationComposer } from './ConversationComposer.jsx'
 import { ConversationSystemItem } from './ConversationSystemCard.jsx'
 import { MessageBubble } from './MessageBubble.jsx'
@@ -48,6 +48,9 @@ export function ConversationThread({
 }) {
   const scrollRef = useRef(null)
   const stickToBottomRef = useRef(true)
+  const lastTimelineKeyRef = useRef('')
+  const lastConversationIdRef = useRef('')
+  const [hasNewMessages, setHasNewMessages] = useState(false)
   const currentUserId = getCurrentUserId(currentUser)
   const counterparty = getCounterpartyProfile(conversation, currentUser)
   const safeTimeline = Array.isArray(timeline) ? timeline : []
@@ -66,11 +69,23 @@ export function ConversationThread({
     }
   }
 
+  const lastTimelineKey = safeTimeline[safeTimeline.length - 1]?.key || ''
+
   useEffect(() => {
     const node = scrollRef.current
     if (!node) return
-    if (stickToBottomRef.current) node.scrollTop = node.scrollHeight
-  }, [conversation?.conversationId, safeTimeline.length, safeTimeline[safeTimeline.length - 1]?.key])
+    const previousKey = lastTimelineKeyRef.current
+    const currentConversationKey = String(conversation?.conversationId || 'none')
+    const changedConversation = lastConversationIdRef.current !== currentConversationKey
+    if (stickToBottomRef.current || changedConversation) {
+      node.scrollTop = node.scrollHeight
+      setHasNewMessages(false)
+    } else if (lastTimelineKey && previousKey && lastTimelineKey !== previousKey) {
+      setHasNewMessages(true)
+    }
+    lastConversationIdRef.current = currentConversationKey
+    lastTimelineKeyRef.current = lastTimelineKey
+  }, [conversation?.conversationId, safeTimeline.length, lastTimelineKey])
 
   useEffect(() => {
     stickToBottomRef.current = true
@@ -80,6 +95,15 @@ export function ConversationThread({
     const node = scrollRef.current
     if (!node) return
     stickToBottomRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 120
+    if (stickToBottomRef.current) setHasNewMessages(false)
+  }
+
+  const scrollToLatest = () => {
+    const node = scrollRef.current
+    if (!node) return
+    node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' })
+    stickToBottomRef.current = true
+    setHasNewMessages(false)
   }
 
   return (
@@ -98,6 +122,7 @@ export function ConversationThread({
         borderRadius: PORTRA_RADII.panel,
         overflow: 'hidden',
         boxShadow: PORTRA_SHADOWS.subtle,
+        position: 'relative',
         backgroundImage: `linear-gradient(180deg, ${PORTRA_COLORS.paperSoft} 0%, ${PORTRA_COLORS.page} 100%)`
       }}
     >
@@ -167,6 +192,17 @@ export function ConversationThread({
         </Stack>
       </Box>
 
+      {hasNewMessages && (
+        <Button
+          size="small"
+          variant="contained"
+          onClick={scrollToLatest}
+          sx={newMessagesButtonSx}
+        >
+          有新消息
+        </Button>
+      )}
+
       <Box data-message-composer="true" sx={{ flexShrink: 0, bgcolor: PORTRA_COLORS.paper }}>
         <ConversationComposer
           content={content}
@@ -198,4 +234,19 @@ export function ConversationThread({
     </Paper>
     </MessageWorkbenchErrorBoundary>
   )
+}
+
+const newMessagesButtonSx = {
+  position: 'absolute',
+  left: '50%',
+  bottom: 92,
+  transform: 'translateX(-50%)',
+  zIndex: 3,
+  minHeight: 30,
+  px: 1.45,
+  borderRadius: 999,
+  bgcolor: PORTRA_COLORS.blue,
+  color: PORTRA_COLORS.paper,
+  boxShadow: '0 10px 22px rgba(13, 47, 178, 0.18)',
+  '&:hover': { bgcolor: PORTRA_COLORS.blueDark }
 }
