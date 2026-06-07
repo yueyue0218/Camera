@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { forwardRef, useMemo, useState } from 'react'
 import {
   Box,
   Button,
@@ -10,6 +10,7 @@ import {
   Divider,
   Stack,
   TextField,
+  Slide,
   Typography
 } from '@mui/material'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
@@ -131,7 +132,7 @@ export function AuthorizationRequestCard({
         </Stack>
       </Root>
 
-      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
+      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm" TransitionComponent={DialogTransition}>
         <DialogTitle sx={{ pb: 1 }}>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
             <Box>
@@ -203,14 +204,14 @@ export function AuthorizationRequestCard({
                   <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                     <PortraPrimaryAction
                       startIcon={<CheckCircleRoundedIcon />}
-                      disabled={loading}
+                      loading={loading}
                       onClick={() => submitDecision('approve')}
                     >
                       同意展示
                     </PortraPrimaryAction>
                     <PortraSecondaryAction
                       startIcon={<CloseRoundedIcon />}
-                      disabled={loading}
+                      loading={loading}
                       onClick={() => rejecting ? submitDecision('reject') : setRejecting(true)}
                     >
                       {rejecting ? '确认拒绝' : '拒绝授权'}
@@ -228,6 +229,10 @@ export function AuthorizationRequestCard({
     </>
   )
 }
+
+const DialogTransition = forwardRef(function DialogTransition(props, ref) {
+  return <Slide direction="up" ref={ref} timeout={180} {...props} />
+})
 
 function InfoLine({ label, value }) {
   if (!value) return null

@@ -899,6 +899,11 @@ export function OrdersPage() {
           <Stack spacing={2} sx={orderDetailWorkspaceSx}>
             <Paper variant="outlined" sx={orderArchiveHeroSx}>
               <Stack spacing={2}>
+                {loading && selectedOrder && (
+                  <Typography variant="caption" sx={{ alignSelf: 'flex-start', color: PORTRA_SURFACE.muted, fontWeight: 850 }}>
+                    正在更新订单信息
+                  </Typography>
+                )}
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between' }}>
                   <Box>
                     <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center', flexWrap: 'wrap', mb: 0.8 }}>

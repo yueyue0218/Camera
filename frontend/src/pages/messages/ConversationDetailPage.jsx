@@ -772,6 +772,7 @@ export function ConversationDetailPage() {
           deliveryRecords={deliveryRecords}
           photoAuthorizations={photoAuthorizations}
           panelSummary={viewModel.panelSummary}
+          loading={loading}
           onOpenOrderArchive={() => openOrderArchive(currentOrder?.orderId)}
           onConfirmOrder={confirmCurrentOrder}
           onUnavailableTool={showUnavailableTool}
