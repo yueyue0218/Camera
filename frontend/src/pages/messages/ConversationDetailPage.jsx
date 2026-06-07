@@ -25,11 +25,14 @@ import {
   addSavedPhoto,
   buildConversationFallback,
   findConversationRecord,
-  getConversationPeer,
   getLocalMessages,
   getOppositeUserId,
   updateConversationLastMessage
 } from './utils/conversationUtils.js'
+import {
+  loadConversationPeerProfile,
+  resolveConversationParticipants
+} from './utils/participantResolver.js'
 import {
   buildConversationWorkbenchViewModel,
   getCurrentUserId,
@@ -79,6 +82,7 @@ export function ConversationDetailPage() {
   const [activeQuote, setActiveQuote] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('WECHAT')
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
+  const [peerProfile, setPeerProfile] = useState(null)
 
   useEffect(() => {
     rememberLastConversation(conversationId, {
@@ -93,6 +97,26 @@ export function ConversationDetailPage() {
     setConversation(fallback)
     loadConversationData(fallback)
   }, [conversationId, getCurrentUserId(currentUser), currentUser.role])
+
+  const participantModel = resolveConversationParticipants(conversation, currentUser, peerProfile)
+
+  useEffect(() => {
+    let cancelled = false
+    let objectUrl = ''
+    setPeerProfile(null)
+    if (!participantModel.peerUserId) return undefined
+    loadConversationPeerProfile(participantModel.peerUserId, participantModel.peerRole, currentUser)
+      .then(profile => {
+        if (cancelled || !profile) return
+        objectUrl = profile.avatarObjectUrl || ''
+        setPeerProfile(profile)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [participantModel.peerUserId, participantModel.peerRole, currentUser.token])
 
   async function run(action, successText) {
     setLoading(true)
@@ -520,7 +544,7 @@ export function ConversationDetailPage() {
   }
 
   const currentUserId = getCurrentUserId(currentUser)
-  const counterparty = getConversationPeer(conversation, currentUser)
+  const counterparty = participantModel
   const viewModel = buildConversationWorkbenchViewModel({
     conversation,
     currentUser,
@@ -601,15 +625,18 @@ export function ConversationDetailPage() {
               </IconButton>
             </Tooltip>
             <Avatar
-              src={counterparty.avatarData || undefined}
+              src={counterparty.peerAvatarUrl || undefined}
               onClick={event => conversation && openUserProfile(getOppositeUserId(conversation, currentUserId), event)}
-              sx={{ width: 44, height: 44, bgcolor: PORTRA_COLORS.blue, color: PORTRA_COLORS.paper, cursor: conversation ? 'pointer' : 'default', fontWeight: 900, boxShadow: `0 0 0 3px ${PORTRA_COLORS.paperSoft}, 0 0 0 4px ${PORTRA_COLORS.border}` }}
+              sx={{ width: 44, height: 44, bgcolor: PORTRA_COLORS.blue, color: PORTRA_COLORS.paper, cursor: counterparty.peerProfilePath ? 'pointer' : 'default', fontWeight: 900, boxShadow: `0 0 0 3px ${PORTRA_COLORS.paperSoft}, 0 0 0 4px ${PORTRA_COLORS.border}` }}
             >
-              {getSafeDisplayText(counterparty.initial, '对').slice(0, 1)}
+              {getSafeDisplayText(counterparty.peerAvatarText, '对').slice(0, 1)}
             </Avatar>
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="h6" sx={{ color: PORTRA_COLORS.ink, fontSize: 17, fontWeight: 950 }} noWrap>
-                {getSafeDisplayText(counterparty.nickname, counterparty.userId ? `用户 ${counterparty.userId}` : '用户')}
+                {getSafeDisplayText(counterparty.peerDisplayName, counterparty.peerUserId ? `用户 ${counterparty.peerUserId}` : '用户')}
+              </Typography>
+              <Typography variant="caption" sx={{ color: PORTRA_COLORS.mutedInk, fontWeight: 850 }}>
+                {counterparty.peerRoleLabel}
               </Typography>
             </Box>
           </Stack>
@@ -638,6 +665,7 @@ export function ConversationDetailPage() {
             messages={messages}
             conversation={conversation}
             currentUser={currentUser}
+            participants={participantModel}
             quotes={quotes}
             order={currentOrder}
             actions={actions}

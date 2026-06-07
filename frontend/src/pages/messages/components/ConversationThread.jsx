@@ -4,15 +4,16 @@ import { ConversationComposer } from './ConversationComposer.jsx'
 import { ConversationSystemItem } from './ConversationSystemCard.jsx'
 import { MessageBubble } from './MessageBubble.jsx'
 import { MessageWorkbenchErrorBoundary } from './MessageWorkbenchErrorBoundary.jsx'
-import { getCounterpartyProfile } from '../utils/conversationUtils.js'
 import { getCurrentUserId } from '../utils/workbenchState.js'
 import { getMessageDirection } from '../utils/messageDirection.js'
+import { mergeActorDisplay } from '../utils/participantResolver.js'
 import { PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
 
 export function ConversationThread({
   messages,
   conversation,
   currentUser,
+  participants,
   quotes,
   order,
   actions,
@@ -52,21 +53,15 @@ export function ConversationThread({
   const lastConversationIdRef = useRef('')
   const [hasNewMessages, setHasNewMessages] = useState(false)
   const currentUserId = getCurrentUserId(currentUser)
-  const counterparty = getCounterpartyProfile(conversation, currentUser)
   const safeTimeline = Array.isArray(timeline) ? timeline : []
   const resolveActorDisplay = actor => {
     if (!actor) return null
     const actorUserId = Number(actor.userId)
-    const mine = actorUserId && actorUserId === currentUserId
-    const other = actorUserId && Number(counterparty.userId) === actorUserId
-    return {
-      ...actor,
-      avatarData: mine ? currentUser?.avatarData : other ? counterparty.avatarData : '',
-      avatarText: mine
-        ? String(currentUser?.nickname || '我').slice(0, 1)
-        : other ? counterparty.initial : actor.avatarText,
-      displayName: mine ? currentUser?.nickname || actor.displayName : other ? counterparty.nickname : actor.displayName
-    }
+    const merged = mergeActorDisplay(actor, participants)
+    if (merged) return merged
+    return actorUserId === currentUserId
+      ? { ...actor, avatarData: currentUser?.avatarData || '', avatarText: String(currentUser?.nickname || '我').slice(0, 1), displayName: currentUser?.nickname || actor.displayName }
+      : actor
   }
 
   const lastTimelineKey = safeTimeline[safeTimeline.length - 1]?.key || ''
