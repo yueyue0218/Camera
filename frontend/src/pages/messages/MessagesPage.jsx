@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Alert, Box, Stack } from '@mui/material'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, Box, Button, Stack } from '@mui/material'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { conversationApi, orderApi } from '../../api.js'
@@ -25,8 +25,20 @@ export function MessagesPage() {
   const location = useLocation()
   const navigate = useWorkflowNavigate()
   const { currentUser } = useAuth()
-  const [conversations, setConversations] = useState([])
+  const currentUserId = getCurrentUserId(currentUser)
+  const currentUserRole = currentUser?.role || ''
+  const currentUserToken = currentUser?.token || ''
+  const requestUser = useMemo(() => currentUser ? {
+    userId: currentUserId,
+    role: currentUserRole,
+    token: currentUserToken
+  } : null, [currentUserId, currentUserRole, currentUserToken])
+  const [conversations, setConversations] = useState(() => getConversationRecordsForUser(requestUser, currentUserRole))
   const [notice, setNotice] = useState(null)
+  const [retryVersion, setRetryVersion] = useState(0)
+  const lastKnownConversationsRef = useRef(conversations)
+  const loadingRef = useRef(false)
+  const requestVersionRef = useRef(0)
 
   useEffect(() => {
     const value = new URLSearchParams(location.search).get('conversationId')
@@ -35,44 +47,97 @@ export function MessagesPage() {
       return
     }
     setLastMessageSurface('list')
-    let mounted = true
-    async function loadConversations() {
-      setNotice(null)
-      try {
-        const [remoteConversations, remoteOrders] = await Promise.all([
-          conversationApi.list(currentUser),
-          orderApi.list({ role: currentUser.role === 'PROVIDER' ? 'provider' : 'customer' }, currentUser)
-        ])
-        if (mounted) {
-          const conversationsForRole = filterConversationsByActiveRole(
-            mergeConversationRecords(remoteConversations || [], currentUser, currentUser.role),
-            currentUser,
-            currentUser.role
-          )
-          const ordersForRole = filterOrdersByActiveRole(remoteOrders || [], currentUser, currentUser.role)
-          setConversations(conversationsForRole.map(conversation => ({
-            ...conversation,
-            activeOrder: selectConversationOrder(ordersForRole, conversation, [])
-          })))
-        }
-      } catch (error) {
-        if (!mounted) return
-        setNotice({ type: 'warning', text: `${getCWorkbenchErrorText(error, '暂时无法加载最新沟通。')} 已先显示本地沟通记录。` })
-        setConversations(getConversationRecordsForUser(currentUser, currentUser.role))
+  }, [location.search, navigate])
+
+  useEffect(() => {
+    const initialConversations = getConversationRecordsForUser(requestUser, currentUserRole)
+    lastKnownConversationsRef.current = initialConversations
+    setConversations(initialConversations)
+    setNotice(null)
+  }, [requestUser, currentUserRole])
+
+  const applyNotice = useCallback(nextNotice => {
+    setNotice(previous => {
+      if (!nextNotice) return previous ? null : previous
+      if (previous?.key === nextNotice.key && previous?.text === nextNotice.text) return previous
+      return nextNotice
+    })
+  }, [])
+
+  const loadConversations = useCallback(async () => {
+    if (!requestUser || !currentUserId || !currentUserRole || loadingRef.current) return
+    loadingRef.current = true
+    const requestVersion = requestVersionRef.current + 1
+    requestVersionRef.current = requestVersion
+    try {
+      const [conversationResult, orderResult] = await Promise.allSettled([
+        conversationApi.list(requestUser),
+        orderApi.list({ role: currentUserRole === 'PROVIDER' ? 'provider' : 'customer' }, requestUser)
+      ])
+
+      if (requestVersionRef.current !== requestVersion) return
+
+      if (conversationResult.status === 'fulfilled') {
+        const conversationsForRole = filterConversationsByActiveRole(
+          mergeConversationRecords(conversationResult.value || [], requestUser, currentUserRole),
+          requestUser,
+          currentUserRole
+        )
+        const ordersForRole = orderResult.status === 'fulfilled'
+          ? filterOrdersByActiveRole(orderResult.value || [], requestUser, currentUserRole)
+          : []
+        const nextConversations = conversationsForRole.map(conversation => ({
+          ...conversation,
+          activeOrder: selectConversationOrder(ordersForRole, conversation, [])
+        }))
+        lastKnownConversationsRef.current = nextConversations
+        setConversations(nextConversations)
+        applyNotice(orderResult.status === 'rejected'
+          ? buildMessageListNotice(orderResult.reason, 'orders')
+          : null)
+        return
       }
+
+      const fallbackConversations = lastKnownConversationsRef.current.length
+        ? lastKnownConversationsRef.current
+        : getConversationRecordsForUser(requestUser, currentUserRole)
+      lastKnownConversationsRef.current = fallbackConversations
+      setConversations(previous => previous.length ? previous : fallbackConversations)
+      applyNotice(buildMessageListNotice(conversationResult.reason, 'conversations'))
+    } finally {
+      loadingRef.current = false
     }
-    loadConversations()
+  }, [applyNotice, currentUserId, currentUserRole, requestUser])
+
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('conversationId')) return undefined
+    let mounted = true
+    loadConversations().catch(error => {
+      if (mounted) applyNotice(buildMessageListNotice(error, 'conversations'))
+    })
     return () => {
       mounted = false
     }
-  }, [getCurrentUserId(currentUser), currentUser.role, currentUser.token, location.search, navigate])
+  }, [applyNotice, loadConversations, location.search, retryVersion])
+
+  const handleRetry = useCallback(() => {
+    setRetryVersion(version => version + 1)
+  }, [])
 
   return (
     <PortraPageFrame component={Stack} spacing={2} maxWidth={1120} sx={{ color: PORTRA_COLORS.ink }}>
       <MessagesSectionHeader title="消息" subtitle="管理正在沟通的约拍、报价和作品进展" />
       <Box>
         {location.state?.roleMismatch && <Alert severity="info" sx={noticeSx}>这条沟通属于另一身份视角，请切换身份后查看。</Alert>}
-        {notice && <Alert severity={notice.type} sx={noticeSx}>{notice.text}</Alert>}
+        {notice && (
+          <Alert
+            severity={notice.type}
+            sx={noticeSx}
+            action={<Button color="inherit" size="small" onClick={handleRetry}>重试</Button>}
+          >
+            {notice.text}
+          </Alert>
+        )}
       </Box>
       <ConversationList
         conversations={conversations}
@@ -89,4 +154,44 @@ const noticeSx = {
   border: `1px solid ${PORTRA_COLORS.borderMuted}`,
   bgcolor: PORTRA_COLORS.paper,
   '& .MuiAlert-message': { py: 0.4 }
+}
+
+function buildMessageListNotice(error, scope) {
+  const status = Number(error?.status)
+  const code = Number(error?.code)
+  const message = error?.message || ''
+  const sourceLabel = scope === 'orders' ? '订单关联信息' : '消息列表'
+
+  if (error?.isNetworkError || message.includes('Failed to fetch') || message.includes('Network Error')) {
+    return {
+      key: `${scope}:network`,
+      type: 'warning',
+      text: `暂时无法连接服务器，已保留当前${sourceLabel}。`
+    }
+  }
+
+  if (status === 401 || status === 403 || code === 40101 || code === 40301) {
+    return {
+      key: `${scope}:auth:${status || code}`,
+      type: 'error',
+      text: '登录状态已失效或当前身份无权查看消息，请重新登录或切换正确身份后重试。'
+    }
+  }
+
+  if (code === 50001 || status >= 500) {
+    const isSchemaError = message.includes('Unknown column') || message.includes('Table') || message.includes('JDBC exception')
+    return {
+      key: `${scope}:${isSchemaError ? 'schema' : 'server'}`,
+      type: 'error',
+      text: isSchemaError
+        ? '服务器数据库结构与当前代码不一致，已保留当前消息列表。请先执行仓库里的数据库初始化或迁移脚本后重试。'
+        : `服务器暂时无法返回最新${sourceLabel}，已保留当前显示内容。`
+    }
+  }
+
+  return {
+    key: `${scope}:unknown:${status || code || 'unknown'}`,
+    type: 'warning',
+    text: `${getCWorkbenchErrorText(error, `暂时无法加载最新${sourceLabel}。`)} 已保留当前显示内容。`
+  }
 }

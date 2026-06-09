@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { flushSync } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 
@@ -5,14 +6,14 @@ export function useWorkflowNavigate() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  return (to, options = {}) => {
+  return useCallback((to, options = {}) => {
     const nextOptions = buildWorkflowNavigateOptions(options, location)
     if (typeof to === 'number') {
       runTransition(() => navigate(to), options)
       return
     }
     runTransition(() => navigate(to, nextOptions), options)
-  }
+  }, [location.pathname, location.search, navigate])
 }
 
 export function workflowNavigate(navigate, to, options = {}) {
