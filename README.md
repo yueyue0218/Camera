@@ -39,7 +39,8 @@ Portra 是一个连接摄影师与有拍摄需求用户的垂直服务平台。�
 | 测试 | JUnit 5 · Spring Boot Test · H2 内存库（398 项测试，全部通过） |
 | 覆盖率 | JaCoCo，行覆盖率 **80.21%**（要求 ≥ 60%） |
 | CI | GitHub Actions（lint → build → test → jacoco report） |
-| 部署 | Railway（在线）/ 本地 localhost |
+| CD | GitHub Actions 自动部署（push main 触发，SSH + scp 推送至阿里云） |
+| 部署 | 阿里云 ECS `http://47.250.86.6` / 本地 localhost |
 
 ---
 
@@ -76,6 +77,30 @@ npm install && npm run dev
 浏览器打开 `http://localhost:5173`，用任意邮箱注册即可（系统内置 QQ SMTP，验证码自动发送，无需额外配置）。
 
 完整演示流程（账号注册、双角色切换、完整订单链路）见 → [`docs/P4/DEMO_GUIDE.md`](docs/P4/DEMO_GUIDE.md)
+
+---
+
+## 线上访问
+
+**线上地址**：[http://47.250.86.6](http://47.250.86.6)（阿里云 ECS）
+
+> 首次部署已通过 CI/CD 自动完成。push 到 `main` 分支后，GitHub Actions 将自动运行 CI（lint → build → test → jacoco），CI 通过后触发 Deploy 工作流，将前端 dist 和后端 JAR 通过 SSH 推送至服务器并重启服务。
+
+---
+
+## CI/CD 配置说明
+
+自动部署依赖以下三个 GitHub Secrets（仓库 → Settings → Secrets → Actions）：
+
+| Secret | 说明 |
+|---|---|
+| `DEPLOY_HOST` | 服务器 IP，当前为 `47.250.86.6` |
+| `DEPLOY_USER` | SSH 登录用户名（如 `root`） |
+| `DEPLOY_KEY` | SSH 私钥（PEM 格式，对应服务器 `~/.ssh/authorized_keys`） |
+
+工作流文件：
+- `.github/workflows/ci.yml`：CI 流水线（lint + build + test + jacoco）
+- `.github/workflows/deploy.yml`：CD 部署（CI 成功后自动触发）
 
 ---
 
