@@ -74,7 +74,7 @@ cd frontend
 npm install && npm run dev
 ```
 
-浏览器打开 `http://localhost:5173`，用任意邮箱注册即可（系统内置 QQ SMTP，验证码自动发送，无需额外配置）。
+浏览器打开 `http://localhost:5173`，用**学校邮箱**注册（系统内置 QQ SMTP 发送验证码）。完整演示需要两个学校邮箱账号，分别扮演客户和摄影师角色。
 
 完整演示流程（账号注册、双角色切换、完整订单链路）见 → [`docs/P4/DEMO_GUIDE.md`](docs/P4/DEMO_GUIDE.md)
 
