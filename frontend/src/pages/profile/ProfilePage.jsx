@@ -199,7 +199,7 @@ export function ProfilePage() {
       reviewApi.listByUser(currentUser.userId, currentUser),
       creditApi.summary(currentUser.userId, currentUser),
       orderApi.list({ role: isProvider ? 'provider' : 'customer' }, currentUser),
-      userApi.followers(currentUser.userId, currentUser)
+      userApi.followers(currentUser.userId, currentUser, currentUser.role)
     ])
     if (myProfileRes.status === 'fulfilled' && myProfileRes.value) {
       const role = myProfileRes.value.currentRole || myProfileRes.value.role || currentUser.role
@@ -264,7 +264,7 @@ export function ProfilePage() {
           if (!avatarData && brief?.avatarFileId) {
             try { avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser) } catch { /**/ }
           }
-          return { ...f, nickname: f.nickname || brief?.nickname, bio: f.bio || brief?.bio || brief?.description || '', avatarData }
+          return { ...f, nickname: f.nickname || brief?.nickname, bio: f.bio || brief?.bio || brief?.description || '', avatarData, role: f.role || brief?.currentRole || brief?.role }
         } catch { return f }
       }))
       setMyFollowers(enrichedFollowers)
