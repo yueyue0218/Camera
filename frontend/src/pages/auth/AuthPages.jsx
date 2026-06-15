@@ -423,22 +423,6 @@ export function LoginChoicePage() {
             <div className="op-wordmark-sub">Meet Right Now</div>
           </a>
 
-          <nav className="op-nav">
-            {[
-              { label: '大厅', id: 'op-page1' },
-              { label: '动态', id: 'op-page2' },
-              { label: '消息', id: 'op-page3' },
-              { label: '个人', id: 'op-about' },
-            ].map(({ label, id }) => (
-              <a
-                key={label}
-                className={`op-nav-item${activeSection === id ? ' active' : ''}`}
-                href={`#${id}`}
-                onClick={event => { event.preventDefault(); setActiveSection(id); scrollToId(id) }}
-              >{label}</a>
-            ))}
-          </nav>
-
           <div className="op-header-actions">
             <button type="button" className="op-avatar" title="登录" onClick={() => navigate('/login/sign-in')} />
           </div>
