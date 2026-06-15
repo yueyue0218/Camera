@@ -19,6 +19,8 @@ function formatUpdatedTime(value) {
 }
 
 function formatScore(value) {
+  if (value === null || value === undefined) return '暂无'
+  if (typeof value === 'string' && value.trim() === '') return '暂无'
   const numeric = Number(value)
   return Number.isFinite(numeric) ? numeric.toFixed(1) : '暂无'
 }
@@ -147,6 +149,10 @@ export function CreditDetailPage() {
   const displayScore = hasRecords ? score : '暂无'
   const displayLevel = hasRecords ? level : '新用户'
   const displayRecordCount = hasRecords ? recordCount : '暂无'
+  const overviewEffectiveOrders = hasRecords ? effectiveOrders : '--'
+  const overviewGoodReviewRate = hasRecords ? goodReviewRate : '--'
+  const overviewFulfillmentRate = hasRecords ? fulfillmentRate : '--'
+  const overviewRiskRecords = hasRecords ? riskRecords : '--'
 
   return (
     <div className="pp-main credit-detail-page">
@@ -203,13 +209,13 @@ export function CreditDetailPage() {
         <div className="hero-side">
           <div>
             <div className="id-label">信用概览</div>
-            <div className="id-number">{score}</div>
+            <div className="id-number">{displayScore}</div>
           </div>
           <div className="metric-grid">
-            <div className="metric"><b>{effectiveOrders}</b><span>有效订单</span></div>
-            <div className="metric"><b>{goodReviewRate}</b><span>好评率</span></div>
-            <div className="metric"><b>{fulfillmentRate}</b><span>履约率</span></div>
-            <div className="metric"><b>{riskRecords}</b><span>风险记录</span></div>
+            <div className="metric"><b>{overviewEffectiveOrders}</b><span>有效订单</span></div>
+            <div className="metric"><b>{overviewGoodReviewRate}</b><span>好评率</span></div>
+            <div className="metric"><b>{overviewFulfillmentRate}</b><span>履约率</span></div>
+            <div className="metric"><b>{overviewRiskRecords}</b><span>风险记录</span></div>
           </div>
         </div>
       </section>

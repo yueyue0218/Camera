@@ -14,6 +14,8 @@ import {
 import './profile.css'
 
 function formatCreditScore(value) {
+  if (value === null || value === undefined) return '暂无'
+  if (typeof value === 'string' && value.trim() === '') return '暂无'
   const numeric = Number(value)
   return Number.isFinite(numeric) ? numeric.toFixed(1) : '暂无'
 }
@@ -177,6 +179,7 @@ export function PublicProfilePage() {
   const genderText = gender === 'MALE' ? '男' : gender === 'FEMALE' ? '女' : '保密'
   const bio = publicProfile?.bio || storedProfile.bio || ''
   const creditScore = creditSummary?.creditScore ?? null
+  const displayCreditScore = formatCreditScore(creditScore)
   const cityPin = pp?.cityCode || publicProfile?.school || publicProfile?.cityCode || storedProfile.school || 'Portra'
   const cityMeta = pp?.cityCode || publicProfile?.cityCode || '未知城市'
 
@@ -193,6 +196,19 @@ export function PublicProfilePage() {
     r.direction === 'PROVIDER_TO_CUSTOMER' ||
     (!r.direction && !isProvider && Number(r.targetUserId) === profileUserId)
   )
+
+  function openReviewCard(review) {
+    const reviewId = review?.reviewId
+    if (reviewId != null && !String(reviewId).startsWith('local')) {
+      navigate(`/reviews/${reviewId}`)
+      return
+    }
+    if (review?.orderId) {
+      navigate(`/orders?orderId=${review.orderId}`)
+      return
+    }
+    navigate(`/users/${profileUserId}/reviews`)
+  }
 
   const styleTags = (() => {
     const raw = pp?.styleTags
@@ -221,7 +237,7 @@ export function PublicProfilePage() {
         <span>
           {isProvider
             ? `FRAME ${pp?.completedOrders ?? 0} · ${pp?.cityCode || 'Portra'}`
-            : `${creditScore != null ? `CREDIT ${formatCreditScore(creditScore)}` : '暂无信用'} · Portra`}
+            : `CREDIT ${displayCreditScore} · Portra`}
         </span>
       </div>
 
@@ -266,7 +282,7 @@ export function PublicProfilePage() {
             </div>
           ) : (
             <div className="metric-grid">
-              <button className="metric metric-button" type="button" onClick={() => navigate(`/users/${profileUserId}/credit`)}><b>{formatCreditScore(creditScore)}</b><span>信用评分</span></button>
+              <button className="metric metric-button" type="button" onClick={() => navigate(`/users/${profileUserId}/credit`)}><b>{displayCreditScore}</b><span>信用评分</span></button>
               <div className="metric"><b>{publicProfile?.followerCount ?? '—'}</b><span>粉丝</span></div>
               <div className="metric"><b>{publicProfile?.followingCount ?? '—'}</b><span>关注</span></div>
               <div className="metric"><b>{publicProfile?.momentCount ?? moments.length}</b><span>动态数</span></div>
@@ -356,7 +372,20 @@ export function PublicProfilePage() {
                   <div className="section-mark">02</div>
                 </div>
                 {providerReviews.length ? providerReviews.slice(0, 4).map(r => (
-                  <div key={r.reviewId || `${r.orderId}-${r.direction}`} className="review-card">
+                  <div
+                    key={r.reviewId || `${r.orderId}-${r.direction}`}
+                    className="review-card"
+                    role="button"
+                    tabIndex={0}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => openReviewCard(r)}
+                    onKeyDown={event => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        openReviewCard(r)
+                      }
+                    }}
+                  >
                     <blockquote>"{r.content || '对方没有留下文字评价'}"</blockquote>
                     <footer>
                       来自 {r.reviewerNickname || `用户 ${r.reviewerId}`} · ★{Number(r.rating || 0).toFixed(1)} · {formatShortTime(r.createdAt)}
@@ -467,7 +496,20 @@ export function PublicProfilePage() {
               <div className="section-mark">02</div>
             </div>
             {customerReviews.length ? customerReviews.slice(0, 4).map(r => (
-              <div key={r.reviewId || `${r.orderId}-${r.direction}`} className="review-card">
+              <div
+                key={r.reviewId || `${r.orderId}-${r.direction}`}
+                className="review-card"
+                role="button"
+                tabIndex={0}
+                style={{ cursor: 'pointer' }}
+                onClick={() => openReviewCard(r)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    openReviewCard(r)
+                  }
+                }}
+              >
                 <blockquote>"{r.content || '对方没有留下文字评价'}"</blockquote>
                 <footer>
                   来自 {r.reviewerNickname || `用户 ${r.reviewerId}`} · ★{Number(r.rating || 0).toFixed(1)} · {formatShortTime(r.createdAt)}

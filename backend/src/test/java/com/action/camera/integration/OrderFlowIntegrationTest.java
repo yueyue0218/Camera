@@ -65,7 +65,7 @@ class OrderFlowIntegrationTest {
 
     @BeforeEach
     void seedDemoUsers() {
-        jdbc.execute("DELETE FROM users WHERE id IN (1001, 2001)");
+        jdbc.execute("DELETE FROM users WHERE id IN (1001, 2001, 9999)");
         jdbc.execute("INSERT INTO users (id, nickname, current_role, status, credit_score, created_at, updated_at) " +
                 "VALUES (1001, '需求方', 'CUSTOMER', 'ACTIVE', 80.00, NOW(), NOW())");
         jdbc.execute("INSERT INTO users (id, nickname, current_role, status, credit_score, created_at, updated_at) " +
@@ -331,6 +331,10 @@ class OrderFlowIntegrationTest {
     }
 
     private HttpEntity<String> userEntity(String userId, String body) {
+        if ("9999".equals(userId)) {
+            jdbc.execute("MERGE INTO users (id, nickname, current_role, status, credit_score, created_at, updated_at) KEY(id) " +
+                    "VALUES (9999, 'Stranger', 'CUSTOMER', 'ACTIVE', 80.00, NOW(), NOW())");
+        }
         HttpHeaders h = new HttpHeaders();
         h.set("X-User-Id", userId);
         h.setContentType(MediaType.APPLICATION_JSON);

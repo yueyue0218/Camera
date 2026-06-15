@@ -16,6 +16,15 @@ import './profile.css'
 
 const MONTH_ABBR = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
 
+function calcAge(birthday) {
+  if (!birthday) return null
+  const [year, month, day] = birthday.split('-').map(Number)
+  const today = new Date()
+  let age = today.getFullYear() - year
+  if (today.getMonth() + 1 < month || (today.getMonth() + 1 === month && today.getDate() < day)) age--
+  return age > 0 ? age : null
+}
+
 function imageFileToDataUrl(file) {
   return new Promise((resolve, reject) => {
     const img = new Image()
@@ -44,6 +53,8 @@ function orderStatusLabel(status) {
 }
 
 function formatCreditScore(value) {
+  if (value === null || value === undefined) return '暂无'
+  if (typeof value === 'string' && value.trim() === '') return '暂无'
   const numeric = Number(value)
   return Number.isFinite(numeric) ? numeric.toFixed(1) : '暂无'
 }
@@ -57,7 +68,12 @@ export function ProfilePage() {
     nickname: currentUser.nickname || currentUser.label || '',
     avatarData: currentUser.avatarData || '',
     bio: currentUser.bio || currentUser.description || '',
-    availability: currentUser.availability || ''
+    gender: currentUser.gender || '',
+    genderVisible: currentUser.genderVisible ?? true,
+    birthday: currentUser.birthday || '',
+    birthdayVisible: currentUser.birthdayVisible ?? true,
+    locationDisplay: currentUser.locationDisplay || '',
+    locationVisible: currentUser.locationVisible ?? false,
   })
   const [avatarFile, setAvatarFile] = useState(null)
   const [activeTab, setActiveTab] = useState('photos')
@@ -92,9 +108,16 @@ export function ProfilePage() {
       nickname: currentUser.nickname || currentUser.label || '',
       avatarData: currentUser.avatarData || '',
       bio: currentUser.bio || currentUser.description || '',
-      availability: currentUser.availability || ''
+      gender: currentUser.gender || '',
+      genderVisible: currentUser.genderVisible ?? true,
+      birthday: currentUser.birthday || '',
+      birthdayVisible: currentUser.birthdayVisible ?? true,
+      locationDisplay: currentUser.locationDisplay || '',
+      locationVisible: currentUser.locationVisible ?? false,
     })
-  }, [currentUser.userId, currentUser.nickname, currentUser.avatarData, currentUser.bio])
+  }, [currentUser.userId, currentUser.nickname, currentUser.avatarData, currentUser.bio,
+      currentUser.gender, currentUser.birthday, currentUser.genderVisible,
+      currentUser.birthdayVisible, currentUser.locationDisplay, currentUser.locationVisible])
 
   // syncBackCardHeight
   const syncHeight = () => {
@@ -130,6 +153,35 @@ export function ProfilePage() {
   }, [activeTab, moments, profileOrders, receivedReviews])
 
   useEffect(() => { loadProfileData() }, [currentUser.userId, currentUser.role])
+
+  useEffect(() => {
+    async function detectIpLocation() {
+      try {
+        const amapKey = import.meta.env.VITE_AMAP_KEY
+        let location = ''
+        if (amapKey) {
+          const res = await fetch(`https://restapi.amap.com/v3/ip?key=${amapKey}&output=json`)
+          const data = await res.json()
+          if (data.status === '1') {
+            const province = typeof data.province === 'string'
+              ? data.province.replace(/(省|市|自治区|特别行政区)$/, '').trim() : ''
+            if (province) location = province
+          }
+        }
+        if (!location) {
+          const res = await fetch('http://ip-api.com/json/?lang=zh-CN&fields=status,regionName')
+          const data = await res.json()
+          if (data.status === 'success' && data.regionName) {
+            location = data.regionName.replace(/(省|市|自治区|特别行政区)$/, '').trim()
+          }
+        }
+        if (!location || location === currentUser.cityCode) return
+        updateProfile({ cityCode: location })
+        await userApi.updateMe({ cityCode: location }, currentUser)
+      } catch { /* ignore */ }
+    }
+    detectIpLocation()
+  }, [currentUser.userId])
 
   async function loadProfileData() {
     const [myProfileRes, momRes, revRes, credRes, ordRes, followersRes] = await Promise.allSettled([
@@ -169,7 +221,13 @@ export function ProfilePage() {
         customerNickname: myProfileRes.value.customerNickname ?? (role === 'CUSTOMER' ? nickname : currentUser.customerNickname),
         customerBio: myProfileRes.value.customerBio ?? (role === 'CUSTOMER' ? bio : currentUser.customerBio),
         providerNickname: myProfileRes.value.providerNickname ?? (role === 'PROVIDER' ? nickname : currentUser.providerNickname),
-        providerBio: myProfileRes.value.providerBio ?? (role === 'PROVIDER' ? bio : currentUser.providerBio)
+        providerBio: myProfileRes.value.providerBio ?? (role === 'PROVIDER' ? bio : currentUser.providerBio),
+        gender: myProfileRes.value.gender ?? currentUser.gender ?? '',
+        genderVisible: myProfileRes.value.genderVisible ?? currentUser.genderVisible ?? true,
+        birthday: myProfileRes.value.birthday ?? currentUser.birthday ?? '',
+        birthdayVisible: myProfileRes.value.birthdayVisible ?? currentUser.birthdayVisible ?? true,
+        locationDisplay: myProfileRes.value.locationDisplay ?? currentUser.locationDisplay ?? '',
+        locationVisible: myProfileRes.value.locationVisible ?? currentUser.locationVisible ?? false,
       })
     }
     setMoments(momRes.status === 'fulfilled' ? momRes.value : [])
@@ -219,8 +277,13 @@ export function ProfilePage() {
       avatarData: profileForm.avatarData,
       bio: profileForm.bio.trim(),
       description: profileForm.bio.trim(),
-      availability: profileForm.availability.trim(),
-      role: currentUser.role
+      role: currentUser.role,
+      gender: profileForm.gender,
+      genderVisible: profileForm.genderVisible,
+      birthday: profileForm.birthday,
+      birthdayVisible: profileForm.birthdayVisible,
+      locationDisplay: profileForm.locationDisplay.trim(),
+      locationVisible: profileForm.locationVisible,
     }
     let avatarFileId = currentUser.avatarFileId || null
     try {
@@ -231,7 +294,18 @@ export function ProfilePage() {
         }
         avatarFileId = uploaded.fileId
       }
-      await userApi.updateMe({ nickname: next.nickname, bio: next.bio, role: currentUser.role, avatarFileId }, currentUser)
+      await userApi.updateMe({
+        nickname: next.nickname,
+        bio: next.bio,
+        role: currentUser.role,
+        avatarFileId,
+        gender: next.gender,
+        genderVisible: next.genderVisible,
+        birthday: next.birthday,
+        birthdayVisible: next.birthdayVisible,
+        locationDisplay: next.locationDisplay,
+        locationVisible: next.locationVisible,
+      }, currentUser)
     } catch (err) {
       setNotice({ type: 'err', text: err.message || 'Profile save failed' })
       return false
@@ -332,6 +406,19 @@ export function ProfilePage() {
     requestAnimationFrame(syncHeight)
   }
 
+  function openReviewCard(review) {
+    const reviewId = review?.reviewId
+    if (reviewId != null && !String(reviewId).startsWith('local')) {
+      navigate(`/reviews/${reviewId}`)
+      return
+    }
+    if (review?.orderId) {
+      navigate(`/orders?orderId=${review.orderId}`)
+      return
+    }
+    navigate('/reviews')
+  }
+
   const tabs = [
     { id: 'photos', labelC: '我的照片', labelP: '我的作品', num: '01' },
     { id: 'intent', labelC: '我的意向', labelP: '橱窗管理', num: '02' },
@@ -376,8 +463,22 @@ export function ProfilePage() {
           </div>
           <p className="profile-uid">UID：{currentUser.userId} · Portra ID</p>
           <div className="profile-meta-line">
-            <span>IP：{currentUser.cityCode || '未知城市'} · {genderText}</span>
+            <span>IP属地：{currentUser.cityCode || '未知'}</span>
           </div>
+          {((currentUser.genderVisible && currentUser.gender) || (currentUser.birthdayVisible && currentUser.birthday)) && (
+            <div className="profile-tag-row">
+              <span className="profile-tag">
+                {currentUser.genderVisible && currentUser.gender === 'FEMALE' && '♀ '}
+                {currentUser.genderVisible && currentUser.gender === 'MALE' && '♂ '}
+                {currentUser.birthdayVisible && currentUser.birthday ? `${calcAge(currentUser.birthday)}岁` : ''}
+              </span>
+            </div>
+          )}
+          {currentUser.locationVisible && currentUser.locationDisplay && (
+            <div className="profile-tag-row">
+              <span className="profile-tag">📍 {currentUser.locationDisplay}</span>
+            </div>
+          )}
           <p className="profile-signature">{profileForm.bio || '这个人还没有写简介。'}</p>
         </div>
 
@@ -578,7 +679,20 @@ export function ProfilePage() {
                 <div className="section-mark">04</div>
               </div>
               {receivedReviews.length ? receivedReviews.slice(0, 4).map(r => (
-                <div key={r.reviewId || `${r.orderId}-${r.direction}`} className="review-card">
+                <div
+                  key={r.reviewId || `${r.orderId}-${r.direction}`}
+                  className="review-card"
+                  role="button"
+                  tabIndex={0}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => openReviewCard(r)}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      openReviewCard(r)
+                    }
+                  }}
+                >
                   <blockquote>"{r.content || '对方没有留下文字评价'}"</blockquote>
                   <footer>来自 用户 {r.reviewerId} · ★{Number(r.rating||0).toFixed(1)} · {formatShortTime(r.createdAt)}</footer>
                 </div>
@@ -752,9 +866,51 @@ export function ProfilePage() {
                   onChange={e => setProfileForm(p => ({...p, bio: e.target.value}))} />
               </div>
               <div>
-                <label className="pp-label">档期</label>
-                <input className="pp-input" value={profileForm.availability}
-                  onChange={e => setProfileForm(p => ({...p, availability: e.target.value}))} />
+                <label className="pp-label">性别</label>
+                <div className="pp-option-group">
+                  {[['MALE','男'],['FEMALE','女'],['','不填']].map(([val, label]) => (
+                    <button key={val} type="button"
+                      className={`pp-option${profileForm.gender === val ? ' active' : ''}`}
+                      onClick={() => setProfileForm(p => ({...p, gender: val}))}>
+                      {label}{profileForm.gender === val && val && ' ✓'}
+                    </button>
+                  ))}
+                </div>
+                <div className="pp-toggle-row">
+                  <span>展示性别标签</span>
+                  <label className="pp-toggle">
+                    <input type="checkbox" checked={!!profileForm.genderVisible}
+                      onChange={e => setProfileForm(p => ({...p, genderVisible: e.target.checked}))} />
+                    <span className="pp-toggle-slider" />
+                  </label>
+                </div>
+              </div>
+              <div>
+                <label className="pp-label">生日</label>
+                <input type="date" className="pp-input" value={profileForm.birthday}
+                  max={new Date().toISOString().slice(0,10)}
+                  onChange={e => setProfileForm(p => ({...p, birthday: e.target.value}))} />
+                <div className="pp-toggle-row" style={{marginTop:8}}>
+                  <span>展示生日标签（年龄）</span>
+                  <label className="pp-toggle">
+                    <input type="checkbox" checked={!!profileForm.birthdayVisible}
+                      onChange={e => setProfileForm(p => ({...p, birthdayVisible: e.target.checked}))} />
+                    <span className="pp-toggle-slider" />
+                  </label>
+                </div>
+              </div>
+              <div>
+                <label className="pp-label">地区</label>
+                <input className="pp-input" placeholder="填写所在地区，如：苏州" value={profileForm.locationDisplay}
+                  onChange={e => setProfileForm(p => ({...p, locationDisplay: e.target.value}))} />
+                <div className="pp-toggle-row" style={{marginTop:8}}>
+                  <span>展示地区标签</span>
+                  <label className="pp-toggle">
+                    <input type="checkbox" checked={!!profileForm.locationVisible}
+                      onChange={e => setProfileForm(p => ({...p, locationVisible: e.target.checked}))} />
+                    <span className="pp-toggle-slider" />
+                  </label>
+                </div>
               </div>
               <div>
                 <label className="pp-label">头像</label>

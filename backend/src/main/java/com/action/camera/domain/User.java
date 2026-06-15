@@ -35,6 +35,21 @@ public class User {
     @Column(name = "gender", length = 20)
     private String gender;
 
+    @Column(name = "gender_visible")
+    private Boolean genderVisible;
+
+    @Column(name = "birthday", length = 20)
+    private String birthday;
+
+    @Column(name = "birthday_visible")
+    private Boolean birthdayVisible;
+
+    @Column(name = "location_display", length = 100)
+    private String locationDisplay;
+
+    @Column(name = "location_visible")
+    private Boolean locationVisible;
+
     @Column(name = "city_code", length = 32)
     private String cityCode;
 

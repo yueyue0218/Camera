@@ -112,6 +112,17 @@ class AuthAndSessionIntegrationTest {
     }
 
     @Test
+    void protectedEndpoint_withUnknownXUserId_returns401() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-User-Id", "910003");
+        headers.set("X-User-Role", "CUSTOMER");
+        headers.setBearerAuth("demo-token-customer-910003");
+        ResponseEntity<Map> resp = rest.exchange("/users/me", HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+
+        assertThat(resp.getBody().get("code")).isEqualTo(40101);
+    }
+
+    @Test
     void getUserBrief_validId_succeeds() {
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-User-Id", "1001");

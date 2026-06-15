@@ -12,6 +12,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 
 import java.util.Map;
@@ -38,10 +39,18 @@ class B1B2RouteAuthIntegrationTest {
     @Autowired
     private ServicePackageRepository servicePackageRepository;
 
+    @Autowired
+    private JdbcTemplate jdbc;
+
     @BeforeEach
     void cleanDatabase() {
         demandRepository.deleteAll();
         servicePackageRepository.deleteAll();
+        jdbc.execute("DELETE FROM users WHERE id IN (1001, 2001, 910003)");
+        jdbc.execute("INSERT INTO users (id, nickname, current_role, status, credit_score, created_at, updated_at) " +
+                "VALUES (1001, 'Route auth customer', 'CUSTOMER', 'ACTIVE', 80.00, NOW(), NOW())");
+        jdbc.execute("INSERT INTO users (id, nickname, current_role, status, credit_score, created_at, updated_at) " +
+                "VALUES (2001, 'Route auth provider', 'PROVIDER', 'ACTIVE', 80.00, NOW(), NOW())");
     }
 
     @Test
@@ -134,6 +143,24 @@ class B1B2RouteAuthIntegrationTest {
                 .getBody().get("code")).isEqualTo(200);
         assertThat(rest.exchange("/demands/" + demandId, HttpMethod.GET, demoEntity, Map.class)
                 .getBody().get("code")).isEqualTo(200);
+    }
+
+    @Test
+    void startChatRejectsUnknownDemoUserBeforeConversationCreation() {
+        Long serviceId = numberValue(data(rest.exchange("/service-packages", HttpMethod.POST,
+                userEntity("2001", "PROVIDER", servicePackageBody()), Map.class)), "serviceId");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-User-Id", "910003");
+        headers.set("X-User-Role", "CUSTOMER");
+        headers.setBearerAuth("demo-token-customer-910003");
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        ResponseEntity<Map> response = rest.exchange("/service-packages/" + serviceId + "/start-chat",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"initialMessage\":\"hello\"}", headers),
+                Map.class);
+
+        assertThat(response.getBody().get("code")).isEqualTo(40101);
     }
 
     @Test

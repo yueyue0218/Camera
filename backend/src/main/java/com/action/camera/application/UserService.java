@@ -26,16 +26,19 @@ public class UserService {
     private final VerificationCodeService codeService;
     private final JwtUtil jwtUtil;
     private final ProviderProfileMapper providerProfileMapper;
+    private final IpLocationService ipLocationService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public UserService(UserRepository userRepository,
                        VerificationCodeService codeService,
                        JwtUtil jwtUtil,
-                       ProviderProfileMapper providerProfileMapper) {
+                       ProviderProfileMapper providerProfileMapper,
+                       IpLocationService ipLocationService) {
         this.userRepository = userRepository;
         this.codeService = codeService;
         this.jwtUtil = jwtUtil;
         this.providerProfileMapper = providerProfileMapper;
+        this.ipLocationService = ipLocationService;
     }
 
     @Transactional
@@ -62,7 +65,7 @@ public class UserService {
     }
 
     @Transactional
-    public LoginResponse login(String studentNo, String password, String role) {
+    public LoginResponse login(String studentNo, String password, String role, String clientIp) {
         User user = userRepository.findByStudentNo(studentNo)
                 .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_ERROR, "学号或密码错误"));
 
@@ -74,8 +77,22 @@ public class UserService {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "学号或密码错误");
         }
 
+        boolean dirty = false;
         if (!role.equals(user.getCurrentRole())) {
             user.setCurrentRole(role);
+            dirty = true;
+        }
+
+        // 最大努力更新 IP 归属地
+        try {
+            String province = ipLocationService.resolveProvince(clientIp);
+            if (province != null && !province.equals(user.getCityCode())) {
+                user.setCityCode(province);
+                dirty = true;
+            }
+        } catch (Exception ignored) {}
+
+        if (dirty) {
             userRepository.save(user);
         }
 
@@ -113,6 +130,11 @@ public class UserService {
         resp.setNickname(user.getNickname());
         resp.setSchool(user.getSchool());
         resp.setGender(user.getGender());
+        resp.setGenderVisible(user.getGenderVisible());
+        resp.setBirthday(user.getBirthday());
+        resp.setBirthdayVisible(user.getBirthdayVisible());
+        resp.setLocationDisplay(user.getLocationDisplay());
+        resp.setLocationVisible(user.getLocationVisible());
         resp.setCityCode(user.getCityCode());
         resp.setBio(user.getBio());
         resp.setAvatarFileId(user.getAvatarFileId());
@@ -210,6 +232,27 @@ public class UserService {
             }
             if (req.getAvatarFileId() != null) {
                 user.setAvatarFileId(req.getAvatarFileId());
+            }
+            if (req.getCityCode() != null && !req.getCityCode().isBlank()) {
+                user.setCityCode(req.getCityCode().trim());
+            }
+            if (req.getGender() != null) {
+                user.setGender(req.getGender().isBlank() ? null : req.getGender().trim());
+            }
+            if (req.getGenderVisible() != null) {
+                user.setGenderVisible(req.getGenderVisible());
+            }
+            if (req.getBirthday() != null) {
+                user.setBirthday(req.getBirthday().isBlank() ? null : req.getBirthday().trim());
+            }
+            if (req.getBirthdayVisible() != null) {
+                user.setBirthdayVisible(req.getBirthdayVisible());
+            }
+            if (req.getLocationDisplay() != null) {
+                user.setLocationDisplay(req.getLocationDisplay().trim());
+            }
+            if (req.getLocationVisible() != null) {
+                user.setLocationVisible(req.getLocationVisible());
             }
             userRepository.save(user);
         }

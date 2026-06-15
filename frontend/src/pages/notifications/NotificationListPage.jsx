@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Badge, Box, Button, Chip, Collapse, Paper, Stack, Tab, Tabs, Typography } from '@mui/material'
+import { Badge, Box, Button, Chip, Collapse, Paper, Skeleton, Stack, Tab, Tabs, Typography } from '@mui/material'
 import DoneAllRoundedIcon from '@mui/icons-material/DoneAllRounded'
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded'
 import { useNavigate } from 'react-router-dom'
@@ -240,6 +240,68 @@ function NotificationCard({ item, compact = false, onClick }) {
   )
 }
 
+function NotificationLoadingState() {
+  return (
+    <Stack gap={1.5}>
+      <Paper
+        variant="outlined"
+        sx={{
+          p: 2.25,
+          borderRadius: 4,
+          overflow: 'hidden',
+          background:
+            'radial-gradient(circle at top right, rgba(13,47,178,.08), transparent 28%), linear-gradient(145deg, rgba(255,253,248,.98), rgba(247,244,237,.96))',
+          borderColor: 'rgba(13,47,178,.12)'
+        }}
+      >
+        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={2} alignItems={{ xs: 'flex-start', sm: 'center' }}>
+          <Box sx={{ minWidth: 0, width: '100%' }}>
+            <Typography variant="overline" sx={{ color: portra.primary, fontWeight: 900, letterSpacing: '.16em' }}>
+              LOADING NOTICE
+            </Typography>
+            <Typography variant="h6" fontWeight={900} mt={0.5}>
+              正在整理你的通知流
+            </Typography>
+            <Typography color="text.secondary" mt={0.75} sx={{ lineHeight: 1.8 }}>
+              订单、评价、申诉和动态互动会按类别归档到这里。
+            </Typography>
+          </Box>
+          <Chip label="同步中" color="primary" />
+        </Stack>
+      </Paper>
+
+      {Array.from({ length: 4 }).map((_, index) => (
+        <Paper
+          key={index}
+          variant="outlined"
+          sx={{
+            p: 2,
+            borderRadius: 3,
+            position: 'relative',
+            overflow: 'hidden',
+            bgcolor: 'rgba(255,255,255,.88)',
+            borderLeft: '5px solid rgba(13,47,178,.18)'
+          }}
+        >
+          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5} alignItems={{ xs: 'flex-start', sm: 'center' }}>
+            <Box sx={{ minWidth: 0, width: '100%' }}>
+              <Stack direction="row" spacing={1} alignItems="center" mb={1}>
+                <Skeleton variant="circular" width={10} height={10} />
+                <Skeleton variant="rounded" width={96} height={22} />
+              </Stack>
+              <Skeleton variant="text" width="58%" height={34} />
+              <Skeleton variant="text" width="92%" height={24} />
+              <Skeleton variant="text" width="76%" height={24} />
+              <Skeleton variant="text" width={160} height={20} sx={{ mt: 1 }} />
+            </Box>
+            <Skeleton variant="rounded" width={74} height={20} sx={{ flexShrink: 0 }} />
+          </Stack>
+        </Paper>
+      ))}
+    </Stack>
+  )
+}
+
 export function NotificationListPage() {
   const navigate = useNavigate()
   const { currentUser } = useAuth()
@@ -386,7 +448,9 @@ export function NotificationListPage() {
         </Tabs>
       </Paper>
 
-      {visibleItems.length ? (
+      {loading ? (
+        <NotificationLoadingState />
+      ) : visibleItems.length ? (
         activeTab === 'dynamic' ? (
           <Stack gap={1.5}>
             {dynamicView.groups.map(group => {

@@ -14,6 +14,11 @@ public class UserProfileResponse {
     private String nickname;
     private String school;
     private String gender;
+    private Boolean genderVisible;
+    private String birthday;
+    private Boolean birthdayVisible;
+    private String locationDisplay;
+    private Boolean locationVisible;
     private String cityCode;
     private String bio;
     private Long avatarFileId;
