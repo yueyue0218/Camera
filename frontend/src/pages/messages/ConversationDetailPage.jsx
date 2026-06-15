@@ -158,8 +158,10 @@ export function ConversationDetailPage() {
           setQuotes([])
           clearOrderWorkbench()
         }
-        loadConversationData(initialConversation)
-        return
+        if (initialConversation.isLocal) {
+          loadConversationData(initialConversation)
+          return
+        }
       }
 
       setPageLoading(true)
