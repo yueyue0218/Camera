@@ -130,7 +130,7 @@ public class OrderService {
         OrderStatus fromStatus = order.getStatus();
         ensureCanChangeStatus(fromStatus, targetStatus);
         ensureNotManualShootingTransition(fromStatus, targetStatus);
-        if (fromStatus == OrderStatus.DELIVERED_PENDING_CONFIRM && targetStatus == OrderStatus.COMPLETED) {
+        if (targetStatus == OrderStatus.COMPLETED) {
             markCompletedAndReleaseEscrow(order, LocalDateTime.now(), false);
         } else if (targetStatus == OrderStatus.CANCELLED) {
             order.setCancelTime(LocalDateTime.now());
@@ -231,6 +231,27 @@ public class OrderService {
         ensureCanChangeStatus(OrderStatus.PENDING_DELIVERY, OrderStatus.DELIVERED_PENDING_CONFIRM);
         return applyStatusChange(
                 pendingDelivery,
+                OrderStatus.PENDING_DELIVERY,
+                OrderStatus.DELIVERED_PENDING_CONFIRM,
+                providerId,
+                "PROVIDER",
+                reason
+        );
+    }
+
+    @Transactional
+    public Order markDeliveryUploaded(Long orderId, Long providerId, String reason) {
+        Order order = getOrderOrThrow(orderId);
+        if (!Objects.equals(order.getProviderUserId(), providerId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only the provider can upload delivery");
+        }
+        if (order.getStatus() != OrderStatus.PENDING_DELIVERY) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                    "Only pending delivery orders can be marked as delivered");
+        }
+        ensureCanChangeStatus(OrderStatus.PENDING_DELIVERY, OrderStatus.DELIVERED_PENDING_CONFIRM);
+        return applyStatusChange(
+                order,
                 OrderStatus.PENDING_DELIVERY,
                 OrderStatus.DELIVERED_PENDING_CONFIRM,
                 providerId,

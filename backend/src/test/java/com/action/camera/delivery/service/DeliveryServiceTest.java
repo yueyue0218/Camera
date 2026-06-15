@@ -1,12 +1,13 @@
 package com.action.camera.delivery.service;
 
 import com.action.camera.application.FileService;
+import com.action.camera.common.ErrorCode;
 import com.action.camera.common.UserContext;
+import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.security.UserRole;
 import com.action.camera.delivery.dto.DeliveryUploadResponse;
 import com.action.camera.delivery.entity.Delivery;
 import com.action.camera.delivery.entity.DeliveryFile;
-import com.action.camera.common.security.UserRole;
 import com.action.camera.delivery.port.OrderQueryPort;
 import com.action.camera.delivery.port.OrderSnapshot;
 import com.action.camera.delivery.port.OrderStatusPort;
@@ -31,6 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
@@ -75,10 +77,6 @@ class DeliveryServiceTest {
 
     @BeforeEach
     void setUp() {
-        when(txTemplate.execute(any())).thenAnswer(invocation -> {
-            TransactionCallback<?> callback = invocation.getArgument(0);
-            return callback.doInTransaction(null);
-        });
         deliveryService = new DeliveryService(
                 deliveryRepository,
                 deliveryFileRepository,
@@ -101,16 +99,18 @@ class DeliveryServiceTest {
     @Test
     void pendingDeliveryUploadStillMovesOrderToDeliveredPendingConfirm() {
         prepareUpload("PENDING_DELIVERY");
+        when(orderService.markDeliveryUploaded(ORDER_ID, PROVIDER_ID, "服务方上传交付文件"))
+                .thenReturn(deliveredOrder());
 
         DeliveryUploadResponse response = deliveryService.upload(ORDER_ID, file(), "首次交付");
 
         assertThat(response.getOrderStatus()).isEqualTo("DELIVERED_PENDING_CONFIRM");
-        verify(orderStatusPort, times(1)).changeStatus(
+        verify(orderService, times(1)).markDeliveryUploaded(
                 ORDER_ID,
-                "DELIVERED_PENDING_CONFIRM",
                 PROVIDER_ID,
                 "服务方上传交付文件"
         );
+        verify(orderStatusPort, never()).changeStatus(any(), any(), any(), any());
     }
 
     @Test
@@ -128,6 +128,32 @@ class DeliveryServiceTest {
         inOrder.verify(deliveryFileRepository).save(any(DeliveryFile.class));
         inOrder.verify(orderService).completeReworkDelivery(ORDER_ID, PROVIDER_ID, "服务方上传交付文件");
         verify(orderStatusPort, never()).changeStatus(ORDER_ID, "PENDING_DELIVERY", PROVIDER_ID, "服务方开始返修交付");
+    }
+
+    @Test
+    void paidPendingShootUploadIsRejectedUntilSchedulerAdvancesRealStatus() {
+        prepareUpload("PAID_PENDING_SHOOT");
+
+        assertThatThrownBy(() -> deliveryService.upload(ORDER_ID, file(), "提前交付"))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.STATUS_CONFLICT));
+
+        verify(fileService, never()).upload(any(), any(), any(), any());
+        verify(orderService, never()).markDeliveryUploaded(any(), any(), any());
+        verify(orderStatusPort, never()).changeStatus(any(), any(), any(), any());
+    }
+
+    @Test
+    void shootingUploadIsRejectedUntilSchedulerAdvancesRealStatus() {
+        prepareUpload("SHOOTING");
+
+        assertThatThrownBy(() -> deliveryService.upload(ORDER_ID, file(), "拍摄中交付"))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.STATUS_CONFLICT));
+
+        verify(fileService, never()).upload(any(), any(), any(), any());
+        verify(orderService, never()).markDeliveryUploaded(any(), any(), any());
+        verify(orderStatusPort, never()).changeStatus(any(), any(), any(), any());
     }
 
     @Test
@@ -152,6 +178,13 @@ class DeliveryServiceTest {
                 "NONE",
                 LocalDateTime.of(2026, 6, 8, 12, 0)
         ));
+        if (!"PENDING_DELIVERY".equals(orderStatus) && !"REWORK_REQUIRED".equals(orderStatus)) {
+            return;
+        }
+        when(txTemplate.execute(any())).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(null);
+        });
         when(fileService.upload(any(), eq(PROVIDER_ID), eq("DELIVERY"), eq("PRIVATE")))
                 .thenReturn(new FileUploadResponse(FILE_ID, "delivery.jpg"));
         when(deliveryRepository.save(any(Delivery.class))).thenAnswer(invocation -> {
@@ -160,10 +193,13 @@ class DeliveryServiceTest {
             return delivery;
         });
         when(deliveryFileRepository.save(any(DeliveryFile.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        if ("PENDING_DELIVERY".equals(orderStatus)) {
-            when(orderStatusPort.changeStatus(ORDER_ID, "DELIVERED_PENDING_CONFIRM", PROVIDER_ID, "服务方上传交付文件"))
-                    .thenReturn("DELIVERED_PENDING_CONFIRM");
-        }
+    }
+
+    private Order deliveredOrder() {
+        Order order = new Order();
+        order.setId(ORDER_ID);
+        order.setStatus(OrderStatus.DELIVERED_PENDING_CONFIRM);
+        return order;
     }
 
     private Order completedOrder() {

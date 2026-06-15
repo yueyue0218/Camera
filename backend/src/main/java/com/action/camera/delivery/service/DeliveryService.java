@@ -33,8 +33,6 @@ import java.util.List;
 @Service
 public class DeliveryService {
 
-    private static final String PAID_PENDING_SHOOT = "PAID_PENDING_SHOOT";
-    private static final String SHOOTING = "SHOOTING";
     private static final String PENDING_DELIVERY = "PENDING_DELIVERY";
     private static final String DELIVERED_PENDING_CONFIRM = "DELIVERED_PENDING_CONFIRM";
     private static final String REWORK_REQUIRED = "REWORK_REQUIRED";
@@ -88,15 +86,8 @@ public class DeliveryService {
         if (!currentUserId.equals(order.getProviderId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "只有订单服务方可以上传交付文件");
         }
-        // 前端在拍摄时间结束后会对 PAID_PENDING_SHOOT/SHOOTING 状态展示上传按钮，
-        // 此处自动推进状态后继续交付，避免要求摄影师手动点击中间步骤。
         String currentStatus = order.getStatus();
-        if (PAID_PENDING_SHOOT.equals(currentStatus)) {
-            orderStatusPort.changeStatus(orderId, SHOOTING, currentUserId, "拍摄时间结束，自动进入拍摄中");
-            orderStatusPort.changeStatus(orderId, PENDING_DELIVERY, currentUserId, "拍摄完成，进入待交付");
-        } else if (SHOOTING.equals(currentStatus)) {
-            orderStatusPort.changeStatus(orderId, PENDING_DELIVERY, currentUserId, "拍摄完成，进入待交付");
-        } else if (!PENDING_DELIVERY.equals(currentStatus) && !REWORK_REQUIRED.equals(currentStatus)) {
+        if (!PENDING_DELIVERY.equals(currentStatus) && !REWORK_REQUIRED.equals(currentStatus)) {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT, "订单当前状态不允许上传交付文件");
         }
 
@@ -145,13 +136,12 @@ public class DeliveryService {
                 );
                 orderStatus = completedOrder.getStatus().name();
             } else {
-                // deliveries 事务已提交，FK 共享锁已释放，可安全发起 HTTP 回调
-                orderStatus = orderStatusPort.changeStatus(
+                Order deliveredOrder = orderService.markDeliveryUploaded(
                         orderId,
-                        DELIVERED_PENDING_CONFIRM,
                         currentUserId,
                         "服务方上传交付文件"
                 );
+                orderStatus = deliveredOrder.getStatus().name();
             }
         } catch (RuntimeException e) {
             rollbackSavedDelivery(saved.getId());

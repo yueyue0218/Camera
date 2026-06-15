@@ -32,7 +32,7 @@ export function deriveOrderWorkflowState(order, options = {}) {
   }
 
   if (status === 'PAID_PENDING_SHOOT' && afterEnd) {
-    return buildState('WAITING_DELIVERY', role === 'PROVIDER' ? '请上传作品' : '等待摄影师上传作品', '约定拍摄时间已结束，订单会以时间感提示进入交付阶段。', role === 'PROVIDER' ? '上传本次拍摄作品。' : '等待摄影师上传作品。', 'primary')
+    return buildState('WAITING_SYSTEM_SHOOT_SYNC', '拍摄状态同步中', '约定拍摄时间已结束，系统会按定时任务自动推进到待交付。', role === 'PROVIDER' ? '状态同步到待交付后再上传作品。' : '等待系统同步拍摄状态。', 'primary')
   }
 
   if (status === 'PAID_PENDING_SHOOT') {

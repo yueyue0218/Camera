@@ -118,19 +118,6 @@ public class OrderController {
                     "PENDING_PAYMENT to PAID_PENDING_SHOOT must use mock payment API");
         }
 
-        if (order.getStatus() == OrderStatus.PAID_PENDING_SHOOT && targetStatus == OrderStatus.SHOOTING) {
-            ensureProvider(order, operatorId);
-            return;
-        }
-        if (order.getStatus() == OrderStatus.SHOOTING && targetStatus == OrderStatus.PENDING_DELIVERY) {
-            ensureProvider(order, operatorId);
-            return;
-        }
-        if (order.getStatus() == OrderStatus.PENDING_DELIVERY
-                && targetStatus == OrderStatus.DELIVERED_PENDING_CONFIRM) {
-            ensureProvider(order, operatorId);
-            return;
-        }
         if (order.getStatus() == OrderStatus.DELIVERED_PENDING_CONFIRM && targetStatus == OrderStatus.COMPLETED) {
             ensureCustomer(order, operatorId);
             return;
