@@ -667,7 +667,6 @@ export function LoginInfoPage() {
       <div style={{ fontSize: 10, letterSpacing: '.22em', color: MUTED, textTransform: 'uppercase', marginTop: 5, marginBottom: 26, fontFamily: SANS }}>
         MEET RIGHT NOW
       </div>
-
       <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '.04em', marginBottom: 4, color: INK }}>欢迎回来</div>
       <div style={{ fontSize: 13, color: MUTED, marginBottom: 22, lineHeight: 1.65 }}>输入邮箱和密码，进入你的 Portra</div>
 
@@ -786,7 +785,6 @@ export function RegisterPage() {
       <div style={{ fontSize: 10, letterSpacing: '.22em', color: MUTED, textTransform: 'uppercase', marginTop: 5, marginBottom: 24, fontFamily: SANS }}>
         MEET RIGHT NOW
       </div>
-
         {/* step dots */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
           <div style={{ display: 'flex', gap: 6 }}>

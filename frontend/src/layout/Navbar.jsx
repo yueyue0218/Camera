@@ -76,22 +76,6 @@ export function Navbar({ activePath, currentUser, logout }) {
           <div className="portra-wordmark-sub">Meet Right Now</div>
         </button>
 
-        <nav className="portra-nav" aria-label="主导航">
-          {navItems.map(item => (
-            <button
-              key={item.key}
-              className={`portra-nav-item ${activeKey === item.key ? 'active' : ''}`}
-              type="button"
-              onClick={() => {
-                const target = item.path === '/messages' ? getMessageNavTarget(activePath) : item.path
-                if (item.path === '/messages') workflowNavigate(target)
-                else navigate(target)
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
 
         <div className="portra-header-actions">
           <button className="portra-notification-btn" type="button" onClick={() => navigate('/notifications')} aria-label="通知">
