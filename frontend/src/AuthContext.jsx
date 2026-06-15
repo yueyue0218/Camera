@@ -186,14 +186,15 @@ export function AuthProvider({ children }) {
 
   function updateProfile(partial) {
     if (!session) return null
-    // Route nickname/bio updates to the correct role-specific field
+    // Route nickname/bio updates to the correct role-specific field,
+    // but only when the caller didn't already supply the role-specific field explicitly.
     const roleFields = {}
     if (partial.role === 'PROVIDER') {
       if (partial.nickname != null) roleFields.providerNickname = partial.nickname
-      if (partial.bio != null) roleFields.providerBio = partial.bio
+      if (partial.bio != null && !('providerBio' in partial)) roleFields.providerBio = partial.bio
     } else if (partial.role === 'CUSTOMER') {
       if (partial.nickname != null) roleFields.customerNickname = partial.nickname
-      if (partial.bio != null) roleFields.customerBio = partial.bio
+      if (partial.bio != null && !('customerBio' in partial)) roleFields.customerBio = partial.bio
     }
     const nextUser = { ...session.user, ...partial, ...roleFields }
     saveStoredProfile(nextUser)

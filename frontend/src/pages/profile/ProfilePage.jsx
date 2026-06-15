@@ -201,7 +201,11 @@ export function ProfilePage() {
     if (myProfileRes.status === 'fulfilled' && myProfileRes.value) {
       const role = myProfileRes.value.currentRole || myProfileRes.value.role || currentUser.role
       const nickname = myProfileRes.value.nickname || currentUser.nickname
-      const bio = myProfileRes.value.bio || currentUser.bio || currentUser.description || ''
+      const apiGenericBio = myProfileRes.value.bio || ''
+      // Prefer role-specific bio from API; fall back to locally stored role bio; last resort: generic bio
+      const resolvedProviderBio = myProfileRes.value.providerBio ?? currentUser.providerBio ?? (role === 'PROVIDER' ? apiGenericBio : '')
+      const resolvedCustomerBio = myProfileRes.value.customerBio ?? currentUser.customerBio ?? (role === 'CUSTOMER' ? apiGenericBio : '')
+      const bio = role === 'PROVIDER' ? resolvedProviderBio : resolvedCustomerBio
       const avatarFileId = role === 'PROVIDER'
         ? (myProfileRes.value.providerAvatarFileId || myProfileRes.value.avatarFileId)
         : (myProfileRes.value.customerAvatarFileId || myProfileRes.value.avatarFileId)
@@ -225,9 +229,9 @@ export function ProfilePage() {
         description: bio,
         creditScore: myProfileRes.value.creditScore ?? null,
         customerNickname: myProfileRes.value.customerNickname ?? (role === 'CUSTOMER' ? nickname : currentUser.customerNickname),
-        customerBio: myProfileRes.value.customerBio ?? (role === 'CUSTOMER' ? bio : currentUser.customerBio),
+        customerBio: resolvedCustomerBio,
         providerNickname: myProfileRes.value.providerNickname ?? (role === 'PROVIDER' ? nickname : currentUser.providerNickname),
-        providerBio: myProfileRes.value.providerBio ?? (role === 'PROVIDER' ? bio : currentUser.providerBio),
+        providerBio: resolvedProviderBio,
         gender: myProfileRes.value.gender ?? currentUser.gender ?? '',
         genderVisible: myProfileRes.value.genderVisible ?? currentUser.genderVisible ?? true,
         birthday: myProfileRes.value.birthday ?? currentUser.birthday ?? '',
