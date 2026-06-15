@@ -180,6 +180,8 @@ export function DemandDetailPage() {
   const [notice, setNotice] = useState(null)
   const [responded, setResponded] = useState(false)
   const [responding, setResponding] = useState(false)
+  const [demandResponders, setDemandResponders] = useState([])
+  const [actioningId, setActioningId] = useState(null)
   const referenceUrls = useFileObjectUrls(
     demand?.referenceFileIds,
     currentUser,
@@ -204,6 +206,24 @@ export function DemandDetailPage() {
         if (!ignored) {
           setDemand(enrichedDetail)
           setStatus({ loading: false, error: '' })
+          const isOwner = isSameOwner(currentUser, collectDemandOwnerIds(enrichedDetail))
+          if (isOwner && currentUser.role === 'CUSTOMER') {
+            try {
+              const resps = await demandApi.responses(demandId, currentUser).catch(() => [])
+              const enrichedResps = await Promise.all((resps || []).map(async r => {
+                const pid = r.providerId || r.userId
+                try {
+                  const brief = await userApi.brief(pid, currentUser)
+                  let avatarData = brief?.avatarData || brief?.avatarUrl || ''
+                  if (!avatarData && brief?.avatarFileId) {
+                    try { avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser) } catch { /**/ }
+                  }
+                  return { ...r, nickname: brief?.nickname || r.nickname, avatarData, providerId: pid }
+                } catch { return { ...r, providerId: pid } }
+              }))
+              if (!ignored) setDemandResponders(enrichedResps)
+            } catch { /**/ }
+          }
         }
       } catch (error) {
         if (!ignored) {
@@ -272,6 +292,26 @@ export function DemandDetailPage() {
     setResponding(false)
   }
 
+  async function acceptResponse(r) {
+    setActioningId(r.responseId)
+    try {
+      const accepted = await demandApi.accept(demand.demandId, r.responseId, currentUser)
+      navigate(`/messages/${accepted.conversationId}`)
+    } catch (error) {
+      setNotice({ type: 'error', text: normalizeError(error) })
+    } finally { setActioningId(null) }
+  }
+
+  async function rejectResponse(r) {
+    setActioningId(r.responseId)
+    try {
+      await demandApi.reject(demand.demandId, r.responseId, currentUser)
+      setDemandResponders(prev => prev.filter(p => p.responseId !== r.responseId))
+    } catch (error) {
+      setNotice({ type: 'error', text: normalizeError(error) })
+    } finally { setActioningId(null) }
+  }
+
   async function closeDemand() {
     if (!window.confirm('确认下架这个需求吗？下架后不会继续作为开放需求展示。')) return
     try {
@@ -332,21 +372,68 @@ export function DemandDetailPage() {
           </div>
         </article>
         <aside className="aside">
-          <div className="aside-card">
-            <h3>发布者信息</h3>
-            <button
-              className="profile-mini detail-provider-link profile-link-button"
-              type="button"
-              onClick={() => demand.customerId && navigate(`/users/${demand.customerId}?role=CUSTOMER`)}
-              disabled={!demand.customerId}
-            >
-              <div className="mini-avatar" style={publisherAvatar ? { '--avatar-art': `url(${publisherAvatar})` } : undefined} aria-hidden="true" />
-              <div>
-                <strong>{publisherName}</strong><br />
-                <span className="micro">响应 {demand.responseCount ?? 0} 次 · {latestTimeText(demand)}</span>
-              </div>
-            </button>
-          </div>
+          {isDemandOwner && currentUser.role === 'CUSTOMER' ? (
+            <div className="aside-card">
+              <h3>响应我的摄影师 · {demand.responseCount ?? demandResponders.length ?? 0}</h3>
+              {demandResponders.length ? (
+                <div style={{display:'flex',flexDirection:'column',gap:10,marginTop:8}}>
+                  {demandResponders.map(r => {
+                    const busy = actioningId === r.responseId
+                    const isAccepted = r.status === 'ACCEPTED'
+                    const isRejected = r.status === 'REJECTED'
+                    return (
+                      <div key={r.responseId ?? r.providerId} style={{display:'flex',alignItems:'center',gap:10}}>
+                        <button
+                          className="profile-mini detail-provider-link profile-link-button"
+                          type="button"
+                          style={{flex:1}}
+                          onClick={() => r.providerId && navigate(`/users/${r.providerId}?role=PROVIDER`)}
+                        >
+                          <div
+                            className="mini-avatar"
+                            style={r.avatarData ? { '--avatar-art': `url(${r.avatarData})` } : { '--avatar-art': `linear-gradient(135deg,hsl(${(Number(r.providerId)*67)%360},45%,68%),hsl(${(Number(r.providerId)*67+120)%360},45%,58%))` }}
+                            aria-hidden="true"
+                          />
+                          <div>
+                            <strong>{r.nickname || `摄影师 ${r.providerId}`}</strong><br />
+                            <span className="micro">{r.responseTime ? latestTimeText({ updatedAt: r.responseTime }) : '已响应'}</span>
+                          </div>
+                        </button>
+                        {isAccepted ? (
+                          <span className="status">已接受</span>
+                        ) : isRejected ? (
+                          <span className="status orange">已婉拒</span>
+                        ) : (
+                          <div style={{display:'flex',gap:6,flexShrink:0}}>
+                            <button className="primary-btn" style={{height:32,fontSize:12,padding:'0 10px'}} disabled={busy} onClick={() => acceptResponse(r)}>接受</button>
+                            <button className="secondary-btn" style={{height:32,fontSize:12,padding:'0 8px'}} disabled={busy} onClick={() => rejectResponse(r)}>婉拒</button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="note-strip" style={{marginTop:8}}>还没有摄影师响应，稍后再来看看。</p>
+              )}
+            </div>
+          ) : (
+            <div className="aside-card">
+              <h3>发布者信息</h3>
+              <button
+                className="profile-mini detail-provider-link profile-link-button"
+                type="button"
+                onClick={() => demand.customerId && navigate(`/users/${demand.customerId}?role=CUSTOMER`)}
+                disabled={!demand.customerId}
+              >
+                <div className="mini-avatar" style={publisherAvatar ? { '--avatar-art': `url(${publisherAvatar})` } : undefined} aria-hidden="true" />
+                <div>
+                  <strong>{publisherName}</strong><br />
+                  <span className="micro">响应 {demand.responseCount ?? 0} 次 · {latestTimeText(demand)}</span>
+                </div>
+              </button>
+            </div>
+          )}
           {canRespond && (
           <div className="photographer-only aside-card">
             <h3>操作</h3>
