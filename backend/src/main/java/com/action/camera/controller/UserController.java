@@ -11,6 +11,7 @@ import com.action.camera.dto.SwitchRoleResponse;
 import com.action.camera.dto.UpdateProfileRequest;
 import com.action.camera.dto.UserBriefResponse;
 import com.action.camera.dto.UserProfileResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -38,9 +39,22 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public Result<LoginResponse> login(@Valid @RequestBody LoginRequest req) {
-        LoginResponse response = userService.login(req.getStudentNo(), req.getPassword(), req.getRole());
+    public Result<LoginResponse> login(@Valid @RequestBody LoginRequest req, HttpServletRequest request) {
+        String clientIp = extractClientIp(request);
+        LoginResponse response = userService.login(req.getStudentNo(), req.getPassword(), req.getRole(), clientIp);
         return Result.success(response);
+    }
+
+    private static String extractClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip != null && !ip.isBlank() && !"unknown".equalsIgnoreCase(ip)) {
+            return ip.split(",")[0].trim();
+        }
+        ip = request.getHeader("X-Real-IP");
+        if (ip != null && !ip.isBlank() && !"unknown".equalsIgnoreCase(ip)) {
+            return ip.trim();
+        }
+        return request.getRemoteAddr();
     }
 
     @GetMapping("/me")

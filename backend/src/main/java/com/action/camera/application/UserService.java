@@ -26,16 +26,19 @@ public class UserService {
     private final VerificationCodeService codeService;
     private final JwtUtil jwtUtil;
     private final ProviderProfileMapper providerProfileMapper;
+    private final IpLocationService ipLocationService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public UserService(UserRepository userRepository,
                        VerificationCodeService codeService,
                        JwtUtil jwtUtil,
-                       ProviderProfileMapper providerProfileMapper) {
+                       ProviderProfileMapper providerProfileMapper,
+                       IpLocationService ipLocationService) {
         this.userRepository = userRepository;
         this.codeService = codeService;
         this.jwtUtil = jwtUtil;
         this.providerProfileMapper = providerProfileMapper;
+        this.ipLocationService = ipLocationService;
     }
 
     @Transactional
@@ -62,7 +65,7 @@ public class UserService {
     }
 
     @Transactional
-    public LoginResponse login(String studentNo, String password, String role) {
+    public LoginResponse login(String studentNo, String password, String role, String clientIp) {
         User user = userRepository.findByStudentNo(studentNo)
                 .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_ERROR, "学号或密码错误"));
 
@@ -74,8 +77,22 @@ public class UserService {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "学号或密码错误");
         }
 
+        boolean dirty = false;
         if (!role.equals(user.getCurrentRole())) {
             user.setCurrentRole(role);
+            dirty = true;
+        }
+
+        // 最大努力更新 IP 归属地
+        try {
+            String province = ipLocationService.resolveProvince(clientIp);
+            if (province != null && !province.equals(user.getCityCode())) {
+                user.setCityCode(province);
+                dirty = true;
+            }
+        } catch (Exception ignored) {}
+
+        if (dirty) {
             userRepository.save(user);
         }
 
