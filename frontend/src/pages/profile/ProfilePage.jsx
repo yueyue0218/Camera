@@ -509,9 +509,6 @@ export function ProfilePage() {
                 <button className="secondary-btn" onClick={() => handleSwitchRole('PROVIDER')}>
                   📷 切换到我的摄影师账号
                 </button>
-                <p style={{fontSize:11, color:'#8a8d92', letterSpacing:'.1em', margin:'6px 0 0', textAlign:'center'}}>
-                  切换后昵称、头像和动态将独立展示
-                </p>
               </>
             )}
           </div>
