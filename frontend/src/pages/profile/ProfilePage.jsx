@@ -4,6 +4,7 @@ import { useAuth } from '../../AuthContext.jsx'
 import {
   creditApi, demandApi, fileApi, momentApi, orderApi, reviewApi, userApi, conversationApi
 } from '../../api.js'
+import { servicePackageApi } from '../../api/servicePackageApi.js'
 import {
   formatShortTime, formatTime,
   getLocalReviewsByTarget, getOrderSnapshotsForUser,
@@ -82,6 +83,7 @@ export function ProfilePage() {
 
   const [moments, setMoments] = useState([])
   const [invitations, setInvitations] = useState([])
+  const [myInterests, setMyInterests] = useState([])
   const [providerInfoMap, setProviderInfoMap] = useState({})
   const [profileOrders, setProfileOrders] = useState([])
   const [receivedReviews, setReceivedReviews] = useState([])
@@ -262,6 +264,10 @@ export function ProfilePage() {
       ])
     } catch { setMyFollowing([]) }
     if (!isProvider) {
+      try {
+        const interestsPage = await servicePackageApi.myInterests({ page: 1, size: 50 }, currentUser).catch(() => null)
+        setMyInterests(interestsPage?.records || interestsPage?.content || (Array.isArray(interestsPage) ? interestsPage : []))
+      } catch { setMyInterests([]) }
       try {
         const invs = await demandApi.responsesReceived(currentUser)
         setInvitations(invs)
@@ -622,50 +628,65 @@ export function ProfilePage() {
                     <div className="ticket-meta"><span className="tag">前往大厅</span></div>
                   </article>
                 </div>
-              ) : invitations.length ? (
-                <div className="order-list">
-                  {invitations.map(inv => {
-                    const status = inv.status || 'PENDING_CUSTOMER_ACCEPT'
-                    const isPending = status === 'PENDING_CUSTOMER_ACCEPT'
-                    const busy = actioningId === inv.responseId
-                    return (
-                      <div key={inv.responseId} className="order-slip" style={{cursor:'default'}}>
-                        <div
-                          style={{width:40,height:40,borderRadius:'50%',overflow:'hidden',flexShrink:0,cursor:'pointer',border:'2px solid var(--line)'}}
-                          onClick={() => navigate(`/users/${inv.providerId}`)}
-                          title="查看摄影师主页"
-                        >
-                          {providerInfoMap[inv.providerId]?.avatarData
-                            ? <img src={providerInfoMap[inv.providerId].avatarData} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} />
-                            : <div style={{width:'100%',height:'100%',background:'var(--line)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,color:'var(--ink-sub)'}}>P</div>
-                          }
-                        </div>
-                        <div>
-                          <h4>需求 #{inv.demandId}</h4>
-                          <p>
-                            <span
-                              style={{cursor:'pointer',textDecoration:'underline',textDecorationColor:'var(--line)'}}
-                              onClick={() => navigate(`/users/${inv.providerId}`)}
-                            >
-                              {providerInfoMap[inv.providerId]?.nickname || `摄影师${inv.providerId}`}
-                            </span>
-                            {' · '}{formatShortTime(inv.responseTime)}
-                          </p>
-                        </div>
-                        {isPending ? (
-                          <div style={{display:'flex',gap:6}}>
-                            <button className="primary-btn" style={{height:34,fontSize:12,padding:'0 12px'}} onClick={() => acceptInvitation(inv)} disabled={busy}>接受</button>
-                            <button className="secondary-btn" style={{height:34,fontSize:12,padding:'0 10px'}} onClick={() => rejectInvitation(inv)} disabled={busy}>婉拒</button>
-                          </div>
-                        ) : (
-                          <span className={`status ${status === 'ACCEPTED' ? '' : 'orange'}`}>{status === 'ACCEPTED' ? '已接受' : status === 'REJECTED' ? '已婉拒' : status}</span>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
               ) : (
-                <div className="pp-empty"><h3>暂无邀请</h3><p>当摄影师对你的需求发起邀请后会在这里显示。</p></div>
+                <>
+                  {myInterests.length ? (
+                    <div className="ticket-grid" style={{marginBottom: invitations.length ? 20 : 0}}>
+                      {myInterests.slice(0, 4).map(item => (
+                        <article key={item.serviceId} className="mini-ticket" onClick={() => navigate(`/service-packages/${item.serviceId}`)}>
+                          <span className="price">{item.priceRange || '价格面议'}</span>
+                          <h3>{item.title || '意向橱窗'}</h3>
+                          <p>{item.description || item.serviceArea || '查看橱窗详情'}</p>
+                          <div className="ticket-meta"><span className="tag blue">查看橱窗</span></div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="pp-empty"><h3>还没有意向橱窗</h3><p>在大厅浏览橱窗，点击「加入意向」收藏感兴趣的摄影师。</p></div>
+                  )}
+                  {invitations.length > 0 && (
+                    <>
+                      <p style={{fontSize:12,letterSpacing:'.1em',color:'#8a8d92',margin:'16px 0 8px',textTransform:'uppercase'}}>待确认邀请</p>
+                      <div className="order-list">
+                        {invitations.map(inv => {
+                          const status = inv.status || 'PENDING_CUSTOMER_ACCEPT'
+                          const isPending = status === 'PENDING_CUSTOMER_ACCEPT'
+                          const busy = actioningId === inv.responseId
+                          return (
+                            <div key={inv.responseId} className="order-slip" style={{cursor:'default'}}>
+                              <div
+                                style={{width:40,height:40,borderRadius:'50%',overflow:'hidden',flexShrink:0,cursor:'pointer',border:'2px solid var(--line)'}}
+                                onClick={() => navigate(`/users/${inv.providerId}`)}
+                              >
+                                {providerInfoMap[inv.providerId]?.avatarData
+                                  ? <img src={providerInfoMap[inv.providerId].avatarData} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} />
+                                  : <div style={{width:'100%',height:'100%',background:'var(--line)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,color:'var(--ink-sub)'}}>P</div>
+                                }
+                              </div>
+                              <div>
+                                <h4>需求 #{inv.demandId}</h4>
+                                <p>
+                                  <span style={{cursor:'pointer',textDecoration:'underline',textDecorationColor:'var(--line)'}} onClick={() => navigate(`/users/${inv.providerId}`)}>
+                                    {providerInfoMap[inv.providerId]?.nickname || `摄影师${inv.providerId}`}
+                                  </span>
+                                  {' · '}{formatShortTime(inv.responseTime)}
+                                </p>
+                              </div>
+                              {isPending ? (
+                                <div style={{display:'flex',gap:6}}>
+                                  <button className="primary-btn" style={{height:34,fontSize:12,padding:'0 12px'}} onClick={() => acceptInvitation(inv)} disabled={busy}>接受</button>
+                                  <button className="secondary-btn" style={{height:34,fontSize:12,padding:'0 10px'}} onClick={() => rejectInvitation(inv)} disabled={busy}>婉拒</button>
+                                </div>
+                              ) : (
+                                <span className={`status ${status === 'ACCEPTED' ? '' : 'orange'}`}>{status === 'ACCEPTED' ? '已接受' : status === 'REJECTED' ? '已婉拒' : status}</span>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </>
+                  )}
+                </>
               )}
             </section>
 

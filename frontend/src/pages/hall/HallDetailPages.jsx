@@ -384,6 +384,7 @@ export function ServicePackageDetailPage() {
   const [interested, setInterested] = useState(false)
   const [followingProvider, setFollowingProvider] = useState(false)
   const [status, setStatus] = useState(createStatus)
+  const [inlineNotice, setInlineNotice] = useState(null)
   const uploadedPortfolioUrls = useFileObjectUrls(
     [service?.portfolioIds, service?.images],
     currentUser,
@@ -456,19 +457,24 @@ export function ServicePackageDetailPage() {
     }
   }
 
+  function showNotice(text, type = 'ok') {
+    setInlineNotice({ text, type })
+    setTimeout(() => setInlineNotice(null), 3000)
+  }
+
   async function toggleInterest() {
     try {
       if (interested) {
         await servicePackageApi.cancelInterest(service.serviceId, currentUser)
         setInterested(false)
-        window.alert('已取消意向')
+        showNotice('已取消意向')
       } else {
         await servicePackageApi.addInterest(service.serviceId, currentUser)
         setInterested(true)
-        window.alert('已加入意向')
+        showNotice('已加入意向 ✓')
       }
     } catch (error) {
-      window.alert(normalizeError(error))
+      showNotice(normalizeError(error), 'err')
     }
   }
 
@@ -573,6 +579,13 @@ export function ServicePackageDetailPage() {
           {isCustomerViewer && (
             <div className="aside-card">
               <h3>操作</h3>
+              {inlineNotice && (
+                <div style={{marginBottom:10,padding:'8px 12px',borderRadius:10,fontSize:13,letterSpacing:'.05em',
+                  background: inlineNotice.type === 'ok' ? 'rgba(13,47,178,.07)' : 'rgba(248,81,4,.08)',
+                  color: inlineNotice.type === 'ok' ? 'var(--blue)' : '#c13a05'}}>
+                  {inlineNotice.text}
+                </div>
+              )}
               <div className="detail-op-actions side-actions">
                 <button className="secondary-btn owner-only" type="button" onClick={toggleInterest}>{interested ? '取消意向' : '加入意向'}</button>
                 <button className="primary-btn owner-only" type="button" onClick={() => startChat()}>现在预定</button>
