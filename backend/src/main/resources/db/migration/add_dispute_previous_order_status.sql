@@ -17,10 +17,10 @@ SET d.previous_order_status = (
 )
 WHERE d.previous_order_status IS NULL;
 
--- Inspect and repair any rows returned here before applying the final ALTER.
+-- Inspect and repair any rows returned here before a later NOT NULL hardening.
+-- Keep the column nullable during deployment so the previous application version
+-- can still create disputes while the new JAR is being released. The new code
+-- safely refuses to restore a dispute whose previous status is unknown.
 SELECT id, order_id
 FROM disputes
 WHERE previous_order_status IS NULL;
-
-ALTER TABLE disputes
-    MODIFY COLUMN previous_order_status VARCHAR(40) NOT NULL;
