@@ -258,10 +258,24 @@ export function ProfilePage() {
         userApi.following(currentUser.userId, currentUser, 'CUSTOMER').catch(() => []),
         userApi.following(currentUser.userId, currentUser, 'PROVIDER').catch(() => [])
       ])
-      setMyFollowing([
+      const combined = [
         ...(followingCustomer || []).map(f => ({ ...f, role: f.role || 'CUSTOMER' })),
         ...(followingProvider || []).map(f => ({ ...f, role: f.role || 'PROVIDER' })),
-      ])
+      ]
+      // Enrich with avatar data
+      const enriched = await Promise.all(combined.map(async f => {
+        const uid = f.userId ?? f.authorId
+        if (f.avatarData || f.avatarUrl) return f
+        try {
+          const brief = await userApi.brief(uid, currentUser)
+          let avatarData = brief?.avatarData || brief?.avatarUrl || ''
+          if (!avatarData && brief?.avatarFileId) {
+            try { avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser) } catch { /**/ }
+          }
+          return { ...f, nickname: f.nickname || brief?.nickname, avatarData }
+        } catch { return f }
+      }))
+      setMyFollowing(enriched)
     } catch { setMyFollowing([]) }
     if (!isProvider) {
       try {
