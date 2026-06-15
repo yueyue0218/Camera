@@ -216,9 +216,9 @@ export function FeedPage() {
     }
   }
 
-  function isFollowing(authorId, authorRole) {
-    const roleKey = (authorRole || 'CUSTOMER').toUpperCase()
-    return followingMap[roleKey]?.has(Number(authorId)) || false
+  function isFollowing(authorId) {
+    const id = Number(authorId)
+    return followingMap.CUSTOMER?.has(id) || followingMap.PROVIDER?.has(id) || false
   }
 
   function mergeMoment(nextMoment) {
@@ -446,7 +446,7 @@ export function FeedPage() {
 
   async function toggleFollow(authorId, authorRole) {
     const roleKey = (authorRole || 'CUSTOMER').toUpperCase()
-    const followed = isFollowing(authorId, authorRole)
+    const followed = isFollowing(authorId)
     try {
       if (followed) {
         await userApi.unfollow(authorId, currentUser, roleKey)
@@ -555,7 +555,7 @@ export function FeedPage() {
             const momentId = getMomentId(moment)
             const isSelf = Number(moment.authorId) === currentUser.userId
             const menuOpen = getMomentId(menuState.momentId) === momentId
-            const followed = isFollowing(moment.authorId, moment.authorRole)
+            const followed = isFollowing(moment.authorId)
             return (
               <MomentCard
                 key={momentId}
@@ -607,7 +607,7 @@ export function FeedPage() {
               moment={currentDrawerMoment}
               authorName={currentDrawerMoment.authorProfile.nickname}
               authorAvatar={currentDrawerMoment.authorProfile.avatarData}
-              isFollowing={isFollowing(currentDrawerMoment.authorId, currentDrawerMoment.authorRole)}
+              isFollowing={isFollowing(currentDrawerMoment.authorId)}
               isSelf={Number(currentDrawerMoment.authorId) === currentUser.userId}
               menuOpen={getMomentId(menuState.momentId) === getMomentId(currentDrawerMoment)}
               menuAnchorEl={menuState.anchorEl}

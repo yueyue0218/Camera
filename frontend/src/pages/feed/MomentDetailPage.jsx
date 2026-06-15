@@ -123,7 +123,7 @@ export function MomentDetailPage() {
 
   async function toggleFollow(authorId, authorRole) {
     const roleKey = String(authorRole || 'CUSTOMER').toUpperCase()
-    const followed = followingMap[roleKey]?.has(Number(authorId))
+    const followed = followingMap.CUSTOMER?.has(Number(authorId)) || followingMap.PROVIDER?.has(Number(authorId))
     try {
       if (followed) {
         await userApi.unfollow(authorId, currentUser, roleKey)
@@ -145,7 +145,7 @@ export function MomentDetailPage() {
     }
   }
 
-  const followed = moment ? followingMap[String(moment.authorRole || 'CUSTOMER').toUpperCase()]?.has(Number(moment.authorId)) : false
+  const followed = moment ? (followingMap.CUSTOMER?.has(Number(moment.authorId)) || followingMap.PROVIDER?.has(Number(moment.authorId))) : false
 
   return (
     <Stack spacing={2.5}>
