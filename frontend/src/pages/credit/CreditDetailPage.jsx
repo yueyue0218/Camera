@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, Typography } from '@mui/material'
 import { useAuth } from '../../AuthContext.jsx'
-import { creditApi } from '../../api/index.js'
+import { creditApi, reviewApi } from '../../api/index.js'
+import { ReviewScore } from '../reviews/ReviewPage.jsx'
 import '../profile/profile.css'
 import './credit.css'
 
@@ -102,6 +103,7 @@ export function CreditDetailPage() {
   const isSelf = targetUserId === currentUser.userId
   const [summary, setSummary] = useState(null)
   const [records, setRecords] = useState([])
+  const [reviews, setReviews] = useState([])
   const [notice, setNotice] = useState(null)
   const [loading, setLoading] = useState(true)
   const [rulesOpen, setRulesOpen] = useState(false)
@@ -122,13 +124,17 @@ export function CreditDetailPage() {
         const failed = [summaryResult, recordsResult].find(r => r.status === 'rejected')
         setNotice(failed ? failed.reason?.message || '信用数据暂时不可用' : null)
       } else {
-        const summaryResult = await creditApi.summary(targetUserId, currentUser).catch(e => ({ _err: e.message }))
+        const [summaryResult, reviewsResult] = await Promise.allSettled([
+          creditApi.summary(targetUserId, currentUser),
+          reviewApi.listByUser(targetUserId, currentUser)
+        ])
         if (cancelled) return
-        if (summaryResult?._err) {
-          setNotice(summaryResult._err)
+        if (summaryResult.status === 'fulfilled') {
+          setSummary(summaryResult.value)
         } else {
-          setSummary(summaryResult)
+          setNotice(summaryResult.reason?.message || '信用数据暂时不可用')
         }
+        setReviews(reviewsResult.status === 'fulfilled' ? (Array.isArray(reviewsResult.value) ? reviewsResult.value : []) : [])
         setRecords([])
       }
       setLoading(false)
@@ -231,6 +237,43 @@ export function CreditDetailPage() {
         </div>
       </section>
 
+      {!isSelf && (
+        <section className="panel-card credit-records-panel">
+          <div className="section-head">
+            <div>
+              <h2>历史评价</h2>
+              <p>来自订单的真实评价，反映该用户的履约表现。</p>
+            </div>
+            <div className="section-mark">{reviews.length || '暂无'}</div>
+          </div>
+          {loading ? (
+            <div className="pp-empty"><h3>加载中...</h3></div>
+          ) : reviews.length > 0 ? (
+            <Stack spacing={1.2} style={{ marginTop: 8 }}>
+              {reviews.map((r, i) => (
+                <div key={r.reviewId || i} className="credit-note credit-note--neutral" style={{ cursor: r.reviewId ? 'pointer' : 'default' }}
+                  onClick={() => r.reviewId && navigate(`/reviews/${r.reviewId}`)}>
+                  <div className="credit-note-body" style={{ width: '100%' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <span style={{ fontSize: 12, color: '#6e737b' }}>
+                        来自 {r.reviewerNickname || `用户 ${r.reviewerId}`} · {formatTime(r.createdAt)}
+                      </span>
+                      <ReviewScore value={r.rating} />
+                    </div>
+                    <Typography className="credit-note-detail" style={{ fontStyle: 'italic' }}>
+                      "{r.content || '对方没有留下文字评价'}"
+                    </Typography>
+                  </div>
+                </div>
+              ))}
+            </Stack>
+          ) : (
+            <div className="pp-empty"><h3>暂无评价</h3><p>该用户尚未收到任何评价。</p></div>
+          )}
+        </section>
+      )}
+
+      {isSelf && (
       <section className="panel-card credit-records-panel">
         <div className="section-head">
           <div>
@@ -244,11 +287,6 @@ export function CreditDetailPage() {
           <div className="pp-empty">
             <h3>正在加载信用记录</h3>
             <p>正在更新信用分和记录。</p>
-          </div>
-        ) : !isSelf ? (
-          <div className="pp-empty">
-            <h3>详细记录不公开</h3>
-            <p>信用记录属于个人隐私，仅本人可见。</p>
           </div>
         ) : hasRecords ? (
           <Stack spacing={1.35} className="credit-note-stack">
@@ -320,6 +358,7 @@ export function CreditDetailPage() {
           </div>
         )}
       </section>
+      )}
 
       <Dialog open={rulesOpen} onClose={() => setRulesOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>信用规则说明</DialogTitle>
