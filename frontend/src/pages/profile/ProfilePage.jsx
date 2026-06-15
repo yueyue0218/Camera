@@ -136,13 +136,13 @@ export function ProfilePage() {
   useEffect(() => {
     async function detectIpLocation() {
       try {
-        const res = await fetch('http://ip-api.com/json/?lang=zh-CN&fields=status,city,regionName')
+        const res = await fetch('http://ip-api.com/json/?lang=zh-CN&fields=status,regionName')
         const data = await res.json()
-        if (data.status !== 'success') return
-        const city = (data.city || data.regionName || '').replace(/(省|市|自治区|特别行政区)$/, '').trim()
-        if (!city || city === currentUser.cityCode) return
-        updateProfile({ cityCode: city })
-        await userApi.updateMe({ cityCode: city }, currentUser)
+        if (data.status !== 'success' || !data.regionName) return
+        const province = data.regionName.replace(/(省|市|自治区|特别行政区)$/, '').trim()
+        if (!province || province === currentUser.cityCode) return
+        updateProfile({ cityCode: province })
+        await userApi.updateMe({ cityCode: province }, currentUser)
       } catch { /* ignore */ }
     }
     detectIpLocation()
