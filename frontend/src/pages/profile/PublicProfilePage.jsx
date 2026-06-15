@@ -338,11 +338,6 @@ export function PublicProfilePage() {
             <button className="secondary-btn" onClick={toggleFollow} disabled={followLoading}>
               {followedByMe && followsMe ? '互相关注' : followedByMe ? '已关注' : '关注'}
             </button>
-            {isProvider && (
-              <button className="secondary-btn" disabled={pp?.acceptingOrders === false} style={pp?.acceptingOrders === false ? { opacity: 0.5, cursor: 'not-allowed' } : {}}>
-                {pp?.acceptingOrders === false ? '暂停接单' : '立即预约'}
-              </button>
-            )}
             <button className="secondary-btn" onClick={() => navigate(`/users/${profileUserId}?role=${isProvider ? 'CUSTOMER' : 'PROVIDER'}`)}>
               {isProvider ? '查看 TA 的约拍方主页 →' : '查看 TA 的摄影师主页 →'}
             </button>
