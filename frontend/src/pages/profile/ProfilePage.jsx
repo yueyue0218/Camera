@@ -256,7 +256,10 @@ export function ProfilePage() {
         userApi.following(currentUser.userId, currentUser, 'CUSTOMER').catch(() => []),
         userApi.following(currentUser.userId, currentUser, 'PROVIDER').catch(() => [])
       ])
-      setMyFollowing([...(followingCustomer || []), ...(followingProvider || [])])
+      setMyFollowing([
+        ...(followingCustomer || []).map(f => ({ ...f, role: f.role || 'CUSTOMER' })),
+        ...(followingProvider || []).map(f => ({ ...f, role: f.role || 'PROVIDER' })),
+      ])
     } catch { setMyFollowing([]) }
     if (!isProvider) {
       try {
@@ -700,11 +703,17 @@ export function ProfilePage() {
                 <div className="order-list">
                   {follows.map(f => {
                     const isMutual = mutualFollowIds.has(Number(f.authorId))
+                    const avatar = f.avatarData || f.avatarUrl || ''
+                    const roleLabel = f.role === 'PROVIDER' ? '摄影师' : '约拍方'
+                    const roleUrl = f.role ? `?role=${f.role}` : ''
                     return (
-                      <div key={f.authorId} className="order-slip" onClick={() => navigate(`/users/${f.authorId}`)}>
-                        <div className="order-num" style={{fontSize:20}}>★</div>
+                      <div key={f.authorId} className="order-slip" onClick={() => navigate(`/users/${f.authorId}${roleUrl}`)}>
+                        <div className="follow-avatar" style={avatar ? { backgroundImage: `url(${avatar})` } : { background: `hsl(${(Number(f.authorId) * 67) % 360},45%,68%)` }} />
                         <div>
-                          <h4>{f.nickname || `用户 ${f.authorId}`}</h4>
+                          <h4 style={{display:'flex',alignItems:'center',gap:8}}>
+                            {f.nickname || `用户 ${f.authorId}`}
+                            <span className="role-badge" style={{fontSize:11,height:22,padding:'0 8px'}}>{roleLabel}</span>
+                          </h4>
                           <p>{f.followedAt ? `${formatShortTime(f.followedAt)} 开始关注` : '已关注'}</p>
                         </div>
                         {isMutual && <span className="status">互相关注</span>}

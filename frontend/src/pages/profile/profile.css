@@ -128,6 +128,7 @@ a{text-decoration:none;color:inherit}
 .order-slip{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;background:#fffaf2;border:1px solid rgba(21,19,24,.11);border-radius:16px;padding:14px;transition:.2s;cursor:pointer;}
 .order-slip:hover{transform:translateX(3px);box-shadow:var(--soft)}
 .order-num{font-family:"Playfair Display","Bodoni 72",Georgia,serif;font-size:28px;color:rgba(13,47,178,.28);width:42px;}
+.follow-avatar{width:42px;height:42px;border-radius:50%;background-size:cover;background-position:center;flex-shrink:0;}
 .order-slip h4{margin:0 0 4px;font-size:15px;letter-spacing:.08em;}
 .order-slip p{margin:0;color:#676c74;font-size:12px;letter-spacing:.08em;}
 .status{display:inline-flex;border-radius:999px;background:rgba(13,47,178,.08);color:var(--blue);padding:6px 10px;font-size:12px;font-weight:700;letter-spacing:.08em;white-space:nowrap;}
