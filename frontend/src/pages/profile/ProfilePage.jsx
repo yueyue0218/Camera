@@ -137,25 +137,32 @@ export function ProfilePage() {
     async function detectIpLocation() {
       try {
         const amapKey = import.meta.env.VITE_AMAP_KEY
-        let city = ''
+        let location = ''
         if (amapKey) {
           const res = await fetch(`https://restapi.amap.com/v3/ip?key=${amapKey}&output=json`)
           const data = await res.json()
-          if (data.status === '1' && data.city && typeof data.city === 'string') {
-            city = data.city.replace(/市$/, '').trim()
+          if (data.status === '1') {
+            const province = typeof data.province === 'string'
+              ? data.province.replace(/(省|市|自治区|特别行政区)$/, '').trim() : ''
+            const city = typeof data.city === 'string'
+              ? data.city.replace(/市$/, '').trim() : ''
+            if (province && city && province !== city) {
+              location = `${province}·${city}`
+            } else if (province) {
+              location = province
+            }
           }
         }
-        if (!city) {
-          // 无高德 Key 时降级用 ip-api.com（省级）
+        if (!location) {
           const res = await fetch('http://ip-api.com/json/?lang=zh-CN&fields=status,regionName')
           const data = await res.json()
           if (data.status === 'success' && data.regionName) {
-            city = data.regionName.replace(/(省|市|自治区|特别行政区)$/, '').trim()
+            location = data.regionName.replace(/(省|市|自治区|特别行政区)$/, '').trim()
           }
         }
-        if (!city || city === currentUser.cityCode) return
-        updateProfile({ cityCode: city })
-        await userApi.updateMe({ cityCode: city }, currentUser)
+        if (!location || location === currentUser.cityCode) return
+        updateProfile({ cityCode: location })
+        await userApi.updateMe({ cityCode: location }, currentUser)
       } catch { /* ignore */ }
     }
     detectIpLocation()
