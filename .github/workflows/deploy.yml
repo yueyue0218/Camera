@@ -35,9 +35,9 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_KEY }}
-          source: "dist/*"
+          source: "dist"
           target: "/var/www/"
-          strip_components: 1
+      
 
       - name: Upload backend JAR to server
         uses: appleboy/scp-action@master
