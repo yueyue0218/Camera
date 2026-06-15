@@ -24,13 +24,19 @@ function saveStoredProfile(user) {
   if (!user?.userId) return
   const profiles = readUserProfiles()
   const userId = String(user.userId)
+  const prev = profiles[userId] || {}
+  // Blob URLs (blob:...) only live for the current page session — don't persist them.
+  // Keep the previously stored data URL so it survives page reloads.
+  const avatarData = user.avatarData && !user.avatarData.startsWith('blob:')
+    ? user.avatarData
+    : (prev.avatarData || '')
   profiles[userId] = {
-    ...profiles[userId],
+    ...prev,
     userId: Number(user.userId),
     role: user.role,
     nickname: user.nickname,
     avatarFileId: user.avatarFileId || null,
-    avatarData: user.avatarData || '',
+    avatarData,
     bio: user.bio || user.description || '',
     description: user.description || user.bio || '',
     availability: user.availability || '',
@@ -98,7 +104,9 @@ function normalizeSession(session) {
       role,
       label: role === 'PROVIDER' ? '服务方' : '需求方',
       nickname,
-      avatarData: storedProfile.avatarData || session.user.avatarData || demoUser.avatarData,
+      avatarData: (storedProfile.avatarData && !storedProfile.avatarData.startsWith('blob:') ? storedProfile.avatarData : null)
+        || (session.user.avatarData && !session.user.avatarData.startsWith('blob:') ? session.user.avatarData : null)
+        || demoUser.avatarData,
       bio,
       description: bio,
       availability,
