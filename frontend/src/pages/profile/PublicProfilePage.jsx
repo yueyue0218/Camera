@@ -11,6 +11,7 @@ import {
   readUserProfiles,
   toggleFollow as toggleFollowLocal,
 } from './utils/profileUtils.js'
+import { ReviewScore } from '../reviews/ReviewPage.jsx'
 import './profile.css'
 
 function formatCreditScore(value) {
@@ -176,12 +177,11 @@ export function PublicProfilePage() {
   const pp = publicProfile?.providerProfile || {}
   const nickname = publicProfile?.nickname || storedProfile.nickname || `用户${profileUserId}`
   const gender = publicProfile?.gender
-  const genderText = gender === 'MALE' ? '男' : gender === 'FEMALE' ? '女' : '保密'
   const bio = publicProfile?.bio || storedProfile.bio || ''
   const creditScore = creditSummary?.creditScore ?? null
   const displayCreditScore = formatCreditScore(creditScore)
   const cityPin = pp?.cityCode || publicProfile?.school || publicProfile?.cityCode || storedProfile.school || 'Portra'
-  const cityMeta = pp?.cityCode || publicProfile?.cityCode || '未知城市'
+  const ipLocation = pp?.cityCode || publicProfile?.cityCode || publicProfile?.ipLocation || storedProfile.cityCode || ''
 
   const momentImages = moments
     .filter(m => m.imageData)
@@ -217,11 +217,40 @@ export function PublicProfilePage() {
     return String(raw).split(',').map(s => s.trim()).filter(Boolean)
   })()
 
-  const providerTabs = [
-    { id: 'portfolio', label: '作品集', num: '01' },
-    { id: 'reviews', label: '历史评价', num: '02' },
-    { id: 'moments', label: 'TA的动态', num: '03' },
-  ]
+  const allTabs = isProvider
+    ? [
+        { id: 'portfolio', label: '作品集', num: '01' },
+        { id: 'reviews', label: '历史评价', num: '02' },
+        { id: 'moments', label: 'TA的动态', num: '03' },
+      ]
+    : [
+        { id: 'moments', label: 'TA的照片', num: '01' },
+        { id: 'reviews', label: '收到的评价', num: '02' },
+      ]
+
+  function ReviewCard({ r }) {
+    return (
+      <div
+        className="review-card"
+        role="button"
+        tabIndex={0}
+        style={{ cursor: 'pointer', marginTop: 12 }}
+        onClick={() => openReviewCard(r)}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openReviewCard(r) } }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 8 }}>
+          <span style={{ fontSize: 13, color: '#6e737b', letterSpacing: '.08em' }}>
+            来自 {r.reviewerNickname || `用户 ${r.reviewerId}`} · {formatShortTime(r.createdAt)}
+          </span>
+          <ReviewScore value={r.rating} />
+        </div>
+        <blockquote style={{ margin: 0 }}>"{r.content || '对方没有留下文字评价'}"</blockquote>
+        {r.replyContent && (
+          <div className="review-reply"><span>追评</span><p>{r.replyContent}</p></div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="pp-main">
@@ -234,11 +263,7 @@ export function PublicProfilePage() {
 
       <div className="pp-crumb">
         <span><strong>PROFILE</strong> / {nickname} / 个人摄影档案</span>
-        <span>
-          {isProvider
-            ? `FRAME ${pp?.completedOrders ?? 0} · ${pp?.cityCode || 'Portra'}`
-            : `CREDIT ${displayCreditScore} · Portra`}
-        </span>
+        <span>{isProvider ? `FRAME ${pp?.completedOrders ?? 0} · ${pp?.cityCode || 'Portra'}` : `CREDIT ${displayCreditScore} · Portra`}</span>
       </div>
 
       {/* ── HERO ── */}
@@ -247,9 +272,7 @@ export function PublicProfilePage() {
 
         <div className="profile-photo-wrap">
           <div className="profile-photo-card">
-            <div className="profile-photo">
-              {avatarUrl && <img src={avatarUrl} alt="" />}
-            </div>
+            <div className="profile-photo">{avatarUrl && <img src={avatarUrl} alt="" />}</div>
             <div className="photo-pin">{cityPin}</div>
           </div>
         </div>
@@ -262,9 +285,25 @@ export function PublicProfilePage() {
           </div>
           <p className="profile-uid">UID：{profileUserId} · Portra ID</p>
           <div className="profile-meta-line">
-            <span>IP：{cityMeta} · {genderText}</span>
+            <span>IP属地：{ipLocation || '未知'}</span>
           </div>
+          {(() => {
+            const chips = []
+            if (gender === 'FEMALE') chips.push('♀ 女')
+            else if (gender === 'MALE') chips.push('♂ 男')
+            if (pp?.cityCode) chips.push(`📍 ${pp.cityCode}`)
+            return chips.length ? (
+              <div className="profile-tag-row">
+                {chips.map((c, i) => <span key={i} className="profile-tag">{c}</span>)}
+              </div>
+            ) : null
+          })()}
           <p className="profile-signature">{bio || '这个人还没有写简介。'}</p>
+          <div className="social-stats-row">
+            <div className="social-stat"><b>{publicProfile?.followingCount ?? '—'}</b><span>关注</span></div>
+            <div className="social-stat"><b>{publicProfile?.followerCount ?? '—'}</b><span>粉丝</span></div>
+            <div className="social-stat"><b>{publicProfile?.momentCount ?? moments.length}</b><span>动态</span></div>
+          </div>
         </div>
 
         <aside className="hero-side">
@@ -272,136 +311,116 @@ export function PublicProfilePage() {
             <div className="id-number">No.{profileUserId}</div>
             <div className="id-label">PORTRA CREDIT FILE</div>
           </div>
-
-          {isProvider ? (
-            <div className="metric-grid">
-              <div className="metric"><b>{pp?.avgRating != null ? Number(pp.avgRating).toFixed(1) : '—'}</b><span>平均评分</span></div>
-              <div className="metric"><b>{pp?.completedOrders ?? '—'}</b><span>历史约拍</span></div>
-              <div className="metric"><b>{publicProfile?.followerCount ?? '—'}</b><span>粉丝</span></div>
-              <div className="metric"><b>{publicProfile?.followingCount ?? '—'}</b><span>关注</span></div>
-            </div>
-          ) : (
-            <div className="metric-grid">
-              <button className="metric metric-button" type="button" onClick={() => navigate(`/users/${profileUserId}/credit`)}><b>{displayCreditScore}</b><span>信用评分</span></button>
-              <div className="metric"><b>{publicProfile?.followerCount ?? '—'}</b><span>粉丝</span></div>
-              <div className="metric"><b>{publicProfile?.followingCount ?? '—'}</b><span>关注</span></div>
-              <div className="metric"><b>{publicProfile?.momentCount ?? moments.length}</b><span>动态数</span></div>
-            </div>
-          )}
-
+          <div className="metric-grid">
+            <button className="metric metric-button" type="button" onClick={() => navigate(`/users/${profileUserId}/credit`)}>
+              <b>{displayCreditScore}</b><span>信用评分</span>
+            </button>
+            {isProvider ? (
+              <>
+                <div className="metric"><b>{pp?.avgRating != null ? Number(pp.avgRating).toFixed(1) : '—'}</b><span>平均评分</span></div>
+                <div className="metric"><b>{pp?.completedOrders ?? '—'}</b><span>历史约拍</span></div>
+                <div className="metric"><b>{reviews.length}</b><span>收到评价</span></div>
+              </>
+            ) : (
+              <>
+                <div className="metric"><b>{reviews.length}</b><span>收到评价</span></div>
+                <div className="metric"><b>{publicProfile?.momentCount ?? moments.length}</b><span>动态数</span></div>
+              </>
+            )}
+          </div>
           <div className="hero-actions">
-            {isProvider && (
-              <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--blue)', fontWeight: 700 }}>
-                {(pp?.priceMin != null && pp?.priceMax != null) ? `¥${pp.priceMin}–¥${pp.priceMax} / 次` : '价格面议'}
+            {isProvider && pp?.priceMin != null && (
+              <div style={{ fontSize: 13, color: 'var(--blue)', fontWeight: 700, marginBottom: 4 }}>
+                {`¥${pp.priceMin}–¥${pp.priceMax} / 次`}
               </div>
             )}
-            <button className="primary-btn" onClick={() => navigate('/messages', { state: { targetUserId: profileUserId } })}>
-              发消息
-            </button>
+            <button className="primary-btn" onClick={() => navigate('/messages', { state: { targetUserId: profileUserId } })}>发消息</button>
             <button className="secondary-btn" onClick={toggleFollow} disabled={followLoading}>
               {followedByMe && followsMe ? '互相关注' : followedByMe ? '已关注' : '关注'}
             </button>
             {isProvider && (
-              <button
-                className="secondary-btn"
-                disabled={!pp?.acceptingOrders}
-                style={!pp?.acceptingOrders ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
-              >
+              <button className="secondary-btn" disabled={!pp?.acceptingOrders} style={!pp?.acceptingOrders ? { opacity: 0.5, cursor: 'not-allowed' } : {}}>
                 {pp?.acceptingOrders ? '立即预约' : '暂停接单'}
               </button>
             )}
+            <button className="secondary-btn" onClick={() => navigate(`/users/${profileUserId}?role=${isProvider ? 'CUSTOMER' : 'PROVIDER'}`)}>
+              {isProvider ? '查看 TA 的约拍方主页 →' : '查看 TA 的摄影师主页 →'}
+            </button>
           </div>
         </aside>
       </section>
 
-      {/* ── PROVIDER: Dashboard ── */}
-      {isProvider && (
-        <section className="pp-dashboard">
-          <div className="dashboard-card-row" ref={dashboardRowRef}>
+      {/* ── DASHBOARD ── */}
+      <section className="pp-dashboard">
+        <div className="dashboard-card-row" ref={dashboardRowRef}>
 
-            <aside className="panel-card frame-nav" ref={frameNavRef}>
-              <p className="frame-title">Frame Navigation</p>
-              {providerTabs.map(tab => (
-                <button
-                  key={tab.id}
-                  className={`frame-tab${activeTab === tab.id ? ' active' : ''}`}
-                  onClick={() => setActiveTab(tab.id)}
-                >
-                  <span>{tab.label}</span>
-                  <small>{tab.num}</small>
-                </button>
-              ))}
-            </aside>
+          <aside className="panel-card frame-nav" ref={frameNavRef}>
+            <p className="frame-title">Frame Navigation</p>
+            {allTabs.map(tab => (
+              <button key={tab.id} className={`frame-tab${activeTab === tab.id ? ' active' : ''}`} onClick={() => setActiveTab(tab.id)}>
+                <span>{tab.label}</span><small>{tab.num}</small>
+              </button>
+            ))}
+          </aside>
 
-            <div className="content-stack" style={{ height: 'auto' }}>
+          <div className="content-stack" style={{ height: 'auto' }}>
 
-              <section className={`panel-card tab-panel${activeTab === 'portfolio' ? ' active' : ''}`}>
-                <div className="section-head">
-                  <div>
-                    <h2>作品集</h2>
-                    <p>摄影师的胶片接触印相，记录每一次按快门的瞬间。</p>
-                  </div>
-                  <div className="section-mark">01</div>
+            {/* 作品集 / TA的照片 */}
+            <section className={`panel-card tab-panel${activeTab === 'portfolio' || activeTab === 'moments' ? ' active' : ''}`}>
+              <div className="section-head">
+                <div>
+                  <h2>{isProvider ? '作品集' : 'TA的照片'}</h2>
+                  <p>{isProvider ? '摄影师的胶片接触印相，记录每一次按快门的瞬间。' : '被快门留下的时刻。'}</p>
                 </div>
-                <div className="contact-sheet">
-                  <div className="photo-grid">
-                    {Array.from({ length: 6 }).map((_, i) => {
-                      const m = momentImages[i]
-                      return (
-                        <div
-                          key={i}
-                          className="film-frame"
-                          onClick={() => m && navigate(`/moments/${m.momentId}`)}
-                          style={m ? { cursor: 'pointer' } : {}}
-                        >
-                          {m?.imageData && <img src={m.imageData} alt="" />}
-                          <span className="cap">FRAME {String(i + 1).padStart(2, '0')}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
+                <div className="section-mark">01</div>
+              </div>
+              <div className="contact-sheet">
+                <div className="photo-grid">
+                  {Array.from({ length: 6 }).map((_, i) => {
+                    const m = momentImages[i]
+                    return (
+                      <div key={i} className="film-frame" onClick={() => m && navigate(`/moments/${m.momentId}`)} style={m ? { cursor: 'pointer' } : {}}>
+                        {m?.imageData && <img src={m.imageData} alt="" />}
+                        <span className="cap">FRAME {String(i + 1).padStart(2, '0')}</span>
+                      </div>
+                    )
+                  })}
                 </div>
-              </section>
-
-              <section className={`panel-card tab-panel${activeTab === 'reviews' ? ' active' : ''}`}>
-                <div className="section-head">
-                  <div>
-                    <h2>历史评价</h2>
-                    <p>来自约拍方的真实反馈，见证每一次约拍。</p>
-                  </div>
-                  <div className="section-mark">02</div>
+              </div>
+              {!isProvider && moments.length > 0 && (
+                <div className="order-list" style={{ marginTop: 16 }}>
+                  {moments.slice(0, 5).map((m, i) => (
+                    <div key={m.momentId} className="order-slip" onClick={() => navigate(`/moments/${m.momentId}`)}>
+                      <div className="order-num">{String(i + 1).padStart(2, '0')}</div>
+                      <div><h4>{m.title || '未命名动态'}</h4><p>{(m.content || '').slice(0, 50)} · {formatShortTime(m.createdAt)}</p></div>
+                    </div>
+                  ))}
                 </div>
-                {providerReviews.length ? providerReviews.slice(0, 4).map(r => (
-                  <div
-                    key={r.reviewId || `${r.orderId}-${r.direction}`}
-                    className="review-card"
-                    role="button"
-                    tabIndex={0}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => openReviewCard(r)}
-                    onKeyDown={event => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        openReviewCard(r)
-                      }
-                    }}
-                  >
-                    <blockquote>"{r.content || '对方没有留下文字评价'}"</blockquote>
-                    <footer>
-                      来自 {r.reviewerNickname || `用户 ${r.reviewerId}`} · ★{Number(r.rating || 0).toFixed(1)} · {formatShortTime(r.createdAt)}
-                    </footer>
-                  </div>
-                )) : (
-                  <div className="pp-empty"><h3>暂无评价</h3><p>还没有收到来自约拍方的评价。</p></div>
-                )}
-              </section>
+              )}
+            </section>
 
+            {/* 历史评价 / 收到的评价 */}
+            <section className={`panel-card tab-panel${activeTab === 'reviews' ? ' active' : ''}`}>
+              <div className="section-head">
+                <div>
+                  <h2>{isProvider ? '历史评价' : '收到的评价'}</h2>
+                  <p>{isProvider ? '来自约拍方的真实反馈，见证每一次约拍。' : '摄影师对 TA 的真实反馈，了解合作体验。'}</p>
+                </div>
+                <div className="section-mark">02</div>
+              </div>
+              {(isProvider ? providerReviews : customerReviews).length
+                ? (isProvider ? providerReviews : customerReviews).slice(0, 6).map(r => (
+                    <ReviewCard key={r.reviewId || `${r.orderId}-${r.direction}`} r={r} />
+                  ))
+                : <div className="pp-empty"><h3>暂无评价</h3><p>完成约拍后双方会互相留下评价。</p></div>
+              }
+            </section>
+
+            {/* TA的动态（仅摄影师） */}
+            {isProvider && (
               <section className={`panel-card tab-panel${activeTab === 'moments' ? ' active' : ''}`}>
                 <div className="section-head">
-                  <div>
-                    <h2>TA的动态</h2>
-                    <p>摄影师最近发布的帖子。</p>
-                  </div>
+                  <div><h2>TA的动态</h2><p>摄影师最近发布的帖子。</p></div>
                   <div className="section-mark">03</div>
                 </div>
                 {moments.length ? (
@@ -409,10 +428,7 @@ export function PublicProfilePage() {
                     {moments.slice(0, 5).map((m, i) => (
                       <div key={m.momentId} className="order-slip" onClick={() => navigate(`/moments/${m.momentId}`)}>
                         <div className="order-num">{String(i + 1).padStart(2, '0')}</div>
-                        <div>
-                          <h4>{m.title || '未命名动态'}</h4>
-                          <p>{(m.content || '').slice(0, 50)} · {formatShortTime(m.createdAt)}</p>
-                        </div>
+                        <div><h4>{m.title || '未命名动态'}</h4><p>{(m.content || '').slice(0, 50)} · {formatShortTime(m.createdAt)}</p></div>
                       </div>
                     ))}
                   </div>
@@ -420,21 +436,21 @@ export function PublicProfilePage() {
                   <div className="pp-empty"><h3>暂无动态</h3><p>该摄影师还没有发布动态。</p></div>
                 )}
               </section>
+            )}
 
-            </div>
+          </div>
 
+          {/* 右侧信息栏（仅摄影师） */}
+          {isProvider && (
             <aside className="side-stack" style={{ height: 'auto', minHeight: 'var(--dashboard-left-card-height)', overflow: 'visible' }}>
               <section className="panel-card">
                 <p className="frame-title">摄影师信息</p>
                 <div style={{ marginBottom: 14 }}>
                   <div style={{ fontSize: 12, letterSpacing: '.14em', color: '#6e737b', marginBottom: 8 }}>风格标签</div>
-                  {styleTags.length ? (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-                      {styleTags.map(tag => <span key={tag} className="tag blue">{tag}</span>)}
-                    </div>
-                  ) : (
-                    <span style={{ fontSize: 13, color: '#999' }}>暂未设置</span>
-                  )}
+                  {styleTags.length
+                    ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>{styleTags.map(tag => <span key={tag} className="tag blue">{tag}</span>)}</div>
+                    : <span style={{ fontSize: 13, color: '#999' }}>暂未设置</span>
+                  }
                 </div>
                 {pp?.equipment && (
                   <div style={{ marginBottom: 14 }}>
@@ -442,86 +458,12 @@ export function PublicProfilePage() {
                     <p style={{ margin: 0, fontSize: 13, color: '#30343a', lineHeight: 1.7 }}>{pp.equipment}</p>
                   </div>
                 )}
-                {bio && (
-                  <div>
-                    <div style={{ fontSize: 12, letterSpacing: '.14em', color: '#6e737b', marginBottom: 6 }}>档期</div>
-                    <p style={{ margin: 0, fontSize: 13, color: '#30343a', lineHeight: 1.7 }}>{bio.split('\n').slice(0, 2).join('\n')}</p>
-                  </div>
-                )}
               </section>
             </aside>
+          )}
 
-          </div>
-        </section>
-      )}
-
-      {/* ── CUSTOMER: Simplified layout ── */}
-      {!isProvider && (
-        <section className="pp-dashboard">
-
-          <section className="panel-card">
-            <div className="section-head">
-              <div>
-                <h2>TA的照片</h2>
-                <p>被快门留下的时刻，会在这里成为 contact sheet。</p>
-              </div>
-              <div className="section-mark">01</div>
-            </div>
-            <div className="contact-sheet">
-              <div className="photo-grid">
-                {Array.from({ length: 6 }).map((_, i) => {
-                  const m = momentImages[i]
-                  return (
-                    <div
-                      key={i}
-                      className="film-frame"
-                      onClick={() => m && navigate(`/moments/${m.momentId}`)}
-                      style={m ? { cursor: 'pointer' } : {}}
-                    >
-                      {m?.imageData && <img src={m.imageData} alt="" />}
-                      <span className="cap">FRAME {String(i + 1).padStart(2, '0')}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </section>
-
-          <section className="panel-card">
-            <div className="section-head">
-              <div>
-                <h2>摄影师对TA的评价</h2>
-                <p>服务方的真实反馈。</p>
-              </div>
-              <div className="section-mark">02</div>
-            </div>
-            {customerReviews.length ? customerReviews.slice(0, 4).map(r => (
-              <div
-                key={r.reviewId || `${r.orderId}-${r.direction}`}
-                className="review-card"
-                role="button"
-                tabIndex={0}
-                style={{ cursor: 'pointer' }}
-                onClick={() => openReviewCard(r)}
-                onKeyDown={event => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault()
-                    openReviewCard(r)
-                  }
-                }}
-              >
-                <blockquote>"{r.content || '对方没有留下文字评价'}"</blockquote>
-                <footer>
-                  来自 {r.reviewerNickname || `用户 ${r.reviewerId}`} · ★{Number(r.rating || 0).toFixed(1)} · {formatShortTime(r.createdAt)}
-                </footer>
-              </div>
-            )) : (
-              <div className="pp-empty"><h3>还没有收到评价</h3><p>完成约拍后摄影师会留下评价。</p></div>
-            )}
-          </section>
-
-        </section>
-      )}
+        </div>
+      </section>
     </div>
   )
 }
