@@ -90,6 +90,7 @@ export function ProfilePage() {
   const [actioningId, setActioningId] = useState(null)
   const [notice, setNotice] = useState(null)
   const [myFollowers, setMyFollowers] = useState([])
+  const [myFollowing, setMyFollowing] = useState([])
 
   const dashboardRowRef = useRef(null)
   const frameNavRef = useRef(null)
@@ -241,6 +242,13 @@ export function ProfilePage() {
     saveOrderSnapshots(orders)
     setPortfolioItems(readPortfolioItems(currentUser.userId))
     setMyFollowers(followersRes.status === 'fulfilled' ? followersRes.value : [])
+    try {
+      const [followingCustomer, followingProvider] = await Promise.all([
+        userApi.following(currentUser.userId, currentUser, 'CUSTOMER').catch(() => []),
+        userApi.following(currentUser.userId, currentUser, 'PROVIDER').catch(() => [])
+      ])
+      setMyFollowing([...(followingCustomer || []), ...(followingProvider || [])])
+    } catch { setMyFollowing([]) }
     if (!isProvider) {
       try {
         const invs = await demandApi.responsesReceived(currentUser)
@@ -364,7 +372,7 @@ export function ProfilePage() {
   )
   const favoriteMoments = useMemo(() => moments.filter(m => m.favoritedByCurrentUser), [moments])
   const likedMoments = useMemo(() => moments.filter(m => m.likedByCurrentUser), [moments])
-  const follows = readFollows().filter(f => Number(f.authorId) !== currentUser.userId)
+  const follows = myFollowing.map(f => ({ ...f, authorId: f.userId ?? f.authorId })).filter(f => Number(f.authorId) !== currentUser.userId)
   const savedPhotos = readSavedPhotos()
   const mutualFollowIds = useMemo(
     () => new Set(myFollowers.filter(f => f.followedByCurrentUser).map(f => Number(f.userId))),
@@ -684,8 +692,8 @@ export function ProfilePage() {
                       <div key={f.authorId} className="order-slip" onClick={() => navigate(`/users/${f.authorId}`)}>
                         <div className="order-num" style={{fontSize:20}}>★</div>
                         <div>
-                          <h4>用户 {f.authorId}</h4>
-                          <p>{formatShortTime(f.followedAt)} 开始关注</p>
+                          <h4>{f.nickname || `用户 ${f.authorId}`}</h4>
+                          <p>{f.followedAt ? `${formatShortTime(f.followedAt)} 开始关注` : '已关注'}</p>
                         </div>
                         {isMutual && <span className="status">互相关注</span>}
                       </div>
