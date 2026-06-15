@@ -34,13 +34,17 @@ public class AuthInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        boolean protectedB1B2Route = isProtectedB1B2RoleRoute(request);
         String demoUserId = request.getHeader("X-User-Id");
-        if (demoUserId != null && !demoUserId.isBlank()) {
+        String authHeader = request.getHeader("Authorization");
+        boolean demoHeaderAuth = authHeader == null
+                || authHeader.isBlank()
+                || authHeader.startsWith("Bearer demo-token-");
+        if (demoHeaderAuth && demoUserId != null && !demoUserId.isBlank()) {
             try {
                 Long userId = parseUserId(demoUserId);
+                ensureKnownUser(userId);
                 UserContext.setUserId(userId);
-                UserRole role = resolveDemoRole(request, userId, protectedB1B2Route);
+                UserRole role = resolveDemoRole(request, userId, isProtectedB1B2RoleRoute(request));
                 enforceProtectedRouteRole(request, role);
                 return true;
             } catch (NumberFormatException e) {
@@ -48,7 +52,6 @@ public class AuthInterceptor implements HandlerInterceptor {
             }
         }
 
-        String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
@@ -206,6 +209,9 @@ public class AuthInterceptor implements HandlerInterceptor {
                 && demoUserId != null && !demoUserId.isBlank()) {
             try {
                 Long userId = parseUserId(demoUserId);
+                if (!userRepository.existsById(userId)) {
+                    return;
+                }
                 UserContext.setUserId(userId);
                 resolveDemoRole(request, userId, false);
                 return;
@@ -245,5 +251,11 @@ public class AuthInterceptor implements HandlerInterceptor {
                     UserContext.setCurrentRole(role);
                     return role;
                 });
+    }
+
+    private void ensureKnownUser(Long userId) {
+        if (!userRepository.existsById(userId)) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        }
     }
 }

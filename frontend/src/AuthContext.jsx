@@ -52,7 +52,15 @@ function tokenSubject(token) {
   }
 }
 
+function isDemoToken(token) {
+  return typeof token === 'string' && token.startsWith('demo-token-')
+}
+
 function normalizedUserId(session, demoUser) {
+  const token = session.token || session.accessToken
+  if (isDemoToken(token)) {
+    return Number(demoUser.userId)
+  }
   const value = tokenSubject(session.token || session.accessToken)
     || session.user.userId
     || session.user.id
@@ -85,9 +93,13 @@ function normalizeSession(session) {
   const isProvider = role === 'PROVIDER'
   const nickname = isProvider ? (providerNickname || customerNickname) : customerNickname
   const bio = isProvider ? providerBio : customerBio
+  const rawToken = session.token || session.accessToken
+  const token = isDemoToken(rawToken)
+    ? `demo-token-${role.toLowerCase()}-${userId}`
+    : (rawToken || `demo-token-${role.toLowerCase()}-${userId}`)
 
   return {
-    token: session.token || session.accessToken || `demo-token-${role.toLowerCase()}-${userId}`,
+    token,
     refreshToken: session.refreshToken || '',
     user: {
       ...demoUser,
