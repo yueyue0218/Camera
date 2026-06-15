@@ -215,7 +215,7 @@ export function deriveConversationActions({
     canRequestPhotoAuthorization: !stage.roleMismatch && actionVisibility.canRequestPhotoAuthorization,
     canReviewPhotoAuthorization: !stage.roleMismatch && actionVisibility.canReviewPhotoAuthorization,
     canViewDispute: !stage.roleMismatch && order?.status === 'APPEALING',
-    canAppeal: !stage.roleMismatch && Boolean(order) && !['CANCELLED', 'REFUNDED', 'APPEALING'].includes(order.status),
+    canAppeal: false,
     canOpenOrder: !stage.roleMismatch && hasOrderId,
     canOpenOrderArchive: !stage.roleMismatch && hasOrderId,
     deliveries,
