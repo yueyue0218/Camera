@@ -22,6 +22,7 @@ import com.action.camera.order.repository.PaymentRecordRepository;
 import com.action.camera.order.statemachine.OrderStatusMachine;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -96,21 +97,22 @@ public class OrderService {
 
     @Transactional
     public Order mockPay(Long orderId, Long payerId, Long amountCent) {
-        Order order = getOrderOrThrow(orderId);
+        Order order = getOrderForUpdateOrThrow(orderId);
 
         if (!Objects.equals(order.getCustomerId(), payerId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Only the customer can pay this order");
         }
-        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
-                    "Order status does not allow payment: " + order.getStatus());
-        }
         if (!Objects.equals(order.getTotalAmountCent(), amountCent)) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Payment amount does not match order amount");
         }
-        if (paymentRecordRepository.findByOrderId(order.getId()).isPresent()) {
-            throw new BusinessException(ErrorCode.DUPLICATE_OPERATION,
-                    "Payment already exists for order: " + order.getId());
+
+        Optional<PaymentRecord> existingPayment = paymentRecordRepository.findByOrderId(order.getId());
+        if (existingPayment.isPresent()) {
+            return handleExistingPayment(order, existingPayment.get(), amountCent, payerId);
+        }
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                    "Order status does not allow payment: " + order.getStatus());
         }
 
         OrderStatus fromStatus = order.getStatus();
@@ -119,7 +121,12 @@ public class OrderService {
 
         order.setEscrowStatus(EscrowStatus.HELD);
         PaymentRecord paymentRecord = buildMockPaymentRecord(order, payerId, amountCent);
-        paymentRecordRepository.save(paymentRecord);
+        try {
+            paymentRecordRepository.saveAndFlush(paymentRecord);
+        } catch (DataIntegrityViolationException ex) {
+            throw new BusinessException(ErrorCode.DUPLICATE_OPERATION,
+                    "Payment already exists for order: " + orderId);
+        }
 
         Order paidOrder = applyStatusChange(order, fromStatus, targetStatus, payerId, "CUSTOMER", "模拟支付成功，资金进入平台托管");
         notifyOrderPaid(paidOrder);
@@ -521,6 +528,14 @@ public class OrderService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Order not found: " + orderId));
     }
 
+    private Order getOrderForUpdateOrThrow(Long orderId) {
+        if (orderId == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "orderId must not be null");
+        }
+        return orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Order not found: " + orderId));
+    }
+
     private List<Order> listCustomerOrders(Long customerId, OrderStatus status) {
         if (status == null) {
             return orderRepository.findByCustomerIdOrderByUpdatedAtDesc(customerId);
@@ -635,6 +650,33 @@ public class OrderService {
         paymentRecord.setPaidAt(now);
         paymentRecord.setCreatedAt(now);
         return paymentRecord;
+    }
+
+    private Order handleExistingPayment(Order order, PaymentRecord existingPayment, Long amountCent, Long payerId) {
+        ensurePaymentAmountMatches(existingPayment, amountCent);
+        if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
+            OrderStatus fromStatus = order.getStatus();
+            ensureCanChangeStatus(fromStatus, OrderStatus.PAID_PENDING_SHOOT);
+            order.setEscrowStatus(EscrowStatus.HELD);
+            Order paidOrder = applyStatusChange(
+                    order,
+                    fromStatus,
+                    OrderStatus.PAID_PENDING_SHOOT,
+                    payerId,
+                    "CUSTOMER",
+                    "重复支付请求命中已有支付记录，补齐订单支付状态"
+            );
+            notifyOrderPaid(paidOrder);
+            return paidOrder;
+        }
+        return order;
+    }
+
+    private void ensurePaymentAmountMatches(PaymentRecord paymentRecord, Long amountCent) {
+        if (!Objects.equals(paymentRecord.getAmountCent(), amountCent)) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR,
+                    "Payment already exists with a different amount for order: " + paymentRecord.getOrderId());
+        }
     }
 
     private void ensureCanChangeStatus(OrderStatus fromStatus, OrderStatus targetStatus) {

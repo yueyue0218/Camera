@@ -150,10 +150,11 @@ class OrderControllerTest {
         UserContext.setUserId(CUSTOMER_ID);
         Order order = order(OrderStatus.PENDING_PAYMENT);
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
         when(paymentRecordRepository.findByOrderId(ORDER_ID))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(paymentRecord()));
-        when(paymentRecordRepository.save(any(PaymentRecord.class))).thenAnswer(invocation -> {
+        when(paymentRecordRepository.saveAndFlush(any(PaymentRecord.class))).thenAnswer(invocation -> {
             PaymentRecord paymentRecord = invocation.getArgument(0);
             paymentRecord.setId(6001L);
             return paymentRecord;
@@ -172,7 +173,7 @@ class OrderControllerTest {
         assertEquals(EscrowStatus.HELD, result.getData().getEscrowStatus());
         assertEquals(AMOUNT_CENT, result.getData().getAmountCent());
         assertEquals(OrderService.MOCK_PAY_METHOD, result.getData().getPayMethod());
-        verify(paymentRecordRepository, times(1)).save(any(PaymentRecord.class));
+        verify(paymentRecordRepository, times(1)).saveAndFlush(any(PaymentRecord.class));
         verify(orderStatusLogRepository, times(1)).save(any(OrderStatusLog.class));
         ArgumentCaptor<NotificationCreateRequest> notificationCaptor =
                 ArgumentCaptor.forClass(NotificationCreateRequest.class);
@@ -186,7 +187,7 @@ class OrderControllerTest {
     @Test
     void providerAndStrangerCannotMockPay() {
         Order order = order(OrderStatus.PENDING_PAYMENT);
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
 
         UserContext.setUserId(PROVIDER_USER_ID);
         assertThrows(BusinessException.class, () -> orderController.mockPay(ORDER_ID, mockPayRequest(AMOUNT_CENT)));
@@ -200,10 +201,10 @@ class OrderControllerTest {
     }
 
     @Test
-    void mockPayRejectsWrongAmountOrWrongStatusOrDuplicatePayment() {
+    void mockPayRejectsWrongAmountOrWrongStatus() {
         UserContext.setUserId(CUSTOMER_ID);
         Order order = order(OrderStatus.PENDING_PAYMENT);
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
 
         assertThrows(BusinessException.class, () -> orderController.mockPay(ORDER_ID, mockPayRequest(AMOUNT_CENT + 1)));
         assertEquals(OrderStatus.PENDING_PAYMENT, order.getStatus());
@@ -211,12 +212,7 @@ class OrderControllerTest {
 
         Order paidOrder = order(OrderStatus.PAID_PENDING_SHOOT);
         paidOrder.setEscrowStatus(EscrowStatus.HELD);
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(paidOrder));
-        assertThrows(BusinessException.class, () -> orderController.mockPay(ORDER_ID, mockPayRequest(AMOUNT_CENT)));
-
-        Order duplicatePaymentOrder = order(OrderStatus.PENDING_PAYMENT);
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(duplicatePaymentOrder));
-        when(paymentRecordRepository.findByOrderId(ORDER_ID)).thenReturn(Optional.of(paymentRecord()));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(paidOrder));
         assertThrows(BusinessException.class, () -> orderController.mockPay(ORDER_ID, mockPayRequest(AMOUNT_CENT)));
     }
 

@@ -10,6 +10,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
+import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -23,7 +24,13 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "payment_records")
+@Table(
+        name = "payment_records",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_payment_records_order_id",
+                columnNames = "order_id"
+        )
+)
 public class PaymentRecord {
 
     @Id

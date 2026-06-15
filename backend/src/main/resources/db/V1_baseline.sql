@@ -153,7 +153,7 @@ CREATE TABLE IF NOT EXISTS payment_records (
     requested_at         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     paid_at              DATETIME      NULL,
     refunded_at          DATETIME      NULL,
-    KEY idx_payment_records_order (order_id),
+    UNIQUE KEY uk_payment_records_order_id (order_id),
     KEY idx_payment_records_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Payment and refund records';
 

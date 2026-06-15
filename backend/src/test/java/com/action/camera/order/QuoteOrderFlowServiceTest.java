@@ -365,9 +365,9 @@ class QuoteOrderFlowServiceTest {
     @Test
     void mockPayHoldsFundsAndWritesPaymentRecordAndStatusLog() {
         Order order = pendingPaymentOrder();
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
         when(paymentRecordRepository.findByOrderId(ORDER_ID)).thenReturn(Optional.empty());
-        when(paymentRecordRepository.save(any(PaymentRecord.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(paymentRecordRepository.saveAndFlush(any(PaymentRecord.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderStatusLogRepository.save(any(OrderStatusLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -377,7 +377,7 @@ class QuoteOrderFlowServiceTest {
         ArgumentCaptor<OrderStatusLog> logCaptor = ArgumentCaptor.forClass(OrderStatusLog.class);
         assertEquals(OrderStatus.PAID_PENDING_SHOOT, paidOrder.getStatus());
         assertEquals(EscrowStatus.HELD, paidOrder.getEscrowStatus());
-        verify(paymentRecordRepository, times(1)).save(paymentCaptor.capture());
+        verify(paymentRecordRepository, times(1)).saveAndFlush(paymentCaptor.capture());
         verify(orderStatusLogRepository, times(1)).save(logCaptor.capture());
 
         PaymentRecord paymentRecord = paymentCaptor.getValue();
@@ -398,7 +398,7 @@ class QuoteOrderFlowServiceTest {
     @Test
     void nonCustomerCannotPayOrder() {
         Order order = pendingPaymentOrder();
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
 
         assertThrows(BusinessException.class,
                 () -> orderService.mockPay(ORDER_ID, PROVIDER_USER_ID, AMOUNT_CENT));
@@ -412,7 +412,7 @@ class QuoteOrderFlowServiceTest {
     @Test
     void mismatchedPaymentAmountFails() {
         Order order = pendingPaymentOrder();
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
 
         assertThrows(BusinessException.class,
                 () -> orderService.mockPay(ORDER_ID, CUSTOMER_ID, AMOUNT_CENT + 1));

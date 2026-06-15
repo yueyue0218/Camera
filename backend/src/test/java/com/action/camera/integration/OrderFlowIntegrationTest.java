@@ -9,12 +9,15 @@ import com.action.camera.order.entity.Order;
 import com.action.camera.order.enums.EscrowStatus;
 import com.action.camera.order.enums.OrderStatus;
 import com.action.camera.order.repository.OrderRepository;
+import com.action.camera.order.repository.PaymentRecordRepository;
+import com.action.camera.order.service.OrderService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -27,8 +30,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = "spring.datasource.url=jdbc:h2:mem:camera_it;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;NON_KEYWORDS=CURRENT_ROLE;DB_CLOSE_DELAY=-1")
@@ -48,6 +56,12 @@ class OrderFlowIntegrationTest {
 
     @Autowired
     private OrderRepository orderRepository;
+
+    @Autowired
+    private PaymentRecordRepository paymentRecordRepository;
+
+    @Autowired
+    private OrderService orderService;
 
     @BeforeEach
     void seedDemoUsers() {
@@ -100,15 +114,64 @@ class OrderFlowIntegrationTest {
     }
 
     @Test
-    void mockPay_alreadyPaid_returnsError() {
-        Order order = createOrderInStatus(OrderStatus.PAID_PENDING_SHOOT);
+    void mockPay_sameAmountTwice_isIdempotentAndCreatesOnePaymentRecord() {
+        Order order = createOrderInStatus(OrderStatus.PENDING_PAYMENT);
 
         String payBody = "{\"payMethod\":\"MOCK_PAY\",\"amountCent\":50000}";
-        ResponseEntity<Map> resp = rest.exchange(
+        ResponseEntity<Map> first = rest.exchange(
+                "/orders/" + order.getId() + "/payments",
+                HttpMethod.POST, asCustomer(payBody), Map.class);
+        ResponseEntity<Map> second = rest.exchange(
                 "/orders/" + order.getId() + "/payments",
                 HttpMethod.POST, asCustomer(payBody), Map.class);
 
-        assertThat(resp.getBody().get("code")).isNotEqualTo(200);
+        assertThat(first.getBody().get("code")).isEqualTo(200);
+        assertThat(second.getBody().get("code")).isEqualTo(200);
+        assertThat(paymentRecordRepository.countByOrderId(order.getId())).isEqualTo(1);
+    }
+
+    @Test
+    void mockPay_differentAmountAfterPayment_returnsErrorAndCreatesOnePaymentRecord() {
+        Order order = createOrderInStatus(OrderStatus.PENDING_PAYMENT);
+        orderService.mockPay(order.getId(), 1001L, 50000L);
+
+        assertThatThrownBy(() -> orderService.mockPay(order.getId(), 1001L, 49999L))
+                .hasMessageContaining("amount");
+        assertThat(paymentRecordRepository.countByOrderId(order.getId())).isEqualTo(1);
+    }
+
+    @Test
+    void paymentRecord_orderIdHasDatabaseUniqueConstraint() {
+        Order order = createOrderInStatus(OrderStatus.PENDING_PAYMENT);
+        orderService.mockPay(order.getId(), 1001L, 50000L);
+
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO payment_records (
+                    payment_no, order_id, amount, refund_amount, pay_method, status, requested_at, paid_at
+                ) VALUES (?, ?, 500.00, 0.00, 'MOCK_PAY', 'SUCCESS', NOW(), NOW())
+                """, "P-DUP-" + UUID.randomUUID(), order.getId()))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(paymentRecordRepository.countByOrderId(order.getId())).isEqualTo(1);
+    }
+
+    @Test
+    void concurrentMockPay_createsOnePaymentRecord() throws Exception {
+        Order order = createOrderInStatus(OrderStatus.PENDING_PAYMENT);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Future<Order> first = executor.submit(() -> payAfterBarrier(order.getId(), ready, start));
+            Future<Order> second = executor.submit(() -> payAfterBarrier(order.getId(), ready, start));
+            ready.await();
+            start.countDown();
+
+            assertThat(first.get().getStatus()).isEqualTo(OrderStatus.PAID_PENDING_SHOOT);
+            assertThat(second.get().getStatus()).isEqualTo(OrderStatus.PAID_PENDING_SHOOT);
+            assertThat(paymentRecordRepository.countByOrderId(order.getId())).isEqualTo(1);
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test
@@ -243,6 +306,12 @@ class OrderFlowIntegrationTest {
         order.setCreatedAt(now);
         order.setUpdatedAt(now);
         return orderRepository.save(order);
+    }
+
+    private Order payAfterBarrier(Long orderId, CountDownLatch ready, CountDownLatch start) throws InterruptedException {
+        ready.countDown();
+        start.await();
+        return orderService.mockPay(orderId, 1001L, 50000L);
     }
 
     // ───────────── HTTP helpers ─────────────

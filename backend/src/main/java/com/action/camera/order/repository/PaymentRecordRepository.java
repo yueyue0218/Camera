@@ -14,6 +14,8 @@ public interface PaymentRecordRepository extends JpaRepository<PaymentRecord, Lo
 
     Optional<PaymentRecord> findByOrderId(Long orderId);
 
+    long countByOrderId(Long orderId);
+
     @Query(value = """
             select coalesce(sum(amount), 0)
             from payment_records
