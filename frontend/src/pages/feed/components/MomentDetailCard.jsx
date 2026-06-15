@@ -112,7 +112,7 @@ export function MomentDetailCard({
                 <EditRoundedIcon fontSize="small" sx={{ mr: 1 }} />
                 编辑动态
               </MenuItem>
-              <MenuItem onClick={() => { onMenuClose(); onDelete(moment.momentId); }} sx={{ color: 'error.main' }}>
+              <MenuItem onClick={() => { onMenuClose(); onDelete(moment); }} sx={{ color: 'error.main' }}>
                 <DeleteRoundedIcon fontSize="small" sx={{ mr: 1 }} />
                 删除动态
               </MenuItem>

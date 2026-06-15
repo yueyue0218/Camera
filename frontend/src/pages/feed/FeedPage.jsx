@@ -429,15 +429,24 @@ export function FeedPage() {
     }
   }
 
-  function requestDelete(moment) {
-    setDeleteTarget(moment)
+  function requestDelete(momentOrMomentId) {
+    const rawMomentId = typeof momentOrMomentId === 'object' && momentOrMomentId !== null
+      ? momentOrMomentId.momentId
+      : momentOrMomentId
+    const momentId = Number(rawMomentId)
+    if (!Number.isFinite(momentId)) {
+      setNotice({ type: 'error', text: '动态 ID 缺失，无法删除' })
+      return
+    }
+    setDeleteTarget(momentId)
   }
 
   async function confirmDelete() {
     if (!deleteTarget) return
     try {
-      await momentApi.delete(deleteTarget.momentId, currentUser)
-      removeMoment(deleteTarget.momentId)
+      const momentId = Number(deleteTarget)
+      await momentApi.delete(momentId, currentUser)
+      removeMoment(momentId)
       setDrawerMomentId(null)
       setDeleteTarget(null)
       await refreshPage()
