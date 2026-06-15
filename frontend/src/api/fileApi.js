@@ -36,6 +36,13 @@ export const fileApi = {
     formData.append('visibility', visibility)
     return request('/files/upload', { method: 'POST', body: formData }, currentUser)
   },
+  uploadImagesBatch(files, { bizType = 'PUBLISH_IMAGE', visibility = 'PUBLIC' } = {}, currentUser) {
+    const formData = new FormData()
+    Array.from(files || []).forEach(file => formData.append('files', file))
+    formData.append('bizType', bizType)
+    formData.append('visibility', visibility)
+    return request('/files/images/batch', { method: 'POST', body: formData }, currentUser)
+  },
   async downloadObjectUrl(fileId, currentUser) {
     const normalizedFileId = extractFileId(fileId)
     if (!normalizedFileId) throw new Error(`Invalid fileId: ${fileId}`)

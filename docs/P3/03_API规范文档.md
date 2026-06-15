@@ -229,7 +229,7 @@ fileId
 4. CUSTOMER 确认报价，系统检查档期冲突并生成 PENDING_PAYMENT 订单。
 
 5. CUSTOMER 支付订单，系统将订单置为 PAID_PENDING_SHOOT，并通过档期模块锁定服务方时段。
-6. 到达拍摄阶段后，订单进入 SHOOTING 或 PENDING_DELIVERY。
+6. 到达拍摄开始/结束时间后，后端定时任务自动将订单推进到 SHOOTING 或 PENDING_DELIVERY。
 7. PROVIDER 上传原片与精修片，订单进入 DELIVERED_PENDING_CONFIRM。
 8. CUSTOMER 确认收货，订单进入 COMPLETED，系统开放双方评价入口。
 9. 若交付质量、爽约、恶意评价或照片违规使用存在争议，订单双方可按申诉类型发起申诉，订单进入
@@ -248,17 +248,17 @@ PAID_PENDING_SHOOT
 已支付，待拍摄
 支付成功
 SHOOTING, CANCELLED,
-APPEALING
+REFUNDED, APPEALING
 SHOOTING
 拍摄中
-服务方或系统标记开始拍摄
+系统定时任务根据拍摄开始时间自动推进
 PENDING_DELIVERY,
 APPEALING
 PENDING_DELIVERY
 待交付
-拍摄完成后等待服务方上传作品
+系统定时任务根据拍摄结束时间自动推进，等待服务方上传作品
 DELIVERED_PENDING_CONFIRM,
- APPEALING
+REFUNDED, APPEALING
 DELIVERED_PENDING_CONFIRM
 已交付，待确认
 服务方上传交付作品
@@ -266,11 +266,11 @@ COMPLETED, APPEALING,
 REWORK_REQUIRED
 COMPLETED
 已完成
-需求方确认收货或仲裁完成
+需求方确认收货、系统自动确认或仲裁驳回申诉
 无
 CANCELLED
 已取消
-支付前取消、支付后按规则取消
+支付前取消
 无
 APPEALING
 仲裁中
@@ -279,14 +279,14 @@ COMPLETED, REWORK_REQUIR
 ED, REFUNDED
 REWORK_REQUIRED
 待返修
-管理员判定返修
+需求方提交返修或管理员判定返修
 PENDING_DELIVERY,
 APPEALING
 REFUNDED
 已退款
-管理员判定退款或取消退款完成
+拍摄前取消退款、超期未交付自动退款或管理员判定退款
 无
-状态变更必须通过订单领域方法完成，不能由 Controller 直接修改 status 字段。
+状态变更必须通过订单领域方法完成，不能由 Controller 直接修改 status 字段。普通用户不能通过通用状态接口手动开始拍摄、结束拍摄或跳过交付动作；拍摄开始和结束只由后端定时任务根据订单时间自动推进。
 2.3 报价单状态枚举
 状态
 含义
@@ -1300,25 +1300,15 @@ POST /orders/{orderId}/cancel
 }
 业务规则：取消成功触发 OrderCancelledEvent，档期模块释放已锁定档期，消息模块通知对方。
 可能错误：40301, 40902
-8.7 标记开始拍摄
-POST /orders/{orderId}/shooting/start
-权限：Provider，仅订单服务方
-响应 data：
-{
- "orderId": "ORD889900",
- "status": "SHOOTING"
-}
-可能错误：40301, 40902
-8.8 标记拍摄完成并进入待交付
-POST /orders/{orderId}/shooting/finish
-权限：Provider，仅订单服务方
-响应 data：
-{
- "orderId": "ORD889900",
- "status": "PENDING_DELIVERY"
-}
-可能错误：40101, 40301, 40401, 40902
-8.9 上传交付作品
+8.7 拍摄状态自动推进
+无手动接口。
+
+拍摄开始和拍摄结束由后端定时任务根据订单的 shootStartTime 与 shootEndTime 自动推进：
+1. PAID_PENDING_SHOOT -> SHOOTING
+2. SHOOTING -> PENDING_DELIVERY
+
+摄影师不能手动调用接口开始或结束拍摄。若前端发现约定拍摄时间已结束但订单真实状态仍未到 PENDING_DELIVERY，应提示“系统正在同步拍摄状态，请稍后刷新”，不能展示上传入口。
+8.8 上传交付作品
 POST /orders/{orderId}/deliveries
 权限：Provider，仅订单服务方
 {
@@ -1338,7 +1328,7 @@ POST /orders/{orderId}/deliveries
 业务规则：系统校验上传数量是否满足报价条款；上传成功触发 DeliveryUploadedEvent，订单状态变为
 DELIVERED_PENDING_CONFIRM。
 可能错误：40301, 40902, 42202
-8.10 查询交付作品
+8.9 查询交付作品
 GET /orders/{orderId}/deliveries
 权限：订单双方或 ADMIN
 说明：交付文件属于订单私有内容，不可作为公开作品集直接展示。若服务方希望公开客片，必须取得照片授权。
@@ -1372,7 +1362,7 @@ GET /orders/{orderId}/deliveries
  ]
 }
 可能错误：40101, 40301, 40401
-8.11 确认收货
+8.10 确认收货
 POST /orders/{orderId}/confirmations
 权限：Customer，仅订单需求方
 请求头：
@@ -1388,7 +1378,7 @@ Idempotency-Key: confirm-ORD889900-001
 自动确认规则：订单进入 DELIVERED_PENDING_CONFIRM 后 7 天内，需求方未确认收货且未发起申诉，系统自
 动确认收货，记录 autoConfirmTime，并触发结算流程。
 可能错误：40003, 40301, 40902, 42202
-8.12 照片授权确认
+8.11 照片授权确认
 POST /orders/{orderId}/photo-authorization
 权限：Customer，仅订单需求方
 {

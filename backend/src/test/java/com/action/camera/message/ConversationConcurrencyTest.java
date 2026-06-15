@@ -127,13 +127,75 @@ class ConversationConcurrencyTest {
     }
 
     @Test
+    void restartingServicePackagePreChatRestoresInitiatorVisibility() {
+        CreateConversationCommand command = new CreateConversationCommand(
+                CUSTOMER_ID,
+                PROVIDER_ID,
+                CUSTOMER_ID,
+                ConversationService.SOURCE_TYPE_SERVICE_PACKAGE,
+                SOURCE_ID + 2,
+                null,
+                "Initial service package conversation."
+        );
+        Long conversationId = conversationService.createConversationWithInitialMessage(command).getConversationId();
+
+        conversationService.hideConversation(conversationId, CUSTOMER_ID);
+
+        assertThat(conversationService.listMyConversations(CUSTOMER_ID))
+                .extracting("id")
+                .doesNotContain(conversationId);
+        assertThat(hiddenByUserRepository.findByConversationIdAndUserId(conversationId, CUSTOMER_ID)).isPresent();
+
+        Long reusedConversationId = conversationService.createConversationWithInitialMessage(command).getConversationId();
+
+        assertThat(reusedConversationId).isEqualTo(conversationId);
+        assertThat(hiddenByUserRepository.findByConversationIdAndUserId(conversationId, CUSTOMER_ID)).isEmpty();
+        assertThat(conversationService.listMyConversations(CUSTOMER_ID))
+                .extracting("id")
+                .contains(conversationId);
+        assertThat(conversationRepository.findById(conversationId)).isPresent();
+        assertThat(messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId)).hasSize(1);
+    }
+
+    @Test
+    void servicePackagePreChatWithNullOrderReusesExistingConversation() {
+        CreateConversationCommand firstCommand = new CreateConversationCommand(
+                CUSTOMER_ID,
+                PROVIDER_ID,
+                CUSTOMER_ID,
+                ConversationService.SOURCE_TYPE_SERVICE_PACKAGE,
+                SOURCE_ID + 3,
+                null,
+                "Initial service package conversation."
+        );
+        Long conversationId = conversationService.createConversationWithInitialMessage(firstCommand).getConversationId();
+
+        CreateConversationCommand secondCommand = new CreateConversationCommand(
+                CUSTOMER_ID,
+                PROVIDER_ID,
+                CUSTOMER_ID,
+                ConversationService.SOURCE_TYPE_SERVICE_PACKAGE,
+                SOURCE_ID + 3,
+                null,
+                "Repeated service package conversation."
+        );
+        Long reusedConversationId = conversationService.createConversationWithInitialMessage(secondCommand).getConversationId();
+
+        assertThat(reusedConversationId).isEqualTo(conversationId);
+        assertThat(conversationRepository.count()).isEqualTo(1);
+        assertThat(conversationRepository.findById(conversationId).orElseThrow().getOrderId())
+                .isEqualTo(ConversationService.PENDING_ORDER_ID);
+        assertThat(messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId)).hasSize(1);
+    }
+
+    @Test
     void nonParticipantCannotHideConversation() {
         Long conversationId = conversationService.createConversationWithInitialMessage(new CreateConversationCommand(
                 CUSTOMER_ID,
                 PROVIDER_ID,
                 CUSTOMER_ID,
                 ConversationService.SOURCE_TYPE_SERVICE_PACKAGE,
-                SOURCE_ID + 2,
+                SOURCE_ID + 4,
                 "Initial service package conversation."
         )).getConversationId();
 

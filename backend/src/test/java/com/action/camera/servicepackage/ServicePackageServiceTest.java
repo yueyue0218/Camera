@@ -117,6 +117,18 @@ class ServicePackageServiceTest {
     }
 
     @Test
+    void publishRejectsMoreThanNinePortfolioImages() {
+        CreateServicePackageRequest request = createRequest();
+        request.setPortfolioIds(List.of(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L));
+
+        assertThatThrownBy(() -> servicePackageService.createServicePackage(provider(), request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("最多只能上传 9 张图片");
+
+        verify(servicePackageRepository, never()).save(any());
+    }
+
+    @Test
     void hallFiltersByTimeTagAndOmitsUntaggedPackagesOnlyWhenFilterIsUsed() {
         ServicePackage nearSeven = servicePackage(1L, ServicePackageStatus.ONLINE, true);
         nearSeven.setTimeTags(List.of("NEAR_7_DAYS"));

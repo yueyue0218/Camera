@@ -237,16 +237,17 @@ class OrderControllerTest {
     }
 
     @Test
-    void providerCanMoveUploadedDeliveryToPendingConfirm() {
+    void genericStatusTransitionCannotMarkDeliveryUploadedWithoutDelivery() {
         UserContext.setUserId(PROVIDER_USER_ID);
         Order order = order(OrderStatus.PENDING_DELIVERY);
-        prepareTransitionMocks(order);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
 
-        StatusTransitionResponse delivered =
-                orderController.changeStatus(ORDER_ID, transitionRequest(OrderStatus.DELIVERED_PENDING_CONFIRM)).getData();
-        assertEquals(OrderStatus.PENDING_DELIVERY, delivered.getFromStatus());
-        assertEquals(OrderStatus.DELIVERED_PENDING_CONFIRM, delivered.getToStatus());
-        verify(orderStatusLogRepository, times(1)).save(any(OrderStatusLog.class));
+        assertThrows(BusinessException.class,
+                () -> orderController.changeStatus(ORDER_ID, transitionRequest(OrderStatus.DELIVERED_PENDING_CONFIRM)));
+
+        assertEquals(OrderStatus.PENDING_DELIVERY, order.getStatus());
+        verify(orderRepository, never()).save(any(Order.class));
+        verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
     }
 
     @Test

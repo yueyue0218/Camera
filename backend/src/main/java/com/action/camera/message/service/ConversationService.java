@@ -95,7 +95,7 @@ public class ConversationService {
                         command.getCustomerId(),
                         command.getProviderId(),
                         orderId)
-                .map(conversation -> new CreateConversationResult(conversation.getId()))
+                .map(conversation -> reuseExistingConversation(command, sourceType, orderId, conversation))
                 .orElseGet(() -> createConversationOrMarkRollback(command, sourceType, status)));
         if (result != null) {
             return result;
@@ -229,11 +229,40 @@ public class ConversationService {
             java.util.Optional<Conversation> existing = executeInNewTransaction(status ->
                     findExistingConversation(command, sourceType));
             if (existing.isPresent()) {
-                return new CreateConversationResult(existing.get().getId());
+                return reuseExistingConversation(
+                        command,
+                        sourceType,
+                        normalizeOrderId(command.getOrderId()),
+                        existing.get());
             }
             waitBeforeRetry();
         }
         throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Conversation was created concurrently but cannot be loaded");
+    }
+
+    private CreateConversationResult reuseExistingConversation(CreateConversationCommand command,
+                                                              String sourceType,
+                                                              Long orderId,
+                                                              Conversation conversation) {
+        if (shouldRestoreServicePackagePreChat(command, sourceType, orderId)) {
+            restoreConversationVisibility(conversation.getId(), command.getInitiatorId());
+        }
+        return new CreateConversationResult(conversation.getId());
+    }
+
+    private boolean shouldRestoreServicePackagePreChat(CreateConversationCommand command,
+                                                       String sourceType,
+                                                       Long orderId) {
+        return SOURCE_TYPE_SERVICE_PACKAGE.equals(sourceType)
+                && Objects.equals(PENDING_ORDER_ID, orderId)
+                && Objects.equals(command.getInitiatorId(), command.getCustomerId());
+    }
+
+    private void restoreConversationVisibility(Long conversationId, Long userId) {
+        if (hiddenByUserRepository == null || conversationId == null || userId == null) {
+            return;
+        }
+        hiddenByUserRepository.deleteByConversationIdAndUserId(conversationId, userId);
     }
 
     private <T> T executeInNewTransaction(org.springframework.transaction.support.TransactionCallback<T> callback) {

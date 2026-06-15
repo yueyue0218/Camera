@@ -31,6 +31,7 @@ import {
   findConversationRecord,
   getLocalMessages,
   getOppositeUserId,
+  saveConversationRecord,
   updateConversationLastMessage
 } from './utils/conversationUtils.js'
 import {
@@ -57,6 +58,24 @@ import { validateQuoteFormModel } from './utils/quoteFormModel.js'
 const DETAIL_SHELL_HEIGHT = {
   xs: 'calc(100dvh - 212px)',
   md: 'calc(100dvh - 154px)'
+}
+
+function isLocalConversationId(value) {
+  return String(value || '').startsWith('local-')
+}
+
+function sameConversationId(conversation, conversationId) {
+  return String(conversation?.conversationId || '') === String(conversationId || '')
+}
+
+function canUseConversationRecord(conversation, currentUser, conversationId) {
+  if (!conversation || !sameConversationId(conversation, conversationId)) return false
+  if (conversation.isLocal) return true
+  return Boolean(getUserRoleInConversation(conversation, currentUser))
+}
+
+function findConversationById(conversations = [], conversationId) {
+  return conversations.find(item => sameConversationId(item, conversationId)) || null
 }
 
 export function ConversationDetailPage() {
@@ -104,19 +123,79 @@ export function ConversationDetailPage() {
   }, [conversationId, currentOrder?.orderId, currentUser.role])
 
   useEffect(() => {
-    const stored = findConversationRecord(conversationId)
-    const fallback = stored || buildConversationFallback(conversationId)
-    const cached = readWorkflowViewState(viewCacheKey)
-    const cachedConversation = cached?.conversation || fallback
-    setConversation(cachedConversation)
-    if (Array.isArray(cached?.messages)) setMessages(cached.messages)
-    if (Array.isArray(cached?.quotes)) setQuotes(cached.quotes)
-    if (cached?.currentOrder) setCurrentOrder(cached.currentOrder)
-    if (Array.isArray(cached?.statusLogs)) setStatusLogs(cached.statusLogs)
-    if (Array.isArray(cached?.deliveryRecords)) setDeliveryRecords(cached.deliveryRecords)
-    if (Array.isArray(cached?.photoAuthorizations)) setPhotoAuthorizations(cached.photoAuthorizations)
-    loadConversationData(cachedConversation)
-  }, [conversationId, getCurrentUserId(currentUser), currentUser.role])
+    let cancelled = false
+
+    async function initializeConversation() {
+      const stored = findConversationRecord(conversationId)
+      const cached = readWorkflowViewState(viewCacheKey)
+      const cachedConversation = canUseConversationRecord(cached?.conversation, currentUser, conversationId)
+        ? cached.conversation
+        : null
+      const storedConversation = canUseConversationRecord(stored, currentUser, conversationId)
+        ? stored
+        : null
+      const localFallback = !cachedConversation && !storedConversation && isLocalConversationId(conversationId)
+        ? buildConversationFallback(conversationId)
+        : null
+      const initialConversation = cachedConversation || storedConversation || localFallback
+
+      if (initialConversation) {
+        if (cancelled) return
+        setConversation(initialConversation)
+        if (cachedConversation) {
+          setMessages(Array.isArray(cached?.messages) ? cached.messages : [])
+          setQuotes(Array.isArray(cached?.quotes) ? cached.quotes : [])
+          if (cached?.currentOrder) {
+            setCurrentOrder(cached.currentOrder)
+            setStatusLogs(Array.isArray(cached?.statusLogs) ? cached.statusLogs : [])
+            setDeliveryRecords(Array.isArray(cached?.deliveryRecords) ? cached.deliveryRecords : [])
+            setPhotoAuthorizations(Array.isArray(cached?.photoAuthorizations) ? cached.photoAuthorizations : [])
+          } else {
+            clearOrderWorkbench()
+          }
+        } else {
+          setMessages([])
+          setQuotes([])
+          clearOrderWorkbench()
+        }
+        if (initialConversation.isLocal) {
+          loadConversationData(initialConversation)
+          return
+        }
+      }
+
+      setPageLoading(true)
+      setNotice(null)
+      setMessages([])
+      setQuotes([])
+      clearOrderWorkbench()
+      try {
+        const remoteConversations = await conversationApi.list(currentUser)
+        const remoteConversation = findConversationById(remoteConversations || [], conversationId)
+        if (!remoteConversation) {
+          throw new Error('会话不存在或当前身份无权查看')
+        }
+        const hydratedConversation = saveConversationRecord(remoteConversation)
+        if (cancelled) return
+        setConversation(hydratedConversation)
+        await loadConversationData(hydratedConversation)
+      } catch (error) {
+        if (cancelled) return
+        setConversation(null)
+        setNotice({
+          type: 'error',
+          text: getCWorkbenchErrorText(error, '会话不存在或当前身份无权查看')
+        })
+      } finally {
+        if (!cancelled) setPageLoading(false)
+      }
+    }
+
+    initializeConversation()
+    return () => {
+      cancelled = true
+    }
+  }, [conversationId, getCurrentUserId(currentUser), currentUser.role, currentUser.token])
 
   useEffect(() => {
     if (!conversation) return

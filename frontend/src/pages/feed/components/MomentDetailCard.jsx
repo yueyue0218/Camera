@@ -43,6 +43,7 @@ export function MomentDetailCard({
   onDelete,
   canFollow = true
 }) {
+  const momentId = Number(moment.momentId ?? moment.id ?? moment.postId)
   const images = useMemo(() => imageList(moment), [moment])
   const sliderRef = useRef(null)
   const [index, setIndex] = useState(0)
@@ -52,7 +53,7 @@ export function MomentDetailCard({
     if (sliderRef.current) {
       sliderRef.current.scrollTo({ left: 0, behavior: 'auto' })
     }
-  }, [moment.momentId, images.length])
+  }, [momentId, images.length])
 
   function scrollToIndex(nextIndex) {
     if (!sliderRef.current || !images.length) return
@@ -72,7 +73,7 @@ export function MomentDetailCard({
   return (
     <Paper className="moment-detail" elevation={0}>
       <div className="moment-detail__header">
-        <div className="moment-detail__serial">No. {String(moment.momentId).padStart(6, '0')}</div>
+        <div className="moment-detail__serial">No. {String(momentId).padStart(6, '0')}</div>
         <div className="moment-detail__stamp">PORTRA FILE</div>
       </div>
 
@@ -98,7 +99,7 @@ export function MomentDetailCard({
         )}
         {isSelf && (
           <div className="moment-detail__menu-wrap">
-            <IconButton className="moment-detail__menu-btn" onClick={event => onMenuOpen(event, moment.momentId)}>
+            <IconButton className="moment-detail__menu-btn" onClick={event => onMenuOpen(event, momentId)}>
               <MoreHorizRoundedIcon fontSize="small" />
             </IconButton>
             <Menu
@@ -112,7 +113,7 @@ export function MomentDetailCard({
                 <EditRoundedIcon fontSize="small" sx={{ mr: 1 }} />
                 编辑动态
               </MenuItem>
-              <MenuItem onClick={() => { onMenuClose(); onDelete(moment.momentId); }} sx={{ color: 'error.main' }}>
+              <MenuItem onClick={() => { onMenuClose(); onDelete(moment); }} sx={{ color: 'error.main' }}>
                 <DeleteRoundedIcon fontSize="small" sx={{ mr: 1 }} />
                 删除动态
               </MenuItem>
@@ -149,7 +150,7 @@ export function MomentDetailCard({
           )}
           <div ref={sliderRef} className="moment-detail__slides" onScroll={handleScroll}>
             {images.map((src, imageIndex) => (
-              <figure key={`${moment.momentId}-${imageIndex}`} className="moment-detail__slide">
+              <figure key={`${momentId}-${imageIndex}`} className="moment-detail__slide">
                 <img src={src} alt={`${moment.title || '动态'} ${imageIndex + 1}`} />
               </figure>
             ))}
@@ -162,7 +163,7 @@ export function MomentDetailCard({
         <button
           type="button"
           className={`moment-action like ${moment.likedByCurrentUser ? 'active' : ''}`}
-          onClick={() => onLike(moment.momentId)}
+          onClick={() => onLike(momentId)}
         >
           {moment.likedByCurrentUser ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
           <span>{moment.likeCount || 0}</span>
@@ -170,7 +171,7 @@ export function MomentDetailCard({
         <button
           type="button"
           className={`moment-action save ${moment.favoritedByCurrentUser ? 'active' : ''}`}
-          onClick={() => onFavorite(moment.momentId)}
+          onClick={() => onFavorite(momentId)}
         >
           {moment.favoritedByCurrentUser ? <BookmarkRoundedIcon /> : <BookmarkBorderRoundedIcon />}
           <span>{moment.favoriteCount || 0}</span>

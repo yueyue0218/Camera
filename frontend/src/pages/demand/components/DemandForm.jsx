@@ -96,7 +96,7 @@ export function DemandForm({ form, uploading, onChange, onSubmit, onSaveDraft, o
           <div className="upload-grid">
             <label className="upload">
               {uploading ? '上传中...' : `+ 添加参考图 (${referenceItems.length}/9)`}
-              <input type="file" accept="image/*" multiple hidden onChange={event => { onFilesSelected?.(event.target.files); event.target.value = '' }} />
+              <input type="file" accept="image/*" multiple hidden disabled={uploading} onChange={event => { onFilesSelected?.(event.target.files); event.target.value = '' }} />
             </label>
             {referenceItems.map((item, index) => (
               <div className="upload-thumb" key={`${item.fileId}-${index}`}>
@@ -117,8 +117,8 @@ export function DemandForm({ form, uploading, onChange, onSubmit, onSaveDraft, o
         <div className="preview-line"><span>预算</span><b>{Number(form.budgetMinYuan) === 0 && Number(form.budgetMaxYuan) === 0 ? '互勉' : `¥${form.budgetMinYuan}-${form.budgetMaxYuan}`}</b></div>
         <div className="preview-line"><span>时间描述</span><b>{form.timeDescription || form.timeSlot || '待沟通'}</b></div>
         <div className="preview-line"><span>时间标签</span><b>{timeTagText(timeTags)}</b></div>
-        <button className="primary-btn" type="submit">{mode === 'edit' ? '保存需求' : '发布需求'}</button>
-        {mode !== 'edit' && <button className="secondary-btn draft-btn" type="button" onClick={onSaveDraft}>保存草稿</button>}
+        <button className="primary-btn" type="submit" disabled={uploading}>{mode === 'edit' ? '保存需求' : '发布需求'}</button>
+        {mode !== 'edit' && <button className="secondary-btn draft-btn" type="button" onClick={onSaveDraft} disabled={uploading}>保存草稿</button>}
       </aside>
     </form>
   )

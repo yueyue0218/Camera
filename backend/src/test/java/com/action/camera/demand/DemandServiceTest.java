@@ -146,6 +146,17 @@ class DemandServiceTest {
     }
 
     @Test
+    void createDemandRejectsMoreThanNineReferenceImages() {
+        CreateDemandRequest request = demandRequest("GRADUATION", "NJU");
+        request.setReferenceFileIds(List.of(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L));
+
+        assertThatThrownBy(() -> demandService.createDemand(customer, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("最多只能上传 9 张图片");
+        assertThat(demandRepository.count()).isZero();
+    }
+
+    @Test
     void createDemandStoresAndReturnsTimeFields() {
         CreateDemandRequest request = demandRequest("GRADUATION", "NJU");
         request.setTimeDescription("July weekends are available");

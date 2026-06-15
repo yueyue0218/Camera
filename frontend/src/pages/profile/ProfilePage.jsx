@@ -44,6 +44,8 @@ function orderStatusLabel(status) {
 }
 
 function formatCreditScore(value) {
+  if (value === null || value === undefined) return '暂无'
+  if (typeof value === 'string' && value.trim() === '') return '暂无'
   const numeric = Number(value)
   return Number.isFinite(numeric) ? numeric.toFixed(1) : '暂无'
 }

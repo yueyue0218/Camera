@@ -41,10 +41,12 @@ public class OrderService {
     private static final int REWORK_REASON_MAX_LENGTH = 200;
     private static final String PAYMENT_SUCCESS = "SUCCESS";
     private static final String PAYMENT_REFUNDED = "REFUNDED";
+    private static final String PAYMENT_PARTIAL_REFUNDED = "PARTIAL_REFUNDED";
     private static final String SETTLEMENT_NOT_SETTLED = "NOT_SETTLED";
     private static final String SETTLEMENT_SETTLED = "SETTLED";
     private static final String REFUND_NONE = "NONE";
     private static final String REFUND_SUCCESS = "REFUNDED";
+    private static final String REFUND_PARTIAL_SUCCESS = "PARTIAL_REFUNDED";
     private static final String SOURCE_TYPE_SERVICE_PACKAGE = "SERVICE_PACKAGE";
     private static final String SYSTEM_OPERATOR_ROLE = "SYSTEM";
     private static final String AUTO_CONFIRM_REASON = "交付后 7 天未操作，系统自动确认完成";
@@ -130,7 +132,7 @@ public class OrderService {
         OrderStatus fromStatus = order.getStatus();
         ensureCanChangeStatus(fromStatus, targetStatus);
         ensureNotManualShootingTransition(fromStatus, targetStatus);
-        if (fromStatus == OrderStatus.DELIVERED_PENDING_CONFIRM && targetStatus == OrderStatus.COMPLETED) {
+        if (targetStatus == OrderStatus.COMPLETED) {
             markCompletedAndReleaseEscrow(order, LocalDateTime.now(), false);
         } else if (targetStatus == OrderStatus.CANCELLED) {
             order.setCancelTime(LocalDateTime.now());
@@ -235,6 +237,51 @@ public class OrderService {
                 OrderStatus.DELIVERED_PENDING_CONFIRM,
                 providerId,
                 "PROVIDER",
+                reason
+        );
+    }
+
+    @Transactional
+    public Order markDeliveryUploaded(Long orderId, Long providerId, String reason) {
+        Order order = getOrderOrThrow(orderId);
+        if (!Objects.equals(order.getProviderUserId(), providerId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only the provider can upload delivery");
+        }
+        if (order.getStatus() != OrderStatus.PENDING_DELIVERY) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                    "Only pending delivery orders can be marked as delivered");
+        }
+        ensureCanChangeStatus(OrderStatus.PENDING_DELIVERY, OrderStatus.DELIVERED_PENDING_CONFIRM);
+        return applyStatusChange(
+                order,
+                OrderStatus.PENDING_DELIVERY,
+                OrderStatus.DELIVERED_PENDING_CONFIRM,
+                providerId,
+                "PROVIDER",
+                reason
+        );
+    }
+
+    @Transactional
+    public Order refundOrderFromDispute(Long orderId, Long adminId, Long refundAmountCent,
+                                        boolean partialRefund, String reason) {
+        Order order = getOrderOrThrow(orderId);
+        OrderStatus fromStatus = order.getStatus();
+        ensureCanChangeStatus(fromStatus, OrderStatus.REFUNDED);
+        LocalDateTime now = LocalDateTime.now();
+        Long normalizedRefundAmount = normalizeDisputeRefundAmount(order, refundAmountCent, partialRefund);
+        markRefunded(
+                order,
+                now,
+                normalizedRefundAmount,
+                partialRefund ? REFUND_PARTIAL_SUCCESS : REFUND_SUCCESS
+        );
+        return applyStatusChange(
+                order,
+                fromStatus,
+                OrderStatus.REFUNDED,
+                adminId,
+                "ADMIN",
                 reason
         );
     }
@@ -638,15 +685,36 @@ public class OrderService {
     }
 
     private void markRefunded(Order order, LocalDateTime refundedAt) {
+        markRefunded(order, refundedAt, order.getTotalAmountCent(), REFUND_SUCCESS);
+    }
+
+    private void markRefunded(Order order, LocalDateTime refundedAt, Long refundAmountCent, String refundStatus) {
+        Long normalizedRefundAmount = refundAmountCent == null ? order.getTotalAmountCent() : refundAmountCent;
         order.setEscrowStatus(EscrowStatus.REFUNDED);
         order.setSettlementStatus(SETTLEMENT_NOT_SETTLED);
-        order.setRefundStatus(REFUND_SUCCESS);
+        order.setRefundStatus(refundStatus);
         paymentRecordRepository.findByOrderId(order.getId()).ifPresent(paymentRecord -> {
-            paymentRecord.setRefundAmountCent(order.getTotalAmountCent());
+            paymentRecord.setRefundAmountCent(normalizedRefundAmount);
             paymentRecord.setRefundedAt(refundedAt);
-            paymentRecord.setStatus(PAYMENT_REFUNDED);
+            paymentRecord.setStatus(Objects.equals(normalizedRefundAmount, order.getTotalAmountCent())
+                    ? PAYMENT_REFUNDED
+                    : PAYMENT_PARTIAL_REFUNDED);
             paymentRecordRepository.save(paymentRecord);
         });
+    }
+
+    private Long normalizeDisputeRefundAmount(Order order, Long refundAmountCent, boolean partialRefund) {
+        Long totalAmount = order.getTotalAmountCent();
+        if (!partialRefund) {
+            return totalAmount;
+        }
+        if (refundAmountCent == null || refundAmountCent <= 0) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Partial refund amount must be positive");
+        }
+        if (totalAmount != null && refundAmountCent > totalAmount) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Partial refund amount exceeds order amount");
+        }
+        return refundAmountCent;
     }
 
     private String cancelReason(String reason, String defaultReason) {

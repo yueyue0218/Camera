@@ -696,7 +696,7 @@ export function OrdersPage() {
         }
       }
       return saveLocalArbitration(localRecord)
-    }, '仲裁申请已提交')
+    }, '评价投诉已提交')
     if (result) {
       setArbitrations(mergeComplaints([result], arbitrations, getArbitrationsByOrder(selectedOrder.orderId)))
       setShowArbitrationForm(false)
@@ -1178,8 +1178,8 @@ export function OrdersPage() {
               <Stack spacing={2}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between' }}>
                   <Box>
-                    <Typography variant="h6">评价与仲裁</Typography>
-                    <Typography sx={{ color: PORTRA_SURFACE.muted }}>订单完成后双方都可以评价；被评价方可对不实评价发起投诉仲裁。</Typography>
+                    <Typography variant="h6">评价与投诉</Typography>
+                    <Typography sx={{ color: PORTRA_SURFACE.muted }}>订单完成后双方都可以评价；被评价方可对不实评价发起投诉。</Typography>
                   </Box>
                   <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                     {canReviewSelectedOrder && !myReview && (
@@ -1198,7 +1198,7 @@ export function OrdersPage() {
                       onClick={() => setShowArbitrationForm(!showArbitrationForm)}
                       disabled={!reviewToComplain}
                     >
-                      申请仲裁
+                      投诉评价
                     </Button>
                   </Stack>
                 </Stack>
@@ -1207,7 +1207,7 @@ export function OrdersPage() {
                   <PortraInfoBanner>你已评价过该订单，可以在历史评价中查看。</PortraInfoBanner>
                 )}
                 {!reviewToComplain && (
-                  <PortraInfoBanner>需收到对方评价后才可发起仲裁。</PortraInfoBanner>
+                  <PortraInfoBanner>需收到对方评价后才可发起评价投诉。</PortraInfoBanner>
                 )}
 
                 {showReviewForm && (
@@ -1240,7 +1240,7 @@ export function OrdersPage() {
                     <Stack spacing={1.5}>
                       <TextField
                         select
-                        label="仲裁原因"
+                        label="投诉原因"
                         value={arbitrationForm.reason}
                         onChange={event => setArbitrationForm({ ...arbitrationForm, reason: event.target.value })}
                       >
@@ -1258,7 +1258,7 @@ export function OrdersPage() {
                         required
                       />
                       <Button type="submit" variant="contained" color="warning" startIcon={<GavelRoundedIcon />}>
-                        提交仲裁记录
+                        提交投诉记录
                       </Button>
                     </Stack>
                   </Paper>
@@ -1268,7 +1268,7 @@ export function OrdersPage() {
 
                 {arbitrations.length > 0 && (
                   <Stack spacing={1}>
-                    <Typography variant="overline" sx={overlineSx}>仲裁记录</Typography>
+                    <Typography variant="overline" sx={overlineSx}>投诉记录</Typography>
                     {arbitrations.map(record => (
                       <Paper key={record.arbitrationId} variant="outlined" sx={warmNoticeSx}>
                         <Stack spacing={0.6}>

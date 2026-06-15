@@ -27,6 +27,18 @@ function normalizeMoments(list) {
   return Array.isArray(list) ? list.filter(Boolean) : []
 }
 
+function getMomentId(momentOrMomentId) {
+  if (typeof momentOrMomentId === 'object' && momentOrMomentId !== null) {
+    return Number(
+      momentOrMomentId.momentId ??
+      momentOrMomentId.id ??
+      momentOrMomentId.postId
+    )
+  }
+
+  return Number(momentOrMomentId)
+}
+
 function uniqueAuthorIds(list, currentUserId) {
   return [...new Set(list.map(item => Number(item.authorId)).filter(id => Number.isFinite(id) && id !== currentUserId))]
 }
@@ -67,7 +79,7 @@ export function FeedPage() {
   )
   const activeMoments = viewMode === 'mine' ? myMoments : moments
   const drawerMoment = useMemo(
-    () => moments.find(moment => Number(moment.momentId) === Number(drawerMomentId)) || null,
+    () => moments.find(moment => getMomentId(moment) === getMomentId(drawerMomentId)) || null,
     [moments, drawerMomentId]
   )
 
@@ -180,8 +192,9 @@ export function FeedPage() {
   }, [currentUser.userId, currentRoleKey, currentUser.nickname, currentUser.label, currentUser.avatarData, scope, viewMode])
 
   useEffect(() => {
-    if (!drawerMomentId) return
-    const selected = moments.find(moment => Number(moment.momentId) === Number(drawerMomentId))
+    const currentDrawerMomentId = getMomentId(drawerMomentId)
+    if (!Number.isFinite(currentDrawerMomentId)) return
+    const selected = moments.find(moment => getMomentId(moment) === currentDrawerMomentId)
     if (!selected) {
       setDrawerMomentId(null)
     }
@@ -204,10 +217,11 @@ export function FeedPage() {
 
   function mergeMoment(nextMoment) {
     if (!nextMoment) return
+    const nextMomentId = getMomentId(nextMoment)
     setMoments(prev => {
-      const found = prev.some(moment => Number(moment.momentId) === Number(nextMoment.momentId))
+      const found = prev.some(moment => getMomentId(moment) === nextMomentId)
       const next = prev.map(moment => (
-        Number(moment.momentId) === Number(nextMoment.momentId)
+        getMomentId(moment) === nextMomentId
           ? { ...moment, ...nextMoment }
           : moment
       ))
@@ -216,14 +230,15 @@ export function FeedPage() {
       }
       return next
     })
-    if (drawerMomentId && Number(drawerMomentId) === Number(nextMoment.momentId)) {
-      setDrawerMomentId(Number(nextMoment.momentId))
+    if (getMomentId(drawerMomentId) === nextMomentId) {
+      setDrawerMomentId(nextMomentId)
     }
   }
 
   function removeMoment(momentId) {
-    setMoments(prev => prev.filter(moment => Number(moment.momentId) !== Number(momentId)))
-    if (drawerMomentId && Number(drawerMomentId) === Number(momentId)) {
+    const normalizedMomentId = getMomentId(momentId)
+    setMoments(prev => prev.filter(moment => getMomentId(moment) !== normalizedMomentId))
+    if (getMomentId(drawerMomentId) === normalizedMomentId) {
       setDrawerMomentId(null)
     }
   }
@@ -322,7 +337,7 @@ export function FeedPage() {
       })
       setAuthorProfiles(nextProfiles)
     })()
-    if (drawerMomentId && !nextMoments.some(moment => Number(moment.momentId) === Number(drawerMomentId))) {
+    if (Number.isFinite(getMomentId(drawerMomentId)) && !nextMoments.some(moment => getMomentId(moment) === getMomentId(drawerMomentId))) {
       setDrawerMomentId(null)
     }
     setLoading(false)
@@ -331,7 +346,7 @@ export function FeedPage() {
   function openComposer(moment = null) {
     if (moment) {
       setComposerMode('edit')
-      setComposerMomentId(moment.momentId)
+      setComposerMomentId(getMomentId(moment))
       setComposerDraft({ title: moment.title || '', content: moment.content || '' })
       setComposerImages((moment.imageDataList?.length ? moment.imageDataList : moment.imageData ? [moment.imageData] : []).slice(0, 9))
     } else {
@@ -343,8 +358,8 @@ export function FeedPage() {
     setComposerOpen(true)
   }
 
-  function openDrawer(momentId) {
-    setDrawerMomentId(momentId)
+  function openDrawer(momentOrMomentId) {
+    setDrawerMomentId(getMomentId(momentOrMomentId))
   }
 
   async function handleComposerSubmit() {
@@ -395,7 +410,12 @@ export function FeedPage() {
     setComposerImages(prev => prev.filter((_, i) => i !== index))
   }
 
-  async function toggleLike(momentId) {
+  async function toggleLike(momentOrMomentId) {
+    const momentId = getMomentId(momentOrMomentId)
+    if (!Number.isFinite(momentId)) {
+      setNotice({ type: 'error', text: '动态 ID 缺失，无法点赞' })
+      return
+    }
     try {
       const nextMoment = await momentApi.like(momentId, currentUser)
       mergeMoment(nextMoment)
@@ -404,7 +424,12 @@ export function FeedPage() {
     }
   }
 
-  async function toggleFavorite(momentId) {
+  async function toggleFavorite(momentOrMomentId) {
+    const momentId = getMomentId(momentOrMomentId)
+    if (!Number.isFinite(momentId)) {
+      setNotice({ type: 'error', text: '动态 ID 缺失，无法收藏' })
+      return
+    }
     try {
       const nextMoment = await momentApi.favorite(momentId, currentUser)
       mergeMoment(nextMoment)
@@ -429,21 +454,31 @@ export function FeedPage() {
     }
   }
 
-  function requestDelete(moment) {
-    setDeleteTarget(moment)
+  function requestDelete(momentOrMomentId) {
+    const momentId = getMomentId(momentOrMomentId)
+    if (!Number.isFinite(momentId)) {
+      setNotice({ type: 'error', text: '动态 ID 缺失，无法删除' })
+      return
+    }
+    setDeleteTarget(momentId)
   }
 
   async function confirmDelete() {
-    if (!deleteTarget) return
+    const momentId = getMomentId(deleteTarget)
+    if (!Number.isFinite(momentId)) {
+      setNotice({ type: 'error', text: '动态 ID 缺失，无法删除' })
+      setDeleteTarget(null)
+      return
+    }
     try {
-      await momentApi.delete(deleteTarget.momentId, currentUser)
-      removeMoment(deleteTarget.momentId)
+      await momentApi.delete(momentId, currentUser)
+      removeMoment(momentId)
       setDrawerMomentId(null)
       setDeleteTarget(null)
       await refreshPage()
       setNotice({ type: 'success', text: '动态已删除' })
     } catch (error) {
-      setNotice({ type: 'error', text: error.message })
+      setNotice({ type: 'error', text: error.message || '删除动态失败' })
     }
   }
 
@@ -511,12 +546,13 @@ export function FeedPage() {
         <Box className="moments-grid">
           {activeMoments.map(moment => {
             const author = authorProfileFor(moment)
+            const momentId = getMomentId(moment)
             const isSelf = Number(moment.authorId) === currentUser.userId
-            const menuOpen = menuState.momentId === moment.momentId
+            const menuOpen = getMomentId(menuState.momentId) === momentId
             const followed = isFollowing(moment.authorId, moment.authorRole)
             return (
               <MomentCard
-                key={moment.momentId}
+                key={momentId}
                 moment={moment}
                 authorName={author.nickname}
                 authorAvatar={author.avatarData}
@@ -524,7 +560,7 @@ export function FeedPage() {
                 isSelf={isSelf}
                 menuOpen={menuOpen}
                 menuAnchorEl={menuState.anchorEl}
-                onMenuOpen={(event, momentId) => setMenuState({ momentId, anchorEl: event.currentTarget })}
+                onMenuOpen={(event, nextMomentId) => setMenuState({ momentId: getMomentId(nextMomentId), anchorEl: event.currentTarget })}
                 onMenuClose={() => setMenuState({ momentId: null, anchorEl: null })}
                 onOpenMoment={openDrawer}
                 onOpenProfile={(authorId, authorRole) => {
@@ -553,7 +589,7 @@ export function FeedPage() {
         <div className="moment-drawer__head">
           <div>
             <div className="moment-drawer__eyebrow">动态详情</div>
-            <h3>{currentDrawerMoment ? `No. ${String(currentDrawerMoment.momentId).padStart(6, '0')}` : '动态详情'}</h3>
+            <h3>{currentDrawerMoment ? `No. ${String(getMomentId(currentDrawerMoment)).padStart(6, '0')}` : '动态详情'}</h3>
           </div>
           <Button onClick={() => setDrawerMomentId(null)} startIcon={<CloseRoundedIcon />}>关闭</Button>
         </div>
@@ -567,9 +603,9 @@ export function FeedPage() {
               authorAvatar={currentDrawerMoment.authorProfile.avatarData}
               isFollowing={isFollowing(currentDrawerMoment.authorId, currentDrawerMoment.authorRole)}
               isSelf={Number(currentDrawerMoment.authorId) === currentUser.userId}
-              menuOpen={menuState.momentId === currentDrawerMoment.momentId}
+              menuOpen={getMomentId(menuState.momentId) === getMomentId(currentDrawerMoment)}
               menuAnchorEl={menuState.anchorEl}
-              onMenuOpen={(event, momentId) => setMenuState({ momentId, anchorEl: event.currentTarget })}
+              onMenuOpen={(event, nextMomentId) => setMenuState({ momentId: getMomentId(nextMomentId), anchorEl: event.currentTarget })}
               onMenuClose={() => setMenuState({ momentId: null, anchorEl: null })}
               onOpenProfile={(authorId, authorRole) => {
                 if (Number(authorId) === currentUser.userId) navigate('/profile')

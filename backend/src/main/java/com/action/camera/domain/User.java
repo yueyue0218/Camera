@@ -47,8 +47,8 @@ public class User {
     @Column(name = "status", nullable = false, length = 20)
     private String status = "ACTIVE";
 
-    @Column(name = "credit_score", nullable = false, precision = 5, scale = 2)
-    private BigDecimal creditScore = new BigDecimal("80.00");
+    @Column(name = "credit_score", precision = 5, scale = 2)
+    private BigDecimal creditScore;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
