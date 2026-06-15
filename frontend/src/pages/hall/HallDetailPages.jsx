@@ -431,6 +431,7 @@ export function ServicePackageDetailPage() {
   const styleTags = splitTags(service.styleTags)
   const timeTags = splitTags(service.timeTags)
   const credit = service.photographerCreditScore ?? service.providerCreditScore ?? service.creditScore
+  const hasCreditScore = credit !== null && credit !== undefined && !(typeof credit === 'string' && credit.trim() === '')
   const city = cityName(service.cityName || service.cityCode) || service.serviceArea || '暂无城市'
   const price = service.priceRange || `${money(service.basePriceCent)} 起`
   const isServiceOwner = isSameOwner(currentUser, collectServiceOwnerIds(service))
@@ -548,7 +549,7 @@ export function ServicePackageDetailPage() {
               <div className="photographer-card-info">
                 <strong className="photographer-card-name">{service.photographerNickname || '暂无昵称'}</strong>
                 <div className="photographer-card-location"><span>{city}</span></div>
-                <div className="photographer-card-credit">{credit ? `信用评分：${credit}` : '暂无信用评分'}</div>
+                <div className="photographer-card-credit">{hasCreditScore ? `信用评分：${credit}` : '暂无信用评分'}</div>
               </div>
             </button>
             <button className="secondary-btn" style={{ width: '100%' }} type="button" onClick={followProvider}>关注摄影师</button>

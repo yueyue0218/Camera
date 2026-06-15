@@ -16,6 +16,13 @@ export function reviewDirectionLabel(direction) {
   return '评价记录'
 }
 
+function formatCreditScore(value) {
+  if (value === null || value === undefined) return '暂无'
+  if (typeof value === 'string' && value.trim() === '') return '暂无'
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric.toFixed(1) : '暂无'
+}
+
 export function ReviewScore({ value }) {
   const numeric = Number(value)
   const score = Number.isFinite(numeric) ? numeric : 0
@@ -209,7 +216,7 @@ export function ReviewPage() {
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }}>
             <Box>
               <Typography variant="h4" fontWeight={900} color={portra.primary}>
-                {credit.creditScore ?? '--'}
+                {formatCreditScore(credit.creditScore)}
               </Typography>
               <Typography color="text.secondary">{credit.creditLevel || '信用等级暂无'}</Typography>
             </Box>

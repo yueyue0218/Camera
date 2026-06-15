@@ -120,6 +120,7 @@ export function DemandAside({ selectedDemand, error, currentUser, onRespond, onH
 
 export function ShowcaseAside({ selectedService, currentUser, interests }) {
   const credit = selectedService?.photographerCreditScore ?? selectedService?.providerCreditScore ?? selectedService?.creditScore
+  const hasCreditScore = credit !== null && credit !== undefined && !(typeof credit === 'string' && credit.trim() === '')
   const uploadedAvatar = useFileObjectUrl(
     [selectedService?.photographerAvatarFileId, selectedService?.avatarFileId],
     currentUser,
@@ -143,7 +144,7 @@ export function ShowcaseAside({ selectedService, currentUser, interests }) {
             <div className="photographer-card-info">
               <strong className="photographer-card-name">{selectedService.photographerNickname || '暂无昵称'}</strong>
               <div className="photographer-card-location">{cityName(selectedService.cityName || selectedService.cityCode) || selectedService.serviceArea || '暂无城市'}</div>
-              <div className="photographer-card-credit">{credit ? `信用 ${credit}` : '暂无信用评分'}</div>
+              <div className="photographer-card-credit">{hasCreditScore ? `信用 ${credit}` : '暂无信用评分'}</div>
             </div>
           </div>
         </div>
