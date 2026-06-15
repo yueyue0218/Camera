@@ -105,10 +105,13 @@ export function ProfilePage() {
 
   // Sync profile form when currentUser changes
   useEffect(() => {
+    const roleBio = isProvider
+      ? (currentUser.providerBio || currentUser.bio || currentUser.description || '')
+      : (currentUser.customerBio || currentUser.bio || currentUser.description || '')
     setProfileForm({
       nickname: currentUser.nickname || currentUser.label || '',
       avatarData: currentUser.avatarData || '',
-      bio: currentUser.bio || currentUser.description || '',
+      bio: roleBio,
       gender: currentUser.gender || '',
       genderVisible: currentUser.genderVisible ?? true,
       birthday: currentUser.birthday || '',
@@ -116,9 +119,11 @@ export function ProfilePage() {
       locationDisplay: currentUser.locationDisplay || '',
       locationVisible: currentUser.locationVisible ?? false,
     })
-  }, [currentUser.userId, currentUser.nickname, currentUser.avatarData, currentUser.bio,
+  }, [currentUser.userId, currentUser.role, currentUser.nickname, currentUser.avatarData,
+      currentUser.bio, currentUser.providerBio, currentUser.customerBio,
       currentUser.gender, currentUser.birthday, currentUser.genderVisible,
-      currentUser.birthdayVisible, currentUser.locationDisplay, currentUser.locationVisible])
+      currentUser.birthdayVisible, currentUser.locationDisplay, currentUser.locationVisible,
+      isProvider])
 
   // syncBackCardHeight
   const syncHeight = () => {
@@ -305,6 +310,7 @@ export function ProfilePage() {
       await userApi.updateMe({
         nickname: next.nickname,
         bio: next.bio,
+        ...(isProvider ? { providerBio: next.bio } : { customerBio: next.bio }),
         role: currentUser.role,
         avatarFileId,
         gender: next.gender,
@@ -318,9 +324,10 @@ export function ProfilePage() {
       setNotice({ type: 'err', text: err.message || 'Profile save failed' })
       return false
     }
-    saveUserProfile(currentUser.userId, next)
+    const roleSpecificBio = isProvider ? { providerBio: next.bio } : { customerBio: next.bio }
+    saveUserProfile(currentUser.userId, { ...next, ...roleSpecificBio })
     setAvatarFile(null)
-    updateProfile({ ...next, avatarFileId })
+    updateProfile({ ...next, ...roleSpecificBio, avatarFileId })
     setNotice({ type: 'ok', text: '个人资料已更新' })
     return true
   }
