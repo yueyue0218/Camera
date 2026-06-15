@@ -363,6 +363,7 @@ export function ProfilePage() {
     [moments, currentUser.userId, currentUser.role]
   )
   const favoriteMoments = useMemo(() => moments.filter(m => m.favoritedByCurrentUser), [moments])
+  const likedMoments = useMemo(() => moments.filter(m => m.likedByCurrentUser), [moments])
   const follows = readFollows().filter(f => Number(f.authorId) !== currentUser.userId)
   const savedPhotos = readSavedPhotos()
   const mutualFollowIds = useMemo(
@@ -423,8 +424,8 @@ export function ProfilePage() {
     { id: 'photos', labelC: '我的照片', labelP: '我的作品', num: '01' },
     { id: 'intent', labelC: '我的意向', labelP: '橱窗管理', num: '02' },
     { id: 'orders', label: '我的订单', num: '03' },
-    { id: 'reviews', label: '历史评价', num: '04' },
-    { id: 'following', label: '我的关注', num: '05' },
+    { id: 'following', label: '我的关注', num: '04' },
+    { id: 'likes', label: '我的点赞', num: '05' },
     { id: 'collections', label: '我的收藏', num: '06' },
   ]
 
@@ -672,40 +673,11 @@ export function ProfilePage() {
               )}
             </section>
 
-            {/* REVIEWS */}
-            <section className={`panel-card tab-panel${activeTab === 'reviews' ? ' active' : ''}`}>
-              <div className="section-head">
-                <div><h2>历史评价</h2><p>用评价建立信任，但不要把页面做成冰冷的信用后台。</p></div>
-                <div className="section-mark">04</div>
-              </div>
-              {receivedReviews.length ? receivedReviews.slice(0, 4).map(r => (
-                <div
-                  key={r.reviewId || `${r.orderId}-${r.direction}`}
-                  className="review-card"
-                  role="button"
-                  tabIndex={0}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => openReviewCard(r)}
-                  onKeyDown={event => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      openReviewCard(r)
-                    }
-                  }}
-                >
-                  <blockquote>"{r.content || '对方没有留下文字评价'}"</blockquote>
-                  <footer>来自 用户 {r.reviewerId} · ★{Number(r.rating||0).toFixed(1)} · {formatShortTime(r.createdAt)}</footer>
-                </div>
-              )) : (
-                <div className="pp-empty"><h3>暂无评价</h3><p>完成约拍后会收到对方的评价。</p></div>
-              )}
-            </section>
-
             {/* FOLLOWING */}
             <section className={`panel-card tab-panel${activeTab === 'following' ? ' active' : ''}`}>
               <div className="section-head">
                 <div><h2>我的关注</h2><p>关注喜欢的摄影师或单主，把之后可能发生的约拍关系先保存下来。</p></div>
-                <div className="section-mark">05</div>
+                <div className="section-mark">04</div>
               </div>
               {follows.length ? (
                 <div className="order-list">
@@ -725,6 +697,28 @@ export function ProfilePage() {
                 </div>
               ) : (
                 <div className="pp-empty"><h3>还没有关注任何人</h3><p>在动态或大厅页面关注感兴趣的用户。</p></div>
+              )}
+            </section>
+
+            {/* LIKES */}
+            <section className={`panel-card tab-panel${activeTab === 'likes' ? ' active' : ''}`}>
+              <div className="section-head">
+                <div><h2>我的点赞</h2><p>点过赞的动态都在这里，随时回顾曾经喜欢的瞬间。</p></div>
+                <div className="section-mark">05</div>
+              </div>
+              {likedMoments.length ? (
+                <div className="ticket-grid">
+                  {likedMoments.slice(0, 4).map(m => (
+                    <article key={m.momentId} className="mini-ticket" onClick={() => navigate(`/moments/${m.momentId}`)}>
+                      <span className="price">POST</span>
+                      <h3>{m.title || '点赞的动态'}</h3>
+                      <p>{m.content || '分享了一张照片'}</p>
+                      <div className="ticket-meta"><span className="tag blue">查看动态</span></div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="pp-empty"><h3>还没有点赞</h3><p>给喜欢的动态点个赞，就会出现在这里。</p></div>
               )}
             </section>
 
