@@ -162,6 +162,12 @@ export function ProfilePage() {
   useEffect(() => { loadProfileData() }, [currentUser.userId, currentUser.role])
 
   useEffect(() => {
+    const IP_CACHE_KEY = `camera-ip-${currentUser.userId}`
+    const cached = (() => { try { return JSON.parse(localStorage.getItem(IP_CACHE_KEY)) } catch { return null } })()
+    if (cached?.location && Date.now() - (cached.ts || 0) < 24 * 3600 * 1000) {
+      if (cached.location !== currentUser.cityCode) updateProfile({ cityCode: cached.location })
+      return
+    }
     async function detectIpLocation() {
       try {
         const amapKey = import.meta.env.VITE_AMAP_KEY
@@ -182,7 +188,9 @@ export function ProfilePage() {
             location = data.regionName.replace(/(省|市|自治区|特别行政区)$/, '').trim()
           }
         }
-        if (!location || location === currentUser.cityCode) return
+        if (!location) return
+        try { localStorage.setItem(IP_CACHE_KEY, JSON.stringify({ location, ts: Date.now() })) } catch { /**/ }
+        if (location === currentUser.cityCode) return
         updateProfile({ cityCode: location })
         await userApi.updateMe({ cityCode: location }, currentUser)
       } catch { /* ignore */ }
