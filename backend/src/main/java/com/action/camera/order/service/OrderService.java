@@ -54,6 +54,13 @@ public class OrderService {
     private static final String AUTO_SHOOTING_START_REASON = "系统根据拍摄开始时间自动进入拍摄中";
     private static final String AUTO_SHOOTING_END_REASON = "系统根据拍摄结束时间自动进入待交付";
     private static final String AUTO_REFUND_UNDELIVERED_REASON = "超过最晚交付时间仍未上传作品，系统自动退款并结束订单";
+    private static final List<OrderStatus> DISPUTE_RESTORABLE_STATUSES = List.of(
+            OrderStatus.PAID_PENDING_SHOOT,
+            OrderStatus.SHOOTING,
+            OrderStatus.PENDING_DELIVERY,
+            OrderStatus.DELIVERED_PENDING_CONFIRM,
+            OrderStatus.REWORK_REQUIRED
+    );
     private static final List<OrderStatus> PROVIDER_TIME_CONFLICT_STATUSES = List.of(
             OrderStatus.PENDING_PAYMENT,
             OrderStatus.PAID_PENDING_SHOOT,
@@ -272,7 +279,7 @@ public class OrderService {
     @Transactional
     public Order refundOrderFromDispute(Long orderId, Long adminId, Long refundAmountCent,
                                         boolean partialRefund, String reason) {
-        Order order = getOrderOrThrow(orderId);
+        Order order = getOrderForUpdateOrThrow(orderId);
         OrderStatus fromStatus = order.getStatus();
         ensureCanChangeStatus(fromStatus, OrderStatus.REFUNDED);
         LocalDateTime now = LocalDateTime.now();
@@ -291,6 +298,50 @@ public class OrderService {
                 "ADMIN",
                 reason
         );
+    }
+
+    @Transactional
+    public Order restoreOrderAfterRejectedDispute(Long orderId, Long adminId,
+                                                   OrderStatus previousStatus, String reason) {
+        if (!DISPUTE_RESTORABLE_STATUSES.contains(previousStatus)) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                    "Dispute cannot restore order to status: " + previousStatus);
+        }
+        Order order = getOrderForUpdateOrThrow(orderId);
+        if (order.getStatus() != OrderStatus.APPEALING) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                    "Only appealing orders can be restored after a rejected dispute");
+        }
+        ensureCanChangeStatus(OrderStatus.APPEALING, previousStatus);
+        return applyStatusChange(
+                order,
+                OrderStatus.APPEALING,
+                previousStatus,
+                adminId,
+                "ADMIN",
+                reason
+        );
+    }
+
+    @Transactional
+    public Order completeOrderFromDispute(Long orderId, Long adminId, String reason) {
+        Order order = getOrderForUpdateOrThrow(orderId);
+        if (order.getStatus() != OrderStatus.APPEALING) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                    "Only appealing orders can be completed by dispute arbitration");
+        }
+        ensureCanChangeStatus(OrderStatus.APPEALING, OrderStatus.COMPLETED);
+        markCompletedAndReleaseEscrow(order, LocalDateTime.now(), false);
+        Order completedOrder = applyStatusChange(
+                order,
+                OrderStatus.APPEALING,
+                OrderStatus.COMPLETED,
+                adminId,
+                "ADMIN",
+                reason
+        );
+        notifyOrderCompleted(completedOrder);
+        return completedOrder;
     }
 
     @Transactional

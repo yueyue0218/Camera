@@ -1,7 +1,10 @@
 package com.action.camera.dispute.entity;
 
+import com.action.camera.order.enums.OrderStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -26,6 +29,10 @@ public class Dispute {
 
     @Column(name = "initiator_id", nullable = false)
     private Long initiatorId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "previous_order_status", nullable = false, length = 40)
+    private OrderStatus previousOrderStatus;
 
     @Column(name = "reason", nullable = false, length = 1000)
     private String reason;

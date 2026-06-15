@@ -66,6 +66,10 @@ public final class OrderStatusMachine {
                 OrderStatus.APPEALING
         ));
         transitions.put(OrderStatus.APPEALING, immutableEnumSet(
+                OrderStatus.PAID_PENDING_SHOOT,
+                OrderStatus.SHOOTING,
+                OrderStatus.PENDING_DELIVERY,
+                OrderStatus.DELIVERED_PENDING_CONFIRM,
                 OrderStatus.COMPLETED,
                 OrderStatus.REFUNDED,
                 OrderStatus.REWORK_REQUIRED

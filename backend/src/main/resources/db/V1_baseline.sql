@@ -161,6 +161,7 @@ CREATE TABLE IF NOT EXISTS disputes (
     id             BIGINT        PRIMARY KEY AUTO_INCREMENT,
     order_id       BIGINT        NOT NULL,
     initiator_id   BIGINT        NOT NULL,
+    previous_order_status VARCHAR(40) NOT NULL,
     reason         VARCHAR(1000) NOT NULL,
     status         VARCHAR(20)   NOT NULL DEFAULT 'OPEN',
     resolution     VARCHAR(30)   NULL,

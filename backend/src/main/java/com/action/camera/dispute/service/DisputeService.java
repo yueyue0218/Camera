@@ -41,6 +41,7 @@ public class DisputeService {
     private static final String RES_PARTIAL_REFUND = "PARTIAL_REFUND";
     private static final String RES_REJECTED = "REJECTED";
     private static final String RES_REWORK = "REWORK";
+    private static final String RES_COMPLETED = "COMPLETED";
 
     private static final String RESPONSIBILITY_NONE = "NONE";
     private static final String RESPONSIBILITY_PROVIDER_FAULT = "PROVIDER_FAULT";
@@ -83,6 +84,7 @@ public class DisputeService {
         Dispute dispute = new Dispute();
         dispute.setOrderId(orderId);
         dispute.setInitiatorId(initiatorId);
+        dispute.setPreviousOrderStatus(currentStatus);
         dispute.setReason(request.reason().trim());
         dispute.setStatus(STATUS_OPEN);
         disputeRepository.save(dispute);
@@ -142,7 +144,7 @@ public class DisputeService {
         String resolution = request.resolution().trim();
         String responsibility = isRefundResolution(resolution) ? normalizeResponsibility(request.responsibility()) : null;
         Long refundAmount = normalizeRefundAmount(request.refundAmount(), resolution);
-        applyOrderArbitrationResult(dispute.getOrderId(), adminId, resolution, refundAmount);
+        applyOrderArbitrationResult(dispute, adminId, resolution, refundAmount);
 
         LocalDateTime now = LocalDateTime.now();
         dispute.setStatus(STATUS_RESOLVED);
@@ -212,20 +214,11 @@ public class DisputeService {
                 .orElse(false);
     }
 
-    private OrderStatus resolveTargetStatus(String resolution) {
-        return switch (resolution) {
-            case RES_FULL_REFUND, RES_PARTIAL_REFUND -> OrderStatus.REFUNDED;
-            case RES_REJECTED -> OrderStatus.COMPLETED;
-            case RES_REWORK -> OrderStatus.REWORK_REQUIRED;
-            default -> throw new BusinessException(ErrorCode.VALIDATION_ERROR, "未知裁定结果: " + resolution);
-        };
-    }
-
-    private void applyOrderArbitrationResult(Long orderId, Long adminId, String resolution, Long refundAmount) {
+    private void applyOrderArbitrationResult(Dispute dispute, Long adminId, String resolution, Long refundAmount) {
         String reason = "管理员裁定申诉，结果：" + resolution;
         if (isRefundResolution(resolution)) {
             orderService.refundOrderFromDispute(
-                    orderId,
+                    dispute.getOrderId(),
                     adminId,
                     refundAmount,
                     RES_PARTIAL_REFUND.equals(resolution),
@@ -233,7 +226,18 @@ public class DisputeService {
             );
             return;
         }
-        orderService.changeStatus(orderId, adminId, resolveTargetStatus(resolution), reason);
+        switch (resolution) {
+            case RES_REJECTED -> orderService.restoreOrderAfterRejectedDispute(
+                    dispute.getOrderId(),
+                    adminId,
+                    dispute.getPreviousOrderStatus(),
+                    reason + "，恢复进入申诉前状态"
+            );
+            case RES_REWORK -> orderService.changeStatus(
+                    dispute.getOrderId(), adminId, OrderStatus.REWORK_REQUIRED, reason);
+            case RES_COMPLETED -> orderService.completeOrderFromDispute(dispute.getOrderId(), adminId, reason);
+            default -> throw new BusinessException(ErrorCode.VALIDATION_ERROR, "未知裁定结果: " + resolution);
+        }
     }
 
     private void notify(Long userId, String title, String content, String type, Long disputeId, Long orderId) {
@@ -288,7 +292,7 @@ public class DisputeService {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "裁定结果不能为空");
         }
         String resolution = request.resolution().trim();
-        if (!List.of(RES_FULL_REFUND, RES_PARTIAL_REFUND, RES_REJECTED, RES_REWORK)
+        if (!List.of(RES_FULL_REFUND, RES_PARTIAL_REFUND, RES_REJECTED, RES_REWORK, RES_COMPLETED)
                 .contains(resolution)) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "不支持的裁定结果: " + resolution);
         }

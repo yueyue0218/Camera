@@ -22,6 +22,10 @@ class OrderStatusMachineTest {
         assertAllowed(OrderStatus.DELIVERED_PENDING_CONFIRM, OrderStatus.COMPLETED);
         assertAllowed(OrderStatus.DELIVERED_PENDING_CONFIRM, OrderStatus.REWORK_REQUIRED);
         assertAllowed(OrderStatus.REWORK_REQUIRED, OrderStatus.PENDING_DELIVERY);
+        assertAllowed(OrderStatus.APPEALING, OrderStatus.PAID_PENDING_SHOOT);
+        assertAllowed(OrderStatus.APPEALING, OrderStatus.SHOOTING);
+        assertAllowed(OrderStatus.APPEALING, OrderStatus.PENDING_DELIVERY);
+        assertAllowed(OrderStatus.APPEALING, OrderStatus.DELIVERED_PENDING_CONFIRM);
         assertAllowed(OrderStatus.APPEALING, OrderStatus.REFUNDED);
     }
 

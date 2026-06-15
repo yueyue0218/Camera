@@ -13,6 +13,7 @@ import com.action.camera.notification.repository.NotificationRepository;
 import com.action.camera.order.enums.EscrowStatus;
 import com.action.camera.order.enums.OrderStatus;
 import com.action.camera.order.repository.OrderRepository;
+import com.action.camera.order.repository.OrderStatusLogRepository;
 import com.action.camera.order.repository.PaymentRecordRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,6 +54,9 @@ class DisputeServiceTest {
 
     @Autowired
     private PaymentRecordRepository paymentRecordRepository;
+
+    @Autowired
+    private OrderStatusLogRepository orderStatusLogRepository;
 
     @Autowired
     private NotificationRepository notificationRepository;
@@ -316,6 +320,44 @@ class DisputeServiceTest {
                 .get().extracting(o -> o.getStatus()).isEqualTo(OrderStatus.REWORK_REQUIRED);
     }
 
+    @Test
+    void rejectedDisputeRestoresPaidPendingShootWithoutReleasingEscrow() {
+        assertRejectedDisputeRestores(OrderStatus.PAID_PENDING_SHOOT);
+    }
+
+    @Test
+    void rejectedDisputeRestoresPendingDeliveryWithoutReleasingEscrow() {
+        assertRejectedDisputeRestores(OrderStatus.PENDING_DELIVERY);
+    }
+
+    @Test
+    void rejectedDisputeRestoresDeliveredPendingConfirmWithoutReleasingEscrow() {
+        assertRejectedDisputeRestores(OrderStatus.DELIVERED_PENDING_CONFIRM);
+    }
+
+    @Test
+    void explicitCompletedArbitrationCompletesOrderAndReleasesEscrow() {
+        DisputeResponse created = disputeService.createDispute(
+                DISPUTE_ORDER_ID, CUSTOMER_ID, new DisputeCreateRequest("双方同意完成"));
+
+        disputeService.arbitrate(
+                created.id(), ADMIN_ID,
+                new DisputeArbitrateRequest("COMPLETED", "管理员确认履约完成"));
+
+        assertThat(orderRepository.findById(DISPUTE_ORDER_ID)).get()
+                .satisfies(order -> {
+                    assertThat(order.getStatus()).isEqualTo(OrderStatus.COMPLETED);
+                    assertThat(order.getEscrowStatus()).isEqualTo(EscrowStatus.RELEASED);
+                    assertThat(order.getSettlementStatus()).isEqualTo("SETTLED");
+                    assertThat(order.getCompleteTime()).isNotNull();
+                });
+        assertThat(paymentRecordRepository.findByOrderId(DISPUTE_ORDER_ID)).get()
+                .satisfies(paymentRecord -> {
+                    assertThat(paymentRecord.getStatus()).isEqualTo("SUCCESS");
+                    assertThat(paymentRecord.getRefundAmountCent()).isZero();
+                });
+    }
+
     // ────────────────────────────────────────────────
     // 9. 非 ADMIN 调用 arbitrate → FORBIDDEN
     // ────────────────────────────────────────────────
@@ -427,6 +469,50 @@ class DisputeServiceTest {
                     assertThat(paymentRecord.getStatus()).isEqualTo(expectedStatus);
                     assertThat(paymentRecord.getRefundAmountCent()).isEqualTo(yuanToCent(expectedRefundAmount));
                     assertThat(paymentRecord.getRefundedAt()).isNotNull();
+                });
+    }
+
+    private void assertRejectedDisputeRestores(OrderStatus previousStatus) {
+        orderRepository.findById(DISPUTE_ORDER_ID).ifPresent(order -> {
+            order.setStatus(previousStatus);
+            order.setEscrowStatus(EscrowStatus.HELD);
+            order.setSettlementStatus("NOT_SETTLED");
+            order.setRefundStatus("NONE");
+            orderRepository.saveAndFlush(order);
+        });
+
+        DisputeResponse created = disputeService.createDispute(
+                DISPUTE_ORDER_ID, CUSTOMER_ID, new DisputeCreateRequest("驳回后恢复原履约状态"));
+        assertThat(disputeRepository.findById(created.id())).get()
+                .extracting(dispute -> dispute.getPreviousOrderStatus())
+                .isEqualTo(previousStatus);
+
+        disputeService.arbitrate(
+                created.id(), ADMIN_ID,
+                new DisputeArbitrateRequest("REJECTED", "证据不足，恢复原履约状态"));
+
+        assertThat(orderRepository.findById(DISPUTE_ORDER_ID)).get()
+                .satisfies(order -> {
+                    assertThat(order.getStatus()).isEqualTo(previousStatus);
+                    assertThat(order.getEscrowStatus()).isEqualTo(EscrowStatus.HELD);
+                    assertThat(order.getSettlementStatus()).isEqualTo("NOT_SETTLED");
+                    assertThat(order.getRefundStatus()).isEqualTo("NONE");
+                    assertThat(order.getCompleteTime()).isNull();
+                });
+        assertThat(paymentRecordRepository.findByOrderId(DISPUTE_ORDER_ID)).get()
+                .satisfies(paymentRecord -> {
+                    assertThat(paymentRecord.getStatus()).isEqualTo("SUCCESS");
+                    assertThat(paymentRecord.getRefundAmountCent()).isZero();
+                    assertThat(paymentRecord.getRefundedAt()).isNull();
+                });
+        assertThat(orderStatusLogRepository.findByOrderIdOrderByCreatedAtAsc(DISPUTE_ORDER_ID))
+                .last()
+                .satisfies(log -> {
+                    assertThat(log.getFromStatus()).isEqualTo(OrderStatus.APPEALING);
+                    assertThat(log.getToStatus()).isEqualTo(previousStatus);
+                    assertThat(log.getOperatorId()).isEqualTo(ADMIN_ID);
+                    assertThat(log.getOperatorRole()).isEqualTo("ADMIN");
+                    assertThat(log.getReason()).contains("恢复进入申诉前状态");
                 });
     }
 
