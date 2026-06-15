@@ -22,7 +22,7 @@ const demandStatusLabel = {
   OPEN: '开放中',
   MATCHED: '已匹配',
   CLOSED: '已下架',
-  PENDING_CUSTOMER_ACCEPT: '待接单主确认',
+  PENDING_CUSTOMER_ACCEPT: '待接约拍方确认',
   ACCEPTED: '已接受',
   REJECTED: '已拒绝'
 }
@@ -249,7 +249,7 @@ export function DemandDetailPage() {
   const timeText = demand.timeDescription || demand.timeSlot || readableDate(demand.expectedDate) || '暂无'
   const isDemandOwner = isSameOwner(currentUser, collectDemandOwnerIds(demand))
   const canRespond = currentUser.role === 'PROVIDER' && demand.status === 'OPEN'
-  const publisherName = firstText(demand.customerNickname, demand.customerName) || '单主'
+  const publisherName = firstText(demand.customerNickname, demand.customerName) || '约拍方'
 
   async function respondDemand() {
     if (responded || responding) return
@@ -261,7 +261,7 @@ export function DemandDetailPage() {
       normalizeError,
       onSuccess: async () => {
         setResponded(true)
-        setNotice({ type: 'success', text: '响应已提交，等待单主确认后会开启会话。' })
+        setNotice({ type: 'success', text: '响应已提交，等待约拍方确认后会开启会话。' })
         const detail = await demandApi.detail(demandId, currentUser)
         setDemand(await enrichDemandPublisher(detail || demand, currentUser))
       },
@@ -382,6 +382,7 @@ export function ServicePackageDetailPage() {
   const { currentUser } = useAuth()
   const [service, setService] = useState(null)
   const [interested, setInterested] = useState(false)
+  const [followingProvider, setFollowingProvider] = useState(false)
   const [status, setStatus] = useState(createStatus)
   const uploadedPortfolioUrls = useFileObjectUrls(
     [service?.portfolioIds, service?.images],
@@ -402,15 +403,19 @@ export function ServicePackageDetailPage() {
     async function loadService() {
       setStatus({ loading: true, error: '' })
       try {
-        const [detail, interestPage] = await Promise.all([
+        const [detail, interestPage, providerFollowing] = await Promise.all([
           servicePackageApi.detail(serviceId, currentUser),
           currentUser.role === 'CUSTOMER'
             ? servicePackageApi.myInterests({ page: 1, size: 100 }, currentUser).catch(() => null)
-            : Promise.resolve(null)
+            : Promise.resolve(null),
+          userApi.following(currentUser.userId, currentUser, 'PROVIDER').catch(() => [])
         ])
         if (!ignored) {
-          setService(await enrichServiceProvider(detail, currentUser))
+          const enriched = await enrichServiceProvider(detail, currentUser)
+          setService(enriched)
           setInterested(Boolean(interestPage?.records?.some(item => Number(item.serviceId) === Number(serviceId))))
+          const pid = enriched.photographerId || enriched.providerId
+          setFollowingProvider(Array.isArray(providerFollowing) && providerFollowing.some(f => Number(f.userId ?? f.authorId) === Number(pid)))
           setStatus({ loading: false, error: '' })
         }
       } catch (error) {
@@ -467,8 +472,19 @@ export function ServicePackageDetailPage() {
     }
   }
 
-  function followProvider() {
-    window.alert('后端暂无关注摄影师接口，当前按钮只能按 HTML 复刻展示。')
+  async function toggleFollowProvider() {
+    if (!providerProfileId) return
+    try {
+      if (followingProvider) {
+        await userApi.unfollow(providerProfileId, currentUser, 'PROVIDER')
+        setFollowingProvider(false)
+      } else {
+        await userApi.follow(providerProfileId, currentUser, 'PROVIDER')
+        setFollowingProvider(true)
+      }
+    } catch (error) {
+      window.alert(normalizeError(error))
+    }
   }
 
   async function offlineService() {
@@ -552,7 +568,7 @@ export function ServicePackageDetailPage() {
                 <div className="photographer-card-credit">{hasCreditScore ? `信用评分：${credit}` : '暂无信用评分'}</div>
               </div>
             </button>
-            <button className="secondary-btn" style={{ width: '100%' }} type="button" onClick={followProvider}>关注摄影师</button>
+            <button className="secondary-btn" style={{ width: '100%' }} type="button" onClick={toggleFollowProvider}>{followingProvider ? '已关注' : '关注摄影师'}</button>
           </div>
           {isCustomerViewer && (
             <div className="aside-card">
