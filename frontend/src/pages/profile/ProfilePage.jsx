@@ -199,7 +199,7 @@ export function ProfilePage() {
       reviewApi.listByUser(currentUser.userId, currentUser),
       creditApi.summary(currentUser.userId, currentUser),
       orderApi.list({ role: isProvider ? 'provider' : 'customer' }, currentUser),
-      userApi.followers(currentUser.userId, currentUser, currentUser.role)
+      userApi.followers(currentUser.userId, currentUser)
     ])
     if (myProfileRes.status === 'fulfilled' && myProfileRes.value) {
       const role = myProfileRes.value.currentRole || myProfileRes.value.role || currentUser.role
