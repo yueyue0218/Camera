@@ -99,6 +99,7 @@ export function CreditDetailPage() {
   const navigate = useNavigate()
   const { currentUser } = useAuth()
   const targetUserId = Number(userId || currentUser.userId)
+  const isSelf = targetUserId === currentUser.userId
   const [summary, setSummary] = useState(null)
   const [records, setRecords] = useState([])
   const [notice, setNotice] = useState(null)
@@ -110,23 +111,32 @@ export function CreditDetailPage() {
 
     async function load() {
       setLoading(true)
-      const [summaryResult, recordsResult] = await Promise.allSettled([
-        creditApi.summary(targetUserId, currentUser),
-        creditApi.records(targetUserId, currentUser)
-      ])
-
-      if (cancelled) return
-
-      setSummary(summaryResult.status === 'fulfilled' ? summaryResult.value : null)
-      setRecords(recordsResult.status === 'fulfilled' ? normalizeRecords(recordsResult.value) : [])
-      const failed = [summaryResult, recordsResult].find(result => result.status === 'rejected')
-      setNotice(failed ? failed.reason?.message || '信用数据暂时不可用' : null)
+      if (isSelf) {
+        const [summaryResult, recordsResult] = await Promise.allSettled([
+          creditApi.summary(targetUserId, currentUser),
+          creditApi.records(targetUserId, currentUser)
+        ])
+        if (cancelled) return
+        setSummary(summaryResult.status === 'fulfilled' ? summaryResult.value : null)
+        setRecords(recordsResult.status === 'fulfilled' ? normalizeRecords(recordsResult.value) : [])
+        const failed = [summaryResult, recordsResult].find(r => r.status === 'rejected')
+        setNotice(failed ? failed.reason?.message || '信用数据暂时不可用' : null)
+      } else {
+        const summaryResult = await creditApi.summary(targetUserId, currentUser).catch(e => ({ _err: e.message }))
+        if (cancelled) return
+        if (summaryResult?._err) {
+          setNotice(summaryResult._err)
+        } else {
+          setSummary(summaryResult)
+        }
+        setRecords([])
+      }
       setLoading(false)
     }
 
     load()
     return () => { cancelled = true }
-  }, [targetUserId, currentUser])
+  }, [targetUserId, isSelf])
 
   const score = useMemo(
     () => formatScore(summary?.creditScore),
@@ -145,14 +155,15 @@ export function CreditDetailPage() {
   const riskRecords = formatMetric(summary?.riskRecordCount)
   const recordCount = records.length
   const hasRecords = records.length > 0
+  const hasSummary = summary != null
   const lastUpdated = summary?.lastUpdatedAt || records[0]?.createdAt || null
-  const displayScore = hasRecords ? score : '暂无'
-  const displayLevel = hasRecords ? level : '新用户'
-  const displayRecordCount = hasRecords ? recordCount : '暂无'
-  const overviewEffectiveOrders = hasRecords ? effectiveOrders : '--'
-  const overviewGoodReviewRate = hasRecords ? goodReviewRate : '--'
-  const overviewFulfillmentRate = hasRecords ? fulfillmentRate : '--'
-  const overviewRiskRecords = hasRecords ? riskRecords : '--'
+  const displayScore = hasSummary ? score : '暂无'
+  const displayLevel = hasSummary ? level : '新用户'
+  const displayRecordCount = isSelf ? (hasRecords ? recordCount : '暂无') : '不公开'
+  const overviewEffectiveOrders = hasSummary ? effectiveOrders : '--'
+  const overviewGoodReviewRate = hasSummary ? goodReviewRate : '--'
+  const overviewFulfillmentRate = hasSummary ? fulfillmentRate : '--'
+  const overviewRiskRecords = hasSummary ? riskRecords : '--'
 
   return (
     <div className="pp-main credit-detail-page">
@@ -233,6 +244,11 @@ export function CreditDetailPage() {
           <div className="pp-empty">
             <h3>正在加载信用记录</h3>
             <p>正在更新信用分和记录。</p>
+          </div>
+        ) : !isSelf ? (
+          <div className="pp-empty">
+            <h3>详细记录不公开</h3>
+            <p>信用记录属于个人隐私，仅本人可见。</p>
           </div>
         ) : hasRecords ? (
           <Stack spacing={1.35} className="credit-note-stack">

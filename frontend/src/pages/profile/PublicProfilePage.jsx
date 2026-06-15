@@ -180,8 +180,8 @@ export function PublicProfilePage() {
   const bio = publicProfile?.bio || storedProfile.bio || ''
   const creditScore = creditSummary?.creditScore ?? null
   const displayCreditScore = formatCreditScore(creditScore)
-  const cityPin = pp?.cityCode || publicProfile?.school || publicProfile?.cityCode || storedProfile.school || 'Portra'
-  const ipLocation = pp?.cityCode || publicProfile?.cityCode || publicProfile?.ipLocation || storedProfile.cityCode || ''
+  const cityPin = pp?.cityCode || publicProfile?.cityCode || publicProfile?.school || storedProfile.school || 'Portra'
+  const ipLocation = publicProfile?.cityCode || storedProfile.cityCode || ''
 
   const momentImages = moments
     .filter(m => m.imageData)
@@ -339,8 +339,8 @@ export function PublicProfilePage() {
               {followedByMe && followsMe ? '互相关注' : followedByMe ? '已关注' : '关注'}
             </button>
             {isProvider && (
-              <button className="secondary-btn" disabled={!pp?.acceptingOrders} style={!pp?.acceptingOrders ? { opacity: 0.5, cursor: 'not-allowed' } : {}}>
-                {pp?.acceptingOrders ? '立即预约' : '暂停接单'}
+              <button className="secondary-btn" disabled={pp?.acceptingOrders === false} style={pp?.acceptingOrders === false ? { opacity: 0.5, cursor: 'not-allowed' } : {}}>
+                {pp?.acceptingOrders === false ? '暂停接单' : '立即预约'}
               </button>
             )}
             <button className="secondary-btn" onClick={() => navigate(`/users/${profileUserId}?role=${isProvider ? 'CUSTOMER' : 'PROVIDER'}`)}>

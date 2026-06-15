@@ -160,7 +160,8 @@ public class SocialRelationService {
                 followingCount,
                 followedByCurrentUser,
                 momentCount,
-                providerProfile
+                providerProfile,
+                user.getCityCode()
         );
     }
 
