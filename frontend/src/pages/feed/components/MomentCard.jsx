@@ -35,6 +35,7 @@ export function MomentCard({
   onDelete,
   canFollow = true
 }) {
+  const momentId = Number(moment.momentId ?? moment.id ?? moment.postId)
   const images = moment.imageDataList?.length
     ? moment.imageDataList
     : moment.imageData ? [moment.imageData] : []
@@ -44,7 +45,7 @@ export function MomentCard({
   return (
     <Paper className="moment-card" elevation={0}>
       <div className="moment-card__side">
-        <div className="moment-card__serial">No. {String(moment.momentId).padStart(6, '0')}</div>
+        <div className="moment-card__serial">No. {String(momentId).padStart(6, '0')}</div>
         <div className="moment-card__avatar-shell" onClick={() => onOpenProfile(moment.authorId, moment.authorRole)}>
           <Avatar src={authorAvatar || undefined} className="moment-card__avatar">
             {(authorName || roleLabel(moment.authorRole)).slice(0, 1)}
@@ -68,13 +69,13 @@ export function MomentCard({
 
       <div className="moment-card__main">
         <div className="moment-card__stamp">PORTRA FILE</div>
-        <h2 onClick={() => onOpenMoment(moment.momentId)}>{moment.title || '未命名动态'}</h2>
+        <h2 onClick={() => onOpenMoment(moment)}>{moment.title || '未命名动态'}</h2>
         <p>{moment.content || '分享了一段被放慢的生活。'}</p>
 
         {total > 0 ? (
-          <div className={`moment-card__filmstrip count-${Math.min(total, 3)}`} onClick={() => onOpenMoment(moment.momentId)}>
+          <div className={`moment-card__filmstrip count-${Math.min(total, 3)}`} onClick={() => onOpenMoment(moment)}>
             {previewImages.map((src, index) => (
-              <img key={`${moment.momentId}-${index}`} src={src} alt={`${moment.title || '动态'} ${index + 1}`} />
+              <img key={`${momentId}-${index}`} src={src} alt={`${moment.title || '动态'} ${index + 1}`} />
             ))}
             {total > 3 && <span className="moment-card__film-count">+{total - 3}</span>}
           </div>
@@ -84,7 +85,7 @@ export function MomentCard({
           <button
             type="button"
             className={`moment-action like ${moment.likedByCurrentUser ? 'active' : ''}`}
-            onClick={() => onLike(moment.momentId)}
+            onClick={() => onLike(momentId)}
           >
             {moment.likedByCurrentUser ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
             <span>{moment.likeCount || 0}</span>
@@ -92,7 +93,7 @@ export function MomentCard({
           <button
             type="button"
             className={`moment-action save ${moment.favoritedByCurrentUser ? 'active' : ''}`}
-            onClick={() => onFavorite(moment.momentId)}
+            onClick={() => onFavorite(momentId)}
           >
             {moment.favoritedByCurrentUser ? <BookmarkRoundedIcon /> : <BookmarkBorderRoundedIcon />}
             <span>{moment.favoriteCount || 0}</span>
@@ -101,7 +102,7 @@ export function MomentCard({
           <div className="moment-card__menu-wrap">
             <IconButton
               className="moment-card__menu-btn"
-              onClick={event => onMenuOpen(event, moment.momentId)}
+              onClick={event => onMenuOpen(event, momentId)}
               aria-label="更多"
             >
               <MoreHorizRoundedIcon fontSize="small" />
@@ -125,7 +126,7 @@ export function MomentCard({
                   删除动态
                 </MenuItem>
               )}
-              {!isSelf && <MenuItem onClick={() => onOpenMoment(moment.momentId)}>查看详情</MenuItem>}
+              {!isSelf && <MenuItem onClick={() => onOpenMoment(moment)}>查看详情</MenuItem>}
             </Menu>
           </div>
         </div>
