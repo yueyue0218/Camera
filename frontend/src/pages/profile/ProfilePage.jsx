@@ -506,7 +506,7 @@ export function ProfilePage() {
             <button className="primary-btn" onClick={() => setEditOpen(true)}>编辑资料</button>
             {isProvider
               ? <button className="secondary-btn" onClick={() => navigate('/publish/service-package')}>发布新橱窗</button>
-              : <button className="secondary-btn" onClick={() => navigate('/feed?view=mine')}>管理我的动态</button>
+              : <button className="secondary-btn" onClick={() => navigate('/publish')}>发布新需求</button>
             }
             {isProvider ? (
               <button className="secondary-btn" onClick={() => handleSwitchRole('CUSTOMER')}>
