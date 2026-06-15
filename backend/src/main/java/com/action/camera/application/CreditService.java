@@ -17,6 +17,8 @@ import java.util.Optional;
 @Service
 public class CreditService {
 
+    private static final BigDecimal INITIAL_CREDIT_BASELINE = new BigDecimal("80.00");
+
     private final UserRepository userRepository;
     private final CreditRecordRepository creditRecordRepository;
 
@@ -55,12 +57,13 @@ public class CreditService {
         User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_ERROR, "用户不存在"));
 
-        BigDecimal beforeScore = normalizeScore(user.getCreditScore());
-        BigDecimal newScore = beforeScore.add(BigDecimal.valueOf(scoreChange))
+        BigDecimal existingScore = user.getCreditScore();
+        BigDecimal calculationBase = calculationBaseFor(existingScore);
+        BigDecimal newScore = calculationBase.add(BigDecimal.valueOf(scoreChange))
                 .max(BigDecimal.ZERO)
                 .min(new BigDecimal("100.00"))
                 .setScale(2, RoundingMode.HALF_UP);
-        int appliedScoreChange = newScore.subtract(beforeScore).intValue();
+        int appliedScoreChange = newScore.subtract(calculationBase).intValue();
 
         user.setCreditScore(newScore);
         userRepository.save(user);
@@ -70,7 +73,7 @@ public class CreditService {
         record.setRelatedOrderId(orderId);
         record.setEventType(eventType);
         record.setScoreChange(scoreChange);
-        record.setBeforeScore(beforeScore);
+        record.setBeforeScore(existingScore == null ? null : normalizeExistingScore(existingScore));
         record.setScoreAfter(newScore);
         record.setAfterScore(newScore);
         record.setAppliedScoreChange(appliedScoreChange);
@@ -116,10 +119,14 @@ public class CreditService {
         return creditRecordRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 
-    private BigDecimal normalizeScore(BigDecimal score) {
-        if (score == null) {
-            return new BigDecimal("80.00");
-        }
+    private BigDecimal normalizeExistingScore(BigDecimal score) {
         return score.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal calculationBaseFor(BigDecimal existingScore) {
+        if (existingScore == null) {
+            return INITIAL_CREDIT_BASELINE;
+        }
+        return normalizeExistingScore(existingScore);
     }
 }

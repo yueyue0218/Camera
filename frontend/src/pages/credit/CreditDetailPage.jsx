@@ -7,9 +7,15 @@ import '../profile/profile.css'
 import './credit.css'
 
 function formatTime(value) {
-  if (!value) return '刚刚'
+  if (!value) return '暂无'
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '刚刚' : date.toLocaleString('zh-CN', { hour12: false })
+  return Number.isNaN(date.getTime()) ? '暂无' : date.toLocaleString('zh-CN', { hour12: false })
+}
+
+function formatUpdatedTime(value) {
+  if (!value) return '暂无'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '暂无' : date.toLocaleString('zh-CN', { hour12: false })
 }
 
 function formatScore(value) {
@@ -136,7 +142,11 @@ export function CreditDetailPage() {
   const fulfillmentRate = formatPercent(summary?.fulfillmentRate)
   const riskRecords = formatMetric(summary?.riskRecordCount)
   const recordCount = records.length
+  const hasRecords = records.length > 0
   const lastUpdated = summary?.lastUpdatedAt || records[0]?.createdAt || null
+  const displayScore = hasRecords ? score : '暂无'
+  const displayLevel = hasRecords ? level : '新用户'
+  const displayRecordCount = hasRecords ? recordCount : '暂无'
 
   return (
     <div className="pp-main credit-detail-page">
@@ -155,10 +165,10 @@ export function CreditDetailPage() {
       <section className="profile-hero credit-hero-surface">
         <div className="credit-hero-watermark" aria-hidden="true">CREDIT</div>
 
-        <div className="profile-photo-wrap">
+          <div className="profile-photo-wrap">
           <div className="credit-stamp-ring" aria-hidden="true" />
           <div className="credit-score-plain">
-            <b>{score}</b>
+            <b>{displayScore}</b>
             <span>信用评分</span>
           </div>
         </div>
@@ -166,10 +176,10 @@ export function CreditDetailPage() {
         <div className="hero-info">
           <div className="ticket-kicker">Credit File</div>
           <div className="hero-name-row">
-            <h1 className="hero-name">{level}</h1>
+            <h1 className="hero-name">{displayLevel}</h1>
             <span className="role-badge">UID {targetUserId}</span>
           </div>
-          <p className="profile-uid">最近更新：{formatTime(lastUpdated)}</p>
+          <p className="profile-uid">最近更新：{formatUpdatedTime(lastUpdated)}</p>
           <p className="profile-signature">
             信用分参考有效订单、好评率、履约率和风险记录；新用户需要完成订单或收到评价后开始积累。
           </p>
@@ -177,7 +187,7 @@ export function CreditDetailPage() {
             <span>有效订单 {effectiveOrders}</span>
             <span>完成订单 {completedOrders}</span>
             <span>收到评价 {reviewCount}</span>
-            <span>信用记录 {recordCount}</span>
+            <span>信用记录 {displayRecordCount}</span>
           </div>
           <Button
             type="button"
@@ -210,7 +220,7 @@ export function CreditDetailPage() {
             <h2>信用记录</h2>
             <p>按时间倒序查看每一次信用变化，记录只展示用户能理解的原因。</p>
           </div>
-          <div className="section-mark">{recordCount}</div>
+          <div className="section-mark">{hasRecords ? recordCount : '暂无'}</div>
         </div>
 
         {loading ? (
@@ -218,7 +228,7 @@ export function CreditDetailPage() {
             <h3>正在加载信用记录</h3>
             <p>正在更新信用分和记录。</p>
           </div>
-        ) : recordCount ? (
+        ) : hasRecords ? (
           <Stack spacing={1.35} className="credit-note-stack">
             {records.map((record, index) => {
               const delta = Number(record.appliedScoreChange ?? record.scoreChange ?? record.deltaScore ?? 0)

@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
     bio            VARCHAR(500)   NULL,
     current_role   VARCHAR(20)    NOT NULL DEFAULT 'CUSTOMER',
     status         VARCHAR(20)    NOT NULL DEFAULT 'ACTIVE',
-    credit_score   DECIMAL(5,2)   NOT NULL DEFAULT 80.00,
+    credit_score   DECIMAL(5,2)   NULL DEFAULT NULL,
     created_at     DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at     DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     KEY idx_users_status (status)

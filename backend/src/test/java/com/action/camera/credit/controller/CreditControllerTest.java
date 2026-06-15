@@ -5,6 +5,7 @@ import com.action.camera.common.ErrorCode;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.security.UserRole;
+import com.action.camera.repository.CreditRecordRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,9 @@ class CreditControllerTest {
     private CreditService creditService;
 
     @Autowired
+    private CreditRecordRepository creditRecordRepository;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
@@ -38,7 +42,6 @@ class CreditControllerTest {
         insertUser(USER_ID, "credit-user", "CUSTOMER");
         insertUser(OTHER_USER_ID, "credit-other", "CUSTOMER");
         insertUser(ADMIN_ID, "credit-admin", "ADMIN");
-        creditService.updateCreditScore(USER_ID, 2, "TEST", 1L, "test credit", "TEST", 100L);
     }
 
     @AfterEach
@@ -57,10 +60,23 @@ class CreditControllerTest {
         assertThat(summary.creditScore()).isNull();
         assertThat(summary.creditLevel()).isEqualTo("新用户");
         assertThat(summary.effectiveOrderCount()).isZero();
+        assertThat(summary.recordCount()).isZero();
+        assertThat(summary.lastUpdatedAt()).isNull();
+    }
+
+    @Test
+    void newUserHasNoCreditRecords() {
+        UserContext.setUserId(USER_ID);
+        UserContext.setCurrentRole(UserRole.CUSTOMER);
+
+        assertThat(creditController.listCreditRecords(USER_ID).getData()).isEmpty();
+        assertThat(creditRecordRepository.findByUserIdOrderByCreatedAtDesc(USER_ID)).isEmpty();
     }
 
     @Test
     void creditRecordsRequireSelfOrAdmin() {
+        creditService.updateCreditScore(USER_ID, 2, "TEST", 1L, "test credit", "TEST", 100L);
+
         UserContext.setUserId(OTHER_USER_ID);
         UserContext.setCurrentRole(UserRole.CUSTOMER);
 
@@ -80,8 +96,8 @@ class CreditControllerTest {
     private void insertUser(Long userId, String nickname, String currentRole) {
         jdbcTemplate.update("""
                 INSERT INTO users (id, nickname, current_role, status, credit_score, created_at, updated_at)
-                VALUES (?, ?, ?, 'ACTIVE', 80.00, NOW(), NOW())
-                ON DUPLICATE KEY UPDATE nickname = VALUES(nickname), current_role = VALUES(current_role)
+                VALUES (?, ?, ?, 'ACTIVE', NULL, NOW(), NOW())
+                ON DUPLICATE KEY UPDATE nickname = VALUES(nickname), current_role = VALUES(current_role), credit_score = VALUES(credit_score)
                 """, userId, nickname, currentRole);
     }
 }

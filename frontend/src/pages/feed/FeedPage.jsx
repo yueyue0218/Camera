@@ -445,6 +445,10 @@ export function FeedPage() {
     if (!deleteTarget) return
     try {
       const momentId = Number(deleteTarget)
+      if (!Number.isFinite(momentId)) {
+        setNotice({ type: 'error', text: '动态 ID 缺失，无法删除' })
+        return
+      }
       await momentApi.delete(momentId, currentUser)
       removeMoment(momentId)
       setDrawerMomentId(null)
@@ -452,7 +456,7 @@ export function FeedPage() {
       await refreshPage()
       setNotice({ type: 'success', text: '动态已删除' })
     } catch (error) {
-      setNotice({ type: 'error', text: error.message })
+      setNotice({ type: 'error', text: error.message || '删除动态失败' })
     }
   }
 

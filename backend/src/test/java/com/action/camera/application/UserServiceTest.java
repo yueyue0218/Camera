@@ -67,6 +67,7 @@ class UserServiceTest {
         assertThat(saved.getNickname()).isEqualTo("测试用户");
         assertThat(saved.getSchool()).isEqualTo("南京大学");
         assertThat(saved.getStatus()).isEqualTo("ACTIVE");
+        assertThat(saved.getCreditScore()).isNull();
         assertThat(saved.getPasswordHash()).isNotEqualTo("test123456");
         assertThat(encoder.matches("test123456", saved.getPasswordHash())).isTrue();
     }
@@ -148,7 +149,7 @@ class UserServiceTest {
         assertThat(profile.getNickname()).isEqualTo("测试用户");
         assertThat(profile.getStudentNo()).isEqualTo("241880166");
         assertThat(profile.getSchool()).isEqualTo("南京大学");
-        assertThat(profile.getCreditScore()).isNotNull();
+        assertThat(profile.getCreditScore()).isNull();
     }
 
     @Test
