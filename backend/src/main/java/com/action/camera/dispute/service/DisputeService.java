@@ -142,17 +142,7 @@ public class DisputeService {
         String resolution = request.resolution().trim();
         String responsibility = isRefundResolution(resolution) ? normalizeResponsibility(request.responsibility()) : null;
         Long refundAmount = normalizeRefundAmount(request.refundAmount(), resolution);
-        OrderStatus targetOrderStatus = resolveTargetStatus(resolution);
-
-        orderService.changeStatus(dispute.getOrderId(), adminId, targetOrderStatus,
-                "管理员裁定申诉，结果：" + resolution);
-
-        if (RES_PARTIAL_REFUND.equals(resolution)) {
-            orderRepository.findById(dispute.getOrderId()).ifPresent(o -> {
-                o.setRefundStatus("PARTIAL");
-                orderRepository.save(o);
-            });
-        }
+        applyOrderArbitrationResult(dispute.getOrderId(), adminId, resolution, refundAmount);
 
         LocalDateTime now = LocalDateTime.now();
         dispute.setStatus(STATUS_RESOLVED);
@@ -229,6 +219,21 @@ public class DisputeService {
             case RES_REWORK -> OrderStatus.REWORK_REQUIRED;
             default -> throw new BusinessException(ErrorCode.VALIDATION_ERROR, "未知裁定结果: " + resolution);
         };
+    }
+
+    private void applyOrderArbitrationResult(Long orderId, Long adminId, String resolution, Long refundAmount) {
+        String reason = "管理员裁定申诉，结果：" + resolution;
+        if (isRefundResolution(resolution)) {
+            orderService.refundOrderFromDispute(
+                    orderId,
+                    adminId,
+                    refundAmount,
+                    RES_PARTIAL_REFUND.equals(resolution),
+                    reason
+            );
+            return;
+        }
+        orderService.changeStatus(orderId, adminId, resolveTargetStatus(resolution), reason);
     }
 
     private void notify(Long userId, String title, String content, String type, Long disputeId, Long orderId) {

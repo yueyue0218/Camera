@@ -10,8 +10,10 @@ import com.action.camera.dispute.dto.DisputeResponse;
 import com.action.camera.dispute.repository.DisputeRepository;
 import com.action.camera.notification.entity.Notification;
 import com.action.camera.notification.repository.NotificationRepository;
+import com.action.camera.order.enums.EscrowStatus;
 import com.action.camera.order.enums.OrderStatus;
 import com.action.camera.order.repository.OrderRepository;
+import com.action.camera.order.repository.PaymentRecordRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,6 +52,9 @@ class DisputeServiceTest {
     private OrderRepository orderRepository;
 
     @Autowired
+    private PaymentRecordRepository paymentRecordRepository;
+
+    @Autowired
     private NotificationRepository notificationRepository;
 
     @Autowired
@@ -59,6 +64,8 @@ class DisputeServiceTest {
     void setUp() {
         jdbcTemplate.update("DELETE FROM notifications WHERE user_id IN (?, ?, ?, ?)",
                 CUSTOMER_ID, PROVIDER_ID, OUTSIDER_ID, ADMIN_ID);
+        jdbcTemplate.update("DELETE FROM payment_records WHERE order_id IN (?, ?)",
+                DISPUTE_ORDER_ID, COMPLETED_ORDER_ID);
         insertUser(CUSTOMER_ID, "dispute-customer", "CUSTOMER");
         insertUser(PROVIDER_ID, "dispute-provider", "PROVIDER");
         insertUser(OUTSIDER_ID, "dispute-outsider", "CUSTOMER");
@@ -67,6 +74,7 @@ class DisputeServiceTest {
         insertQuote();
         insertOrder(DISPUTE_ORDER_ID,   "ORDER-DISPUTE-TEST",    "DELIVERED_PENDING_CONFIRM");
         insertOrder(COMPLETED_ORDER_ID, "ORDER-COMPLETED-TEST",  "COMPLETED");
+        insertPaymentRecord(DISPUTE_ORDER_ID);
     }
 
     @AfterEach
@@ -212,7 +220,14 @@ class DisputeServiceTest {
         assertThat(resolved.resolvedAt()).isNotNull();
 
         assertThat(orderRepository.findById(DISPUTE_ORDER_ID))
-                .get().extracting(o -> o.getStatus()).isEqualTo(OrderStatus.REFUNDED);
+                .get()
+                .satisfies(order -> {
+                    assertThat(order.getStatus()).isEqualTo(OrderStatus.REFUNDED);
+                    assertThat(order.getEscrowStatus()).isEqualTo(EscrowStatus.REFUNDED);
+                    assertThat(order.getSettlementStatus()).isEqualTo("NOT_SETTLED");
+                    assertThat(order.getRefundStatus()).isEqualTo("REFUNDED");
+                });
+        assertPaymentRecord("REFUNDED", "100.00");
 
         assertThat(notificationRepository.findByUserIdOrderByCreatedAtDesc(CUSTOMER_ID))
                 .extracting(Notification::getType)
@@ -244,8 +259,11 @@ class DisputeServiceTest {
         assertThat(orderRepository.findById(DISPUTE_ORDER_ID)).get()
                 .satisfies(order -> {
                     assertThat(order.getStatus()).isEqualTo(OrderStatus.REFUNDED);
-                    assertThat(order.getRefundStatus()).isEqualTo("PARTIAL");
+                    assertThat(order.getEscrowStatus()).isEqualTo(EscrowStatus.REFUNDED);
+                    assertThat(order.getSettlementStatus()).isEqualTo("NOT_SETTLED");
+                    assertThat(order.getRefundStatus()).isEqualTo("PARTIAL_REFUNDED");
                 });
+        assertPaymentRecord("PARTIAL_REFUNDED", "30.00");
     }
 
     @Test
@@ -390,5 +408,29 @@ class DisputeServiceTest {
                 )
                 ON DUPLICATE KEY UPDATE status = VALUES(status)
                 """, orderId, orderNo, QUOTE_ID, CONV_ID, CUSTOMER_ID, PROVIDER_ID, status);
+    }
+
+    private void insertPaymentRecord(Long orderId) {
+        jdbcTemplate.update("""
+                INSERT INTO payment_records (
+                    payment_no, order_id, amount, refund_amount, pay_method, status,
+                    requested_at, paid_at
+                )
+                VALUES (?, ?, 100.00, 0.00, 'MOCK_PAY', 'SUCCESS', NOW(), NOW())
+                """, "PAY-DISPUTE-" + orderId, orderId);
+    }
+
+    private void assertPaymentRecord(String expectedStatus, String expectedRefundAmount) {
+        assertThat(paymentRecordRepository.findByOrderId(DISPUTE_ORDER_ID))
+                .get()
+                .satisfies(paymentRecord -> {
+                    assertThat(paymentRecord.getStatus()).isEqualTo(expectedStatus);
+                    assertThat(paymentRecord.getRefundAmountCent()).isEqualTo(yuanToCent(expectedRefundAmount));
+                    assertThat(paymentRecord.getRefundedAt()).isNotNull();
+                });
+    }
+
+    private long yuanToCent(String yuan) {
+        return new java.math.BigDecimal(yuan).movePointRight(2).longValueExact();
     }
 }
