@@ -11,7 +11,7 @@ import './reviews.css'
 
 export function reviewDirectionLabel(direction) {
   const value = String(direction || '').trim().toUpperCase()
-  if (value === 'CUSTOMER_TO_PROVIDER') return '来自单主的评价'
+  if (value === 'CUSTOMER_TO_PROVIDER') return '来自约拍方的评价'
   if (value === 'PROVIDER_TO_CUSTOMER') return '来自摄影师的评价'
   return '评价记录'
 }

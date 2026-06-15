@@ -321,7 +321,7 @@ export function ProfilePage() {
     try {
       await userApi.switchRole(newRole, currentUser)
       switchRole(newRole)
-      setNotice({ type: 'ok', text: `已切换到${newRole === 'PROVIDER' ? '摄影师' : '单主'}账号` })
+      setNotice({ type: 'ok', text: `已切换到${newRole === 'PROVIDER' ? '摄影师' : '约拍方'}账号` })
     } catch (err) {
       setNotice({ type: 'err', text: err.message || '切换身份失败' })
     }
@@ -460,7 +460,7 @@ export function ProfilePage() {
           <div className="ticket-kicker">Portra Profile Ticket</div>
           <div className="hero-name-row">
             <h1 className="hero-name">{displayName}</h1>
-            <span className="role-badge">{isProvider ? '摄影师' : '单主'}</span>
+            <span className="role-badge">{isProvider ? '摄影师' : '约拍方'}</span>
           </div>
           <p className="profile-uid">UID：{currentUser.userId} · Portra ID</p>
           <div className="profile-meta-line">
@@ -502,7 +502,7 @@ export function ProfilePage() {
             }
             {isProvider ? (
               <button className="secondary-btn" onClick={() => handleSwitchRole('CUSTOMER')}>
-                🎯 切换到我的单主账号
+                🎯 切换到我的约拍方账号
               </button>
             ) : (
               <>
@@ -673,7 +673,7 @@ export function ProfilePage() {
             {/* FOLLOWING */}
             <section className={`panel-card tab-panel${activeTab === 'following' ? ' active' : ''}`}>
               <div className="section-head">
-                <div><h2>我的关注</h2><p>关注喜欢的摄影师或单主，把之后可能发生的约拍关系先保存下来。</p></div>
+                <div><h2>我的关注</h2><p>关注喜欢的摄影师或约拍方，把之后可能发生的约拍关系先保存下来。</p></div>
                 <div className="section-mark">04</div>
               </div>
               {follows.length ? (

@@ -258,7 +258,7 @@ export function PublicProfilePage() {
           <div className="ticket-kicker">Portra Profile Ticket</div>
           <div className="hero-name-row">
             <h1 className="hero-name">{nickname}</h1>
-            <span className="role-badge">{isProvider ? '摄影师' : '单主'}</span>
+            <span className="role-badge">{isProvider ? '摄影师' : '约拍方'}</span>
           </div>
           <p className="profile-uid">UID：{profileUserId} · Portra ID</p>
           <div className="profile-meta-line">
@@ -367,7 +367,7 @@ export function PublicProfilePage() {
                 <div className="section-head">
                   <div>
                     <h2>历史评价</h2>
-                    <p>来自单主的真实反馈，见证每一次约拍。</p>
+                    <p>来自约拍方的真实反馈，见证每一次约拍。</p>
                   </div>
                   <div className="section-mark">02</div>
                 </div>
@@ -392,7 +392,7 @@ export function PublicProfilePage() {
                     </footer>
                   </div>
                 )) : (
-                  <div className="pp-empty"><h3>暂无评价</h3><p>还没有收到来自单主的评价。</p></div>
+                  <div className="pp-empty"><h3>暂无评价</h3><p>还没有收到来自约拍方的评价。</p></div>
                 )}
               </section>
 

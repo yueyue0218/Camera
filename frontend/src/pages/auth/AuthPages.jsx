@@ -169,7 +169,7 @@ function SuccessBanner({ text }) {
 
 function RoleToggle({ value, onChange }) {
   const options = [
-    { key: 'CUSTOMER', label: '单主', hint: '我想拍照' },
+    { key: 'CUSTOMER', label: '约拍方', hint: '我想拍照' },
     { key: 'PROVIDER', label: '摄影师', hint: '我来拍' }
   ]
   return (

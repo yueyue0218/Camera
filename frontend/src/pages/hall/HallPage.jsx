@@ -356,7 +356,7 @@ export function HallPage() {
       normalizeError,
       onSuccess: async () => {
         setRespondedDemandIds(current => new Set(current).add(Number(demand.demandId)))
-        setNotice({ type: 'success', text: '响应已提交，等待单主确认后会开启会话。' })
+        setNotice({ type: 'success', text: '响应已提交，等待约拍方确认后会开启会话。' })
         await loadDemands(filters)
         if (selectedDemand?.demandId === demand.demandId) {
           const detail = await demandApi.detail(demand.demandId, currentUser)
