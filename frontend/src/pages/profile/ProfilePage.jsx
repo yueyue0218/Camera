@@ -394,7 +394,6 @@ export function ProfilePage() {
           <p className="profile-uid">UID：{currentUser.userId} · Portra ID</p>
           <div className="profile-meta-line">
             <span>IP属地：{currentUser.cityCode || '未知'}</span>
-            <span>{genderText}</span>
           </div>
           <p className="profile-signature">{profileForm.bio || '这个人还没有写简介。'}</p>
         </div>
