@@ -41,7 +41,7 @@ export function AppRoutes() {
       <Route path="/orders/:orderId/delivery" element={<DeliveryPage />} />
       <Route path="/orders/:orderId/reviews" element={<ReviewPage />} />
       <Route path="/reviews/:reviewId" element={<ReviewDetailPage />} />
-      <Route path="/reviews" element={<ReviewPage />} />
+      <Route path="/reviews" element={<UserReviewsPage />} />
       <Route path="/review-complaints/:complaintId" element={<ReviewComplaintDetailPage />} />
       <Route path="/notifications" element={<NotificationListPage />} />
       <Route path="/profile" element={<ProfilePage />} />

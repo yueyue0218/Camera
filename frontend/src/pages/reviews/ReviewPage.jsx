@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Avatar, Box, Button, Paper, Rating, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Avatar, Box, Button, Chip, Paper, Rating, Stack, TextField, Typography } from '@mui/material'
 import RateReviewRoundedIcon from '@mui/icons-material/RateReviewRounded'
 import ReportProblemRoundedIcon from '@mui/icons-material/ReportProblemRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
@@ -21,6 +21,44 @@ function formatCreditScore(value) {
   if (typeof value === 'string' && value.trim() === '') return '暂无'
   const numeric = Number(value)
   return Number.isFinite(numeric) ? numeric.toFixed(1) : '暂无'
+}
+
+function complaintStatusTone(status) {
+  const value = String(status || '').trim().toUpperCase()
+
+  if (value === 'REJECTED') {
+    return {
+      label: '已驳回',
+      chipColor: 'warning',
+      accent: '#c76a00',
+      surface: 'rgba(255,196,86,.12)'
+    }
+  }
+
+  if (value === 'APPROVED' || value === 'REVIEW_HIDDEN' || value === 'RESOLVED') {
+    return {
+      label: '已处理',
+      chipColor: 'success',
+      accent: '#157347',
+      surface: 'rgba(46,160,67,.10)'
+    }
+  }
+
+  if (value === 'PROCESSING') {
+    return {
+      label: '处理中',
+      chipColor: 'info',
+      accent: portra.primary,
+      surface: 'rgba(13,47,178,.10)'
+    }
+  }
+
+  return {
+    label: '待提交',
+    chipColor: 'primary',
+    accent: portra.primary,
+    surface: 'rgba(13,47,178,.08)'
+  }
 }
 
 export function ReviewScore({ value }) {
@@ -138,6 +176,10 @@ export function ReviewPage() {
     [currentUser.userId, items]
   )
   const canReview = ['COMPLETED', 'REFUNDED'].includes(order?.status) && !myReview
+  const complaintTone = useMemo(
+    () => complaintStatusTone(receivedReview?.complaintStatus),
+    [receivedReview?.complaintStatus]
+  )
 
   useEffect(() => {
     let alive = true
@@ -251,16 +293,80 @@ export function ReviewPage() {
       )}
 
       {receivedReview ? (
-        <Paper sx={{ ...panelSx, p: 2 }}>
-          <Typography variant="h6" fontWeight={900}>对收到的评价发起申诉</Typography>
-          <Typography color="text.secondary" mb={1.5}>
-            仅被评价方可以申诉，管理端会进行处理。
-          </Typography>
-          <Stack spacing={1.5}>
-            <TextField label="申诉原因" value={complaintReason} onChange={event => setComplaintReason(event.target.value)} />
-            <Button color="warning" startIcon={<ReportProblemRoundedIcon />} disabled={complaintSubmitting} onClick={() => complain(receivedReview.reviewId)}>
-              {complaintSubmitting ? '提交中...' : '提交申诉'}
-            </Button>
+        <Paper
+          sx={{
+            ...panelSx,
+            p: 2.25,
+            borderRadius: 4,
+            border: `1px solid ${complaintTone.surface}`,
+            background:
+              `radial-gradient(circle at top right, ${complaintTone.surface}, transparent 30%), linear-gradient(145deg, rgba(255,253,248,.98), rgba(247,244,237,.96))`
+          }}
+        >
+          <Stack spacing={1.6}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={2} alignItems={{ xs: 'flex-start', sm: 'center' }}>
+              <Box>
+                <Typography variant="overline" sx={{ color: complaintTone.accent, fontWeight: 900, letterSpacing: '.16em' }}>
+                  REVIEW APPEAL
+                </Typography>
+                <Typography variant="h6" fontWeight={900}>对收到的评价发起申诉</Typography>
+                <Typography color="text.secondary" sx={{ mt: 0.5, lineHeight: 1.8 }}>
+                  仅被评价方可以申诉，提交后会进入管理端处理链路。
+                </Typography>
+              </Box>
+              <Chip label={complaintTone.label} color={complaintTone.chipColor} sx={{ fontWeight: 800, minWidth: 84 }} />
+            </Stack>
+
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 1.6,
+                borderRadius: 3,
+                bgcolor: 'rgba(255,255,255,.68)',
+                borderColor: 'rgba(13,47,178,.12)'
+              }}
+            >
+              <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={2} alignItems={{ xs: 'flex-start', sm: 'center' }}>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="caption" color="text.secondary">收到的评价</Typography>
+                  <Typography fontWeight={900} sx={{ mt: 0.4 }}>
+                    订单 #{receivedReview.orderId || '-'} · {reviewDirectionLabel(receivedReview.direction)}
+                  </Typography>
+                  <Typography sx={{ mt: 0.9, lineHeight: 1.85, whiteSpace: 'pre-wrap' }}>
+                    {receivedReview.content || '暂无评价正文'}
+                  </Typography>
+                </Box>
+                <Box sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}>
+                  <ReviewScore value={receivedReview.rating} />
+                </Box>
+              </Stack>
+            </Paper>
+
+            <TextField
+              label="申诉原因"
+              multiline
+              minRows={4}
+              placeholder="请明确说明争议点，例如评价内容与订单事实不符、存在恶意差评、证据链不完整等。"
+              helperText="尽量写清楚事实、时间点和争议内容，后续仲裁会更快。"
+              value={complaintReason}
+              onChange={event => setComplaintReason(event.target.value)}
+            />
+
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', md: 'center' }} justifyContent="space-between">
+              <Alert severity="info" sx={{ flex: 1, borderRadius: 3 }}>
+                当前评价申诉不会直接修改评价结果，需等待处理结论。
+              </Alert>
+              <Button
+                color="warning"
+                variant="contained"
+                startIcon={<ReportProblemRoundedIcon />}
+                disabled={complaintSubmitting}
+                onClick={() => complain(receivedReview.reviewId)}
+                sx={{ minWidth: 148, alignSelf: { xs: 'stretch', md: 'center' } }}
+              >
+                {complaintSubmitting ? '提交中...' : '提交申诉'}
+              </Button>
+            </Stack>
           </Stack>
         </Paper>
       ) : null}
@@ -289,6 +395,8 @@ export function UserReviewsPage() {
   const navigate = useNavigate()
   const { userId } = useParams()
   const { currentUser } = useAuth()
+  const targetUserId = userId || currentUser.userId
+  const isSelf = Number(targetUserId) === Number(currentUser.userId)
   const [items, setItems] = useState([])
   const [feedback, setFeedback] = useState({})
   const [loading, setLoading] = useState(false)
@@ -299,7 +407,7 @@ export function UserReviewsPage() {
     async function load() {
       setLoading(true)
       try {
-        const reviews = await reviewApi.listByUser(userId, currentUser)
+        const reviews = await reviewApi.listByUser(targetUserId, currentUser)
         if (!alive) return
         setItems(Array.isArray(reviews) ? reviews : [])
         setFeedback({})
@@ -312,14 +420,14 @@ export function UserReviewsPage() {
 
     load()
     return () => { alive = false }
-  }, [currentUser, userId])
+  }, [currentUser, targetUserId])
 
   return (
     <Stack spacing={2}>
       <PageHeader
         eyebrow="PORTRA REVIEW"
-        title={`用户 #${userId || '-'} 的评价`}
-        description="查看某位用户收到的评价。"
+        title={isSelf ? '我的评价' : `用户 #${targetUserId} 的评价`}
+        description={isSelf ? '查看你收到的评价与追评。' : '查看某位用户收到的评价。'}
         action={<Button onClick={() => navigate(-1)}>返回</Button>}
       />
       <Feedback {...feedback} />

@@ -349,6 +349,19 @@ export function ProfilePage() {
     requestAnimationFrame(syncHeight)
   }
 
+  function openReviewCard(review) {
+    const reviewId = review?.reviewId
+    if (reviewId != null && !String(reviewId).startsWith('local')) {
+      navigate(`/reviews/${reviewId}`)
+      return
+    }
+    if (review?.orderId) {
+      navigate(`/orders?orderId=${review.orderId}`)
+      return
+    }
+    navigate('/reviews')
+  }
+
   const tabs = [
     { id: 'photos', labelC: '我的照片', labelP: '我的作品', num: '01' },
     { id: 'intent', labelC: '我的意向', labelP: '橱窗管理', num: '02' },
@@ -595,7 +608,20 @@ export function ProfilePage() {
                 <div className="section-mark">04</div>
               </div>
               {receivedReviews.length ? receivedReviews.slice(0, 4).map(r => (
-                <div key={r.reviewId || `${r.orderId}-${r.direction}`} className="review-card">
+                <div
+                  key={r.reviewId || `${r.orderId}-${r.direction}`}
+                  className="review-card"
+                  role="button"
+                  tabIndex={0}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => openReviewCard(r)}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      openReviewCard(r)
+                    }
+                  }}
+                >
                   <blockquote>"{r.content || '对方没有留下文字评价'}"</blockquote>
                   <footer>来自 用户 {r.reviewerId} · ★{Number(r.rating||0).toFixed(1)} · {formatShortTime(r.createdAt)}</footer>
                 </div>
