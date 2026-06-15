@@ -82,14 +82,12 @@ export function ProfilePage() {
   const [editOpen, setEditOpen] = useState(false)
 
   const [moments, setMoments] = useState([])
-  const [invitations, setInvitations] = useState([])
+  const [myDemands, setMyDemands] = useState([])
   const [myInterests, setMyInterests] = useState([])
-  const [providerInfoMap, setProviderInfoMap] = useState({})
   const [profileOrders, setProfileOrders] = useState([])
   const [receivedReviews, setReceivedReviews] = useState([])
   const [creditSummary, setCreditSummary] = useState(null)
   const [portfolioItems, setPortfolioItems] = useState([])
-  const [actioningId, setActioningId] = useState(null)
   const [notice, setNotice] = useState(null)
   const [myFollowers, setMyFollowers] = useState([])
   const [myFollowing, setMyFollowing] = useState([])
@@ -299,21 +297,9 @@ export function ProfilePage() {
         setMyInterests(interestsPage?.records || interestsPage?.content || (Array.isArray(interestsPage) ? interestsPage : []))
       } catch { setMyInterests([]) }
       try {
-        const invs = await demandApi.responsesReceived(currentUser)
-        setInvitations(invs)
-        const uniqueProviderIds = [...new Set(invs.map(i => i.providerId).filter(Boolean))]
-        const infoEntries = await Promise.all(uniqueProviderIds.map(async pid => {
-          try {
-            const brief = await userApi.brief(pid, currentUser)
-            let avatarData = ''
-            if (brief?.avatarFileId) {
-              try { avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser) } catch { /**/ }
-            }
-            return [pid, { nickname: brief?.nickname || `摄影师${pid}`, avatarData }]
-          } catch { return [pid, { nickname: `摄影师${pid}`, avatarData: '' }] }
-        }))
-        setProviderInfoMap(Object.fromEntries(infoEntries))
-      } catch { setInvitations([]) }
+        const demandsRes = await demandApi.list({ customerId: currentUser.userId, page: 1, size: 20 }, currentUser).catch(() => null)
+        setMyDemands(demandsRes?.records || demandsRes?.content || (Array.isArray(demandsRes) ? demandsRes : []))
+      } catch { setMyDemands([]) }
     }
   }
 
@@ -396,26 +382,6 @@ export function ProfilePage() {
     }
   }
 
-  async function acceptInvitation(inv) {
-    setActioningId(inv.responseId)
-    try {
-      const accepted = await demandApi.accept(inv.demandId, inv.responseId, currentUser)
-      saveConversationRecord(
-        { conversationId: accepted.conversationId },
-        { customerId: accepted.customerId, providerId: accepted.providerId, demandId: accepted.demandId }
-      )
-      window.location.href = `/messages/${accepted.conversationId}`
-    } catch (err) { setNotice({ type: 'err', text: err.message }) }
-    finally { setActioningId(null) }
-  }
-
-  async function rejectInvitation(inv) {
-    setActioningId(inv.responseId)
-    try { await demandApi.reject(inv.demandId, inv.responseId, currentUser); await loadProfileData() }
-    catch (err) { setNotice({ type: 'err', text: err.message }) }
-    finally { setActioningId(null) }
-  }
-
   const myMoments = useMemo(
     () => moments.filter(m => Number(m.authorId) === currentUser.userId && m.authorRole === currentUser.role),
     [moments, currentUser.userId, currentUser.role]
@@ -431,7 +397,7 @@ export function ProfilePage() {
   const TERMINAL_STATUSES = ['COMPLETED','REVIEWED','CANCELLED','REFUNDED','APPEALING']
   const historicalOrders = profileOrders.filter(o => ['COMPLETED','REVIEWED'].includes(o.status)).length
   const ongoingOrders = profileOrders.filter(o => !TERMINAL_STATUSES.includes(o.status)).length
-  const pendingInvitations = invitations.filter(i => (i.status || 'PENDING_CUSTOMER_ACCEPT') === 'PENDING_CUSTOMER_ACCEPT').length
+  const openDemandsCount = myDemands.filter(d => d.status === 'OPEN' || !d.status).length
   const creditScore = creditSummary?.creditScore ?? null
   const billableOrders = profileOrders.filter(o => o.status !== 'REFUNDED').length
   const completionRate = billableOrders > 0 ? Math.round((historicalOrders / billableOrders) * 100) : null
@@ -479,10 +445,11 @@ export function ProfilePage() {
 
   const tabs = [
     { id: 'photos', labelC: '我的照片', labelP: '我的作品', num: '01' },
-    { id: 'intent', labelC: '我的意向', labelP: '橱窗管理', num: '02' },
-    { id: 'orders', label: '我的订单', num: '03' },
-    { id: 'likes', label: '我的点赞', num: '04' },
-    { id: 'collections', label: '我的收藏', num: '05' },
+    ...(!isProvider ? [{ id: 'demands', label: '我的需求', num: '02' }] : []),
+    { id: 'intent', labelC: '我的意向', labelP: '橱窗管理', num: isProvider ? '02' : '03' },
+    { id: 'orders', label: '我的订单', num: isProvider ? '03' : '04' },
+    { id: 'likes', label: '我的点赞', num: isProvider ? '04' : '05' },
+    { id: 'collections', label: '我的收藏', num: isProvider ? '05' : '06' },
   ]
 
   return (
@@ -645,6 +612,45 @@ export function ProfilePage() {
               </div>
             </section>
 
+            {/* DEMANDS — customer only */}
+            {!isProvider && (
+              <section className={`panel-card tab-panel${activeTab === 'demands' ? ' active' : ''}`}>
+                <div className="section-head">
+                  <div>
+                    <h2>我的需求</h2>
+                    <p>我发布过的约拍需求，点击详情可查看谁响应了你。</p>
+                  </div>
+                  <div className="section-mark">02</div>
+                </div>
+                {myDemands.length ? (
+                  <div className="ticket-grid">
+                    {myDemands.slice(0, 6).map(d => {
+                      const budget = d.budgetMinCent && d.budgetMaxCent
+                        ? `¥${Math.round(d.budgetMinCent/100)}–¥${Math.round(d.budgetMaxCent/100)}`
+                        : d.budgetMinCent ? `¥${Math.round(d.budgetMinCent/100)} 起` : '预算面议'
+                      return (
+                        <article key={d.demandId} className="mini-ticket" onClick={() => navigate(`/demands/${d.demandId}`)}>
+                          <span className="price">{budget}</span>
+                          <h3>{d.title || d.scene || '未命名需求'}</h3>
+                          <p>{d.description || d.serviceTypes || '点击查看需求详情'}</p>
+                          <div className="ticket-meta">
+                            <span className="tag blue">查看详情</span>
+                            {d.responseCount > 0 && <span className="tag">{d.responseCount} 人响应</span>}
+                          </div>
+                        </article>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="pp-empty">
+                    <h3>还没有发布需求</h3>
+                    <p>发布约拍需求，等待摄影师响应。</p>
+                    <button className="primary-btn" style={{marginTop:14}} onClick={() => navigate('/publish')}>发布新需求</button>
+                  </div>
+                )}
+              </section>
+            )}
+
             {/* INTENT */}
             <section className={`panel-card tab-panel${activeTab === 'intent' ? ' active' : ''}`}>
               <div className="section-head">
@@ -652,7 +658,7 @@ export function ProfilePage() {
                   <h2>{isProvider ? '橱窗管理' : '我的意向'}</h2>
                   <p>{isProvider ? '管理正在展示的约拍服务，保持时间、价格和风格清晰。' : '意向只是收藏感兴趣的橱窗，不自动下单、不锁定时间。'}</p>
                 </div>
-                <div className="section-mark">02</div>
+                <div className="section-mark">{isProvider ? '02' : '03'}</div>
               </div>
               {isProvider ? (
                 <div className="ticket-grid">
@@ -672,7 +678,7 @@ export function ProfilePage() {
               ) : (
                 <>
                   {myInterests.length ? (
-                    <div className="ticket-grid" style={{marginBottom: invitations.length ? 20 : 0}}>
+                    <div className="ticket-grid">
                       {myInterests.slice(0, 4).map(item => (
                         <article key={item.serviceId} className="mini-ticket" onClick={() => navigate(`/service-packages/${item.serviceId}`)}>
                           <span className="price">{item.priceRange || '价格面议'}</span>
@@ -685,48 +691,6 @@ export function ProfilePage() {
                   ) : (
                     <div className="pp-empty"><h3>还没有意向橱窗</h3><p>在大厅浏览橱窗，点击「加入意向」收藏感兴趣的摄影师。</p></div>
                   )}
-                  {invitations.length > 0 && (
-                    <>
-                      <p style={{fontSize:12,letterSpacing:'.1em',color:'#8a8d92',margin:'16px 0 8px',textTransform:'uppercase'}}>待确认邀请</p>
-                      <div className="order-list">
-                        {invitations.map(inv => {
-                          const status = inv.status || 'PENDING_CUSTOMER_ACCEPT'
-                          const isPending = status === 'PENDING_CUSTOMER_ACCEPT'
-                          const busy = actioningId === inv.responseId
-                          return (
-                            <div key={inv.responseId} className="order-slip" style={{cursor:'default'}}>
-                              <div
-                                style={{width:40,height:40,borderRadius:'50%',overflow:'hidden',flexShrink:0,cursor:'pointer',border:'2px solid var(--line)'}}
-                                onClick={() => navigate(`/users/${inv.providerId}`)}
-                              >
-                                {providerInfoMap[inv.providerId]?.avatarData
-                                  ? <img src={providerInfoMap[inv.providerId].avatarData} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} />
-                                  : <div style={{width:'100%',height:'100%',background:'var(--line)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,color:'var(--ink-sub)'}}>P</div>
-                                }
-                              </div>
-                              <div>
-                                <h4>需求 #{inv.demandId}</h4>
-                                <p>
-                                  <span style={{cursor:'pointer',textDecoration:'underline',textDecorationColor:'var(--line)'}} onClick={() => navigate(`/users/${inv.providerId}`)}>
-                                    {providerInfoMap[inv.providerId]?.nickname || `摄影师${inv.providerId}`}
-                                  </span>
-                                  {' · '}{formatShortTime(inv.responseTime)}
-                                </p>
-                              </div>
-                              {isPending ? (
-                                <div style={{display:'flex',gap:6}}>
-                                  <button className="primary-btn" style={{height:34,fontSize:12,padding:'0 12px'}} onClick={() => acceptInvitation(inv)} disabled={busy}>接受</button>
-                                  <button className="secondary-btn" style={{height:34,fontSize:12,padding:'0 10px'}} onClick={() => rejectInvitation(inv)} disabled={busy}>婉拒</button>
-                                </div>
-                              ) : (
-                                <span className={`status ${status === 'ACCEPTED' ? '' : 'orange'}`}>{status === 'ACCEPTED' ? '已接受' : status === 'REJECTED' ? '已婉拒' : status}</span>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </>
-                  )}
                 </>
               )}
             </section>
@@ -735,7 +699,7 @@ export function ProfilePage() {
             <section className={`panel-card tab-panel${activeTab === 'orders' ? ' active' : ''}`}>
               <div className="section-head">
                 <div><h2>我的订单</h2><p>订单像票根一样被保存，每一步状态都能回到会话。</p></div>
-                <div className="section-mark">03</div>
+                <div className="section-mark">{isProvider ? '03' : '04'}</div>
               </div>
               {profileOrders.length ? (
                 <div className="order-list">
@@ -808,12 +772,12 @@ export function ProfilePage() {
                 <span>Portra Credit</span>
               </button>
               <div className="todo-list">
-                <div className="todo" style={{cursor:'pointer'}} onClick={() => handleTabClick('intent')}>
+                <div className="todo" style={{cursor:'pointer'}} onClick={() => handleTabClick(isProvider ? 'intent' : 'demands')}>
                   <div>
-                    <strong>{isProvider ? '待响应需求' : '待确认邀请'}</strong>
-                    <br /><small>今天需要处理</small>
+                    <strong>{isProvider ? '橱窗管理' : '我的需求'}</strong>
+                    <br /><small>{isProvider ? '管理约拍服务包' : '等待摄影师响应'}</small>
                   </div>
-                  <span className="status yellow">{pendingInvitations || 0}</span>
+                  <span className="status yellow">{isProvider ? 0 : openDemandsCount}</span>
                 </div>
                 <div className="todo">
                   <div><strong>进行中订单</strong><br /><small>可进入会话</small></div>
