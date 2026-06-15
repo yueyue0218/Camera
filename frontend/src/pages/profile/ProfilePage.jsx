@@ -93,6 +93,7 @@ export function ProfilePage() {
   const [notice, setNotice] = useState(null)
   const [myFollowers, setMyFollowers] = useState([])
   const [myFollowing, setMyFollowing] = useState([])
+  const [followListOpen, setFollowListOpen] = useState(null) // null | 'following' | 'followers'
 
   const dashboardRowRef = useRef(null)
   const frameNavRef = useRef(null)
@@ -252,7 +253,22 @@ export function ProfilePage() {
     setProfileOrders(orders)
     saveOrderSnapshots(orders)
     setPortfolioItems(readPortfolioItems(currentUser.userId))
-    setMyFollowers(followersRes.status === 'fulfilled' ? followersRes.value : [])
+    const rawFollowers = followersRes.status === 'fulfilled' ? followersRes.value : []
+    try {
+      const enrichedFollowers = await Promise.all(rawFollowers.map(async f => {
+        const uid = f.userId ?? f.authorId
+        if (f.avatarData || f.avatarUrl) return f
+        try {
+          const brief = await userApi.brief(uid, currentUser)
+          let avatarData = brief?.avatarData || brief?.avatarUrl || ''
+          if (!avatarData && brief?.avatarFileId) {
+            try { avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser) } catch { /**/ }
+          }
+          return { ...f, nickname: f.nickname || brief?.nickname, bio: f.bio || brief?.bio || brief?.description || '', avatarData }
+        } catch { return f }
+      }))
+      setMyFollowers(enrichedFollowers)
+    } catch { setMyFollowers(rawFollowers) }
     try {
       const [followingCustomer, followingProvider] = await Promise.all([
         userApi.following(currentUser.userId, currentUser, 'CUSTOMER').catch(() => []),
@@ -406,13 +422,12 @@ export function ProfilePage() {
   )
   const favoriteMoments = useMemo(() => moments.filter(m => m.favoritedByCurrentUser), [moments])
   const likedMoments = useMemo(() => moments.filter(m => m.likedByCurrentUser), [moments])
+  const totalLikesAndFavorites = useMemo(
+    () => myMoments.reduce((sum, m) => sum + (m.likeCount || 0) + (m.favoriteCount || 0), 0),
+    [myMoments]
+  )
   const follows = myFollowing.map(f => ({ ...f, authorId: f.userId ?? f.authorId })).filter(f => Number(f.authorId) !== currentUser.userId)
   const savedPhotos = readSavedPhotos()
-  const mutualFollowIds = useMemo(
-    () => new Set(myFollowers.filter(f => f.followedByCurrentUser).map(f => Number(f.userId))),
-    [myFollowers]
-  )
-
   const TERMINAL_STATUSES = ['COMPLETED','REVIEWED','CANCELLED','REFUNDED','APPEALING']
   const historicalOrders = profileOrders.filter(o => ['COMPLETED','REVIEWED'].includes(o.status)).length
   const ongoingOrders = profileOrders.filter(o => !TERMINAL_STATUSES.includes(o.status)).length
@@ -466,9 +481,8 @@ export function ProfilePage() {
     { id: 'photos', labelC: '我的照片', labelP: '我的作品', num: '01' },
     { id: 'intent', labelC: '我的意向', labelP: '橱窗管理', num: '02' },
     { id: 'orders', label: '我的订单', num: '03' },
-    { id: 'following', label: '我的关注', num: '04' },
-    { id: 'likes', label: '我的点赞', num: '05' },
-    { id: 'collections', label: '我的收藏', num: '06' },
+    { id: 'likes', label: '我的点赞', num: '04' },
+    { id: 'collections', label: '我的收藏', num: '05' },
   ]
 
   return (
@@ -508,21 +522,34 @@ export function ProfilePage() {
           <div className="profile-meta-line">
             <span>IP属地：{currentUser.cityCode || '未知'}</span>
           </div>
-          {((currentUser.genderVisible && currentUser.gender) || (currentUser.birthdayVisible && currentUser.birthday)) && (
-            <div className="profile-tag-row">
-              <span className="profile-tag">
-                {currentUser.genderVisible && currentUser.gender === 'FEMALE' && '♀ '}
-                {currentUser.genderVisible && currentUser.gender === 'MALE' && '♂ '}
-                {currentUser.birthdayVisible && currentUser.birthday ? `${calcAge(currentUser.birthday)}岁` : ''}
-              </span>
-            </div>
-          )}
-          {currentUser.locationVisible && currentUser.locationDisplay && (
-            <div className="profile-tag-row">
-              <span className="profile-tag">📍 {currentUser.locationDisplay}</span>
-            </div>
-          )}
+          {(() => {
+            const chips = []
+            if (currentUser.genderVisible && currentUser.gender) {
+              const sym = currentUser.gender === 'FEMALE' ? '♀' : '♂'
+              const age = currentUser.birthdayVisible && currentUser.birthday ? ` ${calcAge(currentUser.birthday)}岁` : ''
+              chips.push(sym + age)
+            } else if (currentUser.birthdayVisible && currentUser.birthday) {
+              chips.push(`${calcAge(currentUser.birthday)}岁`)
+            }
+            if (currentUser.locationVisible && currentUser.locationDisplay) chips.push(`📍 ${currentUser.locationDisplay}`)
+            return chips.length ? (
+              <div className="profile-tag-row">
+                {chips.map((c, i) => <span key={i} className="profile-tag">{c}</span>)}
+              </div>
+            ) : null
+          })()}
           <p className="profile-signature">{profileForm.bio || '这个人还没有写简介。'}</p>
+          <div className="social-stats-row">
+            <button className="social-stat-btn" type="button" onClick={() => setFollowListOpen('following')}>
+              <b>{follows.length}</b><span>关注</span>
+            </button>
+            <button className="social-stat-btn" type="button" onClick={() => setFollowListOpen('followers')}>
+              <b>{myFollowers.length}</b><span>粉丝</span>
+            </button>
+            <div className="social-stat">
+              <b>{totalLikesAndFavorites}</b><span>获赞与收藏</span>
+            </div>
+          </div>
         </div>
 
         <aside className="hero-side">
@@ -728,44 +755,11 @@ export function ProfilePage() {
               )}
             </section>
 
-            {/* FOLLOWING */}
-            <section className={`panel-card tab-panel${activeTab === 'following' ? ' active' : ''}`}>
-              <div className="section-head">
-                <div><h2>我的关注</h2><p>关注喜欢的摄影师或约拍方，把之后可能发生的约拍关系先保存下来。</p></div>
-                <div className="section-mark">04</div>
-              </div>
-              {follows.length ? (
-                <div className="order-list">
-                  {follows.map(f => {
-                    const isMutual = mutualFollowIds.has(Number(f.authorId))
-                    const avatar = f.avatarData || f.avatarUrl || ''
-                    const roleLabel = f.role === 'PROVIDER' ? '摄影师' : '约拍方'
-                    const roleUrl = f.role ? `?role=${f.role}` : ''
-                    return (
-                      <div key={f.authorId} className="order-slip" onClick={() => navigate(`/users/${f.authorId}${roleUrl}`)}>
-                        <div className="follow-avatar" style={avatar ? { backgroundImage: `url(${avatar})` } : { background: `hsl(${(Number(f.authorId) * 67) % 360},45%,68%)` }} />
-                        <div>
-                          <h4 style={{display:'flex',alignItems:'center',gap:8}}>
-                            {f.nickname || `用户 ${f.authorId}`}
-                            <span className="role-badge" style={{fontSize:11,height:22,padding:'0 8px'}}>{roleLabel}</span>
-                          </h4>
-                          <p>{f.followedAt ? `${formatShortTime(f.followedAt)} 开始关注` : '已关注'}</p>
-                        </div>
-                        {isMutual && <span className="status">互相关注</span>}
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <div className="pp-empty"><h3>还没有关注任何人</h3><p>在动态或大厅页面关注感兴趣的用户。</p></div>
-              )}
-            </section>
-
             {/* LIKES */}
             <section className={`panel-card tab-panel${activeTab === 'likes' ? ' active' : ''}`}>
               <div className="section-head">
                 <div><h2>我的点赞</h2><p>点过赞的动态都在这里，随时回顾曾经喜欢的瞬间。</p></div>
-                <div className="section-mark">05</div>
+                <div className="section-mark">04</div>
               </div>
               {likedMoments.length ? (
                 <div className="ticket-grid">
@@ -787,7 +781,7 @@ export function ProfilePage() {
             <section className={`panel-card tab-panel${activeTab === 'collections' ? ' active' : ''}`}>
               <div className="section-head">
                 <div><h2>我的收藏</h2><p>收藏喜欢的橱窗、动态和风格，下一次约拍不用重新开始。</p></div>
-                <div className="section-mark">06</div>
+                <div className="section-mark">05</div>
               </div>
               {favoriteMoments.length ? (
                 <div className="ticket-grid">
@@ -903,6 +897,55 @@ export function ProfilePage() {
           </div>
         </section>
       </section>
+
+      {/* ── FOLLOW LIST DRAWER ── */}
+      {followListOpen && (
+        <div className="pp-modal-backdrop" onClick={e => { if (e.target === e.currentTarget) setFollowListOpen(null) }}>
+          <div className="pp-modal" style={{maxWidth:500,maxHeight:'75vh',overflow:'hidden',display:'flex',flexDirection:'column',padding:'24px 24px 20px'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:18}}>
+              <h2 style={{margin:0,fontSize:18,letterSpacing:'.12em'}}>{followListOpen === 'following' ? '我的关注' : '我的粉丝'}</h2>
+              <button type="button" onClick={() => setFollowListOpen(null)} style={{border:0,background:'transparent',fontSize:22,cursor:'pointer',color:'var(--muted)',lineHeight:1}}>×</button>
+            </div>
+            <div style={{overflowY:'auto',flex:1}}>
+              {(() => {
+                const list = followListOpen === 'following' ? follows : myFollowers
+                if (!list.length) return (
+                  <div className="pp-empty">
+                    <h3>{followListOpen === 'following' ? '还没有关注任何人' : '还没有粉丝'}</h3>
+                    <p>{followListOpen === 'following' ? '在动态或大厅页面关注感兴趣的用户。' : '发布作品或需求，吸引更多人关注你。'}</p>
+                  </div>
+                )
+                return (
+                  <div className="order-list">
+                    {list.map(f => {
+                      const uid = f.userId ?? f.authorId
+                      const avatar = f.avatarData || f.avatarUrl || ''
+                      const roleLabel = f.role === 'PROVIDER' ? '摄影师' : '约拍方'
+                      const roleUrl = f.role ? `?role=${f.role}` : ''
+                      return (
+                        <div key={uid} className="order-slip" style={{cursor:'pointer'}}
+                          onClick={() => { setFollowListOpen(null); navigate(`/users/${uid}${roleUrl}`) }}>
+                          <div className="follow-avatar"
+                            style={avatar
+                              ? { backgroundImage: `url(${avatar})` }
+                              : { background: `hsl(${(Number(uid) * 67) % 360},45%,68%)` }} />
+                          <div>
+                            <h4 style={{display:'flex',alignItems:'center',gap:8}}>
+                              {f.nickname || `用户 ${uid}`}
+                              <span className="role-badge" style={{fontSize:11,height:22,padding:'0 8px'}}>{roleLabel}</span>
+                            </h4>
+                            <p>{f.bio || f.description || (followListOpen === 'following' ? '已关注' : '关注了你')}</p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── EDIT MODAL ── */}
       {editOpen && (
