@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Snackbar, Stack, TextField, Typography } from '@mui/material'
 import RateReviewRoundedIcon from '@mui/icons-material/RateReviewRounded'
+import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import { useNavigate, useParams } from 'react-router-dom'
 import { reviewApi } from '../../api/index.js'
 import { useAuth } from '../../AuthContext.jsx'
@@ -130,6 +131,15 @@ export function ReviewDetailPage() {
             </Box>
 
             <Stack direction="row" spacing={1.5} flexWrap="wrap">
+              {review.orderId ? (
+                <Button
+                  variant="outlined"
+                  startIcon={<ReceiptLongRoundedIcon />}
+                  onClick={() => navigate(`/orders?orderId=${review.orderId}`)}
+                >
+                  查看关联订单
+                </Button>
+              ) : null}
               {!hasReply ? (
                 <Button
                   variant="contained"

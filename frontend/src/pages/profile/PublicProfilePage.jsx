@@ -197,6 +197,19 @@ export function PublicProfilePage() {
     (!r.direction && !isProvider && Number(r.targetUserId) === profileUserId)
   )
 
+  function openReviewCard(review) {
+    const reviewId = review?.reviewId
+    if (reviewId != null && !String(reviewId).startsWith('local')) {
+      navigate(`/reviews/${reviewId}`)
+      return
+    }
+    if (review?.orderId) {
+      navigate(`/orders?orderId=${review.orderId}`)
+      return
+    }
+    navigate(`/users/${profileUserId}/reviews`)
+  }
+
   const styleTags = (() => {
     const raw = pp?.styleTags
     if (!raw) return []
@@ -359,7 +372,20 @@ export function PublicProfilePage() {
                   <div className="section-mark">02</div>
                 </div>
                 {providerReviews.length ? providerReviews.slice(0, 4).map(r => (
-                  <div key={r.reviewId || `${r.orderId}-${r.direction}`} className="review-card">
+                  <div
+                    key={r.reviewId || `${r.orderId}-${r.direction}`}
+                    className="review-card"
+                    role="button"
+                    tabIndex={0}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => openReviewCard(r)}
+                    onKeyDown={event => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        openReviewCard(r)
+                      }
+                    }}
+                  >
                     <blockquote>"{r.content || '对方没有留下文字评价'}"</blockquote>
                     <footer>
                       来自 {r.reviewerNickname || `用户 ${r.reviewerId}`} · ★{Number(r.rating || 0).toFixed(1)} · {formatShortTime(r.createdAt)}
@@ -470,7 +496,20 @@ export function PublicProfilePage() {
               <div className="section-mark">02</div>
             </div>
             {customerReviews.length ? customerReviews.slice(0, 4).map(r => (
-              <div key={r.reviewId || `${r.orderId}-${r.direction}`} className="review-card">
+              <div
+                key={r.reviewId || `${r.orderId}-${r.direction}`}
+                className="review-card"
+                role="button"
+                tabIndex={0}
+                style={{ cursor: 'pointer' }}
+                onClick={() => openReviewCard(r)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    openReviewCard(r)
+                  }
+                }}
+              >
                 <blockquote>"{r.content || '对方没有留下文字评价'}"</blockquote>
                 <footer>
                   来自 {r.reviewerNickname || `用户 ${r.reviewerId}`} · ★{Number(r.rating || 0).toFixed(1)} · {formatShortTime(r.createdAt)}
