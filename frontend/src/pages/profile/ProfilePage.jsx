@@ -419,7 +419,7 @@ export function ProfilePage() {
   const pendingInvitations = invitations.filter(i => (i.status || 'PENDING_CUSTOMER_ACCEPT') === 'PENDING_CUSTOMER_ACCEPT').length
   const creditScore = creditSummary?.creditScore ?? null
   const billableOrders = profileOrders.filter(o => o.status !== 'REFUNDED').length
-  const completionRate = billableOrders > 0 ? Math.round((historicalOrders / billableOrders) * 100) : 100
+  const completionRate = billableOrders > 0 ? Math.round((historicalOrders / billableOrders) * 100) : null
   const genderText = currentUser.gender === 'MALE' ? '男' : currentUser.gender === 'FEMALE' ? '女' : '保密'
   const displayName = profileForm.nickname || currentUser.label || `用户${currentUser.userId}`
   const schoolPin = currentUser.school || 'Portra'
@@ -532,7 +532,7 @@ export function ProfilePage() {
           </div>
           <div className="metric-grid">
             <button className="metric metric-button" type="button" onClick={() => navigate('/profile/credit')}><b>{formatCreditScore(creditScore)}</b><span>信用评分</span></button>
-            <div className="metric"><b>{completionRate}%</b><span>完成率</span></div>
+            <div className="metric"><b>{completionRate !== null ? `${completionRate}%` : '暂无'}</b><span>完成率</span></div>
             <div className="metric"><b>{historicalOrders}</b><span>历史约拍</span></div>
             <div className="metric"><b>{ongoingOrders}</b><span>进行中</span></div>
           </div>
