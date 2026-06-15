@@ -130,6 +130,11 @@ public class UserService {
         resp.setNickname(user.getNickname());
         resp.setSchool(user.getSchool());
         resp.setGender(user.getGender());
+        resp.setGenderVisible(user.getGenderVisible());
+        resp.setBirthday(user.getBirthday());
+        resp.setBirthdayVisible(user.getBirthdayVisible());
+        resp.setLocationDisplay(user.getLocationDisplay());
+        resp.setLocationVisible(user.getLocationVisible());
         resp.setCityCode(user.getCityCode());
         resp.setBio(user.getBio());
         resp.setAvatarFileId(user.getAvatarFileId());
@@ -230,6 +235,24 @@ public class UserService {
             }
             if (req.getCityCode() != null && !req.getCityCode().isBlank()) {
                 user.setCityCode(req.getCityCode().trim());
+            }
+            if (req.getGender() != null) {
+                user.setGender(req.getGender().isBlank() ? null : req.getGender().trim());
+            }
+            if (req.getGenderVisible() != null) {
+                user.setGenderVisible(req.getGenderVisible());
+            }
+            if (req.getBirthday() != null) {
+                user.setBirthday(req.getBirthday().isBlank() ? null : req.getBirthday().trim());
+            }
+            if (req.getBirthdayVisible() != null) {
+                user.setBirthdayVisible(req.getBirthdayVisible());
+            }
+            if (req.getLocationDisplay() != null) {
+                user.setLocationDisplay(req.getLocationDisplay().trim());
+            }
+            if (req.getLocationVisible() != null) {
+                user.setLocationVisible(req.getLocationVisible());
             }
             userRepository.save(user);
         }

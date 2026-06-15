@@ -203,6 +203,22 @@ a{text-decoration:none;color:inherit}
 .pp-textarea{width:100%;min-height:84px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface);font-size:14px;letter-spacing:.06em;resize:vertical;line-height:1.7;outline:none;}
 .pp-modal-actions{display:flex;gap:12px;margin-top:28px;}
 .pp-modal-actions .primary-btn{flex:1;}
+/* Gender option row */
+.pp-option-group{display:flex;gap:8px;margin-bottom:10px;}
+.pp-option{flex:1;height:40px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:14px;letter-spacing:.06em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;color:var(--ink);transition:border-color .15s,background .15s;}
+.pp-option.active{border-color:var(--blue);background:rgba(13,47,178,.06);color:var(--blue);font-weight:560;}
+/* Toggle switch */
+.pp-toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid var(--line);border-radius:10px;margin-top:6px;background:var(--surface);}
+.pp-toggle-row span{font-size:13px;letter-spacing:.06em;color:var(--ink);}
+.pp-toggle{position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;}
+.pp-toggle input{opacity:0;width:0;height:0;}
+.pp-toggle-slider{position:absolute;inset:0;background:#d1d5db;border-radius:24px;cursor:pointer;transition:background .2s;}
+.pp-toggle-slider::before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2);}
+.pp-toggle input:checked + .pp-toggle-slider{background:var(--blue);}
+.pp-toggle input:checked + .pp-toggle-slider::before{transform:translateX(20px);}
+/* Profile display tags */
+.profile-tag-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
+.profile-tag{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);font-size:13px;letter-spacing:.04em;color:var(--ink-sub);}
 
 @media(max-width:1050px){
   .profile-hero{grid-template-columns:180px minmax(0,1fr);min-height:auto;}
