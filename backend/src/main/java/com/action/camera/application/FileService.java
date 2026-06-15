@@ -2,6 +2,7 @@ package com.action.camera.application;
 
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
+import com.action.camera.common.security.UserRole;
 import com.action.camera.domain.FileRecord;
 import com.action.camera.dto.FileUploadResponse;
 import com.action.camera.infrastructure.storage.FileStorage;
@@ -37,13 +38,15 @@ public class FileService {
 
     private final FileStorage fileStorage;
     private final FileRepository fileRepository;
+    private final FileAccessPolicy fileAccessPolicy;
 
     @Value("${camera.files.image.max-size-bytes:10485760}")
     private long maxImageSizeBytes = DEFAULT_MAX_IMAGE_SIZE_BYTES;
 
-    public FileService(FileStorage fileStorage, FileRepository fileRepository) {
+    public FileService(FileStorage fileStorage, FileRepository fileRepository, FileAccessPolicy fileAccessPolicy) {
         this.fileStorage = fileStorage;
         this.fileRepository = fileRepository;
+        this.fileAccessPolicy = fileAccessPolicy;
     }
 
     /**
@@ -61,6 +64,8 @@ public class FileService {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "文件不能为空");
         }
+        String normalizedBizType = fileAccessPolicy.normalizeBizType(bizType);
+        String normalizedVisibility = fileAccessPolicy.resolveVisibility(normalizedBizType, visibility);
 
         // 1. 物理存储，拿到 fileKey
         String fileKey = fileStorage.store(file);
@@ -74,8 +79,8 @@ public class FileService {
         record.setMimeType(
                 file.getContentType() != null ? file.getContentType() : "application/octet-stream");
         record.setFileSize(file.getSize());
-        record.setBizType(bizType);
-        record.setVisibility(visibility);
+        record.setBizType(normalizedBizType);
+        record.setVisibility(normalizedVisibility);
         // url 留 null（本地存储无公开 URL，通过 GET /files/{fileId}/download 访问）
 
         FileRecord saved = fileRepository.save(record);
@@ -86,13 +91,16 @@ public class FileService {
     public List<FileUploadResponse> uploadImages(List<MultipartFile> files, Long uploaderId,
                                                  String bizType, String visibility) {
         validateImageBatch(files);
+        String normalizedBizType = fileAccessPolicy.normalizeBizType(bizType);
+        String normalizedVisibility = fileAccessPolicy.resolveVisibility(normalizedBizType, visibility);
         List<String> storedFileKeys = new ArrayList<>();
         List<FileUploadResponse> responses = new ArrayList<>();
         try {
             for (MultipartFile file : files) {
                 String fileKey = fileStorage.store(file);
                 storedFileKeys.add(fileKey);
-                FileRecord saved = fileRepository.save(toRecord(file, uploaderId, bizType, visibility, fileKey));
+                FileRecord saved = fileRepository.save(
+                        toRecord(file, uploaderId, normalizedBizType, normalizedVisibility, fileKey));
                 responses.add(new FileUploadResponse(saved.getId(), saved.getOriginalName()));
             }
             return responses;
@@ -106,7 +114,13 @@ public class FileService {
     /** 根据 fileId 查元数据（下载端点用） */
     public FileRecord getById(Long fileId) {
         return fileRepository.findById(fileId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_ERROR, "文件不存在"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "文件不存在"));
+    }
+
+    public FileRecord getForDownload(Long fileId, Long currentUserId, UserRole currentRole) {
+        FileRecord record = getById(fileId);
+        fileAccessPolicy.assertCanDownload(record, currentUserId, currentRole);
+        return record;
     }
 
     private void validateImageBatch(List<MultipartFile> files) {

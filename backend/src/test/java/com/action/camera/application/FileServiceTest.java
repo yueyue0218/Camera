@@ -8,6 +8,7 @@ import com.action.camera.repository.FileRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
@@ -34,11 +35,14 @@ class FileServiceTest {
     @Mock
     private FileRepository fileRepository;
 
+    @Mock
+    private FileAccessPolicy fileAccessPolicy;
+
     private FileService fileService;
 
     @BeforeEach
     void setUp() {
-        fileService = new FileService(fileStorage, fileRepository);
+        fileService = new FileService(fileStorage, fileRepository, fileAccessPolicy);
         ReflectionTestUtils.setField(fileService, "maxImageSizeBytes", 10L * 1024L * 1024L);
     }
 
@@ -83,6 +87,7 @@ class FileServiceTest {
 
     @Test
     void batchImageUploadStoresAllImagesWhenValid() {
+        allowUploadPolicy("SERVICE_PORTFOLIO", "PUBLIC", "PUBLIC");
         AtomicLong ids = new AtomicLong(20L);
         when(fileStorage.store(any())).thenReturn("2026/06/15/a.jpg", "2026/06/15/b.webp");
         when(fileRepository.save(any(FileRecord.class))).thenAnswer(invocation -> {
@@ -103,6 +108,7 @@ class FileServiceTest {
 
     @Test
     void originalSingleFileUploadStillWorks() {
+        allowUploadPolicy("CERTIFICATION", "PRIVATE", "PRIVATE");
         when(fileStorage.store(any())).thenReturn("2026/06/15/file.bin");
         when(fileRepository.save(any(FileRecord.class))).thenAnswer(invocation -> {
             FileRecord record = invocation.getArgument(0);
@@ -113,12 +119,34 @@ class FileServiceTest {
         FileUploadResponse response = fileService.upload(
                 new MockMultipartFile("file", "file.bin", "application/octet-stream", "data".getBytes()),
                 1001L,
-                "LEGACY",
+                "CERTIFICATION",
                 "PRIVATE"
         );
 
         assertThat(response.getFileId()).isEqualTo(31L);
         assertThat(response.getOriginalName()).isEqualTo("file.bin");
+    }
+
+    @Test
+    void deliveryUploadCannotBeMarkedPublicByRequestParameter() {
+        allowUploadPolicy("DELIVERY", "PUBLIC", "PRIVATE");
+        when(fileStorage.store(any())).thenReturn("2026/06/16/delivery.jpg");
+        when(fileRepository.save(any(FileRecord.class))).thenAnswer(invocation -> {
+            FileRecord record = invocation.getArgument(0);
+            record.setId(41L);
+            return record;
+        });
+        ArgumentCaptor<FileRecord> recordCaptor = ArgumentCaptor.forClass(FileRecord.class);
+
+        fileService.upload(image("delivery.jpg", "image/jpeg", "data"), 1001L, "DELIVERY", "PUBLIC");
+
+        verify(fileRepository).save(recordCaptor.capture());
+        assertThat(recordCaptor.getValue().getVisibility()).isEqualTo("PRIVATE");
+    }
+
+    private void allowUploadPolicy(String bizType, String requestedVisibility, String resolvedVisibility) {
+        when(fileAccessPolicy.normalizeBizType(bizType)).thenReturn(bizType);
+        when(fileAccessPolicy.resolveVisibility(bizType, requestedVisibility)).thenReturn(resolvedVisibility);
     }
 
     private MockMultipartFile image(String filename, String contentType, String content) {

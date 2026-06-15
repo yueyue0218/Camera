@@ -51,10 +51,14 @@ public class FileController {
         return Result.success(response);
     }
 
-    /** 下载文件（需登录，用 fileId） */
+    /** 下载文件：公开文件允许匿名访问，私有文件按业务归属授权。 */
     @GetMapping("/{fileId}/download")
     public ResponseEntity<Resource> download(@PathVariable Long fileId) {
-        FileRecord record = fileService.getById(fileId);
+        FileRecord record = fileService.getForDownload(
+                fileId,
+                UserContext.getUserId(),
+                UserContext.getCurrentRole()
+        );
         Resource resource = fileStorage.load(record.getFileKey());
 
         String contentType = record.getMimeType() != null

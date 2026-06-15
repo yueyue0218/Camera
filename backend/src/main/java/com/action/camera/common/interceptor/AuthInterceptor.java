@@ -97,6 +97,7 @@ public class AuthInterceptor implements HandlerInterceptor {
         return uri.equals("/service-packages")
                 || uri.equals("/services")
                 || uri.equals("/demands")
+                || uri.matches("^/files/\\d+/download$")
                 || uri.matches("^/(service-packages|services|demands)/\\d+$");
     }
 
