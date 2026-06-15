@@ -508,6 +508,7 @@ export function ProfilePage() {
               ? <button className="secondary-btn" onClick={() => navigate('/publish/service-package')}>发布新橱窗</button>
               : <button className="secondary-btn" onClick={() => navigate('/publish')}>发布新需求</button>
             }
+            <button className="secondary-btn" onClick={() => navigate('/feed?compose=true')}>发布新动态</button>
             {isProvider ? (
               <button className="secondary-btn" onClick={() => handleSwitchRole('CUSTOMER')}>
                 🎯 切换到我的约拍方账号

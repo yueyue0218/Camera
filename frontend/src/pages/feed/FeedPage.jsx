@@ -90,6 +90,12 @@ export function FeedPage() {
     if (initialScope && ['latest', 'hot', 'following'].includes(initialScope)) {
       setScope(initialScope)
     }
+    if (searchParams.get('compose') === 'true') {
+      setComposerOpen(true)
+      setComposerMode('create')
+      setComposerDraft({ title: '', content: '' })
+      setComposerImages([])
+    }
   }, [])
 
   useEffect(() => {
