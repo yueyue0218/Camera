@@ -297,8 +297,8 @@ export function ProfilePage() {
         setMyInterests(interestsPage?.records || interestsPage?.content || (Array.isArray(interestsPage) ? interestsPage : []))
       } catch { setMyInterests([]) }
       try {
-        const demandsRes = await demandApi.list({ customerId: currentUser.userId, page: 1, size: 20 }, currentUser).catch(() => null)
-        setMyDemands(demandsRes?.records || demandsRes?.content || (Array.isArray(demandsRes) ? demandsRes : []))
+        const demandsRes = await demandApi.myDemands(currentUser).catch(() => null)
+        setMyDemands(Array.isArray(demandsRes) ? demandsRes : (demandsRes?.records || demandsRes?.content || []))
       } catch { setMyDemands([]) }
     }
   }

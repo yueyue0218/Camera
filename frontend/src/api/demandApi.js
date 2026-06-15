@@ -36,6 +36,9 @@ export const demandApi = {
   responses(demandId, currentUser) {
     return request(`/demands/${demandId}/responses`, {}, currentUser)
   },
+  myDemands(currentUser) {
+    return request('/demands/me/history', {}, currentUser)
+  },
   myResponses(currentUser) {
     return request('/demands/responses/me', {}, currentUser)
   },
