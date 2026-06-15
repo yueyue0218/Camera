@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Alert } from '@mui/material'
 import { useAuth } from '../../AuthContext.jsx'
+import { usePortraFeedback } from '../../components/portra/index.js'
 import { demandApi } from '../../api.js'
 import { fileApi } from '../../api/fileApi.js'
+import { prepareImageFilesForUpload } from '../../utils/imageUploadValidation.js'
 import { DemandForm } from './components/DemandForm.jsx'
 import { buildDemandPayload, createDefaultDemandForm, demandDetailToForm, validateDemandForm } from './utils/publishFormUtils.js'
 import '../portraHall.css'
-
-const MAX_UPLOAD_IMAGES = 9
 
 function sameId(a, b) {
   return a !== undefined && a !== null && b !== undefined && b !== null && Number(a) === Number(b)
@@ -18,6 +18,7 @@ export function PublishPage() {
   const navigate = useNavigate()
   const { demandId } = useParams()
   const { currentUser } = useAuth()
+  const feedback = usePortraFeedback()
   const editMode = Boolean(demandId)
   const [notice, setNotice] = useState(null)
   const [uploading, setUploading] = useState(false)
@@ -79,23 +80,23 @@ export function PublishPage() {
   }
 
   async function uploadReferenceFiles(files) {
-    const selectedFiles = Array.from(files || []).filter(Boolean)
-    if (!selectedFiles.length) return
     const currentCount = Array.isArray(form.referenceFileIds) ? form.referenceFileIds.length : 0
-    const remaining = MAX_UPLOAD_IMAGES - currentCount
-    if (remaining <= 0) {
-      setNotice({ type: 'error', text: `最多上传 ${MAX_UPLOAD_IMAGES} 张照片` })
+    const { filesToUpload, error, warning } = prepareImageFilesForUpload(files, currentCount)
+    if (error) {
+      feedback.error(error)
+      setNotice({ type: 'error', text: error })
       return
     }
-    const filesToUpload = selectedFiles.slice(0, remaining)
+    if (!filesToUpload.length) return
+    if (warning) feedback.warning(warning)
     setUploading(true)
     setNotice(null)
     try {
       const previewUrls = filesToUpload.map(file => URL.createObjectURL(file))
-      const uploaded = await Promise.all(filesToUpload.map(file => fileApi.upload(file, {
+      const uploaded = await fileApi.uploadImagesBatch(filesToUpload, {
         bizType: 'DEMAND_REFERENCE',
         visibility: 'PUBLIC'
-      }, currentUser)))
+      }, currentUser)
       setForm(current => ({
         ...current,
         referenceFileIds: [
@@ -111,10 +112,14 @@ export function PublishPage() {
           ...previewUrls
         ]
       }))
-      setNotice({ type: 'success', text: selectedFiles.length > remaining ? `已上传前 ${remaining} 张，最多支持 ${MAX_UPLOAD_IMAGES} 张` : '参考图已上传' })
+      const successText = warning || '参考图已上传'
+      feedback.success(successText)
+      setNotice({ type: 'success', text: successText })
     } catch (error) {
       console.error('demand reference image upload failed', { error })
-      setNotice({ type: 'error', text: error.message })
+      const message = error.message || '上传失败，请稍后重试'
+      feedback.error(message)
+      setNotice({ type: 'error', text: message })
     } finally {
       setUploading(false)
     }

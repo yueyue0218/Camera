@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
 public class DemandService {
 
     private static final int DEFAULT_EXPIRE_DAYS = 30;
+    private static final int MAX_IMAGE_COUNT = 9;
     private static final String DEFAULT_ACCEPT_INITIAL_MESSAGE = "已接受约拍响应，会话已开启。";
     private static final Set<String> SUPPORTED_TIME_TAGS = Set.of(
             "NEAR_3_DAYS",
@@ -81,7 +82,7 @@ public class DemandService {
                 request.getBudgetMinCent(),
                 request.getBudgetMaxCent(),
                 trim(request.getDescription()),
-                request.getReferenceFileIds(),
+                normalizeIds(request.getReferenceFileIds()),
                 now,
                 now.plusDays(DEFAULT_EXPIRE_DAYS)
         );
@@ -472,7 +473,7 @@ public class DemandService {
             demand.setDescription(trim(request.getDescription()));
         }
         if (request.getReferenceFileIds() != null) {
-            demand.setReferenceFileIds(request.getReferenceFileIds());
+            demand.setReferenceFileIds(normalizeIds(request.getReferenceFileIds()));
         }
     }
 
@@ -530,6 +531,20 @@ public class DemandService {
                 .map(tag -> tag.toLowerCase(Locale.ROOT))
                 .distinct()
                 .collect(Collectors.toList());
+    }
+
+    private List<Long> normalizeIds(List<Long> ids) {
+        if (ids == null) {
+            return List.of();
+        }
+        List<Long> normalized = ids.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (normalized.size() > MAX_IMAGE_COUNT) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "最多只能上传 9 张图片");
+        }
+        return normalized;
     }
 
     private List<String> normalizeTimeTags(List<String> tags) {

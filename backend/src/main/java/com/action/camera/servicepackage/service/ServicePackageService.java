@@ -46,6 +46,7 @@ import java.util.stream.Collectors;
 public class ServicePackageService {
 
     private static final int MAX_PAGE_SIZE = 50;
+    private static final int MAX_IMAGE_COUNT = 9;
     private static final String DEFAULT_RESERVE_MESSAGE = "I would like to reserve this service package.";
     private static final Set<String> SUPPORTED_TIME_TAGS = Set.of(
             "NEAR_3_DAYS",
@@ -92,7 +93,9 @@ public class ServicePackageService {
         servicePackage.setRefinedCount(request.getRefinedCount());
         servicePackage.setDeliveryDays(request.getDeliveryDays());
         servicePackage.setAvailableDates(normalizeDates(request.getAvailableDates()));
-        servicePackage.setPortfolioIds(normalizeIds(request.getPortfolioIds()));
+        List<Long> portfolioIds = normalizeIds(request.getPortfolioIds());
+        ensureMaxImageCount(portfolioIds);
+        servicePackage.setPortfolioIds(portfolioIds);
         servicePackage.setDescription(trimToNull(request.getDescription()));
         servicePackage.setTimeDescription(trim(request.getTimeDescription()));
         servicePackage.setTimeTags(normalizeTimeTags(request.getTimeTags()));
@@ -463,7 +466,9 @@ public class ServicePackageService {
             servicePackage.setAvailableDates(normalizeDates(request.getAvailableDates()));
         }
         if (request.getPortfolioIds() != null) {
-            servicePackage.setPortfolioIds(normalizeIds(request.getPortfolioIds()));
+            List<Long> portfolioIds = normalizeIds(request.getPortfolioIds());
+            ensureMaxImageCount(portfolioIds);
+            servicePackage.setPortfolioIds(portfolioIds);
         }
         if (request.getDescription() != null) {
             servicePackage.setDescription(trimToNull(request.getDescription()));
@@ -578,6 +583,12 @@ public class ServicePackageService {
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
+    }
+
+    private void ensureMaxImageCount(List<Long> ids) {
+        if (ids != null && ids.size() > MAX_IMAGE_COUNT) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "最多只能上传 9 张图片");
+        }
     }
 
     private String normalizeFilter(String value) {

@@ -13,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/files")
 public class FileController {
@@ -34,6 +36,18 @@ public class FileController {
 
         Long userId = UserContext.getUserId();
         FileUploadResponse response = fileService.upload(file, userId, bizType, visibility);
+        return Result.success(response);
+    }
+
+    /** 批量上传图片（需登录，最多 9 张） */
+    @PostMapping("/images/batch")
+    public Result<List<FileUploadResponse>> uploadImagesBatch(
+            @RequestParam("files") List<MultipartFile> files,
+            @RequestParam("bizType") String bizType,
+            @RequestParam(value = "visibility", defaultValue = "PRIVATE") String visibility) {
+
+        Long userId = UserContext.getUserId();
+        List<FileUploadResponse> response = fileService.uploadImages(files, userId, bizType, visibility);
         return Result.success(response);
     }
 

@@ -117,7 +117,7 @@ export function ServicePackageForm({ form, errors, uploading, onChange, onSubmit
           <div className="upload-grid">
             <label className="upload">
               {uploading ? '上传中...' : `+ 封面 / 作品集 (${portfolioItems.length}/9)`}
-              <input type="file" accept="image/*" multiple hidden onChange={event => { onFilesSelected?.(event.target.files); event.target.value = '' }} />
+              <input type="file" accept="image/*" multiple hidden disabled={uploading} onChange={event => { onFilesSelected?.(event.target.files); event.target.value = '' }} />
             </label>
             {portfolioItems.map((item, index) => (
               <div className="upload-thumb" key={`${item.fileId}-${index}`}>
@@ -138,8 +138,8 @@ export function ServicePackageForm({ form, errors, uploading, onChange, onSubmit
         <div className="preview-line"><span>价格</span><b>¥{form.basePriceYuan || 0}-{form.maxPriceYuan || 0}</b></div>
         <div className="preview-line"><span>时间描述</span><b>{form.timeDescription || '近三天可约'}</b></div>
         <div className="preview-line"><span>时间标签</span><b>{timeTagText(form.timeTagsText)}</b></div>
-        <button className="primary-btn" type="submit">{mode === 'edit' ? '保存橱窗' : '发布橱窗'}</button>
-        {mode !== 'edit' && <button className="secondary-btn draft-btn" type="button" onClick={onSaveDraft}>保存草稿</button>}
+        <button className="primary-btn" type="submit" disabled={uploading}>{mode === 'edit' ? '保存橱窗' : '发布橱窗'}</button>
+        {mode !== 'edit' && <button className="secondary-btn draft-btn" type="button" onClick={onSaveDraft} disabled={uploading}>保存草稿</button>}
       </aside>
     </form>
   )
