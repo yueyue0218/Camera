@@ -7,6 +7,7 @@ public class UpdateProfileRequest {
     private String availability;
     private String role;
     private Long avatarFileId;
+    private String cityCode;
 
     public String getNickname() { return nickname; }
     public void setNickname(String nickname) { this.nickname = nickname; }
@@ -22,4 +23,7 @@ public class UpdateProfileRequest {
 
     public Long getAvatarFileId() { return avatarFileId; }
     public void setAvatarFileId(Long avatarFileId) { this.avatarFileId = avatarFileId; }
+
+    public String getCityCode() { return cityCode; }
+    public void setCityCode(String cityCode) { this.cityCode = cityCode; }
 }

@@ -228,6 +228,9 @@ public class UserService {
             if (req.getAvatarFileId() != null) {
                 user.setAvatarFileId(req.getAvatarFileId());
             }
+            if (req.getCityCode() != null && !req.getCityCode().isBlank()) {
+                user.setCityCode(req.getCityCode().trim());
+            }
             userRepository.save(user);
         }
     }

@@ -133,6 +133,21 @@ export function ProfilePage() {
 
   useEffect(() => { loadProfileData() }, [currentUser.userId, currentUser.role])
 
+  useEffect(() => {
+    async function detectIpLocation() {
+      try {
+        const res = await fetch('http://ip-api.com/json/?lang=zh-CN&fields=status,regionName')
+        const data = await res.json()
+        if (data.status !== 'success' || !data.regionName) return
+        const province = data.regionName.replace(/(省|市|自治区|特别行政区)$/, '').trim()
+        if (!province || province === currentUser.cityCode) return
+        updateProfile({ cityCode: province })
+        await userApi.updateMe({ cityCode: province }, currentUser)
+      } catch { /* ignore */ }
+    }
+    detectIpLocation()
+  }, [currentUser.userId])
+
   async function loadProfileData() {
     const [myProfileRes, momRes, revRes, credRes, ordRes, followersRes] = await Promise.allSettled([
       userApi.me(currentUser),
