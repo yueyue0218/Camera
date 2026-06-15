@@ -87,6 +87,13 @@ class FileAccessPolicyTest {
     }
 
     @Test
+    void anonymousUserCanDownloadLegacyPublicPortfolio() {
+        assertThatCode(() -> policy.assertCanDownload(publicFile("PORTFOLIO"), null, null))
+                .doesNotThrowAnyException();
+        assertThat(policy.resolveVisibility("PORTFOLIO", "PUBLIC")).isEqualTo("PUBLIC");
+    }
+
+    @Test
     void deliveryCannotBecomePublicOnlyBecauseVisibilitySaysPublic() {
         when(photoAuthorizationFileRepository.findByFileIdIn(List.of(FILE_ID))).thenReturn(List.of());
 

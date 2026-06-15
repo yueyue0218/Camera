@@ -38,6 +38,7 @@ public class FileAccessPolicy {
     private static final Set<String> PUBLIC_BIZ_TYPES = Set.of(
             "AVATAR",
             "DEMAND_REFERENCE",
+            "PORTFOLIO",
             "SERVICE_PORTFOLIO"
     );
     private static final Set<String> PRIVATE_BIZ_TYPES = Set.of(
@@ -49,6 +50,7 @@ public class FileAccessPolicy {
     private static final Set<String> SUPPORTED_BIZ_TYPES = Set.of(
             "AVATAR",
             "DEMAND_REFERENCE",
+            "PORTFOLIO",
             "SERVICE_PORTFOLIO",
             "DELIVERY",
             "PHOTO_AUTHORIZATION",
