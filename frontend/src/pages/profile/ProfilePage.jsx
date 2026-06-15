@@ -84,6 +84,7 @@ export function ProfilePage() {
   const [moments, setMoments] = useState([])
   const [myDemands, setMyDemands] = useState([])
   const [myInterests, setMyInterests] = useState([])
+  const [myShowcases, setMyShowcases] = useState([])
   const [profileOrders, setProfileOrders] = useState([])
   const [receivedReviews, setReceivedReviews] = useState([])
   const [creditSummary, setCreditSummary] = useState(null)
@@ -308,6 +309,12 @@ export function ProfilePage() {
         const demandsRes = await demandApi.myDemands(currentUser).catch(() => null)
         setMyDemands(Array.isArray(demandsRes) ? demandsRes : (demandsRes?.records || demandsRes?.content || []))
       } catch { setMyDemands([]) }
+    } else {
+      try {
+        const showcasesRes = await servicePackageApi.myHistory(currentUser).catch(() => null)
+        const all = Array.isArray(showcasesRes) ? showcasesRes : (showcasesRes?.records || showcasesRes?.content || [])
+        setMyShowcases(all.filter(s => s.status === 'ONLINE'))
+      } catch { setMyShowcases([]) }
     }
   }
 
@@ -676,12 +683,21 @@ export function ProfilePage() {
                     <p>创建约拍服务包，设定价格、风格和档期。</p>
                     <div className="ticket-meta"><span className="tag blue">立即创建</span></div>
                   </article>
-                  <article className="mini-ticket" onClick={() => navigate('/hall?tab=showcases')}>
-                    <span className="price">→</span>
-                    <h3>查看我的橱窗</h3>
-                    <p>前往大厅查看已发布的服务包。</p>
-                    <div className="ticket-meta"><span className="tag">前往大厅</span></div>
-                  </article>
+                  {myShowcases.length ? myShowcases.slice(0, 3).map(s => (
+                    <article key={s.serviceId} className="mini-ticket" onClick={() => navigate(`/service-packages/${s.serviceId}`)}>
+                      <span className="price">{s.priceRange || '价格面议'}</span>
+                      <h3>{s.title || '橱窗'}</h3>
+                      <p>{s.scene || s.timeDescription || '查看橱窗详情'}</p>
+                      <div className="ticket-meta"><span className="tag blue">上线中</span></div>
+                    </article>
+                  )) : (
+                    <article className="mini-ticket" style={{ cursor: 'default', opacity: 0.6 }}>
+                      <span className="price">—</span>
+                      <h3>暂无上线橱窗</h3>
+                      <p>发布后将在这里显示有效期内的服务包。</p>
+                      <div className="ticket-meta"><span className="tag">待发布</span></div>
+                    </article>
+                  )}
                 </div>
               ) : (
                 <>
