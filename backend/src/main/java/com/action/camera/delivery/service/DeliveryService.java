@@ -86,7 +86,10 @@ public class DeliveryService {
         if (!currentUserId.equals(order.getProviderId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "只有订单服务方可以上传交付文件");
         }
-        String currentStatus = order.getStatus();
+        orderService.syncTimelineStatusIfDue(orderId);
+        order = orderQueryPort.getOrderSnapshot(orderId);
+        OrderSnapshot uploadableOrder = order;
+        String currentStatus = uploadableOrder.getStatus();
         if (!PENDING_DELIVERY.equals(currentStatus) && !REWORK_REQUIRED.equals(currentStatus)) {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT, "订单当前状态不允许上传交付文件");
         }
@@ -109,7 +112,7 @@ public class DeliveryService {
             delivery.setIsLatest(true);
             delivery.setOriginalCount(0);
             delivery.setRefinedCount(1);
-            delivery.setDeadline(order.getDeliveryDeadline());
+            delivery.setDeadline(uploadableOrder.getDeliveryDeadline());
             delivery.setStatus(DELIVERY_UPLOADED);
             delivery.setRemark(remark);
             delivery.setUploadTime(now);
@@ -128,7 +131,7 @@ public class DeliveryService {
 
         String orderStatus;
         try {
-            if (REWORK_REQUIRED.equals(order.getStatus())) {
+            if (REWORK_REQUIRED.equals(uploadableOrder.getStatus())) {
                 Order completedOrder = orderService.completeReworkDelivery(
                         orderId,
                         currentUserId,
@@ -148,7 +151,7 @@ public class DeliveryService {
             throw e;
         }
 
-        notifyDeliveryUploaded(order);
+        notifyDeliveryUploaded(uploadableOrder);
 
         return new DeliveryUploadResponse(
                 saved.getId(),

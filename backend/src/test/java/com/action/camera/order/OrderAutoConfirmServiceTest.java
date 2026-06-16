@@ -235,6 +235,101 @@ class OrderAutoConfirmServiceTest {
     }
 
     @Test
+    void syncTimelineAdvancesPaidOrderToShootingAfterShootStart() {
+        Order order = order(ORDER_ID, OrderStatus.PAID_PENDING_SHOOT);
+        whenLocked(order);
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderStatusLogRepository.save(any(OrderStatusLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Order syncedOrder = orderService.syncTimelineStatusIfDue(
+                ORDER_ID,
+                order.getShootStartTime().plusMinutes(1)
+        );
+
+        assertEquals(OrderStatus.SHOOTING, syncedOrder.getStatus());
+        ArgumentCaptor<OrderStatusLog> logCaptor = ArgumentCaptor.forClass(OrderStatusLog.class);
+        verify(orderStatusLogRepository).save(logCaptor.capture());
+        assertEquals(OrderStatus.PAID_PENDING_SHOOT, logCaptor.getValue().getFromStatus());
+        assertEquals(OrderStatus.SHOOTING, logCaptor.getValue().getToStatus());
+        assertNull(logCaptor.getValue().getOperatorId());
+        assertEquals("SYSTEM", logCaptor.getValue().getOperatorRole());
+        assertEquals("系统根据拍摄开始时间自动进入拍摄中", logCaptor.getValue().getRemark());
+    }
+
+    @Test
+    void syncTimelineAdvancesShootingOrderToPendingDeliveryAfterShootEnd() {
+        Order order = order(ORDER_ID, OrderStatus.SHOOTING);
+        whenLocked(order);
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderStatusLogRepository.save(any(OrderStatusLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Order syncedOrder = orderService.syncTimelineStatusIfDue(
+                ORDER_ID,
+                order.getShootEndTime()
+        );
+
+        assertEquals(OrderStatus.PENDING_DELIVERY, syncedOrder.getStatus());
+        ArgumentCaptor<OrderStatusLog> logCaptor = ArgumentCaptor.forClass(OrderStatusLog.class);
+        verify(orderStatusLogRepository).save(logCaptor.capture());
+        assertEquals(OrderStatus.SHOOTING, logCaptor.getValue().getFromStatus());
+        assertEquals(OrderStatus.PENDING_DELIVERY, logCaptor.getValue().getToStatus());
+        assertNull(logCaptor.getValue().getOperatorId());
+        assertEquals("SYSTEM", logCaptor.getValue().getOperatorRole());
+        assertEquals("系统根据拍摄结束时间自动进入待交付", logCaptor.getValue().getRemark());
+    }
+
+    @Test
+    void syncTimelineAdvancesPaidOrderPastShootEndThroughTwoStatusLogs() {
+        Order order = order(ORDER_ID, OrderStatus.PAID_PENDING_SHOOT);
+        whenLocked(order);
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderStatusLogRepository.save(any(OrderStatusLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Order syncedOrder = orderService.syncTimelineStatusIfDue(
+                ORDER_ID,
+                order.getShootEndTime().plusMinutes(1)
+        );
+
+        assertEquals(OrderStatus.PENDING_DELIVERY, syncedOrder.getStatus());
+        ArgumentCaptor<OrderStatusLog> logCaptor = ArgumentCaptor.forClass(OrderStatusLog.class);
+        verify(orderStatusLogRepository, times(2)).save(logCaptor.capture());
+        List<OrderStatusLog> logs = logCaptor.getAllValues();
+        assertEquals(OrderStatus.PAID_PENDING_SHOOT, logs.get(0).getFromStatus());
+        assertEquals(OrderStatus.SHOOTING, logs.get(0).getToStatus());
+        assertEquals("SYSTEM", logs.get(0).getOperatorRole());
+        assertEquals(OrderStatus.SHOOTING, logs.get(1).getFromStatus());
+        assertEquals(OrderStatus.PENDING_DELIVERY, logs.get(1).getToStatus());
+        assertEquals("SYSTEM", logs.get(1).getOperatorRole());
+    }
+
+    @Test
+    void syncTimelineDoesNotOverrideTerminalDeliveredReworkOrAppealingOrders() {
+        List<OrderStatus> statuses = List.of(
+                OrderStatus.COMPLETED,
+                OrderStatus.CANCELLED,
+                OrderStatus.REFUNDED,
+                OrderStatus.DELIVERED_PENDING_CONFIRM,
+                OrderStatus.REWORK_REQUIRED,
+                OrderStatus.APPEALING
+        );
+
+        for (int index = 0; index < statuses.size(); index++) {
+            OrderStatus status = statuses.get(index);
+            Order order = order(8100L + index, status);
+            when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+            Order syncedOrder = orderService.syncTimelineStatusIfDue(
+                    order.getId(),
+                    order.getShootEndTime().plusDays(1)
+            );
+
+            assertEquals(status, syncedOrder.getStatus());
+        }
+        verify(orderRepository, never()).save(any(Order.class));
+        verify(orderStatusLogRepository, never()).save(any(OrderStatusLog.class));
+    }
+
+    @Test
     void autoAdvancePaidOrderToShootingDuringShootWindow() {
         Order order = order(ORDER_ID, OrderStatus.PAID_PENDING_SHOOT);
         when(orderRepository.findByStatus(OrderStatus.PAID_PENDING_SHOOT)).thenReturn(List.of(order));

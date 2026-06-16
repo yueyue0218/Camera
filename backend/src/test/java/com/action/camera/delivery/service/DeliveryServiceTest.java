@@ -105,6 +105,15 @@ class DeliveryServiceTest {
         DeliveryUploadResponse response = deliveryService.upload(ORDER_ID, file(), "首次交付");
 
         assertThat(response.getOrderStatus()).isEqualTo("DELIVERED_PENDING_CONFIRM");
+        InOrder inOrder = inOrder(orderQueryPort, orderService, fileService, deliveryRepository,
+                deliveryFileRepository);
+        inOrder.verify(orderQueryPort).getOrderSnapshot(ORDER_ID);
+        inOrder.verify(orderService).syncTimelineStatusIfDue(ORDER_ID);
+        inOrder.verify(orderQueryPort).getOrderSnapshot(ORDER_ID);
+        inOrder.verify(fileService).upload(any(), eq(PROVIDER_ID), eq("DELIVERY"), eq("PRIVATE"));
+        inOrder.verify(deliveryRepository).save(any(Delivery.class));
+        inOrder.verify(deliveryFileRepository).save(any(DeliveryFile.class));
+        inOrder.verify(orderService).markDeliveryUploaded(ORDER_ID, PROVIDER_ID, "服务方上传交付文件");
         verify(orderService, times(1)).markDeliveryUploaded(
                 ORDER_ID,
                 PROVIDER_ID,
@@ -122,7 +131,11 @@ class DeliveryServiceTest {
         DeliveryUploadResponse response = deliveryService.upload(ORDER_ID, file(), "返修交付");
 
         assertThat(response.getOrderStatus()).isEqualTo("DELIVERED_PENDING_CONFIRM");
-        InOrder inOrder = inOrder(fileService, deliveryRepository, deliveryFileRepository, orderService);
+        InOrder inOrder = inOrder(orderQueryPort, orderService, fileService, deliveryRepository,
+                deliveryFileRepository);
+        inOrder.verify(orderQueryPort).getOrderSnapshot(ORDER_ID);
+        inOrder.verify(orderService).syncTimelineStatusIfDue(ORDER_ID);
+        inOrder.verify(orderQueryPort).getOrderSnapshot(ORDER_ID);
         inOrder.verify(fileService).upload(any(), eq(PROVIDER_ID), eq("DELIVERY"), eq("PRIVATE"));
         inOrder.verify(deliveryRepository).save(any(Delivery.class));
         inOrder.verify(deliveryFileRepository).save(any(DeliveryFile.class));
@@ -138,8 +151,33 @@ class DeliveryServiceTest {
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.STATUS_CONFLICT));
 
+        verify(orderService).syncTimelineStatusIfDue(ORDER_ID);
         verify(fileService, never()).upload(any(), any(), any(), any());
         verify(orderService, never()).markDeliveryUploaded(any(), any(), any());
+        verify(orderStatusPort, never()).changeStatus(any(), any(), any(), any());
+    }
+
+    @Test
+    void uploadRechecksOrderAfterTimelineSyncAndAllowsPendingDelivery() {
+        when(orderQueryPort.getOrderSnapshot(ORDER_ID))
+                .thenReturn(snapshot("SHOOTING"))
+                .thenReturn(snapshot("PENDING_DELIVERY"));
+        prepareDeliveryPersistence();
+        when(orderService.markDeliveryUploaded(ORDER_ID, PROVIDER_ID, "服务方上传交付文件"))
+                .thenReturn(deliveredOrder());
+
+        DeliveryUploadResponse response = deliveryService.upload(ORDER_ID, file(), "拍摄结束后交付");
+
+        assertThat(response.getOrderStatus()).isEqualTo("DELIVERED_PENDING_CONFIRM");
+        InOrder inOrder = inOrder(orderQueryPort, orderService, fileService, deliveryRepository,
+                deliveryFileRepository);
+        inOrder.verify(orderQueryPort).getOrderSnapshot(ORDER_ID);
+        inOrder.verify(orderService).syncTimelineStatusIfDue(ORDER_ID);
+        inOrder.verify(orderQueryPort).getOrderSnapshot(ORDER_ID);
+        inOrder.verify(fileService).upload(any(), eq(PROVIDER_ID), eq("DELIVERY"), eq("PRIVATE"));
+        inOrder.verify(deliveryRepository).save(any(Delivery.class));
+        inOrder.verify(deliveryFileRepository).save(any(DeliveryFile.class));
+        inOrder.verify(orderService).markDeliveryUploaded(ORDER_ID, PROVIDER_ID, "服务方上传交付文件");
         verify(orderStatusPort, never()).changeStatus(any(), any(), any(), any());
     }
 
@@ -151,6 +189,7 @@ class DeliveryServiceTest {
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.STATUS_CONFLICT));
 
+        verify(orderService).syncTimelineStatusIfDue(ORDER_ID);
         verify(fileService, never()).upload(any(), any(), any(), any());
         verify(orderService, never()).markDeliveryUploaded(any(), any(), any());
         verify(orderStatusPort, never()).changeStatus(any(), any(), any(), any());
@@ -170,17 +209,25 @@ class DeliveryServiceTest {
     }
 
     private void prepareUpload(String orderStatus) {
-        when(orderQueryPort.getOrderSnapshot(ORDER_ID)).thenReturn(new OrderSnapshot(
+        when(orderQueryPort.getOrderSnapshot(ORDER_ID)).thenReturn(snapshot(orderStatus));
+        if (!"PENDING_DELIVERY".equals(orderStatus) && !"REWORK_REQUIRED".equals(orderStatus)) {
+            return;
+        }
+        prepareDeliveryPersistence();
+    }
+
+    private OrderSnapshot snapshot(String orderStatus) {
+        return new OrderSnapshot(
                 ORDER_ID,
                 CUSTOMER_ID,
                 PROVIDER_ID,
                 orderStatus,
                 "NONE",
                 LocalDateTime.of(2026, 6, 8, 12, 0)
-        ));
-        if (!"PENDING_DELIVERY".equals(orderStatus) && !"REWORK_REQUIRED".equals(orderStatus)) {
-            return;
-        }
+        );
+    }
+
+    private void prepareDeliveryPersistence() {
         when(txTemplate.execute(any())).thenAnswer(invocation -> {
             TransactionCallback<?> callback = invocation.getArgument(0);
             return callback.doInTransaction(null);
