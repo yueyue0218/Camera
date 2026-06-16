@@ -130,7 +130,7 @@ export function AdminPage() {
   return (
     <Box>
       <PageHeader title="管理后台" description="处理认证审核与评价申诉仲裁。" />
-      {demoMode ? <Box sx={{ mb: 2 }}><Alert severity="info">开发预览数据</Alert></Box> : null}
+      {demoMode ? <Box sx={{ mb: 2 }}><Alert severity="info">当前内容仅供参考</Alert></Box> : null}
       <Feedback {...feedback} />
       <Snackbar
         open={Boolean(feedback.success)}

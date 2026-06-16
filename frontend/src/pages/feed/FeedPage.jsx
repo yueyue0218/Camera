@@ -517,7 +517,7 @@ export function FeedPage() {
 
       <div className={`moments-page__manage${viewMode === 'mine' ? ' is-open' : ''}`}>
         <div>
-          <strong>PORTRA POST ARCHIVE · 我的动态</strong>
+          <strong>动态归档 · 我的动态</strong>
           <span>整理、更新或删除自己发布过的记录。</span>
         </div>
         <Button variant="text" onClick={() => setViewMode(prev => (prev === 'square' ? 'mine' : 'square'))}>

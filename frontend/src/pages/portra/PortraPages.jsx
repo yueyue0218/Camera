@@ -68,7 +68,7 @@ function useDLineDemoMode() {
 }
 
 function DemoBadge() {
-  return <span className="portra-demo-badge">开发预览数据</span>
+  return <span className="portra-demo-badge">仅供参考</span>
 }
 
 function ErrorCard({ title, message = '请稍后重试', detail, onRetry }) {

@@ -244,7 +244,7 @@ export function ReviewPage() {
   return (
     <Stack spacing={2}>
       <PageHeader
-        eyebrow="PORTRA REVIEW"
+        eyebrow="评价服务"
         title={`订单 ${orderId} 评价`}
         description="订单完成后双方可以进行评价，评价会影响信用分。"
       />
@@ -253,7 +253,7 @@ export function ReviewPage() {
       {credit ? (
         <Paper sx={{ ...panelSx, p: 2 }}>
           <Typography variant="overline" sx={{ color: portra.primary, fontWeight: 900, letterSpacing: '0.14em' }}>
-            MY CREDIT
+            信用概览
           </Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }}>
             <Box>
@@ -307,11 +307,11 @@ export function ReviewPage() {
             <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={2} alignItems={{ xs: 'flex-start', sm: 'center' }}>
               <Box>
                 <Typography variant="overline" sx={{ color: complaintTone.accent, fontWeight: 900, letterSpacing: '.16em' }}>
-                  REVIEW APPEAL
+                  申诉处理
                 </Typography>
                 <Typography variant="h6" fontWeight={900}>对收到的评价发起申诉</Typography>
                 <Typography color="text.secondary" sx={{ mt: 0.5, lineHeight: 1.8 }}>
-                  仅被评价方可以申诉，提交后会进入管理端处理链路。
+                  仅被评价方可以申诉，提交后平台会继续跟进处理。
                 </Typography>
               </Box>
               <Chip label={complaintTone.label} color={complaintTone.chipColor} sx={{ fontWeight: 800, minWidth: 84 }} />
@@ -425,7 +425,7 @@ export function UserReviewsPage() {
   return (
     <Stack spacing={2}>
       <PageHeader
-        eyebrow="PORTRA REVIEW"
+        eyebrow="评价记录"
         title={isSelf ? '我的评价' : `用户 #${targetUserId} 的评价`}
         description={isSelf ? '查看你收到的评价与追评。' : '查看某位用户收到的评价。'}
         action={<Button onClick={() => navigate(-1)}>返回</Button>}

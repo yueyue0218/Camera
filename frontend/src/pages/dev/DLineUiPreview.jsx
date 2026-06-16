@@ -117,12 +117,12 @@ function DialogPreview() {
   const [dialogType, setDialogType] = useState('')
   const [text, setText] = useState('')
   const config = useMemo(() => ({
-    review: { title: '评价弹窗', placeholder: '填写评价内容' },
-    followUp: { title: '追评弹窗', placeholder: '填写追评内容' },
-    appeal: { title: '评价申诉弹窗', placeholder: '填写申诉原因' },
-    reject: { title: '管理员驳回认证弹窗', placeholder: '填写驳回原因' },
-    arbitrate: { title: '管理员仲裁说明弹窗', placeholder: '填写仲裁说明' },
-    creditRule: { title: '信用规则说明弹窗', placeholder: '' }
+    review: { title: '评价窗口', placeholder: '填写评价内容' },
+    followUp: { title: '追评窗口', placeholder: '填写追评内容' },
+    appeal: { title: '申诉窗口', placeholder: '填写申诉原因' },
+    reject: { title: '认证处理窗口', placeholder: '填写处理原因' },
+    arbitrate: { title: '申诉处理窗口', placeholder: '填写处理说明' },
+    creditRule: { title: '信用规则说明', placeholder: '' }
   }), [])
 
   const current = config[dialogType]
@@ -168,9 +168,9 @@ export function DLineUiPreview() {
     <Box className="dev-preview-page">
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={2} sx={{ mb: 3 }}>
         <Box>
-          <Typography variant="overline" color="primary">开发预览数据</Typography>
-          <Typography variant="h4" fontWeight={900}>D 线状态预览</Typography>
-          <Typography color="text.secondary">用于检查加载、空状态、失败状态、弹窗和反馈动效。这里不承担正式产品展示。</Typography>
+          <Typography variant="overline" color="primary">界面预览</Typography>
+          <Typography variant="h4" fontWeight={900}>界面状态预览</Typography>
+          <Typography color="text.secondary">这里集中展示加载、空状态、失败状态、弹窗和反馈效果。</Typography>
         </Box>
       </Stack>
 

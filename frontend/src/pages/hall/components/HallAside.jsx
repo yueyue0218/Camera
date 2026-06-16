@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { cityName, firstText, gradientFor, latestTimeText, moneyRange, splitTags } from './hallUtils.js'
+import { creditApi } from '../../../api/creditApi.js'
+import { cityName, firstText, formatCreditScoreValue, gradientFor, hasCreditScoreValue, latestTimeText, moneyRange, serviceProviderUserId, splitTags } from './hallUtils.js'
 import { publicImageUrls, useFileObjectUrl } from '../utils/fileObjectUrls.js'
 
 export const PORTRA_TIPS = [
@@ -119,8 +120,11 @@ export function DemandAside({ selectedDemand, error, currentUser, onRespond, onH
 }
 
 export function ShowcaseAside({ selectedService, currentUser, interests }) {
-  const credit = selectedService?.photographerCreditScore ?? selectedService?.providerCreditScore ?? selectedService?.creditScore
-  const hasCreditScore = credit !== null && credit !== undefined && !(typeof credit === 'string' && credit.trim() === '')
+  const [creditScore, setCreditScore] = useState(null)
+  const providerId = serviceProviderUserId(selectedService)
+  const hasCreditScore = hasCreditScoreValue(creditScore)
+  const displayCreditScore = formatCreditScoreValue(creditScore)
+  const credit = displayCreditScore
   const uploadedAvatar = useFileObjectUrl(
     [selectedService?.photographerAvatarFileId, selectedService?.avatarFileId],
     currentUser,
@@ -129,6 +133,22 @@ export function ShowcaseAside({ selectedService, currentUser, interests }) {
   const fallbackAvatar = publicImageUrls(selectedService?.photographerAvatarUrl, selectedService?.photographerAvatar)[0] || ''
   const avatar = uploadedAvatar || fallbackAvatar
   const avatarArt = avatar ? `url(${avatar})` : gradientFor(selectedService?.photographerId || selectedService?.providerId)
+
+  useEffect(() => {
+    let ignored = false
+    if (!providerId) {
+      setCreditScore(null)
+      return () => { ignored = true }
+    }
+    creditApi.summary(providerId, currentUser)
+      .then(summary => {
+        if (!ignored) setCreditScore(summary?.creditScore ?? null)
+      })
+      .catch(() => {
+        if (!ignored) setCreditScore(null)
+      })
+    return () => { ignored = true }
+  }, [currentUser, providerId])
 
   return (
     <aside className="aside">
