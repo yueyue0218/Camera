@@ -68,7 +68,7 @@ export function ReviewDetailPage() {
   return (
     <Stack spacing={2}>
       <PageHeader
-        eyebrow="PORTRA REVIEW"
+        eyebrow="评价记录"
         title="评价详情"
         description="查看单条评价内容并追加追评。"
         action={<Button onClick={() => navigate(-1)}>返回</Button>}

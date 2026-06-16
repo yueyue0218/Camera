@@ -435,11 +435,11 @@ export function LoginChoicePage() {
           <div className="op-yellow-field" />
           <div className="op-blue-cut" />
           <div className="op-top-ribbon op-reveal"><span className="op-p1-adjust-text">寻找如此简单</span></div>
-          <img alt="search frame asset high resolution" className="op-asset op-search-img op-reveal" decoding="async" src={searchImgUrl} />
-          <img ref={lensRef} alt="lens asset high resolution" className="op-asset op-lens op-reveal" decoding="async" src={lensUrl} style={{ marginLeft: '-1.36667px', marginTop: '-1.60364px' }} />
+          <img alt="搜索取景框" className="op-asset op-search-img op-reveal" decoding="async" src={searchImgUrl} />
+          <img ref={lensRef} alt="镜头图案" className="op-asset op-lens op-reveal" decoding="async" src={lensUrl} style={{ marginLeft: '-1.36667px', marginTop: '-1.60364px' }} />
           <div className="op-lens-flash" aria-hidden="true" />
           <div className="op-shutter-blink" aria-hidden="true" />
-          <img alt="polaroid top row collage asset high resolution" className="op-asset op-polaroids op-reveal" decoding="async" src={polaroidsUrl} style={{ marginLeft: '1.025px', marginTop: '1.06909px' }} />
+          <img alt="拍立得拼贴" className="op-asset op-polaroids op-reveal" decoding="async" src={polaroidsUrl} style={{ marginLeft: '1.025px', marginTop: '1.06909px' }} />
           <div className="op-portra-meet op-reveal">PORTRA MEET<br />YOU</div>
           <div className="op-brand op-reveal"><span>P</span><span className="blue">o</span><span>r</span><span>t</span><span>r</span><span className="orange">a</span></div>
           <div className="op-product-positioning op-reveal">约拍一步到位</div>
@@ -479,7 +479,7 @@ export function LoginChoicePage() {
             <p><span>完成</span><b>18 次拍摄</b></p>
             <p><span>沟通</span><b>先聊再定</b></p>
           </div>
-          <div className="op-material-caption op-reveal">CONTACT SHEET / STYLE SAMPLE / RESPONSE SLIP</div>
+          <div className="op-material-caption op-reveal">CONTACT SHEET / STYLE NOTES / RESPONSE SLIP</div>
           <div className="op-role-switch op-reveal">
             {[
               { label: '我想拍', to: '/login/sign-in' },
@@ -525,7 +525,7 @@ export function LoginChoicePage() {
               <button onClick={() => navigate('/login/sign-in')}>我来拍照</button>
             </article>
           </div>
-          <img alt="polaroid top row collage asset high resolution" className="op-asset op-p3-polaroids" decoding="async" src={polaroidsP3Url} />
+          <img alt="拍立得拼贴" className="op-asset op-p3-polaroids" decoding="async" src={polaroidsP3Url} />
           <div className="op-p3-mini-path"><span>大厅</span><i /><span>消息</span><i /><span>订单</span></div>
         </section>
 

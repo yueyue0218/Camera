@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { creditApi } from '../../api/creditApi.js'
 import { demandApi } from '../../api/demandApi.js'
 import { servicePackageApi } from '../../api/servicePackageApi.js'
 import { fileApi } from '../../api/fileApi.js'
 import { userApi } from '../../api/userApi.js'
 import { useAuth } from '../../AuthContext.jsx'
 import { EmptyState, ErrorState, LoadingState } from './components/HallState.jsx'
-import { cityName, firstText, gradientFor, latestTimeText, money, moneyRange, readableDate, splitTags, timeTagLabel } from './components/hallUtils.js'
+import { cityName, firstText, formatCreditScoreValue, gradientFor, hasCreditScoreValue, latestTimeText, money, moneyRange, readableDate, serviceProviderUserId, splitTags, timeTagLabel } from './components/hallUtils.js'
 import { publicImageUrls, useFileObjectUrl, useFileObjectUrls } from './utils/fileObjectUrls.js'
 import { submitDemandResponse } from './utils/respondDemand.js'
 import '../portraHall.css'
@@ -469,6 +470,7 @@ export function ServicePackageDetailPage() {
   const navigate = useNavigate()
   const { currentUser } = useAuth()
   const [service, setService] = useState(null)
+  const [providerCreditScore, setProviderCreditScore] = useState(null)
   const [interested, setInterested] = useState(false)
   const [followingProvider, setFollowingProvider] = useState(false)
   const [status, setStatus] = useState(createStatus)
@@ -485,6 +487,7 @@ export function ServicePackageDetailPage() {
   )
   const fallbackProviderAvatar = publicImageUrls(service?.photographerAvatarUrl, service?.photographerAvatar)[0] || ''
   const providerAvatar = uploadedProviderAvatar || fallbackProviderAvatar
+  const providerProfileId = serviceProviderUserId(service)
   useBodyRole(currentUser.role)
 
   useEffect(() => {
@@ -518,19 +521,34 @@ export function ServicePackageDetailPage() {
     return () => { ignored = true }
   }, [currentUser, serviceId])
 
+  useEffect(() => {
+    let ignored = false
+    if (!providerProfileId) {
+      setProviderCreditScore(null)
+      return () => { ignored = true }
+    }
+    creditApi.summary(providerProfileId, currentUser)
+      .then(summary => {
+        if (!ignored) setProviderCreditScore(summary?.creditScore ?? null)
+      })
+      .catch(() => {
+        if (!ignored) setProviderCreditScore(null)
+      })
+    return () => { ignored = true }
+  }, [currentUser, providerProfileId])
+
   if (status.loading) return <DetailShell backLabel="← 返回橱窗大厅"><LoadingState text="正在加载真实橱窗详情" /></DetailShell>
   if (status.error) return <DetailShell backLabel="← 返回橱窗大厅"><ErrorState message={status.error} /></DetailShell>
   if (!service) return <DetailShell backLabel="← 返回橱窗大厅"><EmptyState text="暂无橱窗详情" /></DetailShell>
 
   const styleTags = splitTags(service.styleTags)
   const timeTags = splitTags(service.timeTags)
-  const credit = service.photographerCreditScore ?? service.providerCreditScore ?? service.creditScore
-  const hasCreditScore = credit !== null && credit !== undefined && !(typeof credit === 'string' && credit.trim() === '')
+  const credit = formatCreditScoreValue(providerCreditScore)
+  const hasCreditScore = hasCreditScoreValue(providerCreditScore)
   const city = cityName(service.cityName || service.cityCode) || service.serviceArea || '暂无城市'
   const price = service.priceRange || `${money(service.basePriceCent)} 起`
   const isServiceOwner = isSameOwner(currentUser, collectServiceOwnerIds(service))
   const isCustomerViewer = currentUser.role === 'CUSTOMER'
-  const providerProfileId = service.photographerId || service.providerId
 
   async function startChat(message = `我想预约「${service.title || '这个橱窗'}」，想进一步确认时间与服务内容。`) {
     try {

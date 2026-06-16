@@ -246,7 +246,7 @@ function NotificationLoadingState() {
       <Paper
         variant="outlined"
         sx={{
-          p: 2.25,
+          p: { xs: 2.5, sm: 3 },
           borderRadius: 4,
           overflow: 'hidden',
           background:
@@ -254,15 +254,15 @@ function NotificationLoadingState() {
           borderColor: 'rgba(13,47,178,.12)'
         }}
       >
-        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={2} alignItems={{ xs: 'flex-start', sm: 'center' }}>
-          <Box sx={{ minWidth: 0, width: '100%' }}>
-            <Typography variant="overline" sx={{ color: portra.primary, fontWeight: 900, letterSpacing: '.16em' }}>
-              LOADING NOTICE
+        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={{ xs: 2.25, sm: 3 }} alignItems={{ xs: 'flex-start', sm: 'center' }}>
+          <Box sx={{ minWidth: 0, width: '100%', maxWidth: 720 }}>
+            <Typography variant="overline" sx={{ color: portra.primary, fontWeight: 900, letterSpacing: '.16em', lineHeight: 1.4, display: 'block' }}>
+              通知中心
             </Typography>
-            <Typography variant="h6" fontWeight={900} mt={0.5}>
+            <Typography variant="h6" fontWeight={900} mt={0.5} sx={{ lineHeight: 1.35, pr: { sm: 2 } }}>
               正在整理你的通知流
             </Typography>
-            <Typography color="text.secondary" mt={0.75} sx={{ lineHeight: 1.8 }}>
+            <Typography color="text.secondary" mt={0.75} sx={{ lineHeight: 1.8, maxWidth: 620 }}>
               订单、评价、申诉和动态互动会按类别归档到这里。
             </Typography>
           </Box>
@@ -275,7 +275,7 @@ function NotificationLoadingState() {
           key={index}
           variant="outlined"
           sx={{
-            p: 2,
+            p: { xs: 2, sm: 2.25 },
             borderRadius: 3,
             position: 'relative',
             overflow: 'hidden',
@@ -409,7 +409,7 @@ export function NotificationListPage() {
   return (
     <Stack spacing={2}>
       <PageHeader
-        eyebrow="PORTRA NOTICE"
+        eyebrow="消息中心"
         title="通知"
         description={counts.unread ? `${counts.unread} 条未读通知` : '当前没有未读通知'}
         action={<Button startIcon={<DoneAllRoundedIcon />} onClick={markAllRead} disabled={!counts.unread}>全部已读</Button>}

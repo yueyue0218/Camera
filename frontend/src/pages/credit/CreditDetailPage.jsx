@@ -174,7 +174,7 @@ export function CreditDetailPage() {
   return (
     <div className="pp-main credit-detail-page">
       <div className="pp-crumb">
-        <span><strong>信用</strong> / UID {targetUserId}</span>
+        <span><strong>信用</strong> / 用户 {targetUserId}</span>
         <button className="secondary-btn" type="button" onClick={() => navigate(-1)}>返回</button>
       </div>
 
@@ -197,10 +197,10 @@ export function CreditDetailPage() {
         </div>
 
         <div className="hero-info">
-          <div className="ticket-kicker">Credit File</div>
+          <div className="ticket-kicker">信用档案</div>
           <div className="hero-name-row">
             <h1 className="hero-name">{displayLevel}</h1>
-            <span className="role-badge">UID {targetUserId}</span>
+            <span className="role-badge">用户 {targetUserId}</span>
           </div>
           <p className="profile-uid">最近更新：{formatUpdatedTime(lastUpdated)}</p>
           <p className="profile-signature">
@@ -365,7 +365,7 @@ export function CreditDetailPage() {
         <DialogContent>
           <div className="credit-rules-copy">
             <p>信用分参考有效订单、好评率、履约率和风险记录。新用户不会直接显示 100 分，需要完成订单或收到评价后开始积累。</p>
-            <p><strong>信用优秀：</strong>90-100，样本充足且履约稳定。</p>
+            <p><strong>信用优秀：</strong>90-100，记录充足且履约稳定。</p>
             <p><strong>信用良好：</strong>75-89，整体可靠，近期记录正常。</p>
             <p><strong>待提升：</strong>60-74，仍需积累更多好评或改善履约表现。</p>
             <p><strong>信用较差：</strong>60 以下，存在较多风险记录、低分评价或履约问题。</p>

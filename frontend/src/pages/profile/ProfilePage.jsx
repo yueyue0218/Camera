@@ -365,7 +365,7 @@ export function ProfilePage() {
         locationVisible: next.locationVisible,
       }, currentUser)
     } catch (err) {
-      setNotice({ type: 'err', text: err.message || 'Profile save failed' })
+      setNotice({ type: 'err', text: err.message || '个人资料保存失败' })
       return false
     }
     const roleSpecificBio = isProvider ? { providerBio: next.bio } : { customerBio: next.bio }
@@ -477,8 +477,8 @@ export function ProfilePage() {
       )}
 
       <div className="pp-crumb">
-        <span><strong>PROFILE</strong> / PORTRA ID / 个人摄影档案</span>
-        <span>FRAME {String(currentUser.userId).padStart(2,'0')} · Portra</span>
+        <span><strong>个人档案</strong> / 我的主页 / 个人摄影档案</span>
+        <span>编号 {String(currentUser.userId).padStart(2,'0')} · Portra</span>
       </div>
 
       {/* ── HERO ── */}
@@ -495,12 +495,12 @@ export function ProfilePage() {
         </div>
 
         <div className="hero-info">
-          <div className="ticket-kicker">Portra Profile Ticket</div>
+          <div className="ticket-kicker">我的主页</div>
           <div className="hero-name-row">
             <h1 className="hero-name">{displayName}</h1>
             <span className="role-badge">{isProvider ? '摄影师' : '约拍方'}</span>
           </div>
-          <p className="profile-uid">UID：{currentUser.userId} · Portra ID</p>
+          <p className="profile-uid">用户编号：{currentUser.userId}</p>
           <div className="profile-meta-line">
             <span>IP属地：{currentUser.cityCode || '未知'}</span>
           </div>
@@ -537,7 +537,7 @@ export function ProfilePage() {
         <aside className="hero-side">
           <div>
             <div className="id-number">No.{currentUser.userId}</div>
-            <div className="id-label">Portra Credit File</div>
+            <div className="id-label">信用概览</div>
           </div>
           <div className="metric-grid">
             <button className="metric metric-button" type="button" onClick={() => navigate('/profile/credit')}><b>{formatCreditScore(creditScore)}</b><span>信用评分</span></button>
@@ -573,7 +573,7 @@ export function ProfilePage() {
 
           {/* Left: Tab Nav */}
           <aside className="panel-card frame-nav" ref={frameNavRef}>
-            <p className="frame-title">Frame Navigation</p>
+            <p className="frame-title">内容导航</p>
             {tabs.map(tab => (
               <button
                 key={tab.id}
@@ -608,7 +608,7 @@ export function ProfilePage() {
                         ? items.map((m, i) => (
                           <div key={i} className="film-frame">
                             {m?.imageData && <div style={{position:'absolute',inset:0,zIndex:1,backgroundImage:`url(${m.imageData})`,backgroundSize:'cover',backgroundPosition:'center'}} />}
-                            <span className="cap">FRAME {String(i+1).padStart(2,'0')}</span>
+                            <span className="cap">作品 {String(i+1).padStart(2,'0')}</span>
                           </div>
                         ))
                         : Array.from({length:6}).map((_, i) => {
@@ -616,7 +616,7 @@ export function ProfilePage() {
                           return (
                             <div key={i} className="film-frame">
                               {m?.imageData && <div style={{position:'absolute',inset:0,zIndex:1,backgroundImage:`url(${m.imageData})`,backgroundSize:'cover',backgroundPosition:'center'}} />}
-                              <span className="cap">FRAME {String(i+1).padStart(2,'0')}</span>
+                              <span className="cap">作品 {String(i+1).padStart(2,'0')}</span>
                             </div>
                           )
                         })
@@ -820,7 +820,7 @@ export function ProfilePage() {
         <section className="posted-section archive-drawer-section">
           <div className="archive-head">
             <div>
-              <p className="archive-eyebrow">PORTRA POST ARCHIVE</p>
+              <p className="archive-eyebrow">动态归档</p>
               <h2>{isProvider ? '我的作品集' : '我的动态'}</h2>
               <p>{isProvider ? '这里只展示摄影师本人发布过的作品动态、拍摄花絮和档期说明。' : '这里只收纳我自己发布过的帖子：想拍记录、拍摄日记、成片分享。'}</p>
             </div>

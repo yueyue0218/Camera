@@ -220,3 +220,29 @@ export function priceParamsFromBudget(value) {
     maxCent: Number.isFinite(max) ? Math.max(0, Math.round(max * 100)) : null
   }
 }
+
+export function serviceProviderUserId(service) {
+  const value =
+    service?.photographerId ??
+    service?.providerId ??
+    service?.creatorId ??
+    service?.ownerId ??
+    service?.userId ??
+    service?.provider?.id ??
+    service?.photographer?.id ??
+    service?.creator?.id ??
+    service?.owner?.id ??
+    service?.user?.id
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : null
+}
+
+export function hasCreditScoreValue(value) {
+  return !(value === null || value === undefined || (typeof value === 'string' && value.trim() === ''))
+}
+
+export function formatCreditScoreValue(value, fallback = '暂无') {
+  if (!hasCreditScoreValue(value)) return fallback
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric.toFixed(1) : fallback
+}

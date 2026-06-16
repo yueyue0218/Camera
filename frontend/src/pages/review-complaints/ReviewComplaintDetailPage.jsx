@@ -69,7 +69,7 @@ function ComplaintLoadingState() {
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={2} alignItems={{ xs: 'flex-start', sm: 'center' }}>
           <Box sx={{ width: '100%' }}>
             <Typography variant="overline" sx={{ color: portra.primary, fontWeight: 900, letterSpacing: '.16em' }}>
-              REVIEW APPEAL
+              评价申诉
             </Typography>
             <Skeleton variant="text" width="42%" height={40} sx={{ mt: 0.75 }} />
             <Skeleton variant="text" width="76%" height={26} />
@@ -134,7 +134,7 @@ export function ReviewComplaintDetailPage() {
   return (
     <Stack spacing={2}>
       <PageHeader
-        eyebrow="PORTRA REVIEW"
+        eyebrow="申诉处理"
         title="评价申诉详情"
         description="查看申诉原因、处理状态和仲裁结果。"
         action={<Button onClick={() => navigate(-1)}>返回</Button>}
@@ -158,13 +158,13 @@ export function ReviewComplaintDetailPage() {
             <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={2} alignItems={{ xs: 'flex-start', sm: 'center' }}>
               <Box sx={{ minWidth: 0 }}>
                 <Typography variant="overline" sx={{ color: tone.accent, fontWeight: 900, letterSpacing: '.16em' }}>
-                  APPEAL FILE
+                  申诉详情
                 </Typography>
                 <Typography variant="h5" fontWeight={900}>
                   申诉 #{detail.complaintId || complaintId}
                 </Typography>
                 <Typography color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.8 }}>
-                  这里保留申诉原因、处理状态和最终仲裁说明，便于回看整条处理链路。
+                  这里会展示申诉原因、当前状态和最终处理结果，方便随时查看进展。
                 </Typography>
               </Box>
               <Chip
@@ -192,14 +192,14 @@ export function ReviewComplaintDetailPage() {
 
           <Alert severity={tone.severity} sx={{ borderRadius: 3 }}>
             {detail.arbitrationResult
-              ? `当前状态：${tone.label}。本条申诉已有处理结论，可结合下方仲裁说明回看。`
-              : `当前状态：${tone.label}。申诉已进入处理链路，最终结果会同步到这里。`}
+              ? `当前状态：${tone.label}。本条申诉已有处理结论，可结合下方处理结果查看。`
+              : `当前状态：${tone.label}。申诉正在处理中，最终结果会同步到这里。`}
           </Alert>
 
           <Stack gap={1.5}>
             <Paper variant="outlined" sx={{ ...panelSx, p: 2.1, borderRadius: 3.5 }}>
               <Typography variant="overline" sx={{ color: tone.accent, fontWeight: 900, letterSpacing: '.14em' }}>
-                APPEAL REASON
+                申诉原因
               </Typography>
               <Typography sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.9, mt: 1 }}>
                 {detail.reason || '暂无原因'}
@@ -208,7 +208,7 @@ export function ReviewComplaintDetailPage() {
 
             <Paper variant="outlined" sx={{ ...panelSx, p: 2.1, borderRadius: 3.5 }}>
               <Typography variant="overline" sx={{ color: tone.accent, fontWeight: 900, letterSpacing: '.14em' }}>
-                ARBITRATION
+                处理结果
               </Typography>
               <Typography sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.9, mt: 1 }}>
                 {detail.arbitrationResult || '暂未处理'}
