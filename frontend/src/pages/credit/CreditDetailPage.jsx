@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, Typography } from '@mui/material'
 import { useAuth } from '../../AuthContext.jsx'
-import { creditApi } from '../../api/index.js'
+import { creditApi, reviewApi } from '../../api/index.js'
+import { ReviewScore } from '../reviews/ReviewPage.jsx'
 import '../profile/profile.css'
 import './credit.css'
 
@@ -99,8 +100,10 @@ export function CreditDetailPage() {
   const navigate = useNavigate()
   const { currentUser } = useAuth()
   const targetUserId = Number(userId || currentUser.userId)
+  const isSelf = targetUserId === currentUser.userId
   const [summary, setSummary] = useState(null)
   const [records, setRecords] = useState([])
+  const [reviews, setReviews] = useState([])
   const [notice, setNotice] = useState(null)
   const [loading, setLoading] = useState(true)
   const [rulesOpen, setRulesOpen] = useState(false)
@@ -110,23 +113,36 @@ export function CreditDetailPage() {
 
     async function load() {
       setLoading(true)
-      const [summaryResult, recordsResult] = await Promise.allSettled([
-        creditApi.summary(targetUserId, currentUser),
-        creditApi.records(targetUserId, currentUser)
-      ])
-
-      if (cancelled) return
-
-      setSummary(summaryResult.status === 'fulfilled' ? summaryResult.value : null)
-      setRecords(recordsResult.status === 'fulfilled' ? normalizeRecords(recordsResult.value) : [])
-      const failed = [summaryResult, recordsResult].find(result => result.status === 'rejected')
-      setNotice(failed ? failed.reason?.message || '信用数据暂时不可用' : null)
+      if (isSelf) {
+        const [summaryResult, recordsResult] = await Promise.allSettled([
+          creditApi.summary(targetUserId, currentUser),
+          creditApi.records(targetUserId, currentUser)
+        ])
+        if (cancelled) return
+        setSummary(summaryResult.status === 'fulfilled' ? summaryResult.value : null)
+        setRecords(recordsResult.status === 'fulfilled' ? normalizeRecords(recordsResult.value) : [])
+        const failed = [summaryResult, recordsResult].find(r => r.status === 'rejected')
+        setNotice(failed ? failed.reason?.message || '信用数据暂时不可用' : null)
+      } else {
+        const [summaryResult, reviewsResult] = await Promise.allSettled([
+          creditApi.summary(targetUserId, currentUser),
+          reviewApi.listByUser(targetUserId, currentUser)
+        ])
+        if (cancelled) return
+        if (summaryResult.status === 'fulfilled') {
+          setSummary(summaryResult.value)
+        } else {
+          setNotice(summaryResult.reason?.message || '信用数据暂时不可用')
+        }
+        setReviews(reviewsResult.status === 'fulfilled' ? (Array.isArray(reviewsResult.value) ? reviewsResult.value : []) : [])
+        setRecords([])
+      }
       setLoading(false)
     }
 
     load()
     return () => { cancelled = true }
-  }, [targetUserId, currentUser])
+  }, [targetUserId, isSelf])
 
   const score = useMemo(
     () => formatScore(summary?.creditScore),
@@ -145,14 +161,15 @@ export function CreditDetailPage() {
   const riskRecords = formatMetric(summary?.riskRecordCount)
   const recordCount = records.length
   const hasRecords = records.length > 0
+  const hasSummary = summary != null
   const lastUpdated = summary?.lastUpdatedAt || records[0]?.createdAt || null
-  const displayScore = hasRecords ? score : '暂无'
-  const displayLevel = hasRecords ? level : '新用户'
-  const displayRecordCount = hasRecords ? recordCount : '暂无'
-  const overviewEffectiveOrders = hasRecords ? effectiveOrders : '--'
-  const overviewGoodReviewRate = hasRecords ? goodReviewRate : '--'
-  const overviewFulfillmentRate = hasRecords ? fulfillmentRate : '--'
-  const overviewRiskRecords = hasRecords ? riskRecords : '--'
+  const displayScore = hasSummary ? score : '暂无'
+  const displayLevel = hasSummary ? level : '新用户'
+  const displayRecordCount = isSelf ? (hasRecords ? recordCount : '暂无') : '不公开'
+  const overviewEffectiveOrders = hasSummary ? effectiveOrders : '--'
+  const overviewGoodReviewRate = hasSummary ? goodReviewRate : '--'
+  const overviewFulfillmentRate = hasSummary ? fulfillmentRate : '--'
+  const overviewRiskRecords = hasSummary ? riskRecords : '--'
 
   return (
     <div className="pp-main credit-detail-page">
@@ -220,6 +237,43 @@ export function CreditDetailPage() {
         </div>
       </section>
 
+      {!isSelf && (
+        <section className="panel-card credit-records-panel">
+          <div className="section-head">
+            <div>
+              <h2>历史评价</h2>
+              <p>来自订单的真实评价，反映该用户的履约表现。</p>
+            </div>
+            <div className="section-mark">{reviews.length || '暂无'}</div>
+          </div>
+          {loading ? (
+            <div className="pp-empty"><h3>加载中...</h3></div>
+          ) : reviews.length > 0 ? (
+            <Stack spacing={1.2} style={{ marginTop: 8 }}>
+              {reviews.map((r, i) => (
+                <div key={r.reviewId || i} className="credit-note credit-note--neutral" style={{ cursor: r.reviewId ? 'pointer' : 'default' }}
+                  onClick={() => r.reviewId && navigate(`/reviews/${r.reviewId}`)}>
+                  <div className="credit-note-body" style={{ width: '100%' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <span style={{ fontSize: 12, color: '#6e737b' }}>
+                        来自 {r.reviewerNickname || `用户 ${r.reviewerId}`} · {formatTime(r.createdAt)}
+                      </span>
+                      <ReviewScore value={r.rating} />
+                    </div>
+                    <Typography className="credit-note-detail" style={{ fontStyle: 'italic' }}>
+                      "{r.content || '对方没有留下文字评价'}"
+                    </Typography>
+                  </div>
+                </div>
+              ))}
+            </Stack>
+          ) : (
+            <div className="pp-empty"><h3>暂无评价</h3><p>该用户尚未收到任何评价。</p></div>
+          )}
+        </section>
+      )}
+
+      {isSelf && (
       <section className="panel-card credit-records-panel">
         <div className="section-head">
           <div>
@@ -304,6 +358,7 @@ export function CreditDetailPage() {
           </div>
         )}
       </section>
+      )}
 
       <Dialog open={rulesOpen} onClose={() => setRulesOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>信用规则说明</DialogTitle>

@@ -523,7 +523,7 @@ export function ProfilePage() {
         </div>
       </article>
       <aside className="portra-aside">
-        <div className="portra-aside-card"><div className="portra-profile-mini"><div className="portra-mini-avatar" /><div><strong>{isProvider ? '阿屿' : '林同学'}</strong><br /><span className="portra-micro">{isProvider ? '摄影师 · 已实名' : '单主 · 已实名'}</span></div></div><p className="portra-note-strip">{isProvider ? '清透日常、校园毕业和自然引导。' : '偏好清透自然的校园拍摄，最近关注毕业照和社团宣传照。'}</p></div>
+        <div className="portra-aside-card"><div className="portra-profile-mini"><div className="portra-mini-avatar" /><div><strong>{isProvider ? '阿屿' : '林同学'}</strong><br /><span className="portra-micro">{isProvider ? '摄影师 · 已实名' : '约拍方 · 已实名'}</span></div></div><p className="portra-note-strip">{isProvider ? '清透日常、校园毕业和自然引导。' : '偏好清透自然的校园拍摄，最近关注毕业照和社团宣传照。'}</p></div>
       </aside>
     </div>
   )

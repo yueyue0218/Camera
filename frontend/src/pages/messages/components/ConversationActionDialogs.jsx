@@ -133,6 +133,21 @@ export function ConversationActionDialogs({
         </DialogContent>
         <DialogActions sx={dialogActionsSx}>
           <Button color="inherit" variant="text" onClick={onClose}>关闭</Button>
+          {canResendQuote && (
+            <Button color="inherit" variant="outlined" disabled={loading || !quote} onClick={() => onResendQuote?.(quote)}>
+              重新发送报价
+            </Button>
+          )}
+          {canRejectQuote && (
+            <Button color="inherit" variant="outlined" disabled={loading || !quote} onClick={() => onRejectQuote?.(quote)}>
+              拒绝报价
+            </Button>
+          )}
+          {canConfirmQuote && (
+            <Button variant="contained" disabled={loading || !quote} onClick={() => onConfirmQuote?.(quote)}>
+              确认报价
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 

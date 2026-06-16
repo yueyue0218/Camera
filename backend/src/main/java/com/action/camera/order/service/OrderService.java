@@ -398,58 +398,35 @@ public class OrderService {
             if (lockedOrder.isEmpty()) {
                 continue;
             }
-            Order order = lockedOrder.get();
-            if (order.getStatus() != OrderStatus.PAID_PENDING_SHOOT
-                    || order.getShootStartTime() == null
-                    || order.getShootStartTime().isAfter(now)) {
-                continue;
-            }
-            ensureCanChangeStatus(OrderStatus.PAID_PENDING_SHOOT, OrderStatus.SHOOTING);
-            Order shootingOrder = applyStatusChange(
-                    order,
-                    OrderStatus.PAID_PENDING_SHOOT,
-                    OrderStatus.SHOOTING,
-                    null,
-                    SYSTEM_OPERATOR_ROLE,
-                    AUTO_SHOOTING_START_REASON
-            );
-            advancedCount++;
-            if (shootingOrder.getShootEndTime() != null && !shootingOrder.getShootEndTime().isAfter(now)) {
-                ensureCanChangeStatus(OrderStatus.SHOOTING, OrderStatus.PENDING_DELIVERY);
-                applyStatusChange(
-                        shootingOrder,
-                        OrderStatus.SHOOTING,
-                        OrderStatus.PENDING_DELIVERY,
-                        null,
-                        SYSTEM_OPERATOR_ROLE,
-                        AUTO_SHOOTING_END_REASON
-                );
-                advancedCount++;
-            }
+            advancedCount += syncTimelineStatusIfDue(lockedOrder.get(), now);
         }
         for (Order candidate : orderRepository.findByStatus(OrderStatus.SHOOTING)) {
             Optional<Order> lockedOrder = orderRepository.findByIdForUpdate(candidate.getId());
             if (lockedOrder.isEmpty()) {
                 continue;
             }
-            Order order = lockedOrder.get();
-            if (order.getStatus() != OrderStatus.SHOOTING
-                    || order.getShootEndTime() == null
-                    || order.getShootEndTime().isAfter(now)) {
-                continue;
-            }
-            ensureCanChangeStatus(OrderStatus.SHOOTING, OrderStatus.PENDING_DELIVERY);
-            applyStatusChange(
-                    order,
-                    OrderStatus.SHOOTING,
-                    OrderStatus.PENDING_DELIVERY,
-                    null,
-                    SYSTEM_OPERATOR_ROLE,
-                    AUTO_SHOOTING_END_REASON
-            );
-            advancedCount++;
+            advancedCount += syncTimelineStatusIfDue(lockedOrder.get(), now);
         }
         return advancedCount;
+    }
+
+    @Transactional
+    public Order syncTimelineStatusIfDue(Long orderId) {
+        return syncTimelineStatusIfDue(orderId, LocalDateTime.now());
+    }
+
+    @Transactional
+    public Order syncTimelineStatusIfDue(Long orderId, LocalDateTime now) {
+        if (orderId == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "orderId must not be null");
+        }
+        if (now == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "now must not be null");
+        }
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Order not found: " + orderId));
+        syncTimelineStatusIfDue(order, now);
+        return order;
     }
 
     @Transactional
@@ -487,34 +464,39 @@ public class OrderService {
         return refundedCount;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<Order> listMyOrders(Long operatorId, String role, OrderStatus status) {
         if (operatorId == null) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "operatorId must not be null");
         }
+        LocalDateTime now = LocalDateTime.now();
         if ("customer".equalsIgnoreCase(role)) {
-            return listCustomerOrders(operatorId, status);
+            return filterAndSortOrders(
+                    syncTimelineStatusesIfDue(listCustomerOrders(operatorId, null), now),
+                    status
+            );
         }
         if ("provider".equalsIgnoreCase(role)) {
-            return listProviderOrders(operatorId, status);
+            return filterAndSortOrders(
+                    syncTimelineStatusesIfDue(listProviderOrders(operatorId, null), now),
+                    status
+            );
         }
         if (role != null && !role.isBlank()) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Unsupported order role: " + role);
         }
 
         List<Order> orders = new ArrayList<>();
-        orders.addAll(listCustomerOrders(operatorId, status));
-        orders.addAll(listProviderOrders(operatorId, status));
-        orders.sort(Comparator.comparing(Order::getUpdatedAt,
-                Comparator.nullsLast(Comparator.reverseOrder())));
-        return orders;
+        orders.addAll(listCustomerOrders(operatorId, null));
+        orders.addAll(listProviderOrders(operatorId, null));
+        return filterAndSortOrders(syncTimelineStatusesIfDue(orders, now), status);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public Order getOrderForUser(Long orderId, Long operatorId) {
         Order order = getOrderOrThrow(orderId);
         ensureOrderParticipant(order, operatorId);
-        return order;
+        return syncTimelineStatusIfDueIfNeeded(order, LocalDateTime.now());
     }
 
     @Transactional(readOnly = true)
@@ -548,13 +530,13 @@ public class OrderService {
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<OrderStatusLog> listStatusLogs(Long orderId, Long operatorId) {
         Order order = getOrderForUser(orderId, operatorId);
         return orderStatusLogRepository.findByOrderIdOrderByCreatedAtAsc(order.getId());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public PaymentRecord getPaymentRecordForOrder(Long orderId, Long operatorId) {
         Order order = getOrderForUser(orderId, operatorId);
         return paymentRecordRepository.findByOrderId(order.getId())
@@ -599,6 +581,77 @@ public class OrderService {
             return orderRepository.findByProviderUserIdOrderByUpdatedAtDesc(providerUserId);
         }
         return orderRepository.findByProviderUserIdAndStatusOrderByUpdatedAtDesc(providerUserId, status);
+    }
+
+    private List<Order> syncTimelineStatusesIfDue(List<Order> orders, LocalDateTime now) {
+        return orders.stream()
+                .map(order -> syncTimelineStatusIfDueIfNeeded(order, now))
+                .toList();
+    }
+
+    private List<Order> filterAndSortOrders(List<Order> orders, OrderStatus status) {
+        List<Order> sortedOrders = new ArrayList<>(orders.stream()
+                .filter(order -> status == null || order.getStatus() == status)
+                .toList());
+        sortedOrders.sort(Comparator.comparing(Order::getUpdatedAt,
+                Comparator.nullsLast(Comparator.reverseOrder())));
+        return sortedOrders;
+    }
+
+    private Order syncTimelineStatusIfDueIfNeeded(Order order, LocalDateTime now) {
+        if (!isTimelineSyncDue(order, now)) {
+            return order;
+        }
+        return syncTimelineStatusIfDue(order.getId(), now);
+    }
+
+    private boolean isTimelineSyncDue(Order order, LocalDateTime now) {
+        if (order == null || now == null) {
+            return false;
+        }
+        if (order.getStatus() == OrderStatus.PAID_PENDING_SHOOT) {
+            return order.getShootStartTime() != null && !order.getShootStartTime().isAfter(now);
+        }
+        if (order.getStatus() == OrderStatus.SHOOTING) {
+            return order.getShootEndTime() != null && !order.getShootEndTime().isAfter(now);
+        }
+        return false;
+    }
+
+    private int syncTimelineStatusIfDue(Order order, LocalDateTime now) {
+        int advancedCount = 0;
+        if (order == null || now == null) {
+            return advancedCount;
+        }
+        if (order.getStatus() == OrderStatus.PAID_PENDING_SHOOT
+                && order.getShootStartTime() != null
+                && !order.getShootStartTime().isAfter(now)) {
+            ensureCanChangeStatus(OrderStatus.PAID_PENDING_SHOOT, OrderStatus.SHOOTING);
+            order = applyStatusChange(
+                    order,
+                    OrderStatus.PAID_PENDING_SHOOT,
+                    OrderStatus.SHOOTING,
+                    null,
+                    SYSTEM_OPERATOR_ROLE,
+                    AUTO_SHOOTING_START_REASON
+            );
+            advancedCount++;
+        }
+        if (order.getStatus() == OrderStatus.SHOOTING
+                && order.getShootEndTime() != null
+                && !order.getShootEndTime().isAfter(now)) {
+            ensureCanChangeStatus(OrderStatus.SHOOTING, OrderStatus.PENDING_DELIVERY);
+            applyStatusChange(
+                    order,
+                    OrderStatus.SHOOTING,
+                    OrderStatus.PENDING_DELIVERY,
+                    null,
+                    SYSTEM_OPERATOR_ROLE,
+                    AUTO_SHOOTING_END_REASON
+            );
+            advancedCount++;
+        }
+        return advancedCount;
     }
 
     private void ensureOrderParticipant(Order order, Long operatorId) {

@@ -109,8 +109,8 @@ class OrderControllerTest {
     void providerCanListOwnOrdersWithStatusFilter() {
         UserContext.setUserId(PROVIDER_USER_ID);
         Order order = order(OrderStatus.PAID_PENDING_SHOOT);
-        when(orderRepository.findByProviderUserIdAndStatusOrderByUpdatedAtDesc(
-                PROVIDER_USER_ID, OrderStatus.PAID_PENDING_SHOOT)).thenReturn(List.of(order));
+        when(orderRepository.findByProviderUserIdOrderByUpdatedAtDesc(PROVIDER_USER_ID))
+                .thenReturn(List.of(order));
 
         Result<List<OrderResponse>> result =
                 orderController.listMyOrders("provider", OrderStatus.PAID_PENDING_SHOOT);
@@ -558,8 +558,8 @@ class OrderControllerTest {
         order.setSettlementStatus("NOT_SETTLED");
         order.setRefundStatus("NONE");
         order.setTotalAmountCent(AMOUNT_CENT);
-        order.setShootStartTime(LocalDateTime.of(2026, 6, 1, 9, 0));
-        order.setShootEndTime(LocalDateTime.of(2026, 6, 1, 12, 0));
+        order.setShootStartTime(LocalDateTime.now().plusDays(1));
+        order.setShootEndTime(LocalDateTime.now().plusDays(1).plusHours(3));
         order.setShootLocation("南京大学鼓楼校区");
         order.setDeliveryDeadline(LocalDateTime.of(2026, 6, 8, 12, 0));
         order.setPhotoUsageScope("PERSONAL_ONLY");

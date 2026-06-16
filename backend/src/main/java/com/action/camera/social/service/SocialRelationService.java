@@ -128,7 +128,7 @@ public class SocialRelationService {
 
         long followerCount = userFollowRepository.countByFollowingUserIdAndTargetRole(userId, resolvedRole);
         long followingCount = userFollowRepository.countByFollowerIdAndTargetRole(userId, resolvedRole);
-        boolean followedByCurrentUser = userFollowRepository.existsByFollowerIdAndFollowingUserIdAndTargetRole(currentUserId, userId, resolvedRole);
+        boolean followedByCurrentUser = userFollowRepository.existsByFollowerIdAndFollowingUserId(currentUserId, userId);
         long momentCount = momentPostRepository.countByAuthorIdAndAuthorRoleAndStatus(userId, resolvedRole, MomentStatus.PUBLISHED);
 
         ProviderProfilePublicVO providerProfile = isProvider
@@ -160,7 +160,8 @@ public class SocialRelationService {
                 followingCount,
                 followedByCurrentUser,
                 momentCount,
-                providerProfile
+                providerProfile,
+                user.getCityCode()
         );
     }
 

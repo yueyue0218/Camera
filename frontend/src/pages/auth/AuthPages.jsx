@@ -169,7 +169,7 @@ function SuccessBanner({ text }) {
 
 function RoleToggle({ value, onChange }) {
   const options = [
-    { key: 'CUSTOMER', label: '单主', hint: '我想拍照' },
+    { key: 'CUSTOMER', label: '约拍方', hint: '我想拍照' },
     { key: 'PROVIDER', label: '摄影师', hint: '我来拍' }
   ]
   return (
@@ -423,22 +423,6 @@ export function LoginChoicePage() {
             <div className="op-wordmark-sub">Meet Right Now</div>
           </a>
 
-          <nav className="op-nav">
-            {[
-              { label: '大厅', id: 'op-page1' },
-              { label: '动态', id: 'op-page2' },
-              { label: '消息', id: 'op-page3' },
-              { label: '个人', id: 'op-about' },
-            ].map(({ label, id }) => (
-              <a
-                key={label}
-                className={`op-nav-item${activeSection === id ? ' active' : ''}`}
-                href={`#${id}`}
-                onClick={event => { event.preventDefault(); setActiveSection(id); scrollToId(id) }}
-              >{label}</a>
-            ))}
-          </nav>
-
           <div className="op-header-actions">
             <button type="button" className="op-avatar" title="登录" onClick={() => navigate('/login/sign-in')} />
           </div>
@@ -667,7 +651,6 @@ export function LoginInfoPage() {
       <div style={{ fontSize: 10, letterSpacing: '.22em', color: MUTED, textTransform: 'uppercase', marginTop: 5, marginBottom: 26, fontFamily: SANS }}>
         MEET RIGHT NOW
       </div>
-
       <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '.04em', marginBottom: 4, color: INK }}>欢迎回来</div>
       <div style={{ fontSize: 13, color: MUTED, marginBottom: 22, lineHeight: 1.65 }}>输入邮箱和密码，进入你的 Portra</div>
 
@@ -786,7 +769,6 @@ export function RegisterPage() {
       <div style={{ fontSize: 10, letterSpacing: '.22em', color: MUTED, textTransform: 'uppercase', marginTop: 5, marginBottom: 24, fontFamily: SANS }}>
         MEET RIGHT NOW
       </div>
-
         {/* step dots */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
           <div style={{ display: 'flex', gap: 6 }}>

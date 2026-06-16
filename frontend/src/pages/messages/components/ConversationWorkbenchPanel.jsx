@@ -4,6 +4,7 @@ import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
 import PlaceRoundedIcon from '@mui/icons-material/PlaceRounded'
+import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded'
 import { buildOrderAction, buildQuoteAction } from '../../../utils/orderNavigation.js'
 import { PortraActionLink, PortraPrimaryAction, PortraSecondaryAction, PortraWorkflowPanel } from '../../../components/portra/index.js'
@@ -25,6 +26,7 @@ export function ConversationWorkbenchPanel({
   photoAuthorizations,
   loading = false,
   onOpenOrderArchive,
+  onOpenQuoteDetail,
   onConfirmOrder,
   onOpenAction
 }) {
@@ -114,11 +116,21 @@ export function ConversationWorkbenchPanel({
               </Box>
 
               <PanelQuoteStatusPill model={latestQuoteModel} />
-              {(orderAction || quoteOrderAction) && (
-                <PortraActionLink onClick={() => onOpenOrderArchive((orderAction || quoteOrderAction).orderId)} sx={quoteOrderLinkSx}>
-                  查看订单 &gt;
-                </PortraActionLink>
-              )}
+              <Stack direction="row" spacing={0.8} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.7 }}>
+                <PortraSecondaryAction
+                  startIcon={<ReceiptLongRoundedIcon />}
+                  onClick={() => onOpenQuoteDetail?.(latestQuote)}
+                  disabled={!latestQuote || typeof onOpenQuoteDetail !== 'function'}
+                  sx={{ minHeight: 32, px: 1.3 }}
+                >
+                  查看报价详情
+                </PortraSecondaryAction>
+                {(orderAction || quoteOrderAction) && (
+                  <PortraActionLink onClick={() => onOpenOrderArchive((orderAction || quoteOrderAction).orderId)} sx={quoteOrderLinkSx}>
+                    查看订单 &gt;
+                  </PortraActionLink>
+                )}
+              </Stack>
             </Box>
           </WorkbenchSection>
         )}

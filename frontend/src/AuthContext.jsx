@@ -40,6 +40,7 @@ function saveStoredProfile(user) {
     bio: user.bio || user.description || '',
     description: user.description || user.bio || '',
     availability: user.availability || '',
+    cityCode: user.cityCode || prev.cityCode || '',
     customerNickname: user.customerNickname || user.nickname || '',
     customerBio: user.customerBio !== undefined ? user.customerBio : (user.role !== 'PROVIDER' ? (user.bio || '') : profiles[userId]?.customerBio || ''),
     providerNickname: user.providerNickname !== undefined ? user.providerNickname : profiles[userId]?.providerNickname || null,
@@ -85,6 +86,7 @@ function normalizeSession(session) {
   const userId = normalizedUserId(session, demoUser)
   const storedProfile = readUserProfiles()[String(userId)] || {}
   const availability = session.user.availability || storedProfile.availability || demoUser.availability || ''
+  const cityCode = session.user.cityCode || storedProfile.cityCode || ''
 
   // Dual-identity: customer fields come from users table, provider fields from provider_profiles
   const customerNickname = session.user.customerNickname || storedProfile.customerNickname
@@ -114,6 +116,7 @@ function normalizeSession(session) {
       userId,
       id: userId,
       role,
+      cityCode,
       label: role === 'PROVIDER' ? '服务方' : '需求方',
       nickname,
       avatarData: (storedProfile.avatarData && !storedProfile.avatarData.startsWith('blob:') ? storedProfile.avatarData : null)
@@ -186,14 +189,15 @@ export function AuthProvider({ children }) {
 
   function updateProfile(partial) {
     if (!session) return null
-    // Route nickname/bio updates to the correct role-specific field
+    // Route nickname/bio updates to the correct role-specific field,
+    // but only when the caller didn't already supply the role-specific field explicitly.
     const roleFields = {}
     if (partial.role === 'PROVIDER') {
       if (partial.nickname != null) roleFields.providerNickname = partial.nickname
-      if (partial.bio != null) roleFields.providerBio = partial.bio
+      if (partial.bio != null && !('providerBio' in partial)) roleFields.providerBio = partial.bio
     } else if (partial.role === 'CUSTOMER') {
       if (partial.nickname != null) roleFields.customerNickname = partial.nickname
-      if (partial.bio != null) roleFields.customerBio = partial.bio
+      if (partial.bio != null && !('customerBio' in partial)) roleFields.customerBio = partial.bio
     }
     const nextUser = { ...session.user, ...partial, ...roleFields }
     saveStoredProfile(nextUser)

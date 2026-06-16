@@ -854,8 +854,8 @@ body[data-role="photographer"] .aside-card.photographer-only {
 }
 
 .showcase-card .provider-avatar {
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   border-width: 2px;
 }
 
@@ -877,6 +877,7 @@ body[data-role="photographer"] .aside-card.photographer-only {
 .showcase-card .provider-name {
   font-size: 12px;
   line-height: 1.1;
+  color: #4a4f58;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -902,7 +903,7 @@ body[data-role="photographer"] .aside-card.photographer-only {
   margin: 5px 0 0;
   font-weight: 780;
   letter-spacing: .04em;
-  color: #171a20;
+  color: #30343b;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

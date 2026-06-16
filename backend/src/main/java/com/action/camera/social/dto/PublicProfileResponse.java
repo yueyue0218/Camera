@@ -14,10 +14,11 @@ public class PublicProfileResponse {
     private final boolean followedByCurrentUser;
     private final long momentCount;
     private final ProviderProfilePublicVO providerProfile;
+    private final String cityCode;
 
     public PublicProfileResponse(Long userId, String nickname, Long avatarFileId, String bio, String currentRole,
                                  long followerCount, long followingCount, boolean followedByCurrentUser,
-                                 long momentCount, ProviderProfilePublicVO providerProfile) {
+                                 long momentCount, ProviderProfilePublicVO providerProfile, String cityCode) {
         this.userId = userId;
         this.nickname = nickname;
         this.avatarFileId = avatarFileId;
@@ -28,6 +29,7 @@ public class PublicProfileResponse {
         this.followedByCurrentUser = followedByCurrentUser;
         this.momentCount = momentCount;
         this.providerProfile = providerProfile;
+        this.cityCode = cityCode;
     }
 
     public Long getUserId() {
@@ -68,5 +70,9 @@ public class PublicProfileResponse {
 
     public ProviderProfilePublicVO getProviderProfile() {
         return providerProfile;
+    }
+
+    public String getCityCode() {
+        return cityCode;
     }
 }

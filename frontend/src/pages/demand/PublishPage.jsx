@@ -142,7 +142,7 @@ export function PublishPage() {
   if (currentUser.role !== 'CUSTOMER') {
     return (
       <main className="portra-page">
-        <Alert severity="info">请切换为单主身份后{editMode ? '编辑' : '发布'}需求。</Alert>
+        <Alert severity="info">请切换为约拍方身份后{editMode ? '编辑' : '发布'}需求。</Alert>
       </main>
     )
   }

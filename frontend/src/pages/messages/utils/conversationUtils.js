@@ -63,9 +63,13 @@ export function saveConversationRecord(conversation, meta = {}) {
     demandId: meta.demandId ?? previous?.demandId ?? conversation.sourceId,
     scene: meta.scene || previous?.scene || '约拍需求沟通',
     location: meta.location || previous?.location || '',
-    lastMessage: meta.lastMessage || previous?.lastMessage || '点击进入对话',
+    lastMessage: meta.lastMessage || conversation.lastMessage || previous?.lastMessage || '点击进入对话',
+    latestMessage: meta.latestMessage || conversation.latestMessage || previous?.latestMessage || null,
+    latestMessageSenderId: meta.latestMessageSenderId ?? conversation.latestMessageSenderId ?? previous?.latestMessageSenderId ?? null,
+    latestQuotes: meta.latestQuotes || conversation.latestQuotes || previous?.latestQuotes || [],
+    lastMessageObject: meta.lastMessageObject || conversation.lastMessageObject || previous?.lastMessageObject || null,
     interfaceNote: meta.interfaceNote || previous?.interfaceNote || '',
-    updatedAt: conversation.lastMessageTime || conversation.updatedAt || conversation.createdAt || now
+    updatedAt: meta.updatedAt || conversation.lastMessageTime || conversation.updatedAt || conversation.createdAt || now
   }
   const nextRecords = records.filter(item => String(item.conversationId) !== conversationId)
   nextRecords.unshift(record)
@@ -105,10 +109,25 @@ export function mergeConversationRecords(remoteConversations, currentUser, activ
     .sort((left, right) => new Date(right.updatedAt || 0) - new Date(left.updatedAt || 0)), currentUser, activeRole)
 }
 
-export function updateConversationLastMessage(conversationId, content) {
+export function updateConversationLastMessage(conversationId, content, meta = {}) {
   const record = findConversationRecord(conversationId)
   if (!record) return
-  saveConversationRecord(record, { lastMessage: content })
+  const now = meta.createdAt || new Date().toISOString()
+  const latestMessage = meta.latestMessage || {
+    messageId: meta.messageId || `local-preview-${conversationId}-${Date.now()}`,
+    conversationId,
+    senderId: meta.senderId ?? record.latestMessageSenderId ?? null,
+    messageType: meta.messageType || 'TEXT',
+    content,
+    createdAt: now
+  }
+  saveConversationRecord(record, {
+    lastMessage: content,
+    latestMessage,
+    lastMessageObject: latestMessage,
+    latestMessageSenderId: latestMessage.senderId,
+    updatedAt: now
+  })
 }
 
 export function buildConversationFallback(conversationId) {

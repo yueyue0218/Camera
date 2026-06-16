@@ -4,6 +4,7 @@ import { useAuth } from '../../AuthContext.jsx'
 import {
   creditApi, demandApi, fileApi, momentApi, orderApi, reviewApi, userApi, conversationApi
 } from '../../api.js'
+import { servicePackageApi } from '../../api/servicePackageApi.js'
 import {
   formatShortTime, formatTime,
   getLocalReviewsByTarget, getOrderSnapshotsForUser,
@@ -81,15 +82,17 @@ export function ProfilePage() {
   const [editOpen, setEditOpen] = useState(false)
 
   const [moments, setMoments] = useState([])
-  const [invitations, setInvitations] = useState([])
-  const [providerInfoMap, setProviderInfoMap] = useState({})
+  const [myDemands, setMyDemands] = useState([])
+  const [myInterests, setMyInterests] = useState([])
+  const [myShowcases, setMyShowcases] = useState([])
   const [profileOrders, setProfileOrders] = useState([])
   const [receivedReviews, setReceivedReviews] = useState([])
   const [creditSummary, setCreditSummary] = useState(null)
   const [portfolioItems, setPortfolioItems] = useState([])
-  const [actioningId, setActioningId] = useState(null)
   const [notice, setNotice] = useState(null)
   const [myFollowers, setMyFollowers] = useState([])
+  const [myFollowing, setMyFollowing] = useState([])
+  const [followListOpen, setFollowListOpen] = useState(null) // null | 'following' | 'followers'
 
   const dashboardRowRef = useRef(null)
   const frameNavRef = useRef(null)
@@ -104,10 +107,13 @@ export function ProfilePage() {
 
   // Sync profile form when currentUser changes
   useEffect(() => {
+    const roleBio = isProvider
+      ? (currentUser.providerBio || currentUser.bio || currentUser.description || '')
+      : (currentUser.customerBio || currentUser.bio || currentUser.description || '')
     setProfileForm({
       nickname: currentUser.nickname || currentUser.label || '',
       avatarData: currentUser.avatarData || '',
-      bio: currentUser.bio || currentUser.description || '',
+      bio: roleBio,
       gender: currentUser.gender || '',
       genderVisible: currentUser.genderVisible ?? true,
       birthday: currentUser.birthday || '',
@@ -115,9 +121,11 @@ export function ProfilePage() {
       locationDisplay: currentUser.locationDisplay || '',
       locationVisible: currentUser.locationVisible ?? false,
     })
-  }, [currentUser.userId, currentUser.nickname, currentUser.avatarData, currentUser.bio,
+  }, [currentUser.userId, currentUser.role, currentUser.nickname, currentUser.avatarData,
+      currentUser.bio, currentUser.providerBio, currentUser.customerBio,
       currentUser.gender, currentUser.birthday, currentUser.genderVisible,
-      currentUser.birthdayVisible, currentUser.locationDisplay, currentUser.locationVisible])
+      currentUser.birthdayVisible, currentUser.locationDisplay, currentUser.locationVisible,
+      isProvider])
 
   // syncBackCardHeight
   const syncHeight = () => {
@@ -155,6 +163,12 @@ export function ProfilePage() {
   useEffect(() => { loadProfileData() }, [currentUser.userId, currentUser.role])
 
   useEffect(() => {
+    const IP_CACHE_KEY = `camera-ip-${currentUser.userId}`
+    const cached = (() => { try { return JSON.parse(localStorage.getItem(IP_CACHE_KEY)) } catch { return null } })()
+    if (cached?.location && Date.now() - (cached.ts || 0) < 24 * 3600 * 1000) {
+      if (cached.location !== currentUser.cityCode) updateProfile({ cityCode: cached.location })
+      return
+    }
     async function detectIpLocation() {
       try {
         const amapKey = import.meta.env.VITE_AMAP_KEY
@@ -175,7 +189,9 @@ export function ProfilePage() {
             location = data.regionName.replace(/(省|市|自治区|特别行政区)$/, '').trim()
           }
         }
-        if (!location || location === currentUser.cityCode) return
+        if (!location) return
+        try { localStorage.setItem(IP_CACHE_KEY, JSON.stringify({ location, ts: Date.now() })) } catch { /**/ }
+        if (location === currentUser.cityCode) return
         updateProfile({ cityCode: location })
         await userApi.updateMe({ cityCode: location }, currentUser)
       } catch { /* ignore */ }
@@ -195,7 +211,11 @@ export function ProfilePage() {
     if (myProfileRes.status === 'fulfilled' && myProfileRes.value) {
       const role = myProfileRes.value.currentRole || myProfileRes.value.role || currentUser.role
       const nickname = myProfileRes.value.nickname || currentUser.nickname
-      const bio = myProfileRes.value.bio || currentUser.bio || currentUser.description || ''
+      const apiGenericBio = myProfileRes.value.bio || ''
+      // Prefer role-specific bio from API; fall back to locally stored role bio; last resort: generic bio
+      const resolvedProviderBio = myProfileRes.value.providerBio ?? currentUser.providerBio ?? (role === 'PROVIDER' ? apiGenericBio : '')
+      const resolvedCustomerBio = myProfileRes.value.customerBio ?? currentUser.customerBio ?? (role === 'CUSTOMER' ? apiGenericBio : '')
+      const bio = role === 'PROVIDER' ? resolvedProviderBio : resolvedCustomerBio
       const avatarFileId = role === 'PROVIDER'
         ? (myProfileRes.value.providerAvatarFileId || myProfileRes.value.avatarFileId)
         : (myProfileRes.value.customerAvatarFileId || myProfileRes.value.avatarFileId)
@@ -219,9 +239,9 @@ export function ProfilePage() {
         description: bio,
         creditScore: myProfileRes.value.creditScore ?? null,
         customerNickname: myProfileRes.value.customerNickname ?? (role === 'CUSTOMER' ? nickname : currentUser.customerNickname),
-        customerBio: myProfileRes.value.customerBio ?? (role === 'CUSTOMER' ? bio : currentUser.customerBio),
+        customerBio: resolvedCustomerBio,
         providerNickname: myProfileRes.value.providerNickname ?? (role === 'PROVIDER' ? nickname : currentUser.providerNickname),
-        providerBio: myProfileRes.value.providerBio ?? (role === 'PROVIDER' ? bio : currentUser.providerBio),
+        providerBio: resolvedProviderBio,
         gender: myProfileRes.value.gender ?? currentUser.gender ?? '',
         genderVisible: myProfileRes.value.genderVisible ?? currentUser.genderVisible ?? true,
         birthday: myProfileRes.value.birthday ?? currentUser.birthday ?? '',
@@ -240,24 +260,61 @@ export function ProfilePage() {
     setProfileOrders(orders)
     saveOrderSnapshots(orders)
     setPortfolioItems(readPortfolioItems(currentUser.userId))
-    setMyFollowers(followersRes.status === 'fulfilled' ? followersRes.value : [])
+    const rawFollowers = followersRes.status === 'fulfilled' ? followersRes.value : []
+    try {
+      const enrichedFollowers = await Promise.all(rawFollowers.map(async f => {
+        const uid = f.userId ?? f.authorId
+        if (f.avatarData || f.avatarUrl) return f
+        try {
+          const brief = await userApi.brief(uid, currentUser)
+          let avatarData = brief?.avatarData || brief?.avatarUrl || ''
+          if (!avatarData && brief?.avatarFileId) {
+            try { avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser) } catch { /**/ }
+          }
+          return { ...f, nickname: f.nickname || brief?.nickname, bio: f.bio || brief?.bio || brief?.description || '', avatarData, role: f.role || brief?.currentRole || brief?.role }
+        } catch { return f }
+      }))
+      setMyFollowers(enrichedFollowers)
+    } catch { setMyFollowers(rawFollowers) }
+    try {
+      const [followingCustomer, followingProvider] = await Promise.all([
+        userApi.following(currentUser.userId, currentUser, 'CUSTOMER').catch(() => []),
+        userApi.following(currentUser.userId, currentUser, 'PROVIDER').catch(() => [])
+      ])
+      const combined = [
+        ...(followingCustomer || []).map(f => ({ ...f, role: f.role || 'CUSTOMER' })),
+        ...(followingProvider || []).map(f => ({ ...f, role: f.role || 'PROVIDER' })),
+      ]
+      // Enrich with avatar data
+      const enriched = await Promise.all(combined.map(async f => {
+        const uid = f.userId ?? f.authorId
+        if (f.avatarData || f.avatarUrl) return f
+        try {
+          const brief = await userApi.brief(uid, currentUser)
+          let avatarData = brief?.avatarData || brief?.avatarUrl || ''
+          if (!avatarData && brief?.avatarFileId) {
+            try { avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser) } catch { /**/ }
+          }
+          return { ...f, nickname: f.nickname || brief?.nickname, avatarData }
+        } catch { return f }
+      }))
+      setMyFollowing(enriched)
+    } catch { setMyFollowing([]) }
     if (!isProvider) {
       try {
-        const invs = await demandApi.responsesReceived(currentUser)
-        setInvitations(invs)
-        const uniqueProviderIds = [...new Set(invs.map(i => i.providerId).filter(Boolean))]
-        const infoEntries = await Promise.all(uniqueProviderIds.map(async pid => {
-          try {
-            const brief = await userApi.brief(pid, currentUser)
-            let avatarData = ''
-            if (brief?.avatarFileId) {
-              try { avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser) } catch { /**/ }
-            }
-            return [pid, { nickname: brief?.nickname || `摄影师${pid}`, avatarData }]
-          } catch { return [pid, { nickname: `摄影师${pid}`, avatarData: '' }] }
-        }))
-        setProviderInfoMap(Object.fromEntries(infoEntries))
-      } catch { setInvitations([]) }
+        const interestsPage = await servicePackageApi.myInterests({ page: 1, size: 50 }, currentUser).catch(() => null)
+        setMyInterests(interestsPage?.records || interestsPage?.content || (Array.isArray(interestsPage) ? interestsPage : []))
+      } catch { setMyInterests([]) }
+      try {
+        const demandsRes = await demandApi.myDemands(currentUser).catch(() => null)
+        setMyDemands(Array.isArray(demandsRes) ? demandsRes : (demandsRes?.records || demandsRes?.content || []))
+      } catch { setMyDemands([]) }
+    } else {
+      try {
+        const showcasesRes = await servicePackageApi.myHistory(currentUser).catch(() => null)
+        const all = Array.isArray(showcasesRes) ? showcasesRes : (showcasesRes?.records || showcasesRes?.content || [])
+        setMyShowcases(all.filter(s => s.status === 'ONLINE'))
+      } catch { setMyShowcases([]) }
     }
   }
 
@@ -297,6 +354,7 @@ export function ProfilePage() {
       await userApi.updateMe({
         nickname: next.nickname,
         bio: next.bio,
+        ...(isProvider ? { providerBio: next.bio } : { customerBio: next.bio }),
         role: currentUser.role,
         avatarFileId,
         gender: next.gender,
@@ -310,9 +368,10 @@ export function ProfilePage() {
       setNotice({ type: 'err', text: err.message || 'Profile save failed' })
       return false
     }
-    saveUserProfile(currentUser.userId, next)
+    const roleSpecificBio = isProvider ? { providerBio: next.bio } : { customerBio: next.bio }
+    saveUserProfile(currentUser.userId, { ...next, ...roleSpecificBio })
     setAvatarFile(null)
-    updateProfile({ ...next, avatarFileId })
+    updateProfile({ ...next, ...roleSpecificBio, avatarFileId })
     setNotice({ type: 'ok', text: '个人资料已更新' })
     return true
   }
@@ -321,7 +380,7 @@ export function ProfilePage() {
     try {
       await userApi.switchRole(newRole, currentUser)
       switchRole(newRole)
-      setNotice({ type: 'ok', text: `已切换到${newRole === 'PROVIDER' ? '摄影师' : '单主'}账号` })
+      setNotice({ type: 'ok', text: `已切换到${newRole === 'PROVIDER' ? '摄影师' : '约拍方'}账号` })
     } catch (err) {
       setNotice({ type: 'err', text: err.message || '切换身份失败' })
     }
@@ -338,45 +397,25 @@ export function ProfilePage() {
     }
   }
 
-  async function acceptInvitation(inv) {
-    setActioningId(inv.responseId)
-    try {
-      const accepted = await demandApi.accept(inv.demandId, inv.responseId, currentUser)
-      saveConversationRecord(
-        { conversationId: accepted.conversationId },
-        { customerId: accepted.customerId, providerId: accepted.providerId, demandId: accepted.demandId }
-      )
-      window.location.href = `/messages/${accepted.conversationId}`
-    } catch (err) { setNotice({ type: 'err', text: err.message }) }
-    finally { setActioningId(null) }
-  }
-
-  async function rejectInvitation(inv) {
-    setActioningId(inv.responseId)
-    try { await demandApi.reject(inv.demandId, inv.responseId, currentUser); await loadProfileData() }
-    catch (err) { setNotice({ type: 'err', text: err.message }) }
-    finally { setActioningId(null) }
-  }
-
   const myMoments = useMemo(
     () => moments.filter(m => Number(m.authorId) === currentUser.userId && m.authorRole === currentUser.role),
     [moments, currentUser.userId, currentUser.role]
   )
   const favoriteMoments = useMemo(() => moments.filter(m => m.favoritedByCurrentUser), [moments])
-  const follows = readFollows().filter(f => Number(f.authorId) !== currentUser.userId)
-  const savedPhotos = readSavedPhotos()
-  const mutualFollowIds = useMemo(
-    () => new Set(myFollowers.filter(f => f.followedByCurrentUser).map(f => Number(f.userId))),
-    [myFollowers]
+  const likedMoments = useMemo(() => moments.filter(m => m.likedByCurrentUser), [moments])
+  const totalLikesAndFavorites = useMemo(
+    () => myMoments.reduce((sum, m) => sum + (m.likeCount || 0) + (m.favoriteCount || 0), 0),
+    [myMoments]
   )
-
+  const follows = myFollowing.map(f => ({ ...f, authorId: f.userId ?? f.authorId })).filter(f => Number(f.authorId) !== currentUser.userId)
+  const savedPhotos = readSavedPhotos()
   const TERMINAL_STATUSES = ['COMPLETED','REVIEWED','CANCELLED','REFUNDED','APPEALING']
   const historicalOrders = profileOrders.filter(o => ['COMPLETED','REVIEWED'].includes(o.status)).length
   const ongoingOrders = profileOrders.filter(o => !TERMINAL_STATUSES.includes(o.status)).length
-  const pendingInvitations = invitations.filter(i => (i.status || 'PENDING_CUSTOMER_ACCEPT') === 'PENDING_CUSTOMER_ACCEPT').length
+  const openDemandsCount = myDemands.filter(d => d.status === 'OPEN' || !d.status).length
   const creditScore = creditSummary?.creditScore ?? null
   const billableOrders = profileOrders.filter(o => o.status !== 'REFUNDED').length
-  const completionRate = billableOrders > 0 ? Math.round((historicalOrders / billableOrders) * 100) : 100
+  const completionRate = billableOrders > 0 ? Math.round((historicalOrders / billableOrders) * 100) : null
   const genderText = currentUser.gender === 'MALE' ? '男' : currentUser.gender === 'FEMALE' ? '女' : '保密'
   const displayName = profileForm.nickname || currentUser.label || `用户${currentUser.userId}`
   const schoolPin = currentUser.school || 'Portra'
@@ -421,11 +460,11 @@ export function ProfilePage() {
 
   const tabs = [
     { id: 'photos', labelC: '我的照片', labelP: '我的作品', num: '01' },
-    { id: 'intent', labelC: '我的意向', labelP: '橱窗管理', num: '02' },
-    { id: 'orders', label: '我的订单', num: '03' },
-    { id: 'reviews', label: '历史评价', num: '04' },
-    { id: 'following', label: '我的关注', num: '05' },
-    { id: 'collections', label: '我的收藏', num: '06' },
+    ...(!isProvider ? [{ id: 'demands', label: '我的需求', num: '02' }] : []),
+    { id: 'intent', labelC: '我的意向', labelP: '橱窗管理', num: isProvider ? '02' : '03' },
+    { id: 'orders', label: '我的订单', num: isProvider ? '03' : '04' },
+    { id: 'likes', label: '我的点赞', num: isProvider ? '04' : '05' },
+    { id: 'collections', label: '我的收藏', num: isProvider ? '05' : '06' },
   ]
 
   return (
@@ -459,27 +498,40 @@ export function ProfilePage() {
           <div className="ticket-kicker">Portra Profile Ticket</div>
           <div className="hero-name-row">
             <h1 className="hero-name">{displayName}</h1>
-            <span className="role-badge">{isProvider ? '摄影师' : '单主'}</span>
+            <span className="role-badge">{isProvider ? '摄影师' : '约拍方'}</span>
           </div>
           <p className="profile-uid">UID：{currentUser.userId} · Portra ID</p>
           <div className="profile-meta-line">
             <span>IP属地：{currentUser.cityCode || '未知'}</span>
           </div>
-          {((currentUser.genderVisible && currentUser.gender) || (currentUser.birthdayVisible && currentUser.birthday)) && (
-            <div className="profile-tag-row">
-              <span className="profile-tag">
-                {currentUser.genderVisible && currentUser.gender === 'FEMALE' && '♀ '}
-                {currentUser.genderVisible && currentUser.gender === 'MALE' && '♂ '}
-                {currentUser.birthdayVisible && currentUser.birthday ? `${calcAge(currentUser.birthday)}岁` : ''}
-              </span>
-            </div>
-          )}
-          {currentUser.locationVisible && currentUser.locationDisplay && (
-            <div className="profile-tag-row">
-              <span className="profile-tag">📍 {currentUser.locationDisplay}</span>
-            </div>
-          )}
+          {(() => {
+            const chips = []
+            if (currentUser.genderVisible && currentUser.gender) {
+              const sym = currentUser.gender === 'FEMALE' ? '♀' : '♂'
+              const age = currentUser.birthdayVisible && currentUser.birthday ? ` ${calcAge(currentUser.birthday)}岁` : ''
+              chips.push(sym + age)
+            } else if (currentUser.birthdayVisible && currentUser.birthday) {
+              chips.push(`${calcAge(currentUser.birthday)}岁`)
+            }
+            if (currentUser.locationVisible && currentUser.locationDisplay) chips.push(`📍 ${currentUser.locationDisplay}`)
+            return chips.length ? (
+              <div className="profile-tag-row">
+                {chips.map((c, i) => <span key={i} className="profile-tag">{c}</span>)}
+              </div>
+            ) : null
+          })()}
           <p className="profile-signature">{profileForm.bio || '这个人还没有写简介。'}</p>
+          <div className="social-stats-row">
+            <button className="social-stat-btn" type="button" onClick={() => setFollowListOpen('following')}>
+              <b>{follows.length}</b><span>关注</span>
+            </button>
+            <button className="social-stat-btn" type="button" onClick={() => setFollowListOpen('followers')}>
+              <b>{myFollowers.length}</b><span>粉丝</span>
+            </button>
+            <div className="social-stat">
+              <b>{totalLikesAndFavorites}</b><span>获赞与收藏</span>
+            </div>
+          </div>
         </div>
 
         <aside className="hero-side">
@@ -489,7 +541,7 @@ export function ProfilePage() {
           </div>
           <div className="metric-grid">
             <button className="metric metric-button" type="button" onClick={() => navigate('/profile/credit')}><b>{formatCreditScore(creditScore)}</b><span>信用评分</span></button>
-            <div className="metric"><b>{completionRate}%</b><span>完成率</span></div>
+            <div className="metric"><b>{completionRate !== null ? `${completionRate}%` : '暂无'}</b><span>完成率</span></div>
             <div className="metric"><b>{historicalOrders}</b><span>历史约拍</span></div>
             <div className="metric"><b>{ongoingOrders}</b><span>进行中</span></div>
           </div>
@@ -497,20 +549,18 @@ export function ProfilePage() {
             <button className="primary-btn" onClick={() => setEditOpen(true)}>编辑资料</button>
             {isProvider
               ? <button className="secondary-btn" onClick={() => navigate('/publish/service-package')}>发布新橱窗</button>
-              : <button className="secondary-btn" onClick={() => navigate('/feed?view=mine')}>管理我的动态</button>
+              : <button className="secondary-btn" onClick={() => navigate('/publish')}>发布新需求</button>
             }
+            <button className="secondary-btn" onClick={() => navigate('/feed?compose=true')}>{isProvider ? '发布新作品' : '发布新动态'}</button>
             {isProvider ? (
               <button className="secondary-btn" onClick={() => handleSwitchRole('CUSTOMER')}>
-                🎯 切换到我的单主账号
+                🎯 切换到我的约拍方账号
               </button>
             ) : (
               <>
                 <button className="secondary-btn" onClick={() => handleSwitchRole('PROVIDER')}>
                   📷 切换到我的摄影师账号
                 </button>
-                <p style={{fontSize:11, color:'#8a8d92', letterSpacing:'.1em', margin:'6px 0 0', textAlign:'center'}}>
-                  切换后昵称、头像和动态将独立展示
-                </p>
               </>
             )}
           </div>
@@ -577,6 +627,45 @@ export function ProfilePage() {
               </div>
             </section>
 
+            {/* DEMANDS — customer only */}
+            {!isProvider && (
+              <section className={`panel-card tab-panel${activeTab === 'demands' ? ' active' : ''}`}>
+                <div className="section-head">
+                  <div>
+                    <h2>我的需求</h2>
+                    <p>我发布过的约拍需求，点击详情可查看谁响应了你。</p>
+                  </div>
+                  <div className="section-mark">02</div>
+                </div>
+                {myDemands.length ? (
+                  <div className="ticket-grid">
+                    {myDemands.slice(0, 6).map(d => {
+                      const budget = d.budgetMinCent && d.budgetMaxCent
+                        ? `¥${Math.round(d.budgetMinCent/100)}–¥${Math.round(d.budgetMaxCent/100)}`
+                        : d.budgetMinCent ? `¥${Math.round(d.budgetMinCent/100)} 起` : '预算面议'
+                      return (
+                        <article key={d.demandId} className="mini-ticket" onClick={() => navigate(`/demands/${d.demandId}`)}>
+                          <span className="price">{budget}</span>
+                          <h3>{d.title || d.scene || '未命名需求'}</h3>
+                          <p>{d.description || d.serviceTypes || '点击查看需求详情'}</p>
+                          <div className="ticket-meta">
+                            <span className="tag blue">查看详情</span>
+                            {d.responseCount > 0 && <span className="tag">{d.responseCount} 人响应</span>}
+                          </div>
+                        </article>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="pp-empty">
+                    <h3>还没有发布需求</h3>
+                    <p>发布约拍需求，等待摄影师响应。</p>
+                    <button className="primary-btn" style={{marginTop:14}} onClick={() => navigate('/publish')}>发布新需求</button>
+                  </div>
+                )}
+              </section>
+            )}
+
             {/* INTENT */}
             <section className={`panel-card tab-panel${activeTab === 'intent' ? ' active' : ''}`}>
               <div className="section-head">
@@ -584,7 +673,7 @@ export function ProfilePage() {
                   <h2>{isProvider ? '橱窗管理' : '我的意向'}</h2>
                   <p>{isProvider ? '管理正在展示的约拍服务，保持时间、价格和风格清晰。' : '意向只是收藏感兴趣的橱窗，不自动下单、不锁定时间。'}</p>
                 </div>
-                <div className="section-mark">02</div>
+                <div className="section-mark">{isProvider ? '02' : '03'}</div>
               </div>
               {isProvider ? (
                 <div className="ticket-grid">
@@ -594,57 +683,39 @@ export function ProfilePage() {
                     <p>创建约拍服务包，设定价格、风格和档期。</p>
                     <div className="ticket-meta"><span className="tag blue">立即创建</span></div>
                   </article>
-                  <article className="mini-ticket" onClick={() => navigate('/hall?tab=showcases')}>
-                    <span className="price">→</span>
-                    <h3>查看我的橱窗</h3>
-                    <p>前往大厅查看已发布的服务包。</p>
-                    <div className="ticket-meta"><span className="tag">前往大厅</span></div>
-                  </article>
-                </div>
-              ) : invitations.length ? (
-                <div className="order-list">
-                  {invitations.map(inv => {
-                    const status = inv.status || 'PENDING_CUSTOMER_ACCEPT'
-                    const isPending = status === 'PENDING_CUSTOMER_ACCEPT'
-                    const busy = actioningId === inv.responseId
-                    return (
-                      <div key={inv.responseId} className="order-slip" style={{cursor:'default'}}>
-                        <div
-                          style={{width:40,height:40,borderRadius:'50%',overflow:'hidden',flexShrink:0,cursor:'pointer',border:'2px solid var(--line)'}}
-                          onClick={() => navigate(`/users/${inv.providerId}`)}
-                          title="查看摄影师主页"
-                        >
-                          {providerInfoMap[inv.providerId]?.avatarData
-                            ? <img src={providerInfoMap[inv.providerId].avatarData} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} />
-                            : <div style={{width:'100%',height:'100%',background:'var(--line)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,color:'var(--ink-sub)'}}>P</div>
-                          }
-                        </div>
-                        <div>
-                          <h4>需求 #{inv.demandId}</h4>
-                          <p>
-                            <span
-                              style={{cursor:'pointer',textDecoration:'underline',textDecorationColor:'var(--line)'}}
-                              onClick={() => navigate(`/users/${inv.providerId}`)}
-                            >
-                              {providerInfoMap[inv.providerId]?.nickname || `摄影师${inv.providerId}`}
-                            </span>
-                            {' · '}{formatShortTime(inv.responseTime)}
-                          </p>
-                        </div>
-                        {isPending ? (
-                          <div style={{display:'flex',gap:6}}>
-                            <button className="primary-btn" style={{height:34,fontSize:12,padding:'0 12px'}} onClick={() => acceptInvitation(inv)} disabled={busy}>接受</button>
-                            <button className="secondary-btn" style={{height:34,fontSize:12,padding:'0 10px'}} onClick={() => rejectInvitation(inv)} disabled={busy}>婉拒</button>
-                          </div>
-                        ) : (
-                          <span className={`status ${status === 'ACCEPTED' ? '' : 'orange'}`}>{status === 'ACCEPTED' ? '已接受' : status === 'REJECTED' ? '已婉拒' : status}</span>
-                        )}
-                      </div>
-                    )
-                  })}
+                  {myShowcases.length ? myShowcases.slice(0, 3).map(s => (
+                    <article key={s.serviceId} className="mini-ticket" onClick={() => navigate(`/service-packages/${s.serviceId}`)}>
+                      <span className="price">{s.priceRange || '价格面议'}</span>
+                      <h3>{s.title || '橱窗'}</h3>
+                      <p>{s.scene || s.timeDescription || '查看橱窗详情'}</p>
+                      <div className="ticket-meta"><span className="tag blue">上线中</span></div>
+                    </article>
+                  )) : (
+                    <article className="mini-ticket" style={{ cursor: 'default', opacity: 0.6 }}>
+                      <span className="price">—</span>
+                      <h3>暂无上线橱窗</h3>
+                      <p>发布后将在这里显示有效期内的服务包。</p>
+                      <div className="ticket-meta"><span className="tag">待发布</span></div>
+                    </article>
+                  )}
                 </div>
               ) : (
-                <div className="pp-empty"><h3>暂无邀请</h3><p>当摄影师对你的需求发起邀请后会在这里显示。</p></div>
+                <>
+                  {myInterests.length ? (
+                    <div className="ticket-grid">
+                      {myInterests.slice(0, 4).map(item => (
+                        <article key={item.serviceId} className="mini-ticket" onClick={() => navigate(`/service-packages/${item.serviceId}`)}>
+                          <span className="price">{item.priceRange || '价格面议'}</span>
+                          <h3>{item.title || '意向橱窗'}</h3>
+                          <p>{item.description || item.serviceArea || '查看橱窗详情'}</p>
+                          <div className="ticket-meta"><span className="tag blue">查看橱窗</span></div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="pp-empty"><h3>还没有意向橱窗</h3><p>在大厅浏览橱窗，点击「加入意向」收藏感兴趣的摄影师。</p></div>
+                  )}
+                </>
               )}
             </section>
 
@@ -652,7 +723,7 @@ export function ProfilePage() {
             <section className={`panel-card tab-panel${activeTab === 'orders' ? ' active' : ''}`}>
               <div className="section-head">
                 <div><h2>我的订单</h2><p>订单像票根一样被保存，每一步状态都能回到会话。</p></div>
-                <div className="section-mark">03</div>
+                <div className="section-mark">{isProvider ? '03' : '04'}</div>
               </div>
               {profileOrders.length ? (
                 <div className="order-list">
@@ -672,59 +743,25 @@ export function ProfilePage() {
               )}
             </section>
 
-            {/* REVIEWS */}
-            <section className={`panel-card tab-panel${activeTab === 'reviews' ? ' active' : ''}`}>
+            {/* LIKES */}
+            <section className={`panel-card tab-panel${activeTab === 'likes' ? ' active' : ''}`}>
               <div className="section-head">
-                <div><h2>历史评价</h2><p>用评价建立信任，但不要把页面做成冰冷的信用后台。</p></div>
+                <div><h2>我的点赞</h2><p>点过赞的动态都在这里，随时回顾曾经喜欢的瞬间。</p></div>
                 <div className="section-mark">04</div>
               </div>
-              {receivedReviews.length ? receivedReviews.slice(0, 4).map(r => (
-                <div
-                  key={r.reviewId || `${r.orderId}-${r.direction}`}
-                  className="review-card"
-                  role="button"
-                  tabIndex={0}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => openReviewCard(r)}
-                  onKeyDown={event => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      openReviewCard(r)
-                    }
-                  }}
-                >
-                  <blockquote>"{r.content || '对方没有留下文字评价'}"</blockquote>
-                  <footer>来自 用户 {r.reviewerId} · ★{Number(r.rating||0).toFixed(1)} · {formatShortTime(r.createdAt)}</footer>
-                </div>
-              )) : (
-                <div className="pp-empty"><h3>暂无评价</h3><p>完成约拍后会收到对方的评价。</p></div>
-              )}
-            </section>
-
-            {/* FOLLOWING */}
-            <section className={`panel-card tab-panel${activeTab === 'following' ? ' active' : ''}`}>
-              <div className="section-head">
-                <div><h2>我的关注</h2><p>关注喜欢的摄影师或单主，把之后可能发生的约拍关系先保存下来。</p></div>
-                <div className="section-mark">05</div>
-              </div>
-              {follows.length ? (
-                <div className="order-list">
-                  {follows.map(f => {
-                    const isMutual = mutualFollowIds.has(Number(f.authorId))
-                    return (
-                      <div key={f.authorId} className="order-slip" onClick={() => navigate(`/users/${f.authorId}`)}>
-                        <div className="order-num" style={{fontSize:20}}>★</div>
-                        <div>
-                          <h4>用户 {f.authorId}</h4>
-                          <p>{formatShortTime(f.followedAt)} 开始关注</p>
-                        </div>
-                        {isMutual && <span className="status">互相关注</span>}
-                      </div>
-                    )
-                  })}
+              {likedMoments.length ? (
+                <div className="ticket-grid">
+                  {likedMoments.slice(0, 4).map(m => (
+                    <article key={m.momentId} className="mini-ticket" onClick={() => navigate(`/moments/${m.momentId}`)}>
+                      <span className="price">POST</span>
+                      <h3>{m.title || '点赞的动态'}</h3>
+                      <p>{m.content || '分享了一张照片'}</p>
+                      <div className="ticket-meta"><span className="tag blue">查看动态</span></div>
+                    </article>
+                  ))}
                 </div>
               ) : (
-                <div className="pp-empty"><h3>还没有关注任何人</h3><p>在动态或大厅页面关注感兴趣的用户。</p></div>
+                <div className="pp-empty"><h3>还没有点赞</h3><p>给喜欢的动态点个赞，就会出现在这里。</p></div>
               )}
             </section>
 
@@ -732,7 +769,7 @@ export function ProfilePage() {
             <section className={`panel-card tab-panel${activeTab === 'collections' ? ' active' : ''}`}>
               <div className="section-head">
                 <div><h2>我的收藏</h2><p>收藏喜欢的橱窗、动态和风格，下一次约拍不用重新开始。</p></div>
-                <div className="section-mark">06</div>
+                <div className="section-mark">05</div>
               </div>
               {favoriteMoments.length ? (
                 <div className="ticket-grid">
@@ -759,12 +796,12 @@ export function ProfilePage() {
                 <span>Portra Credit</span>
               </button>
               <div className="todo-list">
-                <div className="todo" style={{cursor:'pointer'}} onClick={() => handleTabClick('intent')}>
+                <div className="todo" style={{cursor:'pointer'}} onClick={() => handleTabClick(isProvider ? 'intent' : 'demands')}>
                   <div>
-                    <strong>{isProvider ? '待响应需求' : '待确认邀请'}</strong>
-                    <br /><small>今天需要处理</small>
+                    <strong>{isProvider ? '橱窗管理' : '我的需求'}</strong>
+                    <br /><small>{isProvider ? '管理约拍服务包' : '等待摄影师响应'}</small>
                   </div>
-                  <span className="status yellow">{pendingInvitations || 0}</span>
+                  <span className="status yellow">{isProvider ? 0 : openDemandsCount}</span>
                 </div>
                 <div className="todo">
                   <div><strong>进行中订单</strong><br /><small>可进入会话</small></div>
@@ -848,6 +885,55 @@ export function ProfilePage() {
           </div>
         </section>
       </section>
+
+      {/* ── FOLLOW LIST DRAWER ── */}
+      {followListOpen && (
+        <div className="pp-modal-backdrop" onClick={e => { if (e.target === e.currentTarget) setFollowListOpen(null) }}>
+          <div className="pp-modal" style={{maxWidth:500,maxHeight:'75vh',overflow:'hidden',display:'flex',flexDirection:'column',padding:'24px 24px 20px'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:18}}>
+              <h2 style={{margin:0,fontSize:18,letterSpacing:'.12em'}}>{followListOpen === 'following' ? '我的关注' : '我的粉丝'}</h2>
+              <button type="button" onClick={() => setFollowListOpen(null)} style={{border:0,background:'transparent',fontSize:22,cursor:'pointer',color:'var(--muted)',lineHeight:1}}>×</button>
+            </div>
+            <div style={{overflowY:'auto',flex:1}}>
+              {(() => {
+                const list = followListOpen === 'following' ? follows : myFollowers
+                if (!list.length) return (
+                  <div className="pp-empty">
+                    <h3>{followListOpen === 'following' ? '还没有关注任何人' : '还没有粉丝'}</h3>
+                    <p>{followListOpen === 'following' ? '在动态或大厅页面关注感兴趣的用户。' : '发布作品或需求，吸引更多人关注你。'}</p>
+                  </div>
+                )
+                return (
+                  <div className="order-list">
+                    {list.map(f => {
+                      const uid = f.userId ?? f.authorId
+                      const avatar = f.avatarData || f.avatarUrl || ''
+                      const roleLabel = f.role === 'PROVIDER' ? '摄影师' : '约拍方'
+                      const roleUrl = f.role ? `?role=${f.role}` : ''
+                      return (
+                        <div key={uid} className="order-slip" style={{cursor:'pointer'}}
+                          onClick={() => { setFollowListOpen(null); navigate(`/users/${uid}${roleUrl}`) }}>
+                          <div className="follow-avatar"
+                            style={avatar
+                              ? { backgroundImage: `url(${avatar})` }
+                              : { background: `hsl(${(Number(uid) * 67) % 360},45%,68%)` }} />
+                          <div>
+                            <h4 style={{display:'flex',alignItems:'center',gap:8}}>
+                              {f.nickname || `用户 ${uid}`}
+                              <span className="role-badge" style={{fontSize:11,height:22,padding:'0 8px'}}>{roleLabel}</span>
+                            </h4>
+                            <p>{f.bio || f.description || (followListOpen === 'following' ? '已关注' : '关注了你')}</p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── EDIT MODAL ── */}
       {editOpen && (

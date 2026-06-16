@@ -10,7 +10,8 @@ import { ConversationList } from './components/ConversationList.jsx'
 import { MessagesSectionHeader } from './components/MessagesSectionHeader.jsx'
 import {
   getConversationRecordsForUser,
-  mergeConversationRecords
+  mergeConversationRecords,
+  saveConversationRecord
 } from './utils/conversationUtils.js'
 import { getCWorkbenchErrorText } from './utils/quoteUtils.js'
 import {
@@ -86,10 +87,12 @@ export function MessagesPage() {
         const ordersForRole = orderResult.status === 'fulfilled'
           ? filterOrdersByActiveRole(orderResult.value || [], requestUser, currentUserRole)
           : []
-        const nextConversations = conversationsForRole.map(conversation => ({
+        const baseConversations = conversationsForRole.map(conversation => ({
           ...conversation,
           activeOrder: selectConversationOrder(ordersForRole, conversation, [])
         }))
+        const nextConversations = await hydrateConversationPreviews(baseConversations, requestUser)
+        if (requestVersionRef.current !== requestVersion) return
         lastKnownConversationsRef.current = nextConversations
         setConversations(nextConversations)
         applyNotice(orderResult.status === 'rejected'
@@ -119,6 +122,15 @@ export function MessagesPage() {
       mounted = false
     }
   }, [applyNotice, loadConversations, location.search, retryVersion])
+
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('conversationId')) return undefined
+    if (!requestUser || !currentUserId || !currentUserRole) return undefined
+    const intervalId = window.setInterval(() => {
+      loadConversations().catch(error => applyNotice(buildMessageListNotice(error, 'conversations')))
+    }, 6000)
+    return () => window.clearInterval(intervalId)
+  }, [applyNotice, currentUserId, currentUserRole, loadConversations, location.search, requestUser])
 
   const handleRetry = useCallback(() => {
     setRetryVersion(version => version + 1)
@@ -154,6 +166,52 @@ const noticeSx = {
   border: `1px solid ${PORTRA_COLORS.borderMuted}`,
   bgcolor: PORTRA_COLORS.paper,
   '& .MuiAlert-message': { py: 0.4 }
+}
+
+async function hydrateConversationPreviews(conversations, currentUser) {
+  if (!Array.isArray(conversations) || !conversations.length) return []
+  const entries = await Promise.allSettled(conversations.map(async conversation => {
+    if (conversation.isLocal) return conversation
+    const backendConversationId = conversation.backendConversationId || conversation.conversationId
+    const [messageResult, quoteResult] = await Promise.allSettled([
+      conversationApi.messages(backendConversationId, currentUser),
+      conversationApi.quotes(backendConversationId, currentUser)
+    ])
+    const messages = messageResult.status === 'fulfilled' && Array.isArray(messageResult.value)
+      ? messageResult.value
+      : []
+    const quotes = quoteResult.status === 'fulfilled' && Array.isArray(quoteResult.value)
+      ? quoteResult.value
+      : []
+    const latestMessage = [...messages]
+      .filter(Boolean)
+      .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0))[0] || null
+    const latestQuote = [...quotes]
+      .filter(Boolean)
+      .sort((left, right) => new Date(right.updatedAt || right.createdAt || 0) - new Date(left.updatedAt || left.createdAt || 0))[0] || null
+    const updatedAt = latestMessage?.createdAt
+      || latestQuote?.updatedAt
+      || latestQuote?.createdAt
+      || conversation.activeOrder?.updatedAt
+      || conversation.updatedAt
+    const nextConversation = {
+      ...conversation,
+      latestMessage,
+      lastMessageObject: latestMessage,
+      latestMessageSenderId: latestMessage?.senderId ?? conversation.latestMessageSenderId ?? null,
+      latestQuotes: quotes,
+      updatedAt
+    }
+    saveConversationRecord(nextConversation, {
+      latestMessage,
+      lastMessageObject: latestMessage,
+      latestMessageSenderId: latestMessage?.senderId ?? null,
+      latestQuotes: quotes,
+      updatedAt
+    })
+    return nextConversation
+  }))
+  return entries.map((entry, index) => entry.status === 'fulfilled' ? entry.value : conversations[index])
 }
 
 function buildMessageListNotice(error, scope) {

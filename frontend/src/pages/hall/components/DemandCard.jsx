@@ -55,7 +55,7 @@ export function DemandCard({
       <div className="ticket-meta" aria-label="需求关键信息">
         <div className="meta-item"><span>预算</span><b>{moneyRange(demand.budgetMinCent, demand.budgetMaxCent)}</b></div>
         <div className="meta-item"><span>时间</span><b>{demand.timeDescription || demand.timeSlot || readableDate(demand.expectedDate) || '暂无'}</b></div>
-        <div className="meta-item"><span>需求</span><b>{tags.slice(0, 2).join(' / ') || '暂无'}</b></div>
+        <div className="meta-item"><span>需求</span><b>{tags[0] || '暂无'}</b></div>
         <div className="meta-item"><span>发布</span><b>{fullDateTime(demand.updatedAt || demand.createdAt)}</b></div>
       </div>
       <p className="ticket-desc">{demand.description || '暂无说明'}</p>
