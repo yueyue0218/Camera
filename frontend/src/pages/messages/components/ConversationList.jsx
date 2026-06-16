@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Avatar, Box, Paper, Stack, Typography } from '@mui/material'
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded'
-import { formatShortTime, getConversationSourceLabel } from '../utils/conversationUtils.js'
-import { deriveConversationActions } from '../utils/workbenchState.js'
 import { loadConversationPeerProfile, resolveConversationParticipants } from '../utils/participantResolver.js'
+import { markConversationRead } from '../utils/conversationReadState.js'
+import { buildConversationListItems, formatConversationListTime } from '../utils/conversationListModel.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
 import { EmptyMessageCard } from './EmptyMessageCard.jsx'
 import { StatusChip } from './StatusChip.jsx'
@@ -53,25 +53,24 @@ export function ConversationList({ conversations, currentUser, onOpenConversatio
     avatarObjectUrlsRef.current = []
   }, [])
 
+  const listItems = buildConversationListItems({
+    conversations,
+    currentUser,
+    peerProfiles
+  })
+
   return (
     <Paper variant="outlined" sx={{ p: 1, overflow: 'hidden', bgcolor: PORTRA_COLORS.paperMuted, borderColor: PORTRA_COLORS.borderMuted, borderRadius: PORTRA_RADII.panel, boxShadow: PORTRA_SHADOWS.subtle }}>
       <Stack spacing={1}>
-        {conversations.map(conversation => {
-          const baseParticipant = resolveConversationParticipants(conversation, currentUser)
-          const participant = resolveConversationParticipants(conversation, currentUser, peerProfiles[baseParticipant.peerUserId])
-          const actions = deriveConversationActions({
-            conversation,
-            order: conversation.activeOrder,
-            activeRole: currentUser.role,
-            currentUser
-          })
-          const topic = getConversationListTopic(conversation)
-          const needsMyAction = actions.primaryActions.some(action => ['CONFIRM_QUOTE', 'PAY', 'UPLOAD_DELIVERY', 'REUPLOAD_DELIVERY', 'CONFIRM_DELIVERY', 'REQUEST_REWORK', 'REVIEW_AUTHORIZATION'].includes(action))
-          const activity = getConversationListActivity(conversation, actions)
+        {listItems.map(item => {
+          const { conversation, participant, actions, preview, needsMyAction, unread } = item
           return (
             <Box
               key={conversation.conversationId}
-              onClick={() => onOpenConversation(conversation.conversationId)}
+              onClick={() => {
+                markConversationRead(conversation, currentUser, preview.at)
+                onOpenConversation(conversation.conversationId)
+              }}
               sx={{
                 display: 'grid',
                 gridTemplateColumns: '52px minmax(0, 1fr) auto 20px',
@@ -123,42 +122,43 @@ export function ConversationList({ conversations, currentUser, onOpenConversatio
                 >
                   {getSafeDisplayText(participant.peerAvatarText, '对').slice(0, 1)}
                 </Avatar>
-                {needsMyAction && <Box sx={{ position: 'absolute', right: -1, top: -1, width: 10, height: 10, bgcolor: PORTRA_COLORS.orange, border: `2px solid ${PORTRA_COLORS.paper}`, borderRadius: '50%' }} />}
+                {(unread || needsMyAction) && (
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      right: -1,
+                      top: -1,
+                      width: unread ? 11 : 10,
+                      height: unread ? 11 : 10,
+                      bgcolor: unread ? '#ef4444' : PORTRA_COLORS.orange,
+                      border: `2px solid ${PORTRA_COLORS.paper}`,
+                      borderRadius: '50%'
+                    }}
+                  />
+                )}
               </Box>
-              <Stack spacing={0.5} sx={{ minWidth: 0 }}>
+              <Stack spacing={0.45} sx={{ minWidth: 0 }}>
                 <Typography fontWeight={900} color={PORTRA_COLORS.ink} noWrap>
-                  {getSafeDisplayText(participant.peerDisplayName, participant.peerUserId ? `用户 ${participant.peerUserId}` : '沟通对象')}
+                  {item.title}
                 </Typography>
-                <Typography variant="body2" sx={{ color: needsMyAction ? PORTRA_COLORS.subInk : PORTRA_COLORS.mutedInk, fontWeight: needsMyAction ? 800 : 500 }} noWrap>
-                  {activity}
+                <Typography variant="body2" sx={{ color: unread ? PORTRA_COLORS.subInk : needsMyAction ? PORTRA_COLORS.subInk : PORTRA_COLORS.mutedInk, fontWeight: unread ? 850 : needsMyAction ? 800 : 500 }} noWrap>
+                  {preview.text}
                 </Typography>
-                <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk }} noWrap>{topic} · {getSafeDisplayText(getConversationSourceLabel(conversation), '约拍沟通')}</Typography>
               </Stack>
               <Stack spacing={0.7} sx={{ minWidth: 96, alignItems: 'flex-end' }}>
-                <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk }}>{formatShortTime(conversation.updatedAt)}</Typography>
-                <StatusChip label={needsMyAction ? '待我处理' : actions.stage.title} emphasis={needsMyAction} />
+                <Typography variant="caption" sx={{ color: unread ? PORTRA_COLORS.orange : PORTRA_COLORS.faintInk, fontWeight: unread ? 900 : 500 }}>
+                  {formatConversationListTime(preview.at || conversation.updatedAt)}
+                </Typography>
+                <StatusChip label={unread ? '新消息' : needsMyAction ? '待我处理' : actions.stage.title} emphasis={unread || needsMyAction} />
               </Stack>
               <ChevronRightRoundedIcon className="conversation-chevron" sx={{ color: PORTRA_COLORS.blue, opacity: needsMyAction ? 0.65 : 0, transform: 'translateX(-4px)', transition: 'all 140ms ease' }} />
             </Box>
           )
         })}
-        {!conversations.length && (
+        {!listItems.length && (
           <EmptyMessageCard />
         )}
       </Stack>
     </Paper>
   )
-}
-
-function getConversationListTopic(conversation) {
-  const scene = String(conversation?.scene || '').trim()
-  if (scene && scene !== '约拍沟通' && scene !== '约拍需求沟通') return getSafeDisplayText(scene, '校园约拍')
-  if (conversation?.location) return getSafeDisplayText(conversation.location, '校园约拍')
-  return '校园约拍'
-}
-
-function getConversationListActivity(conversation, actions) {
-  const lastMessage = String(conversation?.lastMessage || '').trim()
-  if (lastMessage && !['最近有新消息', '点击进入对话'].includes(lastMessage)) return getSafeDisplayText(lastMessage, actions.stage.description)
-  return actions.stage.description
 }

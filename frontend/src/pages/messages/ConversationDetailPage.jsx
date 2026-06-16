@@ -34,6 +34,7 @@ import {
   saveConversationRecord,
   updateConversationLastMessage
 } from './utils/conversationUtils.js'
+import { markConversationRead } from './utils/conversationReadState.js'
 import {
   loadConversationPeerProfile,
   resolveConversationParticipants
@@ -264,6 +265,14 @@ export function ConversationDetailPage() {
     ])
     setMessages(nextMessages)
     setQuotes(nextQuotes)
+    const latestMessage = getLatestMessage(nextMessages)
+    saveConversationRecord(record, {
+      latestMessage,
+      lastMessageObject: latestMessage,
+      latestMessageSenderId: latestMessage?.senderId ?? null,
+      latestQuotes: nextQuotes || [],
+      updatedAt: latestMessage?.createdAt || record.updatedAt
+    })
     const selectedOrder = preferredOrderId
       ? { orderId: preferredOrderId }
       : selectConversationOrder(nextOrders || [], record, nextQuotes || [])
@@ -311,7 +320,10 @@ export function ConversationDetailPage() {
         messageType: 'TEXT',
         content: text
       })
-      updateConversationLastMessage(conversation.conversationId, text)
+      updateConversationLastMessage(conversation.conversationId, text, {
+        senderId: getCurrentUserId(currentUser),
+        messageType: 'TEXT'
+      })
       setMessages(nextMessages)
       setContent('')
       return
@@ -319,7 +331,12 @@ export function ConversationDetailPage() {
     const optimisticMessage = createOptimisticMessage(conversation, currentUser, text, 'TEXT')
     setMessages(previous => [...previous, optimisticMessage])
     setContent('')
-    updateConversationLastMessage(conversation.conversationId, text)
+    updateConversationLastMessage(conversation.conversationId, text, {
+      senderId: getCurrentUserId(currentUser),
+      messageType: 'TEXT',
+      latestMessage: optimisticMessage,
+      createdAt: optimisticMessage.createdAt
+    })
     const sent = await run(async () => conversationApi.sendMessage(conversation.backendConversationId || conversation.conversationId, text, currentUser, 'TEXT'))
     if (sent) {
       await refreshConversationData(conversation, currentOrder?.orderId)
@@ -600,7 +617,7 @@ export function ConversationDetailPage() {
       附件: '附件发送能力暂未接入，作品请通过订单上传，普通资料可先用文字说明。',
       表情: '表情工具暂未接入，可以继续使用文字沟通。',
       补款: '补款能力暂未接入，双方可先在沟通中协商金额。',
-      平台协助: '平台协助功能由仲裁模块处理，当前演示可在订单中查看争议状态。'
+      平台协助: '平台协助功能暂未开放'
     }
     setNotice({ type: 'info', text: messages[name] || '该能力暂未接入。' })
     feedback.info(messages[name] || '该能力暂未接入。')
@@ -665,6 +682,16 @@ export function ConversationDetailPage() {
     conversationId: conversation?.backendConversationId || conversation?.conversationId,
     onRefresh: () => refreshConversationData(conversation, currentOrder?.orderId)
   })
+  useEffect(() => {
+    if (!conversation) return
+    const latestMessage = getLatestMessage(messages)
+    markConversationRead({
+      ...conversation,
+      latestMessage,
+      latestMessageSenderId: latestMessage?.senderId ?? conversation.latestMessageSenderId,
+      updatedAt: latestMessage?.createdAt || conversation.updatedAt
+    }, currentUser)
+  }, [conversation?.conversationId, currentUser?.userId, currentUser?.id, messages.length])
   useEffect(() => {
     if (!conversation || conversation.isLocal || !currentOrder?.orderId) return undefined
     const refreshCurrentOrder = () => refreshConversationData(conversation, currentOrder.orderId)
@@ -913,6 +940,12 @@ export function ConversationDetailPage() {
     </PortraWorkflowFrame>
     </MessageWorkbenchErrorBoundary>
   )
+}
+
+function getLatestMessage(messages = []) {
+  return [...(Array.isArray(messages) ? messages : [])]
+    .filter(Boolean)
+    .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0))[0] || null
 }
 
 function createOptimisticMessage(conversation, currentUser, content, messageType) {

@@ -82,6 +82,7 @@ export async function loadConversationPeerProfile(peerUserId, peerRole, currentU
       // Avatar image is optional; fallback initials keep the identity stable.
     }
   }
+  writeStoredProfile(userId, profile)
   return profile
 }
 
@@ -183,6 +184,26 @@ function readStoredProfile(userId) {
     return JSON.parse(window.localStorage.getItem(USER_PROFILE_STORAGE_KEY) || '{}')?.[String(userId)] || {}
   } catch {
     return {}
+  }
+}
+
+function writeStoredProfile(userId, profile) {
+  if (typeof window === 'undefined' || !userId || !profile) return
+  try {
+    const profiles = JSON.parse(window.localStorage.getItem(USER_PROFILE_STORAGE_KEY) || '{}')
+    const previous = profiles[String(userId)] || {}
+    profiles[String(userId)] = {
+      ...previous,
+      userId,
+      nickname: profile.nickname || profile.displayName || previous.nickname,
+      displayName: profile.displayName || profile.nickname || previous.displayName,
+      avatarData: profile.avatarUrl || profile.avatarData || previous.avatarData,
+      avatarUrl: profile.avatarUrl || profile.avatarData || previous.avatarUrl,
+      providerProfile: profile.providerProfile || previous.providerProfile
+    }
+    window.localStorage.setItem(USER_PROFILE_STORAGE_KEY, JSON.stringify(profiles))
+  } catch {
+    // Profile cache is only a UI fallback; failed writes should not block rendering.
   }
 }
 
