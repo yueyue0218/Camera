@@ -39,7 +39,8 @@ public class FileAccessPolicy {
             "AVATAR",
             "DEMAND_REFERENCE",
             "PORTFOLIO",
-            "SERVICE_PORTFOLIO"
+            "SERVICE_PORTFOLIO",
+            "PUBLISH_IMAGE"
     );
     private static final Set<String> PRIVATE_BIZ_TYPES = Set.of(
             "DELIVERY",
@@ -52,6 +53,7 @@ public class FileAccessPolicy {
             "DEMAND_REFERENCE",
             "PORTFOLIO",
             "SERVICE_PORTFOLIO",
+            "PUBLISH_IMAGE",
             "DELIVERY",
             "PHOTO_AUTHORIZATION",
             "REVIEW_EVIDENCE",

@@ -94,6 +94,13 @@ class FileAccessPolicyTest {
     }
 
     @Test
+    void anonymousUserCanDownloadPublishedImage() {
+        assertThatCode(() -> policy.assertCanDownload(publicFile("PUBLISH_IMAGE"), null, null))
+                .doesNotThrowAnyException();
+        assertThat(policy.resolveVisibility("PUBLISH_IMAGE", "PUBLIC")).isEqualTo("PUBLIC");
+    }
+
+    @Test
     void deliveryCannotBecomePublicOnlyBecauseVisibilitySaysPublic() {
         when(photoAuthorizationFileRepository.findByFileIdIn(List.of(FILE_ID))).thenReturn(List.of());
 
@@ -170,7 +177,7 @@ class FileAccessPolicyTest {
     void publicWhitelistRejectsUnknownBizTypeAndKeepsPrivateRequestPrivate() {
         assertThat(policy.resolveVisibility("SERVICE_PORTFOLIO", "PUBLIC")).isEqualTo("PUBLIC");
         assertThat(policy.resolveVisibility("AVATAR", "PRIVATE")).isEqualTo("PRIVATE");
-        assertThatThrownBy(() -> policy.resolveVisibility("PUBLISH_IMAGE", "PUBLIC"))
+        assertThatThrownBy(() -> policy.resolveVisibility("UNRELATED_IMAGE", "PUBLIC"))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.VALIDATION_ERROR);
