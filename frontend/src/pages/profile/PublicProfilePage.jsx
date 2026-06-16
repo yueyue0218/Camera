@@ -15,10 +15,10 @@ import { ReviewScore } from '../reviews/ReviewPage.jsx'
 import './profile.css'
 
 function formatCreditScore(value) {
-  if (value === null || value === undefined) return '鏆傛棤'
-  if (typeof value === 'string' && value.trim() === '') return '鏆傛棤'
+  if (value === null || value === undefined) return '暂无'
+  if (typeof value === 'string' && value.trim() === '') return '暂无'
   const numeric = Number(value)
-  return Number.isFinite(numeric) ? numeric.toFixed(1) : '鏆傛棤'
+  return Number.isFinite(numeric) ? numeric.toFixed(1) : '暂无'
 }
 
 export function PublicProfilePage() {
@@ -72,7 +72,7 @@ export function PublicProfilePage() {
         })
         setFollowedByMe(isFollowing(profileUserId))
       } else if (profileResult.status === 'rejected' && !isApiUnavailable(profileResult.reason)) {
-        setNotice({ type: 'warn', text: '鏃犳硶鍔犺浇瀹屾暣璧勬枡锛屽綋鍓嶅厛灞曠ず宸茶幏鍙栫殑淇℃伅' })
+        setNotice({ type: 'warn', text: '无法加载完整资料，显示本地缓存数据' })
       }
 
       if (myFollowersResult.status === 'fulfilled') {
@@ -153,17 +153,17 @@ export function PublicProfilePage() {
           <div className="profile-photo-wrap">
             <div className="profile-photo-card">
               <div className="profile-photo" />
-              <div className="photo-pin">鈥?/div>
+              <div className="photo-pin">—</div>
             </div>
           </div>
           <div className="hero-info">
-            <div className="ticket-kicker">鍏紑涓婚〉</div>
-            <p style={{ color: '#888', fontSize: 14, letterSpacing: '.1em', margin: 0 }}>鍔犺浇涓?..</p>
+            <div className="ticket-kicker">Portra Profile Ticket</div>
+            <p style={{ color: '#888', fontSize: 14, letterSpacing: '.1em', margin: 0 }}>加载中...</p>
           </div>
           <aside className="hero-side">
             <div>
               <div className="id-number">No.{profileUserId}</div>
-              <div className="id-label">淇＄敤姒傝</div>
+              <div className="id-label">PORTRA CREDIT FILE</div>
             </div>
           </aside>
         </section>
@@ -175,7 +175,7 @@ export function PublicProfilePage() {
   const role = publicProfile?.currentRole || storedProfile.role || 'CUSTOMER'
   const isProvider = role === 'PROVIDER'
   const pp = publicProfile?.providerProfile || {}
-  const nickname = publicProfile?.nickname || storedProfile.nickname || `鐢ㄦ埛${profileUserId}`
+  const nickname = publicProfile?.nickname || storedProfile.nickname || `用户${profileUserId}`
   const gender = publicProfile?.gender
   const bio = publicProfile?.bio || storedProfile.bio || ''
   const creditScore = creditSummary?.creditScore ?? null
@@ -219,13 +219,13 @@ export function PublicProfilePage() {
 
   const allTabs = isProvider
     ? [
-        { id: 'portfolio', label: '浣滃搧闆?, num: '01' },
-        { id: 'reviews', label: '鍘嗗彶璇勪环', num: '02' },
-        { id: 'moments', label: 'TA鐨勫姩鎬?, num: '03' },
+        { id: 'portfolio', label: '作品集', num: '01' },
+        { id: 'reviews', label: '历史评价', num: '02' },
+        { id: 'moments', label: 'TA的动态', num: '03' },
       ]
     : [
-        { id: 'moments', label: 'TA鐨勭収鐗?, num: '01' },
-        { id: 'reviews', label: '鏀跺埌鐨勮瘎浠?, num: '02' },
+        { id: 'moments', label: 'TA的照片', num: '01' },
+        { id: 'reviews', label: '收到的评价', num: '02' },
       ]
 
   function ReviewCard({ r }) {
@@ -240,13 +240,13 @@ export function PublicProfilePage() {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 8 }}>
           <span style={{ fontSize: 13, color: '#6e737b', letterSpacing: '.08em' }}>
-            鏉ヨ嚜 {r.reviewerNickname || `鐢ㄦ埛 ${r.reviewerId}`} 路 {formatShortTime(r.createdAt)}
+            来自 {r.reviewerNickname || `用户 ${r.reviewerId}`} · {formatShortTime(r.createdAt)}
           </span>
           <ReviewScore value={r.rating} />
         </div>
-        <blockquote style={{ margin: 0 }}>"{r.content || '瀵规柟娌℃湁鐣欎笅鏂囧瓧璇勪环'}"</blockquote>
+        <blockquote style={{ margin: 0 }}>"{r.content || '对方没有留下文字评价'}"</blockquote>
         {r.replyContent && (
-          <div className="review-reply"><span>杩借瘎</span><p>{r.replyContent}</p></div>
+          <div className="review-reply"><span>追评</span><p>{r.replyContent}</p></div>
         )}
       </div>
     )
@@ -257,15 +257,16 @@ export function PublicProfilePage() {
       {notice && (
         <div style={{ marginBottom: 14, padding: '10px 16px', borderRadius: 12, background: notice.type === 'err' ? 'rgba(248,81,4,.08)' : 'rgba(13,47,178,.07)', color: notice.type === 'err' ? '#c13a05' : 'var(--blue)', fontSize: 13, letterSpacing: '.06em', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           {notice.text}
-          <button onClick={() => setNotice(null)} style={{ border: 0, background: 'transparent', fontSize: 16, cursor: 'pointer', color: 'inherit', lineHeight: 1 }}>脳</button>
+          <button onClick={() => setNotice(null)} style={{ border: 0, background: 'transparent', fontSize: 16, cursor: 'pointer', color: 'inherit', lineHeight: 1 }}>×</button>
         </div>
       )}
 
-        <span><strong>个人档案</strong> / {nickname} / 公开主页</span>
-        <span>{isProvider ? 约拍  ·  : 信用  · Portra}</span>
+      <div className="pp-crumb">
+        <span><strong>PROFILE</strong> / {nickname} / 个人摄影档案</span>
+        <span>{isProvider ? `FRAME ${pp?.completedOrders ?? 0} · ${pp?.cityCode || 'Portra'}` : `CREDIT ${displayCreditScore} · Portra`}</span>
       </div>
 
-      {/* 鈹€鈹€ HERO 鈹€鈹€ */}
+      {/* ── HERO ── */}
       <section className="profile-hero">
         <div className="hero-bg-word">PROFILE</div>
 
@@ -277,78 +278,77 @@ export function PublicProfilePage() {
         </div>
 
         <div className="hero-info">
-          <div className="ticket-kicker">鍏紑涓婚〉</div>
+          <div className="ticket-kicker">Portra Profile Ticket</div>
           <div className="hero-name-row">
             <h1 className="hero-name">{nickname}</h1>
-            <span className="role-badge">{isProvider ? '鎽勫奖甯? : '绾︽媿鏂?}</span>
+            <span className="role-badge">{isProvider ? '摄影师' : '约拍方'}</span>
           </div>
-          <p className="profile-uid">鐢ㄦ埛缂栧彿锛歿profileUserId}</p>
+          <p className="profile-uid">UID：{profileUserId} · Portra ID</p>
           <div className="profile-meta-line">
-            <span>IP灞炲湴锛歿ipLocation || '鏈煡'}</span>
+            <span>IP属地：{ipLocation || '未知'}</span>
           </div>
           {(() => {
             const chips = []
-            if (gender === 'FEMALE') chips.push('鈾€ 濂?)
-            else if (gender === 'MALE') chips.push('鈾?鐢?)
-            if (pp?.cityCode) chips.push(`馃搷 ${pp.cityCode}`)
+            if (gender === 'FEMALE') chips.push('♀ 女')
+            else if (gender === 'MALE') chips.push('♂ 男')
+            if (pp?.cityCode) chips.push(`📍 ${pp.cityCode}`)
             return chips.length ? (
               <div className="profile-tag-row">
                 {chips.map((c, i) => <span key={i} className="profile-tag">{c}</span>)}
               </div>
             ) : null
           })()}
-          <p className="profile-signature">{bio || '杩欎釜浜鸿繕娌℃湁鍐欑畝浠嬨€?}</p>
+          <p className="profile-signature">{bio || '这个人还没有写简介。'}</p>
           <div className="social-stats-row">
-            <div className="social-stat"><b>{publicProfile?.followingCount ?? '鈥?}</b><span>鍏虫敞</span></div>
-            <div className="social-stat"><b>{publicProfile?.followerCount ?? '鈥?}</b><span>绮変笣</span></div>
-            <div className="social-stat"><b>{publicProfile?.momentCount ?? moments.length}</b><span>鍔ㄦ€?/span></div>
+            <div className="social-stat"><b>{publicProfile?.followingCount ?? '—'}</b><span>关注</span></div>
+            <div className="social-stat"><b>{publicProfile?.followerCount ?? '—'}</b><span>粉丝</span></div>
+            <div className="social-stat"><b>{publicProfile?.momentCount ?? moments.length}</b><span>动态</span></div>
           </div>
         </div>
 
         <aside className="hero-side">
           <div>
             <div className="id-number">No.{profileUserId}</div>
-            <div className="id-label">淇＄敤姒傝</div>
+            <div className="id-label">PORTRA CREDIT FILE</div>
           </div>
           <div className="metric-grid">
             <button className="metric metric-button" type="button" onClick={() => navigate(`/users/${profileUserId}/credit`)}>
-              <b>{displayCreditScore}</b><span>淇＄敤璇勫垎</span>
+              <b>{displayCreditScore}</b><span>信用评分</span>
             </button>
             {isProvider ? (
               <>
-                <div className="metric"><b>{pp?.avgRating != null ? Number(pp.avgRating).toFixed(1) : '鈥?}</b><span>骞冲潎璇勫垎</span></div>
-                <div className="metric"><b>{pp?.completedOrders ?? '鈥?}</b><span>鍘嗗彶绾︽媿</span></div>
-                <div className="metric"><b>{reviews.length}</b><span>鏀跺埌璇勪环</span></div>
+                <div className="metric"><b>{pp?.avgRating != null ? Number(pp.avgRating).toFixed(1) : '—'}</b><span>平均评分</span></div>
+                <div className="metric"><b>{pp?.completedOrders ?? '—'}</b><span>历史约拍</span></div>
+                <div className="metric"><b>{reviews.length}</b><span>收到评价</span></div>
               </>
             ) : (
               <>
-                <div className="metric"><b>{reviews.length}</b><span>鏀跺埌璇勪环</span></div>
-                <div className="metric"><b>{publicProfile?.momentCount ?? moments.length}</b><span>鍔ㄦ€佹暟</span></div>
+                <div className="metric"><b>{reviews.length}</b><span>收到评价</span></div>
+                <div className="metric"><b>{publicProfile?.momentCount ?? moments.length}</b><span>动态数</span></div>
               </>
             )}
           </div>
           <div className="hero-actions">
             {isProvider && pp?.priceMin != null && (
               <div style={{ fontSize: 13, color: 'var(--blue)', fontWeight: 700, marginBottom: 4 }}>
-                {`楼${pp.priceMin}鈥撀?{pp.priceMax} / 娆}
+                {`¥${pp.priceMin}–¥${pp.priceMax} / 次`}
               </div>
             )}
-            <button className="primary-btn" onClick={() => navigate('/messages', { state: { targetUserId: profileUserId } })}>鍙戞秷鎭?/button>
+            <button className="primary-btn" onClick={() => navigate('/messages', { state: { targetUserId: profileUserId } })}>发消息</button>
             <button className="secondary-btn" onClick={toggleFollow} disabled={followLoading}>
-              {followedByMe && followsMe ? '浜掔浉鍏虫敞' : followedByMe ? '宸插叧娉? : '鍏虫敞'}
+              {followedByMe && followsMe ? '互相关注' : followedByMe ? '已关注' : '关注'}
             </button>
             <button className="secondary-btn" onClick={() => navigate(`/users/${profileUserId}?role=${isProvider ? 'CUSTOMER' : 'PROVIDER'}`)}>
-              {isProvider ? '鏌ョ湅 TA 鐨勭害鎷嶆柟涓婚〉 鈫? : '鏌ョ湅 TA 鐨勬憚褰卞笀涓婚〉 鈫?}
+              {isProvider ? '查看 TA 的约拍方主页 →' : '查看 TA 的摄影师主页 →'}
             </button>
           </div>
         </aside>
       </section>
 
-      {/* 鈹€鈹€ DASHBOARD 鈹€鈹€ */}
+      {/* ── DASHBOARD ── */}
       <section className="pp-dashboard">
         <div className="dashboard-card-row" ref={dashboardRowRef}>
 
-<<<<<<< HEAD
           <aside className="panel-card frame-nav" ref={frameNavRef}>
             <p className="frame-title">Frame Navigation</p>
             {allTabs.map(tab => (
@@ -357,32 +357,16 @@ export function PublicProfilePage() {
               </button>
             ))}
           </aside>
-=======
-            <aside className="panel-card frame-nav" ref={frameNavRef}>
-              <p className="frame-title">鍐呭瀵艰埅</p>
-              {providerTabs.map(tab => (
-                <button
-                  key={tab.id}
-                  className={`frame-tab${activeTab === tab.id ? ' active' : ''}`}
-                  onClick={() => setActiveTab(tab.id)}
-                >
-                  <span>{tab.label}</span>
-                  <small>{tab.num}</small>
-                </button>
-              ))}
-            </aside>
->>>>>>> 8b02cbe (fix: unify frontend credit displays and copy)
 
           <div className="content-stack" style={{ height: 'auto' }}>
 
-            {/* 浣滃搧闆?/ TA鐨勭収鐗?*/}
+            {/* 作品集 / TA的照片 */}
             <section className={`panel-card tab-panel${activeTab === 'portfolio' || activeTab === 'moments' ? ' active' : ''}`}>
               <div className="section-head">
                 <div>
-                  <h2>{isProvider ? '浣滃搧闆? : 'TA鐨勭収鐗?}</h2>
-                  <p>{isProvider ? '鎽勫奖甯堢殑鑳剁墖鎺ヨЕ鍗扮浉锛岃褰曟瘡涓€娆℃寜蹇棬鐨勭灛闂淬€? : '琚揩闂ㄧ暀涓嬬殑鏃跺埢銆?}</p>
+                  <h2>{isProvider ? '作品集' : 'TA的照片'}</h2>
+                  <p>{isProvider ? '摄影师的胶片接触印相，记录每一次按快门的瞬间。' : '被快门留下的时刻。'}</p>
                 </div>
-<<<<<<< HEAD
                 <div className="section-mark">01</div>
               </div>
               <div className="contact-sheet">
@@ -396,25 +380,6 @@ export function PublicProfilePage() {
                       </div>
                     )
                   })}
-=======
-                <div className="contact-sheet">
-                  <div className="photo-grid">
-                    {Array.from({ length: 6 }).map((_, i) => {
-                      const m = momentImages[i]
-                      return (
-                        <div
-                          key={i}
-                          className="film-frame"
-                          onClick={() => m && navigate(`/moments/${m.momentId}`)}
-                          style={m ? { cursor: 'pointer' } : {}}
-                        >
-                          {m?.imageData && <img src={m.imageData} alt="" />}
-                          <span className="cap">浣滃搧 {String(i + 1).padStart(2, '0')}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
->>>>>>> 8b02cbe (fix: unify frontend credit displays and copy)
                 </div>
               </div>
               {!isProvider && moments.length > 0 && (
@@ -422,19 +387,19 @@ export function PublicProfilePage() {
                   {moments.slice(0, 5).map((m, i) => (
                     <div key={m.momentId} className="order-slip" onClick={() => navigate(`/moments/${m.momentId}`)}>
                       <div className="order-num">{String(i + 1).padStart(2, '0')}</div>
-                      <div><h4>{m.title || '鏈懡鍚嶅姩鎬?}</h4><p>{(m.content || '').slice(0, 50)} 路 {formatShortTime(m.createdAt)}</p></div>
+                      <div><h4>{m.title || '未命名动态'}</h4><p>{(m.content || '').slice(0, 50)} · {formatShortTime(m.createdAt)}</p></div>
                     </div>
                   ))}
                 </div>
               )}
             </section>
 
-            {/* 鍘嗗彶璇勪环 / 鏀跺埌鐨勮瘎浠?*/}
+            {/* 历史评价 / 收到的评价 */}
             <section className={`panel-card tab-panel${activeTab === 'reviews' ? ' active' : ''}`}>
               <div className="section-head">
                 <div>
-                  <h2>{isProvider ? '鍘嗗彶璇勪环' : '鏀跺埌鐨勮瘎浠?}</h2>
-                  <p>{isProvider ? '鏉ヨ嚜绾︽媿鏂圭殑鐪熷疄鍙嶉锛岃璇佹瘡涓€娆＄害鎷嶃€? : '鎽勫奖甯堝 TA 鐨勭湡瀹炲弽棣堬紝浜嗚В鍚堜綔浣撻獙銆?}</p>
+                  <h2>{isProvider ? '历史评价' : '收到的评价'}</h2>
+                  <p>{isProvider ? '来自约拍方的真实反馈，见证每一次约拍。' : '摄影师对 TA 的真实反馈，了解合作体验。'}</p>
                 </div>
                 <div className="section-mark">02</div>
               </div>
@@ -442,15 +407,15 @@ export function PublicProfilePage() {
                 ? (isProvider ? providerReviews : customerReviews).slice(0, 6).map(r => (
                     <ReviewCard key={r.reviewId || `${r.orderId}-${r.direction}`} r={r} />
                   ))
-                : <div className="pp-empty"><h3>鏆傛棤璇勪环</h3><p>瀹屾垚绾︽媿鍚庡弻鏂逛細浜掔浉鐣欎笅璇勪环銆?/p></div>
+                : <div className="pp-empty"><h3>暂无评价</h3><p>完成约拍后双方会互相留下评价。</p></div>
               }
             </section>
 
-            {/* TA鐨勫姩鎬侊紙浠呮憚褰卞笀锛?*/}
+            {/* TA的动态（仅摄影师） */}
             {isProvider && (
               <section className={`panel-card tab-panel${activeTab === 'moments' ? ' active' : ''}`}>
                 <div className="section-head">
-                  <div><h2>TA鐨勫姩鎬?/h2><p>鎽勫奖甯堟渶杩戝彂甯冪殑甯栧瓙銆?/p></div>
+                  <div><h2>TA的动态</h2><p>摄影师最近发布的帖子。</p></div>
                   <div className="section-mark">03</div>
                 </div>
                 {moments.length ? (
@@ -458,33 +423,33 @@ export function PublicProfilePage() {
                     {moments.slice(0, 5).map((m, i) => (
                       <div key={m.momentId} className="order-slip" onClick={() => navigate(`/moments/${m.momentId}`)}>
                         <div className="order-num">{String(i + 1).padStart(2, '0')}</div>
-                        <div><h4>{m.title || '鏈懡鍚嶅姩鎬?}</h4><p>{(m.content || '').slice(0, 50)} 路 {formatShortTime(m.createdAt)}</p></div>
+                        <div><h4>{m.title || '未命名动态'}</h4><p>{(m.content || '').slice(0, 50)} · {formatShortTime(m.createdAt)}</p></div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="pp-empty"><h3>鏆傛棤鍔ㄦ€?/h3><p>璇ユ憚褰卞笀杩樻病鏈夊彂甯冨姩鎬併€?/p></div>
+                  <div className="pp-empty"><h3>暂无动态</h3><p>该摄影师还没有发布动态。</p></div>
                 )}
               </section>
             )}
 
           </div>
 
-          {/* 鍙充晶淇℃伅鏍忥紙浠呮憚褰卞笀锛?*/}
+          {/* 右侧信息栏（仅摄影师） */}
           {isProvider && (
             <aside className="side-stack" style={{ height: 'auto', minHeight: 'var(--dashboard-left-card-height)', overflow: 'visible' }}>
               <section className="panel-card">
-                <p className="frame-title">鎽勫奖甯堜俊鎭?/p>
+                <p className="frame-title">摄影师信息</p>
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 12, letterSpacing: '.14em', color: '#6e737b', marginBottom: 8 }}>椋庢牸鏍囩</div>
+                  <div style={{ fontSize: 12, letterSpacing: '.14em', color: '#6e737b', marginBottom: 8 }}>风格标签</div>
                   {styleTags.length
                     ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>{styleTags.map(tag => <span key={tag} className="tag blue">{tag}</span>)}</div>
-                    : <span style={{ fontSize: 13, color: '#999' }}>鏆傛湭璁剧疆</span>
+                    : <span style={{ fontSize: 13, color: '#999' }}>暂未设置</span>
                   }
                 </div>
                 {pp?.equipment && (
                   <div style={{ marginBottom: 14 }}>
-                    <div style={{ fontSize: 12, letterSpacing: '.14em', color: '#6e737b', marginBottom: 6 }}>璁惧</div>
+                    <div style={{ fontSize: 12, letterSpacing: '.14em', color: '#6e737b', marginBottom: 6 }}>设备</div>
                     <p style={{ margin: 0, fontSize: 13, color: '#30343a', lineHeight: 1.7 }}>{pp.equipment}</p>
                   </div>
                 )}
@@ -492,82 +457,8 @@ export function PublicProfilePage() {
             </aside>
           )}
 
-<<<<<<< HEAD
         </div>
       </section>
-=======
-          </div>
-        </section>
-      )}
-
-      {/* 鈹€鈹€ CUSTOMER: Simplified layout 鈹€鈹€ */}
-      {!isProvider && (
-        <section className="pp-dashboard">
-
-          <section className="panel-card">
-            <div className="section-head">
-              <div>
-                <h2>TA鐨勭収鐗?/h2>
-                <p>琚揩闂ㄧ暀涓嬬殑鏃跺埢锛屼細鍦ㄨ繖閲屾垚涓?contact sheet銆?/p>
-              </div>
-              <div className="section-mark">01</div>
-            </div>
-            <div className="contact-sheet">
-              <div className="photo-grid">
-                {Array.from({ length: 6 }).map((_, i) => {
-                  const m = momentImages[i]
-                  return (
-                    <div
-                      key={i}
-                      className="film-frame"
-                      onClick={() => m && navigate(`/moments/${m.momentId}`)}
-                      style={m ? { cursor: 'pointer' } : {}}
-                    >
-                      {m?.imageData && <img src={m.imageData} alt="" />}
-                      <span className="cap">浣滃搧 {String(i + 1).padStart(2, '0')}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </section>
-
-          <section className="panel-card">
-            <div className="section-head">
-              <div>
-                <h2>鎽勫奖甯堝TA鐨勮瘎浠?/h2>
-                <p>鏈嶅姟鏂圭殑鐪熷疄鍙嶉銆?/p>
-              </div>
-              <div className="section-mark">02</div>
-            </div>
-            {customerReviews.length ? customerReviews.slice(0, 4).map(r => (
-              <div
-                key={r.reviewId || `${r.orderId}-${r.direction}`}
-                className="review-card"
-                role="button"
-                tabIndex={0}
-                style={{ cursor: 'pointer' }}
-                onClick={() => openReviewCard(r)}
-                onKeyDown={event => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault()
-                    openReviewCard(r)
-                  }
-                }}
-              >
-                <blockquote>"{r.content || '瀵规柟娌℃湁鐣欎笅鏂囧瓧璇勪环'}"</blockquote>
-                <footer>
-                  鏉ヨ嚜 {r.reviewerNickname || `鐢ㄦ埛 ${r.reviewerId}`} 路 鈽厈Number(r.rating || 0).toFixed(1)} 路 {formatShortTime(r.createdAt)}
-                </footer>
-              </div>
-            )) : (
-              <div className="pp-empty"><h3>杩樻病鏈夋敹鍒拌瘎浠?/h3><p>瀹屾垚绾︽媿鍚庢憚褰卞笀浼氱暀涓嬭瘎浠枫€?/p></div>
-            )}
-          </section>
-
-        </section>
-      )}
->>>>>>> 8b02cbe (fix: unify frontend credit displays and copy)
     </div>
   )
 }
