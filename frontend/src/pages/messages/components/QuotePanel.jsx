@@ -7,6 +7,7 @@ import { PortraInfoBanner, PortraStatusBadge, PortraTicketCard } from '../../../
 import { formatTime } from '../utils/conversationUtils.js'
 import {
   canEditQuote,
+  canRespondToQuote,
   getPhotoUsageScopeLabel,
   getQuoteNextStepText,
   getQuoteStatusLabel
@@ -90,7 +91,7 @@ export function QuotePanel({
                   ['照片使用范围', getPhotoUsageScopeLabel(quote.photoUsageScope)],
                   ['下一步', getQuoteNextStepText(quote, currentUser)]
                 ]} />
-                {quote.status === 'PENDING_CONFIRM' && currentUser.role === 'CUSTOMER' && currentUser.userId === Number(conversation?.participantAId) && (
+                {canRespondToQuote(quote, conversation, currentUser) && (
                   <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                     <Button size="small" variant="contained" onClick={() => onConfirmQuote(quote)}>确认报价</Button>
                     <Button size="small" variant="outlined" color="inherit" onClick={() => onRejectQuote(quote)}>拒绝报价</Button>

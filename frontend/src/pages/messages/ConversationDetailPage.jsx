@@ -606,6 +606,15 @@ export function ConversationDetailPage() {
     feedback.info(messages[name] || '该能力暂未接入。')
   }
 
+  function openQuoteDetail(quote) {
+    if (!quote) {
+      setNotice({ type: 'error', text: '报价详情暂时无法打开，请刷新后重试。' })
+      return
+    }
+    setActiveQuote(quote)
+    setActiveAction('QUOTE_DETAIL')
+  }
+
   function openUserProfile(userId, event) {
     event?.stopPropagation()
     goToUserProfile(rawNavigate, userId, currentUser)
@@ -810,12 +819,7 @@ export function ConversationDetailPage() {
             onConfirmQuote={confirmQuote}
             onRejectQuote={rejectQuote}
             onOpenQuoteDetail={quote => {
-              if (!quote) {
-                setNotice({ type: 'error', text: '报价详情暂时无法打开，请刷新后重试。' })
-                return
-              }
-              setActiveQuote(quote)
-              setActiveAction('QUOTE_DETAIL')
+              openQuoteDetail(quote)
             }}
             onOpenOrderArchive={openOrderArchive}
             onOpenDeliveryGallery={openDeliveryGallery}
@@ -859,6 +863,7 @@ export function ConversationDetailPage() {
           panelSummary={viewModel.panelSummary}
           loading={loading}
           onOpenOrderArchive={() => openOrderArchive(currentOrder?.orderId)}
+          onOpenQuoteDetail={openQuoteDetail}
           onConfirmOrder={confirmCurrentOrder}
           onUnavailableTool={showUnavailableTool}
           onOpenAction={setActiveAction}

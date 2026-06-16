@@ -65,6 +65,24 @@ export function canEditQuote(quote, conversation, currentUser) {
     && currentUserId === Number(quote.providerUserId)
 }
 
+export function canRespondToQuote(quote, conversation, currentUser) {
+  const currentUserId = getCurrentUserId(currentUser)
+  const quoteCustomerId = Number(quote?.customerId)
+  const conversationCustomerId = Number(conversation?.participantAId)
+  const hasQuoteCustomer = Number.isFinite(quoteCustomerId) && quoteCustomerId > 0
+  const hasConversationCustomer = Number.isFinite(conversationCustomerId) && conversationCustomerId > 0
+  if (!quote || quote.status !== 'PENDING_CONFIRM' || getQuoteOrderId(quote) || !currentUserId) {
+    return false
+  }
+  if (hasQuoteCustomer && currentUserId !== quoteCustomerId) {
+    return false
+  }
+  if (!hasQuoteCustomer && (!hasConversationCustomer || currentUserId !== conversationCustomerId)) {
+    return false
+  }
+  return !hasConversationCustomer || currentUserId === conversationCustomerId
+}
+
 export function hasPendingQuote(quotes) {
   return quotes.some(quote => quote.status === 'PENDING_CONFIRM')
 }
