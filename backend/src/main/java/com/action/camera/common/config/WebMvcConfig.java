@@ -24,6 +24,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/auth/**",
                         "/sessions",
                         "/sessions/**",
+                        "/admin/login",
                         "/users/register",
                         "/users/login",
                         "/messages/**",

@@ -327,7 +327,7 @@ public class ReviewService {
     }
 
     private boolean isAdmin() {
-        return UserContext.getCurrentRole() != null && UserContext.getCurrentRole().name().equals("ADMIN");
+        return UserContext.isAdmin();
     }
 
     private String buildReviewMetadata(Long orderId, Long reviewId) {

@@ -6,6 +6,7 @@ import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.security.UserRole;
 import com.action.camera.repository.UserRepository;
+import com.action.camera.repository.UserRoleBindingRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
@@ -16,12 +17,18 @@ import java.util.Optional;
 @Component
 public class AuthInterceptor implements HandlerInterceptor {
 
+    private static final String ADMIN_ROLE = UserRole.ADMIN.name();
+
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
+    private final UserRoleBindingRepository userRoleBindingRepository;
 
-    public AuthInterceptor(JwtUtil jwtUtil, UserRepository userRepository) {
+    public AuthInterceptor(JwtUtil jwtUtil,
+                           UserRepository userRepository,
+                           UserRoleBindingRepository userRoleBindingRepository) {
         this.jwtUtil = jwtUtil;
         this.userRepository = userRepository;
+        this.userRoleBindingRepository = userRoleBindingRepository;
     }
 
     @Override
@@ -84,6 +91,7 @@ public class AuthInterceptor implements HandlerInterceptor {
         if (demoRole != null && !demoRole.isBlank()) {
             UserRole role = UserRole.parse(demoRole, null);
             UserContext.setCurrentRole(role);
+            UserContext.setAdmin(role == UserRole.ADMIN);
             return role;
         }
         if (requireExplicitRole) {
@@ -247,9 +255,13 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     private Optional<UserRole> loadAndSetRole(Long userId) {
         return userRepository.findById(userId)
-                .map(user -> UserRole.parse(user.getCurrentRole(), UserRole.CUSTOMER))
-                .map(role -> {
+                .map(user -> {
+                    UserRole role = UserRole.parse(user.getCurrentRole(), UserRole.CUSTOMER);
                     UserContext.setCurrentRole(role);
+                    UserContext.setAdmin(
+                            ADMIN_ROLE.equals(user.getCurrentRole())
+                                    || userRoleBindingRepository.existsByUserIdAndRole(userId, ADMIN_ROLE)
+                    );
                     return role;
                 });
     }

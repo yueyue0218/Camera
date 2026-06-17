@@ -31,6 +31,7 @@ export function AdminPage() {
   const { currentUser } = useAuth()
   const [params] = useSearchParams()
   const demoMode = import.meta.env.DEV && params.get('demo') === '1'
+  const hasAdminAccess = currentUser?.role === 'ADMIN' || currentUser?.adminCapable
   const [tab, setTab] = useState('dashboard')
   const [dashboard, setDashboard] = useState(null)
   const [certifications, setCertifications] = useState([])
@@ -41,7 +42,7 @@ export function AdminPage() {
   const [submitting, setSubmitting] = useState(false)
 
   const load = async () => {
-    if (!demoMode && currentUser.role !== 'ADMIN') return
+    if (!demoMode && !hasAdminAccess) return
     try {
       const [dashboardData, certificationItems, complaintItems] = demoMode
         ? [demoAdminDashboard, demoCertifications, demoAdminComplaints]
@@ -118,7 +119,7 @@ export function AdminPage() {
     if (dialog.kind === 'complaint') arbitrate(dialog.item, dialog.result, dialogText.trim())
   }
 
-  if (!demoMode && currentUser.role !== 'ADMIN') {
+  if (!demoMode && !hasAdminAccess) {
     return (
       <Box>
         <PageHeader title="管理后台" description="审核和仲裁入口。" />

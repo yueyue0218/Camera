@@ -1,5 +1,6 @@
 package com.action.camera.dispute.service;
 
+import com.action.camera.admin.service.AdminPermissionService;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.dispute.dto.DisputeArbitrateRequest;
@@ -12,14 +13,12 @@ import com.action.camera.dispute.entity.DisputeReply;
 import com.action.camera.dispute.event.DisputeResolvedEvent;
 import com.action.camera.dispute.repository.DisputeReplyRepository;
 import com.action.camera.dispute.repository.DisputeRepository;
-import com.action.camera.domain.User;
 import com.action.camera.notification.dto.NotificationCreateRequest;
 import com.action.camera.notification.service.NotificationService;
 import com.action.camera.order.entity.Order;
 import com.action.camera.order.enums.OrderStatus;
 import com.action.camera.order.repository.OrderRepository;
 import com.action.camera.order.service.OrderService;
-import com.action.camera.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -54,10 +53,10 @@ public class DisputeService {
     private final DisputeRepository disputeRepository;
     private final DisputeReplyRepository disputeReplyRepository;
     private final OrderRepository orderRepository;
-    private final UserRepository userRepository;
     private final OrderService orderService;
     private final NotificationService notificationService;
     private final ApplicationEventPublisher eventPublisher;
+    private final AdminPermissionService adminPermissionService;
 
     public DisputeResponse createDispute(Long orderId, Long initiatorId, DisputeCreateRequest request) {
         validateReason(request.reason());
@@ -208,10 +207,7 @@ public class DisputeService {
     }
 
     private boolean isAdmin(Long userId) {
-        return userRepository.findById(userId)
-                .map(User::getCurrentRole)
-                .map("ADMIN"::equals)
-                .orElse(false);
+        return adminPermissionService.hasAdminPermission(userId);
     }
 
     private void applyOrderArbitrationResult(Dispute dispute, Long adminId, String resolution, Long refundAmount) {

@@ -29,7 +29,7 @@ public class MockCurrentUserProvider {
         if (contextUserId != null) {
             UserRole contextRole = UserContext.getCurrentRole();
             UserRole resolvedRole = contextRole == null ? UserRole.CUSTOMER : contextRole;
-            return Optional.of(new CurrentUser(contextUserId, resolvedRole));
+            return Optional.of(new CurrentUser(contextUserId, resolvedRole, UserContext.isAdmin()));
         }
         return Optional.empty();
     }

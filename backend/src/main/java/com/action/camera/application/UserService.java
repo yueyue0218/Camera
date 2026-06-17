@@ -13,11 +13,11 @@ import com.action.camera.dto.UserProfileResponse;
 import com.action.camera.provider.entity.ProviderProfile;
 import com.action.camera.provider.mapper.ProviderProfileMapper;
 import com.action.camera.repository.UserRepository;
+import com.action.camera.repository.UserRoleBindingRepository;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 
 @Service
 public class UserService {
@@ -27,18 +27,21 @@ public class UserService {
     private final JwtUtil jwtUtil;
     private final ProviderProfileMapper providerProfileMapper;
     private final IpLocationService ipLocationService;
+    private final UserRoleBindingRepository userRoleBindingRepository;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public UserService(UserRepository userRepository,
                        VerificationCodeService codeService,
                        JwtUtil jwtUtil,
                        ProviderProfileMapper providerProfileMapper,
-                       IpLocationService ipLocationService) {
+                       IpLocationService ipLocationService,
+                       UserRoleBindingRepository userRoleBindingRepository) {
         this.userRepository = userRepository;
         this.codeService = codeService;
         this.jwtUtil = jwtUtil;
         this.providerProfileMapper = providerProfileMapper;
         this.ipLocationService = ipLocationService;
+        this.userRoleBindingRepository = userRoleBindingRepository;
     }
 
     @Transactional
@@ -77,9 +80,15 @@ public class UserService {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "学号或密码错误");
         }
 
+        UserRole requestedRole = UserRole.parse(role, null);
+        UserRole currentRole = UserRole.parse(user.getCurrentRole(), UserRole.CUSTOMER);
+        if (requestedRole == UserRole.ADMIN || currentRole == UserRole.ADMIN) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "管理员账号需通过专用入口登录");
+        }
+
         boolean dirty = false;
-        if (!role.equals(user.getCurrentRole())) {
-            user.setCurrentRole(role);
+        if (!requestedRole.name().equals(user.getCurrentRole())) {
+            user.setCurrentRole(requestedRole.name());
             dirty = true;
         }
 
@@ -96,12 +105,44 @@ public class UserService {
             userRepository.save(user);
         }
 
-        if ("PROVIDER".equals(role)) {
+        if (requestedRole == UserRole.PROVIDER) {
             ensureProviderProfile(user.getId());
         }
 
         String token = jwtUtil.generateToken(user.getId());
-        return new LoginResponse(token, user.getId(), user.getNickname(), role);
+        return new LoginResponse(
+                token,
+                user.getId(),
+                user.getNickname(),
+                requestedRole.name(),
+                hasAdminPermission(user)
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public LoginResponse adminLogin(String studentNo, String password) {
+        User user = userRepository.findByStudentNo(studentNo)
+                .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_ERROR, "学号或密码错误"));
+
+        if (!"ACTIVE".equals(user.getStatus())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "账号已被禁用");
+        }
+
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "学号或密码错误");
+        }
+
+        if (!hasAdminPermission(user)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "当前账号没有管理员权限");
+        }
+
+        String token = jwtUtil.generateToken(user.getId());
+        return new LoginResponse(token, user.getId(), user.getNickname(), UserRole.ADMIN.name(), true);
+    }
+
+    private boolean hasAdminPermission(User user) {
+        return UserRole.ADMIN.name().equals(user.getCurrentRole())
+                || userRoleBindingRepository.existsByUserIdAndRole(user.getId(), UserRole.ADMIN.name());
     }
 
     private void ensureProviderProfile(Long userId) {
@@ -142,7 +183,6 @@ public class UserService {
         resp.setStatus(user.getStatus());
         resp.setCreditScore(user.getCreditScore());
         resp.setCreatedAt(user.getCreatedAt());
-        // Dual-identity fields
         resp.setCustomerNickname(user.getNickname());
         resp.setCustomerAvatarFileId(user.getAvatarFileId());
         resp.setCustomerBio(user.getBio());

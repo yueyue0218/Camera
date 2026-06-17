@@ -66,6 +66,6 @@ public class UserSocialController {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
         UserRole role = UserContext.getCurrentRole() == null ? UserRole.CUSTOMER : UserContext.getCurrentRole();
-        return new CurrentUser(userId, role);
+        return new CurrentUser(userId, role, UserContext.isAdmin());
     }
 }

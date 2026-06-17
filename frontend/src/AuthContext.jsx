@@ -78,9 +78,37 @@ function normalizedUserId(session, demoUser) {
   return Number.isFinite(number) ? number : Number(demoUser.userId)
 }
 
+function normalizeAdminSession(session) {
+  const rawToken = session.token || session.accessToken || ''
+  const value = tokenSubject(rawToken)
+    || session.user.userId
+    || session.user.id
+    || session.user.user?.userId
+    || session.user.user?.id
+  const userId = Number(value)
+
+  if (!Number.isFinite(userId)) return null
+
+  return {
+    token: rawToken,
+    refreshToken: session.refreshToken || '',
+    user: {
+      ...session.user,
+      userId,
+      id: userId,
+      role: 'ADMIN',
+      adminCapable: true,
+      label: '绠＄悊鍛?',
+      nickname: session.user.nickname || '绠＄悊鍛?',
+      bio: session.user.bio || '',
+      description: session.user.description || session.user.bio || ''
+    }
+  }
+}
+
 function normalizeSession(session) {
   if (!session?.user) return null
-  if (session.user.role === 'ADMIN') return null
+  if (session.user.role === 'ADMIN') return normalizeAdminSession(session)
   const role = session.user.role === 'PROVIDER' ? 'PROVIDER' : 'CUSTOMER'
   const demoUser = USERS[roleToUserKey(role)]
   const userId = normalizedUserId(session, demoUser)
@@ -116,6 +144,7 @@ function normalizeSession(session) {
       userId,
       id: userId,
       role,
+      adminCapable: Boolean(session.user.adminCapable),
       cityCode,
       label: role === 'PROVIDER' ? '服务方' : '需求方',
       nickname,
@@ -214,6 +243,7 @@ export function AuthProvider({ children }) {
 
   function switchRole(newRole) {
     if (!session) return
+    if (session.user.role === 'ADMIN') return
     const nextSession = normalizeSession({
       ...session,
       user: { ...session.user, role: newRole }

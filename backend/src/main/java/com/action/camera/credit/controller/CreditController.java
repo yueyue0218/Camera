@@ -5,7 +5,6 @@ import com.action.camera.common.ErrorCode;
 import com.action.camera.common.Result;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
-import com.action.camera.common.security.UserRole;
 import com.action.camera.credit.dto.CreditRecordResponse;
 import com.action.camera.credit.dto.CreditSummaryResponse;
 import com.action.camera.domain.CreditRecord;
@@ -97,7 +96,7 @@ public class CreditController {
         if (currentUserId == null) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
-        if (currentUserId.equals(userId) || UserRole.ADMIN.equals(UserContext.getCurrentRole())) {
+        if (currentUserId.equals(userId) || UserContext.isAdmin()) {
             return;
         }
         throw new BusinessException(ErrorCode.FORBIDDEN, "只能查看自己的信用记录");

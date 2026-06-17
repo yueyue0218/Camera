@@ -320,8 +320,9 @@ function enhanceTilt(el, { maxRot = 5, maxMove = 10, perspective = 900 }) {
 export function LoginChoicePage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, currentUser } = useAuth()
   const hasModal = location.pathname !== '/login' && location.pathname !== '/login/'
+  const authenticatedHome = currentUser?.role === 'ADMIN' ? '/admin' : '/hall'
 
   const [activeSection, setActiveSection] = useState('op-page1')
   const [roleActive, setRoleActive] = useState('我想拍')
@@ -338,8 +339,8 @@ export function LoginChoicePage() {
   const card3Ref = useRef(null)
 
   useEffect(() => {
-    if (isAuthenticated) navigate('/hall', { replace: true })
-  }, [isAuthenticated, navigate])
+    if (isAuthenticated) navigate(authenticatedHome, { replace: true })
+  }, [authenticatedHome, isAuthenticated, navigate])
 
   useEffect(() => {
     const scroller = scrollRef.current
@@ -600,16 +601,25 @@ export function LoginInfoPage() {
   usePortraStyles()
   const navigate   = useNavigate()
   const location   = useLocation()
-  const { isAuthenticated, completeLogin, loginWithDemo } = useAuth()
+  const { isAuthenticated, currentUser, completeLogin, loginWithDemo } = useAuth()
   const [email, setEmail]     = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]     = useState('')
   const [loading, setLoading] = useState(false)
   const notice = location.state?.notice || ''
+  const isAdminEntry = location.pathname === '/login/admin'
+  const hasAdminAccess = currentUser?.role === 'ADMIN' || currentUser?.adminCapable
+  const authenticatedHome = currentUser?.role === 'ADMIN' ? '/admin' : '/hall'
+  const postLoginHome = isAdminEntry ? '/admin' : '/hall'
 
   useEffect(() => {
-    if (isAuthenticated) navigate('/hall', { replace: true })
-  }, [isAuthenticated, navigate])
+    if (!isAuthenticated) return
+    if (isAdminEntry && hasAdminAccess) {
+      navigate('/admin', { replace: true })
+      return
+    }
+    navigate(authenticatedHome, { replace: true })
+  }, [authenticatedHome, hasAdminAccess, isAdminEntry, isAuthenticated, navigate])
 
   async function submit() {
     setError('')
@@ -617,7 +627,9 @@ export function LoginInfoPage() {
     if (!password)      { setError('请输入密码'); return }
     setLoading(true)
     try {
-      const data = await authApi.login({ email: email.trim(), password })
+      const data = await (isAdminEntry
+        ? authApi.adminLogin({ email: email.trim(), password })
+        : authApi.login({ email: email.trim(), password }))
       const loginUser = data?.user || data || {}
       completeLogin({
         token: data?.token,
@@ -630,9 +642,9 @@ export function LoginInfoPage() {
           email: email.trim()
         }
       })
-      navigate('/hall', { replace: true })
+      navigate(postLoginHome, { replace: true })
     } catch (err) {
-      if (err.canUseDemoLogin) {
+      if (!isAdminEntry && err.canUseDemoLogin) {
         loginWithDemo({})
         navigate('/hall', { replace: true })
         return
@@ -649,13 +661,18 @@ export function LoginInfoPage() {
     <AuthCard>
       <Wordmark size={26} />
       <div style={{ fontSize: 10, letterSpacing: '.22em', color: MUTED, textTransform: 'uppercase', marginTop: 5, marginBottom: 26, fontFamily: SANS }}>
-        MEET RIGHT NOW
+        {isAdminEntry ? 'ADMIN ACCESS' : 'MEET RIGHT NOW'}
       </div>
       <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '.04em', marginBottom: 4, color: INK }}>欢迎回来</div>
       <div style={{ fontSize: 13, color: MUTED, marginBottom: 22, lineHeight: 1.65 }}>输入邮箱和密码，进入你的 Portra</div>
 
       <SuccessBanner text={notice} />
       <ErrorBanner text={error} />
+      {isAdminEntry ? (
+        <SwitchLine prompt="杩斿洖鏅€氱櫥褰曪紵" linkText="鐢ㄦ埛鐧诲綍" onClick={() => navigate('/login/sign-in')} />
+      ) : (
+        <SwitchLine prompt="绠＄悊鍛樿处鍙凤紵" linkText="绠＄悊鐧诲綍" onClick={() => navigate('/login/admin')} />
+      )}
 
       <div style={{ marginBottom: 14 }}>
         <FieldLabel label="学校邮箱" htmlFor="li-email" />
@@ -692,7 +709,7 @@ export function LoginInfoPage() {
 export function RegisterPage() {
   usePortraStyles()
   const navigate = useNavigate()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, currentUser } = useAuth()
   const [step, setStep] = useState(1)
   const [email, setEmail]       = useState('')
   const [code, setCode]         = useState('')
@@ -706,9 +723,9 @@ export function RegisterPage() {
   const timerRef = useRef(null)
 
   useEffect(() => {
-    if (isAuthenticated) navigate('/hall', { replace: true })
+    if (isAuthenticated) navigate(currentUser?.role === 'ADMIN' ? '/admin' : '/hall', { replace: true })
     return () => clearInterval(timerRef.current)
-  }, [isAuthenticated, navigate])
+  }, [currentUser?.role, isAuthenticated, navigate])
 
   async function sendCode() {
     setError('')

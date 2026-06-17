@@ -4,10 +4,16 @@ public class CurrentUser {
 
     private final Long userId;
     private final UserRole role;
+    private final boolean admin;
 
     public CurrentUser(Long userId, UserRole role) {
+        this(userId, role, role == UserRole.ADMIN);
+    }
+
+    public CurrentUser(Long userId, UserRole role, boolean admin) {
         this.userId = userId;
         this.role = role;
+        this.admin = admin || role == UserRole.ADMIN;
     }
 
     public Long getUserId() {
@@ -19,7 +25,7 @@ public class CurrentUser {
     }
 
     public boolean isAdmin() {
-        return role == UserRole.ADMIN;
+        return admin;
     }
 
     public boolean isCustomer() {

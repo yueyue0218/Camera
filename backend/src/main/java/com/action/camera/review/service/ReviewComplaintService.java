@@ -1,13 +1,12 @@
 package com.action.camera.review.service;
 
+import com.action.camera.admin.service.AdminPermissionService;
 import com.action.camera.application.CreditService;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
-import com.action.camera.domain.User;
 import com.action.camera.notification.dto.NotificationCreateRequest;
 import com.action.camera.notification.service.NotificationService;
-import com.action.camera.repository.UserRepository;
 import com.action.camera.review.dto.ReviewComplaintArbitrateRequest;
 import com.action.camera.review.dto.ReviewComplaintCreateRequest;
 import com.action.camera.review.dto.ReviewComplaintResponse;
@@ -35,8 +34,6 @@ public class ReviewComplaintService {
     private static final String REJECTED = "REJECTED";
     private static final String REVIEW_HIDDEN = "REVIEW_HIDDEN";
 
-    private static final String ADMIN = "ADMIN";
-
     private static final String TYPE_COMPLAINT_CREATED = "REVIEW_COMPLAINT_CREATED";
     private static final String TYPE_COMPLAINT_RESOLVED = "REVIEW_COMPLAINT_RESOLVED";
     private static final String RELATED_REVIEW_COMPLAINT = "REVIEW_COMPLAINT";
@@ -47,23 +44,23 @@ public class ReviewComplaintService {
 
     private final ReviewComplaintRepository complaintRepository;
     private final ReviewRepository reviewRepository;
-    private final UserRepository userRepository;
     private final CreditService creditService;
     private final NotificationService notificationService;
     private final EvidenceFileQueryPort evidenceFileQueryPort;
+    private final AdminPermissionService adminPermissionService;
 
     public ReviewComplaintService(ReviewComplaintRepository complaintRepository,
                                   ReviewRepository reviewRepository,
-                                  UserRepository userRepository,
                                   CreditService creditService,
                                   NotificationService notificationService,
-                                  EvidenceFileQueryPort evidenceFileQueryPort) {
+                                  EvidenceFileQueryPort evidenceFileQueryPort,
+                                  AdminPermissionService adminPermissionService) {
         this.complaintRepository = complaintRepository;
         this.reviewRepository = reviewRepository;
-        this.userRepository = userRepository;
         this.creditService = creditService;
         this.notificationService = notificationService;
         this.evidenceFileQueryPort = evidenceFileQueryPort;
+        this.adminPermissionService = adminPermissionService;
     }
 
     @Transactional
@@ -323,10 +320,7 @@ public class ReviewComplaintService {
     }
 
     private boolean isAdmin(Long userId) {
-        return userRepository.findById(userId)
-                .map(User::getCurrentRole)
-                .map(ADMIN::equals)
-                .orElse(false);
+        return adminPermissionService.hasAdminPermission(userId);
     }
 
     private void notifyResolved(ReviewComplaint complaint) {

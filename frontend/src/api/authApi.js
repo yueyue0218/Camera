@@ -1,5 +1,9 @@
 import { request } from './client.js'
 
+function studentNoFromEmail(email) {
+  return email.trim().split('@')[0]
+}
+
 export const authApi = {
   sendCode(email) {
     return request('/auth/send-code', { method: 'POST', body: JSON.stringify({ email }) })
@@ -30,7 +34,7 @@ export const authApi = {
     throw fallbackError || new Error('注册接口暂不可用')
   },
   async login({ email, password }) {
-    const studentNo = email.trim().split('@')[0]
+    const studentNo = studentNoFromEmail(email)
     try {
       return await request('/users/login', {
         method: 'POST',
@@ -42,5 +46,11 @@ export const authApi = {
       }
       throw error
     }
+  },
+  adminLogin({ email, password }) {
+    return request('/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ studentNo: studentNoFromEmail(email), password })
+    })
   }
 }

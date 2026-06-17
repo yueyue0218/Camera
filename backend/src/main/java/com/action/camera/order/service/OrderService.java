@@ -871,6 +871,9 @@ public class OrderService {
     }
 
     private String resolveOperatorRole(Order order, Long operatorId) {
+        if (UserContext.isAdmin()) {
+            return "ADMIN";
+        }
         UserRole contextRole = UserContext.getCurrentRole();
         if (contextRole != null) {
             return contextRole.name();

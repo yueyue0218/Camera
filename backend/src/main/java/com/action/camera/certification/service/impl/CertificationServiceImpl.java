@@ -1,5 +1,6 @@
 package com.action.camera.certification.service.impl;
 
+import com.action.camera.admin.service.AdminPermissionService;
 import com.action.camera.certification.dto.CertificationRequest;
 import com.action.camera.certification.dto.CertificationResponse;
 import com.action.camera.certification.entity.AuditRecord;
@@ -12,8 +13,6 @@ import com.action.camera.certification.service.CertificationService;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.page.PageResult;
-import com.action.camera.domain.User;
-import com.action.camera.repository.UserRepository;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.context.ApplicationEventPublisher;
@@ -32,16 +31,16 @@ public class CertificationServiceImpl implements CertificationService {
 
     private final RealNameCertificationMapper certificationMapper;
     private final AuditRecordMapper auditRecordMapper;
-    private final UserRepository userRepository;
+    private final AdminPermissionService adminPermissionService;
     private final ApplicationEventPublisher eventPublisher;
 
     public CertificationServiceImpl(RealNameCertificationMapper certificationMapper,
                                     AuditRecordMapper auditRecordMapper,
-                                    UserRepository userRepository,
+                                    AdminPermissionService adminPermissionService,
                                     ApplicationEventPublisher eventPublisher) {
         this.certificationMapper = certificationMapper;
         this.auditRecordMapper = auditRecordMapper;
-        this.userRepository = userRepository;
+        this.adminPermissionService = adminPermissionService;
         this.eventPublisher = eventPublisher;
     }
 
@@ -124,14 +123,12 @@ public class CertificationServiceImpl implements CertificationService {
     public PageResult<CertificationResponse> listByStatus(Long adminId, String status, int page, int size) {
         checkAdminRole(adminId);
 
-        // 先 count，再查数据（MyBatis-Plus 3.5.9 去掉了 PaginationInnerInterceptor，total 需手动计算）
-        LambdaQueryWrapper<RealNameCertification> countWrapper = new LambdaQueryWrapper<RealNameCertification>();
+        LambdaQueryWrapper<RealNameCertification> countWrapper = new LambdaQueryWrapper<>();
         if (status != null && !status.isBlank()) {
             countWrapper.eq(RealNameCertification::getStatus, status);
         }
         long total = certificationMapper.selectCount(countWrapper);
 
-        // API 用 0-indexed page，MyBatis-Plus 用 1-indexed
         Page<RealNameCertification> pageParam = new Page<>(page + 1L, size);
         var result = certificationMapper.selectPageByStatus(pageParam, status);
 
@@ -142,9 +139,6 @@ public class CertificationServiceImpl implements CertificationService {
         return new PageResult<>(records, page, size, total);
     }
 
-    // ---- 私有工具方法 ----
-
-    /** 前3位 + 若干 * + 后4位 */
     private String maskIdCard(String idCard) {
         if (idCard == null || idCard.length() <= 7) {
             return idCard;
@@ -155,9 +149,7 @@ public class CertificationServiceImpl implements CertificationService {
     }
 
     private void checkAdminRole(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
-        if (!"ADMIN".equals(user.getCurrentRole())) {
+        if (!adminPermissionService.hasAdminPermission(userId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "需要管理员权限");
         }
     }
@@ -168,7 +160,7 @@ public class CertificationServiceImpl implements CertificationService {
             throw new BusinessException(ErrorCode.NOT_FOUND, "认证申请不存在");
         }
         if (!PENDING.equals(cert.getStatus())) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "该申请当前状态不可审批");
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "该申请当前状态不可审核");
         }
         return cert;
     }

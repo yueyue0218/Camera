@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { useAuth } from './AuthContext.jsx'
 import { LoginChoicePage, LoginInfoPage, RegisterPage } from './pages/auth/index.js'
 import { DemandDetailPage, HallPage, ServicePackageDetailPage } from './pages/hall/index.js'
 import { PublishPage, PublishServicePackagePage } from './pages/demand/index.js'
@@ -20,6 +21,21 @@ import { PortraRouteTransition } from './components/portra/index.js'
 const DevDLineUiPreview = import.meta.env.DEV
   ? lazy(() => import('./pages/dev/index.jsx').then(module => ({ default: module.DLineUiPreview })))
   : null
+
+function RequireAdminRoute({ children }) {
+  const { isAuthenticated, currentUser } = useAuth()
+  const hasAdminAccess = currentUser?.role === 'ADMIN' || currentUser?.adminCapable
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login/admin" replace />
+  }
+
+  if (!hasAdminAccess) {
+    return <Navigate to="/hall" replace />
+  }
+
+  return children
+}
 
 export function AppRoutes() {
   return (
@@ -49,7 +65,7 @@ export function AppRoutes() {
       <Route path="/users/:userId" element={<PublicProfilePage />} />
       <Route path="/users/:userId/credit" element={<CreditDetailPage />} />
       <Route path="/users/:userId/reviews" element={<UserReviewsPage />} />
-      <Route path="/admin" element={<AdminPage />} />
+      <Route path="/admin" element={<RequireAdminRoute><AdminPage /></RequireAdminRoute>} />
       {import.meta.env.DEV && DevDLineUiPreview ? (
         <Route path="/dev/dline-ui-preview" element={<Suspense fallback={null}><DevDLineUiPreview /></Suspense>} />
       ) : null}
@@ -63,6 +79,7 @@ export function LoginRoutes() {
     <Routes>
       <Route path="/login" element={<LoginChoicePage />}>
         <Route path="sign-in" element={<LoginInfoPage />} />
+        <Route path="admin" element={<LoginInfoPage />} />
         <Route path="register" element={<RegisterPage />} />
       </Route>
       <Route path="/login/customer" element={<Navigate to="/login/sign-in" replace />} />

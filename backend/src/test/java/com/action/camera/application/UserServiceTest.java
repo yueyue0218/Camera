@@ -3,11 +3,13 @@ package com.action.camera.application;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.domain.User;
+import com.action.camera.domain.UserRoleBinding;
 import com.action.camera.dto.LoginResponse;
 import com.action.camera.dto.UpdateProfileRequest;
 import com.action.camera.dto.UserBriefResponse;
 import com.action.camera.dto.UserProfileResponse;
 import com.action.camera.repository.UserRepository;
+import com.action.camera.repository.UserRoleBindingRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,6 +44,9 @@ class UserServiceTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private UserRoleBindingRepository userRoleBindingRepository;
+
     @MockBean
     private VerificationCodeService codeService;
 
@@ -51,59 +56,60 @@ class UserServiceTest {
     @MockBean
     private IpLocationService ipLocationService;
 
-    private static final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+    private static final BCryptPasswordEncoder ENCODER = new BCryptPasswordEncoder();
 
     @BeforeEach
     void setUp() {
+        userRoleBindingRepository.deleteAll();
         userRepository.deleteAll();
     }
 
     @Test
-    @DisplayName("注册-正常：有效邮箱+验证码+密码+昵称 → 用户存入 DB，密码已 BCrypt 加密")
+    @DisplayName("register saves a new user with encrypted password")
     void register_success() {
         doNothing().when(codeService).verify(anyString(), anyString());
 
         userService.register(
-                "241880166@smail.nju.edu.cn", "123456", "test123456", "测试用户", "CUSTOMER");
+                "241880166@smail.nju.edu.cn", "123456", "test123456", "Test User", "CUSTOMER");
 
         User saved = userRepository.findByStudentNo("241880166").orElseThrow();
-        assertThat(saved.getNickname()).isEqualTo("测试用户");
+        assertThat(saved.getNickname()).isEqualTo("Test User");
         assertThat(saved.getSchool()).isEqualTo("南京大学");
         assertThat(saved.getStatus()).isEqualTo("ACTIVE");
         assertThat(saved.getCreditScore()).isNull();
         assertThat(saved.getPasswordHash()).isNotEqualTo("test123456");
-        assertThat(encoder.matches("test123456", saved.getPasswordHash())).isTrue();
+        assertThat(ENCODER.matches("test123456", saved.getPasswordHash())).isTrue();
     }
 
     @Test
-    @DisplayName("注册-异常：学号已注册 → 抛出 BusinessException（该学号已注册）")
+    @DisplayName("register rejects duplicate student number")
     void register_duplicateStudentNo() {
         doNothing().when(codeService).verify(anyString(), anyString());
         userService.register(
-                "241880166@smail.nju.edu.cn", "123456", "test123456", "用户一", "CUSTOMER");
+                "241880166@smail.nju.edu.cn", "123456", "test123456", "User One", "CUSTOMER");
 
         assertThatThrownBy(() ->
-            userService.register(
-                    "241880166@smail.nju.edu.cn", "654321", "password2", "用户二", "CUSTOMER")
-        ).isInstanceOf(BusinessException.class)
-         .hasMessageContaining("该学号已注册");
+                userService.register(
+                        "241880166@smail.nju.edu.cn", "654321", "password2", "User Two", "CUSTOMER"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("该学号已注册");
     }
 
     @Test
-    @DisplayName("注册-异常：验证码错误 → 抛出 BusinessException（验证码错误）")
+    @DisplayName("register rejects wrong verification code")
     void register_wrongCode() {
         doThrow(new BusinessException(ErrorCode.VALIDATION_ERROR, "验证码错误"))
                 .when(codeService).verify(anyString(), anyString());
 
         assertThatThrownBy(() ->
-            userService.register(
-                    "241880166@smail.nju.edu.cn", "000000", "test123456", "测试用户", "CUSTOMER")
-        ).isInstanceOf(BusinessException.class)
-         .hasMessageContaining("验证码错误");
+                userService.register(
+                        "241880166@smail.nju.edu.cn", "000000", "test123456", "Test User", "CUSTOMER"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("验证码错误");
     }
 
     @Test
-    @DisplayName("登录-正常：正确学号+密码 → 返回非空 token 和正确昵称")
+    @DisplayName("login returns token for valid credentials")
     void login_success() {
         createTestUser("241880166", "test123456", "ACTIVE");
 
@@ -111,11 +117,13 @@ class UserServiceTest {
 
         assertThat(response.getToken()).isNotBlank();
         assertThat(response.getUserId()).isNotNull();
-        assertThat(response.getNickname()).isEqualTo("测试用户");
+        assertThat(response.getNickname()).isEqualTo("Test User");
+        assertThat(response.getRole()).isEqualTo("CUSTOMER");
+        assertThat(response.isAdminCapable()).isFalse();
     }
 
     @Test
-    @DisplayName("登录-异常：学号不存在 → 抛出 BusinessException（学号或密码错误）")
+    @DisplayName("login rejects unknown student number")
     void login_studentNoNotFound() {
         assertThatThrownBy(() -> userService.login("999999999", "test123456", "CUSTOMER", null))
                 .isInstanceOf(BusinessException.class)
@@ -123,7 +131,7 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("登录-异常：密码错误 → 抛出 BusinessException（学号或密码错误）")
+    @DisplayName("login rejects wrong password")
     void login_wrongPassword() {
         createTestUser("241880166", "test123456", "ACTIVE");
 
@@ -133,7 +141,7 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("登录-异常：账号已禁用 → 抛出 BusinessException（账号已被禁用）")
+    @DisplayName("login rejects disabled account")
     void login_accountDisabled() {
         createTestUser("241880166", "test123456", "BANNED");
 
@@ -143,20 +151,97 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("查个人资料-正常：有效 userId → 返回完整信息")
+    @DisplayName("login cannot escalate a normal user to admin")
+    void login_customerCannotEscalateToAdmin() {
+        User user = createTestUser("241880168", "test123456", "ACTIVE");
+
+        assertThatThrownBy(() -> userService.login("241880168", "test123456", "ADMIN", null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("管理员账号需通过专用入口登录");
+
+        User reloaded = userRepository.findById(user.getId()).orElseThrow();
+        assertThat(reloaded.getCurrentRole()).isEqualTo("CUSTOMER");
+    }
+
+    @Test
+    @DisplayName("login cannot rewrite an existing admin account role")
+    void login_adminAccountCannotUseCommonRoleEntry() {
+        User admin = createTestUser("241880169", "test123456", "ACTIVE", "ADMIN");
+
+        assertThatThrownBy(() -> userService.login("241880169", "test123456", "CUSTOMER", null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("管理员账号需通过专用入口登录");
+
+        User reloaded = userRepository.findById(admin.getId()).orElseThrow();
+        assertThat(reloaded.getCurrentRole()).isEqualTo("ADMIN");
+    }
+
+    @Test
+    @DisplayName("admin login returns token for active admin account")
+    void adminLogin_success() {
+        User admin = createTestUser("241880170", "test123456", "ACTIVE", "ADMIN");
+
+        LoginResponse response = userService.adminLogin("241880170", "test123456");
+
+        assertThat(response.getToken()).isNotBlank();
+        assertThat(response.getUserId()).isEqualTo(admin.getId());
+        assertThat(response.getRole()).isEqualTo("ADMIN");
+        assertThat(response.isAdminCapable()).isTrue();
+    }
+
+    @Test
+    @DisplayName("admin login rejects non-admin account")
+    void adminLogin_rejectsNonAdminAccount() {
+        createTestUser("241880171", "test123456", "ACTIVE", "CUSTOMER");
+
+        assertThatThrownBy(() -> userService.adminLogin("241880171", "test123456"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("当前账号没有管理员权限");
+    }
+
+    @Test
+    @DisplayName("provider account with admin binding can still use normal provider login")
+    void login_providerWithAdminBindingKeepsProviderRole() {
+        User user = createTestUser("241880172", "test123456", "ACTIVE", "PROVIDER");
+        grantAdminBinding(user.getId());
+
+        LoginResponse response = userService.login("241880172", "test123456", "PROVIDER", null);
+
+        assertThat(response.getRole()).isEqualTo("PROVIDER");
+        assertThat(response.isAdminCapable()).isTrue();
+        User reloaded = userRepository.findById(user.getId()).orElseThrow();
+        assertThat(reloaded.getCurrentRole()).isEqualTo("PROVIDER");
+    }
+
+    @Test
+    @DisplayName("provider account with admin binding can use admin login")
+    void adminLogin_providerWithAdminBindingSucceeds() {
+        User user = createTestUser("241880173", "test123456", "ACTIVE", "PROVIDER");
+        grantAdminBinding(user.getId());
+
+        LoginResponse response = userService.adminLogin("241880173", "test123456");
+
+        assertThat(response.getToken()).isNotBlank();
+        assertThat(response.getUserId()).isEqualTo(user.getId());
+        assertThat(response.getRole()).isEqualTo("ADMIN");
+        assertThat(response.isAdminCapable()).isTrue();
+    }
+
+    @Test
+    @DisplayName("getMyProfile returns persisted user profile")
     void getMyProfile_success() {
         User user = createTestUser("241880166", "test123456", "ACTIVE");
 
         UserProfileResponse profile = userService.getMyProfile(user.getId());
 
-        assertThat(profile.getNickname()).isEqualTo("测试用户");
+        assertThat(profile.getNickname()).isEqualTo("Test User");
         assertThat(profile.getStudentNo()).isEqualTo("241880166");
         assertThat(profile.getSchool()).isEqualTo("南京大学");
         assertThat(profile.getCreditScore()).isNull();
     }
 
     @Test
-    @DisplayName("查个人资料-异常：userId 不存在 → 抛出 BusinessException（用户不存在）")
+    @DisplayName("getMyProfile rejects unknown user")
     void getMyProfile_notFound() {
         assertThatThrownBy(() -> userService.getMyProfile(99999L))
                 .isInstanceOf(BusinessException.class)
@@ -164,7 +249,7 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("更新单主头像后，brief 返回最新头像")
+    @DisplayName("customer brief returns latest avatar after profile update")
     void updateCustomerAvatar_returnsLatestAvatarInBrief() {
         User user = createTestUser("241880166", "test123456", "ACTIVE");
         UpdateProfileRequest request = new UpdateProfileRequest();
@@ -180,7 +265,7 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("更新摄影师头像后，brief 返回最新头像")
+    @DisplayName("provider brief returns latest avatar after profile update")
     void updateProviderAvatar_returnsLatestAvatarInBrief() {
         User user = createTestUser("241880167", "test123456", "ACTIVE");
         UpdateProfileRequest request = new UpdateProfileRequest();
@@ -196,12 +281,24 @@ class UserServiceTest {
     }
 
     private User createTestUser(String studentNo, String password, String status) {
+        return createTestUser(studentNo, password, status, "CUSTOMER");
+    }
+
+    private User createTestUser(String studentNo, String password, String status, String currentRole) {
         User user = new User();
         user.setStudentNo(studentNo);
-        user.setPasswordHash(encoder.encode(password));
-        user.setNickname("测试用户");
+        user.setPasswordHash(ENCODER.encode(password));
+        user.setNickname("Test User");
         user.setSchool("南京大学");
         user.setStatus(status);
+        user.setCurrentRole(currentRole);
         return userRepository.save(user);
+    }
+
+    private void grantAdminBinding(Long userId) {
+        UserRoleBinding binding = new UserRoleBinding();
+        binding.setUserId(userId);
+        binding.setRole("ADMIN");
+        userRoleBindingRepository.save(binding);
     }
 }
