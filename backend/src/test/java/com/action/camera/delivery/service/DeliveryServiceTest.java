@@ -22,6 +22,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -30,6 +31,7 @@ import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -105,6 +107,15 @@ class DeliveryServiceTest {
         DeliveryUploadResponse response = deliveryService.upload(ORDER_ID, file(), "首次交付");
 
         assertThat(response.getOrderStatus()).isEqualTo("DELIVERED_PENDING_CONFIRM");
+        assertThat(response.getFileId()).isEqualTo(FILE_ID);
+        assertThat(response.getFiles()).singleElement()
+                .satisfies(file -> {
+                    assertThat(file.getFileId()).isEqualTo(FILE_ID);
+                    assertThat(file.getFileName()).isEqualTo("delivery.jpg");
+                    assertThat(file.getMimeType()).isEqualTo("image/jpeg");
+                    assertThat(file.getFileType()).isEqualTo("IMAGE");
+                    assertThat(file.getSortOrder()).isZero();
+                });
         InOrder inOrder = inOrder(orderQueryPort, orderService, fileService, deliveryRepository,
                 deliveryFileRepository);
         inOrder.verify(orderQueryPort).getOrderSnapshot(ORDER_ID);
@@ -182,6 +193,85 @@ class DeliveryServiceTest {
     }
 
     @Test
+    void multiImageUploadCreatesOneDeliveryBatchWithMultipleDeliveryFiles() {
+        prepareUpload("PENDING_DELIVERY",
+                new FileUploadResponse(5001L, "cover.jpg"),
+                new FileUploadResponse(5002L, "detail.png"),
+                new FileUploadResponse(5003L, "retouch.webp"));
+        when(orderService.markDeliveryUploaded(ORDER_ID, PROVIDER_ID, "服务方上传交付文件"))
+                .thenReturn(deliveredOrder());
+
+        DeliveryUploadResponse response = deliveryService.upload(ORDER_ID, List.of(
+                multipart("files", "cover.jpg", "image/jpeg"),
+                multipart("files", "detail.png", "image/png"),
+                multipart("files", "retouch.webp", "image/webp")
+        ), "多图交付");
+
+        assertThat(response.getFileId()).isEqualTo(5001L);
+        assertThat(response.getFiles()).hasSize(3);
+        assertThat(response.getFiles())
+                .extracting("fileType")
+                .containsExactly("IMAGE", "IMAGE", "IMAGE");
+
+        ArgumentCaptor<Delivery> deliveryCaptor = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveryRepository).save(deliveryCaptor.capture());
+        assertThat(deliveryCaptor.getValue().getOriginalCount()).isEqualTo(3);
+        assertThat(deliveryCaptor.getValue().getRefinedCount()).isEqualTo(3);
+
+        ArgumentCaptor<DeliveryFile> deliveryFileCaptor = ArgumentCaptor.forClass(DeliveryFile.class);
+        verify(deliveryFileRepository, times(3)).save(deliveryFileCaptor.capture());
+        assertThat(deliveryFileCaptor.getAllValues())
+                .extracting(DeliveryFile::getFileId)
+                .containsExactly(5001L, 5002L, 5003L);
+        assertThat(deliveryFileCaptor.getAllValues())
+                .extracting(DeliveryFile::getSortOrder)
+                .containsExactly(0, 1, 2);
+    }
+
+    @Test
+    void imageAndZipUploadKeepsZipAsFileCardOnlyType() {
+        prepareUpload("PENDING_DELIVERY",
+                new FileUploadResponse(5001L, "cover.jpg"),
+                new FileUploadResponse(5002L, "all-originals.zip"));
+        when(orderService.markDeliveryUploaded(ORDER_ID, PROVIDER_ID, "服务方上传交付文件"))
+                .thenReturn(deliveredOrder());
+
+        DeliveryUploadResponse response = deliveryService.upload(ORDER_ID, List.of(
+                multipart("files", "cover.jpg", "image/jpeg"),
+                multipart("files", "all-originals.zip", "application/zip")
+        ), "图片和压缩包");
+
+        assertThat(response.getFiles()).hasSize(2);
+        assertThat(response.getFiles())
+                .extracting("fileType")
+                .containsExactly("IMAGE", "ZIP");
+
+        ArgumentCaptor<DeliveryFile> deliveryFileCaptor = ArgumentCaptor.forClass(DeliveryFile.class);
+        verify(deliveryFileRepository, times(2)).save(deliveryFileCaptor.capture());
+        assertThat(deliveryFileCaptor.getAllValues())
+                .extracting(DeliveryFile::getFileType)
+                .containsExactly("IMAGE", "ZIP");
+
+        ArgumentCaptor<Delivery> deliveryCaptor = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveryRepository).save(deliveryCaptor.capture());
+        assertThat(deliveryCaptor.getValue().getOriginalCount()).isEqualTo(1);
+        assertThat(deliveryCaptor.getValue().getRefinedCount()).isEqualTo(1);
+    }
+
+    @Test
+    void executableDeliveryFileIsRejectedBeforeUpload() {
+        assertThatThrownBy(() -> deliveryService.upload(ORDER_ID,
+                List.of(multipart("files", "malware.exe", "application/octet-stream")),
+                "非法文件"))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR));
+
+        verify(fileService, never()).upload(any(), any(), any(), any());
+        verify(deliveryRepository, never()).save(any(Delivery.class));
+        verify(orderService, never()).markDeliveryUploaded(any(), any(), any());
+    }
+
+    @Test
     void shootingUploadIsRejectedUntilSchedulerAdvancesRealStatus() {
         prepareUpload("SHOOTING");
 
@@ -206,14 +296,19 @@ class DeliveryServiceTest {
 
         verify(deliveryFileRepository).deleteByDeliveryId(9001L);
         verify(deliveryRepository).deleteById(9001L);
+        verify(fileService).deleteUploadedFileQuietly(FILE_ID);
     }
 
     private void prepareUpload(String orderStatus) {
+        prepareUpload(orderStatus, new FileUploadResponse(FILE_ID, "delivery.jpg"));
+    }
+
+    private void prepareUpload(String orderStatus, FileUploadResponse... uploadedFiles) {
         when(orderQueryPort.getOrderSnapshot(ORDER_ID)).thenReturn(snapshot(orderStatus));
         if (!"PENDING_DELIVERY".equals(orderStatus) && !"REWORK_REQUIRED".equals(orderStatus)) {
             return;
         }
-        prepareDeliveryPersistence();
+        prepareDeliveryPersistence(uploadedFiles);
     }
 
     private OrderSnapshot snapshot(String orderStatus) {
@@ -227,13 +322,18 @@ class DeliveryServiceTest {
         );
     }
 
-    private void prepareDeliveryPersistence() {
+    private void prepareDeliveryPersistence(FileUploadResponse... uploadedFiles) {
+        if (uploadedFiles == null || uploadedFiles.length == 0) {
+            uploadedFiles = new FileUploadResponse[] { new FileUploadResponse(FILE_ID, "delivery.jpg") };
+        }
+        final FileUploadResponse[] responses = uploadedFiles;
         when(txTemplate.execute(any())).thenAnswer(invocation -> {
             TransactionCallback<?> callback = invocation.getArgument(0);
             return callback.doInTransaction(null);
         });
+        final int[] uploadIndex = {0};
         when(fileService.upload(any(), eq(PROVIDER_ID), eq("DELIVERY"), eq("PRIVATE")))
-                .thenReturn(new FileUploadResponse(FILE_ID, "delivery.jpg"));
+                .thenAnswer(invocation -> responses[Math.min(uploadIndex[0]++, responses.length - 1)]);
         when(deliveryRepository.save(any(Delivery.class))).thenAnswer(invocation -> {
             Delivery delivery = invocation.getArgument(0);
             delivery.setId(9001L);
@@ -258,5 +358,9 @@ class DeliveryServiceTest {
 
     private MockMultipartFile file() {
         return new MockMultipartFile("file", "delivery.jpg", "image/jpeg", "fake-image".getBytes());
+    }
+
+    private MockMultipartFile multipart(String fieldName, String fileName, String contentType) {
+        return new MockMultipartFile(fieldName, fileName, contentType, ("fake-" + fileName).getBytes());
     }
 }

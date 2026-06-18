@@ -117,6 +117,21 @@ public class FileService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "文件不存在"));
     }
 
+    @Transactional
+    public void deleteUploadedFileQuietly(Long fileId) {
+        if (fileId == null) {
+            return;
+        }
+        try {
+            fileRepository.findById(fileId).ifPresent(record -> {
+                deleteQuietly(record.getFileKey());
+                fileRepository.delete(record);
+            });
+        } catch (RuntimeException ignored) {
+            // Best-effort cleanup for higher-level workflow rollback.
+        }
+    }
+
     public FileRecord getForDownload(Long fileId, Long currentUserId, UserRole currentRole) {
         FileRecord record = getById(fileId);
         fileAccessPolicy.assertCanDownload(record, currentUserId, currentRole);

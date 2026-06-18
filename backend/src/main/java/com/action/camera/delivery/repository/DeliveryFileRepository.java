@@ -11,6 +11,8 @@ public interface DeliveryFileRepository extends JpaRepository<DeliveryFile, Long
 
     Optional<DeliveryFile> findFirstByDeliveryIdOrderBySortOrderAsc(Long deliveryId);
 
+    List<DeliveryFile> findByDeliveryIdOrderBySortOrderAsc(Long deliveryId);
+
     List<DeliveryFile> findByDeliveryIdInAndFileIdIn(Collection<Long> deliveryIds, Collection<Long> fileIds);
 
     List<DeliveryFile> findByFileId(Long fileId);

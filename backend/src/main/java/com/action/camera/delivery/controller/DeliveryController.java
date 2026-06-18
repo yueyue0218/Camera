@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.ArrayList;
 
 @RestController
 @RequestMapping("/orders/{orderId}/deliveries")
@@ -26,9 +27,21 @@ public class DeliveryController {
 
     @PostMapping
     public Result<DeliveryUploadResponse> upload(@PathVariable Long orderId,
-                                                 @RequestParam("file") MultipartFile file,
+                                                 @RequestParam(value = "file", required = false) MultipartFile file,
+                                                 @RequestParam(value = "files", required = false) List<MultipartFile> files,
+                                                 @RequestParam(value = "files[]", required = false) List<MultipartFile> filesArray,
                                                  @RequestParam(value = "remark", required = false) String remark) {
-        return Result.success(deliveryService.upload(orderId, file, remark));
+        List<MultipartFile> uploadFiles = new ArrayList<>();
+        if (files != null) {
+            uploadFiles.addAll(files);
+        }
+        if (filesArray != null) {
+            uploadFiles.addAll(filesArray);
+        }
+        if (file != null) {
+            uploadFiles.add(file);
+        }
+        return Result.success(deliveryService.upload(orderId, uploadFiles, remark));
     }
 
     @GetMapping

@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @AllArgsConstructor
@@ -20,4 +21,5 @@ public class DeliveryResponse {
     private String status;
     private String remark;
     private LocalDateTime uploadTime;
+    private List<DeliveryFileResponse> files;
 }
