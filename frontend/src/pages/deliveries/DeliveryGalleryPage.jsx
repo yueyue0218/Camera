@@ -313,6 +313,7 @@ export function DeliveryGalleryPage() {
                 selectedIds={selectedIds}
                 onToggle={toggleSelected}
                 onOpenViewer={setViewerIndex}
+                onDownloadFile={downloadFile}
               />
             ) : (
               <PortraEmptyState title="暂无作品" description="该作品记录没有可展示的照片信息。" />
@@ -333,7 +334,7 @@ export function DeliveryGalleryPage() {
             <PortraTicketSection title="作品信息">
               <Stack spacing={0.85}>
                 <InfoLine label="订单金额" value={centToYuan(order?.amountCent)} />
-                <InfoLine label="作品数量" value={`${batch.fileCount} 张作品`} />
+                <InfoLine label="交付内容" value={formatGalleryFileCount(batch)} />
                 <InfoBlock label="作品说明" value={batch.description || '摄影师已上传作品，等待客户确认。'} />
               </Stack>
             </PortraTicketSection>
@@ -508,4 +509,16 @@ const sidePanelSx = {
 
 const primaryBackButtonSx = {
   alignSelf: 'flex-start'
+}
+
+function formatGalleryFileCount(batch) {
+  const imageCount = Number(batch?.imageCount || 0)
+  const zipCount = Number(batch?.zipCount || 0)
+  const fileCount = Number(batch?.fileCount || batch?.files?.length || 0)
+  const otherCount = Math.max(0, fileCount - imageCount - zipCount)
+  const parts = []
+  if (imageCount) parts.push(`${imageCount} 张图片`)
+  if (zipCount) parts.push(`${zipCount} 个 ZIP`)
+  if (otherCount) parts.push(`${otherCount} 个文件`)
+  return parts.length ? parts.join(' / ') : '暂无文件'
 }

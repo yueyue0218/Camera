@@ -3,7 +3,6 @@ import CollectionsRoundedIcon from '@mui/icons-material/CollectionsRounded'
 import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded'
 import { PortraStatusBadge, PortraTicketCard } from '../../../components/portra/index.js'
 import { PORTRA_SURFACE } from '../../../theme/portraSurfaceTokens.js'
-import { formatFileUnit } from '../../../utils/productCopy.js'
 import { DeliveryThumbnailStrip } from './DeliveryThumbnailStrip.jsx'
 
 export function DeliveryBatchCard({
@@ -82,7 +81,7 @@ export function DeliveryBatchCard({
         <DeliveryThumbnailStrip files={batch.files} previewUrls={previewUrls} variant={thumbnailVariant} mode="contain" />
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
           <Typography variant="body2" sx={{ color: PORTRA_SURFACE.muted, minWidth: 0 }}>
-            共 {formatFileUnit(batch.fileCount || batch.files?.length || 0, message ? '张作品' : '份作品')}
+            共 {formatDeliveryBatchCount(batch, message)}
           </Typography>
           <Button size="small" variant="outlined" startIcon={<OpenInNewRoundedIcon />} disabled={!clickable} onClick={event => {
             event.stopPropagation()
@@ -97,4 +96,17 @@ export function DeliveryBatchCard({
       </Stack>
     </Root>
   )
+}
+
+function formatDeliveryBatchCount(batch, compact = false) {
+  const imageCount = Number(batch?.imageCount || 0)
+  const zipCount = Number(batch?.zipCount || 0)
+  const fileCount = Number(batch?.fileCount || batch?.files?.length || 0)
+  const otherCount = Math.max(0, fileCount - imageCount - zipCount)
+  const parts = []
+  if (imageCount) parts.push(`${imageCount} 张图片`)
+  if (zipCount) parts.push(`${zipCount} 个 ZIP`)
+  if (otherCount) parts.push(`${otherCount} 个文件`)
+  if (!parts.length) return compact ? '0 张作品' : '0 份作品'
+  return parts.join(' / ')
 }

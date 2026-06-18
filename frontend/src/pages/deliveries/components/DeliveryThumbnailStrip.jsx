@@ -3,7 +3,7 @@ import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
 import InsertDriveFileRoundedIcon from '@mui/icons-material/InsertDriveFileRounded'
 import { useAuth } from '../../../AuthContext.jsx'
 import { PORTRA_RADIUS, PORTRA_SURFACE } from '../../../theme/portraSurfaceTokens.js'
-import { getDeliveryFileId, isImageDeliveryFile } from '../deliveryDisplay.js'
+import { getDeliveryFileId, isImageDeliveryFile, isZipDeliveryFile } from '../deliveryDisplay.js'
 import { getPreviewKey, useDeliveryFilePreviews } from '../useDeliveryFilePreviews.js'
 
 export function DeliveryThumbnailStrip({ files = [], previewUrls = {}, variant = 'order', mode = 'cover' }) {
@@ -55,7 +55,7 @@ function ThumbnailTile({ file, previewUrl, loading, mode, overlay }) {
       ) : loading && imageFile ? (
         <ThumbnailLoading />
       ) : (
-        <ThumbnailPlaceholder label={imageFile ? '暂无缩略图' : '作品'} />
+        <ThumbnailPlaceholder label={imageFile ? '暂无缩略图' : isZipDeliveryFile(file) ? 'ZIP' : '文件'} />
       )}
       {overlay && (
         <Box sx={{
@@ -111,7 +111,7 @@ function ThumbnailPlaceholder({ label }) {
       color: PORTRA_SURFACE.muted
     }}>
       <Box sx={{ textAlign: 'center' }}>
-        {label === '作品' ? <InsertDriveFileRoundedIcon /> : <ImageRoundedIcon />}
+        {label === 'ZIP' || label === '文件' ? <InsertDriveFileRoundedIcon /> : <ImageRoundedIcon />}
         <Typography variant="caption" sx={{ display: 'block', fontWeight: 800 }}>{label}</Typography>
       </Box>
     </Box>

@@ -24,6 +24,8 @@ import { PortraStatusBadge } from '../../../components/portra/index.js'
 import { formatTime } from '../utils/conversationUtils.js'
 import { buildQuoteDisplayModel } from '../utils/quoteDisplayModel.js'
 import { QuoteMoneyText } from './QuoteMoneyText.jsx'
+import { DeliveryUploadDialog } from '../../deliveries/components/DeliveryUploadDialog.jsx'
+import { flattenDeliveryFiles, isAuthorizableDeliveryFile } from '../../deliveries/deliveryDisplay.js'
 
 export function ConversationActionDialogs({
   activeAction,
@@ -44,7 +46,7 @@ export function ConversationActionDialogs({
   onRejectQuote,
   onResendQuote,
   onConfirmPayment,
-  onDeliveryFileChange,
+  onDeliveryFilesChange,
   onDeliveryRemarkChange,
   onReworkRequirementChange,
   onPhotoAuthorizationFileIdsChange,
@@ -53,17 +55,17 @@ export function ConversationActionDialogs({
   onSubmitRework,
   onSubmitPhotoAuthorization
 }) {
-  const safeDeliveryForm = deliveryForm || { file: null, remark: '' }
+  const safeDeliveryForm = deliveryForm || { files: [], remark: '' }
   const safePhotoAuthorizationForm = {
     fileIds: Array.isArray(photoAuthorizationForm?.fileIds) ? photoAuthorizationForm.fileIds : [],
     remark: photoAuthorizationForm?.remark || ''
   }
   const quoteDisplay = quote ? buildQuoteDisplayModel(quote) : null
-  const deliveryFiles = (Array.isArray(deliveryRecords) ? deliveryRecords : [])
-    .filter(record => record.fileId)
-    .map(record => ({
-      fileId: Number(record.fileId),
-      fileName: formatFileDisplayName(record, '作品')
+  const deliveryFiles = flattenDeliveryFiles(deliveryRecords)
+    .filter(file => file.fileId && isAuthorizableDeliveryFile(file))
+    .map(file => ({
+      fileId: Number(file.fileId),
+      fileName: formatFileDisplayName(file, '作品')
     }))
 
   async function submitAndClose(handler, event) {
@@ -184,35 +186,18 @@ export function ConversationActionDialogs({
         </DialogActions>
       </Dialog>
 
-      <Dialog open={activeAction === 'UPLOAD_DELIVERY' || activeAction === 'REUPLOAD_DELIVERY'} onClose={onClose} fullWidth maxWidth="sm" PaperProps={dialogPaperProps}>
-        <DialogTitle sx={dialogTitleSx}>{activeAction === 'REUPLOAD_DELIVERY' ? '重新上传作品' : '上传作品'}</DialogTitle>
-        <DialogContent sx={dialogContentSx}>
-          <Stack component="form" id="delivery-dialog-form" spacing={2} sx={{ pt: 1 }} onSubmit={event => submitAndClose(onSubmitDelivery, event)}>
-            <DialogContentText>
-              {activeAction === 'REUPLOAD_DELIVERY' ? '请根据客户的返修要求上传调整后的作品。' : '选择本次作品，并补充必要的作品说明。'}
-            </DialogContentText>
-            <Button component="label" variant="outlined" sx={{ alignSelf: 'flex-start' }}>
-              选择作品
-              <input hidden type="file" onChange={event => onDeliveryFileChange(event.target.files?.[0] || null)} />
-            </Button>
-            <Typography color="text.secondary" variant="body2">{safeDeliveryForm.file ? getSafeDisplayText(safeDeliveryForm.file.name, '已选择作品') : '尚未选择作品'}</Typography>
-            <TextField
-              label="作品说明"
-              value={safeDeliveryForm.remark}
-              onChange={event => onDeliveryRemarkChange(event.target.value)}
-              multiline
-              minRows={3}
-              placeholder="说明本次作品内容、返修修改点或注意事项"
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={dialogActionsSx}>
-          <Button color="inherit" variant="text" onClick={onClose}>取消</Button>
-          <Button type="submit" form="delivery-dialog-form" variant="contained" disabled={loading || !safeDeliveryForm.file}>
-            {activeAction === 'REUPLOAD_DELIVERY' ? '上传返修作品' : '上传作品'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <DeliveryUploadDialog
+        open={activeAction === 'UPLOAD_DELIVERY' || activeAction === 'REUPLOAD_DELIVERY'}
+        mode={activeAction === 'REUPLOAD_DELIVERY' ? 'rework' : 'upload'}
+        value={safeDeliveryForm}
+        loading={loading}
+        onClose={onClose}
+        onChange={nextValue => {
+          onDeliveryFilesChange?.(nextValue.files || [])
+          onDeliveryRemarkChange?.(nextValue.remark || '')
+        }}
+        onSubmit={onSubmitDelivery}
+      />
 
       <Dialog open={activeAction === 'REQUEST_REWORK'} onClose={onClose} fullWidth maxWidth="sm" PaperProps={dialogPaperProps}>
         <DialogTitle sx={dialogTitleSx}>提交返修要求</DialogTitle>

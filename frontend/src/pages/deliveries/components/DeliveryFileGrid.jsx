@@ -1,5 +1,6 @@
 import { Box, Checkbox, IconButton, Stack, Typography } from '@mui/material'
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded'
+import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded'
 import InsertDriveFileRoundedIcon from '@mui/icons-material/InsertDriveFileRounded'
 import { PORTRA_RADIUS, PORTRA_SURFACE } from '../../../theme/portraSurfaceTokens.js'
 import { isImageDeliveryFile } from '../deliveryDisplay.js'
@@ -9,7 +10,8 @@ export function DeliveryFileGrid({
   previewUrls = {},
   selectedIds = new Set(),
   onToggle,
-  onOpenViewer
+  onOpenViewer,
+  onDownloadFile
 }) {
   return (
     <Box sx={{
@@ -20,6 +22,7 @@ export function DeliveryFileGrid({
       {files.map((file, index) => {
         const selected = selectedIds.has(file.id)
         const previewUrl = previewUrls[file.id] || previewUrls[file.fileId]
+        const image = isImageDeliveryFile(file)
         return (
           <Box
             key={file.id}
@@ -32,13 +35,13 @@ export function DeliveryFileGrid({
               boxShadow: selected ? '0 0 0 3px rgba(13,47,178,.12)' : 'none'
             }}
           >
-            <Box sx={{ aspectRatio: '4 / 3', bgcolor: PORTRA_SURFACE.paperMuted, cursor: 'zoom-in' }} onClick={() => onOpenViewer(index)}>
-              {previewUrl && isImageDeliveryFile(file) ? (
+            <Box sx={{ aspectRatio: '4 / 3', bgcolor: PORTRA_SURFACE.paperMuted, cursor: image ? 'zoom-in' : 'default' }} onClick={() => image && onOpenViewer(index)}>
+              {previewUrl && image ? (
                 <Box component="img" src={previewUrl} alt={file.fileName} sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               ) : (
                 <Stack spacing={0.5} sx={{ height: '100%', alignItems: 'center', justifyContent: 'center', color: PORTRA_SURFACE.muted }}>
                   <InsertDriveFileRoundedIcon />
-                  <Typography variant="caption">暂无缩略图</Typography>
+                  <Typography variant="caption">{image ? '暂无缩略图' : 'ZIP 文件'}</Typography>
                 </Stack>
               )}
             </Box>
@@ -49,15 +52,15 @@ export function DeliveryFileGrid({
             />
             <IconButton
               size="small"
-              onClick={() => onOpenViewer(index)}
+              onClick={() => image ? onOpenViewer(index) : onDownloadFile?.(file, index)}
               sx={{ position: 'absolute', top: 6, right: 6, bgcolor: 'rgba(255,255,255,.78)' }}
             >
-              <VisibilityRoundedIcon fontSize="small" />
+              {image ? <VisibilityRoundedIcon fontSize="small" /> : <DownloadRoundedIcon fontSize="small" />}
             </IconButton>
             <Box sx={{ px: 0.9, py: 0.75 }}>
               <Typography variant="body2" noWrap sx={{ color: PORTRA_SURFACE.ink, fontWeight: 800 }}>{file.fileName}</Typography>
               <Typography variant="caption" sx={{ color: PORTRA_SURFACE.muted }}>
-                {file.fileId ? '可下载原图' : '原图待同步'}
+                {image ? (file.fileId ? '可预览 / 下载原图' : '原图待同步') : '压缩包 / 可下载'}
               </Typography>
             </Box>
           </Box>

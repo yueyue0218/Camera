@@ -93,7 +93,7 @@ export function ConversationDetailPage() {
   const [photoAuthorizations, setPhotoAuthorizations] = useState([])
   const [content, setContent] = useState('')
   const [quoteForm, setQuoteForm] = useState(() => createDefaultQuoteForm())
-  const [deliveryForm, setDeliveryForm] = useState({ file: null, remark: '' })
+  const [deliveryForm, setDeliveryForm] = useState({ files: [], remark: '' })
   const [reworkRequirement, setReworkRequirement] = useState('')
   const [photoAuthorizationForm, setPhotoAuthorizationForm] = useState({ fileIds: [], remark: '' })
   const [authorizationRemarks, setAuthorizationRemarks] = useState({})
@@ -288,7 +288,7 @@ export function ConversationDetailPage() {
     setStatusLogs([])
     setDeliveryRecords([])
     setPhotoAuthorizations([])
-    setDeliveryForm({ file: null, remark: '' })
+    setDeliveryForm({ files: [], remark: '' })
     setReworkRequirement('')
     setPhotoAuthorizationForm({ fileIds: [], remark: '' })
     setAuthorizationRemarks({})
@@ -305,7 +305,7 @@ export function ConversationDetailPage() {
     setStatusLogs(logs || [])
     setDeliveryRecords(deliveries || [])
     setPhotoAuthorizations(authorizations || [])
-    setDeliveryForm({ file: null, remark: '' })
+    setDeliveryForm({ files: [], remark: '' })
     setReworkRequirement('')
     setPhotoAuthorizationForm({ fileIds: [], remark: '' })
     setAuthorizationRemarks({})
@@ -542,11 +542,13 @@ export function ConversationDetailPage() {
   }
 
   async function submitDelivery(event) {
-    event.preventDefault()
-    if (!currentOrder || !deliveryForm.file) return false
-    const result = await run(async () => deliveryApi.upload(currentOrder.orderId, deliveryForm.file, deliveryForm.remark.trim(), currentUser),
-      currentOrder.status === 'REWORK_REQUIRED' ? '返修作品已上传' : '作品已上传')
+    event?.preventDefault?.()
+    const files = Array.isArray(deliveryForm.files) ? deliveryForm.files : deliveryForm.file ? [deliveryForm.file] : []
+    if (!currentOrder || !files.length) return false
+    const result = await run(async () => deliveryApi.upload(currentOrder.orderId, files, deliveryForm.remark.trim(), currentUser),
+      currentOrder.status === 'REWORK_REQUIRED' ? '返修作品已发送给客户验收' : '交付作品已发送给客户验收')
     if (result) {
+      setDeliveryForm({ files: [], remark: '' })
       await refreshConversationData(conversation, currentOrder.orderId)
       return true
     }
@@ -918,7 +920,7 @@ export function ConversationDetailPage() {
         onRejectQuote={rejectQuoteFromDialog}
         onResendQuote={resendQuote}
         onConfirmPayment={confirmPaymentFromDialog}
-        onDeliveryFileChange={file => setDeliveryForm({ ...deliveryForm, file })}
+        onDeliveryFilesChange={files => setDeliveryForm({ ...deliveryForm, files })}
         onDeliveryRemarkChange={remark => setDeliveryForm({ ...deliveryForm, remark })}
         onReworkRequirementChange={setReworkRequirement}
         onPhotoAuthorizationFileIdsChange={fileIds => setPhotoAuthorizationForm({ ...photoAuthorizationForm, fileIds })}

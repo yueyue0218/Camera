@@ -38,7 +38,7 @@ export function DeliveryPreviewViewer({
       </DialogContent>
       <DialogActions sx={{ bgcolor: PORTRA_SURFACE.paperMuted }}>
         <Button color="inherit" onClick={onClose}>关闭</Button>
-        <Button startIcon={<DownloadRoundedIcon />} onClick={() => onDownload(file)} disabled={!file?.fileId}>下载当前图片</Button>
+        <Button startIcon={<DownloadRoundedIcon />} onClick={() => onDownload(file)} disabled={!file?.fileId}>下载当前文件</Button>
       </DialogActions>
     </Dialog>
   )

@@ -25,15 +25,11 @@ import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import GavelRoundedIcon from '@mui/icons-material/GavelRounded'
-import AddPhotoAlternateRoundedIcon from '@mui/icons-material/AddPhotoAlternateRounded'
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded'
 import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
-import InsertDriveFileRoundedIcon from '@mui/icons-material/InsertDriveFileRounded'
 import PaidRoundedIcon from '@mui/icons-material/PaidRounded'
 import RateReviewRoundedIcon from '@mui/icons-material/RateReviewRounded'
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
-import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded'
-import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded'
 import { useAuth } from '../../AuthContext.jsx'
 import {
   demandApi,
@@ -92,7 +88,8 @@ import { InfoRows } from './components/InfoRows.jsx'
 import { OrdersSectionHeader } from './components/OrdersSectionHeader.jsx'
 import { ReviewList } from './components/ReviewList.jsx'
 import { DeliveryBatchCard } from '../deliveries/components/DeliveryBatchCard.jsx'
-import { buildDeliveryBatches } from '../deliveries/deliveryDisplay.js'
+import { DeliveryUploadPanel } from '../deliveries/components/DeliveryUploadPanel.jsx'
+import { buildDeliveryBatches, flattenDeliveryFiles, isAuthorizableDeliveryFile } from '../deliveries/deliveryDisplay.js'
 import {
   addDays,
   complaintStatusMap,
@@ -274,7 +271,7 @@ export function OrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [statusLogs, setStatusLogs] = useState([])
   const [deliveryRecords, setDeliveryRecords] = useState([])
-  const [deliveryForm, setDeliveryForm] = useState({ file: null, remark: '' })
+  const [deliveryForm, setDeliveryForm] = useState({ files: [], remark: '' })
   const [reworkRequirement, setReworkRequirement] = useState('')
   const [reworkDialogOpen, setReworkDialogOpen] = useState(false)
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
@@ -448,7 +445,7 @@ export function OrdersPage() {
       saveOrderSnapshots([detail])
       setStatusLogs(logs)
       setDeliveryRecords(deliveries)
-      setDeliveryForm({ file: null, remark: '' })
+      setDeliveryForm({ files: [], remark: '' })
       setReworkRequirement('')
       setPhotoAuthorizations(authorizations)
       setPhotoAuthorizationForm({ fileIds: [], remark: '' })
@@ -502,18 +499,20 @@ export function OrdersPage() {
   }
 
   async function submitDelivery(event) {
-    event.preventDefault()
-    if (!selectedOrder || !deliveryForm.file) return
+    event?.preventDefault?.()
+    const files = Array.isArray(deliveryForm.files) ? deliveryForm.files : deliveryForm.file ? [deliveryForm.file] : []
+    if (!selectedOrder || !files.length) return false
     const result = await run(async () => deliveryApi.upload(
       selectedOrder.orderId,
-      deliveryForm.file,
+      files,
       deliveryForm.remark.trim(),
       currentUser
-    ), selectedOrder.status === 'REWORK_REQUIRED' ? '返修作品已上传' : '作品已上传')
+    ), selectedOrder.status === 'REWORK_REQUIRED' ? '返修作品已发送给客户验收' : '交付作品已发送给客户验收')
     if (result) {
-      setDeliveryForm({ file: null, remark: '' })
+      setDeliveryForm({ files: [], remark: '' })
       await loadOrders(selectedOrder.orderId)
     }
+    return Boolean(result)
   }
 
   async function submitRework(event) {
@@ -724,15 +723,15 @@ export function OrdersPage() {
     && shouldShowShootStartedCancelNotice(selectedOrder, currentUser)
   const deliveryFileOptions = useMemo(() => {
     const map = new Map()
-    deliveryRecords
-      .filter(record => record.fileId)
-      .forEach(record => {
-        const fileId = Number(record.fileId)
+    flattenDeliveryFiles(deliveryRecords)
+      .filter(file => file.fileId && isAuthorizableDeliveryFile(file))
+      .forEach(file => {
+        const fileId = Number(file.fileId)
         if (!map.has(fileId)) {
           map.set(fileId, {
             fileId,
-            fileName: formatFileDisplayName(record, `作品 ${fileId}`),
-            uploadTime: record.uploadTime
+            fileName: formatFileDisplayName(file, `作品 ${fileId}`),
+            uploadTime: file.uploadTime
           })
         }
       })
@@ -1026,33 +1025,15 @@ export function OrdersPage() {
                 </Stack>
 
                 {canUploadDelivery && (
-                  <Paper component="form" variant="outlined" onSubmit={submitDelivery} sx={subCardSx}>
-                    <Stack spacing={1.5}>
-                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.2} sx={{ alignItems: { xs: 'stretch', sm: 'center' } }}>
-                        <Button variant="outlined" component="label" startIcon={<AddPhotoAlternateRoundedIcon />}>
-                          选择作品
-                          <input
-                            hidden
-                            type="file"
-                            onChange={event => setDeliveryForm({ ...deliveryForm, file: event.target.files?.[0] || null })}
-                          />
-                        </Button>
-                        <Typography sx={{ color: PORTRA_SURFACE.muted }} variant="body2">
-                          {deliveryForm.file ? deliveryForm.file.name : '尚未选择作品'}
-                        </Typography>
-                      </Stack>
-                      <TextField
-                        label="作品说明"
-                        value={deliveryForm.remark}
-                        onChange={event => setDeliveryForm({ ...deliveryForm, remark: event.target.value })}
-                        multiline
-                        minRows={2}
-                        placeholder="说明本次作品内容、返修修改点或注意事项"
-                      />
-                      <PortraActionButton type="submit" startIcon={<TaskAltRoundedIcon />} disabled={loading || !deliveryForm.file}>
-                        上传作品
-                      </PortraActionButton>
-                    </Stack>
+                  <Paper variant="outlined" sx={subCardSx}>
+                    <DeliveryUploadPanel
+                      compact
+                      mode={selectedOrder.status === 'REWORK_REQUIRED' ? 'rework' : 'upload'}
+                      value={deliveryForm}
+                      loading={loading}
+                      onChange={setDeliveryForm}
+                      onSubmit={submitDelivery}
+                    />
                   </Paper>
                 )}
 

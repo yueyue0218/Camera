@@ -27,19 +27,26 @@ export function buildDeliveryBatches(deliveries = [], order) {
     }
     const batch = groups.get(key)
     batch.latestUploadTime = pickLatestTime(batch.latestUploadTime, delivery.uploadTime || delivery.createdAt)
-    batch.files.push(normalizeDeliveryFile(delivery, batch.files.length))
+    flattenFilesFromDelivery(delivery).forEach(file => {
+      batch.files.push(normalizeDeliveryFile(file, batch.files.length))
+    })
   })
   return Array.from(groups.values()).map((batch, index) => {
     const round = batch.round || index + 1
-    const count = batch.files.length
+    const fileCount = batch.files.length
+    const imageCount = batch.files.filter(isImageDeliveryFile).length
+    const zipCount = batch.files.filter(isZipDeliveryFile).length
     const latest = formatTime(batch.latestUploadTime)
+    const countText = formatDeliveryFileCount(imageCount, zipCount, fileCount)
     return {
       ...batch,
       round,
-      fileCount: count,
-      subtitle: `最近上传：${latest} · 共 ${count} 张`,
-      orderSubtitle: `最近上传：${latest} · 共 ${count} 张`,
-      messageSubtitle: `最近上传：${latest} · 共 ${count} 张`,
+      fileCount,
+      imageCount,
+      zipCount,
+      subtitle: `最近上传：${latest} · ${countText}`,
+      orderSubtitle: `最近上传：${latest} · ${countText}`,
+      messageSubtitle: `最近上传：${latest} · ${countText}`,
       statusLabel: getDeliveryBatchStatusLabel(order)
     }
   })
@@ -64,17 +71,24 @@ export function getDeliveryBatchStatusLabel(order) {
 export function normalizeDeliveryFile(delivery, index = 0) {
   const fileId = getDeliveryFileId(delivery)
   return {
-    id: delivery.deliveryId || fileId || `${delivery.orderId || 'delivery'}-${index}`,
+    id: delivery.id || `${delivery.deliveryId || delivery.orderId || 'delivery'}-${fileId || index}`,
     deliveryId: delivery.deliveryId,
     orderId: delivery.orderId,
     fileId,
     fileName: formatFileDisplayName(delivery, `作品 ${index + 1}`),
     rawFileName: delivery.fileName || delivery.name || delivery.originalName || '',
     mimeType: delivery.mimeType || delivery.contentType || '',
+    fileSize: delivery.fileSize,
+    fileType: delivery.fileType,
+    sortOrder: delivery.sortOrder,
     uploadTime: delivery.uploadTime || delivery.createdAt,
     remark: formatDeliveryDescription(delivery),
     source: delivery
   }
+}
+
+export function flattenDeliveryFiles(deliveries = []) {
+  return deliveries.filter(Boolean).flatMap((delivery, index) => flattenFilesFromDelivery(delivery, index))
 }
 
 export function getDeliveryId(delivery) {
@@ -87,9 +101,22 @@ export function getDeliveryFileId(fileOrDelivery) {
 }
 
 export function isImageDeliveryFile(file) {
+  if (String(file?.fileType || '').toUpperCase() === 'IMAGE') return true
+  if (String(file?.fileType || '').toUpperCase() === 'ZIP') return false
   const type = String(file?.mimeType || file?.contentType || '').toLowerCase()
   const name = String(file?.fileName || file?.rawFileName || '').toLowerCase()
   return type.startsWith('image/') || IMAGE_EXTENSIONS.test(name)
+}
+
+export function isZipDeliveryFile(file) {
+  const fileType = String(file?.fileType || '').toUpperCase()
+  const type = String(file?.mimeType || file?.contentType || '').toLowerCase()
+  const name = String(file?.fileName || file?.rawFileName || '').toLowerCase()
+  return fileType === 'ZIP' || type.includes('zip') || /\.zip$/i.test(name)
+}
+
+export function isAuthorizableDeliveryFile(file) {
+  return isImageDeliveryFile(file)
 }
 
 export function getDeliveryDownloadName(file, index = 0) {
@@ -101,6 +128,7 @@ export function getDeliveryTitleForRecord(delivery, index = 0) {
 }
 
 function getBatchKey(delivery, index) {
+  if (delivery.deliveryId || delivery.id) return `delivery-${delivery.deliveryId || delivery.id}`
   if (delivery.batchId) return `batch-${delivery.batchId}`
   if (delivery.deliveryRound || delivery.round) return `round-${delivery.deliveryRound || delivery.round}`
   return `single-${delivery.deliveryId || delivery.fileId || index}`
@@ -110,4 +138,28 @@ function pickLatestTime(left, right) {
   const leftTime = left ? new Date(left).getTime() : 0
   const rightTime = right ? new Date(right).getTime() : 0
   return rightTime > leftTime ? right : left
+}
+
+function flattenFilesFromDelivery(delivery, fallbackIndex = 0) {
+  if (Array.isArray(delivery?.files) && delivery.files.length) {
+    return delivery.files.map((file, index) => ({
+      ...delivery,
+      ...file,
+      deliveryId: delivery.deliveryId || delivery.id,
+      orderId: delivery.orderId,
+      uploadTime: delivery.uploadTime || delivery.createdAt,
+      remark: delivery.remark,
+      id: file.id || `${delivery.deliveryId || delivery.id || fallbackIndex}-${file.fileId || index}`
+    }))
+  }
+  return [delivery]
+}
+
+function formatDeliveryFileCount(imageCount, zipCount, totalCount) {
+  const parts = []
+  if (imageCount) parts.push(`${imageCount} 张图片`)
+  if (zipCount) parts.push(`${zipCount} 个压缩包`)
+  const otherCount = Math.max(0, totalCount - imageCount - zipCount)
+  if (otherCount) parts.push(`${otherCount} 个文件`)
+  return parts.length ? parts.join(' / ') : '暂无文件'
 }
