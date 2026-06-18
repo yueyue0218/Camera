@@ -16,20 +16,36 @@ export default function AppShell() {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />
   }
 
-  const activePath = location.pathname.startsWith('/orders')
-    ? '/profile'
-    : location.pathname.startsWith('/users')
+  const searchParams = new URLSearchParams(location.search)
+  const hasAdminAccess = currentUser?.role === 'ADMIN' || currentUser?.adminCapable
+  const adminSurface = hasAdminAccess
+    && (location.pathname.startsWith('/admin')
+      || (location.pathname.startsWith('/profile') && searchParams.get('from') === 'admin'))
+  const adminTab = adminSurface && location.pathname.startsWith('/admin')
+    ? (searchParams.get('tab') || 'dashboard')
+    : null
+  const activePath = adminSurface
+    ? (location.pathname.startsWith('/profile') ? '/profile' : '/admin')
+    : location.pathname.startsWith('/orders')
       ? '/profile'
-      : location.pathname.startsWith('/moments')
-        ? '/feed'
-        : ['/hall', '/publish', '/feed', '/messages', '/profile'].some(path => location.pathname.startsWith(path))
-          ? location.pathname
-          : '/hall'
+      : location.pathname.startsWith('/users')
+        ? '/profile'
+        : location.pathname.startsWith('/moments')
+          ? '/feed'
+          : ['/hall', '/publish', '/feed', '/messages', '/profile'].some(path => location.pathname.startsWith(path))
+            ? location.pathname
+            : '/hall'
   const isFixedWorkflow = /^\/messages\/[^/]+/.test(location.pathname)
 
   return (
     <div className="portra-app">
-      <Navbar activePath={activePath} currentUser={currentUser} logout={logout} />
+      <Navbar
+        activePath={activePath}
+        currentUser={currentUser}
+        logout={logout}
+        adminSurface={adminSurface}
+        adminTab={adminTab}
+      />
       <div className={`portra-main-shell${isFixedWorkflow ? ' portra-main-shell--fixed-workflow' : ''}`}>
         <AppRoutes />
       </div>
