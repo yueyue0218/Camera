@@ -4,6 +4,7 @@ import com.action.camera.common.ErrorCode;
 import com.action.camera.common.JwtUtil;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.security.UserRole;
+import com.action.camera.credit.service.CreditSnapshotService;
 import com.action.camera.domain.User;
 import com.action.camera.dto.LoginResponse;
 import com.action.camera.dto.SwitchRoleResponse;
@@ -28,6 +29,7 @@ public class UserService {
     private final ProviderProfileMapper providerProfileMapper;
     private final IpLocationService ipLocationService;
     private final UserRoleBindingRepository userRoleBindingRepository;
+    private final CreditSnapshotService creditSnapshotService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public UserService(UserRepository userRepository,
@@ -35,13 +37,15 @@ public class UserService {
                        JwtUtil jwtUtil,
                        ProviderProfileMapper providerProfileMapper,
                        IpLocationService ipLocationService,
-                       UserRoleBindingRepository userRoleBindingRepository) {
+                       UserRoleBindingRepository userRoleBindingRepository,
+                       CreditSnapshotService creditSnapshotService) {
         this.userRepository = userRepository;
         this.codeService = codeService;
         this.jwtUtil = jwtUtil;
         this.providerProfileMapper = providerProfileMapper;
         this.ipLocationService = ipLocationService;
         this.userRoleBindingRepository = userRoleBindingRepository;
+        this.creditSnapshotService = creditSnapshotService;
     }
 
     @Transactional
@@ -181,7 +185,7 @@ public class UserService {
         resp.setAvatarFileId(user.getAvatarFileId());
         resp.setCurrentRole(user.getCurrentRole());
         resp.setStatus(user.getStatus());
-        resp.setCreditScore(user.getCreditScore());
+        resp.setCreditScore(creditSnapshotService.getDisplayCreditScore(userId));
         resp.setCreatedAt(user.getCreatedAt());
         resp.setCustomerNickname(user.getNickname());
         resp.setCustomerAvatarFileId(user.getAvatarFileId());

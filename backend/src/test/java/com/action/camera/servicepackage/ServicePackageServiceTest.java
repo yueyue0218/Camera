@@ -4,6 +4,7 @@ import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.page.PageResult;
 import com.action.camera.common.security.CurrentUser;
 import com.action.camera.common.security.UserRole;
+import com.action.camera.credit.service.CreditSnapshotService;
 import com.action.camera.domain.User;
 import com.action.camera.message.model.CreateConversationCommand;
 import com.action.camera.message.model.CreateConversationResult;
@@ -40,6 +41,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -68,6 +70,9 @@ class ServicePackageServiceTest {
     @Mock
     private ProviderProfileMapper providerProfileMapper;
 
+    @Mock
+    private CreditSnapshotService creditSnapshotService;
+
     private ServicePackageService servicePackageService;
 
     @BeforeEach
@@ -77,8 +82,10 @@ class ServicePackageServiceTest {
                 interestRepository,
                 conversationService,
                 userRepository,
-                providerProfileMapper
+                providerProfileMapper,
+                creditSnapshotService
         );
+        lenient().when(creditSnapshotService.getDisplayCreditScore(PROVIDER_ID)).thenReturn(new BigDecimal("88.50"));
     }
 
     @Test
@@ -378,7 +385,6 @@ class ServicePackageServiceTest {
         user.setId(PROVIDER_ID);
         user.setNickname("Photographer Lin");
         user.setCurrentRole("PROVIDER");
-        user.setCreditScore(new BigDecimal("88.50"));
         return user;
     }
 }

@@ -669,9 +669,9 @@ export function LoginInfoPage() {
       <SuccessBanner text={notice} />
       <ErrorBanner text={error} />
       {isAdminEntry ? (
-        <SwitchLine prompt="杩斿洖鏅€氱櫥褰曪紵" linkText="鐢ㄦ埛鐧诲綍" onClick={() => navigate('/login/sign-in')} />
+        <SwitchLine prompt="返回普通登录？" linkText="用户登录" onClick={() => navigate('/login/sign-in')} />
       ) : (
-        <SwitchLine prompt="绠＄悊鍛樿处鍙凤紵" linkText="绠＄悊鐧诲綍" onClick={() => navigate('/login/admin')} />
+        <SwitchLine prompt="管理员账号？" linkText="管理员登录" onClick={() => navigate('/login/admin')} />
       )}
 
       <div style={{ marginBottom: 14 }}>

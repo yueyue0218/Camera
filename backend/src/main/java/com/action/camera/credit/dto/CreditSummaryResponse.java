@@ -12,7 +12,7 @@ public record CreditSummaryResponse(
         Long effectiveOrderCount,
         Long completedOrderCount,
         BigDecimal goodReviewRate,
-        BigDecimal fulfillmentRate,
+        BigDecimal defaultRate,
         Long riskRecordCount,
         Long receivedReviewCount,
         BigDecimal averageRating

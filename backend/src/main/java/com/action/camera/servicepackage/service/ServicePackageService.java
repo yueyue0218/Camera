@@ -4,6 +4,7 @@ import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.page.PageResult;
 import com.action.camera.common.security.CurrentUser;
+import com.action.camera.credit.service.CreditSnapshotService;
 import com.action.camera.domain.User;
 import com.action.camera.message.model.CreateConversationCommand;
 import com.action.camera.message.model.CreateConversationResult;
@@ -59,17 +60,20 @@ public class ServicePackageService {
     private final ConversationService conversationService;
     private final UserRepository userRepository;
     private final ProviderProfileMapper providerProfileMapper;
+    private final CreditSnapshotService creditSnapshotService;
 
     public ServicePackageService(ServicePackageRepository servicePackageRepository,
                                   ServicePackageInterestRepository interestRepository,
                                   ConversationService conversationService,
                                   UserRepository userRepository,
-                                  ProviderProfileMapper providerProfileMapper) {
+                                  ProviderProfileMapper providerProfileMapper,
+                                  CreditSnapshotService creditSnapshotService) {
         this.servicePackageRepository = servicePackageRepository;
         this.interestRepository = interestRepository;
         this.conversationService = conversationService;
         this.userRepository = userRepository;
         this.providerProfileMapper = providerProfileMapper;
+        this.creditSnapshotService = creditSnapshotService;
     }
 
     @Transactional
@@ -664,7 +668,7 @@ public class ServicePackageService {
                             nickname,
                             avatarFileId,
                             null,
-                            user.getCreditScore());
+                            creditSnapshotService.getDisplayCreditScore(user.getId()));
                 })
                 .orElse(new PhotographerInfo(photographerId, null, null, null, null));
     }

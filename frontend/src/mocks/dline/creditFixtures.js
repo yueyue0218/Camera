@@ -6,7 +6,7 @@ export const demoCreditSummary = {
   effectiveOrderCount: 13,
   completedOrderCount: 12,
   goodReviewRate: 88.9,
-  fulfillmentRate: 92.3,
+  defaultRate: 7.7,
   riskRecordCount: 1,
   receivedReviewCount: 9,
   averageRating: 4.8,

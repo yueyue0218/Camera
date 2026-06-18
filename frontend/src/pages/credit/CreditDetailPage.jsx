@@ -157,7 +157,7 @@ export function CreditDetailPage() {
   const completedOrders = formatMetric(summary?.completedOrderCount)
   const reviewCount = formatMetric(summary?.receivedReviewCount)
   const goodReviewRate = formatPercent(summary?.goodReviewRate)
-  const fulfillmentRate = formatPercent(summary?.fulfillmentRate)
+  const defaultRate = formatPercent(summary?.defaultRate)
   const riskRecords = formatMetric(summary?.riskRecordCount)
   const recordCount = records.length
   const hasRecords = records.length > 0
@@ -168,7 +168,7 @@ export function CreditDetailPage() {
   const displayRecordCount = isSelf ? (hasRecords ? recordCount : '暂无') : '不公开'
   const overviewEffectiveOrders = hasSummary ? effectiveOrders : '--'
   const overviewGoodReviewRate = hasSummary ? goodReviewRate : '--'
-  const overviewFulfillmentRate = hasSummary ? fulfillmentRate : '--'
+  const overviewDefaultRate = hasSummary ? defaultRate : '--'
   const overviewRiskRecords = hasSummary ? riskRecords : '--'
 
   return (
@@ -204,7 +204,7 @@ export function CreditDetailPage() {
           </div>
           <p className="profile-uid">最近更新：{formatUpdatedTime(lastUpdated)}</p>
           <p className="profile-signature">
-            信用分参考有效订单、好评率、履约率和风险记录；新用户需要完成订单或收到评价后开始积累。
+            信用分会结合有效订单规模、评价表现、失信率和风险记录动态更新；没有评价的订单不会进入信用样本。
           </p>
           <div className="profile-meta-line">
             <span>有效订单 {effectiveOrders}</span>
@@ -231,7 +231,7 @@ export function CreditDetailPage() {
           <div className="metric-grid">
             <div className="metric"><b>{overviewEffectiveOrders}</b><span>有效订单</span></div>
             <div className="metric"><b>{overviewGoodReviewRate}</b><span>好评率</span></div>
-            <div className="metric"><b>{overviewFulfillmentRate}</b><span>履约率</span></div>
+            <div className="metric"><b>{overviewDefaultRate}</b><span>失信率</span></div>
             <div className="metric"><b>{overviewRiskRecords}</b><span>风险记录</span></div>
           </div>
         </div>
@@ -242,7 +242,7 @@ export function CreditDetailPage() {
           <div className="section-head">
             <div>
               <h2>历史评价</h2>
-              <p>来自订单的真实评价，反映该用户的履约表现。</p>
+              <p>来自订单的真实评价，反映该用户的评价表现与合作稳定度。</p>
             </div>
             <div className="section-mark">{reviews.length || '暂无'}</div>
           </div>
@@ -364,12 +364,14 @@ export function CreditDetailPage() {
         <DialogTitle>信用规则说明</DialogTitle>
         <DialogContent>
           <div className="credit-rules-copy">
-            <p>信用分参考有效订单、好评率、履约率和风险记录。新用户不会直接显示 100 分，需要完成订单或收到评价后开始积累。</p>
-            <p><strong>信用优秀：</strong>90-100，记录充足且履约稳定。</p>
-            <p><strong>信用良好：</strong>75-89，整体可靠，近期记录正常。</p>
-            <p><strong>待提升：</strong>60-74，仍需积累更多好评或改善履约表现。</p>
-            <p><strong>信用较差：</strong>60 以下，存在较多风险记录、低分评价或履约问题。</p>
-            <p><strong>新用户 / 待积累：</strong>记录不足时会先展示积累状态，分数会随着真实订单和评价逐步稳定。</p>
+            <p>信用分只参考收到他人评价后的有效订单。拍摄前取消、没有评价的订单，不会直接影响信用分。</p>
+            <p>失信率 = 风险记录 / 有效订单。风险记录只统计申诉或争议裁定后，责任落在该用户身上的情况。</p>
+            <p>评价表现会结合收到的评分结果动态更新，不同评分会拉开信用分差距。</p>
+            <p><strong>信用优秀：</strong>90-100，评价稳定，失信率低。</p>
+            <p><strong>信用良好：</strong>75-89，整体表现正常，风险记录较少。</p>
+            <p><strong>待提升：</strong>60-74，仍需继续积累真实好评与稳定记录。</p>
+            <p><strong>信用较差：</strong>60 以下，近期存在较多责任申诉或低分评价。</p>
+            <p><strong>新用户 / 待积累：</strong>还没有足够有效订单时，会先显示积累状态。</p>
           </div>
         </DialogContent>
         <DialogActions>

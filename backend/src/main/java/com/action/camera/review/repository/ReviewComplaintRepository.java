@@ -24,6 +24,8 @@ public interface ReviewComplaintRepository extends JpaRepository<ReviewComplaint
 
     long countByStatusIn(List<String> statuses);
 
+    long countByRespondentIdAndStatusAndArbitrationResult(Long respondentId, String status, String arbitrationResult);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select c from ReviewComplaint c where c.id = :id")
     Optional<ReviewComplaint> findByIdForUpdate(@Param("id") Long id);

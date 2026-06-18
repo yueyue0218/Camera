@@ -2,6 +2,7 @@ package com.action.camera.provider.service.impl;
 
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
+import com.action.camera.credit.service.CreditSnapshotService;
 import com.action.camera.domain.User;
 import com.action.camera.provider.dto.ProviderProfilePublicVO;
 import com.action.camera.provider.dto.ProviderProfileUpdateDTO;
@@ -22,13 +23,16 @@ public class ProviderProfileServiceImpl implements ProviderProfileService {
     private final ProviderProfileMapper providerProfileMapper;
     private final ProviderStyleTagMapper providerStyleTagMapper;
     private final UserRepository userRepository;
+    private final CreditSnapshotService creditSnapshotService;
 
     public ProviderProfileServiceImpl(ProviderProfileMapper providerProfileMapper,
                                       ProviderStyleTagMapper providerStyleTagMapper,
-                                      UserRepository userRepository) {
+                                      UserRepository userRepository,
+                                      CreditSnapshotService creditSnapshotService) {
         this.providerProfileMapper = providerProfileMapper;
         this.providerStyleTagMapper = providerStyleTagMapper;
         this.userRepository = userRepository;
+        this.creditSnapshotService = creditSnapshotService;
     }
 
     @Override
@@ -77,6 +81,7 @@ public class ProviderProfileServiceImpl implements ProviderProfileService {
         if (vo.getStyleTags() != null) {
             vo.setStyleTags(vo.getStyleTags().stream().filter(t -> t != null).toList());
         }
+        vo.setCreditScore(creditSnapshotService.getDisplayCreditScore(providerUserId));
         return vo;
     }
 }

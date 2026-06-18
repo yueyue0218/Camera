@@ -3,6 +3,7 @@ package com.action.camera.social.service;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.security.CurrentUser;
+import com.action.camera.credit.service.CreditSnapshotService;
 import com.action.camera.domain.User;
 import com.action.camera.notification.dto.NotificationCreateRequest;
 import com.action.camera.notification.service.NotificationService;
@@ -33,17 +34,20 @@ public class SocialRelationService {
     private final MomentPostRepository momentPostRepository;
     private final NotificationService notificationService;
     private final ProviderProfileMapper providerProfileMapper;
+    private final CreditSnapshotService creditSnapshotService;
 
     public SocialRelationService(UserFollowRepository userFollowRepository,
                                  UserRepository userRepository,
                                  MomentPostRepository momentPostRepository,
                                  NotificationService notificationService,
-                                 ProviderProfileMapper providerProfileMapper) {
+                                 ProviderProfileMapper providerProfileMapper,
+                                 CreditSnapshotService creditSnapshotService) {
         this.userFollowRepository = userFollowRepository;
         this.userRepository = userRepository;
         this.momentPostRepository = momentPostRepository;
         this.notificationService = notificationService;
         this.providerProfileMapper = providerProfileMapper;
+        this.creditSnapshotService = creditSnapshotService;
     }
 
     @Transactional
@@ -134,6 +138,9 @@ public class SocialRelationService {
         ProviderProfilePublicVO providerProfile = isProvider
                 ? providerProfileMapper.selectPublicProfile(userId)
                 : null;
+        if (providerProfile != null) {
+            providerProfile.setCreditScore(creditSnapshotService.getDisplayCreditScore(userId));
+        }
 
         String nickname;
         Long avatarFileId;
