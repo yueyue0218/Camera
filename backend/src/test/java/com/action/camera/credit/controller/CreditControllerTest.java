@@ -90,6 +90,7 @@ class CreditControllerTest {
 
         UserContext.setUserId(ADMIN_ID);
         UserContext.setCurrentRole(UserRole.ADMIN);
+        UserContext.setAdmin(true);
         assertThat(creditController.listCreditRecords(USER_ID).getData()).hasSize(1);
     }
 

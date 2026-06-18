@@ -151,6 +151,7 @@ class ReviewServiceTest {
 
         UserContext.setUserId(ADMIN_ID);
         UserContext.setCurrentRole(UserRole.ADMIN);
+        UserContext.setAdmin(true);
 
         ReviewResponse response = reviewService.detail(review.reviewId());
 
@@ -168,13 +169,16 @@ class ReviewServiceTest {
 
         UserContext.setUserId(CUSTOMER_ID);
         UserContext.setCurrentRole(null);
+        UserContext.setAdmin(false);
         assertThat(reviewService.detail(review.reviewId()).complaintStatus()).isEqualTo("PENDING");
 
         UserContext.setUserId(OUTSIDER_ID);
+        UserContext.setAdmin(false);
         assertThat(reviewService.detail(review.reviewId()).complaintStatus()).isNull();
 
         UserContext.setUserId(ADMIN_ID);
         UserContext.setCurrentRole(UserRole.ADMIN);
+        UserContext.setAdmin(true);
         assertThat(reviewService.detail(review.reviewId()).complaintStatus()).isEqualTo("PENDING");
     }
 

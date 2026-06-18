@@ -3,6 +3,7 @@ package com.action.camera.common.interceptor;
 import com.action.camera.common.JwtUtil;
 import com.action.camera.common.UserContext;
 import com.action.camera.repository.UserRepository;
+import com.action.camera.repository.UserRoleBindingRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.AfterEach;
@@ -22,6 +23,8 @@ class AuthInterceptorTest {
     @Mock
     private UserRepository userRepository;
     @Mock
+    private UserRoleBindingRepository userRoleBindingRepository;
+    @Mock
     private HttpServletRequest request;
     @Mock
     private HttpServletResponse response;
@@ -36,7 +39,7 @@ class AuthInterceptorTest {
         when(request.getMethod()).thenReturn("GET");
         when(request.getRequestURI()).thenReturn("/files/42/download");
 
-        AuthInterceptor interceptor = new AuthInterceptor(jwtUtil, userRepository);
+        AuthInterceptor interceptor = new AuthInterceptor(jwtUtil, userRepository, userRoleBindingRepository);
 
         assertThat(interceptor.preHandle(request, response, new Object())).isTrue();
         assertThat(UserContext.getUserId()).isNull();
