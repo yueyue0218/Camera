@@ -668,11 +668,6 @@ export function LoginInfoPage() {
 
       <SuccessBanner text={notice} />
       <ErrorBanner text={error} />
-      {isAdminEntry ? (
-        <SwitchLine prompt="返回普通登录？" linkText="用户登录" onClick={() => navigate('/login/sign-in')} />
-      ) : (
-        <SwitchLine prompt="管理员账号？" linkText="管理员登录" onClick={() => navigate('/login/admin')} />
-      )}
 
       <div style={{ marginBottom: 14 }}>
         <FieldLabel label="学校邮箱" htmlFor="li-email" />
@@ -698,8 +693,8 @@ export function LoginInfoPage() {
       </div>
 
       <PrimaryBtn onClick={submit} loading={loading}>进入 Portra</PrimaryBtn>
-      <SwitchLine prompt="还没有账号？" linkText="立即注册" onClick={() => navigate('/login/register')} />
-      <BackLink label="返回" onClick={() => navigate('/login')} />
+      {!isAdminEntry ? <SwitchLine prompt="还没有账号？" linkText="立即注册" onClick={() => navigate('/login/register')} /> : null}
+      {!isAdminEntry ? <BackLink label="返回" onClick={() => navigate('/login')} /> : null}
     </AuthCard>
   )
 }
