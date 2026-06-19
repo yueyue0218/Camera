@@ -78,7 +78,8 @@ export function PublishServicePackagePage() {
         ? await servicePackageApi.update(serviceId, payload, currentUser)
         : await servicePackageApi.create(payload, currentUser)
       setNotice({ type: 'success', text: editMode ? '橱窗已保存' : '橱窗已发布' })
-      navigate(editMode ? `/service-packages/${result?.serviceId || serviceId}` : '/hall?tab=showcase')
+      const publishedId = result?.serviceId
+      navigate(editMode ? `/service-packages/${publishedId || serviceId}` : `/hall?tab=showcase&published=showcase${publishedId ? `&id=${publishedId}` : ''}`)
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }

@@ -73,7 +73,8 @@ export function PublishPage() {
         ? await demandApi.update(demandId, payload, currentUser)
         : await demandApi.create(payload, currentUser)
       setNotice({ type: 'success', text: editMode ? '需求已保存' : '需求已发布' })
-      navigate(editMode ? `/demands/${result?.demandId || demandId}` : '/hall?tab=demand')
+      const publishedId = result?.demandId
+      navigate(editMode ? `/demands/${publishedId || demandId}` : `/hall?tab=demand&published=demand${publishedId ? `&id=${publishedId}` : ''}`)
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     }

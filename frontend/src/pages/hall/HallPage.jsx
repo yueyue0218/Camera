@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import KeyboardArrowUpRoundedIcon from '@mui/icons-material/KeyboardArrowUpRounded'
+import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { demandApi } from '../../api/demandApi.js'
 import { servicePackageApi } from '../../api/servicePackageApi.js'
@@ -14,6 +16,8 @@ import { TIME_STYLE_OPTIONS, priceParamsFromBudget } from './components/hallUtil
 import { submitDemandResponse } from './utils/respondDemand.js'
 import '../portraHall.css'
 
+const PAGE_SIZE = 20
+
 const initialFilters = {
   keyword: '',
   cityCode: '',
@@ -23,18 +27,48 @@ const initialFilters = {
   timeTag: ''
 }
 
-function createStatus() {
-  return { loading: false, error: '' }
+function createInitialPageState() {
+  return {
+    page: 1,
+    size: PAGE_SIZE,
+    total: 0,
+    hasNext: false,
+    loading: false,
+    loadingMore: false,
+    refreshing: false,
+    error: '',
+    errorMode: ''
+  }
 }
 
 function normalizeError(error) {
-  return error?.message || '请求失败，启动后端服务后会显示真实数据。'
+  return error?.message || '请求失败，请稍后重试。'
 }
 
 function panelFromSearch(search) {
   const params = new URLSearchParams(search)
   const view = params.get('tab') || params.get('view')
   return view === 'demand' || view === 'demands' ? 'demands' : 'showcases'
+}
+
+function totalFromPage(page) {
+  const total = Number(page?.total)
+  return Number.isFinite(total) && total >= 0 ? total : 0
+}
+
+function pageInfoFromResult(page, fallbackPage, fallbackSize) {
+  const nextPage = Number(page?.page) || fallbackPage
+  const nextSize = Number(page?.size) || fallbackSize
+  const total = totalFromPage(page)
+  const hasNext = typeof page?.hasNext === 'boolean'
+    ? page.hasNext
+    : nextPage * nextSize < total
+  return {
+    page: nextPage,
+    size: nextSize,
+    total,
+    hasNext
+  }
 }
 
 async function enrichDemandPublisher(demand, currentUser) {
@@ -127,17 +161,21 @@ export function HallPage() {
   const [interests, setInterests] = useState([])
   const [selectedDemand, setSelectedDemand] = useState(null)
   const [selectedService, setSelectedService] = useState(null)
-  const [demandStatus, setDemandStatus] = useState(createStatus)
-  const [serviceStatus, setServiceStatus] = useState(createStatus)
+  const [demandPagination, setDemandPagination] = useState(createInitialPageState)
+  const [servicePagination, setServicePagination] = useState(createInitialPageState)
   const [notice, setNotice] = useState(null)
   const [respondedDemandIds, setRespondedDemandIds] = useState(() => new Set())
   const [respondingDemandIds, setRespondingDemandIds] = useState(() => new Set())
+  const demandRequestSeq = useRef(0)
+  const serviceRequestSeq = useRef(0)
+  const demandAppendInFlight = useRef(false)
+  const serviceAppendInFlight = useRef(false)
 
   const interestedIds = useMemo(() => new Set(interests.map(item => item.serviceId)), [interests])
 
   useEffect(() => {
-    loadDemands()
-    loadServices()
+    loadDemands({ page: 1, mode: 'replace' })
+    loadServices({ page: 1, mode: 'replace' })
     loadInterests()
     loadMyResponses()
   }, [currentUser.userId, currentUser.role])
@@ -150,7 +188,29 @@ export function HallPage() {
 
   useEffect(() => {
     setActivePanel(panelFromSearch(location.search))
-  }, [location.search])
+    const params = new URLSearchParams(location.search)
+    const published = params.get('published')
+    const id = params.get('id')
+    if (published === 'demand') {
+      loadDemands({ page: 1, mode: 'replace' })
+      setNotice({
+        type: 'success',
+        text: '需求已发布',
+        actionText: id ? '查看详情' : '',
+        onAction: id ? () => navigate(`/demands/${id}`) : undefined
+      })
+    }
+    if (published === 'showcase') {
+      loadServices({ page: 1, mode: 'replace' })
+      loadInterests()
+      setNotice({
+        type: 'success',
+        text: '橱窗已发布',
+        actionText: id ? '查看详情' : '',
+        onAction: id ? () => navigate(`/service-packages/${id}`) : undefined
+      })
+    }
+  }, [location.search, navigate])
 
   useEffect(() => {
     if (!notice) return undefined
@@ -162,37 +222,61 @@ export function HallPage() {
     setFilters(current => ({ ...current, ...partial }))
   }
 
-  function demandParams(nextFilters = filters) {
+  function updateDemandLoading(mode, active, error = '') {
+    setDemandPagination(current => ({
+      ...current,
+      loading: mode === 'replace' ? active : current.loading,
+      loadingMore: mode === 'append' ? active : (active ? false : current.loadingMore),
+      refreshing: mode === 'refresh' ? active : current.refreshing,
+      error,
+      errorMode: error ? mode : ''
+    }))
+  }
+
+  function updateServiceLoading(mode, active, error = '') {
+    setServicePagination(current => ({
+      ...current,
+      loading: mode === 'replace' ? active : current.loading,
+      loadingMore: mode === 'append' ? active : (active ? false : current.loadingMore),
+      refreshing: mode === 'refresh' ? active : current.refreshing,
+      error,
+      errorMode: error ? mode : ''
+    }))
+  }
+
+  function demandParams(nextFilters = filters, page = 1, size = PAGE_SIZE, cacheBust = '') {
     const price = priceParamsFromBudget({
       minYuan: nextFilters.minBudgetYuan,
       maxYuan: nextFilters.maxBudgetYuan
     })
     return {
-      page: 1,
-      size: 20,
+      page,
+      size,
       status: 'OPEN',
       styleTag: nextFilters.type,
       cityCode: nextFilters.cityCode,
       timeTag: nextFilters.timeTag,
       minBudgetCent: price.minCent,
-      maxBudgetCent: price.maxCent
+      maxBudgetCent: price.maxCent,
+      _t: cacheBust
     }
   }
 
-  function serviceParams(nextFilters = filters) {
+  function serviceParams(nextFilters = filters, page = 1, size = PAGE_SIZE, cacheBust = '') {
     const price = priceParamsFromBudget({
       minYuan: nextFilters.minBudgetYuan,
       maxYuan: nextFilters.maxBudgetYuan
     })
     return {
-      page: 1,
-      size: 20,
+      page,
+      size,
       cityCode: nextFilters.cityCode,
       style: nextFilters.type,
       timeTag: nextFilters.timeTag,
       minPriceCent: price.minCent,
       maxPriceCent: price.maxCent,
-      sort: 'latest'
+      sort: 'latest',
+      _t: cacheBust
     }
   }
 
@@ -215,29 +299,89 @@ export function HallPage() {
     return haystack.includes(normalized)
   }
 
-  async function loadDemands(nextFilters = filters) {
-    setDemandStatus({ loading: true, error: '' })
+  async function loadDemands({ nextFilters = filters, page = 1, mode = 'replace', cacheBust = '' } = {}) {
+    const size = demandPagination.size || PAGE_SIZE
+    const requestId = ++demandRequestSeq.current
+    if (mode !== 'append') demandAppendInFlight.current = false
+    updateDemandLoading(mode, true)
     try {
-      const page = await demandApi.list(demandParams(nextFilters), currentUser)
-      const enrichedRecords = await enrichDemandPublishers(page?.records || [], currentUser)
-      setDemands(enrichedRecords.filter(record => matchesKeyword(record, nextFilters.keyword)))
-      setDemandStatus({ loading: false, error: '' })
+      const result = await demandApi.list(demandParams(nextFilters, page, size, cacheBust), currentUser)
+      const rawRecords = result?.records || []
+      const enrichedRecords = await enrichDemandPublishers(rawRecords, currentUser)
+      // Stage 1 keeps keyword filtering on the loaded page only; Stage 2 moves keyword search to the backend candidate set.
+      const visibleRecords = enrichedRecords.filter(record => matchesKeyword(record, nextFilters.keyword))
+      const pageInfo = pageInfoFromResult(result, page, size)
+      if (requestId !== demandRequestSeq.current) return null
+      setDemands(current => mode === 'append' ? [...current, ...visibleRecords] : visibleRecords)
+      setDemandPagination(current => ({
+        ...current,
+        ...pageInfo,
+        loading: false,
+        loadingMore: false,
+        refreshing: false,
+        error: '',
+        errorMode: ''
+      }))
+      return { ...pageInfo, recordCount: rawRecords.length }
     } catch (error) {
-      setDemands([])
-      setDemandStatus({ loading: false, error: normalizeError(error) })
+      const message = normalizeError(error)
+      if (requestId !== demandRequestSeq.current) return null
+      if (mode === 'replace') setDemands([])
+      setDemandPagination(current => ({
+        ...current,
+        loading: false,
+        loadingMore: false,
+        refreshing: false,
+        error: message,
+        errorMode: mode
+      }))
+      if (mode === 'refresh') {
+        setNotice({ type: 'error', text: message })
+      }
+      return null
     }
   }
 
-  async function loadServices(nextFilters = filters) {
-    setServiceStatus({ loading: true, error: '' })
+  async function loadServices({ nextFilters = filters, page = 1, mode = 'replace', cacheBust = '' } = {}) {
+    const size = servicePagination.size || PAGE_SIZE
+    const requestId = ++serviceRequestSeq.current
+    if (mode !== 'append') serviceAppendInFlight.current = false
+    updateServiceLoading(mode, true)
     try {
-      const page = await servicePackageApi.list(serviceParams(nextFilters), currentUser)
-      const enrichedRecords = await enrichServiceProviders(page?.records || [], currentUser)
-      setServices(enrichedRecords.filter(record => matchesKeyword(record, nextFilters.keyword)))
-      setServiceStatus({ loading: false, error: '' })
+      const result = await servicePackageApi.list(serviceParams(nextFilters, page, size, cacheBust), currentUser)
+      const rawRecords = result?.records || []
+      const enrichedRecords = await enrichServiceProviders(rawRecords, currentUser)
+      // Stage 1 keeps keyword filtering on the loaded page only; Stage 2 moves keyword search to the backend candidate set.
+      const visibleRecords = enrichedRecords.filter(record => matchesKeyword(record, nextFilters.keyword))
+      const pageInfo = pageInfoFromResult(result, page, size)
+      if (requestId !== serviceRequestSeq.current) return null
+      setServices(current => mode === 'append' ? [...current, ...visibleRecords] : visibleRecords)
+      setServicePagination(current => ({
+        ...current,
+        ...pageInfo,
+        loading: false,
+        loadingMore: false,
+        refreshing: false,
+        error: '',
+        errorMode: ''
+      }))
+      return { ...pageInfo, recordCount: rawRecords.length }
     } catch (error) {
-      setServices([])
-      setServiceStatus({ loading: false, error: normalizeError(error) })
+      const message = normalizeError(error)
+      if (requestId !== serviceRequestSeq.current) return null
+      if (mode === 'replace') setServices([])
+      setServicePagination(current => ({
+        ...current,
+        loading: false,
+        loadingMore: false,
+        refreshing: false,
+        error: message,
+        errorMode: mode
+      }))
+      if (mode === 'refresh') {
+        setNotice({ type: 'error', text: message })
+      }
+      return null
     }
   }
 
@@ -287,10 +431,10 @@ export function HallPage() {
 
   function applyFilters(nextFilters = filters) {
     if (activePanel === 'demands') {
-      loadDemands(nextFilters)
+      loadDemands({ nextFilters, page: 1, mode: 'replace' })
       return
     }
-    loadServices(nextFilters)
+    loadServices({ nextFilters, page: 1, mode: 'replace' })
     loadInterests(nextFilters)
   }
 
@@ -305,11 +449,13 @@ export function HallPage() {
   function changePanel(nextPanel) {
     setActivePanel(nextPanel)
     setFilters(initialFilters)
+    setSelectedDemand(null)
+    setSelectedService(null)
     navigate(`/hall?tab=${nextPanel === 'demands' ? 'demand' : 'showcase'}`, { replace: true })
     if (nextPanel === 'demands') {
-      loadDemands(initialFilters)
+      loadDemands({ nextFilters: initialFilters, page: 1, mode: 'replace' })
     } else {
-      loadServices(initialFilters)
+      loadServices({ nextFilters: initialFilters, page: 1, mode: 'replace' })
       loadInterests(initialFilters)
     }
   }
@@ -324,6 +470,60 @@ export function HallPage() {
     const nextFilters = { ...filters, type }
     setFilters(nextFilters)
     applyFilters(nextFilters)
+  }
+
+  function refreshActivePanel() {
+    const cacheBust = Date.now()
+    if (activePanel === 'demands') {
+      const nextPage = demandPagination.hasNext ? demandPagination.page + 1 : 1
+      const listPromise = loadDemands({ page: nextPage, mode: 'refresh', cacheBust })
+      loadMyResponses()
+      return listPromise
+    }
+    const nextPage = servicePagination.hasNext ? servicePagination.page + 1 : 1
+    const listPromise = loadServices({ page: nextPage, mode: 'refresh', cacheBust })
+    loadInterests()
+    return listPromise
+  }
+
+  function scrollHallToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  async function refreshAndScrollTop() {
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+    await refreshActivePanel()
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+  }
+
+  function loadMoreDemands() {
+    if (!demandPagination.hasNext || demandPagination.loadingMore || demandAppendInFlight.current) return
+    demandAppendInFlight.current = true
+    loadDemands({ page: demandPagination.page + 1, mode: 'append' })
+      .finally(() => { demandAppendInFlight.current = false })
+  }
+
+  function loadMoreServices() {
+    if (!servicePagination.hasNext || servicePagination.loadingMore || serviceAppendInFlight.current) return
+    serviceAppendInFlight.current = true
+    loadServices({ page: servicePagination.page + 1, mode: 'append' })
+      .finally(() => { serviceAppendInFlight.current = false })
+  }
+
+  async function reloadDemandsAfterRemoval() {
+    const currentPage = Math.max(demandPagination.page, 1)
+    const result = await loadDemands({ page: currentPage, mode: 'replace' })
+    if (result && result.recordCount === 0 && result.total > 0 && currentPage > 1) {
+      await loadDemands({ page: currentPage - 1, mode: 'replace' })
+    }
+  }
+
+  async function reloadServicesAfterRemoval() {
+    const currentPage = Math.max(servicePagination.page, 1)
+    const result = await loadServices({ page: currentPage, mode: 'replace' })
+    if (result && result.recordCount === 0 && result.total > 0 && currentPage > 1) {
+      await loadServices({ page: currentPage - 1, mode: 'replace' })
+    }
   }
 
   async function openDemand(demand) {
@@ -357,7 +557,7 @@ export function HallPage() {
       onSuccess: async () => {
         setRespondedDemandIds(current => new Set(current).add(Number(demand.demandId)))
         setNotice({ type: 'success', text: '响应已提交，等待约拍方确认后会开启会话。' })
-        await loadDemands(filters)
+        await loadDemands({ page: 1, mode: 'replace' })
         if (selectedDemand?.demandId === demand.demandId) {
           const detail = await demandApi.detail(demand.demandId, currentUser)
           setSelectedDemand(await enrichDemandPublisher(detail || demand, currentUser))
@@ -377,7 +577,7 @@ export function HallPage() {
     if (!window.confirm('确认下架这个需求吗？下架后不会继续作为开放需求展示。')) return
     try {
       await demandApi.close(demand.demandId, currentUser)
-      await loadDemands(filters)
+      await reloadDemandsAfterRemoval()
       setSelectedDemand(null)
       window.alert('需求已下架')
     } catch (error) {
@@ -393,8 +593,8 @@ export function HallPage() {
     if (!window.confirm('确认下架这个橱窗吗？下架后不会继续作为在线橱窗展示。')) return
     try {
       await servicePackageApi.offline(service.serviceId, currentUser)
-      await loadServices(filters)
-      await loadInterests(filters)
+      await reloadServicesAfterRemoval()
+      await loadInterests()
       setSelectedService(null)
       window.alert('橱窗已下架')
     } catch (error) {
@@ -414,16 +614,15 @@ export function HallPage() {
   }
 
   function renderDemands() {
-    if (demandStatus.loading) return <LoadingState text="正在加载真实需求" />
-    if (demandStatus.error) return <ErrorState message={demandStatus.error} />
+    if (demandPagination.loading) return <LoadingState text="正在加载真实需求" />
+    if (demandPagination.error && !demands.length) return <ErrorState message={demandPagination.error} />
     if (!demands.length) return <EmptyState text="暂无符合条件的需求" />
     return demands.map(demand => (
       <DemandCard
         key={demand.demandId}
         demand={demand}
         currentUser={currentUser}
-        onOpen={() => openDemand(demand)}
-        onDetail={() => navigate(`/demands/${demand.demandId}`)}
+        onOpen={() => navigate(`/demands/${demand.demandId}`)}
         onRespond={() => respondDemand(demand)}
         responded={hasResponded(demand.demandId)}
         responding={isResponding(demand.demandId)}
@@ -433,8 +632,8 @@ export function HallPage() {
   }
 
   function renderServices() {
-    if (serviceStatus.loading) return <LoadingState text="正在加载真实橱窗" />
-    if (serviceStatus.error) return <ErrorState message={serviceStatus.error} />
+    if (servicePagination.loading) return <LoadingState text="正在加载真实橱窗" />
+    if (servicePagination.error && !services.length) return <ErrorState message={servicePagination.error} />
     if (!services.length) return <EmptyState text="暂无符合条件的橱窗" />
     return services.map(service => (
       <ServicePackageCard
@@ -452,6 +651,55 @@ export function HallPage() {
     ))
   }
 
+  function renderDemandFooter() {
+    if (demandPagination.loading || (!demands.length && !demandPagination.hasNext && !demandPagination.error)) return null
+    return (
+      <div className="hall-list-footer">
+        {demandPagination.error && (
+          <p className="hall-footer-error">{demandPagination.error}</p>
+        )}
+        {demandPagination.hasNext ? (
+          <button
+            className="secondary-btn"
+            type="button"
+            disabled={demandPagination.loadingMore}
+            onClick={loadMoreDemands}
+          >
+            {demandPagination.loadingMore ? '加载中...' : '加载更多'}
+          </button>
+        ) : (
+          <span className="micro">已展示全部符合条件的需求</span>
+        )}
+      </div>
+    )
+  }
+
+  function renderServiceFooter() {
+    if (servicePagination.loading || (!services.length && !servicePagination.hasNext && !servicePagination.error)) return null
+    return (
+      <div className="hall-list-footer">
+        {servicePagination.error && (
+          <p className="hall-footer-error">{servicePagination.error}</p>
+        )}
+        {servicePagination.hasNext ? (
+          <button
+            className="secondary-btn"
+            type="button"
+            disabled={servicePagination.loadingMore}
+            onClick={loadMoreServices}
+          >
+            {servicePagination.loadingMore ? '加载中...' : '加载更多'}
+          </button>
+        ) : (
+          <span className="micro">已展示全部符合条件的橱窗</span>
+        )}
+      </div>
+    )
+  }
+
+  const activePagination = activePanel === 'demands' ? demandPagination : servicePagination
+  const floatingRefreshDisabled = activePagination.refreshing
+
   return (
     <main className="portra-page" data-role={currentUser.role === 'CUSTOMER' ? 'owner' : 'photographer'}>
       <FilterBar
@@ -462,16 +710,35 @@ export function HallPage() {
         currentUserRole={currentUser.role}
       />
 
+      <div className="hall-refresh-row">
+        <span className="micro">
+          当前共 {activePagination.total} 条{activePanel === 'demands' ? '需求' : '橱窗'}
+        </span>
+        <button
+          className="secondary-btn"
+          type="button"
+          onClick={refreshActivePanel}
+          disabled={activePagination.refreshing}
+        >
+          {activePagination.refreshing ? '刷新中...' : '刷新'}
+        </button>
+      </div>
+
       {notice && (
         <div className={`hall-notice ${notice.type === 'error' ? 'error' : 'success'}`} role="status">
-          {notice.text}
+          <span>{notice.text}</span>
+          {notice.actionText && notice.onAction && (
+            <button className="hall-notice-action" type="button" onClick={notice.onAction}>
+              {notice.actionText}
+            </button>
+          )}
         </div>
       )}
 
       <HallTabs
         activePanel={activePanel}
-        demandCount={demands.length}
-        serviceCount={services.length}
+        demandCount={demandPagination.total}
+        serviceCount={servicePagination.total}
         onChange={changePanel}
       />
 
@@ -479,22 +746,25 @@ export function HallPage() {
         <section className="panel active">
           <div className="section-title">
             <h2>订单大厅</h2>
-            <span className="micro">按匹配度排序 · 已过滤过期需求</span>
+            <span className="micro">按当前筛选展示开放需求</span>
           </div>
           <div className="order-layout">
-            <div className="order-grid">{renderDemands()}</div>
+            <div>
+              <div className="order-grid">{renderDemands()}</div>
+              {renderDemandFooter()}
+            </div>
             <DemandAside
               selectedDemand={selectedDemand}
-              error={demandStatus.error}
+              error={demandPagination.error}
               currentUser={currentUser}
               onRespond={respondDemand}
               onHotStyleClick={applyHotStyle}
               onEditDemand={editDemand}
-        onCloseDemand={closeDemand}
-        onOpenPublisher={selectedDemand?.customerId ? () => navigate(`/users/${selectedDemand.customerId}?role=CUSTOMER`) : undefined}
-        responded={selectedDemand ? hasResponded(selectedDemand.demandId) : false}
-        responding={selectedDemand ? isResponding(selectedDemand.demandId) : false}
-      />
+              onCloseDemand={closeDemand}
+              onOpenPublisher={selectedDemand?.customerId ? () => navigate(`/users/${selectedDemand.customerId}?role=CUSTOMER`) : undefined}
+              responded={selectedDemand ? hasResponded(selectedDemand.demandId) : false}
+              responding={selectedDemand ? isResponding(selectedDemand.demandId) : false}
+            />
           </div>
         </section>
       ) : (
@@ -516,8 +786,31 @@ export function HallPage() {
             ))}
           </div>
           <div className="showcase-grid">{renderServices()}</div>
+          {renderServiceFooter()}
         </section>
       )}
+
+      <div className="hall-floating-actions" aria-label="大厅快捷操作">
+        <button
+          className="hall-floating-btn"
+          type="button"
+          aria-label="回到顶部"
+          title="回到顶部"
+          onClick={scrollHallToTop}
+        >
+          <KeyboardArrowUpRoundedIcon fontSize="small" />
+        </button>
+        <button
+          className={`hall-floating-btn ${activePagination.refreshing ? 'is-refreshing' : ''}`}
+          type="button"
+          aria-label="刷新大厅"
+          title="刷新大厅"
+          disabled={floatingRefreshDisabled}
+          onClick={refreshAndScrollTop}
+        >
+          <RefreshRoundedIcon fontSize="small" />
+        </button>
+      </div>
     </main>
   )
 }
