@@ -36,6 +36,7 @@ function Section({ title, subtitle, children }) {
 function DemoBell() {
   const [unread, setUnread] = useState(0)
   const [ringing, setRinging] = useState(false)
+  const badgeText = unread > 99 ? '99+' : String(unread)
 
   const dispatchState = (nextUnread, ring = false) => {
     setUnread(nextUnread)
@@ -54,7 +55,7 @@ function DemoBell() {
         ) : (
           <NotificationsNoneRoundedIcon className="portra-notification-bell" />
         )}
-        {unread ? <span className="portra-notice-badge" /> : null}
+        {unread ? <span className="portra-notice-badge">{badgeText}</span> : null}
       </button>
       <Stack direction="row" gap={1} flexWrap="wrap">
         <Button variant="outlined" onClick={() => dispatchState(0)}>无未读通知</Button>

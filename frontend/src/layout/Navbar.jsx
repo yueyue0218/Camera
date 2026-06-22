@@ -21,6 +21,11 @@ const adminNavItems = [
   { label: '个人', path: '/profile?from=admin', key: 'profile' }
 ]
 
+function formatUnreadBadge(count) {
+  if (!count) return ''
+  return count > 99 ? '99+' : String(count)
+}
+
 function activeKeyFromPath(pathname, adminSurface, adminTab) {
   if (adminSurface) {
     if (pathname.startsWith('/profile')) return 'profile'
@@ -62,9 +67,18 @@ export function Navbar({
     let alive = true
 
     const refresh = async event => {
-      if (import.meta.env.DEV && typeof event?.detail?.previewUnreadCount === 'number') {
-        setUnreadCount(event.detail.previewUnreadCount)
-        if (event.detail.previewRing) {
+      const detailUnreadCount = typeof event?.detail?.unreadCount === 'number'
+        ? event.detail.unreadCount
+        : typeof event?.detail?.previewUnreadCount === 'number'
+          ? event.detail.previewUnreadCount
+          : null
+
+      const shouldRing = Boolean(event?.detail?.ring || event?.detail?.previewRing)
+
+      if (detailUnreadCount !== null) {
+        setUnreadCount(detailUnreadCount)
+        initializedRef.current = true
+        if (shouldRing) {
           setBellRinging(true)
           window.setTimeout(() => setBellRinging(false), 620)
         }
@@ -131,13 +145,18 @@ export function Navbar({
 
         <div className="portra-header-actions">
           {!adminSurface ? (
-            <button className="portra-notification-btn" type="button" onClick={() => navigate('/notifications')} aria-label="通知">
+            <button
+              className="portra-notification-btn"
+              type="button"
+              onClick={() => navigate('/notifications')}
+              aria-label={unreadCount ? `通知，${unreadCount} 条未读` : '通知，无未读'}
+            >
               {unreadCount ? (
                 <NotificationsRoundedIcon className={`portra-notification-bell ${bellRinging ? 'portra-notification-bell--ringing' : ''}`} fontSize="small" />
               ) : (
                 <NotificationsNoneRoundedIcon className="portra-notification-bell" fontSize="small" />
               )}
-              {unreadCount ? <span className="portra-notice-badge" /> : null}
+              {unreadCount ? <span className="portra-notice-badge">{formatUnreadBadge(unreadCount)}</span> : null}
             </button>
           ) : null}
           <button

@@ -61,6 +61,14 @@ function complaintStatusTone(status) {
   }
 }
 
+function reviewFeedbackText(type) {
+  if (type === 'load') return '评价页暂时打不开，请稍后再试。'
+  if (type === 'submit') return '这条评价暂时没提交成功，请稍后再试。'
+  if (type === 'complaint') return '这条申诉暂时没提交成功，请稍后再试。'
+  if (type === 'list') return '评价列表暂时打不开，请稍后再试。'
+  return '这次操作暂时没完成，请稍后再试。'
+}
+
 export function ReviewScore({ value }) {
   const numeric = Number(value)
   const score = Number.isFinite(numeric) ? numeric : 0
@@ -197,8 +205,8 @@ export function ReviewPage() {
         setItems(Array.isArray(reviews) ? reviews : [])
         setCredit(summary)
         setFeedback({})
-      } catch (error) {
-        if (alive) setFeedback({ error: error.message })
+      } catch {
+        if (alive) setFeedback({ error: reviewFeedbackText('load') })
       } finally {
         if (alive) setLoading(false)
       }
@@ -217,8 +225,8 @@ export function ReviewPage() {
       setItems(Array.isArray(reviews) ? reviews : [])
       setForm({ rating: 5, content: '' })
       setFeedback({ success: '评价已提交' })
-    } catch (error) {
-      setFeedback({ error: error.message })
+    } catch {
+      setFeedback({ error: reviewFeedbackText('submit') })
     } finally {
       setSubmitting(false)
     }
@@ -234,8 +242,8 @@ export function ReviewPage() {
       await reviewComplaintApi.create(reviewId, { reason: complaintReason.trim(), evidenceFileIds: '' }, currentUser)
       setComplaintReason('')
       setFeedback({ success: '申诉已提交' })
-    } catch (error) {
-      setFeedback({ error: error.message })
+    } catch {
+      setFeedback({ error: reviewFeedbackText('complaint') })
     } finally {
       setComplaintSubmitting(false)
     }
@@ -246,7 +254,7 @@ export function ReviewPage() {
       <PageHeader
         eyebrow="评价服务"
         title={`订单 ${orderId} 评价`}
-        description="订单完成后双方可以进行评价，评价会影响信用分。"
+        description="完成合作后，双方都可以留下评价，信用分也会随之变化。"
       />
       <Feedback {...feedback} />
 
@@ -411,8 +419,8 @@ export function UserReviewsPage() {
         if (!alive) return
         setItems(Array.isArray(reviews) ? reviews : [])
         setFeedback({})
-      } catch (error) {
-        if (alive) setFeedback({ error: error.message })
+      } catch {
+        if (alive) setFeedback({ error: reviewFeedbackText('list') })
       } finally {
         if (alive) setLoading(false)
       }

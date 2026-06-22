@@ -35,6 +35,10 @@ function formatPercent(value) {
   return Number.isFinite(numeric) ? `${numeric.toFixed(1)}%` : '--'
 }
 
+function creditUnavailableMessage() {
+  return '信用页暂时打不开，请稍后再试。'
+}
+
 function creditLevel(score, summaryLevel) {
   const label = String(summaryLevel || '').trim()
   if (label) {
@@ -63,10 +67,10 @@ function recordMetaLabel(record, orderId) {
   if (orderId) return '关联订单'
   const sourceType = String(record.sourceType || '').toUpperCase()
   const eventType = String(record.eventType || '').toUpperCase()
-  if (sourceType.includes('REVIEW') || eventType.includes('REVIEW')) return '评价记录'
-  if (sourceType.includes('ORDER') || eventType.includes('ORDER')) return '订单记录'
-  if (sourceType.includes('REFUND') || eventType.includes('REFUND')) return '退款记录'
-  return '信用记录'
+  if (sourceType.includes('REVIEW') || eventType.includes('REVIEW')) return '评价'
+  if (sourceType.includes('ORDER') || eventType.includes('ORDER')) return '合作'
+  if (sourceType.includes('REFUND') || eventType.includes('REFUND')) return '退款'
+  return '分数变化'
 }
 
 function recordTitle(record, delta) {
@@ -75,24 +79,24 @@ function recordTitle(record, delta) {
   if (text.includes('REFUND')) return '退款责任记录'
   if (text.includes('CANCEL')) return '订单取消记录'
   if (text.includes('ORDER')) return delta < 0 ? '订单履约异常' : '订单履约记录'
-  if (delta < 0) return '信用扣分'
-  if (delta > 0) return '信用加分'
-  return '信用记录更新'
+  if (delta < 0) return '这次减分'
+  if (delta > 0) return '这次加分'
+  return '分数变化'
 }
 
 function recordDetail(record, delta) {
   const text = `${record.eventType || ''} ${record.reason || ''} ${record.sourceType || ''}`.toUpperCase()
   if (text.includes('REVIEW')) {
-    if (delta < 0) return '低分评价会拉低信用表现，后续稳定履约和好评会逐步修复。'
-    if (delta > 0) return '评价表现较好，已计入信用表现。'
-    return '评价已记录，本次未造成分数变化。'
+    if (delta < 0) return '这次低分评价会拉低当前信用分，后续稳定合作和好评会慢慢补回来。'
+    if (delta > 0) return '这次评价不错，已经体现在信用分里。'
+    return '这次评价已经收下，分数暂时没有变化。'
   }
-  if (text.includes('REFUND')) return '该退款记录已计入风险记录。'
-  if (text.includes('CANCEL')) return '该订单取消记录已计入履约表现。'
-  if (text.includes('ORDER')) return '该订单结果已计入履约表现。'
-  if (delta < 0) return '该记录会影响信用分，请留意后续履约和评价。'
-  if (delta > 0) return '该记录提升了信用表现。'
-  return '该记录已纳入信用档案。'
+  if (text.includes('REFUND')) return '这次退款情况已经记在信用分参考里。'
+  if (text.includes('CANCEL')) return '这次取消合作已经记在信用分参考里。'
+  if (text.includes('ORDER')) return '这次合作结果已经记在信用分参考里。'
+  if (delta < 0) return '这次情况会影响信用分，后续多完成合作、多收好评会逐步恢复。'
+  if (delta > 0) return '这次情况让信用表现更好了。'
+  return '这次情况已经记在信用页里。'
 }
 
 export function CreditDetailPage() {
@@ -122,7 +126,7 @@ export function CreditDetailPage() {
         setSummary(summaryResult.status === 'fulfilled' ? summaryResult.value : null)
         setRecords(recordsResult.status === 'fulfilled' ? normalizeRecords(recordsResult.value) : [])
         const failed = [summaryResult, recordsResult].find(r => r.status === 'rejected')
-        setNotice(failed ? failed.reason?.message || '信用数据暂时不可用' : null)
+        setNotice(failed ? creditUnavailableMessage() : null)
       } else {
         const [summaryResult, reviewsResult] = await Promise.allSettled([
           creditApi.summary(targetUserId, currentUser),
@@ -132,7 +136,7 @@ export function CreditDetailPage() {
         if (summaryResult.status === 'fulfilled') {
           setSummary(summaryResult.value)
         } else {
-          setNotice(summaryResult.reason?.message || '信用数据暂时不可用')
+          setNotice(creditUnavailableMessage())
         }
         setReviews(reviewsResult.status === 'fulfilled' ? (Array.isArray(reviewsResult.value) ? reviewsResult.value : []) : [])
         setRecords([])
@@ -165,7 +169,7 @@ export function CreditDetailPage() {
   const lastUpdated = summary?.lastUpdatedAt || records[0]?.createdAt || null
   const displayScore = hasSummary ? score : '暂无'
   const displayLevel = hasSummary ? level : '新用户'
-  const displayRecordCount = isSelf ? (hasRecords ? recordCount : '暂无') : '不公开'
+  const displayRecordCount = isSelf ? (hasRecords ? recordCount : '暂无') : '仅自己可见'
   const overviewEffectiveOrders = hasSummary ? effectiveOrders : '--'
   const overviewGoodReviewRate = hasSummary ? goodReviewRate : '--'
   const overviewDefaultRate = hasSummary ? defaultRate : '--'
@@ -174,13 +178,13 @@ export function CreditDetailPage() {
   return (
     <div className="pp-main credit-detail-page">
       <div className="pp-crumb">
-        <span><strong>信用</strong> / 用户 {targetUserId}</span>
+        <span><strong>信用分</strong> / 用户 {targetUserId}</span>
         <button className="secondary-btn" type="button" onClick={() => navigate(-1)}>返回</button>
       </div>
 
       {notice && (
         <div className="pp-empty credit-notice">
-          <h3>信用数据暂时不可用</h3>
+          <h3>暂时看不到信用分</h3>
           <p>{notice}</p>
         </div>
       )}
@@ -197,20 +201,20 @@ export function CreditDetailPage() {
         </div>
 
         <div className="hero-info">
-          <div className="ticket-kicker">信用档案</div>
+          <div className="ticket-kicker">信用分</div>
           <div className="hero-name-row">
             <h1 className="hero-name">{displayLevel}</h1>
             <span className="role-badge">用户 {targetUserId}</span>
           </div>
           <p className="profile-uid">最近更新：{formatUpdatedTime(lastUpdated)}</p>
           <p className="profile-signature">
-            信用分会结合有效订单规模、评价表现、失信率和风险记录动态更新；没有评价的订单不会进入信用样本。
+            信用分会参考完成合作后的评价、是否按约以及争议处理情况，近期表现越稳定，分数通常也越稳。
           </p>
           <div className="profile-meta-line">
-            <span>有效订单 {effectiveOrders}</span>
-            <span>完成订单 {completedOrders}</span>
+            <span>计分合作 {effectiveOrders}</span>
+            <span>完成合作 {completedOrders}</span>
             <span>收到评价 {reviewCount}</span>
-            <span>信用记录 {displayRecordCount}</span>
+            <span>分数变化 {displayRecordCount}</span>
           </div>
           <Button
             type="button"
@@ -219,20 +223,20 @@ export function CreditDetailPage() {
             size="small"
             onClick={() => setRulesOpen(true)}
           >
-            信用规则说明
+            评分说明
           </Button>
         </div>
 
         <div className="hero-side">
           <div>
-            <div className="id-label">信用概览</div>
+            <div className="id-label">当前信用分</div>
             <div className="id-number">{displayScore}</div>
           </div>
           <div className="metric-grid">
-            <div className="metric"><b>{overviewEffectiveOrders}</b><span>有效订单</span></div>
+            <div className="metric"><b>{overviewEffectiveOrders}</b><span>计分合作</span></div>
             <div className="metric"><b>{overviewGoodReviewRate}</b><span>好评率</span></div>
-            <div className="metric"><b>{overviewDefaultRate}</b><span>失信率</span></div>
-            <div className="metric"><b>{overviewRiskRecords}</b><span>风险记录</span></div>
+            <div className="metric"><b>{overviewDefaultRate}</b><span>未按约占比</span></div>
+            <div className="metric"><b>{overviewRiskRecords}</b><span>争议记录</span></div>
           </div>
         </div>
       </section>
@@ -242,7 +246,7 @@ export function CreditDetailPage() {
           <div className="section-head">
             <div>
               <h2>历史评价</h2>
-              <p>来自订单的真实评价，反映该用户的评价表现与合作稳定度。</p>
+              <p>这些评价来自真实合作，能帮助你了解对方平时的合作表现。</p>
             </div>
             <div className="section-mark">{reviews.length || '暂无'}</div>
           </div>
@@ -277,16 +281,16 @@ export function CreditDetailPage() {
       <section className="panel-card credit-records-panel">
         <div className="section-head">
           <div>
-            <h2>信用记录</h2>
-            <p>按时间倒序查看每一次信用变化，记录只展示用户能理解的原因。</p>
+            <h2>分数变化</h2>
+            <p>按时间查看每一次分数变化，只保留你一眼能看懂的原因。</p>
           </div>
           <div className="section-mark">{hasRecords ? recordCount : '暂无'}</div>
         </div>
 
         {loading ? (
           <div className="pp-empty">
-            <h3>正在加载信用记录</h3>
-            <p>正在更新信用分和记录。</p>
+            <h3>正在整理信用分</h3>
+            <p>请稍等，这里马上显示最新情况。</p>
           </div>
         ) : hasRecords ? (
           <Stack spacing={1.35} className="credit-note-stack">
@@ -322,14 +326,14 @@ export function CreditDetailPage() {
                   <span className="credit-note-pin" aria-hidden="true" />
                   <div className="credit-note-delta">
                     <strong>{positive ? '+' : ''}{delta.toFixed(1)}</strong>
-                    <span>分变化</span>
+                    <span>分数变化</span>
                   </div>
                   <div className="credit-note-body">
                     <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                       <Typography className="credit-note-title">{title}</Typography>
                       <Chip
                         size="small"
-                        label={positive ? '加分' : negative ? '扣分' : '记录'}
+                        label={positive ? '加分' : negative ? '减分' : '记录'}
                         sx={{
                           height: 26,
                           fontWeight: 800,
@@ -353,25 +357,25 @@ export function CreditDetailPage() {
           </Stack>
         ) : (
           <div className="pp-empty">
-            <h3>暂无信用记录</h3>
-            <p>完成订单或收到评价后，这里会更新记录。</p>
+            <h3>还没有分数变化</h3>
+            <p>完成合作或收到评价后，这里会出现变化说明。</p>
           </div>
         )}
       </section>
       )}
 
       <Dialog open={rulesOpen} onClose={() => setRulesOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>信用规则说明</DialogTitle>
+        <DialogTitle>评分说明</DialogTitle>
         <DialogContent>
           <div className="credit-rules-copy">
-            <p>信用分只参考收到他人评价后的有效订单。拍摄前取消、没有评价的订单，不会直接影响信用分。</p>
-            <p>失信率 = 风险记录 / 有效订单。风险记录只统计申诉或争议裁定后，责任落在该用户身上的情况。</p>
-            <p>评价表现会结合收到的评分结果动态更新，不同评分会拉开信用分差距。</p>
-            <p><strong>信用优秀：</strong>90-100，评价稳定，失信率低。</p>
-            <p><strong>信用良好：</strong>75-89，整体表现正常，风险记录较少。</p>
-            <p><strong>待提升：</strong>60-74，仍需继续积累真实好评与稳定记录。</p>
-            <p><strong>信用较差：</strong>60 以下，近期存在较多责任申诉或低分评价。</p>
-            <p><strong>新用户 / 待积累：</strong>还没有足够有效订单时，会先显示积累状态。</p>
+            <p>信用分主要参考完成合作后的评价、是否按约以及争议处理结果。拍摄前取消、没有评价的合作，一般不会直接影响信用分。</p>
+            <p>如果合作里出现争议，并确认责任在你，这里会留下提醒；之后稳定完成合作、持续收到好评，分数也会慢慢回升。</p>
+            <p>评价越稳定、好评越多，信用分通常越高。</p>
+            <p><strong>信用优秀：</strong>90-100，评价稳定，基本都能按约完成。</p>
+            <p><strong>信用良好：</strong>75-89，整体表现稳定，偶尔有波动。</p>
+            <p><strong>待提升：</strong>60-74，还需要更多稳定合作和真实好评。</p>
+            <p><strong>信用较差：</strong>60 以下，近期低分评价或争议情况偏多。</p>
+            <p><strong>新用户 / 待积累：</strong>合作和评价还不够多时，会先显示积累状态。</p>
           </div>
         </DialogContent>
         <DialogActions>

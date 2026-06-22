@@ -99,6 +99,10 @@ function ComplaintLoadingState() {
   )
 }
 
+function complaintFeedbackText() {
+  return '申诉页暂时打不开，请稍后再试。'
+}
+
 export function ReviewComplaintDetailPage() {
   const { complaintId } = useParams()
   const navigate = useNavigate()
@@ -120,8 +124,8 @@ export function ReviewComplaintDetailPage() {
           setDetail(data || null)
           setFeedback({})
         }
-      } catch (error) {
-        if (alive) setFeedback({ error: error.message || '申诉详情加载失败' })
+      } catch {
+        if (alive) setFeedback({ error: complaintFeedbackText() })
       } finally {
         if (alive) setLoading(false)
       }
@@ -136,7 +140,7 @@ export function ReviewComplaintDetailPage() {
       <PageHeader
         eyebrow="申诉处理"
         title="评价申诉详情"
-        description="查看申诉原因、处理状态和仲裁结果。"
+        description="查看申诉原因、当前进展和处理结果。"
         action={<Button onClick={() => navigate(-1)}>返回</Button>}
       />
       <Feedback {...feedback} />
@@ -193,7 +197,7 @@ export function ReviewComplaintDetailPage() {
           <Alert severity={tone.severity} sx={{ borderRadius: 3 }}>
             {detail.arbitrationResult
               ? `当前状态：${tone.label}。本条申诉已有处理结论，可结合下方处理结果查看。`
-              : `当前状态：${tone.label}。申诉正在处理中，最终结果会同步到这里。`}
+              : `当前状态：${tone.label}。申诉正在处理中，结果出来后会显示在这里。`}
           </Alert>
 
           <Stack gap={1.5}>

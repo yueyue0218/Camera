@@ -8,6 +8,12 @@ import { useAuth } from '../../AuthContext.jsx'
 import { EmptyState, Feedback, PageHeader, formatDateTime, panelSx, portra } from '../dline/shared.jsx'
 import { ReviewScore, reviewDirectionLabel } from './ReviewPage.jsx'
 
+function reviewDetailFeedbackText(type) {
+  if (type === 'load') return '评价详情暂时打不开，请稍后再试。'
+  if (type === 'reply') return '这条追评暂时没提交成功，请稍后再试。'
+  return '这次操作暂时没完成，请稍后再试。'
+}
+
 export function ReviewDetailPage() {
   const navigate = useNavigate()
   const { reviewId } = useParams()
@@ -32,8 +38,8 @@ export function ReviewDetailPage() {
         if (data?.replyContent) {
           setReplyOpen(false)
         }
-      } catch (error) {
-        if (alive) setFeedback({ error: error.message })
+      } catch {
+        if (alive) setFeedback({ error: reviewDetailFeedbackText('load') })
       } finally {
         if (alive) setLoading(false)
       }
@@ -58,8 +64,8 @@ export function ReviewDetailPage() {
       setReplyOpen(false)
       setReplyContent('')
       setFeedback({ success: '追评已提交' })
-    } catch (error) {
-      setFeedback({ error: error.message })
+    } catch {
+      setFeedback({ error: reviewDetailFeedbackText('reply') })
     } finally {
       setReplySubmitting(false)
     }
@@ -70,7 +76,7 @@ export function ReviewDetailPage() {
       <PageHeader
         eyebrow="评价记录"
         title="评价详情"
-        description="查看单条评价内容并追加追评。"
+        description="查看这条评价，也可以在这里补充追评。"
         action={<Button onClick={() => navigate(-1)}>返回</Button>}
       />
 

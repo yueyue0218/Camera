@@ -103,6 +103,16 @@ function formatNoticeTime(value) {
   return new Date(value).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
+function countUnreadNotifications(items = []) {
+  return items.filter(item => !item?.isRead).length
+}
+
+function broadcastNotificationState(unreadCount, ring = false) {
+  window.dispatchEvent(new CustomEvent(PORTRA_STATE_EVENT, {
+    detail: { unreadCount, ring }
+  }))
+}
+
 function creditLevel(score) {
   const numeric = Number(score)
   if (Number.isNaN(numeric)) return '信用未知'
@@ -426,8 +436,8 @@ export function NotificationListPage() {
     try {
       const data = demoMode ? demoNotifications : await notificationApi.listMine(currentUser)
       setItems(asArray(data))
-    } catch (loadError) {
-      setError(loadError.message || '通知加载失败')
+    } catch {
+      setError('通知暂时加载失败，请稍后再试。')
     } finally {
       setLoading(false)
     }
@@ -443,11 +453,12 @@ export function NotificationListPage() {
       const data = demoMode
         ? items.map(item => ({ ...item, isRead: true }))
         : await notificationApi.markAllRead(currentUser)
-      setItems(asArray(data))
+      const nextItems = asArray(data)
+      setItems(nextItems)
       setFeedback({ type: 'success', message: '已全部标记为已读' })
-      window.dispatchEvent(new Event(PORTRA_STATE_EVENT))
-    } catch (markError) {
-      setFeedback({ type: 'error', message: markError.message || '操作失败，请稍后重试' })
+      broadcastNotificationState(countUnreadNotifications(nextItems))
+    } catch {
+      setFeedback({ type: 'error', message: '全部已读暂时没成功，请稍后再试。' })
     }
   }
 
@@ -465,14 +476,15 @@ export function NotificationListPage() {
         const updated = demoMode
           ? { ...notice, isRead: true }
           : await notificationApi.markRead(notice.notificationId, currentUser)
-        setItems(current => current.map(item => item.notificationId === notice.notificationId ? updated : item))
+        const nextItems = items.map(item => item.notificationId === notice.notificationId ? updated : item)
+        setItems(nextItems)
         setFeedback({ type: 'success', message: '已标记为已读' })
-        window.dispatchEvent(new Event(PORTRA_STATE_EVENT))
+        broadcastNotificationState(countUnreadNotifications(nextItems))
       }
       const target = noticeTarget(notice)
       if (target) navigate(target)
-    } catch (noticeError) {
-      setFeedback({ type: 'error', message: noticeError.message || '通知操作失败' })
+    } catch {
+      setFeedback({ type: 'error', message: '这条通知暂时处理失败，请稍后再试。' })
     }
   }
 

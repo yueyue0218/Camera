@@ -22,6 +22,23 @@ const APPEAL_EVENTS = ['REVIEW_COMPLAINT_', 'DISPUTE']
 const DYNAMIC_EVENTS = ['MOMENT_LIKED', 'FOLLOWED']
 const PORTRA_STATE_EVENT = 'portra-preview-state'
 
+function notificationErrorText(action) {
+  if (action === 'load') return '通知暂时加载失败，请稍后再试。'
+  if (action === 'read') return '这条通知暂时处理失败，请稍后再试。'
+  if (action === 'read-all') return '全部已读暂时没成功，请稍后再试。'
+  return '通知暂时处理失败，请稍后再试。'
+}
+
+function countUnreadNotifications(items = []) {
+  return items.filter(item => !item?.isRead).length
+}
+
+function broadcastNotificationState(unreadCount, ring = false) {
+  window.dispatchEvent(new CustomEvent(PORTRA_STATE_EVENT, {
+    detail: { unreadCount, ring }
+  }))
+}
+
 function normalizeText(value) {
   return String(value || '').trim().toUpperCase()
 }
@@ -86,12 +103,13 @@ function resolveTypeLabel(item) {
 
   if (APPEAL_EVENTS.some(token => type.includes(token) || eventType.includes(token) || relatedType.includes(token))) return '申诉'
   if (type.includes('DEMAND_RESPONSE') || eventType.includes('DEMAND_RESPONSE') || type.includes('CONVERSATION_STARTED')) return '约拍'
+  if (type.includes('MESSAGE') || eventType.includes('MESSAGE') || type.includes('CONVERSATION') || eventType.includes('CONVERSATION')) return '消息'
   if (ORDER_EVENTS.some(token => type.includes(token) || eventType.includes(token) || relatedType.includes(token))) return '订单'
   if (REVIEW_EVENTS.some(token => type.includes(token) || eventType.includes(token) || relatedType.includes(token))) return '评价'
   if (DYNAMIC_EVENTS.some(token => type.includes(token) || eventType.includes(token) || relatedType.includes(token))) return '动态'
   if (type.includes('CREDIT') || eventType.includes('CREDIT')) return '信用'
   if (type.includes('FOLLOWED') || eventType.includes('FOLLOWED')) return '关注'
-  return item?.type ? String(item.type) : '通知'
+  return '通知'
 }
 
 function buildDynamicGroups(items) {
@@ -294,8 +312,8 @@ export function NotificationListPage() {
         if (!alive) return
         setItems(data)
         setFeedback({})
-      } catch (error) {
-        if (alive) setFeedback({ error: error.message })
+      } catch {
+        if (alive) setFeedback({ error: notificationErrorText('load') })
       } finally {
         if (alive) setLoading(false)
       }
@@ -329,12 +347,13 @@ export function NotificationListPage() {
   async function markRead(notificationId) {
     try {
       const updated = await notificationApi.markRead(notificationId, currentUser)
-      setItems(current => current.map(item => (item.notificationId === notificationId ? updated : item)))
+      const nextItems = items.map(item => (item.notificationId === notificationId ? updated : item))
+      setItems(nextItems)
       setFeedback({ success: '通知已读' })
-      window.dispatchEvent(new Event(PORTRA_STATE_EVENT))
+      broadcastNotificationState(countUnreadNotifications(nextItems))
       return updated
-    } catch (error) {
-      setFeedback({ error: error.message })
+    } catch {
+      setFeedback({ error: notificationErrorText('read') })
       return null
     }
   }
@@ -344,9 +363,9 @@ export function NotificationListPage() {
       const updated = await notificationApi.markAllRead(currentUser)
       setItems(updated)
       setFeedback({ success: '全部通知已读' })
-      window.dispatchEvent(new Event(PORTRA_STATE_EVENT))
-    } catch (error) {
-      setFeedback({ error: error.message })
+      broadcastNotificationState(countUnreadNotifications(updated))
+    } catch {
+      setFeedback({ error: notificationErrorText('read-all') })
     }
   }
 

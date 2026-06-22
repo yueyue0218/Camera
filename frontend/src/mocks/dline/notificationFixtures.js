@@ -12,7 +12,7 @@ export const demoNotifications = [
   {
     notificationId: 302,
     title: '订单已更新',
-    content: '订单 #8106 已标记为完成。',
+    content: '订单 #8106 已完成。',
     type: 'ORDER_STATUS_CHANGED',
     relatedType: 'ORDER',
     relatedId: 8106,
@@ -22,7 +22,7 @@ export const demoNotifications = [
   {
     notificationId: 303,
     title: '评价申诉已收到',
-    content: '平台已收到你的申诉，结果会同步到这里。',
+    content: '平台已收到你的申诉，结果出来后会显示在这里。',
     type: 'REVIEW_COMPLAINT_CREATED',
     relatedType: 'REVIEW_COMPLAINT',
     relatedId: 9001,
@@ -42,7 +42,7 @@ export const demoNotifications = [
   {
     notificationId: 305,
     title: '订单已完成',
-    content: '订单 #8108 已完成，信用记录已刷新。',
+    content: '订单 #8108 已完成，信用分也会随之更新。',
     type: 'ORDER_COMPLETED',
     relatedType: 'ORDER',
     relatedId: 8108,
