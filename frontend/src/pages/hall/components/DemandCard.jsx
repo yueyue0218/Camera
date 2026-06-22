@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { cityName, firstText, readableDate, splitTags } from './hallUtils.js'
-import { publicImageUrls, useFileObjectUrl } from '../utils/fileObjectUrls.js'
+import { publicImageUrls, useFileObjectUrlState } from '../utils/fileObjectUrls.js'
 
 function firstValue(...values) {
   return values.find(value => value !== null && value !== undefined && String(value).trim() !== '')
@@ -9,13 +10,13 @@ function firstArrayItem(value) {
   return Array.isArray(value) ? value[0] : undefined
 }
 
-function imageFileValues(demand) {
-  return [
+function coverFileValue(demand) {
+  return firstValue(
     demand.thumbnailFileId,
     demand.coverFileId,
     demand.imageFileId,
     demand.referenceFileId,
-    demand.referenceFileIds,
+    firstArrayItem(demand.referenceFileIds),
     demand.imageUrl,
     demand.coverUrl,
     demand.thumbnailUrl,
@@ -25,7 +26,7 @@ function imageFileValues(demand) {
     demand.photoUrl,
     firstArrayItem(demand.attachmentUrls),
     firstArrayItem(demand.referencePreviewUrls)
-  ]
+  )
 }
 
 function publicImageValues(demand) {
@@ -132,13 +133,29 @@ export function DemandCard({
     demand.timeDescription,
     demand.timeSlot
   ) || readableDate(demand.expectedDate) || '暂无'
-  const coverUrl = useFileObjectUrl(
-    imageFileValues(demand),
+  const { url: coverUrl, loading: coverDownloading, error: coverDownloadFailed } = useFileObjectUrlState(
+    coverFileValue(demand),
     currentUser,
     `demand ${demand.demandId} reference`
   )
   const fallbackCoverUrl = publicImageUrls(publicImageValues(demand))[0] || ''
   const imageUrl = coverUrl || fallbackCoverUrl
+  const [loadedImageUrl, setLoadedImageUrl] = useState('')
+  const [failedImageUrl, setFailedImageUrl] = useState('')
+  const imageLoaded = Boolean(imageUrl) && loadedImageUrl === imageUrl
+  const imageFailed = Boolean(imageUrl) && failedImageUrl === imageUrl
+
+  const imageState = !imageUrl
+    ? coverDownloading
+      ? 'is-loading'
+      : coverDownloadFailed
+        ? 'is-error'
+        : 'is-placeholder'
+    : imageFailed
+      ? 'is-error'
+      : imageLoaded
+        ? 'is-loaded'
+        : 'is-loading'
 
   return (
     <article className={`ticket-card has-cover ${imageUrl ? 'with-cover' : 'without-cover'}`} onClick={onOpen}>
@@ -156,9 +173,19 @@ export function DemandCard({
         <div className="meta-item"><span>时间</span><b>{shootTime}</b></div>
         <div className="meta-item"><span>已有响应人数</span><b>{responseCountText(demand)}</b></div>
       </div>
-      <div className={`ticket-cover ${imageUrl ? '' : 'is-placeholder'}`}>
-        {imageUrl && (
-          <img src={imageUrl} alt={`${title || '需求'}参考图`} loading="lazy" />
+      <div className={`ticket-cover ${imageState}`}>
+        {imageUrl && !imageFailed && (
+          <img
+            className={imageLoaded ? 'is-loaded' : ''}
+            src={imageUrl}
+            alt={`${title || '需求'}参考图`}
+            loading="lazy"
+            decoding="async"
+            width="126"
+            height="168"
+            onLoad={() => setLoadedImageUrl(imageUrl)}
+            onError={() => setFailedImageUrl(imageUrl)}
+          />
         )}
       </div>
     </article>

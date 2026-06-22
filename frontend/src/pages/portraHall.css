@@ -431,6 +431,7 @@
 }
 
 .ticket-cover {
+  position: relative;
   grid-area: cover;
   align-self: start;
   justify-self: end;
@@ -451,12 +452,38 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  opacity: 0;
+  transition: opacity .2s ease;
+}
+
+.ticket-cover img.is-loaded {
+  opacity: 1;
 }
 
 .ticket-cover.is-placeholder {
   background: transparent;
   border-color: transparent;
   box-shadow: none;
+}
+
+.ticket-cover.is-loading,
+.ticket-cover.is-error {
+  background: #eee9e1;
+}
+
+.ticket-cover.is-loading::after,
+.work-cover.is-loading::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 28%, rgba(255,255,255,.48) 44%, transparent 60%);
+  transform: translateX(-100%);
+  animation: hallImageShimmer 1.25s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes hallImageShimmer {
+  to { transform: translateX(100%); }
 }
 
 .ticket-top {
@@ -941,23 +968,35 @@ body[data-role="photographer"] .aside-card.photographer-only {
   height: 320px;
   position: relative;
   overflow: hidden;
-  background: #ddd0c5;
+  background: var(--placeholder-art, #ddd0c5);
 }
 
-.work-cover::before {
-  content: "";
+.work-cover-image {
   position: absolute;
   inset: 0;
-  background: var(--art);
-  background-size: cover;
-  background-position: center;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   filter: saturate(.82) contrast(.96);
+  opacity: 0;
+  transition: opacity .22s ease;
+}
+
+.work-cover-image.is-loaded {
+  opacity: 1;
+}
+
+.work-cover.is-loading::before {
+  z-index: 2;
 }
 
 .work-cover::after {
   content: "";
   position: absolute;
   inset: 0;
+  z-index: 2;
   background: linear-gradient(180deg, transparent 46%, rgba(0,0,0,.22));
 }
 
@@ -965,7 +1004,7 @@ body[data-role="photographer"] .aside-card.photographer-only {
   position: absolute;
   right: 12px;
   top: 12px;
-  z-index: 2;
+  z-index: 3;
   background: var(--yellow);
   border-radius: 999px;
   padding: 7px 10px;
@@ -977,7 +1016,7 @@ body[data-role="photographer"] .aside-card.photographer-only {
   position: absolute;
   left: 12px;
   bottom: 12px;
-  z-index: 2;
+  z-index: 3;
   background: rgba(248,243,235,.9);
   border-radius: 999px;
   padding: 6px 10px;
@@ -1572,7 +1611,7 @@ body[data-role="photographer"] .aside-card.photographer-only {
 }
 
 @keyframes galleryPrevLeft {
-  from { transform: translateX(-100%); opacity: .45; }
+  from { transform: translateX(-24px); opacity: .88; }
   to { transform: translateX(0); opacity: 1; }
 }
 

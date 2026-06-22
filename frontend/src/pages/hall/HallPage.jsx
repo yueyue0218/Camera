@@ -45,6 +45,10 @@ function normalizeError(error) {
   return error?.message || '请求失败，请稍后重试。'
 }
 
+function hasOwn(record, field) {
+  return Object.prototype.hasOwnProperty.call(record || {}, field)
+}
+
 function panelFromSearch(search) {
   const params = new URLSearchParams(search)
   const view = params.get('tab') || params.get('view')
@@ -73,6 +77,9 @@ function pageInfoFromResult(page, fallbackPage, fallbackSize) {
 
 async function enrichDemandPublisher(demand, currentUser) {
   if (!demand?.customerId) return demand
+  const hasNickname = Boolean(String(demand.customerNickname || '').trim())
+  const hasAvatarField = hasOwn(demand, 'customerAvatarFileId')
+  if (hasNickname && hasAvatarField) return demand
   try {
     const brief = await userApi.brief(demand.customerId, currentUser, 'CUSTOMER')
     const avatarFileId = demand.customerAvatarFileId ?? brief?.avatarFileId
@@ -113,6 +120,9 @@ async function enrichDemandPublishers(records, currentUser) {
 async function enrichServiceProvider(service, currentUser) {
   const providerId = service?.photographerId || service?.providerId
   if (!providerId) return service
+  const hasNickname = Boolean(String(service.photographerNickname || '').trim())
+  const hasAvatarField = hasOwn(service, 'photographerAvatarFileId')
+  if (hasNickname && hasAvatarField) return service
   try {
     const brief = await userApi.brief(providerId, currentUser, 'PROVIDER')
     const avatarFileId = service.photographerAvatarFileId ?? brief?.avatarFileId
@@ -170,10 +180,12 @@ export function HallPage() {
   const serviceRequestSeq = useRef(0)
   const demandAppendInFlight = useRef(false)
   const serviceAppendInFlight = useRef(false)
+  const initialLoadSearchRef = useRef(null)
 
   const interestedIds = useMemo(() => new Set(interests.map(item => item.serviceId)), [interests])
 
   useEffect(() => {
+    initialLoadSearchRef.current = location.search
     loadDemands({ page: 1, mode: 'replace' })
     loadServices({ page: 1, mode: 'replace' })
     loadInterests()
@@ -191,8 +203,9 @@ export function HallPage() {
     const params = new URLSearchParams(location.search)
     const published = params.get('published')
     const id = params.get('id')
+    const initialLoadAlreadyCoveredSearch = initialLoadSearchRef.current === location.search
     if (published === 'demand') {
-      loadDemands({ page: 1, mode: 'replace' })
+      if (!initialLoadAlreadyCoveredSearch) loadDemands({ page: 1, mode: 'replace' })
       setNotice({
         type: 'success',
         text: '需求已发布',
@@ -201,8 +214,10 @@ export function HallPage() {
       })
     }
     if (published === 'showcase') {
-      loadServices({ page: 1, mode: 'replace' })
-      loadInterests()
+      if (!initialLoadAlreadyCoveredSearch) {
+        loadServices({ page: 1, mode: 'replace' })
+        loadInterests()
+      }
       setNotice({
         type: 'success',
         text: '橱窗已发布',
