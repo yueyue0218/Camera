@@ -136,6 +136,19 @@ class ServicePackageServiceTest {
     }
 
     @Test
+    void publishRejectsPackageWithoutAnyImage() {
+        CreateServicePackageRequest request = createRequest();
+        request.setImages(List.of());
+        request.setPortfolioIds(List.of());
+
+        assertThatThrownBy(() -> servicePackageService.createServicePackage(provider(), request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("至少需要上传 1 张图片");
+
+        verify(servicePackageRepository, never()).save(any());
+    }
+
+    @Test
     void hallFiltersByTimeTagAndOmitsUntaggedPackagesOnlyWhenFilterIsUsed() {
         ServicePackage nearSeven = servicePackage(1L, ServicePackageStatus.ONLINE, true);
         nearSeven.setTimeTags(List.of("NEAR_7_DAYS"));

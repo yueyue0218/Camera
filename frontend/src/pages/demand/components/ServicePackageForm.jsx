@@ -113,7 +113,7 @@ export function ServicePackageForm({ form, errors, uploading, onChange, onSubmit
         </div>
 
         <div className="form-section">
-          <h3>作品上传</h3>
+          <h3>作品上传（必填）</h3>
           <div className="upload-grid">
             <label className="upload">
               {uploading ? '上传中...' : `+ 封面 / 作品集 (${portfolioItems.length}/9)`}
@@ -126,7 +126,9 @@ export function ServicePackageForm({ form, errors, uploading, onChange, onSubmit
               </div>
             ))}
           </div>
-          {!!portfolioItems.length && <p className="micro">已上传 {portfolioItems.length} 张，发布时写入 portfolioIds。</p>}
+          {portfolioItems.length
+            ? <p className="micro">已上传 {portfolioItems.length} 张，发布时写入 portfolioIds。</p>
+            : <p className="micro">发布橱窗至少需要上传 1 张图片。</p>}
         </div>
       </article>
 

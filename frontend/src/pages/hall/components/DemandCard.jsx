@@ -109,10 +109,7 @@ function demandCopy(demand) {
 export function DemandCard({
   demand,
   currentUser,
-  onOpen,
-  onRespond,
-  responded = false,
-  responding = false
+  onOpen
 }) {
   const tags = splitTags(demand.serviceTypes).length ? splitTags(demand.serviceTypes) : splitTags(demand.styleTags)
   const copy = demandCopy(demand)
@@ -159,21 +156,9 @@ export function DemandCard({
         <div className="meta-item"><span>时间</span><b>{shootTime}</b></div>
         <div className="meta-item"><span>已有响应人数</span><b>{responseCountText(demand)}</b></div>
       </div>
-      <div className="card-actions">
-        <button
-          className={`solid-btn photographer-only ${responded ? 'is-responded' : ''}`}
-          type="button"
-          disabled={responded || responding}
-          onClick={(event) => { event.stopPropagation(); onRespond() }}
-        >
-          {responding ? '提交中...' : responded ? '已响应' : '我来响应'}
-        </button>
-      </div>
       <div className={`ticket-cover ${imageUrl ? '' : 'is-placeholder'}`}>
-        {imageUrl ? (
+        {imageUrl && (
           <img src={imageUrl} alt={`${title || '需求'}参考图`} loading="lazy" />
-        ) : (
-          <span>参考图</span>
         )}
       </div>
     </article>

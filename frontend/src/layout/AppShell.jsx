@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../AuthContext.jsx'
 import { AppRoutes, LoginRoutes } from '../routes.jsx'
@@ -6,14 +7,28 @@ import { Navbar } from './Navbar.jsx'
 export default function AppShell() {
   const location = useLocation()
   const { currentUser, isAuthenticated, logout } = useAuth()
+  const [authenticationTimedOut, setAuthenticationTimedOut] = useState(false)
   const isLoginRoute = location.pathname === '/login' || location.pathname.startsWith('/login/')
+
+  useEffect(() => {
+    function handleAuthenticationTimeout() {
+      setAuthenticationTimedOut(true)
+      logout()
+    }
+    window.addEventListener('portra:authentication-timeout', handleAuthenticationTimeout)
+    return () => window.removeEventListener('portra:authentication-timeout', handleAuthenticationTimeout)
+  }, [logout])
 
   if (isLoginRoute) {
     return <LoginRoutes />
   }
 
   if (!isAuthenticated || !currentUser) {
-    return <Navigate to="/login" state={{ from: location.pathname }} replace />
+    return <Navigate
+      to={authenticationTimedOut ? '/login/sign-in' : '/login'}
+      state={{ from: location.pathname, ...(authenticationTimedOut ? { error: '登录超时，请重新登录' } : {}) }}
+      replace
+    />
   }
 
   const searchParams = new URLSearchParams(location.search)

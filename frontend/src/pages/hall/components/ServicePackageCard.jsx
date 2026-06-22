@@ -35,11 +35,6 @@ export function ServicePackageCard({ service, currentUser, onDetail }) {
             <h3 className="showcase-title">{service.title || '暂无标题'}</h3>
           </div>
         </div>
-        <div className="show-actions single-action">
-          <button className="solid-btn owner-only" type="button" onClick={(event) => { event.stopPropagation(); onDetail() }}>
-            去看看
-          </button>
-        </div>
       </div>
     </article>
   )
