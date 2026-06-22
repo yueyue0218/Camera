@@ -573,9 +573,10 @@ export function ServicePackageDetailPage() {
   const isServiceOwner = isSameOwner(currentUser, collectServiceOwnerIds(service))
   const isCustomerViewer = currentUser.role === 'CUSTOMER'
   const visiblePortfolioImages = portfolioImages.length
-    ? Array.from({ length: Math.min(2, portfolioImages.length) }, (_, slot) => {
+    ? Array.from({ length: 2 }, (_, slot) => {
+        if (slot >= portfolioImages.length) return { index: null, url: '', slot, empty: true }
         const index = (galleryStart + slot) % portfolioImages.length
-        return { index, url: portfolioImages[index], slot }
+        return { index, url: portfolioImages[index], slot, empty: false }
       })
     : []
 
@@ -672,14 +673,16 @@ export function ServicePackageDetailPage() {
             <span className={`tag ${service.status !== 'ONLINE' ? 'blue' : 'gray'}`}>{serviceStatusLabel[service.status] || service.status || '在线'}</span>
           </div>
           <div className="detail-publish-time">{latestTimeText(service, true)}</div>
-          <div className={`service-carousel ${galleryDirection ? `is-${galleryDirection}` : ''} ${visiblePortfolioImages.length === 1 ? 'is-single' : ''}`}>
+          <div className={`service-carousel ${galleryDirection ? `is-${galleryDirection}` : ''}`}>
             {portfolioImages.length > 1 && (
               <button className="service-carousel-nav is-prev" type="button" onClick={() => moveGallery('prev')} aria-label="上一张">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>
               </button>
             )}
             <div className="service-carousel-stage" aria-live="polite">
-              {visiblePortfolioImages.map(({ index, url, slot }) => (
+              {visiblePortfolioImages.map(({ index, url, slot, empty }) => empty ? (
+                <div className={`service-carousel-card is-empty slot-${slot + 1}`} aria-hidden="true" key={`empty-${slot}`} />
+              ) : (
                 <button
                   className={`service-carousel-card slot-${slot + 1}`}
                   type="button"

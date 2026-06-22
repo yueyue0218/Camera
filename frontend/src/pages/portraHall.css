@@ -1459,10 +1459,6 @@ body[data-role="photographer"] .aside-card.photographer-only {
   overflow: hidden;
 }
 
-.service-carousel.is-single .service-carousel-stage {
-  grid-template-columns: minmax(0, 1fr);
-}
-
 .service-carousel-card {
   position: relative;
   min-width: 0;
@@ -1474,6 +1470,13 @@ body[data-role="photographer"] .aside-card.photographer-only {
   background: #eee9e1;
   box-shadow: 0 10px 24px rgba(21,19,24,.10);
   cursor: zoom-in;
+}
+
+.service-carousel-card.is-empty {
+  border: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
+  cursor: default;
 }
 
 .service-carousel-card img {
