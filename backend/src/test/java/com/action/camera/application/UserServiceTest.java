@@ -76,7 +76,7 @@ class UserServiceTest {
         assertThat(saved.getNickname()).isEqualTo("Test User");
         assertThat(saved.getSchool()).isEqualTo("南京大学");
         assertThat(saved.getStatus()).isEqualTo("ACTIVE");
-        assertThat(saved.getCreditScore()).isNull();
+        assertThat(saved.getCreditScore()).isEqualByComparingTo("80.00");
         assertThat(saved.getPasswordHash()).isNotEqualTo("test123456");
         assertThat(ENCODER.matches("test123456", saved.getPasswordHash())).isTrue();
     }

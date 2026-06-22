@@ -456,13 +456,9 @@ export function DemandDetailPage() {
   )
 }
 
-function galleryItems(service, uploadedUrls = []) {
-  const images = publicImageUrls(service.images)
-  const items = uploadedUrls.length
-    ? uploadedUrls.map(image => `url(${image})`)
-    : (images.length ? images.slice(0, 5).map(image => `url(${image})`) : [])
-  while (items.length < 5) items.push(gradientFor((service.serviceId || 0) + items.length))
-  return items
+function galleryImages(service, uploadedUrls = []) {
+  if (uploadedUrls.length) return uploadedUrls
+  return publicImageUrls(service?.images)
 }
 
 export function ServicePackageDetailPage() {
@@ -475,6 +471,10 @@ export function ServicePackageDetailPage() {
   const [followingProvider, setFollowingProvider] = useState(false)
   const [status, setStatus] = useState(createStatus)
   const [inlineNotice, setInlineNotice] = useState(null)
+  const [galleryStart, setGalleryStart] = useState(0)
+  const [galleryDirection, setGalleryDirection] = useState('')
+  const [galleryStep, setGalleryStep] = useState(0)
+  const [lightboxIndex, setLightboxIndex] = useState(null)
   const uploadedPortfolioUrls = useFileObjectUrls(
     [service?.portfolioIds, service?.images],
     currentUser,
@@ -488,7 +488,30 @@ export function ServicePackageDetailPage() {
   const fallbackProviderAvatar = publicImageUrls(service?.photographerAvatarUrl, service?.photographerAvatar)[0] || ''
   const providerAvatar = uploadedProviderAvatar || fallbackProviderAvatar
   const providerProfileId = serviceProviderUserId(service)
+  const portfolioImages = galleryImages(service, uploadedPortfolioUrls)
   useBodyRole(currentUser.role)
+
+  useEffect(() => {
+    setGalleryStart(0)
+    setGalleryDirection('')
+    setGalleryStep(0)
+    setLightboxIndex(null)
+  }, [serviceId, portfolioImages.length])
+
+  useEffect(() => {
+    if (lightboxIndex === null) return undefined
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') setLightboxIndex(null)
+      if (event.key === 'ArrowLeft') {
+        setLightboxIndex(current => (current - 1 + portfolioImages.length) % portfolioImages.length)
+      }
+      if (event.key === 'ArrowRight') {
+        setLightboxIndex(current => (current + 1) % portfolioImages.length)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [lightboxIndex, portfolioImages.length])
 
   useEffect(() => {
     let ignored = false
@@ -549,6 +572,24 @@ export function ServicePackageDetailPage() {
   const price = service.priceRange || `${money(service.basePriceCent)} 起`
   const isServiceOwner = isSameOwner(currentUser, collectServiceOwnerIds(service))
   const isCustomerViewer = currentUser.role === 'CUSTOMER'
+  const visiblePortfolioImages = portfolioImages.length
+    ? Array.from({ length: 2 }, (_, slot) => {
+        if (slot >= portfolioImages.length) return { index: null, url: '', slot, empty: true }
+        const index = (galleryStart + slot) % portfolioImages.length
+        return { index, url: portfolioImages[index], slot, empty: false }
+      })
+    : []
+
+  function moveGallery(direction) {
+    if (portfolioImages.length <= 1) return
+    setGalleryDirection(direction)
+    setGalleryStart(current => (
+      direction === 'next'
+        ? (current + 1) % portfolioImages.length
+        : (current - 1 + portfolioImages.length) % portfolioImages.length
+    ))
+    setGalleryStep(current => current + 1)
+  }
 
   async function startChat(message = `我想预约「${service.title || '这个橱窗'}」，想进一步确认时间与服务内容。`) {
     try {
@@ -632,10 +673,34 @@ export function ServicePackageDetailPage() {
             <span className={`tag ${service.status !== 'ONLINE' ? 'blue' : 'gray'}`}>{serviceStatusLabel[service.status] || service.status || '在线'}</span>
           </div>
           <div className="detail-publish-time">{latestTimeText(service, true)}</div>
-          <div className={`gallery ${uploadedPortfolioUrls.length > 5 ? 'is-scrollable' : ''}`}>
-            {galleryItems(service, uploadedPortfolioUrls).map((art, index) => (
-              <div className="photo" data-no={String(index + 1).padStart(2, '0')} style={{ '--art': art }} key={`${art}-${index}`} />
-            ))}
+          <div className={`service-carousel ${galleryDirection ? `is-${galleryDirection}` : ''}`}>
+            {portfolioImages.length > 1 && (
+              <button className="service-carousel-nav is-prev" type="button" onClick={() => moveGallery('prev')} aria-label="上一张">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>
+              </button>
+            )}
+            <div className="service-carousel-stage" aria-live="polite">
+              {visiblePortfolioImages.map(({ index, url, slot, empty }) => empty ? (
+                <div className={`service-carousel-card is-empty slot-${slot + 1}`} aria-hidden="true" key={`empty-${slot}`} />
+              ) : (
+                <button
+                  className={`service-carousel-card slot-${slot + 1}`}
+                  type="button"
+                  onClick={() => setLightboxIndex(index)}
+                  key={`${galleryStep}-${slot}-${index}`}
+                  aria-label={`放大查看第 ${index + 1} 张图片`}
+                >
+                  <img src={url} alt={`${service.title || '橱窗'}参考图 ${index + 1}`} />
+                  <span>{String(index + 1).padStart(2, '0')} / {String(portfolioImages.length).padStart(2, '0')}</span>
+                </button>
+              ))}
+              {!visiblePortfolioImages.length && <div className="service-carousel-empty" aria-label="暂无参考图" />}
+            </div>
+            {portfolioImages.length > 1 && (
+              <button className="service-carousel-nav is-next" type="button" onClick={() => moveGallery('next')} aria-label="下一张">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+              </button>
+            )}
           </div>
           <div className="text-block">
             <h3>价格区间</h3>
@@ -700,6 +765,19 @@ export function ServicePackageDetailPage() {
           )}
         </aside>
       </div>
+      {lightboxIndex !== null && portfolioImages[lightboxIndex] && (
+        <div className="service-lightbox" role="dialog" aria-modal="true" aria-label="橱窗图片放大查看" onClick={() => setLightboxIndex(null)}>
+          <button className="service-lightbox-close" type="button" onClick={() => setLightboxIndex(null)} aria-label="关闭放大图片">×</button>
+          {portfolioImages.length > 1 && (
+            <button className="service-lightbox-nav is-prev" type="button" onClick={(event) => { event.stopPropagation(); setLightboxIndex((lightboxIndex - 1 + portfolioImages.length) % portfolioImages.length) }} aria-label="查看上一张">←</button>
+          )}
+          <img src={portfolioImages[lightboxIndex]} alt={`${service.title || '橱窗'}参考图 ${lightboxIndex + 1}`} onClick={event => event.stopPropagation()} />
+          <div className="service-lightbox-count">{lightboxIndex + 1} / {portfolioImages.length}</div>
+          {portfolioImages.length > 1 && (
+            <button className="service-lightbox-nav is-next" type="button" onClick={(event) => { event.stopPropagation(); setLightboxIndex((lightboxIndex + 1) % portfolioImages.length) }} aria-label="查看下一张">→</button>
+          )}
+        </div>
+      )}
     </DetailShell>
   )
 }

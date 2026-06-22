@@ -87,6 +87,11 @@ export function validateServicePackageForm(form) {
   if (Number(form.originalCount) < 0) errors.push('原片数量不能为负数')
   if (Number(form.refinedCount) < 0) errors.push('精修数量不能为负数')
   if (Number(form.deliveryDays) <= 0) errors.push('交付天数必须大于 0')
+  const imageCount = uniqueIds([
+    ...(Array.isArray(form.portfolioIds) ? form.portfolioIds : []),
+    ...splitIds(form.portfolioIdsText)
+  ]).length + splitList(form.imagesText).length
+  if (imageCount === 0) errors.push('发布橱窗至少需要上传 1 张图片')
   return errors
 }
 

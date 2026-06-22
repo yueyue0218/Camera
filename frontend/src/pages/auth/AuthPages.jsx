@@ -607,6 +607,7 @@ export function LoginInfoPage() {
   const [error, setError]     = useState('')
   const [loading, setLoading] = useState(false)
   const notice = location.state?.notice || ''
+  const sessionError = location.state?.error || ''
   const isAdminEntry = location.pathname === '/login/admin'
   const hasAdminAccess = currentUser?.role === 'ADMIN' || currentUser?.adminCapable
   const authenticatedHome = currentUser?.role === 'ADMIN' ? '/admin' : '/hall'
@@ -667,6 +668,7 @@ export function LoginInfoPage() {
       <div style={{ fontSize: 13, color: MUTED, marginBottom: 22, lineHeight: 1.65 }}>输入邮箱和密码，进入你的 Portra</div>
 
       <SuccessBanner text={notice} />
+      <ErrorBanner text={sessionError} />
       <ErrorBanner text={error} />
 
       <div style={{ marginBottom: 14 }}>

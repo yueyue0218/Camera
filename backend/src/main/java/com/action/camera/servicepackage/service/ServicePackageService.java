@@ -362,6 +362,10 @@ public class ServicePackageService {
         requireNonNegative(request.getOriginalCount(), "originalCount must not be negative");
         requireNonNegative(request.getRefinedCount(), "refinedCount must not be negative");
         requirePositive(request.getDeliveryDays(), "deliveryDays must be positive");
+        if (normalizeStrings(request.getImages(), false).isEmpty()
+                && normalizeIds(request.getPortfolioIds()).isEmpty()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "发布橱窗至少需要上传 1 张图片");
+        }
         normalizeTimeTags(request.getTimeTags());
     }
 

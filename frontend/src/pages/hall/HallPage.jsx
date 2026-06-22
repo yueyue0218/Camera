@@ -623,9 +623,6 @@ export function HallPage() {
         demand={demand}
         currentUser={currentUser}
         onOpen={() => navigate(`/demands/${demand.demandId}`)}
-        onRespond={() => respondDemand(demand)}
-        responded={hasResponded(demand.demandId)}
-        responding={isResponding(demand.demandId)}
         onOpenPublisher={demand.customerId ? () => navigate(`/users/${demand.customerId}?role=CUSTOMER`) : undefined}
       />
     ))
