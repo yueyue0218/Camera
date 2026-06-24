@@ -17,14 +17,21 @@ import { submitDemandResponse } from './utils/respondDemand.js'
 import '../portraHall.css'
 
 const PAGE_SIZE = 20
+const FEED_CURSOR_STORAGE_KEY = 'portra-hall-feed-cursors'
+const HALL_RETURN_STATE_STORAGE_KEY = 'portra-hall-return-state'
 
 const initialFilters = {
   keyword: '',
+  sort: 'recommend',
   cityCode: '',
   type: '',
   minBudgetYuan: '',
   maxBudgetYuan: '',
   timeTag: ''
+}
+
+function createFeedSeed() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 function createInitialPageState() {
@@ -72,6 +79,67 @@ function pageInfoFromResult(page, fallbackPage, fallbackSize) {
     size: nextSize,
     total,
     hasNext
+  }
+}
+
+function readFeedCursors() {
+  if (typeof window === 'undefined') return {}
+  try {
+    return JSON.parse(window.sessionStorage.getItem(FEED_CURSOR_STORAGE_KEY) || '{}')
+  } catch {
+    return {}
+  }
+}
+
+function rememberFeedCursor(panel, pageInfo) {
+  if (typeof window === 'undefined' || !pageInfo) return
+  try {
+    const current = readFeedCursors()
+    window.sessionStorage.setItem(FEED_CURSOR_STORAGE_KEY, JSON.stringify({
+      ...current,
+      [panel]: {
+        page: pageInfo.page,
+        hasNext: pageInfo.hasNext,
+        total: pageInfo.total
+      }
+    }))
+  } catch {
+    // Browsers can disable sessionStorage; the feed still works without persistence.
+  }
+}
+
+function storedNextFeedPage(panel) {
+  const cursor = readFeedCursors()[panel]
+  const page = Number(cursor?.page)
+  if (!Number.isFinite(page) || page < 1) return 1
+  return cursor?.hasNext ? page + 1 : 1
+}
+
+function saveHallReturnState(state) {
+  if (typeof window === 'undefined') return
+  try {
+    window.sessionStorage.setItem(HALL_RETURN_STATE_STORAGE_KEY, JSON.stringify({
+      ...state,
+      savedAt: Date.now()
+    }))
+  } catch {
+    // The next hall entry can still load a fresh feed if the snapshot cannot be stored.
+  }
+}
+
+function consumeHallReturnState(search) {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.sessionStorage.getItem(HALL_RETURN_STATE_STORAGE_KEY)
+    if (!raw) return null
+    window.sessionStorage.removeItem(HALL_RETURN_STATE_STORAGE_KEY)
+    const state = JSON.parse(raw)
+    if (state?.search !== search) return null
+    if (Date.now() - Number(state.savedAt || 0) > 10 * 60 * 1000) return null
+    return state
+  } catch {
+    window.sessionStorage.removeItem(HALL_RETURN_STATE_STORAGE_KEY)
+    return null
   }
 }
 
@@ -165,6 +233,10 @@ export function HallPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const [activePanel, setActivePanel] = useState(() => panelFromSearch(location.search))
+  const [feedSeeds, setFeedSeeds] = useState(() => ({
+    demands: createFeedSeed(),
+    showcases: createFeedSeed()
+  }))
   const [filters, setFilters] = useState(initialFilters)
   const [demands, setDemands] = useState([])
   const [services, setServices] = useState([])
@@ -180,14 +252,45 @@ export function HallPage() {
   const serviceRequestSeq = useRef(0)
   const demandAppendInFlight = useRef(false)
   const serviceAppendInFlight = useRef(false)
+  const demandSentinelRef = useRef(null)
+  const serviceSentinelRef = useRef(null)
+  const suppressAutoLoadUntil = useRef(0)
   const initialLoadSearchRef = useRef(null)
 
   const interestedIds = useMemo(() => new Set(interests.map(item => item.serviceId)), [interests])
 
   useEffect(() => {
     initialLoadSearchRef.current = location.search
-    loadDemands({ page: 1, mode: 'replace' })
-    loadServices({ page: 1, mode: 'replace' })
+    const returnState = consumeHallReturnState(location.search)
+    if (returnState) {
+      setActivePanel(returnState.activePanel || panelFromSearch(location.search))
+      setFeedSeeds(returnState.feedSeeds || {
+        demands: createFeedSeed(),
+        showcases: createFeedSeed()
+      })
+      setFilters(returnState.filters || initialFilters)
+      setDemands(Array.isArray(returnState.demands) ? returnState.demands : [])
+      setServices(Array.isArray(returnState.services) ? returnState.services : [])
+      setDemandPagination(returnState.demandPagination || createInitialPageState())
+      setServicePagination(returnState.servicePagination || createInitialPageState())
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: Number(returnState.scrollY) || 0, left: 0, behavior: 'auto' })
+      })
+      loadInterests(returnState.filters || initialFilters)
+      loadMyResponses()
+      return
+    }
+    const currentPanel = panelFromSearch(location.search)
+    loadDemands({
+      page: currentPanel === 'demands' ? storedNextFeedPage('demands') : 1,
+      mode: 'replace',
+      rememberCursor: currentPanel === 'demands'
+    })
+    loadServices({
+      page: currentPanel === 'showcases' ? storedNextFeedPage('showcases') : 1,
+      mode: 'replace',
+      rememberCursor: currentPanel === 'showcases'
+    })
     loadInterests()
     loadMyResponses()
   }, [currentUser.userId, currentUser.role])
@@ -203,9 +306,8 @@ export function HallPage() {
     const params = new URLSearchParams(location.search)
     const published = params.get('published')
     const id = params.get('id')
-    const initialLoadAlreadyCoveredSearch = initialLoadSearchRef.current === location.search
     if (published === 'demand') {
-      if (!initialLoadAlreadyCoveredSearch) loadDemands({ page: 1, mode: 'replace' })
+      loadDemands({ page: 1, mode: 'replace', promoteId: id })
       setNotice({
         type: 'success',
         text: '需求已发布',
@@ -214,10 +316,8 @@ export function HallPage() {
       })
     }
     if (published === 'showcase') {
-      if (!initialLoadAlreadyCoveredSearch) {
-        loadServices({ page: 1, mode: 'replace' })
-        loadInterests()
-      }
+      loadServices({ page: 1, mode: 'replace', promoteId: id })
+      loadInterests()
       setNotice({
         type: 'success',
         text: '橱窗已发布',
@@ -232,6 +332,50 @@ export function HallPage() {
     const timer = window.setTimeout(() => setNotice(null), 3200)
     return () => window.clearTimeout(timer)
   }, [notice])
+
+  useEffect(() => {
+    const target = activePanel === 'demands' ? demandSentinelRef.current : serviceSentinelRef.current
+    if (!target || typeof IntersectionObserver === 'undefined') return undefined
+    const observer = new IntersectionObserver(entries => {
+      const entry = entries[0]
+      if (!entry?.isIntersecting) return
+      if (Date.now() < suppressAutoLoadUntil.current) return
+      if (activePanel === 'demands') {
+        if (
+          demandPagination.loading ||
+          demandPagination.loadingMore ||
+          demandPagination.refreshing ||
+          !demandPagination.hasNext ||
+          demandAppendInFlight.current
+        ) return
+        loadMoreDemands()
+        return
+      }
+      if (
+        servicePagination.loading ||
+        servicePagination.loadingMore ||
+        servicePagination.refreshing ||
+        !servicePagination.hasNext ||
+        serviceAppendInFlight.current
+      ) return
+      loadMoreServices()
+    }, { rootMargin: '360px 0px 480px' })
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [
+    activePanel,
+    demandPagination.loading,
+    demandPagination.loadingMore,
+    demandPagination.refreshing,
+    demandPagination.hasNext,
+    demandPagination.page,
+    servicePagination.loading,
+    servicePagination.loadingMore,
+    servicePagination.refreshing,
+    servicePagination.hasNext,
+    servicePagination.page,
+    filters
+  ])
 
   function updateFilters(partial) {
     setFilters(current => ({ ...current, ...partial }))
@@ -273,6 +417,9 @@ export function HallPage() {
       timeTag: nextFilters.timeTag,
       minBudgetCent: price.minCent,
       maxBudgetCent: price.maxCent,
+      keyword: nextFilters.keyword?.trim() || undefined,
+      sort: 'recommend',
+      feedSeed: nextFilters.feedSeed || feedSeeds.demands,
       _t: cacheBust
     }
   }
@@ -290,31 +437,46 @@ export function HallPage() {
       timeTag: nextFilters.timeTag,
       minPriceCent: price.minCent,
       maxPriceCent: price.maxCent,
-      sort: 'latest',
+      keyword: nextFilters.keyword?.trim() || undefined,
+      sort: 'recommend',
+      feedSeed: nextFilters.feedSeed || feedSeeds.showcases,
       _t: cacheBust
     }
   }
 
-  function matchesKeyword(record, keyword) {
-    const normalized = keyword?.trim().toLowerCase()
-    if (!normalized) return true
-    const haystack = [
-      record.title,
-      record.scene,
-      record.description,
-      record.remark,
-      record.location,
-      record.serviceArea,
-      record.customerNickname,
-      record.customerName,
-      record.photographerNickname,
-      ...(Array.isArray(record.styleTags) ? record.styleTags : []),
-      ...(Array.isArray(record.timeTags) ? record.timeTags : [])
-    ].filter(Boolean).join(' ').toLowerCase()
-    return haystack.includes(normalized)
+  async function promoteDemandRecord(records, promoteId, size) {
+    const id = Number(promoteId)
+    if (!Number.isFinite(id)) return records
+    const current = records.find(record => Number(record.demandId) === id)
+    const promoted = current || await demandApi.detail(id, currentUser)
+      .then(record => enrichDemandPublisher(record, currentUser))
+      .catch(() => null)
+    if (!promoted) return records
+    if (String(promoted.status || 'OPEN').toUpperCase() !== 'OPEN' || Boolean(promoted.hiddenByCustomer)) {
+      return records
+    }
+    return [promoted, ...records.filter(record => Number(record.demandId) !== id)].slice(0, size)
   }
 
-  async function loadDemands({ nextFilters = filters, page = 1, mode = 'replace', cacheBust = '' } = {}) {
+  async function promoteServiceRecord(records, promoteId, size) {
+    const id = Number(promoteId)
+    if (!Number.isFinite(id)) return records
+    const current = records.find(record => Number(record.serviceId) === id)
+    const promoted = current || await servicePackageApi.detail(id, currentUser)
+      .then(record => enrichServiceProvider(record, currentUser))
+      .catch(() => null)
+    if (!promoted) return records
+    if (
+      String(promoted.status || 'ONLINE').toUpperCase() !== 'ONLINE' ||
+      Boolean(promoted.hiddenByProvider) ||
+      promoted.isAvailable === false
+    ) {
+      return records
+    }
+    return [promoted, ...records.filter(record => Number(record.serviceId) !== id)].slice(0, size)
+  }
+
+  async function loadDemands({ nextFilters = filters, page = 1, mode = 'replace', cacheBust = '', promoteId = '', rememberCursor = true } = {}) {
     const size = demandPagination.size || PAGE_SIZE
     const requestId = ++demandRequestSeq.current
     if (mode !== 'append') demandAppendInFlight.current = false
@@ -323,10 +485,12 @@ export function HallPage() {
       const result = await demandApi.list(demandParams(nextFilters, page, size, cacheBust), currentUser)
       const rawRecords = result?.records || []
       const enrichedRecords = await enrichDemandPublishers(rawRecords, currentUser)
-      // Stage 1 keeps keyword filtering on the loaded page only; Stage 2 moves keyword search to the backend candidate set.
-      const visibleRecords = enrichedRecords.filter(record => matchesKeyword(record, nextFilters.keyword))
+      const visibleRecords = promoteId && mode !== 'append'
+        ? await promoteDemandRecord(enrichedRecords, promoteId, size)
+        : enrichedRecords
       const pageInfo = pageInfoFromResult(result, page, size)
       if (requestId !== demandRequestSeq.current) return null
+      if (rememberCursor) rememberFeedCursor('demands', pageInfo)
       setDemands(current => mode === 'append' ? [...current, ...visibleRecords] : visibleRecords)
       setDemandPagination(current => ({
         ...current,
@@ -357,7 +521,7 @@ export function HallPage() {
     }
   }
 
-  async function loadServices({ nextFilters = filters, page = 1, mode = 'replace', cacheBust = '' } = {}) {
+  async function loadServices({ nextFilters = filters, page = 1, mode = 'replace', cacheBust = '', promoteId = '', rememberCursor = true } = {}) {
     const size = servicePagination.size || PAGE_SIZE
     const requestId = ++serviceRequestSeq.current
     if (mode !== 'append') serviceAppendInFlight.current = false
@@ -366,10 +530,12 @@ export function HallPage() {
       const result = await servicePackageApi.list(serviceParams(nextFilters, page, size, cacheBust), currentUser)
       const rawRecords = result?.records || []
       const enrichedRecords = await enrichServiceProviders(rawRecords, currentUser)
-      // Stage 1 keeps keyword filtering on the loaded page only; Stage 2 moves keyword search to the backend candidate set.
-      const visibleRecords = enrichedRecords.filter(record => matchesKeyword(record, nextFilters.keyword))
+      const visibleRecords = promoteId && mode !== 'append'
+        ? await promoteServiceRecord(enrichedRecords, promoteId, size)
+        : enrichedRecords
       const pageInfo = pageInfoFromResult(result, page, size)
       if (requestId !== serviceRequestSeq.current) return null
+      if (rememberCursor) rememberFeedCursor('showcases', pageInfo)
       setServices(current => mode === 'append' ? [...current, ...visibleRecords] : visibleRecords)
       setServicePagination(current => ({
         ...current,
@@ -445,12 +611,16 @@ export function HallPage() {
   }
 
   function applyFilters(nextFilters = filters) {
+    const feedSeed = createFeedSeed()
+    const requestFilters = { ...nextFilters, sort: 'recommend', feedSeed }
     if (activePanel === 'demands') {
-      loadDemands({ nextFilters, page: 1, mode: 'replace' })
+      setFeedSeeds(current => ({ ...current, demands: feedSeed }))
+      loadDemands({ nextFilters: requestFilters, page: 1, mode: 'replace' })
       return
     }
-    loadServices({ nextFilters, page: 1, mode: 'replace' })
-    loadInterests(nextFilters)
+    setFeedSeeds(current => ({ ...current, showcases: feedSeed }))
+    loadServices({ nextFilters: requestFilters, page: 1, mode: 'replace' })
+    loadInterests(requestFilters)
   }
 
   function handlePublishClick() {
@@ -461,17 +631,46 @@ export function HallPage() {
     navigate('/publish')
   }
 
+  function rememberHallBeforeDetail() {
+    saveHallReturnState({
+      search: location.search,
+      activePanel,
+      filters,
+      feedSeeds,
+      demands,
+      services,
+      demandPagination,
+      servicePagination,
+      scrollY: window.scrollY
+    })
+  }
+
+  function navigateToDemandDetail(demandId) {
+    rememberHallBeforeDetail()
+    navigate(`/demands/${demandId}`)
+  }
+
+  function navigateToServiceDetail(serviceId) {
+    rememberHallBeforeDetail()
+    navigate(`/service-packages/${serviceId}`)
+  }
+
   function changePanel(nextPanel) {
+    const feedSeed = createFeedSeed()
+    const requestFilters = { ...initialFilters, feedSeed }
+    const nextPage = storedNextFeedPage(nextPanel)
     setActivePanel(nextPanel)
     setFilters(initialFilters)
     setSelectedDemand(null)
     setSelectedService(null)
     navigate(`/hall?tab=${nextPanel === 'demands' ? 'demand' : 'showcase'}`, { replace: true })
     if (nextPanel === 'demands') {
-      loadDemands({ nextFilters: initialFilters, page: 1, mode: 'replace' })
+      setFeedSeeds(current => ({ ...current, demands: feedSeed }))
+      loadDemands({ nextFilters: requestFilters, page: nextPage, mode: 'replace' })
     } else {
-      loadServices({ nextFilters: initialFilters, page: 1, mode: 'replace' })
-      loadInterests(initialFilters)
+      setFeedSeeds(current => ({ ...current, showcases: feedSeed }))
+      loadServices({ nextFilters: requestFilters, page: nextPage, mode: 'replace' })
+      loadInterests(requestFilters)
     }
   }
 
@@ -489,15 +688,19 @@ export function HallPage() {
 
   function refreshActivePanel() {
     const cacheBust = Date.now()
+    const feedSeed = createFeedSeed()
+    const refreshFilters = { ...filters, sort: 'recommend', feedSeed }
     if (activePanel === 'demands') {
+      setFeedSeeds(current => ({ ...current, demands: feedSeed }))
       const nextPage = demandPagination.hasNext ? demandPagination.page + 1 : 1
-      const listPromise = loadDemands({ page: nextPage, mode: 'refresh', cacheBust })
+      const listPromise = loadDemands({ nextFilters: refreshFilters, page: nextPage, mode: 'refresh', cacheBust })
       loadMyResponses()
       return listPromise
     }
+    setFeedSeeds(current => ({ ...current, showcases: feedSeed }))
     const nextPage = servicePagination.hasNext ? servicePagination.page + 1 : 1
-    const listPromise = loadServices({ page: nextPage, mode: 'refresh', cacheBust })
-    loadInterests()
+    const listPromise = loadServices({ nextFilters: refreshFilters, page: nextPage, mode: 'refresh', cacheBust })
+    loadInterests(refreshFilters)
     return listPromise
   }
 
@@ -506,9 +709,10 @@ export function HallPage() {
   }
 
   async function refreshAndScrollTop() {
-    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+    suppressAutoLoadUntil.current = Date.now() + 1200
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
     await refreshActivePanel()
-    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
   }
 
   function loadMoreDemands() {
@@ -637,7 +841,7 @@ export function HallPage() {
         key={demand.demandId}
         demand={demand}
         currentUser={currentUser}
-        onOpen={() => navigate(`/demands/${demand.demandId}`)}
+        onOpen={() => navigateToDemandDetail(demand.demandId)}
         onOpenPublisher={demand.customerId ? () => navigate(`/users/${demand.customerId}?role=CUSTOMER`) : undefined}
       />
     ))
@@ -655,7 +859,7 @@ export function HallPage() {
         onOpenProvider={(service.photographerId || service.providerId) ? () => navigate(`/users/${service.photographerId || service.providerId}?role=PROVIDER`) : undefined}
         interested={interestedIds.has(service.serviceId)}
         onOpen={() => openService(service)}
-        onDetail={() => navigate(`/service-packages/${service.serviceId}`)}
+        onDetail={() => navigateToServiceDetail(service.serviceId)}
         onReserve={() => startServiceChat(service)}
         onEdit={() => editService(service)}
         onOffline={() => offlineService(service)}
@@ -666,22 +870,13 @@ export function HallPage() {
   function renderDemandFooter() {
     if (demandPagination.loading || (!demands.length && !demandPagination.hasNext && !demandPagination.error)) return null
     return (
-      <div className="hall-list-footer">
+      <div className="hall-list-footer" ref={demandSentinelRef}>
         {demandPagination.error && (
           <p className="hall-footer-error">{demandPagination.error}</p>
         )}
-        {demandPagination.hasNext ? (
-          <button
-            className="secondary-btn"
-            type="button"
-            disabled={demandPagination.loadingMore}
-            onClick={loadMoreDemands}
-          >
-            {demandPagination.loadingMore ? '加载中...' : '加载更多'}
-          </button>
-        ) : (
-          <span className="micro">已展示全部符合条件的需求</span>
-        )}
+        {demandPagination.loadingMore && <span className="micro">正在加载更多内容...</span>}
+        {!demandPagination.loadingMore && demandPagination.hasNext && <span className="micro">继续下滑加载更多</span>}
+        {!demandPagination.loadingMore && !demandPagination.hasNext && <span className="micro">已展示全部符合条件内容</span>}
       </div>
     )
   }
@@ -689,22 +884,13 @@ export function HallPage() {
   function renderServiceFooter() {
     if (servicePagination.loading || (!services.length && !servicePagination.hasNext && !servicePagination.error)) return null
     return (
-      <div className="hall-list-footer">
+      <div className="hall-list-footer" ref={serviceSentinelRef}>
         {servicePagination.error && (
           <p className="hall-footer-error">{servicePagination.error}</p>
         )}
-        {servicePagination.hasNext ? (
-          <button
-            className="secondary-btn"
-            type="button"
-            disabled={servicePagination.loadingMore}
-            onClick={loadMoreServices}
-          >
-            {servicePagination.loadingMore ? '加载中...' : '加载更多'}
-          </button>
-        ) : (
-          <span className="micro">已展示全部符合条件的橱窗</span>
-        )}
+        {servicePagination.loadingMore && <span className="micro">正在加载更多内容...</span>}
+        {!servicePagination.loadingMore && servicePagination.hasNext && <span className="micro">继续下滑加载更多</span>}
+        {!servicePagination.loadingMore && !servicePagination.hasNext && <span className="micro">已展示全部符合条件内容</span>}
       </div>
     )
   }
@@ -726,14 +912,6 @@ export function HallPage() {
         <span className="micro">
           当前共 {activePagination.total} 条{activePanel === 'demands' ? '需求' : '橱窗'}
         </span>
-        <button
-          className="secondary-btn"
-          type="button"
-          onClick={refreshActivePanel}
-          disabled={activePagination.refreshing}
-        >
-          {activePagination.refreshing ? '刷新中...' : '刷新'}
-        </button>
       </div>
 
       {notice && (
@@ -783,7 +961,7 @@ export function HallPage() {
         <section className="panel active">
           <div className="section-title">
             <h2>橱窗大厅</h2>
-            <span className="micro">按时间标签与最新更新排序</span>
+            <span className="micro">按当前筛选展示推荐橱窗</span>
           </div>
           <div className="style-bar">
             {TIME_STYLE_OPTIONS.map(option => (

@@ -27,6 +27,7 @@ public class DemandDto {
     private final Integer acceptedCount;
     private final Integer rejectedCount;
     private final List<Long> referenceFileIds;
+    private final List<String> recommendReasons;
     private final LocalDateTime createdAt;
     private final LocalDateTime updatedAt;
 
@@ -50,7 +51,7 @@ public class DemandDto {
                      LocalDateTime updatedAt) {
         this(demandId, customerId, null, null, scene, styleTags, expectedDate, timeSlot, timeDescription, timeTags,
                 cityCode, location, budgetMinCent, budgetMaxCent, description, status, responseCount,
-                null, null, null, referenceFileIds, createdAt, updatedAt);
+                null, null, null, referenceFileIds, null, createdAt, updatedAt);
     }
 
     public DemandDto(Long demandId,
@@ -75,7 +76,7 @@ public class DemandDto {
                      LocalDateTime updatedAt) {
         this(demandId, customerId, customerNickname, customerAvatarFileId, scene, styleTags, expectedDate,
                 timeSlot, timeDescription, timeTags, cityCode, location, budgetMinCent, budgetMaxCent,
-                description, status, responseCount, null, null, null, referenceFileIds, createdAt, updatedAt);
+                description, status, responseCount, null, null, null, referenceFileIds, null, createdAt, updatedAt);
     }
 
     public DemandDto(Long demandId,
@@ -120,6 +121,7 @@ public class DemandDto {
         this.acceptedCount = acceptedCount;
         this.rejectedCount = rejectedCount;
         this.referenceFileIds = referenceFileIds;
+        this.recommendReasons = List.of();
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -147,6 +149,36 @@ public class DemandDto {
                      List<Long> referenceFileIds,
                      LocalDateTime createdAt,
                      LocalDateTime updatedAt) {
+        this(demandId, customerId, customerNickname, customerAvatarFileId, scene, styleTags, expectedDate,
+                timeSlot, timeDescription, timeTags, cityCode, location, budgetMinCent, budgetMaxCent,
+                description, status, responseCount, pendingCount, acceptedCount, rejectedCount,
+                referenceFileIds, null, createdAt, updatedAt);
+    }
+
+    public DemandDto(Long demandId,
+                     Long customerId,
+                     String customerNickname,
+                     Long customerAvatarFileId,
+                     String scene,
+                     List<String> styleTags,
+                     LocalDate expectedDate,
+                     String timeSlot,
+                     String timeDescription,
+                     List<String> timeTags,
+                     String cityCode,
+                     String location,
+                     Integer budgetMinCent,
+                     Integer budgetMaxCent,
+                     String description,
+                     String status,
+                     int responseCount,
+                     Integer pendingCount,
+                     Integer acceptedCount,
+                     Integer rejectedCount,
+                     List<Long> referenceFileIds,
+                     List<String> recommendReasons,
+                     LocalDateTime createdAt,
+                     LocalDateTime updatedAt) {
         this.demandId = demandId;
         this.customerId = customerId;
         this.customerNickname = customerNickname;
@@ -168,6 +200,7 @@ public class DemandDto {
         this.acceptedCount = acceptedCount;
         this.rejectedCount = rejectedCount;
         this.referenceFileIds = referenceFileIds;
+        this.recommendReasons = recommendReasons == null ? List.of() : recommendReasons;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -254,6 +287,10 @@ public class DemandDto {
 
     public List<Long> getReferenceFileIds() {
         return referenceFileIds;
+    }
+
+    public List<String> getRecommendReasons() {
+        return recommendReasons;
     }
 
     public LocalDateTime getCreatedAt() {

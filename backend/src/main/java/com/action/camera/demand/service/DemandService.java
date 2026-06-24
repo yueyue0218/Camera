@@ -22,14 +22,21 @@ import com.action.camera.message.service.ConversationService;
 import com.action.camera.notification.dto.NotificationCreateRequest;
 import com.action.camera.notification.service.NotificationService;
 import com.action.camera.repository.UserRepository;
+import com.action.camera.servicepackage.domain.ServicePackage;
+import com.action.camera.servicepackage.domain.ServicePackageStatus;
+import com.action.camera.servicepackage.repository.ServicePackageRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -51,17 +58,20 @@ public class DemandService {
     private final ConversationService conversationService;
     private final NotificationService notificationService;
     private final UserRepository userRepository;
+    private final ServicePackageRepository servicePackageRepository;
 
     public DemandService(DemandRepository demandRepository,
                          DemandResponseRepository responseRepository,
                          ConversationService conversationService,
                          NotificationService notificationService,
-                         UserRepository userRepository) {
+                         UserRepository userRepository,
+                         ServicePackageRepository servicePackageRepository) {
         this.demandRepository = demandRepository;
         this.responseRepository = responseRepository;
         this.conversationService = conversationService;
         this.notificationService = notificationService;
         this.userRepository = userRepository;
+        this.servicePackageRepository = servicePackageRepository;
     }
 
     @Transactional
@@ -120,25 +130,67 @@ public class DemandService {
                                              Integer minBudgetCent,
                                              Integer maxBudgetCent,
                                              String timeTag) {
+        return listDemands(page, size, cityCode, scene, status, expectedDate, styleTag,
+                minBudgetCent, maxBudgetCent, timeTag, null, null, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<DemandDto> listDemands(int page,
+                                             int size,
+                                             String cityCode,
+                                             String scene,
+                                             String status,
+                                             LocalDate expectedDate,
+                                             String styleTag,
+                                             Integer minBudgetCent,
+                                             Integer maxBudgetCent,
+                                             String timeTag,
+                                             String keyword,
+                                             String sort,
+                                             String feedSeed,
+                                             CurrentUser currentUser) {
         int safePage = Math.max(page, 1);
         int safeSize = Math.max(1, Math.min(size, 50));
         String normalizedTag = isBlank(styleTag) ? null : styleTag.trim().toLowerCase(Locale.ROOT);
+        String normalizedCity = normalizeTextFilter(cityCode);
+        String normalizedScene = normalizeTextFilter(scene);
         String normalizedTimeTag = normalizeTimeTagFilter(timeTag);
+        String normalizedSort = normalizeDemandSort(sort);
         DemandStatus publicStatus = resolvePublicStatusFilter(status);
         if (publicStatus == null) {
             return new PageResult<>(List.of(), safePage, safeSize, 0);
         }
-        List<DemandDto> filtered = demandRepository.findAll().stream()
-                .filter(demand -> isBlank(cityCode) || demand.getCityCode().equalsIgnoreCase(cityCode.trim()))
-                .filter(demand -> isBlank(scene) || demand.getScene().equalsIgnoreCase(scene.trim()))
+        List<Demand> candidates = demandRepository.findAll().stream()
+                .filter(demand -> !Boolean.TRUE.equals(demand.getHiddenByCustomer()))
+                .filter(demand -> normalizedCity == null || equalsIgnoreCase(demand.getCityCode(), normalizedCity))
+                .filter(demand -> normalizedScene == null || equalsIgnoreCase(demand.getScene(), normalizedScene))
                 .filter(demand -> demand.getStatus() == publicStatus)
                 .filter(demand -> expectedDate == null || expectedDate.equals(demand.getExpectedDate()))
                 .filter(demand -> normalizedTag == null || demand.getStyleTags().contains(normalizedTag))
                 .filter(demand -> normalizedTimeTag == null || demand.getTimeTags().contains(normalizedTimeTag))
                 .filter(demand -> matchesBudget(demand, minBudgetCent, maxBudgetCent))
-                .sorted(Comparator.comparing(Demand::getUpdatedAt,
-                        Comparator.nullsFirst(Comparator.naturalOrder())).reversed())
-                .map(this::toDemandDto)
+                .filter(demand -> matchesDemandKeyword(demand, keyword))
+                .collect(Collectors.toList());
+        PhotographerPreference preference = demandRecommendationPreference(
+                currentUser, normalizedCity, normalizedTag, minBudgetCent, maxBudgetCent);
+        boolean shouldRecommend = "recommend".equals(normalizedSort);
+        Set<Long> respondedDemandIds = respondedDemandIds(currentUser, candidates, shouldRecommend);
+        Map<Long, Recommendation> recommendations = shouldRecommend
+                ? candidates.stream().collect(Collectors.toMap(Demand::getId,
+                        demand -> scoreDemandRecommendation(demand, preference, normalizedTimeTag, respondedDemandIds, feedSeed)))
+                : Map.of();
+        Comparator<Demand> comparator = recommendations.isEmpty()
+                ? latestDemandComparator()
+                : Comparator.<Demand>comparingInt(demand -> recommendations.get(demand.getId()).score()).reversed()
+                .thenComparing(latestDemandComparator());
+        List<Demand> sortedDemands = candidates.stream()
+                .sorted(comparator)
+                .collect(Collectors.toList());
+        if (shouldRecommend) {
+            sortedDemands = diversifyDemands(sortedDemands);
+        }
+        List<DemandDto> filtered = sortedDemands.stream()
+                .map(demand -> toDemandDto(demand, recommendations.get(demand.getId())))
                 .collect(Collectors.toList());
         int fromIndex = Math.min((safePage - 1) * safeSize, filtered.size());
         int toIndex = Math.min(fromIndex + safeSize, filtered.size());
@@ -363,6 +415,14 @@ public class DemandService {
         return DemandMapper.toDemandDto(demand, customerInfo(demand.getCustomerId()));
     }
 
+    private DemandDto toDemandDto(Demand demand, Recommendation recommendation) {
+        return DemandMapper.toDemandDto(
+                demand,
+                customerInfo(demand.getCustomerId()),
+                recommendation == null ? null : recommendation.limitedReasons()
+        );
+    }
+
     private CustomerInfo customerInfo(Long customerId) {
         if (customerId == null || userRepository == null) {
             return null;
@@ -577,6 +637,287 @@ public class DemandService {
         return normalized;
     }
 
+    private String normalizeTextFilter(String value) {
+        if (isBlank(value)) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private String normalizeDemandSort(String sort) {
+        if ("recommend".equalsIgnoreCase(trim(sort))) {
+            return "recommend";
+        }
+        return "latest";
+    }
+
+    private Comparator<Demand> latestDemandComparator() {
+        return Comparator
+                .comparing(Demand::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(Demand::getId, Comparator.nullsLast(Comparator.reverseOrder()));
+    }
+
+    private boolean matchesDemandKeyword(Demand demand, String keyword) {
+        String normalized = normalizeKeyword(keyword);
+        if (normalized == null) {
+            return true;
+        }
+        CustomerInfo customerInfo = customerInfo(demand.getCustomerId());
+        return containsKeyword(normalized,
+                demand.getScene(),
+                demand.getDescription(),
+                demand.getLocation(),
+                customerInfo == null ? null : customerInfo.nickname())
+                || listContainsKeyword(demand.getStyleTags(), normalized);
+    }
+
+    private PhotographerPreference demandRecommendationPreference(CurrentUser currentUser,
+                                                                  String cityCode,
+                                                                  String styleTag,
+                                                                  Integer minBudgetCent,
+                                                                  Integer maxBudgetCent) {
+        List<ServicePackage> providerPackages = currentUser == null || !currentUser.isProvider()
+                ? List.of()
+                : servicePackageRepository.findByStatus(ServicePackageStatus.ONLINE).stream()
+                .filter(servicePackage -> Objects.equals(servicePackage.getProviderId(), currentUser.getUserId()))
+                .filter(servicePackage -> !Boolean.TRUE.equals(servicePackage.getHiddenByProvider()))
+                .toList();
+        String preferredCity = providerPackages.stream()
+                .map(ServicePackage::getCityCode)
+                .filter(value -> !isBlank(value))
+                .findFirst()
+                .orElse(cityCode);
+        Set<String> preferredStyles = providerPackages.stream()
+                .flatMap(servicePackage -> servicePackage.getStyleTags().stream())
+                .filter(value -> !isBlank(value))
+                .map(value -> value.trim().toLowerCase(Locale.ROOT))
+                .collect(Collectors.toSet());
+        if (preferredStyles.isEmpty() && !isBlank(styleTag)) {
+            preferredStyles = Set.of(styleTag.trim().toLowerCase(Locale.ROOT));
+        }
+        Integer preferredMin = providerPackages.stream()
+                .map(ServicePackage::getBasePriceCent)
+                .filter(Objects::nonNull)
+                .map(Long::intValue)
+                .min(Integer::compareTo)
+                .orElse(minBudgetCent);
+        Integer preferredMax = providerPackages.stream()
+                .map(ServicePackage::getBasePriceCent)
+                .filter(Objects::nonNull)
+                .map(Long::intValue)
+                .max(Integer::compareTo)
+                .orElse(maxBudgetCent);
+        boolean hasProfile = !isBlank(preferredCity)
+                || !preferredStyles.isEmpty()
+                || preferredMin != null
+                || preferredMax != null;
+        return new PhotographerPreference(preferredCity, preferredStyles, preferredMin, preferredMax, hasProfile);
+    }
+
+    private Recommendation scoreDemandRecommendation(Demand demand,
+                                                     PhotographerPreference preference,
+                                                     String timeTag,
+                                                     Set<Long> respondedDemandIds,
+                                                     String feedSeed) {
+        int score = 0;
+        List<String> reasons = new ArrayList<>();
+        if (!isBlank(preference.cityCode()) && equalsIgnoreCase(demand.getCityCode(), preference.cityCode())) {
+            score += 30;
+            addReason(reasons, "同城匹配");
+        }
+        if (!preference.styleTags().isEmpty() && overlaps(demand.getStyleTags(), preference.styleTags())) {
+            score += 25;
+            addReason(reasons, "风格匹配");
+        }
+        if (budgetOverlaps(demand.getBudgetMinCent(), demand.getBudgetMaxCent(),
+                preference.minPriceCent(), preference.maxPriceCent())) {
+            score += 15;
+            addReason(reasons, "预算合适");
+        }
+        if (timeTag != null && demand.getTimeTags().contains(timeTag)) {
+            score += 15;
+            addReason(reasons, "近期需求");
+        } else if (isWithinDays(demand.getExpectedDate(), 30)) {
+            score += 10;
+            addReason(reasons, "近期需求");
+        }
+        if (demand.getResponseCount() <= 2) {
+            score += 10;
+            addReason(reasons, "响应较少");
+        } else if (demand.getResponseCount() <= 8) {
+            score += 5;
+            addReason(reasons, "响应较少");
+        }
+        score += freshnessScore(demand.getUpdatedAt(), reasons, "近期需求");
+        if (!isBlank(demand.getLocation())
+                && !isBlank(demand.getDescription())
+                && (demand.getBudgetMinCent() != null || demand.getBudgetMaxCent() != null)
+                && demand.getReferenceFileIds() != null
+                && !demand.getReferenceFileIds().isEmpty()) {
+            score += 5;
+            addReason(reasons, "信息完整");
+        }
+        if (respondedDemandIds.contains(demand.getId())) {
+            score -= 100;
+        }
+        score += feedSeedScore(feedSeed, demand.getId());
+        return new Recommendation(score, reasons);
+    }
+
+    private Set<Long> respondedDemandIds(CurrentUser currentUser, List<Demand> candidates, boolean shouldRecommend) {
+        if (!shouldRecommend || currentUser == null || !currentUser.isProvider() || candidates == null || candidates.isEmpty()) {
+            return Set.of();
+        }
+        List<Long> demandIds = candidates.stream()
+                .map(Demand::getId)
+                .filter(Objects::nonNull)
+                .toList();
+        if (demandIds.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(responseRepository.findDemandIdsByProviderIdAndDemandIdIn(currentUser.getUserId(), demandIds));
+    }
+
+    private int freshnessScore(LocalDateTime updatedAt, List<String> reasons, String reason) {
+        if (updatedAt == null) {
+            return 0;
+        }
+        long days = ChronoUnit.DAYS.between(updatedAt.toLocalDate(), LocalDate.now());
+        if (days <= 3) {
+            addReason(reasons, reason);
+            return 10;
+        }
+        if (days <= 7) {
+            addReason(reasons, reason);
+            return 6;
+        }
+        if (days <= 30) {
+            return 2;
+        }
+        return 0;
+    }
+
+    private int feedSeedScore(String feedSeed, Long id) {
+        if (isBlank(feedSeed) || id == null) {
+            return 0;
+        }
+        return Math.floorMod(Objects.hash(feedSeed, id), 11) - 5;
+    }
+
+    private List<Demand> diversifyDemands(List<Demand> sortedDemands) {
+        if (sortedDemands == null || sortedDemands.size() < 3) {
+            return sortedDemands;
+        }
+        List<Demand> pool = new ArrayList<>(sortedDemands);
+        List<Demand> result = new ArrayList<>(sortedDemands.size());
+        while (!pool.isEmpty()) {
+            int selectedIndex = 0;
+            int window = Math.min(pool.size(), 8);
+            for (int i = 0; i < window; i++) {
+                if (!isTooSimilarDemand(pool.get(i), result)) {
+                    selectedIndex = i;
+                    break;
+                }
+            }
+            result.add(pool.remove(selectedIndex));
+        }
+        return result;
+    }
+
+    private boolean isTooSimilarDemand(Demand candidate, List<Demand> result) {
+        if (candidate == null || result.size() < 2) {
+            return false;
+        }
+        Demand first = result.get(result.size() - 1);
+        Demand second = result.get(result.size() - 2);
+        boolean sameCity = equalsIgnoreCase(candidate.getCityCode(), first.getCityCode())
+                && equalsIgnoreCase(candidate.getCityCode(), second.getCityCode());
+        boolean sameStyle = sharesAnyStyle(candidate.getStyleTags(), first.getStyleTags())
+                && sharesAnyStyle(candidate.getStyleTags(), second.getStyleTags());
+        return sameCity || sameStyle;
+    }
+
+    private boolean sharesAnyStyle(List<String> left, List<String> right) {
+        if (left == null || right == null || left.isEmpty() || right.isEmpty()) {
+            return false;
+        }
+        Set<String> normalizedRight = right.stream()
+                .filter(Objects::nonNull)
+                .map(value -> value.trim().toLowerCase(Locale.ROOT))
+                .collect(Collectors.toSet());
+        return left.stream()
+                .filter(Objects::nonNull)
+                .map(value -> value.trim().toLowerCase(Locale.ROOT))
+                .anyMatch(normalizedRight::contains);
+    }
+
+    private boolean isWithinDays(LocalDate date, int days) {
+        if (date == null) {
+            return false;
+        }
+        LocalDate today = LocalDate.now();
+        return !date.isBefore(today) && !date.isAfter(today.plusDays(days));
+    }
+
+    private boolean budgetOverlaps(Integer leftMin, Integer leftMax, Integer rightMin, Integer rightMax) {
+        if (rightMin == null && rightMax == null) {
+            return false;
+        }
+        if (leftMin == null && leftMax == null) {
+            return false;
+        }
+        int normalizedLeftMin = leftMin == null ? leftMax : leftMin;
+        int normalizedLeftMax = leftMax == null ? leftMin : leftMax;
+        int normalizedRightMin = rightMin == null ? rightMax : rightMin;
+        int normalizedRightMax = rightMax == null ? rightMin : rightMax;
+        return normalizedLeftMax >= normalizedRightMin && normalizedLeftMin <= normalizedRightMax;
+    }
+
+    private boolean overlaps(List<String> values, Set<String> targets) {
+        if (values == null || values.isEmpty() || targets == null || targets.isEmpty()) {
+            return false;
+        }
+        return values.stream()
+                .filter(Objects::nonNull)
+                .map(value -> value.trim().toLowerCase(Locale.ROOT))
+                .anyMatch(targets::contains);
+    }
+
+    private void addReason(List<String> reasons, String reason) {
+        if (reasons.size() < 3 && !reasons.contains(reason)) {
+            reasons.add(reason);
+        }
+    }
+
+    private String normalizeKeyword(String keyword) {
+        if (isBlank(keyword)) {
+            return null;
+        }
+        return keyword.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private boolean containsKeyword(String keyword, String... values) {
+        for (String value : values) {
+            if (value != null && value.toLowerCase(Locale.ROOT).contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean listContainsKeyword(List<String> values, String keyword) {
+        if (values == null) {
+            return false;
+        }
+        return values.stream()
+                .filter(Objects::nonNull)
+                .anyMatch(value -> value.toLowerCase(Locale.ROOT).contains(keyword));
+    }
+
+    private boolean equalsIgnoreCase(String left, String right) {
+        return left != null && right != null && left.equalsIgnoreCase(right.trim());
+    }
+
     private DemandStatus resolvePublicStatusFilter(String status) {
         if (isBlank(status) || DemandStatus.OPEN.name().equalsIgnoreCase(status.trim())) {
             return DemandStatus.OPEN;
@@ -590,6 +931,22 @@ public class DemandService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private record PhotographerPreference(String cityCode,
+                                          Set<String> styleTags,
+                                          Integer minPriceCent,
+                                          Integer maxPriceCent,
+                                          boolean hasProfile) {
+    }
+
+    private record Recommendation(int score, List<String> reasons) {
+        private List<String> limitedReasons() {
+            if (reasons == null || reasons.isEmpty()) {
+                return List.of();
+            }
+            return reasons.stream().limit(3).toList();
+        }
     }
 
     private void notifyResponseAccepted(AcceptedDemandResponseSnapshot snapshot) {

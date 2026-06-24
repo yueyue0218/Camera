@@ -55,9 +55,14 @@ public class DemandController {
                                                      @RequestParam(required = false) String styleTag,
                                                      @RequestParam(required = false) Integer minBudgetCent,
                                                      @RequestParam(required = false) Integer maxBudgetCent,
-                                                     @RequestParam(required = false) String timeTag) {
+                                                     @RequestParam(required = false) String timeTag,
+                                                     @RequestParam(required = false) String keyword,
+                                                     @RequestParam(required = false) String sort,
+                                                     @RequestParam(required = false) String feedSeed,
+                                                     HttpServletRequest httpRequest) {
+        CurrentUser currentUser = currentUserProvider.getCurrentUserIfPresent(httpRequest).orElse(null);
         return Result.success(demandService.listDemands(page, size, cityCode, scene, status,
-                expectedDate, styleTag, minBudgetCent, maxBudgetCent, timeTag));
+                expectedDate, styleTag, minBudgetCent, maxBudgetCent, timeTag, keyword, sort, feedSeed, currentUser));
     }
 
     @GetMapping("/me/history")

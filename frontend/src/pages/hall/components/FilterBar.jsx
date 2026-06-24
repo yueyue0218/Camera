@@ -79,7 +79,6 @@ export function FilterBar({ filters, onChange, onApplyFilters, onPublishClick, c
     onChange(partial)
     onApplyFilters(nextFilters)
   }
-
   const handleSearchKeyDown = event => {
     if (event.key === 'Enter') onApplyFilters({ ...filters, keyword: event.currentTarget.value })
   }
