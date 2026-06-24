@@ -36,7 +36,7 @@
 
 .toolbar {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) minmax(126px, auto) minmax(126px, auto) minmax(220px, auto) minmax(126px, auto) auto;
+  grid-template-columns: minmax(240px, 1fr) minmax(126px, auto) minmax(126px, auto) minmax(220px, auto) minmax(126px, auto) minmax(126px, auto) auto;
   gap: 12px;
   align-items: center;
   background: rgba(248,243,235,.86);
@@ -628,12 +628,41 @@ button.publisher-row {
   white-space: nowrap;
 }
 
-.ticket-desc {
+.ticket-summary {
   grid-area: desc;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  align-self: start;
+}
+
+.recommend-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.recommend-reason-chip {
+  max-width: 100%;
+  min-height: 20px;
+  border: 1px solid rgba(47,93,151,.18);
+  border-radius: 999px;
+  background: rgba(240,192,100,.28);
+  color: #35404b;
+  padding: 3px 7px;
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ticket-desc {
   font-size: 13px;
   line-height: 1.45;
   color: #565a62;
-  margin: 8px 0 0;
+  margin: 0;
   min-height: 18px;
   white-space: nowrap;
   overflow: hidden;
@@ -729,7 +758,7 @@ button.publisher-row {
 }
 
 .hall-list-footer {
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
@@ -1025,13 +1054,15 @@ body[data-role="photographer"] .aside-card.photographer-only {
 
 .show-info {
   box-sizing: border-box;
-  height: 64px;
+  min-height: 64px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "provider";
+  grid-template-areas:
+    "provider"
+    "reasons";
   align-items: center;
   column-gap: 8px;
-  row-gap: 2px;
+  row-gap: 6px;
   padding: 7px 10px;
 }
 
@@ -1048,6 +1079,10 @@ body[data-role="photographer"] .aside-card.photographer-only {
   gap: 7px;
   min-width: 0;
   margin-bottom: 0;
+}
+
+.showcase-card .recommend-reasons {
+  grid-area: reasons;
 }
 
 .profile-link-button {

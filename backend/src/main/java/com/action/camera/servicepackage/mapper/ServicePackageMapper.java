@@ -25,6 +25,12 @@ public final class ServicePackageMapper {
     }
 
     public static ServicePackageCardDto toCard(ServicePackage servicePackage, PhotographerInfo photographerInfo) {
+        return toCard(servicePackage, photographerInfo, null);
+    }
+
+    public static ServicePackageCardDto toCard(ServicePackage servicePackage,
+                                               PhotographerInfo photographerInfo,
+                                               List<String> recommendReasons) {
         List<Long> portfolioIds = servicePackage.getPortfolioIds();
         Long coverPortfolioId = portfolioIds == null || portfolioIds.isEmpty() ? null : portfolioIds.get(0);
         List<String> images = servicePackage.getImages();
@@ -54,7 +60,8 @@ public final class ServicePackageMapper {
                 servicePackage.getTimeDescription(),
                 servicePackage.getTimeTags(),
                 servicePackage.getCreatedAt(),
-                servicePackage.getUpdatedAt()
+                servicePackage.getUpdatedAt(),
+                recommendReasons == null ? List.of() : recommendReasons
         );
     }
 

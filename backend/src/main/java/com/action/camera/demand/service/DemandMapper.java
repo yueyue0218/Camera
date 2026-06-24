@@ -18,6 +18,10 @@ final class DemandMapper {
         return toDemandDto(demand, customerInfo, null, null, null);
     }
 
+    static DemandDto toDemandDto(Demand demand, CustomerInfo customerInfo, java.util.List<String> recommendReasons) {
+        return toDemandDto(demand, customerInfo, null, null, null, recommendReasons);
+    }
+
     static DemandDto toDemandDto(Demand demand,
                                  Integer pendingCount,
                                  Integer acceptedCount,
@@ -30,6 +34,15 @@ final class DemandMapper {
                                  Integer pendingCount,
                                  Integer acceptedCount,
                                  Integer rejectedCount) {
+        return toDemandDto(demand, customerInfo, pendingCount, acceptedCount, rejectedCount, null);
+    }
+
+    static DemandDto toDemandDto(Demand demand,
+                                 CustomerInfo customerInfo,
+                                 Integer pendingCount,
+                                 Integer acceptedCount,
+                                 Integer rejectedCount,
+                                 java.util.List<String> recommendReasons) {
         return new DemandDto(
                 demand.getId(),
                 demand.getCustomerId(),
@@ -52,6 +65,7 @@ final class DemandMapper {
                 acceptedCount,
                 rejectedCount,
                 demand.getReferenceFileIds(),
+                recommendReasons,
                 demand.getCreatedAt(),
                 demand.getUpdatedAt()
         );

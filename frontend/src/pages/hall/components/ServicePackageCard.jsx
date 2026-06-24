@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { cityName, gradientFor, money, splitTags } from './hallUtils.js'
 import { publicImageUrls, useFileObjectUrl, useFileObjectUrlState } from '../utils/fileObjectUrls.js'
 
@@ -10,7 +10,7 @@ function firstValue(...values) {
   return values.find(value => value !== null && value !== undefined && String(value).trim() !== '')
 }
 
-export function ServicePackageCard({ service, currentUser, onDetail }) {
+export const ServicePackageCard = memo(function ServicePackageCard({ service, currentUser, onDetail }) {
   const timeTags = splitTags(service.timeTags)
   const coverFileValue = firstValue(
     service.coverPortfolioId,
@@ -84,4 +84,4 @@ export function ServicePackageCard({ service, currentUser, onDetail }) {
       </div>
     </article>
   )
-}
+})

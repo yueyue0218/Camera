@@ -61,8 +61,12 @@ public class ServicePackageController {
                                                                   @RequestParam(required = false) Long maxPriceCent,
                                                                   @RequestParam(required = false) LocalDate availableDate,
                                                                   @RequestParam(required = false) String timeTag,
-                                                                  @RequestParam(required = false) String sort) {
+                                                                  @RequestParam(required = false) String keyword,
+                                                                  @RequestParam(required = false) String sort,
+                                                                  @RequestParam(required = false) String feedSeed,
+                                                                  HttpServletRequest httpRequest) {
         String resolvedCity = cityCode == null ? city : cityCode;
+        CurrentUser currentUser = currentUserProvider.getCurrentUserIfPresent(httpRequest).orElse(null);
         return Result.success(servicePackageService.listServices(
                 page,
                 size,
@@ -73,7 +77,10 @@ public class ServicePackageController {
                 maxPriceCent,
                 availableDate,
                 timeTag,
-                sort
+                keyword,
+                sort,
+                feedSeed,
+                currentUser
         ));
     }
 

@@ -34,6 +34,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.List;
@@ -134,18 +137,38 @@ public class ServicePackageService {
                                                           LocalDate availableDate,
                                                           String timeTag,
                                                           String sort) {
+        return listServices(page, size, cityCode, scene, style, minPriceCent, maxPriceCent,
+                availableDate, timeTag, null, sort, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<ServicePackageCardDto> listServices(int page,
+                                                          int size,
+                                                          String cityCode,
+                                                          String scene,
+                                                          String style,
+                                                          Long minPriceCent,
+                                                          Long maxPriceCent,
+                                                          LocalDate availableDate,
+                                                          String timeTag,
+                                                          String keyword,
+                                                          String sort,
+                                                          String feedSeed,
+                                                          CurrentUser currentUser) {
         int safePage = Math.max(page, 1);
         int safeSize = Math.max(1, Math.min(size, MAX_PAGE_SIZE));
         String normalizedCity = normalizeFilter(cityCode);
         String normalizedScene = normalizeFilter(scene);
         String normalizedStyle = normalizeFilter(style);
         String normalizedTimeTag = normalizeTimeTagFilter(timeTag);
+        String normalizedSort = normalizeServiceSort(sort);
 
         List<ServicePackage> packages = servicePackageRepository.findByStatus(ServicePackageStatus.ONLINE);
         Map<Long, PhotographerInfo> photographerInfos = photographerInfos(packages);
 
-        List<ServicePackageCardDto> filtered = packages.stream()
+        List<ServicePackage> candidates = packages.stream()
                 .filter(servicePackage -> servicePackage.getStatus() == ServicePackageStatus.ONLINE)
+                .filter(servicePackage -> !Boolean.TRUE.equals(servicePackage.getHiddenByProvider()))
                 .filter(servicePackage -> normalizedCity == null
                         || servicePackage.getCityCode().equalsIgnoreCase(normalizedCity))
                 .filter(servicePackage -> normalizedScene == null
@@ -157,10 +180,43 @@ public class ServicePackageService {
                 .filter(servicePackage -> matchesPrice(servicePackage, minPriceCent, maxPriceCent))
                 .filter(servicePackage -> availableDate == null
                         || servicePackage.getAvailableDates().contains(availableDate))
-                .sorted(resolveSort(sort))
+                .filter(servicePackage -> matchesServiceKeyword(
+                        servicePackage,
+                        photographerInfos.get(servicePackage.getProviderId()),
+                        keyword))
+                .filter(servicePackage -> !"recommend".equals(normalizedSort)
+                        || currentUser == null
+                        || !currentUser.isProvider()
+                        || !Objects.equals(servicePackage.getProviderId(), currentUser.getUserId()))
+                .toList();
+        CustomerPreference preference = serviceRecommendationPreference(
+                currentUser, normalizedCity, normalizedStyle, minPriceCent, maxPriceCent, normalizedTimeTag);
+        Map<Long, Recommendation> recommendations = "recommend".equals(normalizedSort)
+                ? candidates.stream().collect(Collectors.toMap(ServicePackage::getId,
+                servicePackage -> scoreServiceRecommendation(
+                        servicePackage,
+                        photographerInfos.get(servicePackage.getProviderId()),
+                        preference,
+                        feedSeed)))
+                : Map.of();
+        Comparator<ServicePackage> comparator = recommendations.isEmpty()
+                ? resolveSort(normalizedSort)
+                : Comparator.<ServicePackage>comparingInt(
+                servicePackage -> recommendations.get(servicePackage.getId()).score()).reversed()
+                .thenComparing(latestServiceComparator());
+        List<ServicePackage> sortedPackages = candidates.stream()
+                .sorted(comparator)
+                .toList();
+        if ("recommend".equals(normalizedSort)) {
+            sortedPackages = diversifyServicePackages(sortedPackages);
+        }
+        List<ServicePackageCardDto> filtered = sortedPackages.stream()
                 .map(servicePackage -> ServicePackageMapper.toCard(
                         servicePackage,
-                        photographerInfos.get(servicePackage.getProviderId())))
+                        photographerInfos.get(servicePackage.getProviderId()),
+                        recommendations.get(servicePackage.getId()) == null
+                                ? null
+                                : recommendations.get(servicePackage.getId()).limitedReasons()))
                 .toList();
 
         int fromIndex = Math.min((safePage - 1) * safeSize, filtered.size());
@@ -514,17 +570,306 @@ public class ServicePackageService {
 
     private Comparator<ServicePackage> resolveSort(String sort) {
         if ("price_asc".equalsIgnoreCase(sort)) {
-            return Comparator.comparing(ServicePackage::getBasePriceCent);
+            return Comparator.comparing(ServicePackage::getBasePriceCent,
+                    Comparator.nullsLast(Comparator.naturalOrder()))
+                    .thenComparing(ServicePackage::getId, Comparator.nullsLast(Comparator.naturalOrder()));
         }
         if ("price_desc".equalsIgnoreCase(sort)) {
-            return Comparator.comparing(ServicePackage::getBasePriceCent).reversed();
+            return Comparator.comparing(ServicePackage::getBasePriceCent,
+                    Comparator.nullsLast(Comparator.reverseOrder()))
+                    .thenComparing(ServicePackage::getId, Comparator.nullsLast(Comparator.reverseOrder()));
         }
         if ("created_asc".equalsIgnoreCase(sort)) {
             return Comparator.comparing(ServicePackage::getCreatedAt,
-                    Comparator.nullsLast(Comparator.naturalOrder()));
+                    Comparator.nullsLast(Comparator.naturalOrder()))
+                    .thenComparing(ServicePackage::getId, Comparator.nullsLast(Comparator.naturalOrder()));
         }
+        return latestServiceComparator();
+    }
+
+    private Comparator<ServicePackage> latestServiceComparator() {
         return Comparator.comparing(ServicePackage::getUpdatedAt,
-                Comparator.nullsFirst(Comparator.naturalOrder())).reversed();
+                Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(ServicePackage::getId, Comparator.nullsLast(Comparator.reverseOrder()));
+    }
+
+    private String normalizeServiceSort(String sort) {
+        if ("recommend".equalsIgnoreCase(trim(sort))) {
+            return "recommend";
+        }
+        if ("price_asc".equalsIgnoreCase(trim(sort))) {
+            return "price_asc";
+        }
+        if ("price_desc".equalsIgnoreCase(trim(sort))) {
+            return "price_desc";
+        }
+        if ("created_asc".equalsIgnoreCase(trim(sort))) {
+            return "created_asc";
+        }
+        return "latest";
+    }
+
+    private boolean matchesServiceKeyword(ServicePackage servicePackage,
+                                          PhotographerInfo photographerInfo,
+                                          String keyword) {
+        String normalized = normalizeKeyword(keyword);
+        if (normalized == null) {
+            return true;
+        }
+        return containsKeyword(normalized,
+                servicePackage.getTitle(),
+                servicePackage.getDescription(),
+                servicePackage.getServiceArea(),
+                servicePackage.getScene(),
+                photographerInfo == null ? null : photographerInfo.nickname())
+                || listContainsKeyword(servicePackage.getStyleTags(), normalized);
+    }
+
+    private CustomerPreference serviceRecommendationPreference(CurrentUser currentUser,
+                                                               String cityCode,
+                                                               String style,
+                                                               Long minPriceCent,
+                                                               Long maxPriceCent,
+                                                               String timeTag) {
+        String preferredCity = cityCode;
+        if (isBlank(preferredCity) && currentUser != null && currentUser.getUserId() != null) {
+            preferredCity = userRepository.findById(currentUser.getUserId())
+                    .map(User::getCityCode)
+                    .filter(value -> !isBlank(value))
+                    .orElse(null);
+        }
+        Set<Long> interestedIds = currentUser == null || !currentUser.isCustomer()
+                ? Set.of()
+                : interestRepository.findByUserIdOrderByCreatedAtDesc(currentUser.getUserId()).stream()
+                .map(ServicePackageInterest::getServicePackageId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Set<String> preferredStyles = isBlank(style)
+                ? Set.of()
+                : Set.of(style.trim().toLowerCase(Locale.ROOT));
+        boolean hasProfile = !isBlank(preferredCity)
+                || !preferredStyles.isEmpty()
+                || minPriceCent != null
+                || maxPriceCent != null
+                || timeTag != null
+                || !interestedIds.isEmpty();
+        return new CustomerPreference(
+                preferredCity,
+                preferredStyles,
+                minPriceCent,
+                maxPriceCent,
+                timeTag,
+                interestedIds,
+                hasProfile);
+    }
+
+    private Recommendation scoreServiceRecommendation(ServicePackage servicePackage,
+                                                      PhotographerInfo photographerInfo,
+                                                      CustomerPreference preference,
+                                                      String feedSeed) {
+        int score = 0;
+        List<String> reasons = new ArrayList<>();
+        if (!isBlank(preference.cityCode()) && equalsIgnoreCase(servicePackage.getCityCode(), preference.cityCode())) {
+            score += 30;
+            addReason(reasons, "同城匹配");
+        }
+        if (!preference.styleTags().isEmpty() && overlaps(servicePackage.getStyleTags(), preference.styleTags())) {
+            score += 25;
+            addReason(reasons, "风格匹配");
+        }
+        if (priceMatches(servicePackage.getBasePriceCent(), preference.minPriceCent(), preference.maxPriceCent())) {
+            score += 20;
+            addReason(reasons, "价格合适");
+        } else if (preference.minPriceCent() == null
+                && preference.maxPriceCent() == null
+                && isReasonableDefaultPrice(servicePackage.getBasePriceCent())) {
+            score += 4;
+            addReason(reasons, "价格合适");
+        }
+        if (preference.timeTag() != null && servicePackage.getTimeTags().contains(preference.timeTag())) {
+            score += 15;
+            addReason(reasons, "近期可约");
+        } else if (hasNearAvailableDate(servicePackage)) {
+            score += 8;
+            addReason(reasons, "近期可约");
+        }
+        score += creditScore(photographerInfo, reasons);
+        if (hasWorkCompleteness(servicePackage)) {
+            score += 5;
+            addReason(reasons, "作品完整");
+        }
+        score += freshnessScore(servicePackage.getUpdatedAt());
+        if (preference.interestedServiceIds().contains(servicePackage.getId())) {
+            score += 8;
+        }
+        score += feedSeedScore(feedSeed, servicePackage.getId());
+        return new Recommendation(score, reasons);
+    }
+
+    private int creditScore(PhotographerInfo photographerInfo, List<String> reasons) {
+        if (photographerInfo == null || photographerInfo.creditScore() == null) {
+            return 0;
+        }
+        double value = photographerInfo.creditScore().doubleValue();
+        if (value >= 85) {
+            addReason(reasons, "信用较高");
+            return 10;
+        }
+        if (value >= 75) {
+            addReason(reasons, "信用较高");
+            return 6;
+        }
+        return 0;
+    }
+
+    private int freshnessScore(LocalDateTime updatedAt) {
+        if (updatedAt == null) {
+            return 0;
+        }
+        long days = ChronoUnit.DAYS.between(updatedAt.toLocalDate(), LocalDate.now());
+        if (days <= 3) {
+            return 10;
+        }
+        if (days <= 7) {
+            return 6;
+        }
+        return days <= 30 ? 2 : 0;
+    }
+
+    private boolean hasNearAvailableDate(ServicePackage servicePackage) {
+        if (servicePackage.getAvailableDates() == null) {
+            return false;
+        }
+        LocalDate today = LocalDate.now();
+        LocalDate limit = today.plusDays(30);
+        return servicePackage.getAvailableDates().stream()
+                .filter(Objects::nonNull)
+                .anyMatch(date -> !date.isBefore(today) && !date.isAfter(limit));
+    }
+
+    private boolean hasWorkCompleteness(ServicePackage servicePackage) {
+        boolean hasCover = (servicePackage.getImages() != null && !servicePackage.getImages().isEmpty())
+                || (servicePackage.getPortfolioIds() != null && !servicePackage.getPortfolioIds().isEmpty());
+        return hasCover && !isBlank(servicePackage.getDescription());
+    }
+
+    private boolean priceMatches(Long price, Long minPriceCent, Long maxPriceCent) {
+        if (price == null || (minPriceCent == null && maxPriceCent == null)) {
+            return false;
+        }
+        if (minPriceCent != null && price < minPriceCent) {
+            return false;
+        }
+        return maxPriceCent == null || price <= maxPriceCent;
+    }
+
+    private boolean isReasonableDefaultPrice(Long price) {
+        return price != null && price >= 30_000L && price <= 150_000L;
+    }
+
+    private int feedSeedScore(String feedSeed, Long id) {
+        if (isBlank(feedSeed) || id == null) {
+            return 0;
+        }
+        return Math.floorMod(Objects.hash(feedSeed, id), 11) - 5;
+    }
+
+    private List<ServicePackage> diversifyServicePackages(List<ServicePackage> sortedPackages) {
+        if (sortedPackages == null || sortedPackages.size() < 3) {
+            return sortedPackages;
+        }
+        List<ServicePackage> pool = new ArrayList<>(sortedPackages);
+        List<ServicePackage> result = new ArrayList<>(sortedPackages.size());
+        while (!pool.isEmpty()) {
+            int selectedIndex = 0;
+            int window = Math.min(pool.size(), 8);
+            for (int i = 0; i < window; i++) {
+                if (!isTooSimilarServicePackage(pool.get(i), result)) {
+                    selectedIndex = i;
+                    break;
+                }
+            }
+            result.add(pool.remove(selectedIndex));
+        }
+        return result;
+    }
+
+    private boolean isTooSimilarServicePackage(ServicePackage candidate, List<ServicePackage> result) {
+        if (candidate == null || result.size() < 2) {
+            return false;
+        }
+        ServicePackage first = result.get(result.size() - 1);
+        ServicePackage second = result.get(result.size() - 2);
+        boolean sameProvider = Objects.equals(candidate.getProviderId(), first.getProviderId())
+                && Objects.equals(candidate.getProviderId(), second.getProviderId());
+        boolean sameCity = equalsIgnoreCase(candidate.getCityCode(), first.getCityCode())
+                && equalsIgnoreCase(candidate.getCityCode(), second.getCityCode());
+        boolean sameStyle = sharesAnyStyle(candidate.getStyleTags(), first.getStyleTags())
+                && sharesAnyStyle(candidate.getStyleTags(), second.getStyleTags());
+        return sameProvider || sameCity || sameStyle;
+    }
+
+    private boolean sharesAnyStyle(List<String> left, List<String> right) {
+        if (left == null || right == null || left.isEmpty() || right.isEmpty()) {
+            return false;
+        }
+        Set<String> normalizedRight = right.stream()
+                .filter(Objects::nonNull)
+                .map(value -> value.trim().toLowerCase(Locale.ROOT))
+                .collect(Collectors.toSet());
+        return left.stream()
+                .filter(Objects::nonNull)
+                .map(value -> value.trim().toLowerCase(Locale.ROOT))
+                .anyMatch(normalizedRight::contains);
+    }
+
+    private boolean overlaps(List<String> values, Set<String> targets) {
+        if (values == null || values.isEmpty() || targets == null || targets.isEmpty()) {
+            return false;
+        }
+        return values.stream()
+                .filter(Objects::nonNull)
+                .map(value -> value.trim().toLowerCase(Locale.ROOT))
+                .anyMatch(targets::contains);
+    }
+
+    private String normalizeKeyword(String keyword) {
+        if (isBlank(keyword)) {
+            return null;
+        }
+        return keyword.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private boolean containsKeyword(String keyword, String... values) {
+        for (String value : values) {
+            if (value != null && value.toLowerCase(Locale.ROOT).contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean listContainsKeyword(List<String> values, String keyword) {
+        if (values == null) {
+            return false;
+        }
+        return values.stream()
+                .filter(Objects::nonNull)
+                .anyMatch(value -> value.toLowerCase(Locale.ROOT).contains(keyword));
+    }
+
+    private void addReason(List<String> reasons, String reason) {
+        if (reasons.size() < 3 && !reasons.contains(reason)) {
+            reasons.add(reason);
+        }
+    }
+
+    private boolean equalsIgnoreCase(String left, String right) {
+        return left != null && right != null && left.equalsIgnoreCase(right.trim());
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private boolean canViewOfflineServicePackage(ServicePackage servicePackage, CurrentUser currentUser) {
@@ -686,5 +1031,23 @@ public class ServicePackageService {
             return null;
         }
         return value.trim();
+    }
+
+    private record CustomerPreference(String cityCode,
+                                      Set<String> styleTags,
+                                      Long minPriceCent,
+                                      Long maxPriceCent,
+                                      String timeTag,
+                                      Set<Long> interestedServiceIds,
+                                      boolean hasProfile) {
+    }
+
+    private record Recommendation(int score, List<String> reasons) {
+        private List<String> limitedReasons() {
+            if (reasons == null || reasons.isEmpty()) {
+                return List.of();
+            }
+            return reasons.stream().limit(3).toList();
+        }
     }
 }

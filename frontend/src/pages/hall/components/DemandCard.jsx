@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { cityName, firstText, readableDate, splitTags } from './hallUtils.js'
 import { publicImageUrls, useFileObjectUrlState } from '../utils/fileObjectUrls.js'
 
@@ -107,7 +107,7 @@ function demandCopy(demand) {
   }
 }
 
-export function DemandCard({
+export const DemandCard = memo(function DemandCard({
   demand,
   currentUser,
   onOpen
@@ -168,7 +168,9 @@ export function DemandCard({
           <div className="ticket-place">{place || '暂无地点'}</div>
         </div>
       </div>
-      <p className="ticket-desc">{truncateText(copy.description)}</p>
+      <div className="ticket-summary">
+        <p className="ticket-desc">{truncateText(copy.description)}</p>
+      </div>
       <div className="ticket-meta" aria-label="需求关键信息">
         <div className="meta-item"><span>时间</span><b>{shootTime}</b></div>
         <div className="meta-item"><span>已有响应人数</span><b>{responseCountText(demand)}</b></div>
@@ -190,4 +192,4 @@ export function DemandCard({
       </div>
     </article>
   )
-}
+})

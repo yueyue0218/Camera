@@ -61,4 +61,6 @@ public class ServicePackageCardDto {
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
+
+    private List<String> recommendReasons;
 }
