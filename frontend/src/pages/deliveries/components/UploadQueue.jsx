@@ -26,6 +26,11 @@ export function UploadQueue({
 
   return (
     <Stack spacing={1.2}>
+      {failed && (
+        <Alert severity="error" sx={{ borderRadius: 2 }}>
+          上传失败，请检查网络或稍后重试；队列已保留，可以直接再次提交。
+        </Alert>
+      )}
       {errors.map(error => (
         <Alert key={error} severity="warning" sx={{ borderRadius: 2 }}>
           {error}

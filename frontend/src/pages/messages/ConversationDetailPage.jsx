@@ -920,8 +920,8 @@ export function ConversationDetailPage() {
         onRejectQuote={rejectQuoteFromDialog}
         onResendQuote={resendQuote}
         onConfirmPayment={confirmPaymentFromDialog}
-        onDeliveryFilesChange={files => setDeliveryForm({ ...deliveryForm, files })}
-        onDeliveryRemarkChange={remark => setDeliveryForm({ ...deliveryForm, remark })}
+        onDeliveryFilesChange={files => setDeliveryForm(previous => ({ ...previous, files }))}
+        onDeliveryRemarkChange={remark => setDeliveryForm(previous => ({ ...previous, remark }))}
         onReworkRequirementChange={setReworkRequirement}
         onPhotoAuthorizationFileIdsChange={fileIds => setPhotoAuthorizationForm({ ...photoAuthorizationForm, fileIds })}
         onPhotoAuthorizationRemarkChange={remark => setPhotoAuthorizationForm({ ...photoAuthorizationForm, remark })}

@@ -7,6 +7,8 @@ import { FileDropzone } from './FileDropzone.jsx'
 import { UploadQueue } from './UploadQueue.jsx'
 import {
   createUploadItems,
+  DELIVERY_UPLOAD_LIMITS,
+  getDeliveryUploadFileType,
   validateDeliveryUploadFiles
 } from './deliveryUploadModel.js'
 
@@ -31,21 +33,47 @@ export function DeliveryUploadPanel({
     ? '请根据客户返修要求重新整理作品，本批文件会发送给客户再次验收。'
     : '这是给客户验收的本单成片，交付文件仅你和客户可见。'
 
-  function updateFiles(nextFiles) {
-    const normalized = dedupeFiles(nextFiles).slice(0, 20)
-    const nextErrors = validateDeliveryUploadFiles(normalized)
-    setErrors(nextErrors)
+  function updateFiles(nextFiles, nextErrors = []) {
+    const normalized = dedupeFiles(nextFiles)
+    const overflowCount = Math.max(0, normalized.length - DELIVERY_UPLOAD_LIMITS.maxFiles)
+    const limited = normalized.slice(0, DELIVERY_UPLOAD_LIMITS.maxFiles)
+    const combinedErrors = [
+      ...nextErrors,
+      ...(overflowCount ? [`一次最多上传 ${DELIVERY_UPLOAD_LIMITS.maxFiles} 个文件，已保留前 ${DELIVERY_UPLOAD_LIMITS.maxFiles} 个。`] : []),
+      ...validateDeliveryUploadFiles(limited)
+    ]
+    setErrors(combinedErrors)
     setSubmitFailed(false)
-    onChange?.({ files: normalized, remark })
+    onChange?.({ files: limited, remark })
   }
 
   function appendFiles(fileList) {
-    updateFiles([...files, ...Array.from(fileList || [])])
+    const incoming = Array.from(fileList || [])
+    const existingKeys = new Set(files.map(getFileKey))
+    const accepted = []
+    const rejected = []
+    incoming.forEach(file => {
+      const fileType = getDeliveryUploadFileType(file)
+      if (existingKeys.has(getFileKey(file)) || accepted.some(item => getFileKey(item) === getFileKey(file))) {
+        rejected.push(`${file.name || '这个文件'} 已在队列中，已跳过重复文件。`)
+        return
+      }
+      const error = getFileError(file, fileType)
+      if (error) {
+        rejected.push(error)
+        return
+      }
+      accepted.push(file)
+    })
+    updateFiles([...files, ...accepted], rejected)
   }
 
   function removeItem(itemId) {
     const nextFiles = items.filter(item => item.id !== itemId).map(item => item.file)
-    updateFiles(nextFiles)
+    const nextErrors = validateDeliveryUploadFiles(nextFiles)
+    setErrors(nextErrors)
+    setSubmitFailed(false)
+    onChange?.({ files: nextFiles, remark })
   }
 
   async function handleSubmit(event) {
@@ -61,6 +89,7 @@ export function DeliveryUploadPanel({
   function handleDrag(event) {
     event.preventDefault()
     event.stopPropagation()
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
     if (event.type === 'dragenter' || event.type === 'dragover') setDragging(true)
     if (event.type === 'dragleave') setDragging(false)
   }
@@ -77,12 +106,12 @@ export function DeliveryUploadPanel({
         <Typography sx={{ color: PORTRA_SURFACE.ink, fontSize: compact ? 18 : 22, fontWeight: 950 }}>
           {title}
         </Typography>
-        <Typography sx={{ color: PORTRA_SURFACE.muted, lineHeight: 1.7 }}>
+          <Typography sx={{ color: PORTRA_SURFACE.muted, lineHeight: 1.7 }}>
           {description}
         </Typography>
         <Stack direction="row" spacing={0.7} sx={{ alignItems: 'center', color: PORTRA_SURFACE.portraBlue }}>
           <LockRoundedIcon sx={{ fontSize: 17 }} />
-          <Typography sx={{ fontSize: 13.5, fontWeight: 850 }}>交付文件将以 DELIVERY / PRIVATE 保存，仅订单双方可访问。</Typography>
+          <Typography sx={{ fontSize: 13.5, fontWeight: 850 }}>这些文件只会发送给本单客户验收，不会公开展示。</Typography>
         </Stack>
       </Stack>
 
@@ -152,9 +181,28 @@ export function DeliveryUploadPanel({
 function dedupeFiles(files) {
   const seen = new Set()
   return Array.from(files || []).filter(file => {
-    const key = `${file.name}-${file.size}-${file.lastModified}`
+    const key = getFileKey(file)
     if (seen.has(key)) return false
     seen.add(key)
     return true
   })
+}
+
+function getFileKey(file) {
+  return `${file?.name || ''}-${file?.size || 0}-${file?.lastModified || 0}`
+}
+
+function getFileError(file, fileType) {
+  const name = file?.name || '未知文件'
+  if (fileType === 'UNSUPPORTED') {
+    const extension = name.includes('.') ? name.slice(name.lastIndexOf('.')) : '该'
+    return `不支持 ${extension} 文件，请上传 JPG、PNG、WEBP 图片或 ZIP 压缩包。`
+  }
+  if (fileType === 'IMAGE' && file.size > DELIVERY_UPLOAD_LIMITS.imageMaxBytes) {
+    return `这张图片超过 20MB，请压缩后重新上传：${name}`
+  }
+  if (fileType === 'ZIP' && file.size > DELIVERY_UPLOAD_LIMITS.zipMaxBytes) {
+    return `这个 ZIP 超过 200MB，请拆分或压缩后重新上传：${name}`
+  }
+  return ''
 }

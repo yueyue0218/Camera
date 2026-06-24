@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Box, IconButton, Stack, Typography } from '@mui/material'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import { PORTRA_RADIUS, PORTRA_SURFACE } from '../../../theme/portraSurfaceTokens.js'
@@ -10,14 +10,19 @@ export function ImagePreviewGrid({
   onRemove,
   disabled = false
 }) {
-  const previews = useMemo(() => items.map(item => ({
-    item,
-    url: URL.createObjectURL(item.file)
-  })), [items])
+  const [previewUrls, setPreviewUrls] = useState({})
+  const previewKey = useMemo(() => items.map(item => item.id).join('|'), [items])
 
-  useEffect(() => () => {
-    previews.forEach(preview => URL.revokeObjectURL(preview.url))
-  }, [previews])
+  useEffect(() => {
+    const urls = {}
+    items.forEach(item => {
+      urls[item.id] = URL.createObjectURL(item.file)
+    })
+    setPreviewUrls(urls)
+    return () => {
+      Object.values(urls).forEach(url => URL.revokeObjectURL(url))
+    }
+  }, [previewKey])
 
   if (!items.length) return null
 
@@ -27,12 +32,12 @@ export function ImagePreviewGrid({
       gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(3, minmax(0, 1fr))' },
       gap: 1
     }}>
-      {previews.map(({ item, url }) => (
+      {items.map(item => (
         <Box key={item.id} sx={imageCardSx}>
           <Box sx={{ aspectRatio: '4 / 3', overflow: 'hidden', bgcolor: PORTRA_SURFACE.paperMuted }}>
             <Box
               component="img"
-              src={url}
+              src={previewUrls[item.id]}
               alt={item.file.name}
               sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
             />
