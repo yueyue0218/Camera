@@ -3,8 +3,9 @@ import { Alert, Snackbar } from '@mui/material'
 export function PortraToast({ toast, onClose }) {
   return (
     <Snackbar
+      key={toast?.key || toast?.message || 'portra-toast'}
       open={Boolean(toast?.open)}
-      autoHideDuration={toast?.autoHideDuration || 3200}
+      autoHideDuration={toast?.autoHideDuration || 3000}
       onClose={onClose}
       anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
     >

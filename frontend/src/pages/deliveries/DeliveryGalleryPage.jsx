@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Paper, Skeleton, Stack, TextField, Typography } from '@mui/material'
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Paper, Skeleton, Stack, TextField, Typography } from '@mui/material'
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import ForumRoundedIcon from '@mui/icons-material/ForumRounded'
@@ -42,7 +42,6 @@ export function DeliveryGalleryPage() {
   const [deliveries, setDeliveries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState(null)
   const [previewUrls, setPreviewUrls] = useState({})
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [viewerIndex, setViewerIndex] = useState(-1)
@@ -144,7 +143,6 @@ export function DeliveryGalleryPage() {
       return true
     } catch (downloadError) {
       const message = downloadError.message || '作品下载失败。'
-      setNotice({ type: 'error', text: message })
       feedback.error(message)
       return false
     }
@@ -153,7 +151,6 @@ export function DeliveryGalleryPage() {
   async function downloadFiles(nextFiles) {
     const downloadable = nextFiles.filter(file => file.fileId)
     if (!downloadable.length) {
-      setNotice({ type: 'warning', text: '当前没有可下载作品。' })
       feedback.warning('当前没有可下载作品。')
       return
     }
@@ -161,7 +158,6 @@ export function DeliveryGalleryPage() {
       await downloadFile(file, index)
     }
     const message = downloadable.length > 1 ? '浏览器可能会逐个确认多个作品下载。' : '已开始下载。'
-    setNotice({ type: 'info', text: message })
     feedback.info(message)
   }
 
@@ -177,7 +173,6 @@ export function DeliveryGalleryPage() {
   async function confirmDelivery() {
     if (!order?.orderId || !canCustomerAct) return
     setActionLoading(true)
-    setNotice(null)
     try {
       await orderApi.transition(order.orderId, 'COMPLETED', '客户确认接收作品', currentUser)
       await reloadOrderAndDeliveries()
@@ -185,7 +180,6 @@ export function DeliveryGalleryPage() {
       setCompletionDialogOpen(true)
     } catch (actionError) {
       const message = actionError.message || '确认接收失败。'
-      setNotice({ type: 'error', text: message })
       feedback.error(message)
     } finally {
       setActionLoading(false)
@@ -196,25 +190,22 @@ export function DeliveryGalleryPage() {
     event.preventDefault()
     const reason = reworkRequirement.trim()
     if (!reason) {
-      setNotice({ type: 'warning', text: '请填写返修要求。' })
+      feedback.warning('请填写返修要求。')
       return
     }
     if (reason.length > 500) {
-      setNotice({ type: 'warning', text: '返修要求不能超过 500 字。' })
+      feedback.warning('返修要求不能超过 500 字。')
       return
     }
     setActionLoading(true)
-    setNotice(null)
     try {
       await orderApi.requestRework(order.orderId, reason, currentUser)
       setReworkDialogOpen(false)
       setReworkRequirement('')
       await reloadOrderAndDeliveries()
-      setNotice({ type: 'success', text: '返修要求已提交。' })
       feedback.success('返修要求已提交。')
     } catch (actionError) {
       const message = actionError.message || '返修要求提交失败。'
-      setNotice({ type: 'error', text: message })
       feedback.error(message)
     } finally {
       setActionLoading(false)
@@ -299,9 +290,6 @@ export function DeliveryGalleryPage() {
           </Stack>
         </Stack>
       </Paper>
-
-      {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
-
       <Box data-delivery-gallery-grid="true" sx={galleryGridSx}>
         <Paper variant="outlined" sx={galleryPanelSx}>
           <Stack spacing={1.5} sx={{ minWidth: 0 }}>

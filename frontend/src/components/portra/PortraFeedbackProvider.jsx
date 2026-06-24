@@ -16,11 +16,24 @@ export function PortraFeedbackProvider({ children }) {
   const showToast = useCallback((message, severity = 'info', options = {}) => {
     const text = String(message || '').trim()
     if (!text) return
-    setToast({
-      open: true,
-      message: text,
-      severity,
-      autoHideDuration: options.autoHideDuration
+    setToast(previous => {
+      const normalizedSeverity = severity || 'info'
+      const autoHideDuration = options.autoHideDuration
+        || (normalizedSeverity === 'error' ? 5000 : 3000)
+      if (previous?.open && previous.message === text && previous.severity === normalizedSeverity) {
+        return {
+          ...previous,
+          key: Date.now(),
+          autoHideDuration
+        }
+      }
+      return {
+        key: Date.now(),
+        open: true,
+        message: text,
+        severity: normalizedSeverity,
+        autoHideDuration
+      }
     })
   }, [])
 

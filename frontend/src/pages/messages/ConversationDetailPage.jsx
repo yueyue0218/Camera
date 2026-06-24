@@ -235,11 +235,7 @@ export function ConversationDetailPage() {
   async function run(action, successText) {
     setNotice(null)
     return runWorkflowAction(action, {
-      successMessage: successText,
-      onSuccess: () => {
-        if (successText) setNotice({ type: 'success', text: successText })
-      },
-      onError: (_error, message) => setNotice({ type: 'error', text: message })
+      successMessage: successText
     })
   }
 
@@ -400,7 +396,7 @@ export function ConversationDetailPage() {
       authorId: message.senderId,
       createdAt: message.createdAt
     })
-    setNotice({ type: 'success', text: '照片已保存到我的照片' })
+    feedback.success('照片已保存')
   }
 
   async function createQuote(event) {
@@ -414,7 +410,7 @@ export function ConversationDetailPage() {
     setQuoteValidationErrors(validation.errors)
     setQuoteFieldErrors(validation.fieldErrors)
     if (validation.errors.length) {
-      setNotice({ type: 'warning', text: validation.errors[0] })
+      feedback.warning(validation.errors[0])
       return
     }
     const quotePayload = buildQuotePayload(quoteForm, conversation)
@@ -433,7 +429,7 @@ export function ConversationDetailPage() {
 
   function startQuoteEditing(quote) {
     if (!quote) {
-      setNotice({ type: 'error', text: '报价详情暂时无法打开，请刷新后重试。' })
+      feedback.error('报价详情暂时无法打开，请刷新后重试。')
       return
     }
     setEditingQuotationId(quote.quotationId)
@@ -441,7 +437,7 @@ export function ConversationDetailPage() {
     setQuoteValidationErrors([])
     setQuoteFieldErrors({})
     setShowQuoteForm(true)
-    setNotice({ type: 'info', text: '正在编辑待确认报价，保存前客户仍看到原报价。' })
+    feedback.info('正在编辑待确认报价，保存前客户仍看到原报价。')
   }
 
   function closeQuoteForm() {
@@ -471,7 +467,7 @@ export function ConversationDetailPage() {
 
   function resendQuote(quote) {
     if (!quote) {
-      setNotice({ type: 'error', text: '报价详情暂时无法打开，请刷新后重试。' })
+      feedback.error('报价详情暂时无法打开，请刷新后重试。')
       return
     }
     setQuoteForm(createQuoteFormFromQuote(quote))
@@ -481,25 +477,23 @@ export function ConversationDetailPage() {
     setShowQuoteForm(true)
     setActiveAction(null)
     setActiveQuote(null)
-    setNotice({ type: 'info', text: '已带入上次报价内容，请确认后重新发送给客户。' })
+    feedback.info('已带入上次报价内容，请确认后重新发送给客户。')
   }
 
   async function confirmQuote(quote) {
     if (!quote?.quotationId) {
-      setNotice({ type: 'error', text: '报价详情暂时无法打开，请刷新后重试。' })
+      feedback.error('报价详情暂时无法打开，请刷新后重试。')
       return false
     }
     setPageLoading(true)
     setNotice(null)
     try {
       const result = await quoteApi.confirm(quote.quotationId, '客户已确认本次报价', currentUser)
-      setNotice({ type: 'success', text: '报价已确认，订单已生成' })
       feedback.success('报价已确认，订单已生成')
       if (result?.orderId) {
         await refreshConversationData(conversation, result.orderId)
       } else {
         await refreshConversationData()
-        setNotice({ type: 'error', text: '报价已确认，但暂时没有拿到订单信息，请刷新后再查看。' })
         feedback.error('报价已确认，但暂时没有拿到订单信息，请刷新后再查看。')
       }
       return true
@@ -510,7 +504,6 @@ export function ConversationDetailPage() {
         // Keep the original quote confirmation error visible.
       }
       const message = getQuoteConfirmationErrorText(error)
-      setNotice({ type: 'error', text: message })
       feedback.error(message)
       return false
     } finally {
@@ -520,7 +513,7 @@ export function ConversationDetailPage() {
 
   async function rejectQuote(quote) {
     if (!quote?.quotationId) {
-      setNotice({ type: 'error', text: '报价详情暂时无法打开，请刷新后重试。' })
+      feedback.error('报价详情暂时无法打开，请刷新后重试。')
       return false
     }
     const result = await run(async () => quoteApi.reject(quote.quotationId, '本次暂不采用该报价', currentUser), '报价已拒绝')
@@ -604,7 +597,7 @@ export function ConversationDetailPage() {
     if (!currentOrder) return false
     const reason = reworkRequirement.trim()
     if (!reason) {
-      setNotice({ type: 'warning', text: '请填写返修要求' })
+      feedback.warning('请填写返修要求')
       return false
     }
     const result = await run(async () => orderApi.requestRework(currentOrder.orderId, reason, currentUser), '返修请求已提交')
@@ -633,7 +626,7 @@ export function ConversationDetailPage() {
     if (!currentOrder) return
     const remark = (decisionRemark || authorizationRemarks[authorization.id] || '').trim()
     if (decision === 'reject' && !remark) {
-      setNotice({ type: 'warning', text: '请填写拒绝原因' })
+      feedback.warning('请填写拒绝原因')
       return false
     }
     const action = decision === 'approve' ? photoAuthorizationApi.approve : photoAuthorizationApi.reject
@@ -659,19 +652,18 @@ export function ConversationDetailPage() {
 
   function showUnavailableTool(name) {
     const messages = {
-      图片: '当前接口暂不支持发送图片，作品请通过订单上传。',
-      附件: '附件发送能力暂未接入，作品请通过订单上传，普通资料可先用文字说明。',
-      表情: '表情工具暂未接入，可以继续使用文字沟通。',
-      补款: '补款能力暂未接入，双方可先在沟通中协商金额。',
-      平台协助: '平台协助功能暂未开放'
+      图片: '图片发送正在完善中，暂未开放；交付作品请通过订单上传。',
+      附件: '附件发送正在完善中，暂未开放。',
+      表情: '表情功能正在完善中，暂未开放。',
+      补款: '补款属于订单交易能力，后续会以追加费用流程开放。',
+      平台协助: '平台协助正在完善中，暂未开放。'
     }
-    setNotice({ type: 'info', text: messages[name] || '该能力暂未接入。' })
-    feedback.info(messages[name] || '该能力暂未接入。')
+    feedback.info(messages[name] || '该功能正在完善中，暂未开放。')
   }
 
   function openQuoteDetail(quote) {
     if (!quote) {
-      setNotice({ type: 'error', text: '报价详情暂时无法打开，请刷新后重试。' })
+      feedback.error('报价详情暂时无法打开，请刷新后重试。')
       return
     }
     setActiveQuote(quote)
@@ -689,7 +681,6 @@ export function ConversationDetailPage() {
       conversationId
     }, options)
     if (!succeeded) {
-      setNotice({ type: 'warning', text: '订单信息暂时不可用，请稍后刷新后再查看。' })
       feedback.warning('订单信息暂时不可用，请稍后刷新后再查看。')
       return false
     }
@@ -703,7 +694,6 @@ export function ConversationDetailPage() {
       conversationId
     })
     if (!succeeded) {
-      setNotice({ type: 'warning', text: '作品记录暂不可查看，请刷新后重试。' })
       feedback.warning('作品记录暂不可查看，请刷新后重试。')
     }
     return succeeded

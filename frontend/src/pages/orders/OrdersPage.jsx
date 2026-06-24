@@ -1,7 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import {
-  Alert,
   Box,
   Button,
   Chip,
@@ -293,7 +292,6 @@ export function OrdersPage() {
   const [showArbitrationForm, setShowArbitrationForm] = useState(false)
   const [sentInvitations, setSentInvitations] = useState([])
   const [statusFilter, setStatusFilter] = useState('')
-  const [notice, setNotice] = useState(null)
   const [pageLoading, setPageLoading] = useState(false)
   const feedback = usePortraFeedback()
   const { run: runWorkflowAction, loading: actionLoading } = usePortraAsyncAction({
@@ -356,13 +354,8 @@ export function OrdersPage() {
   }, [previewUrl])
 
   async function run(action, successText) {
-    setNotice(null)
     return runWorkflowAction(action, {
-      successMessage: successText,
-      onSuccess: () => {
-        if (successText) setNotice({ type: 'success', text: successText })
-      },
-      onError: (_error, message) => setNotice({ type: 'error', text: message })
+      successMessage: successText
     })
   }
 
@@ -406,21 +399,20 @@ export function OrdersPage() {
     const orderId = normalizeOrderId(typeof orderOrId === 'object' ? orderOrId.orderId : orderOrId)
     const fallbackOrder = typeof orderOrId === 'object' ? orderOrId : orders.find(order => Number(order.orderId) === Number(orderId))
     if (!orderId) {
-      setNotice({ type: 'warning', text: '订单信息暂时不可用，请刷新后重试。' })
+      feedback.warning('订单信息暂时不可用，请刷新后重试。')
       return false
     }
     setPageLoading(true)
-    setNotice(null)
     try {
       let detail = fallbackOrder || null
       try {
         detail = await orderApi.detail(orderId, currentUser) || detail
       } catch (error) {
         if (!detail || (!isApiUnavailable(error) && error.status !== 403 && error.status !== 404)) throw error
-        setNotice({ type: 'warning', text: '订单详情接口暂时不可用，已先展示订单列表中的档案信息。' })
+        feedback.warning('订单详情接口暂时不可用，已先展示订单列表中的档案信息。')
       }
       if (!detail) {
-        setNotice({ type: 'warning', text: '订单信息暂时不可用，请刷新后重试。' })
+        feedback.warning('订单信息暂时不可用，请刷新后重试。')
         return false
       }
       const logs = asArray(await optionalOrderData(() => orderApi.statusLogs(orderId, currentUser)))
@@ -466,7 +458,7 @@ export function OrdersPage() {
       }
       return true
     } catch (error) {
-      setNotice({ type: 'error', text: error.message || '订单详情暂时无法打开，请刷新后重试。' })
+      feedback.error(error.message || '订单详情暂时无法打开，请刷新后重试。')
       return false
     } finally {
       setPageLoading(false)
@@ -520,7 +512,7 @@ export function OrdersPage() {
     if (!selectedOrder) return
     const trimmedRequirement = reworkRequirement.trim()
     if (!trimmedRequirement) {
-      setNotice({ type: 'warning', text: '请填写返修要求' })
+      feedback.warning('请填写返修要求')
       return
     }
     const result = await run(async () => orderApi.requestRework(
@@ -573,7 +565,6 @@ export function OrdersPage() {
 
   async function downloadDeliveryFile(record) {
     if (!record?.fileId) {
-      setNotice({ type: 'warning', text: '当前作品暂未提供下载链接。' })
       feedback.warning('当前作品暂未提供下载链接。')
       return
     }
@@ -625,7 +616,7 @@ export function OrdersPage() {
     if (!selectedOrder) return
     const remark = (decisionRemark || authorizationRemarks[authorization.id] || '').trim()
     if (decision === 'reject' && !remark) {
-      setNotice({ type: 'warning', text: '请填写拒绝原因' })
+      feedback.warning('请填写拒绝原因')
       return false
     }
     const action = decision === 'approve' ? photoAuthorizationApi.approve : photoAuthorizationApi.reject
@@ -785,18 +776,18 @@ export function OrdersPage() {
       source: explicitReturnToConversation ? WORKFLOW_SOURCES.conversation : WORKFLOW_SOURCES.order
     })
     if (!succeeded) {
-      setNotice({ type: 'warning', text: '作品记录暂不可查看，请刷新后重试。' })
+      feedback.warning('作品记录暂不可查看，请刷新后重试。')
     }
   }
 
   function returnToConversation() {
     const succeeded = navigateBackToConversation(navigate, location, selectedOrderConversationId)
-    if (!succeeded) setNotice({ type: 'warning', text: '暂时没有可返回的沟通记录。' })
+    if (!succeeded) feedback.warning('暂时没有可返回的沟通记录。')
   }
 
   function continueConversation() {
     const succeeded = goToOrderConversation(navigate, selectedOrderConversationId)
-    if (!succeeded) setNotice({ type: 'warning', text: '暂无可进入的沟通记录。' })
+    if (!succeeded) feedback.warning('暂无可进入的沟通记录。')
   }
 
   function returnToOrderList() {
@@ -813,7 +804,6 @@ export function OrdersPage() {
   return (
     <PortraWorkflowFrame spacing={2.5} maxWidth="page" sx={orderPageSx}>
       <OrdersSectionHeader title="订单" subtitle="查看订单进展、平台担保状态和每次状态流转。" />
-      {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
 
       <Box data-order-workspace="true" sx={orderGridSx}>
         <Paper variant="outlined" sx={orderIndexPanelSx}>
