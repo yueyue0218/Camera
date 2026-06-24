@@ -36,12 +36,15 @@ export function useConversationRealtime({
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') refreshIfVisible()
     }
+    const onFocus = () => refreshIfVisible()
     document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('focus', onFocus)
 
     return () => {
       alive = false
       window.clearInterval(intervalId)
       document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('focus', onFocus)
     }
   }, [enabled, conversationId, intervalMs])
 }

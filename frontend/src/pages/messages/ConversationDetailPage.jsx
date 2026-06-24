@@ -263,7 +263,7 @@ export function ConversationDetailPage() {
       conversationApi.quotes(record.backendConversationId || record.conversationId, currentUser),
       orderApi.list({}, currentUser)
     ])
-    setMessages(nextMessages)
+    setMessages(previous => mergeConversationMessages(previous, nextMessages))
     setQuotes(nextQuotes)
     const latestMessage = getLatestMessage(nextMessages)
     saveConversationRecord(record, {
@@ -280,6 +280,21 @@ export function ConversationDetailPage() {
       await loadOrderWorkbench(selectedOrder.orderId)
     } else {
       clearOrderWorkbench()
+    }
+  }
+
+  async function refreshConversationMessages(record = conversation) {
+    if (!record || record.isLocal) return
+    const nextMessages = await conversationApi.messages(record.backendConversationId || record.conversationId, currentUser)
+    setMessages(previous => mergeConversationMessages(previous, nextMessages))
+    const latestMessage = getLatestMessage(nextMessages)
+    if (latestMessage) {
+      saveConversationRecord(record, {
+        latestMessage,
+        lastMessageObject: latestMessage,
+        latestMessageSenderId: latestMessage.senderId ?? null,
+        updatedAt: latestMessage.createdAt || record.updatedAt
+      })
     }
   }
 
@@ -337,13 +352,42 @@ export function ConversationDetailPage() {
       latestMessage: optimisticMessage,
       createdAt: optimisticMessage.createdAt
     })
-    const sent = await run(async () => conversationApi.sendMessage(conversation.backendConversationId || conversation.conversationId, text, currentUser, 'TEXT'))
-    if (sent) {
-      await refreshConversationData(conversation, currentOrder?.orderId)
-      return
+    try {
+      const sent = await conversationApi.sendMessage(conversation.backendConversationId || conversation.conversationId, text, currentUser, 'TEXT')
+      setMessages(previous => replaceTemporaryMessage(previous, optimisticMessage.messageId, sent))
+      if (sent) {
+        updateConversationLastMessage(conversation.conversationId, sent.content || text, {
+          senderId: sent.senderId ?? optimisticMessage.senderId,
+          messageType: sent.messageType || 'TEXT',
+          latestMessage: normalizeRemoteMessage(sent),
+          createdAt: sent.createdAt || optimisticMessage.createdAt
+        })
+      }
+    } catch (error) {
+      setMessages(previous => markTemporaryMessageFailed(previous, optimisticMessage.messageId, error))
     }
-    setMessages(previous => previous.filter(message => message.messageId !== optimisticMessage.messageId))
-    setContent(text)
+  }
+
+  async function retryMessage(message) {
+    if (!conversation || !message?.content || conversation.isLocal) return
+    const tempId = message.clientTempId || message.messageId
+    setMessages(previous => previous.map(item => String(item.messageId) === String(tempId)
+      ? { ...item, deliveryStatus: 'sending', errorMessage: '' }
+      : item))
+    try {
+      const sent = await conversationApi.sendMessage(conversation.backendConversationId || conversation.conversationId, message.content, currentUser, message.messageType || 'TEXT')
+      setMessages(previous => replaceTemporaryMessage(previous, tempId, sent))
+      if (sent) {
+        updateConversationLastMessage(conversation.conversationId, sent.content || message.content, {
+          senderId: sent.senderId ?? message.senderId,
+          messageType: sent.messageType || 'TEXT',
+          latestMessage: normalizeRemoteMessage(sent),
+          createdAt: sent.createdAt || message.createdAt
+        })
+      }
+    } catch (error) {
+      setMessages(previous => markTemporaryMessageFailed(previous, tempId, error))
+    }
   }
 
   function saveSubmittedPhoto(message) {
@@ -682,7 +726,8 @@ export function ConversationDetailPage() {
   useConversationRealtime({
     enabled: Boolean(conversation && !conversation.isLocal && !actions.roleMismatch),
     conversationId: conversation?.backendConversationId || conversation?.conversationId,
-    onRefresh: () => refreshConversationData(conversation, currentOrder?.orderId)
+    intervalMs: 4000,
+    onRefresh: () => refreshConversationMessages(conversation)
   })
   useEffect(() => {
     if (!conversation) return
@@ -856,6 +901,7 @@ export function ConversationDetailPage() {
             onSubmitQuote={createQuote}
             onContentChange={setContent}
             onSendMessage={sendMessage}
+            onRetryMessage={retryMessage}
             onChooseMessageImage={() => showUnavailableTool('图片')}
             onSaveSubmittedPhoto={saveSubmittedPhoto}
             onPayOrder={openPaymentDialog}
@@ -952,15 +998,111 @@ function getLatestMessage(messages = []) {
 
 function createOptimisticMessage(conversation, currentUser, content, messageType) {
   const conversationId = conversation?.backendConversationId || conversation?.conversationId
+  const tempId = `temp-${Date.now()}-${Math.round(Math.random() * 100000)}`
   return {
-    messageId: `optimistic-${conversationId}-${Date.now()}`,
+    messageId: tempId,
+    clientTempId: tempId,
     conversationId,
     senderId: getCurrentUserId(currentUser),
     messageType,
     content,
     createdAt: new Date().toISOString(),
-    optimistic: true
+    optimistic: true,
+    deliveryStatus: 'sending'
   }
+}
+
+function normalizeRemoteMessages(messages = []) {
+  return (Array.isArray(messages) ? messages : []).filter(Boolean).map(normalizeRemoteMessage)
+}
+
+function normalizeRemoteMessage(message) {
+  if (!message) return message
+  return {
+    ...message,
+    deliveryStatus: 'sent',
+    optimistic: false,
+    errorMessage: ''
+  }
+}
+
+function mergeConversationMessages(previous = [], incoming = []) {
+  const next = [...(Array.isArray(previous) ? previous : [])]
+  normalizeRemoteMessages(incoming).forEach(remoteMessage => {
+    const remoteIndex = next.findIndex(item => isSamePersistedMessage(item, remoteMessage))
+    if (remoteIndex >= 0) {
+      next[remoteIndex] = { ...next[remoteIndex], ...remoteMessage, deliveryStatus: 'sent', optimistic: false }
+      return
+    }
+    const localIndex = next.findIndex(item => isMatchingTemporaryMessage(item, remoteMessage))
+    if (localIndex >= 0) {
+      next[localIndex] = remoteMessage
+      return
+    }
+    next.push(remoteMessage)
+  })
+  return sortMessages(next)
+}
+
+function replaceTemporaryMessage(previous = [], tempId, sentMessage) {
+  if (!sentMessage) return markTemporaryMessageFailed(previous, tempId)
+  const normalized = normalizeRemoteMessage(sentMessage)
+  return sortMessages(previous.map(message => {
+    if (String(message.messageId) === String(tempId) || String(message.clientTempId) === String(tempId)) {
+      return normalized
+    }
+    return message
+  }))
+}
+
+function markTemporaryMessageFailed(previous = [], tempId, error) {
+  const message = getSendErrorMessage(error)
+  return previous.map(item => {
+    if (String(item.messageId) === String(tempId) || String(item.clientTempId) === String(tempId)) {
+      return {
+        ...item,
+        deliveryStatus: 'failed',
+        optimistic: true,
+        errorMessage: message
+      }
+    }
+    return item
+  })
+}
+
+function isSamePersistedMessage(left, right) {
+  if (!left?.messageId || !right?.messageId) return false
+  if (isTemporaryMessageId(left.messageId) || isTemporaryMessageId(right.messageId)) return false
+  return String(left.messageId) === String(right.messageId)
+}
+
+function isMatchingTemporaryMessage(localMessage, remoteMessage) {
+  if (!localMessage || !remoteMessage || !isTemporaryMessageId(localMessage.messageId)) return false
+  if (Number(localMessage.senderId) !== Number(remoteMessage.senderId)) return false
+  if (String(localMessage.messageType || 'TEXT') !== String(remoteMessage.messageType || 'TEXT')) return false
+  if (String(localMessage.content || '') !== String(remoteMessage.content || '')) return false
+  const localTime = new Date(localMessage.createdAt || 0).getTime()
+  const remoteTime = new Date(remoteMessage.createdAt || 0).getTime()
+  if (!Number.isFinite(localTime) || !Number.isFinite(remoteTime)) return true
+  return Math.abs(remoteTime - localTime) < 2 * 60 * 1000
+}
+
+function isTemporaryMessageId(value) {
+  return String(value || '').startsWith('temp-')
+}
+
+function sortMessages(messages = []) {
+  return [...messages].sort((left, right) => {
+    const leftTime = new Date(left?.createdAt || 0).getTime()
+    const rightTime = new Date(right?.createdAt || 0).getTime()
+    return (Number.isFinite(leftTime) ? leftTime : 0) - (Number.isFinite(rightTime) ? rightTime : 0)
+  })
+}
+
+function getSendErrorMessage(error) {
+  if (error?.isNetworkError) return '网络连接异常，点击重试。'
+  if (error?.status === 401 || error?.status === 403) return '登录状态或权限异常，请刷新后重试。'
+  return error?.message || '发送失败，点击重试。'
 }
 
 const noticeSx = {

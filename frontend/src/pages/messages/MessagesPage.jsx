@@ -126,10 +126,21 @@ export function MessagesPage() {
   useEffect(() => {
     if (new URLSearchParams(location.search).get('conversationId')) return undefined
     if (!requestUser || !currentUserId || !currentUserRole) return undefined
-    const intervalId = window.setInterval(() => {
+    const refresh = () => {
+      if (document.visibilityState !== 'visible') return
       loadConversations().catch(error => applyNotice(buildMessageListNotice(error, 'conversations')))
-    }, 6000)
-    return () => window.clearInterval(intervalId)
+    }
+    const intervalId = window.setInterval(refresh, 12000)
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
   }, [applyNotice, currentUserId, currentUserRole, loadConversations, location.search, requestUser])
 
   const handleRetry = useCallback(() => {

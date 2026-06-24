@@ -38,6 +38,7 @@ export function ConversationThread({
   onOpenDeliveryGallery,
   onContentChange,
   onSendMessage,
+  onRetryMessage,
   onChooseMessageImage,
   onSaveSubmittedPhoto,
   onPayOrder,
@@ -185,6 +186,7 @@ export function ConversationThread({
                 actor={resolveActorDisplay(item.actor)}
                 canSaveSubmittedPhoto={canSaveSubmittedPhoto}
                 onSaveSubmittedPhoto={() => onSaveSubmittedPhoto(message)}
+                onRetry={() => onRetryMessage?.(message)}
               />
             )
           })}
