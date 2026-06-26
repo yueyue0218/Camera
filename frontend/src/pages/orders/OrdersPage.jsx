@@ -9,12 +9,9 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
-  FormControl,
-  InputLabel,
   MenuItem,
   Paper,
   Rating,
-  Select,
   Skeleton,
   Stack,
   TextField,
@@ -59,7 +56,6 @@ import {
   formatDeliveryTitle,
   formatFileDisplayName,
   formatPhotoUsageScope,
-  formatStatusLogText
 } from '../../utils/displayFormatters.js'
 import {
   PortraActionButton,
@@ -68,15 +64,11 @@ import {
   PortraInfoBanner,
   OrderCompletionDialog,
   PortraWorkflowFrame,
-  PortraStatusBadge,
-  PortraTicketCard,
-  PortraTicketSection,
-  PortraTimeline,
   usePortraFeedback
 } from '../../components/portra/index.js'
 import { usePortraAsyncAction } from '../../hooks/usePortraAsyncAction.js'
 import { AuthorizationRequestCard } from '../../components/portra/AuthorizationRequestCard.jsx'
-import { PORTRA_LAYOUT, PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
+import { PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
 import {
   canCustomerConfirm,
   canCustomerReviewPhotoAuthorization,
@@ -84,11 +76,12 @@ import {
 } from './orderActions.js'
 import { EmptyOrderCard } from './components/EmptyOrderCard.jsx'
 import { InfoRows } from './components/InfoRows.jsx'
+import { OrderCurrentTaskCard } from './components/OrderCurrentTaskCard.jsx'
+import { OrderDeliverySummaryCard } from './components/OrderDeliverySummaryCard.jsx'
 import { OrderSectionCard } from './components/OrderSectionCard.jsx'
-import { OrderStatusHero } from './components/OrderStatusHero.jsx'
-import { OrdersSectionHeader } from './components/OrdersSectionHeader.jsx'
+import { OrderSummaryCard } from './components/OrderSummaryCard.jsx'
+import { OrderTimelineCard } from './components/OrderTimelineCard.jsx'
 import { ReviewList } from './components/ReviewList.jsx'
-import { DeliveryBatchCard } from '../deliveries/components/DeliveryBatchCard.jsx'
 import { DeliveryFileGrid } from '../deliveries/components/DeliveryFileGrid.jsx'
 import { DeliveryUploadPanel } from '../deliveries/components/DeliveryUploadPanel.jsx'
 import { buildDeliveryBatches, flattenDeliveryFiles, isAuthorizableDeliveryFile } from '../deliveries/deliveryDisplay.js'
@@ -104,14 +97,12 @@ import {
   getArbitrationsByOrder,
   getLatestDeliveryUploadTime,
   getLocalReviewsByOrder,
-  getOrderFulfillmentNotice,
   getOrderReviewDirection,
   getReviewTargetUserId,
   isApiUnavailable,
   isOrderParticipant,
   mergeComplaints,
   mergeReviewLists,
-  orderStatusMap,
   parseQuoteSnapshot,
   saveLocalArbitration,
   saveLocalReview,
@@ -173,12 +164,6 @@ function getCustomerCancelAction(order, currentUser) {
   return null
 }
 
-function shouldShowShootStartedCancelNotice(order, currentUser) {
-  return isOrderCustomer(order, currentUser)
-    && order.status === 'PAID_PENDING_SHOOT'
-    && !isBeforeShootStart(order)
-}
-
 function isOrderCustomer(order, currentUser) {
   return Boolean(order)
     && Boolean(currentUser)
@@ -195,12 +180,12 @@ function getOrderPerspective(order, currentUser) {
 function getCounterpartyLabel(order, currentUser) {
   if (!order || !currentUser) return '对方未确认'
   if (Number(order.customerId) === Number(currentUser.userId)) {
-    return `摄影师 ${order.providerUserId || '-'}`
+    return '摄影师'
   }
   if (Number(order.providerUserId) === Number(currentUser.userId)) {
-    return `客户 ${order.customerId || '-'}`
+    return '客户'
   }
-  return `客户 ${order.customerId || '-'} / 摄影师 ${order.providerUserId || '-'}`
+  return '订单参与方'
 }
 
 const deliveryStatusLabelMap = {
@@ -221,6 +206,23 @@ function formatOrderIndexDate(order) {
   return label ? label.slice(5).replace('-', '/') : '待定'
 }
 
+function orderStatusDotSx(status) {
+  return {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+    flexShrink: 0,
+    bgcolor: getOrderStatusDotColor(status)
+  }
+}
+
+function getOrderStatusDotColor(status) {
+  if (['COMPLETED'].includes(status)) return '#4fbd78'
+  if (['CANCELLED', 'REFUNDED'].includes(status)) return '#c4cedd'
+  if (['PENDING_DELIVERY', 'DELIVERED_PENDING_CONFIRM', 'REWORK_REQUIRED', 'APPEALING'].includes(status)) return '#f05a24'
+  return PORTRA_SURFACE.portraBlue
+}
+
 function isImageDelivery(record) {
   const text = `${record?.mimeType || ''} ${record?.contentType || ''} ${record?.fileName || ''}`.toLowerCase()
   return /image\//.test(text) || /\.(png|jpe?g|webp|gif|bmp)$/i.test(text)
@@ -231,6 +233,172 @@ function formatQuoteCount(quoteSnapshot) {
   const refinedCount = quoteSnapshot?.refinedCount
   if (originalCount === undefined && refinedCount === undefined) return '未填写'
   return `${originalCount ?? 0} / ${refinedCount ?? 0}`
+}
+
+function buildOrderMetaText(order, counterpartyLabel, locationLabel) {
+  const timeText = formatOrderTimeRange(order)
+  return [counterpartyLabel, timeText, locationLabel].filter(Boolean).join(' · ')
+}
+
+function buildOrderSummaryRows({ order, quoteSnapshot, deliveryText, estimatedAutoConfirmTime }) {
+  if (estimatedAutoConfirmTime) {
+    return [
+      {
+        label: '交付内容',
+        value: deliveryText || '按约定交付'
+      },
+      {
+        label: '照片用途',
+        value: formatPhotoUsageScope(quoteSnapshot?.photoUsageScope)
+      },
+      {
+        label: '结算状态',
+        value: formatEscrowStatus(order?.escrowStatus)
+      },
+      {
+        label: '自动确认',
+        value: formatShortDateTime(estimatedAutoConfirmTime)
+      }
+    ]
+  }
+
+  return [
+    {
+      label: '成片截止',
+      value: formatTime(order?.deliveryDeadline),
+      tone: isDeadlineClose(order?.deliveryDeadline) ? 'warning' : undefined
+    },
+    {
+      label: '交付内容',
+      value: deliveryText || '按约定交付'
+    },
+    {
+      label: '结算状态',
+      value: formatEscrowStatus(order?.escrowStatus)
+    },
+    {
+      label: '照片用途',
+      value: formatPhotoUsageScope(quoteSnapshot?.photoUsageScope)
+    }
+  ]
+}
+
+function formatDeliveryBatchContent(batch) {
+  if (!batch) return '等待上传'
+  const imageCount = Number(batch.imageCount || 0)
+  const zipCount = Number(batch.zipCount || 0)
+  const parts = []
+  if (imageCount) parts.push(`${imageCount} 张图片`)
+  if (zipCount) parts.push(`${zipCount} 个压缩包`)
+  return parts.length ? parts.join(' · ') : '已上传作品'
+}
+
+function getLatestDeliveryBatch(batches = []) {
+  return [...batches].sort((left, right) => {
+    const leftTime = left?.latestUploadTime ? new Date(left.latestUploadTime).getTime() : 0
+    const rightTime = right?.latestUploadTime ? new Date(right.latestUploadTime).getTime() : 0
+    return rightTime - leftTime
+  })[0] || null
+}
+
+function formatDeadlineDistance(value) {
+  const deadline = parseInputDate(value)
+  if (!deadline) return '未设置截止时间'
+  const diff = deadline.getTime() - Date.now()
+  if (diff <= 0) return '已到截止时间'
+  const hours = Math.floor(diff / (60 * 60 * 1000))
+  const days = Math.floor(hours / 24)
+  const remainHours = hours % 24
+  if (days > 0) return `${days} 天 ${remainHours} 小时`
+  if (hours > 0) return `${hours} 小时`
+  const minutes = Math.max(1, Math.floor(diff / (60 * 1000)))
+  return `${minutes} 分钟`
+}
+
+function formatShortDateTime(value) {
+  const date = parseInputDate(value)
+  if (!date) return '待同步'
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hour = String(date.getHours()).padStart(2, '0')
+  const minute = String(date.getMinutes()).padStart(2, '0')
+  return `${month}/${day} ${hour}:${minute}`
+}
+
+function isDeadlineClose(value) {
+  const deadline = parseInputDate(value)
+  if (!deadline) return false
+  return deadline.getTime() - Date.now() < 24 * 60 * 60 * 1000
+}
+
+function formatAuthorizationSummary(records = []) {
+  if (!records.length) return '暂无申请'
+  const latest = records[0]
+  const status = String(latest.status || latest.authorizationStatus || '').toUpperCase()
+  if (status === 'APPROVED' || status === 'GRANTED') return '已同意'
+  if (status === 'REJECTED') return '已拒绝'
+  return '待客户确认'
+}
+
+function buildOrderProgressItems({ order, statusLogs = [], deliveryRecords = [], currentUser }) {
+  const status = order?.status || ''
+  const hasDelivery = deliveryRecords.length > 0 || ['DELIVERED_PENDING_CONFIRM', 'REWORK_REQUIRED', 'COMPLETED'].includes(status)
+  const isCustomer = Number(order?.customerId) === Number(currentUser?.userId)
+  const completedStatuses = new Set(['COMPLETED'])
+  const refundedOrCancelled = ['CANCELLED', 'REFUNDED'].includes(status)
+  const steps = [
+    {
+      id: 'payment',
+      title: '支付成功',
+      complete: status !== 'PENDING_PAYMENT',
+      time: findStatusTime(statusLogs, ['PAID_PENDING_SHOOT', 'SHOOTING', 'PENDING_DELIVERY', 'DELIVERED_PENDING_CONFIRM', 'COMPLETED'])
+    },
+    {
+      id: 'shoot-start',
+      title: '拍摄开始',
+      complete: ['SHOOTING', 'PENDING_DELIVERY', 'DELIVERED_PENDING_CONFIRM', 'REWORK_REQUIRED', 'COMPLETED'].includes(status),
+      current: status === 'SHOOTING',
+      time: formatShortDateTime(order?.shootStartTime)
+    },
+    {
+      id: 'shoot-end',
+      title: '拍摄结束',
+      complete: ['PENDING_DELIVERY', 'DELIVERED_PENDING_CONFIRM', 'REWORK_REQUIRED', 'COMPLETED'].includes(status),
+      current: status === 'PENDING_DELIVERY',
+      time: formatShortDateTime(order?.shootEndTime)
+    },
+    {
+      id: 'delivery',
+      title: hasDelivery ? '摄影师上传作品' : '待上传作品',
+      complete: hasDelivery,
+      current: status === 'PENDING_DELIVERY',
+      time: hasDelivery ? findStatusTime(statusLogs, ['DELIVERED_PENDING_CONFIRM', 'REWORK_REQUIRED', 'COMPLETED']) : ''
+    },
+    {
+      id: 'confirm',
+      title: isCustomer ? '待你确认' : '待客户确认',
+      complete: completedStatuses.has(status),
+      current: status === 'DELIVERED_PENDING_CONFIRM',
+      time: completedStatuses.has(status) ? findStatusTime(statusLogs, ['COMPLETED']) : ''
+    },
+    {
+      id: 'complete',
+      title: refundedOrCancelled ? formatOrderStatus(status) : '订单完成',
+      complete: completedStatuses.has(status) || refundedOrCancelled,
+      current: completedStatuses.has(status) || refundedOrCancelled,
+      time: completedStatuses.has(status) || refundedOrCancelled ? findStatusTime(statusLogs, [status]) : ''
+    }
+  ]
+
+  return steps.map(step => ({
+    ...step,
+    state: step.current ? 'current' : step.complete ? 'complete' : 'upcoming'
+  }))
+}
+
+function findStatusTime(statusLogs = [], statuses = []) {
+  const match = statusLogs.find(log => statuses.includes(log.toStatus))
+  return match?.createdAt ? formatTime(match.createdAt) : ''
 }
 
 function isBeforeShootStart(order) {
@@ -310,6 +478,8 @@ export function OrdersPage() {
   const [statusLogs, setStatusLogs] = useState([])
   const [deliveryRecords, setDeliveryRecords] = useState([])
   const [reworkDialogOpen, setReworkDialogOpen] = useState(false)
+  const [deliveryUploadDialogOpen, setDeliveryUploadDialogOpen] = useState(false)
+  const [photoAuthorizationDialogOpen, setPhotoAuthorizationDialogOpen] = useState(false)
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
   const [previewDelivery, setPreviewDelivery] = useState(null)
   const [previewUrl, setPreviewUrl] = useState('')
@@ -321,7 +491,7 @@ export function OrdersPage() {
   const [arbitrations, setArbitrations] = useState([])
   const [showArbitrationForm, setShowArbitrationForm] = useState(false)
   const [sentInvitations, setSentInvitations] = useState([])
-  const [statusFilter, setStatusFilter] = useState('')
+  const statusFilter = ''
   const [pageLoading, setPageLoading] = useState(false)
   const feedback = usePortraFeedback()
   const orderDraftScope = `order:${selectedOrder?.orderId || focusOrderId || 'none'}`
@@ -499,6 +669,8 @@ export function OrdersPage() {
         reviewDraft.clearDraft()
         arbitrationDraft.clearDraft()
         setReworkDialogOpen(false)
+        setDeliveryUploadDialogOpen(false)
+        setPhotoAuthorizationDialogOpen(false)
         setShowReviewForm(false)
         setShowArbitrationForm(false)
       }
@@ -558,6 +730,7 @@ export function OrdersPage() {
     ), selectedOrder.status === 'REWORK_REQUIRED' ? '返修作品已发送给客户验收' : '交付作品已发送给客户验收')
     if (result) {
       deliveryDraft.clearDraft()
+      setDeliveryUploadDialogOpen(false)
       await loadOrders(selectedOrder.orderId, { preserveDrafts: true })
     }
     return Boolean(result)
@@ -664,6 +837,7 @@ export function OrdersPage() {
     }, currentUser), '展示授权申请已发送')
     if (result) {
       photoAuthorizationDraft.clearDraft()
+      setPhotoAuthorizationDialogOpen(false)
       setPhotoAuthorizations(await photoAuthorizationApi.listByOrder(selectedOrder.orderId, currentUser))
     }
   }
@@ -796,6 +970,8 @@ export function OrdersPage() {
     reviewDraft.clearDraft()
     arbitrationDraft.clearDraft()
     setReworkDialogOpen(false)
+    setDeliveryUploadDialogOpen(false)
+    setPhotoAuthorizationDialogOpen(false)
     setShowReviewForm(false)
     setShowArbitrationForm(false)
   }
@@ -809,6 +985,28 @@ export function OrdersPage() {
       message: '当前返修要求尚未提交，关闭后将丢弃已填写内容。确定关闭吗？'
     })
     if (confirmed) setReworkDialogOpen(false)
+  }
+
+  async function closeDeliveryUploadDialog() {
+    if (actionLoading) {
+      feedback.warning('作品正在提交，请稍候。')
+      return
+    }
+    const confirmed = await deliveryDraft.confirmDiscard(feedback, {
+      message: '当前交付作品尚未提交，关闭后将丢弃已选择的文件和填写内容。确定关闭吗？'
+    })
+    if (confirmed) setDeliveryUploadDialogOpen(false)
+  }
+
+  async function closePhotoAuthorizationDialog() {
+    if (actionLoading) {
+      feedback.warning('授权申请正在提交，请稍候。')
+      return
+    }
+    const confirmed = await photoAuthorizationDraft.confirmDiscard(feedback, {
+      message: '当前授权申请尚未提交，关闭后将丢弃已选择的图片和填写内容。确定关闭吗？'
+    })
+    if (confirmed) setPhotoAuthorizationDialogOpen(false)
   }
 
   async function toggleReviewForm() {
@@ -849,8 +1047,6 @@ export function OrdersPage() {
   const canRequestRework = selectedOrder && actionVisibility.canRequestRework
   const canRequestPhotoAuthorization = selectedOrder && actionVisibility.canRequestPhotoAuthorization
   const cancelAction = selectedOrder ? getCustomerCancelAction(selectedOrder, currentUser) : null
-  const showShootStartedCancelNotice = selectedOrder
-    && shouldShowShootStartedCancelNotice(selectedOrder, currentUser)
   const deliveryFileOptions = useMemo(() => {
     const map = new Map()
     flattenDeliveryFiles(deliveryRecords)
@@ -861,7 +1057,7 @@ export function OrdersPage() {
           map.set(fileId, {
             fileId,
             id: file.id || `authorization-${fileId}`,
-            fileName: formatFileDisplayName(file, `作品 ${fileId}`),
+            fileName: formatFileDisplayName(file, '交付图片'),
             mimeType: file.mimeType,
             fileType: file.fileType,
             fileSize: file.fileSize,
@@ -877,15 +1073,9 @@ export function OrdersPage() {
     [photoAuthorizationForm.fileIds]
   )
   const deliveryBatches = useMemo(() => buildDeliveryBatches(deliveryRecords, selectedOrder), [deliveryRecords, selectedOrder])
+  const latestDeliveryBatch = useMemo(() => getLatestDeliveryBatch(deliveryBatches), [deliveryBatches])
   const latestDeliveryUploadTime = useMemo(() => getLatestDeliveryUploadTime(deliveryRecords), [deliveryRecords])
   const estimatedAutoConfirmTime = latestDeliveryUploadTime ? addDays(latestDeliveryUploadTime, 7) : null
-  const fulfillmentNotice = selectedOrder
-    ? {
-        ...getOrderFulfillmentNotice(selectedOrder, statusLogs, deliveryRecords, latestDeliveryUploadTime, estimatedAutoConfirmTime),
-        title: selectedOrderWorkflow.title,
-        description: selectedOrderWorkflow.description
-      }
-    : null
   const canReviewSelectedOrder = selectedOrder?.status === 'COMPLETED' && isOrderParticipant(selectedOrder, currentUser.userId)
   const currentReviewDirection = selectedOrder ? getOrderReviewDirection(selectedOrder, currentUser.userId) : ''
   const myReview = orderReviews.find(review => Number(review.reviewerId) === currentUser.userId || review.direction === currentReviewDirection)
@@ -896,16 +1086,22 @@ export function OrdersPage() {
   const selectedOrderServiceContent = sanitizeSeedText(quoteSnapshot?.serviceContent || selectedOrder?.serviceContent, '校园约拍服务')
   const selectedOrderTitle = selectedOrder ? formatOrderTitle(selectedOrder, quoteSnapshot) : ''
   const selectedOrderConversationId = selectedOrder?.conversationId
+  const selectedOrderMetaText = selectedOrder ? buildOrderMetaText(selectedOrder, selectedCounterpartyLabel, selectedOrderLocation) : ''
+  const selectedOrderDeliveryText = quoteSnapshot ? formatQuoteCount(quoteSnapshot) : formatDeliveryBatchContent(latestDeliveryBatch)
+  const orderSummaryRows = selectedOrder ? buildOrderSummaryRows({
+    order: selectedOrder,
+    quoteSnapshot,
+    deliveryText: selectedOrderDeliveryText,
+    estimatedAutoConfirmTime
+  }) : []
+  const orderTimelineItems = selectedOrder ? buildOrderProgressItems({
+    order: selectedOrder,
+    statusLogs,
+    deliveryRecords,
+    currentUser
+  }) : []
   const canReturnToConversation = Boolean(explicitReturnToConversation)
   const canContactCounterparty = !canReturnToConversation && Boolean(selectedOrderConversationId)
-  const statusTimelineItems = statusLogs.map(log => ({
-    id: log.logId || `${log.orderId}-${log.createdAt}`,
-    title: formatStatusLogText(log),
-    description: `${log.fromStatus ? formatOrderStatus(log.fromStatus) : '创建'} → ${formatOrderStatus(log.toStatus)}`,
-    time: formatTime(log.createdAt),
-    tone: log.toStatus === 'APPEALING' || log.toStatus === 'REWORK_REQUIRED' ? 'danger' : 'primary'
-  }))
-
   useEffect(() => {
     if (!location.state?.openReview || !selectedOrder?.orderId || !canReviewSelectedOrder || myReview) return
     setShowReviewForm(true)
@@ -935,6 +1131,106 @@ export function OrdersPage() {
     if (!succeeded) feedback.warning('暂无可进入的沟通记录。')
   }
 
+  function renderCurrentTaskCard() {
+    if (!selectedOrder) return null
+
+    if (canAcceptDelivery) {
+      return (
+        <OrderCurrentTaskCard
+          icon="confirm"
+          title="作品已到达，请确认"
+          subtitle="摄影师已上传成片，查看后确认是否收片。"
+          chipLabel="待你操作"
+          chipTone="warning"
+          notice={estimatedAutoConfirmTime ? `逾期未操作，平台将于 ${formatTime(estimatedAutoConfirmTime)} 自动确认并结算给摄影师。` : ''}
+          primaryAction={{
+            label: '确认收片',
+            onClick: () => action && operateOrder(action),
+            disabled: loading || !action?.allowed
+          }}
+          secondaryAction={{
+            label: '有问题',
+            onClick: () => setReworkDialogOpen(true),
+            disabled: loading
+          }}
+        >
+          {latestDeliveryBatch ? (
+            <OrderDeliverySummaryCard
+              batch={latestDeliveryBatch}
+              label="作品已上传"
+              onOpen={() => openDeliveryBatch(latestDeliveryBatch)}
+              disabled={!latestDeliveryBatch.deliveryId || !selectedOrder?.orderId}
+            />
+          ) : null}
+        </OrderCurrentTaskCard>
+      )
+    }
+
+    if (canUploadDelivery) {
+      return (
+        <OrderCurrentTaskCard
+          icon="upload"
+          title={selectedOrder.status === 'REWORK_REQUIRED' ? '上传返修作品' : '上传作品'}
+          subtitle={selectedOrder.status === 'REWORK_REQUIRED' ? '客户提出了返修要求，请重新上传调整后的成片。' : '拍摄已结束，等待你上传成片。'}
+          chipLabel="待处理"
+          chipTone="warning"
+          deadlineLabel="距离截止还有"
+          deadlineValue={formatDeadlineDistance(selectedOrder.deliveryDeadline)}
+          primaryAction={{
+            label: selectedOrder.status === 'REWORK_REQUIRED' ? '上传返修作品' : '上传作品',
+            onClick: () => setDeliveryUploadDialogOpen(true),
+            disabled: loading
+          }}
+        />
+      )
+    }
+
+    if (action && canShowOrderNormalActions(selectedOrder)) {
+      return (
+        <OrderCurrentTaskCard
+          icon={action.kind === 'pay' ? 'warning' : 'idle'}
+          title={selectedOrderWorkflow.title || action.label}
+          subtitle={selectedOrderWorkflow.description}
+          chipLabel="待处理"
+          chipTone="warning"
+          primaryAction={{
+            label: action.label,
+            onClick: () => operateOrder(action),
+            disabled: loading || !action.allowed
+          }}
+          secondaryAction={cancelAction ? {
+            label: cancelAction.label,
+            onClick: () => cancelSelectedOrder(cancelAction),
+            disabled: loading
+          } : null}
+        />
+      )
+    }
+
+    return (
+      <OrderCurrentTaskCard
+        icon="idle"
+        title="暂无需要你处理的事项"
+        subtitle={selectedOrderWorkflow.description || '订单正在按流程推进，可以查看作品、授权、评价和进度记录。'}
+        chipLabel="已同步"
+        secondaryAction={cancelAction ? {
+          label: cancelAction.label,
+          onClick: () => cancelSelectedOrder(cancelAction),
+          disabled: loading
+        } : null}
+      >
+        {latestDeliveryBatch ? (
+          <OrderDeliverySummaryCard
+            batch={latestDeliveryBatch}
+            label="查看交付作品"
+            onOpen={() => openDeliveryBatch(latestDeliveryBatch)}
+            disabled={!latestDeliveryBatch.deliveryId || !selectedOrder?.orderId}
+          />
+        ) : null}
+      </OrderCurrentTaskCard>
+    )
+  }
+
   function returnToOrderList() {
     const target = buildOrderListTarget()
     setSelectedOrder(null)
@@ -947,49 +1243,45 @@ export function OrdersPage() {
   }
 
   return (
-    <PortraWorkflowFrame spacing={2.5} maxWidth="page" sx={orderPageSx}>
-      <OrdersSectionHeader title="订单" subtitle="查看订单进展、平台担保状态和每次状态流转。" />
-
+    <PortraWorkflowFrame spacing={0} maxWidth="page" sx={orderPageSx}>
       <Box data-order-workspace="true" sx={orderGridSx}>
         <Paper variant="outlined" sx={orderIndexPanelSx}>
-          <Stack spacing={2}>
+          <Stack spacing={1.6}>
             <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="h6" sx={{ fontWeight: 950 }}>订单索引</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 950, color: PORTRA_SURFACE.faint }}>我的订单</Typography>
               <Button size="small" startIcon={<RefreshRoundedIcon />} onClick={() => loadOrders()} disabled={loading}>
                 刷新
               </Button>
             </Stack>
-            <FormControl size="small" sx={filterControlSx}>
-              <InputLabel>状态</InputLabel>
-              <Select label="状态" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
-                <MenuItem value="">全部</MenuItem>
-                {Object.entries(orderStatusMap).map(([value, label]) => (
-                  <MenuItem key={value} value={value}>{label}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <Stack spacing={1.2}>
+            <Stack spacing={0.4} sx={{ mx: -1.6 }}>
               {loading && !orders.length && <OrderIndexSkeleton />}
               {orders.map(order => {
                 const orderQuoteSnapshot = parseQuoteSnapshot(order.quoteSnapshotJson)
+                const selected = selectedOrder?.orderId === order.orderId
                 return (
-                  <PortraTicketCard
+                  <Paper
                     key={order.orderId}
+                    variant="outlined"
                     onClick={() => openOrderWithDraftGuard(order)}
-                    selected={selectedOrder?.orderId === order.orderId}
-                    sx={orderIndexCardSx(selectedOrder?.orderId === order.orderId)}
+                    sx={orderIndexCardSx(selected)}
                   >
-                    <Stack spacing={0.55} sx={{ minHeight: 66, px: 1.5, py: 1.05, pl: 2.3, justifyContent: 'center' }}>
+                    <Stack spacing={0.65} sx={{ minHeight: 82, px: 2.2, py: 1.25, justifyContent: 'center' }}>
                       <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
-                        <Typography fontWeight={900} noWrap sx={{ minWidth: 0, color: PORTRA_SURFACE.ink, lineHeight: 1.3 }}>{formatOrderTitle(order, orderQuoteSnapshot)}</Typography>
-                        <PortraStatusBadge label={formatOrderStatus(order.status)} />
+                        <Typography fontWeight={950} noWrap sx={{ minWidth: 0, color: selected ? PORTRA_SURFACE.portraBlue : PORTRA_SURFACE.ink, lineHeight: 1.3 }}>
+                          {formatOrderTitle(order, orderQuoteSnapshot)}
+                        </Typography>
+                        <Typography sx={{ color: PORTRA_SURFACE.faint, fontSize: 13, flexShrink: 0 }}>
+                          {formatOrderIndexDate(order)}
+                        </Typography>
                       </Stack>
-                      <Typography sx={{ color: PORTRA_SURFACE.ink, fontWeight: 850 }}>{centToYuan(order.amountCent)} · {getCounterpartyLabel(order, currentUser)}</Typography>
-                      <Typography sx={{ color: PORTRA_SURFACE.faint, fontSize: 12.5 }} variant="body2">
-                        拍摄日期 {formatOrderIndexDate(order)}
-                      </Typography>
+                      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', minWidth: 0 }}>
+                        <Box sx={orderStatusDotSx(order.status)} />
+                        <Typography sx={{ color: PORTRA_SURFACE.muted, fontSize: 14 }} noWrap>
+                          {formatOrderStatus(order.status)}
+                        </Typography>
+                      </Stack>
                     </Stack>
-                  </PortraTicketCard>
+                  </Paper>
                 )
               })}
               {!loading && !orders.length && <PortraEmptyState title="暂无订单" description="当前还没有进入订单阶段的合作。" />}
@@ -1030,242 +1322,91 @@ export function OrdersPage() {
         ) : !selectedOrder ? (
           <EmptyOrderCard text="选择订单查看详情" />
         ) : (
-          <Stack spacing={2} sx={orderDetailWorkspaceSx}>
-            <OrderStatusHero
-              loading={Boolean(loading && selectedOrder)}
-              returnActions={(
-                <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center', flexWrap: 'wrap', mb: 0.8 }}>
-                  <PortraActionLink
-                    startIcon={<ArrowBackRoundedIcon />}
-                    onClick={canReturnToConversation ? returnToConversation : returnToOrderList}
-                    sx={returnLinkSx}
-                  >
-                    {canReturnToConversation ? PRODUCT_ACTION_COPY.returnConversation : PRODUCT_ACTION_COPY.returnOrderList}
-                  </PortraActionLink>
-                  {!canReturnToConversation && canContactCounterparty && (
-                    <PortraActionLink onClick={continueConversation} sx={returnLinkSx}>
-                      {PRODUCT_ACTION_COPY.goConversation}
-                    </PortraActionLink>
-                  )}
-                </Stack>
+          <Stack spacing={2.6} sx={orderDetailWorkspaceSx}>
+            <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+              <PortraActionLink
+                startIcon={<ArrowBackRoundedIcon />}
+                onClick={canReturnToConversation ? returnToConversation : returnToOrderList}
+                sx={returnLinkSx}
+              >
+                {canReturnToConversation ? PRODUCT_ACTION_COPY.returnConversation : PRODUCT_ACTION_COPY.returnOrderList}
+              </PortraActionLink>
+              {!canReturnToConversation && canContactCounterparty && (
+                <PortraActionLink onClick={continueConversation} sx={returnLinkSx}>
+                  {PRODUCT_ACTION_COPY.goConversation}
+                </PortraActionLink>
               )}
+            </Stack>
+
+            <OrderSummaryCard
               title={selectedOrderTitle}
-              subtitle={`订单 · ${selectedCounterpartyLabel}`}
               amountText={centToYuan(selectedOrder.amountCent)}
-              perspectiveLabel={selectedOrderPerspective}
-              workflow={selectedOrderWorkflow}
-              statusLabel={formatOrderStatus(selectedOrder.status)}
-              escrowLabel={formatEscrowStatus(selectedOrder.escrowStatus)}
-              fulfillmentNotice={fulfillmentNotice}
-              overviewRows={[
-                ['当前身份', selectedOrderPerspective || '未确认'],
-                ['对方', selectedCounterpartyLabel],
-                ['结算/退款', getSettlementRefundLabel(selectedOrder)]
-              ]}
-              scheduleRows={[
-                ['拍摄时间', formatOrderTimeRange(selectedOrder)],
-                ['拍摄地点', selectedOrderLocation],
-                ['成片截止', formatTime(selectedOrder.deliveryDeadline)]
-              ]}
-              quoteRows={quoteSnapshot ? [
-                ['服务内容', selectedOrderServiceContent],
-                ['原片/精修', formatQuoteCount(quoteSnapshot)],
-                ['照片用途', formatPhotoUsageScope(quoteSnapshot.photoUsageScope)]
-              ] : []}
-              primaryAction={action && canShowOrderNormalActions(selectedOrder) ? (
-                <PortraActionButton
-                  startIcon={action.icon}
-                  onClick={() => operateOrder(action)}
-                  disabled={loading || !action.allowed}
-                  sx={{ width: { xs: '100%', sm: 'auto' } }}
-                >
-                  {action.label}
-                </PortraActionButton>
-              ) : null}
-              cancelNotice={cancelAction ? (
-                <Paper variant="outlined" sx={warmNoticeSx}>
-                  <Stack spacing={1}>
-                    <Typography fontWeight={900}>{cancelAction.title}</Typography>
-                    <Typography sx={{ color: PORTRA_SURFACE.muted }} variant="body2">{cancelAction.description}</Typography>
-                    <Button
-                      variant="outlined"
-                      color="error"
-                      startIcon={<CloseRoundedIcon />}
-                      onClick={() => cancelSelectedOrder(cancelAction)}
-                      disabled={loading}
-                      sx={{ alignSelf: 'flex-start' }}
-                    >
-                      {cancelAction.label}
-                    </Button>
-                  </Stack>
-                </Paper>
-              ) : null}
-              shootStartedNotice={showShootStartedCancelNotice}
+              metaText={selectedOrderMetaText}
+              badgeText={selectedOrderPerspective}
+              rows={orderSummaryRows}
             />
 
-            <OrderSectionCard
-              title="交付作品"
-              description="摄影师通过上传成片推进验收；客户可在这里预览、下载、确认收片或提交返修。"
-              trailing={canUploadDelivery ? (
-                <Chip color="secondary" label={selectedOrder.status === 'REWORK_REQUIRED' ? '可上传返修作品' : '可上传作品'} />
-              ) : null}
-            >
-              <Stack spacing={2}>
+            {renderCurrentTaskCard()}
 
-                {canUploadDelivery && (
-                  <Paper variant="outlined" sx={subCardSx}>
-                    <DeliveryUploadPanel
-                      compact
-                      mode={selectedOrder.status === 'REWORK_REQUIRED' ? 'rework' : 'upload'}
-                      value={deliveryForm}
-                      loading={loading}
-                      onChange={setDeliveryForm}
-                      onSubmit={submitDelivery}
-                    />
-                  </Paper>
-                )}
-
-                {(canAcceptDelivery || canRequestRework) && (
-                  <PortraInfoBanner tone="warning" title="请处理作品">
-                    {canAcceptDelivery && (
-                      <Typography variant="body2" sx={{ mt: 0.6, color: PORTRA_SURFACE.muted }}>
-                        确认收片是当前主操作，可在顶部状态区完成；如需要修改，请提交返修要求。
-                      </Typography>
-                    )}
-                    <Stack direction="row" spacing={1} sx={{ mt: 0.8, flexWrap: 'wrap' }}>
-                      {canRequestRework && (
-                        <PortraActionButton tone="secondary" startIcon={<RefreshRoundedIcon />} onClick={() => setReworkDialogOpen(true)} disabled={loading}>
-                          提交返修要求
-                        </PortraActionButton>
-                      )}
-                    </Stack>
-                  </PortraInfoBanner>
-                )}
-
-                <Stack spacing={1}>
-                  <Typography variant="overline" sx={overlineSx}>作品记录</Typography>
-                  {deliveryBatches.map(batch => (
-                    <Paper key={batch.id} variant="outlined" sx={{ ...subCardSx, p: 1.15 }}>
-                      <Stack spacing={1.1}>
-                        <DeliveryBatchCard
-                          batch={batch}
-                          variant="orderSection"
-                          chrome="none"
-                          onOpen={() => openDeliveryBatch(batch)}
-                          disabled={!batch.deliveryId || !selectedOrder?.orderId}
-                        />
-                        {batch.files?.length ? (
-                          <DeliveryFileGrid
-                            files={batch.files.slice(0, 6)}
-                            mode="browse"
-                            compact
-                            onPreview={openDeliveryPreview}
-                            onDownload={downloadDeliveryFile}
-                          />
-                        ) : null}
-                        {batch.files?.length > 6 && (
-                          <Button size="small" variant="text" onClick={() => openDeliveryBatch(batch)}>
-                            查看全部 {batch.files.length} 个文件
-                          </Button>
-                        )}
-                      </Stack>
-                    </Paper>
-                  ))}
-                  {!deliveryBatches.length && <PortraEmptyState title="暂无作品记录" compact />}
-                </Stack>
-              </Stack>
-            </OrderSectionCard>
+            <OrderTimelineCard items={orderTimelineItems} />
 
             <OrderSectionCard
               title="展示授权"
-              description="客户同意后，摄影师才能把本订单图片作品作为真实客片展示。"
-              trailing={selectedOrder.status === 'COMPLETED' ? <Chip color="success" label="订单已完成，可处理授权" /> : null}
-            >
-              <Stack spacing={2}>
-
-                {canRequestPhotoAuthorization && (
-                  <Paper component="form" variant="outlined" onSubmit={submitPhotoAuthorizationRequest} sx={subCardSx}>
-                    <Stack spacing={1.5}>
-                      <Typography fontWeight={800}>发起展示授权申请</Typography>
-                      {deliveryFileOptions.length ? (
-                        <>
-                          <PortraInfoBanner>仅可选择图片作品用于展示授权，压缩包不会用于公开展示。</PortraInfoBanner>
-                          <Typography variant="body2" sx={{ color: PORTRA_SURFACE.muted, fontWeight: 800 }}>
-                            已选择 {selectedPhotoAuthorizationFileIds.size} 张
-                          </Typography>
-                          <DeliveryFileGrid
-                            files={deliveryFileOptions}
-                            mode="select"
-                            compact
-                            selectedFileIds={selectedPhotoAuthorizationFileIds}
-                            onToggleSelect={togglePhotoAuthorizationFile}
-                          />
-                          <TextField
-                            label="申请说明"
-                            value={photoAuthorizationForm.remark}
-                            onChange={event => setPhotoAuthorizationForm({ ...photoAuthorizationForm, remark: event.target.value })}
-                            multiline
-                            minRows={2}
-                            placeholder="说明希望展示这些照片的用途，例如作品集客片展示"
-                          />
-                          <PortraActionButton
-                            type="submit"
-                            startIcon={<ImageRoundedIcon />}
-                            disabled={loading || !photoAuthorizationForm.fileIds.length}
-                          >
-                            发送授权申请
-                          </PortraActionButton>
-                        </>
-                      ) : (
-                        <PortraInfoBanner>暂无可授权作品，请先上传作品。</PortraInfoBanner>
-                      )}
-                    </Stack>
-                  </Paper>
-                )}
-
-                <Stack spacing={1}>
-                  <Typography variant="overline" sx={overlineSx}>授权申请记录</Typography>
-                  {photoAuthorizations.map(authorization => (
-                    <AuthorizationRequestCard
-                      key={authorization.id || authorization.authorizationId}
-                      authorization={authorization}
-                      order={selectedOrder}
-                      chrome="none"
-                      canReview={canCustomerReviewPhotoAuthorization(selectedOrder, currentUser, authorization)}
-                      loading={loading}
-                      onDecision={handlePhotoAuthorizationDecision}
-                      onOpenDelivery={openDeliveryBatch}
-                    />
-                  ))}
-                  {!photoAuthorizations.length && <PortraEmptyState title="暂无照片授权申请" compact />}
+              description="客户同意后，摄影师才能将本订单作品作为客片展示。"
+              trailing={(
+                <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+                  <Chip size="small" label={formatAuthorizationSummary(photoAuthorizations)} />
+                  {canRequestPhotoAuthorization && (
+                    <Button variant="outlined" size="small" startIcon={<ImageRoundedIcon />} onClick={() => setPhotoAuthorizationDialogOpen(true)}>
+                      申请展示授权
+                    </Button>
+                  )}
                 </Stack>
+              )}
+            >
+              <Stack spacing={1}>
+                {photoAuthorizations.map(authorization => (
+                  <AuthorizationRequestCard
+                    key={authorization.id || authorization.authorizationId}
+                    authorization={authorization}
+                    order={selectedOrder}
+                    chrome="none"
+                    canReview={canCustomerReviewPhotoAuthorization(selectedOrder, currentUser, authorization)}
+                    loading={loading}
+                    onDecision={handlePhotoAuthorizationDecision}
+                    onOpenDelivery={openDeliveryBatch}
+                  />
+                ))}
+                {!photoAuthorizations.length && <PortraEmptyState title="暂无授权申请" compact />}
               </Stack>
             </OrderSectionCard>
 
             <OrderSectionCard
               title="评价与投诉"
-              description="订单完成后双方都可以评价；收到对方评价后，可对不实评价发起投诉。"
+              description="订单完成后可评价本次合作；收到对方评价后，可对不实评价发起投诉。"
               trailing={(
-                  <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                    {canReviewSelectedOrder && !myReview && (
-                      <Button
-                        variant={showReviewForm ? 'contained' : 'outlined'}
-                        startIcon={<RateReviewRoundedIcon />}
-                        onClick={toggleReviewForm}
-                      >
-                        评价
-                      </Button>
-                    )}
+                <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+                  {canReviewSelectedOrder && !myReview && (
                     <Button
-                      variant={showArbitrationForm ? 'contained' : 'outlined'}
-                      color="inherit"
-                      startIcon={<GavelRoundedIcon />}
-                      onClick={toggleArbitrationForm}
-                      disabled={!reviewToComplain}
+                      variant={showReviewForm ? 'contained' : 'outlined'}
+                      size="small"
+                      startIcon={<RateReviewRoundedIcon />}
+                      onClick={toggleReviewForm}
                     >
-                      投诉评价
+                      评价
                     </Button>
-                  </Stack>
+                  )}
+                  <Button
+                    variant={showArbitrationForm ? 'contained' : 'outlined'}
+                    size="small"
+                    color="inherit"
+                    startIcon={<GavelRoundedIcon />}
+                    onClick={toggleArbitrationForm}
+                    disabled={!reviewToComplain}
+                  >
+                    投诉评价
+                  </Button>
+                </Stack>
               )}
             >
               <Stack spacing={2}>
@@ -1354,14 +1495,6 @@ export function OrdersPage() {
                 )}
               </Stack>
             </OrderSectionCard>
-
-            <OrderSectionCard title="历史记录" description="订单状态变化、系统自动推进和双方操作记录都会保留在这里。">
-              <Stack spacing={2}>
-                <PortraTicketSection title="状态日志">
-                  <PortraTimeline items={statusTimelineItems} emptyText="暂无状态日志" />
-                </PortraTicketSection>
-              </Stack>
-            </OrderSectionCard>
           </Stack>
         )}
       </Box>
@@ -1408,6 +1541,66 @@ export function OrdersPage() {
         reviewDisabled={!canReviewSelectedOrder || Boolean(myReview)}
       />
 
+      <Dialog open={deliveryUploadDialogOpen} onClose={closeDeliveryUploadDialog} fullWidth maxWidth="md">
+        <DialogTitle>{selectedOrder?.status === 'REWORK_REQUIRED' ? '上传返修作品' : '上传作品'}</DialogTitle>
+        <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
+          <DeliveryUploadPanel
+            mode={selectedOrder?.status === 'REWORK_REQUIRED' ? 'rework' : 'upload'}
+            value={deliveryForm}
+            loading={loading}
+            onChange={setDeliveryForm}
+            onSubmit={submitDelivery}
+          />
+        </DialogContent>
+        <DialogActions sx={{ bgcolor: PORTRA_SURFACE.paperMuted }}>
+          <Button color="inherit" onClick={closeDeliveryUploadDialog}>取消</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={photoAuthorizationDialogOpen} onClose={closePhotoAuthorizationDialog} fullWidth maxWidth="md">
+        <DialogTitle>申请展示授权</DialogTitle>
+        <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
+          <Stack component="form" id="order-photo-authorization-form" spacing={1.5} onSubmit={submitPhotoAuthorizationRequest}>
+            <PortraInfoBanner>仅可选择图片作品用于展示授权，压缩包不会用于公开展示。</PortraInfoBanner>
+            {deliveryFileOptions.length ? (
+              <>
+                <Typography variant="body2" sx={{ color: PORTRA_SURFACE.muted, fontWeight: 850 }}>
+                  已选择 {selectedPhotoAuthorizationFileIds.size} 张
+                </Typography>
+                <DeliveryFileGrid
+                  files={deliveryFileOptions}
+                  mode="select"
+                  selectedFileIds={selectedPhotoAuthorizationFileIds}
+                  onToggleSelect={togglePhotoAuthorizationFile}
+                />
+                <TextField
+                  label="申请说明"
+                  value={photoAuthorizationForm.remark}
+                  onChange={event => setPhotoAuthorizationForm({ ...photoAuthorizationForm, remark: event.target.value })}
+                  multiline
+                  minRows={3}
+                  placeholder="说明希望展示这些照片的用途，例如作品集客片展示"
+                />
+              </>
+            ) : (
+              <PortraInfoBanner>暂无可授权的图片作品，请先上传图片交付文件。</PortraInfoBanner>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ bgcolor: PORTRA_SURFACE.paperMuted }}>
+          <Button color="inherit" onClick={closePhotoAuthorizationDialog}>取消</Button>
+          <Button
+            type="submit"
+            form="order-photo-authorization-form"
+            variant="contained"
+            startIcon={<ImageRoundedIcon />}
+            disabled={loading || !photoAuthorizationForm.fileIds.length}
+          >
+            发送申请
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={reworkDialogOpen} onClose={closeReworkDialog} fullWidth maxWidth="sm">
         <DialogTitle>提交返修要求</DialogTitle>
         <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
@@ -1438,7 +1631,10 @@ export function OrdersPage() {
 const orderPageSx = {
   color: PORTRA_SURFACE.ink,
   overflowWrap: 'anywhere',
-  overflowX: 'hidden'
+  overflowX: 'hidden',
+  bgcolor: '#f3f6fb',
+  minHeight: 'calc(100dvh - 88px)',
+  borderRadius: { xs: 0, md: '0' }
 }
 
 const orderGridSx = {
@@ -1446,29 +1642,34 @@ const orderGridSx = {
   width: '100%',
   gridTemplateColumns: {
     xs: 'minmax(0, 1fr)',
-    lg: `${PORTRA_LAYOUT.orderSidebarWidth.lg} minmax(0, 1fr)`,
-    xl: `${PORTRA_LAYOUT.orderSidebarWidth.xl} minmax(0, 1fr)`
+    lg: '300px minmax(0, 1fr)',
+    xl: '300px minmax(0, 1fr)'
   },
-  gap: { xs: 1.6, lg: 2.75 },
+  gap: { xs: 1.6, lg: 0 },
   alignItems: 'start',
   minWidth: 0,
   overflowX: 'hidden'
 }
 
 const orderIndexPanelSx = {
-  p: { xs: 1.6, md: 1.8 },
+  p: { xs: 1.6, md: 2 },
   alignSelf: 'start',
   minWidth: 0,
-  bgcolor: PORTRA_SURFACE.paper,
-  borderColor: PORTRA_SURFACE.borderSubtle,
-  borderRadius: PORTRA_RADIUS.panel,
-  boxShadow: PORTRA_SHADOW.soft
+  minHeight: { lg: 'calc(100dvh - 88px)' },
+  bgcolor: '#fff',
+  borderColor: 'transparent',
+  borderRight: { lg: '1px solid rgba(133, 148, 173, .18)' },
+  borderRadius: 0,
+  boxShadow: 'none'
 }
 
 const orderDetailWorkspaceSx = {
   minWidth: 0,
   width: '100%',
-  maxWidth: '100%',
+  maxWidth: 860,
+  mx: 'auto',
+  px: { xs: 1.2, md: 4 },
+  py: { xs: 1.8, md: 4 },
   overflowWrap: 'anywhere'
 }
 
@@ -1506,26 +1707,17 @@ function OrderDetailSkeleton() {
   )
 }
 
-const filterControlSx = {
-  '& .MuiOutlinedInput-root': {
-    bgcolor: PORTRA_SURFACE.paperSoft,
-    borderRadius: PORTRA_RADIUS.control
-  }
-}
-
 function orderIndexCardSx(selected) {
   return {
     cursor: 'pointer',
-    bgcolor: selected ? PORTRA_SURFACE.portraBlueSoft : PORTRA_SURFACE.paper,
-    borderColor: selected ? PORTRA_SURFACE.portraBlue : PORTRA_SURFACE.borderSoft,
-    borderRadius: PORTRA_RADIUS.card,
+    bgcolor: selected ? '#eaf2ff' : '#fff',
+    borderColor: 'transparent',
+    borderRadius: 0,
     borderLeft: `4px solid ${selected ? PORTRA_SURFACE.portraBlue : 'transparent'}`,
-    boxShadow: selected ? '0 14px 32px rgba(13, 47, 178, 0.12)' : 'none',
-    transition: 'border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease',
+    boxShadow: 'none',
+    transition: 'background-color 140ms ease, border-color 140ms ease',
     '&:hover': {
-      borderColor: PORTRA_SURFACE.portraBlue,
-      transform: 'translateY(-1px)',
-      boxShadow: '0 12px 26px rgba(25, 30, 45, 0.08)'
+      bgcolor: selected ? '#eaf2ff' : '#f6f8fc'
     }
   }
 }
@@ -1568,12 +1760,6 @@ const overlineSx = {
   color: PORTRA_SURFACE.faint,
   fontWeight: 950,
   letterSpacing: 0
-}
-
-const statusChipSx = {
-  borderRadius: PORTRA_RADIUS.compact,
-  fontWeight: 800,
-  '& .MuiChip-label': { px: 1 }
 }
 
 const returnLinkSx = {
