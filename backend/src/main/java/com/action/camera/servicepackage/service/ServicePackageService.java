@@ -42,7 +42,6 @@ import java.util.Map;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -164,9 +163,7 @@ public class ServicePackageService {
         String normalizedSort = normalizeServiceSort(sort);
 
         List<ServicePackage> packages = servicePackageRepository.findByStatus(ServicePackageStatus.ONLINE);
-        Map<Long, PhotographerInfo> photographerInfos = photographerInfos(packages);
-
-        List<ServicePackage> candidates = packages.stream()
+        List<ServicePackage> baseCandidates = packages.stream()
                 .filter(servicePackage -> servicePackage.getStatus() == ServicePackageStatus.ONLINE)
                 .filter(servicePackage -> !Boolean.TRUE.equals(servicePackage.getHiddenByProvider()))
                 .filter(servicePackage -> normalizedCity == null
@@ -180,14 +177,18 @@ public class ServicePackageService {
                 .filter(servicePackage -> matchesPrice(servicePackage, minPriceCent, maxPriceCent))
                 .filter(servicePackage -> availableDate == null
                         || servicePackage.getAvailableDates().contains(availableDate))
-                .filter(servicePackage -> matchesServiceKeyword(
-                        servicePackage,
-                        photographerInfos.get(servicePackage.getProviderId()),
-                        keyword))
                 .filter(servicePackage -> !"recommend".equals(normalizedSort)
                         || currentUser == null
                         || !currentUser.isProvider()
                         || !Objects.equals(servicePackage.getProviderId(), currentUser.getUserId()))
+                .toList();
+        Map<Long, PhotographerInfo> photographerInfos = photographerInfos(baseCandidates);
+
+        List<ServicePackage> candidates = baseCandidates.stream()
+                .filter(servicePackage -> matchesServiceKeyword(
+                        servicePackage,
+                        photographerInfos.get(servicePackage.getProviderId()),
+                        keyword))
                 .toList();
         CustomerPreference preference = serviceRecommendationPreference(
                 currentUser, normalizedCity, normalizedStyle, minPriceCent, maxPriceCent, normalizedTimeTag);
@@ -335,10 +336,31 @@ public class ServicePackageService {
         int safePage = Math.max(page, 1);
         int safeSize = Math.max(1, Math.min(size, MAX_PAGE_SIZE));
         String normalizedTimeTag = normalizeTimeTagFilter(timeTag);
-        List<ServicePackage> packages = interestRepository.findByUserIdOrderByCreatedAtDesc(currentUser.getUserId())
+        List<Long> serviceIds = interestRepository.findByUserIdOrderByCreatedAtDesc(currentUser.getUserId())
                 .stream()
-                .map(interest -> servicePackageRepository.findById(interest.getServicePackageId()))
-                .flatMap(Optional::stream)
+                .map(ServicePackageInterest::getServicePackageId)
+                .filter(Objects::nonNull)
+                .toList();
+        Map<Long, ServicePackage> packageById = servicePackageRepository.findAllById(serviceIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        ServicePackage::getId,
+                        servicePackage -> servicePackage,
+                        (left, right) -> left
+                ));
+        if (packageById.isEmpty() && !serviceIds.isEmpty()) {
+            packageById = serviceIds.stream()
+                    .map(serviceId -> servicePackageRepository.findById(serviceId).orElse(null))
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toMap(
+                            ServicePackage::getId,
+                            servicePackage -> servicePackage,
+                            (left, right) -> left
+                    ));
+        }
+        List<ServicePackage> packages = serviceIds.stream()
+                .map(packageById::get)
+                .filter(Objects::nonNull)
                 .filter(servicePackage -> normalizedTimeTag == null
                         || servicePackage.getTimeTags().contains(normalizedTimeTag))
                 .toList();
