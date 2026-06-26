@@ -18,7 +18,7 @@ import { getSafeDisplayText, PORTRA_COLORS, QUOTE_VISUAL } from '../MessageVisua
 import { EventAttachmentCard } from './EventAttachmentCard.jsx'
 import { MessageActorAvatar } from './MessageActorAvatar.jsx'
 import { QuoteMoneyText } from './QuoteMoneyText.jsx'
-import { DeliveryBatchCard } from '../../deliveries/components/DeliveryBatchCard.jsx'
+import { DeliverySummaryCard } from '../../deliveries/components/DeliverySummaryCard.jsx'
 import { buildDeliveryBatches } from '../../deliveries/deliveryDisplay.js'
 
 export function ConversationSystemItem({
@@ -116,6 +116,18 @@ export function ConversationSystemItem({
     )
   }
 
+  if (event.type === 'DELIVERY' && delivery) {
+    return (
+      <DeliveryEventCard
+        event={event}
+        actor={actor || event.actor}
+        direction={direction}
+        actions={actionButtons}
+        onOpenDeliveryGallery={onOpenDeliveryGallery}
+      />
+    )
+  }
+
   return (
     <Box id={event.type === 'AUTHORIZATION' ? 'conversation-authorization-action' : undefined}>
       <EventAttachmentCard
@@ -128,12 +140,6 @@ export function ConversationSystemItem({
         actions={actionButtons}
       >
         {event.type === 'ORDER_CREATED' && eventMeta.order && <OrderMeta order={eventMeta.order} />}
-        {event.type === 'DELIVERY' && delivery && (
-          <DeliveryMeta
-            event={event}
-            onOpenDeliveryGallery={onOpenDeliveryGallery}
-          />
-        )}
         {authorization && (
           <AuthorizationRequestCard
             authorization={authorization}
@@ -366,23 +372,46 @@ function OrderMeta({ order }) {
   return <Typography variant="body2" sx={attachmentMetaSx}>{centToYuan(order.amountCent)} · {formatTime(order.shootStartTime)}</Typography>
 }
 
-function DeliveryMeta({ event, onOpenDeliveryGallery }) {
+function DeliveryEventCard({ event, actor, direction, actions, onOpenDeliveryGallery }) {
   const delivery = event?.meta?.delivery
   if (!delivery) return null
   const batch = buildDeliveryBatches([delivery], event?.meta?.order)[0]
+  const self = (direction || event.side) === 'self'
   return (
-    <Stack spacing={0.4} sx={attachmentMetaSx}>
-      <DeliveryBatchCard
-        batch={{
-          ...batch,
-          fileCount: event.meta?.deliveryCount || batch.fileCount
+    <Box sx={{ display: 'flex', justifyContent: self ? 'flex-end' : 'flex-start' }}>
+      <Stack
+        direction="row"
+        spacing={1.05}
+        sx={{
+          alignItems: 'flex-start',
+          maxWidth: { xs: '100%', md: 'min(78%, 560px)' },
+          flexDirection: self ? 'row-reverse' : 'row'
         }}
-        variant="message"
-        chrome="none"
-        onOpen={() => onOpenDeliveryGallery?.(delivery)}
-        disabled={!batch?.orderId || !batch?.deliveryId}
-      />
-    </Stack>
+      >
+        <MessageActorAvatar
+          actor={actor || event.actor}
+          dataKind="event"
+          accent={PORTRA_COLORS.blue}
+          fallbackText={self ? '我' : '对'}
+          sx={{ mt: 0.25, fontWeight: 950 }}
+        />
+        <Stack spacing={0.85} sx={{ alignItems: self ? 'flex-end' : 'flex-start', minWidth: 0 }}>
+          <DeliverySummaryCard
+            batch={{
+              ...batch,
+              fileCount: event.meta?.deliveryCount || batch.fileCount
+            }}
+            variant="conversation"
+            label="作品已上传"
+            timeLabel={formatTime(event.timestamp || batch?.latestUploadTime)}
+            statusLabel={batch?.statusLabel || '待客户确认'}
+            onOpen={() => onOpenDeliveryGallery?.(delivery)}
+            disabled={!batch?.orderId || !batch?.deliveryId}
+          />
+          {actions}
+        </Stack>
+      </Stack>
+    </Box>
   )
 }
 

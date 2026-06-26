@@ -10,9 +10,10 @@ export function DeliveryThumbnailStrip({ files = [], previewUrls = {}, variant =
   const { currentUser } = useAuth()
   const visible = files.slice(0, 4)
   const extraCount = Math.max(0, files.length - visible.length)
+  const summary = variant === 'orderSummary'
   const compact = variant === 'message' || variant === 'sidePanel'
   const gallery = variant === 'gallery'
-  const height = getStripHeight(visible.length, compact, gallery)
+  const height = getStripHeight(visible.length, compact, gallery, summary)
   const shouldLoadPreviews = !previewUrls || !Object.keys(previewUrls).length
   const loadedPreviews = useDeliveryFilePreviews(visible, currentUser, { enabled: shouldLoadPreviews })
 
@@ -21,7 +22,7 @@ export function DeliveryThumbnailStrip({ files = [], previewUrls = {}, variant =
       sx={{
         display: 'grid',
         gridTemplateColumns: getGridColumns(visible.length, compact),
-        gridAutoRows: getGridAutoRows(visible.length, compact, gallery),
+        gridAutoRows: getGridAutoRows(visible.length, compact, gallery, summary),
         gap: 0.6,
         height,
         minHeight: 0,
@@ -118,7 +119,8 @@ function ThumbnailPlaceholder({ label }) {
   )
 }
 
-function getStripHeight(count, compact, gallery) {
+function getStripHeight(count, compact, gallery, summary) {
+  if (summary) return 82
   if (gallery) return count <= 1 ? 260 : 276
   if (count <= 1) return compact ? 180 : 220
   return compact ? 184 : 228
@@ -130,7 +132,8 @@ function getGridColumns(count, compact) {
   return 'repeat(2, minmax(0, 1fr))'
 }
 
-function getGridAutoRows(count, compact, gallery) {
+function getGridAutoRows(count, compact, gallery, summary) {
+  if (summary) return count <= 1 ? 82 : 38
   if (count <= 1) return '1fr'
   if (gallery) return 132
   return compact ? 90 : 108

@@ -1117,7 +1117,7 @@ export function OrdersPage() {
       source: explicitReturnToConversation ? WORKFLOW_SOURCES.conversation : WORKFLOW_SOURCES.order
     })
     if (!succeeded) {
-      feedback.warning('作品记录暂不可查看，请刷新后重试。')
+      feedback.warning('作品暂不可查看，请刷新后重试。')
     }
   }
 
