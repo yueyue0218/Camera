@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -38,11 +39,12 @@ public class CreditController {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
         List<CreditRecord> records = creditService.getCreditHistory(user.getId());
         CreditSnapshotService.CreditSnapshot snapshot = creditSnapshotService.getSnapshot(user.getId());
+        BigDecimal currentScore = user.getCreditScore();
 
         return Result.success(new CreditSummaryResponse(
                 user.getId(),
-                snapshot.creditScore(),
-                creditSnapshotService.resolveCreditLevel(snapshot),
+                currentScore,
+                creditSnapshotService.resolveCreditLevel(currentScore, snapshot.effectiveOrderCount(), snapshot.receivedReviewCount()),
                 (long) records.size(),
                 records.isEmpty() ? null : records.get(0).getCreatedAt(),
                 snapshot.effectiveOrderCount(),

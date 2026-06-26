@@ -5,6 +5,8 @@ import {
   creditApi, demandApi, fileApi, momentApi, orderApi, reviewApi, userApi, conversationApi
 } from '../../api.js'
 import { servicePackageApi } from '../../api/servicePackageApi.js'
+import { ReviewStarsDisplay } from '../../components/reviews/ReviewStarsDisplay.jsx'
+import { buildOrderNavigationTarget } from '../../utils/orderNavigation.js'
 import {
   formatShortTime, formatTime,
   getLocalReviewsByTarget, getOrderSnapshotsForUser,
@@ -417,7 +419,7 @@ export function ProfilePage() {
   const billableOrders = profileOrders.filter(o => o.status !== 'REFUNDED').length
   const completionRate = billableOrders > 0 ? Math.round((historicalOrders / billableOrders) * 100) : null
   const genderText = currentUser.gender === 'MALE' ? '男' : currentUser.gender === 'FEMALE' ? '女' : '保密'
-  const displayName = profileForm.nickname || currentUser.label || `用户${currentUser.userId}`
+  const displayName = profileForm.nickname || currentUser.label || currentUser.username || 'Portra 用户'
   const schoolPin = currentUser.school || 'Portra'
 
   const momentsByMonth = useMemo(() => {
@@ -446,13 +448,12 @@ export function ProfilePage() {
   }
 
   function openReviewCard(review) {
-    const reviewId = review?.reviewId
-    if (reviewId != null && !String(reviewId).startsWith('local')) {
-      navigate(`/reviews/${reviewId}`)
-      return
-    }
     if (review?.orderId) {
-      navigate(`/orders?orderId=${review.orderId}`)
+      const target = buildOrderNavigationTarget(review.orderId, { section: 'reviews' })
+      if (target) {
+        navigate(target.to, { state: target.state })
+        return
+      }
       return
     }
     navigate('/reviews')
@@ -813,6 +814,53 @@ export function ProfilePage() {
                 </div>
               </div>
             </section>
+            <section className="panel-card">
+              <div className="section-head" style={{ marginBottom: 14 }}>
+                <div>
+                  <h2 style={{ fontSize: 18 }}>历史评价预览</h2>
+                  <p>最近收到的评价会先显示在这里。</p>
+                </div>
+                <button className="archive-all" type="button" onClick={() => navigate('/reviews')}>
+                  查看全部 →
+                </button>
+              </div>
+              {receivedReviews.length ? (
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {receivedReviews.slice(0, 2).map(review => (
+                    <button
+                      key={review.reviewId || `${review.orderId}-${review.createdAt}`}
+                      type="button"
+                      onClick={() => openReviewCard(review)}
+                      style={{
+                        textAlign: 'left',
+                        border: '1px solid rgba(13,47,178,.12)',
+                        borderRadius: 18,
+                        padding: '14px 15px',
+                        background: '#fffdf8',
+                        boxShadow: '0 10px 22px rgba(25,30,45,.05)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 10 }}>
+                        <div>
+                          <div style={{ fontWeight: 900, color: '#1d2530' }}>{review.direction === 'CUSTOMER_TO_PROVIDER' ? '客户评价摄影师' : '摄影师评价客户'}</div>
+                          <div style={{ fontSize: 12, color: '#6e737b', marginTop: 4 }}>订单 #{review.orderId || '-'}</div>
+                        </div>
+                        <ReviewStarsDisplay value={review.rating} emphasize />
+                      </div>
+                      <div style={{ fontSize: 13, color: '#6e737b', marginBottom: 8 }}>
+                        {review.reviewerNickname || 'Portra 用户'} → {review.targetUserNickname || 'Portra 用户'}
+                      </div>
+                      <div style={{ color: '#30343a', lineHeight: 1.75 }}>
+                        {review.content || '对方没有留下文字评价'}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="pp-empty"><h3>暂无评价</h3><p>完成合作后，这里会显示最近收到的评价。</p></div>
+              )}
+            </section>
           </aside>
         </div>
 
@@ -919,7 +967,7 @@ export function ProfilePage() {
                               : { background: `hsl(${(Number(uid) * 67) % 360},45%,68%)` }} />
                           <div>
                             <h4 style={{display:'flex',alignItems:'center',gap:8}}>
-                              {f.nickname || `用户 ${uid}`}
+                              {f.nickname || 'Portra 用户'}
                               <span className="role-badge" style={{fontSize:11,height:22,padding:'0 8px'}}>{roleLabel}</span>
                             </h4>
                             <p>{f.bio || f.description || (followListOpen === 'following' ? '已关注' : '关注了你')}</p>

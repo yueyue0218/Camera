@@ -43,12 +43,16 @@ export function normalizeReview(review) {
     reviewId: review.reviewId || review.id,
     orderId: Number(review.orderId),
     reviewerId: Number(review.reviewerId),
+    reviewerNickname: review.reviewerNickname || '',
     targetUserId: Number(review.targetUserId),
+    targetUserNickname: review.targetUserNickname || '',
     direction: review.direction,
     rating: Number(review.rating || 0),
     content: review.content || '',
     isVisible: review.isVisible ?? true,
-    createdAt: review.createdAt
+    createdAt: review.createdAt,
+    replyContent: review.replyContent || '',
+    replyTime: review.replyTime || null
   }
 }
 

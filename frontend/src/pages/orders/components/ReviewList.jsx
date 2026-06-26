@@ -1,36 +1,102 @@
-import { Paper, Rating, Stack, Typography } from '@mui/material'
+import { Button, Chip, Paper, Stack, Typography } from '@mui/material'
+import RateReviewRoundedIcon from '@mui/icons-material/RateReviewRounded'
 import { directionLabel, formatTime } from '../utils/orderStatusUtils.js'
 import { EmptyOrderCard } from './EmptyOrderCard.jsx'
+import { ReviewStarsDisplay } from '../../../components/reviews/ReviewStarsDisplay.jsx'
 
-export function ReviewList({ reviews, emptyText = '暂无历史评价' }) {
+function reviewComplaintLabel(review, complaints = []) {
+  const result = complaints[0]?.resultLabel
+  if (result) return result
+  if (review?.complaintStatus === 'REVIEW_HIDDEN') return '申诉通过'
+  if (review?.complaintStatus === 'REJECTED') return '申诉驳回'
+  if (review?.complaintStatus === 'PENDING') return '申诉处理中'
+  return ''
+}
+
+export function ReviewList({
+  reviews,
+  emptyText = '暂无历史评价',
+  getComplaints,
+  canFollowUp,
+  onFollowUp
+}) {
   return reviews.length ? (
-    <Stack spacing={1.2}>
+    <Stack spacing={1.35}>
       {reviews.map(review => (
-        <Paper key={review.reviewId || `${review.orderId}-${review.direction}-${review.createdAt}`} variant="outlined" sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
-          <Stack spacing={0.8}>
+        <Paper
+          key={review.reviewId || `${review.orderId}-${review.direction}-${review.createdAt}`}
+          variant="outlined"
+          sx={{
+            p: 1.7,
+            bgcolor: '#fffdf8',
+            borderColor: 'rgba(13,47,178,.12)',
+            borderRadius: 3,
+            boxShadow: '0 10px 22px rgba(25,30,45,.05)'
+          }}
+        >
+          <Stack spacing={1.15}>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
-              <Typography fontWeight={800}>{directionLabel(review.direction)} · 本次订单</Typography>
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                <Typography fontWeight={900}>{directionLabel(review.direction)}</Typography>
+                <Chip size="small" label={`订单 #${review.orderId || '-'}`} sx={{ height: 24, fontWeight: 800, bgcolor: 'rgba(13,47,178,.08)', color: '#0d2fb2' }} />
+                {reviewComplaintLabel(review, getComplaints?.(review) || []) ? (
+                  <Chip size="small" label={reviewComplaintLabel(review, getComplaints?.(review) || [])} sx={{ height: 24, fontWeight: 800 }} />
+                ) : null}
+              </Stack>
               <Typography color="text.secondary" variant="body2">{formatTime(review.createdAt)}</Typography>
             </Stack>
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-              <Rating value={Number(review.rating || 0)} readOnly size="small" />
-              <Typography fontWeight={800}>{Number(review.rating || 0).toFixed(1)}</Typography>
+
+            <ReviewStarsDisplay value={review.rating} emphasize />
+
+            <Stack spacing={0.45}>
+              <Typography variant="body2" color="text.secondary">评价人</Typography>
+              <Typography fontWeight={800}>{review.reviewerNickname || 'Portra 用户'}</Typography>
             </Stack>
-            <Typography>{review.content || '对方没有留下文字评价'}</Typography>
-            <Typography color="text.secondary" variant="body2">
-              {getReviewScopeLabel(review)}
-            </Typography>
+
+            <Stack spacing={0.45}>
+              <Typography variant="body2" color="text.secondary">被评价人</Typography>
+              <Typography fontWeight={800}>{review.targetUserNickname || 'Portra 用户'}</Typography>
+            </Stack>
+
+            <Stack spacing={0.45}>
+              <Typography variant="body2" color="text.secondary">评价内容</Typography>
+              <Typography sx={{ lineHeight: 1.85 }}>{review.content || '对方没有留下文字评价'}</Typography>
+            </Stack>
+
+            {review.replyContent ? (
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 1.2,
+                  bgcolor: '#f5f8ff',
+                  borderColor: 'rgba(13,47,178,.14)',
+                  borderRadius: 2.5
+                }}
+              >
+                <Stack spacing={0.5}>
+                  <Typography sx={{ color: '#0d2fb2', fontWeight: 900, fontSize: 13 }}>追加追评</Typography>
+                  <Typography sx={{ lineHeight: 1.8 }}>{review.replyContent}</Typography>
+                  {review.replyTime ? (
+                    <Typography variant="body2" color="text.secondary">{formatTime(review.replyTime)}</Typography>
+                  ) : null}
+                </Stack>
+              </Paper>
+            ) : null}
+
+            {canFollowUp?.(review) ? (
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<RateReviewRoundedIcon />}
+                onClick={() => onFollowUp?.(review)}
+                sx={{ alignSelf: 'flex-start', fontWeight: 800 }}
+              >
+                追加追评
+              </Button>
+            ) : null}
           </Stack>
         </Paper>
       ))}
     </Stack>
   ) : <EmptyOrderCard text={emptyText} />
-}
-
-function getReviewScopeLabel(review) {
-  if (review.direction === 'CUSTOMER_TO_PROVIDER') return '客户写给摄影师'
-  if (review.direction === 'PROVIDER_TO_CUSTOMER') return '摄影师写给客户'
-  if (review.direction === 'MY_REVIEW') return '我的评价'
-  if (review.direction === 'COUNTERPARTY_REVIEW') return '对方评价'
-  return '本次订单评价'
 }

@@ -18,6 +18,7 @@ public record NotificationResponse(
         Long sourceId,
         String dedupeKey,
         String metadataJson,
+        String navigationPath,
         Boolean isRead,
         LocalDateTime createdAt
 ) {
@@ -30,6 +31,6 @@ public record NotificationResponse(
                                 Boolean isRead,
                                 LocalDateTime createdAt) {
         this(notificationId, null, null, title, content, type, type, relatedType, relatedId,
-                relatedType, relatedId, relatedType, relatedId, null, null, isRead, createdAt);
+                relatedType, relatedId, relatedType, relatedId, null, null, null, isRead, createdAt);
     }
 }

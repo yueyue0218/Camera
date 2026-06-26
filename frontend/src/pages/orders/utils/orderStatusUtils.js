@@ -37,7 +37,8 @@ export const complaintStatusMap = {
   PENDING: '待处理',
   PROCESSING: '处理中',
   RESOLVED: '已处理',
-  REJECTED: '已驳回'
+  REJECTED: '已驳回',
+  REVIEW_HIDDEN: '申诉通过'
 }
 
 export function formatOrderStatus(status, fallback = '状态已更新') {
@@ -123,17 +124,23 @@ export function saveLocalArbitration(record) {
 
 function normalizeComplaint(record) {
   if (!record) return null
+  const result = record.arbitrationResult || ''
   return {
     arbitrationId: record.arbitrationId || record.complaintId,
     complaintId: record.complaintId,
     reviewId: record.reviewId,
     orderId: Number(record.orderId),
     applicantId: Number(record.applicantId ?? record.complainantId),
+    applicantNickname: record.applicantNickname || record.complainantNickname || '',
     respondentId: Number(record.respondentId),
+    respondentNickname: record.respondentNickname || '',
     reason: record.reason || '评价争议',
     description: record.description || record.arbitrationComment || record.evidenceFileIds || '',
     status: record.status || 'PENDING',
-    arbitrationResult: record.arbitrationResult,
+    arbitrationResult: result,
+    handledBy: record.handledBy,
+    handledByNickname: record.handledByNickname || '',
+    resultLabel: result === 'REVIEW_HIDDEN' ? '申诉通过' : result === 'REJECTED' ? '申诉驳回' : complaintStatusMap[record.status] || '处理中',
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     handledAt: record.handledAt
@@ -190,12 +197,17 @@ function normalizeReview(review) {
     reviewId: review.reviewId || review.id,
     orderId: Number(review.orderId),
     reviewerId: Number(review.reviewerId),
+    reviewerNickname: review.reviewerNickname || '',
     targetUserId: Number(review.targetUserId),
+    targetUserNickname: review.targetUserNickname || '',
     direction: review.direction,
     rating: Number(review.rating || 0),
     content: review.content || '',
     isVisible: review.isVisible ?? true,
-    createdAt: review.createdAt
+    createdAt: review.createdAt,
+    replyContent: review.replyContent || '',
+    replyTime: review.replyTime || null,
+    complaintStatus: review.complaintStatus || null
   }
 }
 

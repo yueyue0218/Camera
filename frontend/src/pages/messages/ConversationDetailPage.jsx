@@ -772,6 +772,34 @@ export function ConversationDetailPage() {
     onRefresh: () => refreshConversationMessages(conversation)
   })
   useEffect(() => {
+    if (!currentUser?.token || !currentUserId) return undefined
+
+    const backendConversationId = !isLocalConversationId(conversationId)
+      ? Number(conversation?.backendConversationId || conversation?.conversationId || conversationId)
+      : null
+    const normalizedConversationId = Number.isFinite(backendConversationId) && backendConversationId > 0
+      ? backendConversationId
+      : null
+    const reportPresence = active => {
+      conversationApi.reportPresence(normalizedConversationId, active, currentUser, active ? {} : { keepalive: true }).catch(() => {})
+    }
+
+    reportPresence(true)
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === 'visible') reportPresence(true)
+    }, 8000)
+    const handleVisibilityChange = () => {
+      reportPresence(document.visibilityState === 'visible')
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      reportPresence(false)
+    }
+  }, [conversation?.backendConversationId, conversation?.conversationId, conversationId, currentUser, currentUserId])
+  useEffect(() => {
     if (!conversation) return
     const latestMessage = getLatestMessage(messages)
     markConversationRead({
@@ -877,7 +905,7 @@ export function ConversationDetailPage() {
             </Avatar>
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="h6" sx={{ color: PORTRA_COLORS.ink, fontSize: 17, fontWeight: 950 }} noWrap>
-                {getSafeDisplayText(counterparty.peerDisplayName, counterparty.peerUserId ? `用户 ${counterparty.peerUserId}` : '用户')}
+                {getSafeDisplayText(counterparty.peerDisplayName, 'Portra 用户')}
               </Typography>
               <Typography variant="caption" sx={{ color: PORTRA_COLORS.mutedInk, fontWeight: 850 }}>
                 {counterparty.peerRoleLabel}

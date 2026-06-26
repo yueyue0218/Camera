@@ -50,7 +50,7 @@ export function buildConversationListItems({
         activityTime: getConversationActivityTime(conversation),
         title: getSafeDisplayText(
           participant.peerDisplayName,
-          participant.peerUserId ? `用户 ${participant.peerUserId}` : '沟通对象'
+          'Portra 用户'
         )
       }
     })

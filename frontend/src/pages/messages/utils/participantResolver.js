@@ -118,7 +118,7 @@ function buildPeerProfile(conversation, peerUserId, peerRole, profileOverride) {
     storedProfile.displayName,
     demoProfile.nickname,
     demoProfile.displayName,
-    peerUserId ? `用户 ${peerUserId}` : '用户'
+    'Portra 用户'
   )
   const avatarUrl = pickText(
     profileOverride?.avatarUrl,

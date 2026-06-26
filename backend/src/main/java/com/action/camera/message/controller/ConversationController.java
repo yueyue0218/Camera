@@ -5,6 +5,7 @@ import com.action.camera.common.Result;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.message.dto.ConversationListItemResponse;
+import com.action.camera.message.dto.ConversationPresenceRequest;
 import com.action.camera.message.dto.ConversationResponse;
 import com.action.camera.message.dto.CreateConversationFromResponseRequest;
 import com.action.camera.message.dto.MessageResponse;
@@ -75,6 +76,13 @@ public class ConversationController {
                 .map(MessageResponse::from)
                 .toList();
         return Result.success(messages);
+    }
+
+    @PostMapping("/conversations/presence")
+    public Result<Void> reportPresence(@RequestBody(required = false) ConversationPresenceRequest request) {
+        Long operatorId = currentUserId();
+        messageService.reportPresence(operatorId, request == null ? null : request.conversationId(), request == null || !Boolean.FALSE.equals(request.active()));
+        return Result.success(null);
     }
 
     @PostMapping("/conversations/{conversationId}/messages")

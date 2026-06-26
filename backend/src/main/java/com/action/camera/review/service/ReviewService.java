@@ -1,6 +1,8 @@
 package com.action.camera.review.service;
 
 import com.action.camera.application.CreditService;
+import com.action.camera.application.OrderDisplayService;
+import com.action.camera.application.UserDisplayService;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
@@ -37,17 +39,23 @@ public class ReviewService {
     private final ReviewComplaintRepository complaintRepository;
     private final OrderQueryPort orderQueryPort;
     private final CreditService creditService;
+    private final OrderDisplayService orderDisplayService;
+    private final UserDisplayService userDisplayService;
     private final NotificationService notificationService;
 
     public ReviewService(ReviewRepository reviewRepository,
                          ReviewComplaintRepository complaintRepository,
                          OrderQueryPort orderQueryPort,
                          CreditService creditService,
+                         OrderDisplayService orderDisplayService,
+                         UserDisplayService userDisplayService,
                          NotificationService notificationService) {
         this.reviewRepository = reviewRepository;
         this.complaintRepository = complaintRepository;
         this.orderQueryPort = orderQueryPort;
         this.creditService = creditService;
+        this.orderDisplayService = orderDisplayService;
+        this.userDisplayService = userDisplayService;
         this.notificationService = notificationService;
     }
 
@@ -78,6 +86,7 @@ public class ReviewService {
         } catch (DataIntegrityViolationException ex) {
             throw new BusinessException(ErrorCode.DUPLICATE_OPERATION, "This order direction has already been reviewed");
         }
+
         creditService.updateCreditScore(
                 savedReview.getTargetUserId(),
                 calculateReviewScoreChange(savedReview.getRating()),
@@ -87,11 +96,15 @@ public class ReviewService {
                 CREDIT_EVENT_REVIEW,
                 savedReview.getId()
         );
+
+        String reviewerName = resolveReviewerNickname(savedReview);
+        String targetName = resolveTargetNickname(savedReview);
+        String orderSubject = orderDisplayService.resolveOrderSubject(savedReview.getOrderId());
         notificationService.createNotification(new NotificationCreateRequest(
                 savedReview.getTargetUserId(),
                 savedReview.getReviewerId(),
-                "收到新评价",
-                "你收到了一条新的订单评价。",
+                orderSubject + " 收到一条新评价",
+                reviewerName + " 针对" + orderSubject + "给 " + targetName + " 留下了一条新评价，点击查看评价与申诉。",
                 REVIEW_RECEIVED,
                 REVIEW_RECEIVED,
                 RELATED_REVIEW,
@@ -127,11 +140,15 @@ public class ReviewService {
         review.setReplyContent(request.content().trim());
         review.setReplyTime(LocalDateTime.now());
         Review savedReview = reviewRepository.save(review);
+
+        String reviewerName = resolveReviewerNickname(savedReview);
+        String targetName = resolveTargetNickname(savedReview);
+        String orderSubject = orderDisplayService.resolveOrderSubject(savedReview.getOrderId());
         notificationService.createNotification(new NotificationCreateRequest(
                 savedReview.getTargetUserId(),
                 savedReview.getReviewerId(),
-                "收到追评",
-                "你收到了一条订单追评。",
+                reviewerName + " 追加了一条追评",
+                reviewerName + " 针对" + orderSubject + "给 " + targetName + " 的评价追加了追评，点击查看评价与申诉。",
                 REVIEW_FOLLOW_UP_RECEIVED,
                 REVIEW_FOLLOW_UP_RECEIVED,
                 RELATED_REVIEW,
@@ -143,6 +160,7 @@ public class ReviewService {
                 "review:follow-up:" + savedReview.getId(),
                 buildReviewMetadata(savedReview.getOrderId(), savedReview.getId())
         ));
+
         return toResponse(savedReview);
     }
 
@@ -173,6 +191,7 @@ public class ReviewService {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Only order participants can view order reviews");
         }
         return reviewRepository.findByOrderIdOrderByCreatedAtDesc(orderId).stream()
+                .filter(review -> isAdmin() || Boolean.TRUE.equals(review.getIsVisible()))
                 .map(this::toResponse)
                 .toList();
     }
@@ -192,8 +211,10 @@ public class ReviewService {
         if (REFUNDED.equals(order.getStatus())) {
             return resolveRefundResponsibilityReviewTarget(order, reviewerId);
         }
-        throw new BusinessException(ErrorCode.STATUS_CONFLICT,
-                "Order can be reviewed only after completion or fault-based refund resolution");
+        throw new BusinessException(
+                ErrorCode.STATUS_CONFLICT,
+                "Order can be reviewed only after completion or fault-based refund resolution"
+        );
     }
 
     private ReviewTarget resolveParticipantReviewTarget(OrderSnapshot order, Long reviewerId) {
@@ -286,7 +307,9 @@ public class ReviewService {
                 review.getId(),
                 review.getOrderId(),
                 review.getReviewerId(),
+                resolveReviewerNickname(review),
                 review.getTargetUserId(),
+                resolveTargetNickname(review),
                 review.getDirection(),
                 review.getRating(),
                 review.getContent(),
@@ -310,8 +333,32 @@ public class ReviewService {
         }
         return complaintRepository.findByReviewIdOrderByCreatedAtDesc(review.getId()).stream()
                 .findFirst()
-                .map(complaint -> complaint.getStatus())
+                .map(complaint -> complaint.getArbitrationResult() == null ? complaint.getStatus() : complaint.getArbitrationResult())
                 .orElse(null);
+    }
+
+    private String resolveReviewerNickname(Review review) {
+        return userDisplayService.resolveDisplayName(review.getReviewerId(), reviewerRole(review.getDirection()));
+    }
+
+    private String resolveTargetNickname(Review review) {
+        return userDisplayService.resolveDisplayName(review.getTargetUserId(), targetRole(review.getDirection()));
+    }
+
+    private String reviewerRole(String direction) {
+        return switch (String.valueOf(direction).trim().toUpperCase()) {
+            case CUSTOMER_TO_PROVIDER -> "CUSTOMER";
+            case PROVIDER_TO_CUSTOMER -> "PROVIDER";
+            default -> "";
+        };
+    }
+
+    private String targetRole(String direction) {
+        return switch (String.valueOf(direction).trim().toUpperCase()) {
+            case CUSTOMER_TO_PROVIDER -> "PROVIDER";
+            case PROVIDER_TO_CUSTOMER -> "CUSTOMER";
+            default -> "";
+        };
     }
 
     private boolean isBlank(String value) {
@@ -331,7 +378,12 @@ public class ReviewService {
     }
 
     private String buildReviewMetadata(Long orderId, Long reviewId) {
-        return String.format("{\"orderId\":%d,\"reviewId\":%d}", orderId, reviewId);
+        return String.format(
+                "{\"orderId\":%d,\"reviewId\":%d,\"navigationPath\":\"/orders?orderId=%d&section=reviews\"}",
+                orderId,
+                reviewId,
+                orderId
+        );
     }
 
     private record ReviewTarget(Long targetUserId, String direction) {

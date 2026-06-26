@@ -1,409 +1,124 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Alert, Avatar, Box, Button, Chip, Paper, Rating, Stack, TextField, Typography } from '@mui/material'
-import RateReviewRoundedIcon from '@mui/icons-material/RateReviewRounded'
-import ReportProblemRoundedIcon from '@mui/icons-material/ReportProblemRounded'
+import { useEffect, useState } from 'react'
+import { Alert, Box, Button, Chip, Paper, Stack, Typography } from '@mui/material'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
-import { useNavigate, useParams } from 'react-router-dom'
-import { creditApi, orderApi, reviewApi, reviewComplaintApi } from '../../api/index.js'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { reviewApi } from '../../api/index.js'
 import { useAuth } from '../../AuthContext.jsx'
-import { EmptyState, Feedback, PageHeader, formatDateTime, panelSx, portra } from '../dline/shared.jsx'
-import './reviews.css'
+import { ReviewStarsDisplay } from '../../components/reviews/ReviewStarsDisplay.jsx'
+import { buildOrderNavigationTarget } from '../../utils/orderNavigation.js'
+import { EmptyState, Feedback, PageHeader, formatDateTime, panelSx } from '../dline/shared.jsx'
 
 export function reviewDirectionLabel(direction) {
   const value = String(direction || '').trim().toUpperCase()
-  if (value === 'CUSTOMER_TO_PROVIDER') return '来自约拍方的评价'
-  if (value === 'PROVIDER_TO_CUSTOMER') return '来自摄影师的评价'
-  return '评价记录'
-}
-
-function formatCreditScore(value) {
-  if (value === null || value === undefined) return '暂无'
-  if (typeof value === 'string' && value.trim() === '') return '暂无'
-  const numeric = Number(value)
-  return Number.isFinite(numeric) ? numeric.toFixed(1) : '暂无'
-}
-
-function complaintStatusTone(status) {
-  const value = String(status || '').trim().toUpperCase()
-
-  if (value === 'REJECTED') {
-    return {
-      label: '已驳回',
-      chipColor: 'warning',
-      accent: '#c76a00',
-      surface: 'rgba(255,196,86,.12)'
-    }
-  }
-
-  if (value === 'APPROVED' || value === 'REVIEW_HIDDEN' || value === 'RESOLVED') {
-    return {
-      label: '已处理',
-      chipColor: 'success',
-      accent: '#157347',
-      surface: 'rgba(46,160,67,.10)'
-    }
-  }
-
-  if (value === 'PROCESSING') {
-    return {
-      label: '处理中',
-      chipColor: 'info',
-      accent: portra.primary,
-      surface: 'rgba(13,47,178,.10)'
-    }
-  }
-
-  return {
-    label: '待提交',
-    chipColor: 'primary',
-    accent: portra.primary,
-    surface: 'rgba(13,47,178,.08)'
-  }
-}
-
-function reviewFeedbackText(type) {
-  if (type === 'load') return '评价页暂时打不开，请稍后再试。'
-  if (type === 'submit') return '这条评价暂时没提交成功，请稍后再试。'
-  if (type === 'complaint') return '这条申诉暂时没提交成功，请稍后再试。'
-  if (type === 'list') return '评价列表暂时打不开，请稍后再试。'
-  return '这次操作暂时没完成，请稍后再试。'
+  if (value === 'CUSTOMER_TO_PROVIDER') return '客户评价摄影师'
+  if (value === 'PROVIDER_TO_CUSTOMER') return '摄影师评价客户'
+  return '订单评价'
 }
 
 export function ReviewScore({ value }) {
-  const numeric = Number(value)
-  const score = Number.isFinite(numeric) ? numeric : 0
-  const filled = Math.max(0, Math.min(5, Math.round(score)))
-
-  return (
-    <Stack direction="row" spacing={1} alignItems="center" className="review-score-wrap">
-      <Typography className="review-score-pill">{Number.isFinite(numeric) ? score.toFixed(1) : '--'} 分</Typography>
-      <Box className="review-score-meter" aria-label={`评分 ${Number.isFinite(numeric) ? score.toFixed(1) : '暂无'}`}>
-        {Array.from({ length: 5 }).map((_, index) => (
-          <span key={index} className={index < filled ? 'filled' : ''} />
-        ))}
-      </Box>
-    </Stack>
-  )
+  return <ReviewStarsDisplay value={value} emphasize />
 }
 
-function ReviewItem({ item, index = 0, onOpenOrder, onOpenReview }) {
-  const avatarText = String(item.reviewerId || item.targetUserId || 'U').slice(-2)
-  const orderId = item.orderId || item.targetOrderId
-  const directionLabel = reviewDirectionLabel(item.direction)
+function reviewFeedbackText(type) {
+  if (type === 'list') return '历史评价暂时加载失败，请稍后再试。'
+  return '评价页暂时打不开，请稍后再试。'
+}
 
-  const openReview = () => {
-    if (item.reviewId != null) {
-      onOpenReview?.(item.reviewId)
-    }
-  }
-
+function ReviewArchiveCard({ review, onOpenOrder }) {
   return (
     <Paper
-      className="review-ticket"
-      role="button"
-      tabIndex={0}
-      onClick={openReview}
-      onKeyDown={event => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault()
-          openReview()
-        }
+      variant="outlined"
+      sx={{
+        ...panelSx,
+        p: 2.1,
+        borderRadius: 3.5,
+        bgcolor: '#fffdf8',
+        borderColor: 'rgba(13,47,178,.12)',
+        boxShadow: '0 10px 24px rgba(25,30,45,.055)'
       }}
-      style={{ '--review-index': index }}
-      sx={{ ...panelSx, p: 2, cursor: 'pointer' }}
     >
-      <Stack spacing={1.5}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
-          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0 }}>
-            <Avatar sx={{ bgcolor: portra.primary, width: 40, height: 40 }}>{avatarText}</Avatar>
-            <Box sx={{ minWidth: 0 }}>
-              <Typography fontWeight={900}>{directionLabel}</Typography>
-              <Typography variant="body2" className="review-order-line">
-                订单 #{item.orderId || item.targetOrderId || '-'}
-              </Typography>
-            </Box>
+      <Stack spacing={1.25}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between">
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+            <Typography fontWeight={900}>{reviewDirectionLabel(review.direction)}</Typography>
+            <Chip
+              size="small"
+              label={`订单 #${review.orderId || '-'}`}
+              sx={{ height: 24, fontWeight: 800, bgcolor: 'rgba(13,47,178,.08)', color: '#0d2fb2' }}
+            />
           </Stack>
-          <Box sx={{ textAlign: 'right' }}>
-            <ReviewScore value={item.rating} />
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, whiteSpace: 'nowrap' }}>
-              {formatDateTime(item.createdAt)}
-            </Typography>
-          </Box>
+          <Typography variant="body2" color="text.secondary">
+            {formatDateTime(review.createdAt)}
+          </Typography>
         </Stack>
 
-        <Typography className="review-content" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.9 }}>
-          {item.content || '暂无评价正文'}
-        </Typography>
+        <ReviewStarsDisplay value={review.rating} size="large" emphasize />
 
-        {item.replyContent ? (
-          <Box className="review-reply">
-            <span>追评</span>
-            <p>{item.replyContent}</p>
-          </Box>
-        ) : null}
+        <Stack spacing={0.5}>
+          <Typography variant="body2" color="text.secondary">评价人</Typography>
+          <Typography fontWeight={800}>{review.reviewerNickname || 'Portra 用户'}</Typography>
+        </Stack>
 
-        {orderId ? (
-          <Button
-            size="small"
-            variant="text"
-            startIcon={<ReceiptLongRoundedIcon />}
-            onClick={event => {
-              event.stopPropagation()
-              onOpenOrder(orderId)
+        <Stack spacing={0.5}>
+          <Typography variant="body2" color="text.secondary">被评价人</Typography>
+          <Typography fontWeight={800}>{review.targetUserNickname || 'Portra 用户'}</Typography>
+        </Stack>
+
+        <Stack spacing={0.5}>
+          <Typography variant="body2" color="text.secondary">评价内容</Typography>
+          <Typography sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.85 }}>
+            {review.content || '对方没有留下文字评价'}
+          </Typography>
+        </Stack>
+
+        {review.replyContent ? (
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 1.3,
+              borderRadius: 2.5,
+              bgcolor: '#f5f8ff',
+              borderColor: 'rgba(13,47,178,.14)'
             }}
-            sx={{ alignSelf: 'flex-start', fontWeight: 900 }}
           >
-            查看关联订单
-          </Button>
+            <Stack spacing={0.5}>
+              <Typography sx={{ color: '#0d2fb2', fontWeight: 900, fontSize: 13 }}>追加追评</Typography>
+              <Typography sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{review.replyContent}</Typography>
+              {review.replyTime ? (
+                <Typography variant="body2" color="text.secondary">{formatDateTime(review.replyTime)}</Typography>
+              ) : null}
+            </Stack>
+          </Paper>
         ) : null}
+
+        <Button
+          variant="text"
+          size="small"
+          startIcon={<ReceiptLongRoundedIcon />}
+          onClick={() => onOpenOrder?.(review)}
+          sx={{ alignSelf: 'flex-start', fontWeight: 900 }}
+        >
+          查看订单评价区
+        </Button>
       </Stack>
     </Paper>
   )
 }
 
 export function ReviewPage() {
-  const navigate = useNavigate()
   const { orderId } = useParams()
-  const { currentUser } = useAuth()
-  const [order, setOrder] = useState(null)
-  const [items, setItems] = useState([])
-  const [credit, setCredit] = useState(null)
-  const [form, setForm] = useState({ rating: 5, content: '' })
-  const [complaintReason, setComplaintReason] = useState('')
-  const [feedback, setFeedback] = useState({})
-  const [loading, setLoading] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [complaintSubmitting, setComplaintSubmitting] = useState(false)
-
-  const myReview = useMemo(
-    () => items.find(item => Number(item.reviewerId) === Number(currentUser.userId)),
-    [currentUser.userId, items]
-  )
-  const receivedReview = useMemo(
-    () => items.find(item => Number(item.targetUserId) === Number(currentUser.userId) && item.isVisible !== false),
-    [currentUser.userId, items]
-  )
-  const canReview = ['COMPLETED', 'REFUNDED'].includes(order?.status) && !myReview
-  const complaintTone = useMemo(
-    () => complaintStatusTone(receivedReview?.complaintStatus),
-    [receivedReview?.complaintStatus]
-  )
-
-  useEffect(() => {
-    let alive = true
-
-    async function load() {
-      setLoading(true)
-      try {
-        const [nextOrder, reviews, summary] = await Promise.all([
-          orderApi.detail(orderId, currentUser),
-          reviewApi.listByOrder(orderId, currentUser),
-          creditApi.summary(currentUser.userId, currentUser)
-        ])
-        if (!alive) return
-        setOrder(nextOrder)
-        setItems(Array.isArray(reviews) ? reviews : [])
-        setCredit(summary)
-        setFeedback({})
-      } catch {
-        if (alive) setFeedback({ error: reviewFeedbackText('load') })
-      } finally {
-        if (alive) setLoading(false)
-      }
-    }
-
-    load()
-    return () => { alive = false }
-  }, [currentUser, orderId])
-
-  async function submit(event) {
-    event.preventDefault()
-    setSubmitting(true)
-    try {
-      await reviewApi.create(orderId, { rating: form.rating, content: form.content.trim() }, currentUser)
-      const reviews = await reviewApi.listByOrder(orderId, currentUser)
-      setItems(Array.isArray(reviews) ? reviews : [])
-      setForm({ rating: 5, content: '' })
-      setFeedback({ success: '评价已提交' })
-    } catch {
-      setFeedback({ error: reviewFeedbackText('submit') })
-    } finally {
-      setSubmitting(false)
-    }
+  const target = buildOrderNavigationTarget(orderId, { section: 'reviews' })
+  if (!target) {
+    return <Navigate to="/orders" replace />
   }
-
-  async function complain(reviewId) {
-    if (!complaintReason.trim()) {
-      setFeedback({ error: '请先填写申诉原因' })
-      return
-    }
-    setComplaintSubmitting(true)
-    try {
-      await reviewComplaintApi.create(reviewId, { reason: complaintReason.trim(), evidenceFileIds: '' }, currentUser)
-      setComplaintReason('')
-      setFeedback({ success: '申诉已提交' })
-    } catch {
-      setFeedback({ error: reviewFeedbackText('complaint') })
-    } finally {
-      setComplaintSubmitting(false)
-    }
-  }
-
-  return (
-    <Stack spacing={2}>
-      <PageHeader
-        eyebrow="评价服务"
-        title={`订单 ${orderId} 评价`}
-        description="完成合作后，双方都可以留下评价，信用分也会随之变化。"
-      />
-      <Feedback {...feedback} />
-
-      {credit ? (
-        <Paper sx={{ ...panelSx, p: 2 }}>
-          <Typography variant="overline" sx={{ color: portra.primary, fontWeight: 900, letterSpacing: '0.14em' }}>
-            信用概览
-          </Typography>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }}>
-            <Box>
-              <Typography variant="h4" fontWeight={900} color={portra.primary}>
-                {formatCreditScore(credit.creditScore)}
-              </Typography>
-              <Typography color="text.secondary">{credit.creditLevel || '信用等级暂无'}</Typography>
-            </Box>
-            <Stack direction="row" spacing={1} flexWrap="wrap">
-              <Alert severity="info" sx={{ py: 0.5 }}>{credit.completedOrderCount ?? '暂无'} 个已完成订单</Alert>
-              <Alert severity="info" sx={{ py: 0.5 }}>{credit.receivedReviewCount ?? '暂无'} 条收到评价</Alert>
-              <Alert severity="info" sx={{ py: 0.5 }}>{credit.averageRating ?? '暂无'} 平均星级</Alert>
-            </Stack>
-          </Stack>
-        </Paper>
-      ) : null}
-
-      {canReview ? (
-        <Paper component="form" onSubmit={submit} sx={{ ...panelSx, p: 2 }}>
-          <Stack spacing={1.5}>
-            <Typography variant="h6" fontWeight={900}>提交评价</Typography>
-            <Rating value={form.rating} onChange={(_, value) => setForm(current => ({ ...current, rating: value || 5 }))} />
-            <TextField
-              label="评价内容"
-              multiline
-              minRows={3}
-              value={form.content}
-              onChange={event => setForm(current => ({ ...current, content: event.target.value }))}
-            />
-            <Button type="submit" variant="contained" startIcon={<RateReviewRoundedIcon />} disabled={submitting}>
-              {submitting ? '提交中...' : '提交评价'}
-            </Button>
-          </Stack>
-        </Paper>
-      ) : (
-        <Alert severity="info">{myReview ? '你已经评价过该订单。' : '当前订单状态暂不可评价。'}</Alert>
-      )}
-
-      {receivedReview ? (
-        <Paper
-          sx={{
-            ...panelSx,
-            p: 2.25,
-            borderRadius: 4,
-            border: `1px solid ${complaintTone.surface}`,
-            background:
-              `radial-gradient(circle at top right, ${complaintTone.surface}, transparent 30%), linear-gradient(145deg, rgba(255,253,248,.98), rgba(247,244,237,.96))`
-          }}
-        >
-          <Stack spacing={1.6}>
-            <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={2} alignItems={{ xs: 'flex-start', sm: 'center' }}>
-              <Box>
-                <Typography variant="overline" sx={{ color: complaintTone.accent, fontWeight: 900, letterSpacing: '.16em' }}>
-                  申诉处理
-                </Typography>
-                <Typography variant="h6" fontWeight={900}>对收到的评价发起申诉</Typography>
-                <Typography color="text.secondary" sx={{ mt: 0.5, lineHeight: 1.8 }}>
-                  仅被评价方可以申诉，提交后平台会继续跟进处理。
-                </Typography>
-              </Box>
-              <Chip label={complaintTone.label} color={complaintTone.chipColor} sx={{ fontWeight: 800, minWidth: 84 }} />
-            </Stack>
-
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 1.6,
-                borderRadius: 3,
-                bgcolor: 'rgba(255,255,255,.68)',
-                borderColor: 'rgba(13,47,178,.12)'
-              }}
-            >
-              <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={2} alignItems={{ xs: 'flex-start', sm: 'center' }}>
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography variant="caption" color="text.secondary">收到的评价</Typography>
-                  <Typography fontWeight={900} sx={{ mt: 0.4 }}>
-                    订单 #{receivedReview.orderId || '-'} · {reviewDirectionLabel(receivedReview.direction)}
-                  </Typography>
-                  <Typography sx={{ mt: 0.9, lineHeight: 1.85, whiteSpace: 'pre-wrap' }}>
-                    {receivedReview.content || '暂无评价正文'}
-                  </Typography>
-                </Box>
-                <Box sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}>
-                  <ReviewScore value={receivedReview.rating} />
-                </Box>
-              </Stack>
-            </Paper>
-
-            <TextField
-              label="申诉原因"
-              multiline
-              minRows={4}
-              placeholder="请明确说明争议点，例如评价内容与订单事实不符、存在恶意差评、证据链不完整等。"
-              helperText="尽量写清楚事实、时间点和争议内容，后续仲裁会更快。"
-              value={complaintReason}
-              onChange={event => setComplaintReason(event.target.value)}
-            />
-
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', md: 'center' }} justifyContent="space-between">
-              <Alert severity="info" sx={{ flex: 1, borderRadius: 3 }}>
-                当前评价申诉不会直接修改评价结果，需等待处理结论。
-              </Alert>
-              <Button
-                color="warning"
-                variant="contained"
-                startIcon={<ReportProblemRoundedIcon />}
-                disabled={complaintSubmitting}
-                onClick={() => complain(receivedReview.reviewId)}
-                sx={{ minWidth: 148, alignSelf: { xs: 'stretch', md: 'center' } }}
-              >
-                {complaintSubmitting ? '提交中...' : '提交申诉'}
-              </Button>
-            </Stack>
-          </Stack>
-        </Paper>
-      ) : null}
-
-      <Typography variant="h6" fontWeight={900}>订单评价</Typography>
-      {loading ? <EmptyState>正在加载评价...</EmptyState> : null}
-      {!loading && items.length ? (
-        <Stack gap={1.5}>
-          {items.map((item, index) => (
-            <ReviewItem
-              key={item.reviewId}
-              item={item}
-              index={index}
-              onOpenOrder={id => navigate(`/orders?orderId=${id}`)}
-              onOpenReview={id => navigate(`/reviews/${id}`)}
-            />
-          ))}
-        </Stack>
-      ) : null}
-      {!loading && !items.length ? <EmptyState>暂无评价</EmptyState> : null}
-    </Stack>
-  )
+  return <Navigate to={target.to} replace state={target.state} />
 }
 
 export function UserReviewsPage() {
   const navigate = useNavigate()
   const { userId } = useParams()
   const { currentUser } = useAuth()
-  const targetUserId = userId || currentUser.userId
+  const targetUserId = Number(userId || currentUser.userId)
   const isSelf = Number(targetUserId) === Number(currentUser.userId)
   const [items, setItems] = useState([])
   const [feedback, setFeedback] = useState({})
@@ -433,27 +148,64 @@ export function UserReviewsPage() {
   return (
     <Stack spacing={2}>
       <PageHeader
-        eyebrow="评价记录"
-        title={isSelf ? '我的评价' : `用户 #${targetUserId} 的评价`}
-        description={isSelf ? '查看你收到的评价与追评。' : '查看某位用户收到的评价。'}
+        eyebrow="全部历史评价"
+        title={isSelf ? '我的全部历史评价' : '全部历史评价'}
+        description={isSelf ? '这里汇总你收到的全部评价与追评。' : '这里汇总这位用户收到的全部评价与追评。'}
         action={<Button onClick={() => navigate(-1)}>返回</Button>}
       />
       <Feedback {...feedback} />
-      {loading ? <EmptyState>正在加载评价...</EmptyState> : null}
+
+      <Paper
+        variant="outlined"
+        sx={{
+          ...panelSx,
+          p: 2.2,
+          borderRadius: 3.5,
+          background: 'linear-gradient(180deg, rgba(255,251,242,.96), rgba(255,255,255,.98))'
+        }}
+      >
+        <Stack spacing={1}>
+          <Typography variant="overline" sx={{ color: '#0d2fb2', fontWeight: 900, letterSpacing: '.12em' }}>
+            Review Archive
+          </Typography>
+          <Typography variant="h6" fontWeight={900}>历史评价</Typography>
+          <Typography color="text.secondary">
+            评分、评价正文、评价人与被评价人、订单信息都会统一展示在这里。
+          </Typography>
+        </Stack>
+      </Paper>
+
+      {loading ? <EmptyState>正在加载历史评价...</EmptyState> : null}
       {!loading && items.length ? (
-        <Stack gap={1.5}>
-          {items.map((item, index) => (
-            <ReviewItem
-              key={item.reviewId}
-              item={item}
-              index={index}
-              onOpenOrder={id => navigate(`/orders?orderId=${id}`)}
-              onOpenReview={id => navigate(`/reviews/${id}`)}
+        <Stack spacing={1.35}>
+          {items.map(review => (
+            <ReviewArchiveCard
+              key={review.reviewId || `${review.orderId}-${review.direction}-${review.createdAt}`}
+              review={review}
+              onOpenOrder={item => {
+                const target = buildOrderNavigationTarget(item.orderId, { section: 'reviews' })
+                if (target) navigate(target.to, { state: target.state })
+              }}
             />
           ))}
         </Stack>
       ) : null}
-      {!loading && !items.length ? <EmptyState>暂无收到的评价。</EmptyState> : null}
+      {!loading && !items.length ? (
+        <EmptyState>
+          <Box>
+            <Typography fontWeight={900}>暂无历史评价</Typography>
+            <Typography sx={{ mt: 0.6, color: 'text.secondary' }}>
+              完成合作并产生评价后，这里会显示对应记录。
+            </Typography>
+          </Box>
+        </EmptyState>
+      ) : null}
+
+      {isSelf ? (
+        <Alert severity="info" sx={{ borderRadius: 3 }}>
+          通知和申诉结果不会跳到这里；它们都会直接回到对应订单的评价与申诉区域。
+        </Alert>
+      ) : null}
     </Stack>
   )
 }

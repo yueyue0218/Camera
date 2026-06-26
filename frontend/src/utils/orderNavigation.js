@@ -11,8 +11,10 @@ export function buildOrderNavigationTarget(value, options = {}) {
   const conversationId = normalizeConversationId(options.conversationId)
   const returnTo = sanitizeOrderReturnPath(options.returnTo)
   const search = new URLSearchParams({ orderId: String(orderId) })
+  const section = sanitizeOrderSection(options.section)
   if (conversationId) search.set('conversationId', String(conversationId))
   if (returnTo) search.set('returnTo', returnTo)
+  if (section) search.set('section', section)
   if (options.source) search.set('source', String(options.source))
   if (options.orderSurface) search.set('surface', String(options.orderSurface))
   return {
@@ -21,6 +23,7 @@ export function buildOrderNavigationTarget(value, options = {}) {
       orderId,
       conversationId,
       returnTo,
+      section,
       ...(options.source ? { workflowSource: String(options.source) } : {}),
       ...(options.orderSurface ? { orderSurface: String(options.orderSurface) } : {})
     }
@@ -91,4 +94,9 @@ function normalizeUserId(value) {
 function sanitizeOrderReturnPath(value) {
   const text = String(value || '')
   return /^\/messages\/\d+$/.test(text) ? text : ''
+}
+
+function sanitizeOrderSection(value) {
+  const text = String(value || '').trim().toLowerCase()
+  return ['reviews'].includes(text) ? text : ''
 }

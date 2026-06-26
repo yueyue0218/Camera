@@ -2,6 +2,8 @@ package com.action.camera.review.service;
 
 import com.action.camera.admin.service.AdminPermissionService;
 import com.action.camera.application.CreditService;
+import com.action.camera.application.OrderDisplayService;
+import com.action.camera.application.UserDisplayService;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
@@ -37,14 +39,15 @@ public class ReviewComplaintService {
     private static final String TYPE_COMPLAINT_CREATED = "REVIEW_COMPLAINT_CREATED";
     private static final String TYPE_COMPLAINT_RESOLVED = "REVIEW_COMPLAINT_RESOLVED";
     private static final String RELATED_REVIEW_COMPLAINT = "REVIEW_COMPLAINT";
-    private static final String CREDIT_EVENT_REVIEW_ARBITRATION = "REVIEW_ARBITRATION";
-    private static final String CREDIT_EVENT_REVIEW_ARBITRATION_PENALTY = "REVIEW_ARBITRATION_PENALTY";
-    private static final int ARBITRATION_RESPONSIBLE_PENALTY = -5;
+    private static final String CREDIT_EVENT_REVIEW_ARBITRATION_APPROVED = "REVIEW_ARBITRATION_APPROVED";
+    private static final String CREDIT_EVENT_REVIEW_ARBITRATION_REJECTED = "REVIEW_ARBITRATION_REJECTED";
     private static final int MAX_EVIDENCE_FILE_COUNT = 5;
 
     private final ReviewComplaintRepository complaintRepository;
     private final ReviewRepository reviewRepository;
     private final CreditService creditService;
+    private final OrderDisplayService orderDisplayService;
+    private final UserDisplayService userDisplayService;
     private final NotificationService notificationService;
     private final EvidenceFileQueryPort evidenceFileQueryPort;
     private final AdminPermissionService adminPermissionService;
@@ -52,12 +55,16 @@ public class ReviewComplaintService {
     public ReviewComplaintService(ReviewComplaintRepository complaintRepository,
                                   ReviewRepository reviewRepository,
                                   CreditService creditService,
+                                  OrderDisplayService orderDisplayService,
+                                  UserDisplayService userDisplayService,
                                   NotificationService notificationService,
                                   EvidenceFileQueryPort evidenceFileQueryPort,
                                   AdminPermissionService adminPermissionService) {
         this.complaintRepository = complaintRepository;
         this.reviewRepository = reviewRepository;
         this.creditService = creditService;
+        this.orderDisplayService = orderDisplayService;
+        this.userDisplayService = userDisplayService;
         this.notificationService = notificationService;
         this.evidenceFileQueryPort = evidenceFileQueryPort;
         this.adminPermissionService = adminPermissionService;
@@ -95,11 +102,14 @@ public class ReviewComplaintService {
         complaint.setUpdatedAt(now);
 
         ReviewComplaint savedComplaint = complaintRepository.save(complaint);
+        String complainantName = resolveComplainantNickname(savedComplaint, review);
+        String respondentName = resolveRespondentNickname(savedComplaint, review);
+        String orderSubject = orderDisplayService.resolveOrderSubject(review.getOrderId());
         notificationService.createNotification(new NotificationCreateRequest(
                 review.getReviewerId(),
                 currentUserId,
-                "Review complaint submitted",
-                "A complaint has been submitted for your review.",
+                orderSubject + " 收到一条评价申诉",
+                complainantName + " 针对你在" + orderSubject + "中的评价发起了申诉，可前往订单详情查看处理进展。",
                 TYPE_COMPLAINT_CREATED,
                 TYPE_COMPLAINT_CREATED,
                 RELATED_REVIEW_COMPLAINT,
@@ -109,7 +119,7 @@ public class ReviewComplaintService {
                 RELATED_REVIEW_COMPLAINT,
                 savedComplaint.getId(),
                 "review-complaint:created:" + savedComplaint.getId(),
-                null
+                buildComplaintMetadata(savedComplaint)
         ));
 
         return toResponse(savedComplaint);
@@ -210,26 +220,27 @@ public class ReviewComplaintService {
                     review.getTargetUserId(),
                     "REVIEW",
                     review.getId(),
-                    CREDIT_EVENT_REVIEW_ARBITRATION,
+                    CREDIT_EVENT_REVIEW_ARBITRATION_APPROVED,
                     review.getOrderId(),
-                    "Review arbitration adjusted credit",
-                    CREDIT_EVENT_REVIEW_ARBITRATION,
+                    "评价申诉通过，已撤销该评价并回滚其对信用分的影响",
+                    CREDIT_EVENT_REVIEW_ARBITRATION_APPROVED,
                     complaint.getId(),
                     calculateReviewScoreChange(review.getRating())
             );
+        } else if (REJECTED.equals(result)) {
             creditService.updateCreditScore(
-                    review.getReviewerId(),
-                    ARBITRATION_RESPONSIBLE_PENALTY,
-                    CREDIT_EVENT_REVIEW_ARBITRATION,
+                    review.getTargetUserId(),
+                    0,
+                    CREDIT_EVENT_REVIEW_ARBITRATION_REJECTED,
                     review.getOrderId(),
-                    "Responsible party penalty for review arbitration",
-                    CREDIT_EVENT_REVIEW_ARBITRATION_PENALTY,
+                    "评价申诉被驳回，原评价影响继续生效",
+                    CREDIT_EVENT_REVIEW_ARBITRATION_REJECTED,
                     complaint.getId()
             );
         }
 
         ReviewComplaint savedComplaint = complaintRepository.save(complaint);
-        notifyResolved(savedComplaint);
+        notifyResolved(savedComplaint, review);
         return toResponse(savedComplaint);
     }
 
@@ -323,12 +334,23 @@ public class ReviewComplaintService {
         return adminPermissionService.hasAdminPermission(userId);
     }
 
-    private void notifyResolved(ReviewComplaint complaint) {
+    private void notifyResolved(ReviewComplaint complaint, Review review) {
+        String complainantName = resolveComplainantNickname(complaint, review);
+        String respondentName = resolveRespondentNickname(complaint, review);
+        boolean approved = REVIEW_HIDDEN.equals(complaint.getArbitrationResult());
+        String orderSubject = orderDisplayService.resolveOrderSubject(complaint.getOrderId());
+        String title = orderSubject + (approved ? " 评价申诉已通过" : " 评价申诉已驳回");
+        String complainantContent = approved
+                ? "你针对" + orderSubject + "的评价申诉已通过，该评价已被隐藏并撤销其信用影响。"
+                : "你针对" + orderSubject + "的评价申诉已被驳回，原评价将继续保留并按规则生效。";
+        String respondentContent = approved
+                ? complainantName + " 针对" + orderSubject + "的评价申诉已通过，你留下的相关评价已被隐藏。"
+                : complainantName + " 针对" + orderSubject + "的评价申诉已被驳回，你留下的评价继续保留。";
         notificationService.createNotification(new NotificationCreateRequest(
                 complaint.getComplainantId(),
                 complaint.getHandledBy(),
-                "Review complaint resolved",
-                "Your review complaint has been resolved.",
+                title,
+                complainantContent,
                 TYPE_COMPLAINT_RESOLVED,
                 TYPE_COMPLAINT_RESOLVED,
                 RELATED_REVIEW_COMPLAINT,
@@ -338,13 +360,13 @@ public class ReviewComplaintService {
                 RELATED_REVIEW_COMPLAINT,
                 complaint.getId(),
                 "review-complaint:resolved:complainant:" + complaint.getId(),
-                null
+                buildComplaintMetadata(complaint)
         ));
         notificationService.createNotification(new NotificationCreateRequest(
                 complaint.getRespondentId(),
                 complaint.getHandledBy(),
-                "Review complaint resolved",
-                "A complaint related to your review has been resolved.",
+                title,
+                respondentContent,
                 TYPE_COMPLAINT_RESOLVED,
                 TYPE_COMPLAINT_RESOLVED,
                 RELATED_REVIEW_COMPLAINT,
@@ -354,7 +376,7 @@ public class ReviewComplaintService {
                 RELATED_REVIEW_COMPLAINT,
                 complaint.getId(),
                 "review-complaint:resolved:respondent:" + complaint.getId(),
-                null
+                buildComplaintMetadata(complaint)
         ));
     }
 
@@ -375,16 +397,66 @@ public class ReviewComplaintService {
                 complaint.getReviewId(),
                 complaint.getOrderId(),
                 complaint.getComplainantId(),
+                resolveComplainantNickname(complaint, null),
                 complaint.getRespondentId(),
+                resolveRespondentNickname(complaint, null),
                 complaint.getReason(),
                 complaint.getEvidenceFileIds(),
                 complaint.getStatus(),
                 complaint.getArbitrationResult(),
                 complaint.getArbitrationComment(),
                 complaint.getHandledBy(),
+                resolveHandledByNickname(complaint),
                 complaint.getCreatedAt(),
                 complaint.getUpdatedAt(),
                 complaint.getHandledAt()
+        );
+    }
+
+    private String resolveComplainantNickname(ReviewComplaint complaint, Review review) {
+        if (review != null && complaint.getComplainantId() != null && complaint.getComplainantId().equals(review.getTargetUserId())) {
+            return userDisplayService.resolveDisplayName(complaint.getComplainantId(), targetRole(review));
+        }
+        return userDisplayService.resolveDisplayName(complaint.getComplainantId(), "");
+    }
+
+    private String resolveRespondentNickname(ReviewComplaint complaint, Review review) {
+        if (review != null && complaint.getRespondentId() != null && complaint.getRespondentId().equals(review.getReviewerId())) {
+            return userDisplayService.resolveDisplayName(complaint.getRespondentId(), reviewerRole(review));
+        }
+        return userDisplayService.resolveDisplayName(complaint.getRespondentId(), "");
+    }
+
+    private String resolveHandledByNickname(ReviewComplaint complaint) {
+        if (complaint.getHandledBy() == null) {
+            return null;
+        }
+        return userDisplayService.resolveDisplayName(complaint.getHandledBy(), "");
+    }
+
+    private String reviewerRole(Review review) {
+        return switch (String.valueOf(review.getDirection()).trim().toUpperCase()) {
+            case "CUSTOMER_TO_PROVIDER" -> "CUSTOMER";
+            case "PROVIDER_TO_CUSTOMER" -> "PROVIDER";
+            default -> "";
+        };
+    }
+
+    private String targetRole(Review review) {
+        return switch (String.valueOf(review.getDirection()).trim().toUpperCase()) {
+            case "CUSTOMER_TO_PROVIDER" -> "PROVIDER";
+            case "PROVIDER_TO_CUSTOMER" -> "CUSTOMER";
+            default -> "";
+        };
+    }
+
+    private String buildComplaintMetadata(ReviewComplaint complaint) {
+        return String.format(
+                "{\"orderId\":%d,\"reviewId\":%d,\"complaintId\":%d,\"navigationPath\":\"/orders?orderId=%d&section=reviews\"}",
+                complaint.getOrderId(),
+                complaint.getReviewId(),
+                complaint.getId(),
+                complaint.getOrderId()
         );
     }
 
