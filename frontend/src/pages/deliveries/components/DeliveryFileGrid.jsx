@@ -56,8 +56,12 @@ export function DeliveryFileGrid({
       display: 'grid',
       gridTemplateColumns: compact
         ? { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(3, minmax(0, 1fr))', xl: 'repeat(4, minmax(0, 1fr))' }
-        : { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(4, minmax(0, 1fr))', xl: 'repeat(5, minmax(0, 1fr))' },
-      gap: compact ? 0.8 : 1
+        : files.length === 1
+          ? { xs: 'minmax(0, min(100%, 420px))' }
+          : { xs: '1fr', sm: 'repeat(auto-fit, minmax(220px, 1fr))' },
+      gap: compact ? 0.8 : 1.4,
+      alignItems: 'start',
+      justifyContent: compact ? 'stretch' : 'start'
     }}>
       {files.map((file, index) => {
         const selected = isSelected(file)
@@ -105,9 +109,15 @@ export function DeliveryFileGrid({
               }
             }}
           >
-            <Box sx={{ position: 'relative', aspectRatio: '4 / 3', bgcolor: PORTRA_SURFACE.paperMuted, overflow: 'hidden' }}>
+            <Box sx={{
+              position: 'relative',
+              aspectRatio: compact || selectMode ? '4 / 3' : '3 / 2',
+              minHeight: compact || selectMode ? 0 : { xs: 220, sm: 190 },
+              bgcolor: '#f6f8fc',
+              overflow: 'hidden'
+            }}>
               {previewUrl && image ? (
-                <Box component="img" src={previewUrl} alt={file.fileName} sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                <Box component="img" src={previewUrl} alt={file.fileName} sx={{ width: '100%', height: '100%', objectFit: compact || selectMode ? 'cover' : 'contain', display: 'block' }} />
               ) : loadingPreview && image ? (
                 <Stack spacing={0.5} sx={{ height: '100%', alignItems: 'center', justifyContent: 'center', color: PORTRA_SURFACE.muted }}>
                   <Typography variant="caption" sx={{ fontWeight: 800 }}>缩略图加载中</Typography>

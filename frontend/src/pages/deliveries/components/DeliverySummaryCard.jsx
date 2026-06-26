@@ -2,7 +2,7 @@ import { Box, Button, Chip, Paper, Stack, Typography } from '@mui/material'
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded'
 import CollectionsRoundedIcon from '@mui/icons-material/CollectionsRounded'
 import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
-import { DeliveryThumbnailStrip } from './DeliveryThumbnailStrip.jsx'
+import { DeliveryCoverMosaic } from './DeliveryCoverMosaic.jsx'
 import { PORTRA_RADIUS, PORTRA_SURFACE } from '../../../theme/portraSurfaceTokens.js'
 
 export function DeliverySummaryCard({
@@ -30,52 +30,50 @@ export function DeliverySummaryCard({
         onKeyDown={event => handleKeyboardOpen(event, clickable, onOpen)}
         sx={conversationCardSx(clickable)}
       >
-        <Stack spacing={1.2}>
-          <Stack direction="row" spacing={1.1} sx={{ alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start', minWidth: 0 }}>
-              <Box sx={conversationIconSx}>
-                <ImageRoundedIcon sx={{ fontSize: 20 }} />
-              </Box>
-              <Box sx={{ minWidth: 0 }}>
-                <Typography sx={{ color: PORTRA_SURFACE.ink, fontSize: 17, fontWeight: 950, lineHeight: 1.25 }}>
-                  {label || '作品已上传'}
-                </Typography>
-                {timeLabel && (
-                  <Typography variant="body2" sx={{ mt: 0.2, color: PORTRA_SURFACE.muted, fontWeight: 750 }}>
-                    {timeLabel}
-                  </Typography>
-                )}
-              </Box>
-            </Stack>
-            <Chip
-              size="small"
-              label={statusLabel || batch.statusLabel || '待客户确认'}
-              sx={conversationChipSx}
-            />
-          </Stack>
-
-          <DeliveryThumbnailStrip files={batch.files || []} variant="message" mode="cover" />
-
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-            <Stack direction="row" spacing={0.65} sx={{ alignItems: 'center', minWidth: 0 }}>
-              <CollectionsRoundedIcon sx={{ color: PORTRA_SURFACE.portraBlue, fontSize: 18 }} />
-              <Typography variant="body2" sx={{ color: PORTRA_SURFACE.muted, fontWeight: 850, minWidth: 0 }}>
-                {countText}
+        <Box sx={conversationHeaderSx}>
+          <Stack direction="row" spacing={1.1} sx={{ alignItems: 'flex-start', minWidth: 0 }}>
+            <Box sx={conversationIconSx}>
+              <ImageRoundedIcon sx={{ fontSize: 20 }} />
+            </Box>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ color: PORTRA_SURFACE.ink, fontSize: 18, fontWeight: 950, lineHeight: 1.22 }}>
+                {label || '作品已上传'}
               </Typography>
-            </Stack>
-            <Button
-              variant="outlined"
-              endIcon={<ArrowForwardRoundedIcon />}
-              disabled={!clickable}
-              onClick={event => {
-                event.stopPropagation()
-                if (clickable) onOpen()
-              }}
-              sx={conversationButtonSx}
-            >
-              查看作品
-            </Button>
+              {timeLabel && (
+                <Typography variant="body2" sx={{ mt: 0.22, color: PORTRA_SURFACE.muted, fontWeight: 750 }}>
+                  {timeLabel}
+                </Typography>
+              )}
+            </Box>
           </Stack>
+          <Chip
+            size="small"
+            label={statusLabel || batch.statusLabel || '待客户确认'}
+            sx={conversationChipSx}
+          />
+        </Box>
+
+        <DeliveryCoverMosaic files={batch.files || []} variant="conversation" />
+
+        <Stack direction="row" spacing={1} sx={conversationFooterSx}>
+          <Stack direction="row" spacing={0.65} sx={{ alignItems: 'center', minWidth: 0 }}>
+            <CollectionsRoundedIcon sx={{ color: PORTRA_SURFACE.portraBlue, fontSize: 18 }} />
+            <Typography variant="body2" sx={{ color: PORTRA_SURFACE.muted, fontWeight: 850, minWidth: 0 }}>
+              {countText}
+            </Typography>
+          </Stack>
+          <Button
+            variant="outlined"
+            endIcon={<ArrowForwardRoundedIcon />}
+            disabled={!clickable}
+            onClick={event => {
+              event.stopPropagation()
+              if (clickable) onOpen()
+            }}
+            sx={conversationButtonSx}
+          >
+            查看作品
+          </Button>
         </Stack>
       </Paper>
     )
@@ -92,7 +90,7 @@ export function DeliverySummaryCard({
     >
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} sx={{ alignItems: { sm: 'center' } }}>
         <Box sx={{ width: { xs: '100%', sm: 132 }, flexShrink: 0 }}>
-          <DeliveryThumbnailStrip files={batch.files || []} variant="orderSummary" mode="cover" />
+          <DeliveryCoverMosaic files={batch.files || []} variant="order" />
         </Box>
         <Stack spacing={0.45} sx={{ minWidth: 0, flex: 1 }}>
           <Typography sx={{ color: PORTRA_SURFACE.ink, fontWeight: 950, lineHeight: 1.35 }}>
@@ -154,15 +152,22 @@ function conversationCardSx(clickable) {
     cursor: clickable ? 'pointer' : 'default',
     boxShadow: '0 10px 24px rgba(24, 38, 62, .055)',
     transition: 'transform .16s ease, border-color .16s ease, box-shadow .16s ease',
-    '& > .MuiStack-root': {
-      p: 1.05
-    },
     '&:hover': clickable ? {
       transform: 'translateY(-1px)',
       borderColor: 'rgba(63, 127, 219, .46)',
       boxShadow: '0 14px 30px rgba(24, 38, 62, .075)'
     } : undefined
   }
+}
+
+const conversationHeaderSx = {
+  minHeight: { xs: 72, sm: 80 },
+  px: { xs: 1.45, sm: 1.7 },
+  py: { xs: 1.15, sm: 1.35 },
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 1.2
 }
 
 const conversationIconSx = {
@@ -184,6 +189,15 @@ const conversationChipSx = {
   color: '#e95a24',
   fontWeight: 900,
   flexShrink: 0
+}
+
+const conversationFooterSx = {
+  minHeight: { xs: 76, sm: 84 },
+  px: { xs: 1.45, sm: 1.7 },
+  py: { xs: 1.2, sm: 1.35 },
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 1
 }
 
 const conversationButtonSx = {
