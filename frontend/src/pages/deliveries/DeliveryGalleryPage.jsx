@@ -43,6 +43,7 @@ export function DeliveryGalleryPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [previewUrls, setPreviewUrls] = useState({})
+  const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [viewerIndex, setViewerIndex] = useState(-1)
   const [actionLoading, setActionLoading] = useState(false)
@@ -119,7 +120,8 @@ export function DeliveryGalleryPage() {
     Object.values(previewUrls).forEach(url => URL.revokeObjectURL(url))
   }, [previewUrls])
 
-  function toggleSelected(fileId) {
+  function toggleSelected(file) {
+    const fileId = getGallerySelectionId(file)
     setSelectedIds(previous => {
       const next = new Set(previous)
       if (next.has(fileId)) next.delete(fileId)
@@ -212,7 +214,7 @@ export function DeliveryGalleryPage() {
     }
   }
 
-  const selectedFiles = files.filter(file => selectedIds.has(file.id))
+  const selectedFiles = files.filter(file => selectedIds.has(getGallerySelectionId(file)))
   const viewerFile = viewerIndex >= 0 ? files[viewerIndex] : null
   const viewerUrl = viewerFile ? previewUrls[viewerFile.id] || previewUrls[viewerFile.fileId] : ''
   const conversationId = location.state?.conversationId || new URLSearchParams(location.search).get('conversationId')
@@ -297,22 +299,28 @@ export function DeliveryGalleryPage() {
             {files.length ? (
               <DeliveryFileGrid
                 files={files}
+                mode={selectionMode ? 'select' : 'browse'}
                 previewUrls={previewUrls}
-                selectedIds={selectedIds}
-                onToggle={toggleSelected}
-                onOpenViewer={setViewerIndex}
-                onDownloadFile={downloadFile}
+                selectedFileIds={selectedIds}
+                onToggleSelect={toggleSelected}
+                onPreview={(_, index) => setViewerIndex(index)}
+                onDownload={downloadFile}
               />
             ) : (
               <PortraEmptyState title="暂无作品" description="该作品记录没有可展示的照片信息。" />
             )}
           </PortraTicketSection>
           <DeliveryActionBar
+            selectionMode={selectionMode}
             selectedCount={selectedFiles.length}
             downloadableCount={files.filter(file => file.fileId).length}
             onDownloadSelected={() => downloadFiles(selectedFiles)}
             onDownloadAll={() => downloadFiles(files)}
-            onClearSelection={() => setSelectedIds(new Set())}
+            onEnterSelection={() => setSelectionMode(true)}
+            onCancelSelection={() => {
+              setSelectedIds(new Set())
+              setSelectionMode(false)
+            }}
           />
           </Stack>
         </Paper>
@@ -509,4 +517,8 @@ function formatGalleryFileCount(batch) {
   if (zipCount) parts.push(`${zipCount} 个 ZIP`)
   if (otherCount) parts.push(`${otherCount} 个文件`)
   return parts.length ? parts.join(' / ') : '暂无文件'
+}
+
+function getGallerySelectionId(file) {
+  return getDeliveryFileId(file) || file?.id
 }

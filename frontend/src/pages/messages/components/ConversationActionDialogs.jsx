@@ -10,9 +10,6 @@ import {
   RadioGroup,
   FormControl,
   FormControlLabel,
-  InputLabel,
-  MenuItem,
-  Select,
   Stack,
   TextField,
   Typography
@@ -25,6 +22,7 @@ import { formatTime } from '../utils/conversationUtils.js'
 import { buildQuoteDisplayModel } from '../utils/quoteDisplayModel.js'
 import { QuoteMoneyText } from './QuoteMoneyText.jsx'
 import { DeliveryUploadDialog } from '../../deliveries/components/DeliveryUploadDialog.jsx'
+import { DeliveryFileGrid } from '../../deliveries/components/DeliveryFileGrid.jsx'
 import { flattenDeliveryFiles, isAuthorizableDeliveryFile } from '../../deliveries/deliveryDisplay.js'
 
 export function ConversationActionDialogs({
@@ -65,8 +63,23 @@ export function ConversationActionDialogs({
     .filter(file => file.fileId && isAuthorizableDeliveryFile(file))
     .map(file => ({
       fileId: Number(file.fileId),
-      fileName: formatFileDisplayName(file, '作品')
+      id: file.id || `authorization-${file.fileId}`,
+      fileName: formatFileDisplayName(file, '作品'),
+      mimeType: file.mimeType,
+      fileType: file.fileType,
+      uploadTime: file.uploadTime,
+      source: file
     }))
+  const selectedAuthorizationFileIds = new Set(safePhotoAuthorizationForm.fileIds.map(Number))
+
+  function toggleAuthorizationFile(file) {
+    const fileId = Number(file?.fileId)
+    if (!fileId) return
+    const next = new Set(selectedAuthorizationFileIds)
+    if (next.has(fileId)) next.delete(fileId)
+    else next.add(fileId)
+    onPhotoAuthorizationFileIdsChange(Array.from(next))
+  }
 
   async function submitAndClose(handler, event) {
     event.preventDefault()
@@ -225,22 +238,23 @@ export function ConversationActionDialogs({
         <DialogTitle sx={dialogTitleSx}>申请展示授权</DialogTitle>
         <DialogContent sx={dialogContentSx}>
           <Stack component="form" id="authorization-dialog-form" spacing={2} sx={{ pt: 1 }} onSubmit={event => submitAndClose(onSubmitPhotoAuthorization, event)}>
-            <DialogContentText>请选择已经上传的作品，并说明希望展示这些照片的用途。</DialogContentText>
-            <FormControl>
-              <InputLabel>选择已上传作品</InputLabel>
-              <Select
-                multiple
-                label="选择已上传作品"
-                value={safePhotoAuthorizationForm.fileIds}
-                onChange={event => {
-                  const value = event.target.value
-                  onPhotoAuthorizationFileIdsChange((typeof value === 'string' ? value.split(',') : value).map(Number))
-                }}
-                renderValue={selected => selected.map(fileId => deliveryFiles.find(file => file.fileId === Number(fileId))?.fileName || '作品').join('、')}
-              >
-                {deliveryFiles.map(file => <MenuItem key={file.fileId} value={file.fileId}>{file.fileName}</MenuItem>)}
-              </Select>
-            </FormControl>
+            <DialogContentText>请选择已经上传的图片作品，并说明希望展示这些照片的用途。压缩包不会用于公开展示。</DialogContentText>
+            {deliveryFiles.length ? (
+              <Stack spacing={1}>
+                <Typography sx={{ color: PORTRA_COLORS.faintInk, fontSize: 12, fontWeight: 900 }}>
+                  已选择 {selectedAuthorizationFileIds.size} 张
+                </Typography>
+                <DeliveryFileGrid
+                  files={deliveryFiles}
+                  mode="select"
+                  compact
+                  selectedFileIds={selectedAuthorizationFileIds}
+                  onToggleSelect={toggleAuthorizationFile}
+                />
+              </Stack>
+            ) : (
+              <DialogContentText>暂无可授权的图片作品，请先上传图片交付文件。</DialogContentText>
+            )}
             <TextField
               label="申请说明"
               value={safePhotoAuthorizationForm.remark}

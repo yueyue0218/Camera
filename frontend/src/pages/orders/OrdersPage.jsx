@@ -88,6 +88,7 @@ import { InfoRows } from './components/InfoRows.jsx'
 import { OrdersSectionHeader } from './components/OrdersSectionHeader.jsx'
 import { ReviewList } from './components/ReviewList.jsx'
 import { DeliveryBatchCard } from '../deliveries/components/DeliveryBatchCard.jsx'
+import { DeliveryFileGrid } from '../deliveries/components/DeliveryFileGrid.jsx'
 import { DeliveryUploadPanel } from '../deliveries/components/DeliveryUploadPanel.jsx'
 import { buildDeliveryBatches, flattenDeliveryFiles, isAuthorizableDeliveryFile } from '../deliveries/deliveryDisplay.js'
 import {
@@ -666,6 +667,18 @@ export function OrdersPage() {
     }
   }
 
+  function togglePhotoAuthorizationFile(file) {
+    const fileId = Number(file?.fileId)
+    if (!fileId) return
+    const next = new Set(photoAuthorizationForm.fileIds.map(Number))
+    if (next.has(fileId)) next.delete(fileId)
+    else next.add(fileId)
+    setPhotoAuthorizationForm({
+      ...photoAuthorizationForm,
+      fileIds: Array.from(next)
+    })
+  }
+
   async function handlePhotoAuthorizationDecision(authorization, decision, decisionRemark = '') {
     if (!selectedOrder) return
     const remark = (decisionRemark || authorizationRemarks[authorization.id] || '').trim()
@@ -846,16 +859,22 @@ export function OrdersPage() {
         if (!map.has(fileId)) {
           map.set(fileId, {
             fileId,
+            id: file.id || `authorization-${fileId}`,
             fileName: formatFileDisplayName(file, `作品 ${fileId}`),
-            uploadTime: file.uploadTime
+            mimeType: file.mimeType,
+            fileType: file.fileType,
+            fileSize: file.fileSize,
+            uploadTime: file.uploadTime,
+            source: file
           })
         }
       })
     return Array.from(map.values())
   }, [deliveryRecords])
-  const deliveryFileNameMap = useMemo(() => new Map(
-    deliveryFileOptions.map(file => [Number(file.fileId), file.fileName])
-  ), [deliveryFileOptions])
+  const selectedPhotoAuthorizationFileIds = useMemo(
+    () => new Set(photoAuthorizationForm.fileIds.map(Number)),
+    [photoAuthorizationForm.fileIds]
+  )
   const deliveryBatches = useMemo(() => buildDeliveryBatches(deliveryRecords, selectedOrder), [deliveryRecords, selectedOrder])
   const latestDeliveryUploadTime = useMemo(() => getLatestDeliveryUploadTime(deliveryRecords), [deliveryRecords])
   const estimatedAutoConfirmTime = latestDeliveryUploadTime ? addDays(latestDeliveryUploadTime, 7) : null
@@ -1172,14 +1191,31 @@ export function OrdersPage() {
                 <Stack spacing={1}>
                   <Typography variant="overline" sx={overlineSx}>作品记录</Typography>
                   {deliveryBatches.map(batch => (
-                    <DeliveryBatchCard
-                      key={batch.id}
-                      batch={batch}
-                      variant="orderSection"
-                      chrome="none"
-                      onOpen={() => openDeliveryBatch(batch)}
-                      disabled={!batch.deliveryId || !selectedOrder?.orderId}
-                    />
+                    <Paper key={batch.id} variant="outlined" sx={{ ...subCardSx, p: 1.15 }}>
+                      <Stack spacing={1.1}>
+                        <DeliveryBatchCard
+                          batch={batch}
+                          variant="orderSection"
+                          chrome="none"
+                          onOpen={() => openDeliveryBatch(batch)}
+                          disabled={!batch.deliveryId || !selectedOrder?.orderId}
+                        />
+                        {batch.files?.length ? (
+                          <DeliveryFileGrid
+                            files={batch.files.slice(0, 6)}
+                            mode="browse"
+                            compact
+                            onPreview={openDeliveryPreview}
+                            onDownload={downloadDeliveryFile}
+                          />
+                        ) : null}
+                        {batch.files?.length > 6 && (
+                          <Button size="small" variant="text" onClick={() => openDeliveryBatch(batch)}>
+                            查看全部 {batch.files.length} 个文件
+                          </Button>
+                        )}
+                      </Stack>
+                    </Paper>
                   ))}
                   {!deliveryBatches.length && <PortraEmptyState title="暂无作品记录" compact />}
                 </Stack>
@@ -1204,30 +1240,17 @@ export function OrdersPage() {
                       <Typography fontWeight={800}>发起展示授权申请</Typography>
                       {deliveryFileOptions.length ? (
                         <>
-                          <FormControl size="small">
-                            <InputLabel>选择作品</InputLabel>
-                            <Select
-                              multiple
-                              label="选择作品"
-                              value={photoAuthorizationForm.fileIds}
-                              onChange={event => {
-                                const value = event.target.value
-                                setPhotoAuthorizationForm({
-                                  ...photoAuthorizationForm,
-                                  fileIds: (typeof value === 'string' ? value.split(',') : value).map(Number)
-                                })
-                              }}
-                              renderValue={selected => selected
-                                .map(fileId => deliveryFileNameMap.get(Number(fileId)) || `作品 ${fileId}`)
-                                .join('、')}
-                            >
-                              {deliveryFileOptions.map(file => (
-                                <MenuItem key={file.fileId} value={file.fileId}>
-                                  {file.fileName} · {formatTime(file.uploadTime)}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </FormControl>
+                          <PortraInfoBanner>仅可选择图片作品用于展示授权，压缩包不会用于公开展示。</PortraInfoBanner>
+                          <Typography variant="body2" sx={{ color: PORTRA_SURFACE.muted, fontWeight: 800 }}>
+                            已选择 {selectedPhotoAuthorizationFileIds.size} 张
+                          </Typography>
+                          <DeliveryFileGrid
+                            files={deliveryFileOptions}
+                            mode="select"
+                            compact
+                            selectedFileIds={selectedPhotoAuthorizationFileIds}
+                            onToggleSelect={togglePhotoAuthorizationFile}
+                          />
                           <TextField
                             label="申请说明"
                             value={photoAuthorizationForm.remark}
