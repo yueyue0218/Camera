@@ -151,27 +151,29 @@ export function DeliveryFileGrid({
                 sx={{ position: 'absolute', top: 6, right: 6, p: 0.4, bgcolor: 'rgba(255,255,255,.82)', borderRadius: '50%' }}
               />
             )}
-            <Box sx={{ px: 0.9, py: 0.75 }}>
-              <Typography variant="body2" noWrap sx={{ color: PORTRA_SURFACE.ink, fontWeight: 800 }}>{file.fileName}</Typography>
-              <Stack direction="row" spacing={0.7} sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-                <Typography variant="caption" sx={{ color: PORTRA_SURFACE.muted }}>
-                  {image ? '图片作品' : zip ? 'ZIP 压缩包' : '交付文件'}
-                </Typography>
-                {!selectMode && hasFile && !image && (
-                  <Button
-                    size="small"
-                    startIcon={<DownloadRoundedIcon />}
-                    onClick={event => {
-                      event.stopPropagation()
-                      download(file, index)
-                    }}
-                    sx={{ minWidth: 0, px: 0.6, py: 0.1, fontSize: 12 }}
-                  >
-                    下载
-                  </Button>
-                )}
-              </Stack>
-            </Box>
+            {selectMode || !image ? (
+              <Box sx={{ px: 0.9, py: 0.75 }}>
+                <Typography variant="body2" noWrap sx={{ color: PORTRA_SURFACE.ink, fontWeight: 800 }}>{file.fileName}</Typography>
+                <Stack direction="row" spacing={0.7} sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                  <Typography variant="caption" sx={{ color: PORTRA_SURFACE.muted }}>
+                    {image ? '图片' : zip ? 'ZIP 压缩包' : '交付文件'}
+                  </Typography>
+                  {!selectMode && hasFile && !image && (
+                    <Button
+                      size="small"
+                      startIcon={<DownloadRoundedIcon />}
+                      onClick={event => {
+                        event.stopPropagation()
+                        download(file, index)
+                      }}
+                      sx={{ minWidth: 0, px: 0.6, py: 0.1, fontSize: 12 }}
+                    >
+                      下载
+                    </Button>
+                  )}
+                </Stack>
+              </Box>
+            ) : null}
           </Box>
         )
       })}
