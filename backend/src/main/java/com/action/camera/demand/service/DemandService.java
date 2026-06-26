@@ -160,11 +160,10 @@ public class DemandService {
         if (publicStatus == null) {
             return new PageResult<>(List.of(), safePage, safeSize, 0);
         }
-        List<Demand> candidates = demandRepository.findAll().stream()
+        List<Demand> candidates = demandRepository.findByStatus(publicStatus).stream()
                 .filter(demand -> !Boolean.TRUE.equals(demand.getHiddenByCustomer()))
                 .filter(demand -> normalizedCity == null || equalsIgnoreCase(demand.getCityCode(), normalizedCity))
                 .filter(demand -> normalizedScene == null || equalsIgnoreCase(demand.getScene(), normalizedScene))
-                .filter(demand -> demand.getStatus() == publicStatus)
                 .filter(demand -> expectedDate == null || expectedDate.equals(demand.getExpectedDate()))
                 .filter(demand -> normalizedTag == null || demand.getStyleTags().contains(normalizedTag))
                 .filter(demand -> normalizedTimeTag == null || demand.getTimeTags().contains(normalizedTimeTag))
@@ -662,13 +661,16 @@ public class DemandService {
         if (normalized == null) {
             return true;
         }
-        CustomerInfo customerInfo = customerInfo(demand.getCustomerId());
-        return containsKeyword(normalized,
+        boolean demandMatched = containsKeyword(normalized,
                 demand.getScene(),
                 demand.getDescription(),
-                demand.getLocation(),
-                customerInfo == null ? null : customerInfo.nickname())
+                demand.getLocation())
                 || listContainsKeyword(demand.getStyleTags(), normalized);
+        if (demandMatched) {
+            return true;
+        }
+        CustomerInfo customerInfo = customerInfo(demand.getCustomerId());
+        return containsKeyword(normalized, customerInfo == null ? null : customerInfo.nickname());
     }
 
     private PhotographerPreference demandRecommendationPreference(CurrentUser currentUser,

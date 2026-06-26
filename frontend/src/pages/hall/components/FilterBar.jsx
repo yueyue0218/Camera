@@ -79,6 +79,9 @@ export function FilterBar({ filters, onChange, onApplyFilters, onPublishClick, c
     onChange(partial)
     onApplyFilters(nextFilters)
   }
+  const handleBudgetKeyDown = field => event => {
+    if (event.key === 'Enter') updateAndApply({ [field]: event.currentTarget.value })
+  }
   const handleSearchKeyDown = event => {
     if (event.key === 'Enter') onApplyFilters({ ...filters, keyword: event.currentTarget.value })
   }
@@ -113,7 +116,9 @@ export function FilterBar({ filters, onChange, onApplyFilters, onPublishClick, c
           min="0"
           type="number"
           value={filters.minBudgetYuan}
-          onChange={event => updateAndApply({ minBudgetYuan: event.target.value })}
+          onChange={event => onChange({ minBudgetYuan: event.target.value })}
+          onBlur={event => updateAndApply({ minBudgetYuan: event.currentTarget.value })}
+          onKeyDown={handleBudgetKeyDown('minBudgetYuan')}
           placeholder="最低价"
         />
         <span>-</span>
@@ -122,7 +127,9 @@ export function FilterBar({ filters, onChange, onApplyFilters, onPublishClick, c
           min="0"
           type="number"
           value={filters.maxBudgetYuan}
-          onChange={event => updateAndApply({ maxBudgetYuan: event.target.value })}
+          onChange={event => onChange({ maxBudgetYuan: event.target.value })}
+          onBlur={event => updateAndApply({ maxBudgetYuan: event.currentTarget.value })}
+          onKeyDown={handleBudgetKeyDown('maxBudgetYuan')}
           placeholder="最高价"
         />
         {(filters.minBudgetYuan || filters.maxBudgetYuan) && <button className="filter-clear" type="button" onClick={() => updateAndApply({ minBudgetYuan: '', maxBudgetYuan: '' })}>清空</button>}
