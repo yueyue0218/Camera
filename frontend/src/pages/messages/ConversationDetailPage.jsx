@@ -8,6 +8,7 @@ import { conversationApi, deliveryApi, orderApi, photoAuthorizationApi, quoteApi
 import { goToUserProfile } from '../../utils/orderNavigation.js'
 import { getNextOrderWorkflowRefreshDelay } from '../../utils/orderWorkflowModel.js'
 import { useWorkflowNavigate } from '../../hooks/useWorkflowNavigate.js'
+import { useWorkflowDraft } from '../../hooks/useWorkflowDraft.js'
 import { buildWorkflowCacheKey, mergeWorkflowViewState, readWorkflowViewState, writeWorkflowViewState } from '../../utils/workflowViewCache.js'
 import {
   navigateToDeliveryFromConversation,
@@ -75,6 +76,26 @@ function canUseConversationRecord(conversation, currentUser, conversationId) {
   return Boolean(getUserRoleInConversation(conversation, currentUser))
 }
 
+function createDeliveryDraft() {
+  return { files: [], remark: '' }
+}
+
+function createPhotoAuthorizationDraft() {
+  return { fileIds: [], remark: '' }
+}
+
+function isDeliveryDraftDirty(value) {
+  return Boolean((Array.isArray(value?.files) && value.files.length) || String(value?.remark || '').trim())
+}
+
+function isPhotoAuthorizationDraftDirty(value) {
+  return Boolean((Array.isArray(value?.fileIds) && value.fileIds.length) || String(value?.remark || '').trim())
+}
+
+function hasAuthorizationRemarkDraft(value) {
+  return Object.values(value || {}).some(remark => String(remark || '').trim())
+}
+
 function findConversationById(conversations = [], conversationId) {
   return conversations.find(item => sameConversationId(item, conversationId)) || null
 }
@@ -93,10 +114,6 @@ export function ConversationDetailPage() {
   const [photoAuthorizations, setPhotoAuthorizations] = useState([])
   const [content, setContent] = useState('')
   const [quoteForm, setQuoteForm] = useState(() => createDefaultQuoteForm())
-  const [deliveryForm, setDeliveryForm] = useState({ files: [], remark: '' })
-  const [reworkRequirement, setReworkRequirement] = useState('')
-  const [photoAuthorizationForm, setPhotoAuthorizationForm] = useState({ fileIds: [], remark: '' })
-  const [authorizationRemarks, setAuthorizationRemarks] = useState({})
   const [showQuoteForm, setShowQuoteForm] = useState(false)
   const [editingQuotationId, setEditingQuotationId] = useState(null)
   const [quoteValidationErrors, setQuoteValidationErrors] = useState([])
@@ -109,6 +126,19 @@ export function ConversationDetailPage() {
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
   const [peerProfile, setPeerProfile] = useState(null)
   const feedback = usePortraFeedback()
+  const orderDraftScope = `conversation:${conversationId}:order:${currentOrder?.orderId || 'none'}`
+  const deliveryDraft = useWorkflowDraft(`${orderDraftScope}:delivery`, createDeliveryDraft, isDeliveryDraftDirty)
+  const reworkDraft = useWorkflowDraft(`${orderDraftScope}:rework`, () => '', value => String(value || '').trim().length > 0)
+  const photoAuthorizationDraft = useWorkflowDraft(`${orderDraftScope}:photo-authorization`, createPhotoAuthorizationDraft, isPhotoAuthorizationDraftDirty)
+  const authorizationRemarkDraft = useWorkflowDraft(`${orderDraftScope}:authorization-remarks`, () => ({}), hasAuthorizationRemarkDraft)
+  const deliveryForm = deliveryDraft.value || createDeliveryDraft()
+  const setDeliveryForm = deliveryDraft.setValue
+  const reworkRequirement = reworkDraft.value || ''
+  const setReworkRequirement = reworkDraft.setValue
+  const photoAuthorizationForm = photoAuthorizationDraft.value || createPhotoAuthorizationDraft()
+  const setPhotoAuthorizationForm = photoAuthorizationDraft.setValue
+  const authorizationRemarks = authorizationRemarkDraft.value || {}
+  const setAuthorizationRemarks = authorizationRemarkDraft.setValue
   const { run: runWorkflowAction, loading: actionLoading } = usePortraAsyncAction({
     errorMessage: getCWorkbenchErrorText
   })
@@ -299,10 +329,6 @@ export function ConversationDetailPage() {
     setStatusLogs([])
     setDeliveryRecords([])
     setPhotoAuthorizations([])
-    setDeliveryForm({ files: [], remark: '' })
-    setReworkRequirement('')
-    setPhotoAuthorizationForm({ fileIds: [], remark: '' })
-    setAuthorizationRemarks({})
   }
 
   async function loadOrderWorkbench(orderId) {
@@ -316,10 +342,6 @@ export function ConversationDetailPage() {
     setStatusLogs(logs || [])
     setDeliveryRecords(deliveries || [])
     setPhotoAuthorizations(authorizations || [])
-    setDeliveryForm({ files: [], remark: '' })
-    setReworkRequirement('')
-    setPhotoAuthorizationForm({ fileIds: [], remark: '' })
-    setAuthorizationRemarks({})
   }
 
   async function sendMessage() {
@@ -585,7 +607,7 @@ export function ConversationDetailPage() {
     const result = await run(async () => deliveryApi.upload(currentOrder.orderId, files, deliveryForm.remark.trim(), currentUser),
       currentOrder.status === 'REWORK_REQUIRED' ? '返修作品已发送给客户验收' : '交付作品已发送给客户验收')
     if (result) {
-      setDeliveryForm({ files: [], remark: '' })
+      deliveryDraft.clearDraft()
       await refreshConversationData(conversation, currentOrder.orderId)
       return true
     }
@@ -602,6 +624,7 @@ export function ConversationDetailPage() {
     }
     const result = await run(async () => orderApi.requestRework(currentOrder.orderId, reason, currentUser), '返修请求已提交')
     if (result) {
+      reworkDraft.clearDraft()
       await refreshConversationData(conversation, currentOrder.orderId)
       return true
     }
@@ -616,6 +639,7 @@ export function ConversationDetailPage() {
       remark: photoAuthorizationForm.remark.trim()
     }, currentUser), '展示授权申请已发送')
     if (result) {
+      photoAuthorizationDraft.clearDraft()
       await refreshConversationData(conversation, currentOrder.orderId)
       return true
     }
@@ -633,7 +657,7 @@ export function ConversationDetailPage() {
     const successText = decision === 'approve' ? '已同意展示授权' : '已拒绝展示授权'
     const result = await run(async () => action(authorization.id, { remark }, currentUser), successText)
     if (result) {
-      setAuthorizationRemarks({ ...authorizationRemarks, [authorization.id]: '' })
+      authorizationRemarkDraft.setValue(previous => ({ ...previous, [authorization.id]: '' }))
       await refreshConversationData(conversation, currentOrder.orderId)
     }
     return Boolean(result)
@@ -697,6 +721,34 @@ export function ConversationDetailPage() {
       feedback.warning('作品记录暂不可查看，请刷新后重试。')
     }
     return succeeded
+  }
+
+  async function closeActionDialogs() {
+    if (loading) {
+      feedback.warning('操作正在提交，请稍候。')
+      return
+    }
+    const shouldClose = await confirmActiveActionDiscard()
+    if (!shouldClose) return
+    setActiveAction(null)
+    setActiveQuote(null)
+  }
+
+  async function confirmActiveActionDiscard() {
+    if (activeAction === 'UPLOAD_DELIVERY' || activeAction === 'REUPLOAD_DELIVERY') {
+      return deliveryDraft.confirmDiscard(feedback)
+    }
+    if (activeAction === 'REQUEST_REWORK') {
+      return reworkDraft.confirmDiscard(feedback, {
+        message: '当前返修要求尚未提交，关闭后将丢弃已填写内容。确定关闭吗？'
+      })
+    }
+    if (activeAction === 'REQUEST_AUTHORIZATION') {
+      return photoAuthorizationDraft.confirmDiscard(feedback, {
+        message: '当前授权申请尚未提交，关闭后将丢弃已选择的作品和填写内容。确定关闭吗？'
+      })
+    }
+    return true
   }
 
   const currentUserId = getCurrentUserId(currentUser)
@@ -947,10 +999,7 @@ export function ConversationDetailPage() {
         deliveryForm={deliveryForm}
         reworkRequirement={reworkRequirement}
         photoAuthorizationForm={photoAuthorizationForm}
-        onClose={() => {
-          setActiveAction(null)
-          setActiveQuote(null)
-        }}
+        onClose={closeActionDialogs}
         onPaymentMethodChange={setPaymentMethod}
         onConfirmQuote={confirmQuoteFromDialog}
         onRejectQuote={rejectQuoteFromDialog}
@@ -959,8 +1008,8 @@ export function ConversationDetailPage() {
         onDeliveryFilesChange={files => setDeliveryForm(previous => ({ ...previous, files }))}
         onDeliveryRemarkChange={remark => setDeliveryForm(previous => ({ ...previous, remark }))}
         onReworkRequirementChange={setReworkRequirement}
-        onPhotoAuthorizationFileIdsChange={fileIds => setPhotoAuthorizationForm({ ...photoAuthorizationForm, fileIds })}
-        onPhotoAuthorizationRemarkChange={remark => setPhotoAuthorizationForm({ ...photoAuthorizationForm, remark })}
+        onPhotoAuthorizationFileIdsChange={fileIds => setPhotoAuthorizationForm(previous => ({ ...previous, fileIds }))}
+        onPhotoAuthorizationRemarkChange={remark => setPhotoAuthorizationForm(previous => ({ ...previous, remark }))}
         onSubmitDelivery={submitDelivery}
         onSubmitRework={submitRework}
         onSubmitPhotoAuthorization={submitPhotoAuthorizationRequest}

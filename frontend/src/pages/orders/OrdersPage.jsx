@@ -46,6 +46,7 @@ import { ORDER_SURFACES, WORKFLOW_SOURCES, buildOrderListTarget, isOrderListSurf
 import { deriveOrderWorkflowState, getNextOrderWorkflowRefreshDelay } from '../../utils/orderWorkflowModel.js'
 import { getOrderActionVisibility } from '../../utils/orderActionVisibility.js'
 import { useWorkflowNavigate } from '../../hooks/useWorkflowNavigate.js'
+import { useWorkflowDraft } from '../../hooks/useWorkflowDraft.js'
 import { buildWorkflowCacheKey, readWorkflowViewState, writeWorkflowViewState } from '../../utils/workflowViewCache.js'
 import {
   getExplicitReturnToConversation,
@@ -256,6 +257,42 @@ function asArray(value) {
   return Array.isArray(value) ? value : []
 }
 
+function createDeliveryDraft() {
+  return { files: [], remark: '' }
+}
+
+function createPhotoAuthorizationDraft() {
+  return { fileIds: [], remark: '' }
+}
+
+function createReviewDraft() {
+  return { rating: 5, content: '沟通顺畅，履约体验很好。' }
+}
+
+function createArbitrationDraft() {
+  return { reason: '评价内容不实', description: '' }
+}
+
+function isDeliveryDraftDirty(value) {
+  return Boolean((Array.isArray(value?.files) && value.files.length) || String(value?.remark || '').trim())
+}
+
+function isPhotoAuthorizationDraftDirty(value) {
+  return Boolean((Array.isArray(value?.fileIds) && value.fileIds.length) || String(value?.remark || '').trim())
+}
+
+function isReviewDraftDirty(value) {
+  return Number(value?.rating || 5) !== 5 || String(value?.content || '').trim() !== '沟通顺畅，履约体验很好。'
+}
+
+function isArbitrationDraftDirty(value) {
+  return String(value?.reason || '') !== '评价内容不实' || String(value?.description || '').trim().length > 0
+}
+
+function hasAuthorizationRemarkDraft(value) {
+  return Object.values(value || {}).some(remark => String(remark || '').trim())
+}
+
 export function OrdersPage() {
   const location = useLocation()
   const navigate = useWorkflowNavigate()
@@ -270,8 +307,6 @@ export function OrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [statusLogs, setStatusLogs] = useState([])
   const [deliveryRecords, setDeliveryRecords] = useState([])
-  const [deliveryForm, setDeliveryForm] = useState({ files: [], remark: '' })
-  const [reworkRequirement, setReworkRequirement] = useState('')
   const [reworkDialogOpen, setReworkDialogOpen] = useState(false)
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
   const [previewDelivery, setPreviewDelivery] = useState(null)
@@ -279,21 +314,33 @@ export function OrdersPage() {
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewError, setPreviewError] = useState('')
   const [photoAuthorizations, setPhotoAuthorizations] = useState([])
-  const [photoAuthorizationForm, setPhotoAuthorizationForm] = useState({ fileIds: [], remark: '' })
-  const [authorizationRemarks, setAuthorizationRemarks] = useState({})
   const [orderReviews, setOrderReviews] = useState([])
-  const [reviewForm, setReviewForm] = useState({ rating: 5, content: '沟通顺畅，履约体验很好。' })
   const [showReviewForm, setShowReviewForm] = useState(false)
   const [arbitrations, setArbitrations] = useState([])
-  const [arbitrationForm, setArbitrationForm] = useState({
-    reason: '评价内容不实',
-    description: ''
-  })
   const [showArbitrationForm, setShowArbitrationForm] = useState(false)
   const [sentInvitations, setSentInvitations] = useState([])
   const [statusFilter, setStatusFilter] = useState('')
   const [pageLoading, setPageLoading] = useState(false)
   const feedback = usePortraFeedback()
+  const orderDraftScope = `order:${selectedOrder?.orderId || focusOrderId || 'none'}`
+  const deliveryDraft = useWorkflowDraft(`${orderDraftScope}:delivery`, createDeliveryDraft, isDeliveryDraftDirty)
+  const reworkDraft = useWorkflowDraft(`${orderDraftScope}:rework`, () => '', value => String(value || '').trim().length > 0)
+  const photoAuthorizationDraft = useWorkflowDraft(`${orderDraftScope}:photo-authorization`, createPhotoAuthorizationDraft, isPhotoAuthorizationDraftDirty)
+  const authorizationRemarkDraft = useWorkflowDraft(`${orderDraftScope}:authorization-remarks`, () => ({}), hasAuthorizationRemarkDraft)
+  const reviewDraft = useWorkflowDraft(`${orderDraftScope}:review`, createReviewDraft, isReviewDraftDirty)
+  const arbitrationDraft = useWorkflowDraft(`${orderDraftScope}:arbitration`, createArbitrationDraft, isArbitrationDraftDirty)
+  const deliveryForm = deliveryDraft.value || createDeliveryDraft()
+  const setDeliveryForm = deliveryDraft.setValue
+  const reworkRequirement = reworkDraft.value || ''
+  const setReworkRequirement = reworkDraft.setValue
+  const photoAuthorizationForm = photoAuthorizationDraft.value || createPhotoAuthorizationDraft()
+  const setPhotoAuthorizationForm = photoAuthorizationDraft.setValue
+  const authorizationRemarks = authorizationRemarkDraft.value || {}
+  const setAuthorizationRemarks = authorizationRemarkDraft.setValue
+  const reviewForm = reviewDraft.value || createReviewDraft()
+  const setReviewForm = reviewDraft.setValue
+  const arbitrationForm = arbitrationDraft.value || createArbitrationDraft()
+  const setArbitrationForm = arbitrationDraft.setValue
   const { run: runWorkflowAction, loading: actionLoading } = usePortraAsyncAction({
     errorMessage: error => error?.message || '操作失败，请稍后重试。'
   })
@@ -359,7 +406,8 @@ export function OrdersPage() {
     })
   }
 
-  async function loadOrders(focusOrderId = selectedOrder?.orderId) {
+  async function loadOrders(focusOrderId = selectedOrder?.orderId, options = {}) {
+    const { preserveDrafts = true } = options
     await run(async () => {
       const nextOrders = await orderApi.list({
         role: currentUser.role === 'PROVIDER' ? 'provider' : 'customer',
@@ -381,9 +429,9 @@ export function OrdersPage() {
       setSentInvitations(asArray(nextInvitations))
       if (focusOrderId && roleOrders.some(order => Number(order.orderId) === Number(focusOrderId))) {
         const focusedOrder = roleOrders.find(order => Number(order.orderId) === Number(focusOrderId))
-        await openOrder(focusedOrder || focusOrderId, false)
+        await openOrder(focusedOrder || focusOrderId, false, { preserveDrafts })
       } else if (roleOrders.length && !orderListSurface) {
-        await openOrder(roleOrders[0], false)
+        await openOrder(roleOrders[0], false, { preserveDrafts })
       } else {
         setSelectedOrder(null)
         setStatusLogs([])
@@ -395,7 +443,8 @@ export function OrdersPage() {
     })
   }
 
-  async function openOrder(orderOrId, updateUrl = true) {
+  async function openOrder(orderOrId, updateUrl = true, options = {}) {
+    const { preserveDrafts = false } = options
     const orderId = normalizeOrderId(typeof orderOrId === 'object' ? orderOrId.orderId : orderOrId)
     const fallbackOrder = typeof orderOrId === 'object' ? orderOrId : orders.find(order => Number(order.orderId) === Number(orderId))
     if (!orderId) {
@@ -437,15 +486,20 @@ export function OrdersPage() {
       saveOrderSnapshots([detail])
       setStatusLogs(logs)
       setDeliveryRecords(deliveries)
-      setDeliveryForm({ files: [], remark: '' })
-      setReworkRequirement('')
       setPhotoAuthorizations(authorizations)
-      setPhotoAuthorizationForm({ fileIds: [], remark: '' })
-      setAuthorizationRemarks({})
       setOrderReviews(reviews)
       setArbitrations(complaints)
-      setShowReviewForm(false)
-      setShowArbitrationForm(false)
+      if (!preserveDrafts) {
+        deliveryDraft.clearDraft()
+        reworkDraft.clearDraft()
+        photoAuthorizationDraft.clearDraft()
+        authorizationRemarkDraft.clearDraft()
+        reviewDraft.clearDraft()
+        arbitrationDraft.clearDraft()
+        setReworkDialogOpen(false)
+        setShowReviewForm(false)
+        setShowArbitrationForm(false)
+      }
       if (updateUrl) {
         const searchConversationId = new URLSearchParams(location.search).get('conversationId')
         const target = buildOrderNavigationTarget(orderId, {
@@ -501,8 +555,8 @@ export function OrdersPage() {
       currentUser
     ), selectedOrder.status === 'REWORK_REQUIRED' ? '返修作品已发送给客户验收' : '交付作品已发送给客户验收')
     if (result) {
-      setDeliveryForm({ files: [], remark: '' })
-      await loadOrders(selectedOrder.orderId)
+      deliveryDraft.clearDraft()
+      await loadOrders(selectedOrder.orderId, { preserveDrafts: true })
     }
     return Boolean(result)
   }
@@ -521,9 +575,9 @@ export function OrdersPage() {
       currentUser
     ), '返修请求已提交')
     if (result) {
-      setReworkRequirement('')
+      reworkDraft.clearDraft()
       setReworkDialogOpen(false)
-      await loadOrders(selectedOrder.orderId)
+      await loadOrders(selectedOrder.orderId, { preserveDrafts: true })
     }
   }
 
@@ -607,7 +661,7 @@ export function OrdersPage() {
       remark: photoAuthorizationForm.remark.trim()
     }, currentUser), '展示授权申请已发送')
     if (result) {
-      setPhotoAuthorizationForm({ fileIds: [], remark: '' })
+      photoAuthorizationDraft.clearDraft()
       setPhotoAuthorizations(await photoAuthorizationApi.listByOrder(selectedOrder.orderId, currentUser))
     }
   }
@@ -623,7 +677,7 @@ export function OrdersPage() {
     const successText = decision === 'approve' ? '已同意展示授权' : '已拒绝展示授权'
     const result = await run(async () => action(authorization.id, { remark }, currentUser), successText)
     if (result) {
-      setAuthorizationRemarks({ ...authorizationRemarks, [authorization.id]: '' })
+      authorizationRemarkDraft.setValue(previous => ({ ...previous, [authorization.id]: '' }))
       setPhotoAuthorizations(await photoAuthorizationApi.listByOrder(selectedOrder.orderId, currentUser))
     }
     return Boolean(result)
@@ -657,7 +711,7 @@ export function OrdersPage() {
     if (result) {
       setOrderReviews(mergeReviewLists([result], orderReviews, getLocalReviewsByOrder(selectedOrder.orderId)))
       setShowReviewForm(false)
-      setReviewForm({ rating: 5, content: '沟通顺畅，履约体验很好。' })
+      reviewDraft.clearDraft()
     }
   }
 
@@ -690,8 +744,79 @@ export function OrdersPage() {
     if (result) {
       setArbitrations(mergeComplaints([result], arbitrations, getArbitrationsByOrder(selectedOrder.orderId)))
       setShowArbitrationForm(false)
-      setArbitrationForm({ reason: '评价内容不实', description: '' })
+      arbitrationDraft.clearDraft()
     }
+  }
+
+  async function openOrderWithDraftGuard(orderOrId) {
+    const nextOrderId = normalizeOrderId(typeof orderOrId === 'object' ? orderOrId.orderId : orderOrId)
+    const currentOrderId = normalizeOrderId(selectedOrder?.orderId)
+    if (currentOrderId && nextOrderId && Number(currentOrderId) !== Number(nextOrderId) && hasUnsavedOrderDraft()) {
+      const confirmed = await feedback.confirm({
+        title: '切换订单？',
+        message: '当前订单仍有未提交内容，切换后将丢弃这些草稿。确定切换吗？',
+        confirmText: '确定切换',
+        cancelText: '继续编辑',
+        tone: 'danger'
+      })
+      if (!confirmed) return false
+      clearCurrentOrderDrafts()
+    }
+    return openOrder(orderOrId, true, { preserveDrafts: nextOrderId && Number(currentOrderId) === Number(nextOrderId) })
+  }
+
+  function hasUnsavedOrderDraft() {
+    return deliveryDraft.dirty
+      || reworkDraft.dirty
+      || photoAuthorizationDraft.dirty
+      || authorizationRemarkDraft.dirty
+      || reviewDraft.dirty
+      || arbitrationDraft.dirty
+  }
+
+  function clearCurrentOrderDrafts() {
+    deliveryDraft.clearDraft()
+    reworkDraft.clearDraft()
+    photoAuthorizationDraft.clearDraft()
+    authorizationRemarkDraft.clearDraft()
+    reviewDraft.clearDraft()
+    arbitrationDraft.clearDraft()
+    setReworkDialogOpen(false)
+    setShowReviewForm(false)
+    setShowArbitrationForm(false)
+  }
+
+  async function closeReworkDialog() {
+    if (actionLoading) {
+      feedback.warning('操作正在提交，请稍候。')
+      return
+    }
+    const confirmed = await reworkDraft.confirmDiscard(feedback, {
+      message: '当前返修要求尚未提交，关闭后将丢弃已填写内容。确定关闭吗？'
+    })
+    if (confirmed) setReworkDialogOpen(false)
+  }
+
+  async function toggleReviewForm() {
+    if (showReviewForm) {
+      const confirmed = await reviewDraft.confirmDiscard(feedback, {
+        message: '当前评价尚未提交，关闭后将丢弃已填写内容。确定关闭吗？'
+      })
+      if (confirmed) setShowReviewForm(false)
+      return
+    }
+    setShowReviewForm(true)
+  }
+
+  async function toggleArbitrationForm() {
+    if (showArbitrationForm) {
+      const confirmed = await arbitrationDraft.confirmDiscard(feedback, {
+        message: '当前投诉说明尚未提交，关闭后将丢弃已填写内容。确定关闭吗？'
+      })
+      if (confirmed) setShowArbitrationForm(false)
+      return
+    }
+    setShowArbitrationForm(true)
   }
 
   const selectedOrderWorkflow = useMemo(() => deriveOrderWorkflowState(selectedOrder, {
@@ -830,7 +955,7 @@ export function OrdersPage() {
                 return (
                   <PortraTicketCard
                     key={order.orderId}
-                    onClick={() => openOrder(order)}
+                    onClick={() => openOrderWithDraftGuard(order)}
                     selected={selectedOrder?.orderId === order.orderId}
                     sx={orderIndexCardSx(selectedOrder?.orderId === order.orderId)}
                   >
@@ -1157,7 +1282,7 @@ export function OrdersPage() {
                       <Button
                         variant={showReviewForm ? 'contained' : 'outlined'}
                         startIcon={<RateReviewRoundedIcon />}
-                        onClick={() => setShowReviewForm(!showReviewForm)}
+                        onClick={toggleReviewForm}
                       >
                         评价
                       </Button>
@@ -1166,7 +1291,7 @@ export function OrdersPage() {
                       variant={showArbitrationForm ? 'contained' : 'outlined'}
                       color="inherit"
                       startIcon={<GavelRoundedIcon />}
-                      onClick={() => setShowArbitrationForm(!showArbitrationForm)}
+                      onClick={toggleArbitrationForm}
                       disabled={!reviewToComplain}
                     >
                       投诉评价
@@ -1312,7 +1437,7 @@ export function OrdersPage() {
         reviewDisabled={!canReviewSelectedOrder || Boolean(myReview)}
       />
 
-      <Dialog open={reworkDialogOpen} onClose={() => setReworkDialogOpen(false)} fullWidth maxWidth="sm">
+      <Dialog open={reworkDialogOpen} onClose={closeReworkDialog} fullWidth maxWidth="sm">
         <DialogTitle>提交返修要求</DialogTitle>
         <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
           <Stack component="form" id="order-rework-dialog-form" spacing={1.5} onSubmit={submitRework}>
@@ -1329,7 +1454,7 @@ export function OrdersPage() {
           </Stack>
         </DialogContent>
         <DialogActions sx={{ bgcolor: PORTRA_SURFACE.paperMuted }}>
-          <Button color="inherit" onClick={() => setReworkDialogOpen(false)}>取消</Button>
+          <Button color="inherit" onClick={closeReworkDialog}>取消</Button>
           <Button type="submit" form="order-rework-dialog-form" variant="contained" disabled={loading || !reworkRequirement.trim()}>
             提交返修
           </Button>
