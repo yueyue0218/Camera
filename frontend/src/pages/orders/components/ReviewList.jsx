@@ -18,11 +18,19 @@ export function ReviewList({ reviews, emptyText = '暂无历史评价' }) {
             </Stack>
             <Typography>{review.content || '对方没有留下文字评价'}</Typography>
             <Typography color="text.secondary" variant="body2">
-              评价人 {review.reviewerId} · 被评价人 {review.targetUserId}
+              {getReviewScopeLabel(review)}
             </Typography>
           </Stack>
         </Paper>
       ))}
     </Stack>
   ) : <EmptyOrderCard text={emptyText} />
+}
+
+function getReviewScopeLabel(review) {
+  if (review.direction === 'CUSTOMER_TO_PROVIDER') return '客户写给摄影师'
+  if (review.direction === 'PROVIDER_TO_CUSTOMER') return '摄影师写给客户'
+  if (review.direction === 'MY_REVIEW') return '我的评价'
+  if (review.direction === 'COUNTERPARTY_REVIEW') return '对方评价'
+  return '本次订单评价'
 }
