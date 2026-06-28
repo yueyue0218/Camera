@@ -78,7 +78,7 @@ import { EmptyOrderCard } from './components/EmptyOrderCard.jsx'
 import { InfoRows } from './components/InfoRows.jsx'
 import { OrderCurrentTaskCard } from './components/OrderCurrentTaskCard.jsx'
 import { OrderDeliverySummaryCard } from './components/OrderDeliverySummaryCard.jsx'
-import { OrderSectionCard } from './components/OrderSectionCard.jsx'
+import { OrderFollowupCards } from './components/OrderFollowupCards.jsx'
 import { OrderSummaryCard } from './components/OrderSummaryCard.jsx'
 import { OrderTimelineCard } from './components/OrderTimelineCard.jsx'
 import { ReviewList } from './components/ReviewList.jsx'
@@ -340,6 +340,37 @@ function formatAuthorizationSummary(records = []) {
   return '待客户确认'
 }
 
+function getAuthorizationFollowupTone(records = []) {
+  const label = formatAuthorizationSummary(records)
+  if (label === '已同意') return 'success'
+  if (label === '待客户确认') return 'warning'
+  return 'default'
+}
+
+function formatReviewFollowupStatus({ canReview, myReview, reviewToComplain, orderReviews = [], arbitrations = [] }) {
+  if (reviewToComplain) return '可投诉评价'
+  if (arbitrations.length) return '有投诉记录'
+  if (myReview) return '已评价'
+  if (canReview) return '可评价'
+  if (orderReviews.length) return '已有评价'
+  return '暂未开放'
+}
+
+function getReviewFollowupTone(context) {
+  const status = formatReviewFollowupStatus(context)
+  if (status === '可评价' || status === '可投诉评价') return 'warning'
+  if (status === '已评价' || status === '已有评价') return 'success'
+  return 'default'
+}
+
+function getReviewFollowupDescription({ canReview, myReview, reviewToComplain, orderReviews = [] }) {
+  if (reviewToComplain) return '收到评价后，可对不实评价发起投诉。'
+  if (myReview) return '你已完成本次合作评价。'
+  if (canReview) return '本次合作已完成，可以留下评价。'
+  if (orderReviews.length) return '这里保存本次合作的评价记录。'
+  return '订单完成后可评价本次合作。'
+}
+
 function buildOrderProgressItems({ order, statusLogs = [], deliveryRecords = [], currentUser }) {
   const status = order?.status || ''
   const hasDelivery = deliveryRecords.length > 0 || ['DELIVERED_PENDING_CONFIRM', 'REWORK_REQUIRED', 'COMPLETED'].includes(status)
@@ -480,6 +511,8 @@ export function OrdersPage() {
   const [reworkDialogOpen, setReworkDialogOpen] = useState(false)
   const [deliveryUploadDialogOpen, setDeliveryUploadDialogOpen] = useState(false)
   const [photoAuthorizationDialogOpen, setPhotoAuthorizationDialogOpen] = useState(false)
+  const [authorizationRecordsDialogOpen, setAuthorizationRecordsDialogOpen] = useState(false)
+  const [reviewRecordsDialogOpen, setReviewRecordsDialogOpen] = useState(false)
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
   const [previewDelivery, setPreviewDelivery] = useState(null)
   const [previewUrl, setPreviewUrl] = useState('')
@@ -671,6 +704,8 @@ export function OrdersPage() {
         setReworkDialogOpen(false)
         setDeliveryUploadDialogOpen(false)
         setPhotoAuthorizationDialogOpen(false)
+        setAuthorizationRecordsDialogOpen(false)
+        setReviewRecordsDialogOpen(false)
         setShowReviewForm(false)
         setShowArbitrationForm(false)
       }
@@ -972,6 +1007,8 @@ export function OrdersPage() {
     setReworkDialogOpen(false)
     setDeliveryUploadDialogOpen(false)
     setPhotoAuthorizationDialogOpen(false)
+    setAuthorizationRecordsDialogOpen(false)
+    setReviewRecordsDialogOpen(false)
     setShowReviewForm(false)
     setShowArbitrationForm(false)
   }
@@ -1100,6 +1137,67 @@ export function OrdersPage() {
     deliveryRecords,
     currentUser
   }) : []
+  const followupItems = selectedOrder ? [
+    {
+      key: 'delivery',
+      kind: 'delivery',
+      title: '交付作品',
+      status: latestDeliveryBatch ? formatDeliveryBatchContent(latestDeliveryBatch) : canUploadDelivery ? '待上传' : '等待作品',
+      tone: latestDeliveryBatch ? 'success' : canUploadDelivery ? 'warning' : 'default',
+      description: latestDeliveryBatch
+        ? '查看本单已交付的图片和文件。'
+        : canUploadDelivery
+          ? '拍摄已结束，请上传本单成片。'
+          : '作品交付后会在这里出现入口。',
+      primaryAction: latestDeliveryBatch ? {
+        label: '查看作品',
+        onClick: () => openDeliveryBatch(latestDeliveryBatch),
+        disabled: !latestDeliveryBatch.deliveryId || !selectedOrder?.orderId
+      } : canUploadDelivery ? {
+        label: selectedOrder.status === 'REWORK_REQUIRED' ? '上传返修作品' : '上传作品',
+        onClick: () => setDeliveryUploadDialogOpen(true),
+        disabled: loading
+      } : null
+    },
+    {
+      key: 'authorization',
+      kind: 'authorization',
+      title: '展示授权',
+      status: formatAuthorizationSummary(photoAuthorizations),
+      tone: getAuthorizationFollowupTone(photoAuthorizations),
+      description: '客户同意后，摄影师才能将本订单图片作为客片展示。',
+      primaryAction: photoAuthorizations.length ? {
+        label: '查看授权记录',
+        onClick: () => setAuthorizationRecordsDialogOpen(true)
+      } : canRequestPhotoAuthorization ? {
+        label: '申请展示授权',
+        onClick: () => setPhotoAuthorizationDialogOpen(true)
+      } : null,
+      secondaryAction: photoAuthorizations.length && canRequestPhotoAuthorization ? {
+        label: '再次申请',
+        onClick: () => setPhotoAuthorizationDialogOpen(true)
+      } : null
+    },
+    {
+      key: 'review',
+      kind: 'review',
+      title: '评价与投诉',
+      status: formatReviewFollowupStatus({ canReview: canReviewSelectedOrder, myReview, reviewToComplain, orderReviews, arbitrations }),
+      tone: getReviewFollowupTone({ canReview: canReviewSelectedOrder, myReview, reviewToComplain, orderReviews, arbitrations }),
+      description: getReviewFollowupDescription({ canReview: canReviewSelectedOrder, myReview, reviewToComplain, orderReviews }),
+      primaryAction: canReviewSelectedOrder && !myReview ? {
+        label: '评价',
+        onClick: toggleReviewForm
+      } : (orderReviews.length || arbitrations.length) ? {
+        label: '查看评价',
+        onClick: () => setReviewRecordsDialogOpen(true)
+      } : null,
+      secondaryAction: reviewToComplain ? {
+        label: '投诉评价',
+        onClick: toggleArbitrationForm
+      } : null
+    }
+  ] : []
   const canReturnToConversation = Boolean(explicitReturnToConversation)
   const canContactCounterparty = !canReturnToConversation && Boolean(selectedOrderConversationId)
   useEffect(() => {
@@ -1350,151 +1448,7 @@ export function OrdersPage() {
 
             <OrderTimelineCard items={orderTimelineItems} />
 
-            <OrderSectionCard
-              title="展示授权"
-              description="客户同意后，摄影师才能将本订单作品作为客片展示。"
-              trailing={(
-                <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                  <Chip size="small" label={formatAuthorizationSummary(photoAuthorizations)} />
-                  {canRequestPhotoAuthorization && (
-                    <Button variant="outlined" size="small" startIcon={<ImageRoundedIcon />} onClick={() => setPhotoAuthorizationDialogOpen(true)}>
-                      申请展示授权
-                    </Button>
-                  )}
-                </Stack>
-              )}
-            >
-              <Stack spacing={1}>
-                {photoAuthorizations.map(authorization => (
-                  <AuthorizationRequestCard
-                    key={authorization.id || authorization.authorizationId}
-                    authorization={authorization}
-                    order={selectedOrder}
-                    chrome="none"
-                    canReview={canCustomerReviewPhotoAuthorization(selectedOrder, currentUser, authorization)}
-                    loading={loading}
-                    onDecision={handlePhotoAuthorizationDecision}
-                    onOpenDelivery={openDeliveryBatch}
-                  />
-                ))}
-                {!photoAuthorizations.length && <PortraEmptyState title="暂无授权申请" compact />}
-              </Stack>
-            </OrderSectionCard>
-
-            <OrderSectionCard
-              title="评价与投诉"
-              description="订单完成后可评价本次合作；收到对方评价后，可对不实评价发起投诉。"
-              trailing={(
-                <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                  {canReviewSelectedOrder && !myReview && (
-                    <Button
-                      variant={showReviewForm ? 'contained' : 'outlined'}
-                      size="small"
-                      startIcon={<RateReviewRoundedIcon />}
-                      onClick={toggleReviewForm}
-                    >
-                      评价
-                    </Button>
-                  )}
-                  <Button
-                    variant={showArbitrationForm ? 'contained' : 'outlined'}
-                    size="small"
-                    color="inherit"
-                    startIcon={<GavelRoundedIcon />}
-                    onClick={toggleArbitrationForm}
-                    disabled={!reviewToComplain}
-                  >
-                    投诉评价
-                  </Button>
-                </Stack>
-              )}
-            >
-              <Stack spacing={2}>
-
-                {myReview && (
-                  <PortraInfoBanner>你已评价过该订单，可以在历史评价中查看。</PortraInfoBanner>
-                )}
-                {!reviewToComplain && (
-                  <PortraInfoBanner>需收到对方评价后才可发起评价投诉。</PortraInfoBanner>
-                )}
-
-                {showReviewForm && (
-                  <Paper component="form" variant="outlined" onSubmit={submitReview} sx={subCardSx}>
-                    <Stack spacing={1.5}>
-                      <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center' }}>
-                        <Typography fontWeight={800}>评分</Typography>
-                        <Rating
-                          value={reviewForm.rating}
-                          onChange={(_, value) => setReviewForm({ ...reviewForm, rating: value || 5 })}
-                        />
-                      </Stack>
-                      <TextField
-                        label="评价内容"
-                        value={reviewForm.content}
-                        onChange={event => setReviewForm({ ...reviewForm, content: event.target.value })}
-                        multiline
-                        minRows={2}
-                        required
-                      />
-                      <Button type="submit" variant="contained" startIcon={<RateReviewRoundedIcon />} disabled={loading}>
-                        提交评价
-                      </Button>
-                    </Stack>
-                  </Paper>
-                )}
-
-                {showArbitrationForm && (
-                  <Paper component="form" variant="outlined" onSubmit={submitArbitration} sx={subCardSx}>
-                    <Stack spacing={1.5}>
-                      <TextField
-                        select
-                        label="投诉原因"
-                        value={arbitrationForm.reason}
-                        onChange={event => setArbitrationForm({ ...arbitrationForm, reason: event.target.value })}
-                      >
-                        <MenuItem value="评价内容不实">评价内容不实</MenuItem>
-                        <MenuItem value="评价包含攻击性表述">评价包含攻击性表述</MenuItem>
-                        <MenuItem value="评价与订单无关">评价与订单无关</MenuItem>
-                        <MenuItem value="其他评价争议">其他评价争议</MenuItem>
-                      </TextField>
-                      <TextField
-                        label="补充说明"
-                        value={arbitrationForm.description}
-                        onChange={event => setArbitrationForm({ ...arbitrationForm, description: event.target.value })}
-                        multiline
-                        minRows={2}
-                        required
-                      />
-                      <Button type="submit" variant="contained" color="warning" startIcon={<GavelRoundedIcon />}>
-                        提交投诉记录
-                      </Button>
-                    </Stack>
-                  </Paper>
-                )}
-
-                <ReviewList reviews={orderReviews} emptyText="该订单还没有评价" />
-
-                {arbitrations.length > 0 && (
-                  <Stack spacing={1}>
-                    <Typography variant="overline" sx={overlineSx}>投诉记录</Typography>
-                    {arbitrations.map(record => (
-                      <Paper key={record.arbitrationId} variant="outlined" sx={warmNoticeSx}>
-                        <Stack spacing={0.6}>
-                          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
-                            <Typography fontWeight={800}>{record.reason}</Typography>
-                            <Chip size="small" color="warning" label={complaintStatusMap[record.status] || '处理记录'} />
-                          </Stack>
-                          <Typography>{record.description}</Typography>
-                          <Typography sx={{ color: PORTRA_SURFACE.muted }} variant="body2">
-                            提交时间：{formatTime(record.createdAt)}
-                          </Typography>
-                        </Stack>
-                      </Paper>
-                    ))}
-                  </Stack>
-                )}
-              </Stack>
-            </OrderSectionCard>
+            <OrderFollowupCards items={followupItems} />
           </Stack>
         )}
       </Box>
@@ -1541,6 +1495,151 @@ export function OrdersPage() {
         reviewDisabled={!canReviewSelectedOrder || Boolean(myReview)}
       />
 
+      <Dialog open={authorizationRecordsDialogOpen} onClose={() => setAuthorizationRecordsDialogOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>展示授权记录</DialogTitle>
+        <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
+          <Stack spacing={1.2}>
+            <PortraInfoBanner>客户同意后，摄影师才能将本订单图片作为客片展示。</PortraInfoBanner>
+            {photoAuthorizations.map(authorization => (
+              <AuthorizationRequestCard
+                key={authorization.id || authorization.authorizationId}
+                authorization={authorization}
+                order={selectedOrder}
+                chrome="none"
+                canReview={canCustomerReviewPhotoAuthorization(selectedOrder, currentUser, authorization)}
+                loading={loading}
+                onDecision={handlePhotoAuthorizationDecision}
+                onOpenDelivery={openDeliveryBatch}
+              />
+            ))}
+            {!photoAuthorizations.length && <PortraEmptyState title="暂无授权申请" compact />}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ bgcolor: PORTRA_SURFACE.paperMuted }}>
+          <Button color="inherit" onClick={() => setAuthorizationRecordsDialogOpen(false)}>关闭</Button>
+          {canRequestPhotoAuthorization && (
+            <Button variant="contained" startIcon={<ImageRoundedIcon />} onClick={() => {
+              setAuthorizationRecordsDialogOpen(false)
+              setPhotoAuthorizationDialogOpen(true)
+            }}>
+              申请展示授权
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={reviewRecordsDialogOpen} onClose={() => setReviewRecordsDialogOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>评价与投诉</DialogTitle>
+        <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
+          <Stack spacing={1.6}>
+            <ReviewList reviews={orderReviews} emptyText="该订单还没有评价" />
+            {arbitrations.length > 0 && (
+              <Stack spacing={1}>
+                <Typography variant="overline" sx={overlineSx}>投诉记录</Typography>
+                {arbitrations.map(record => (
+                  <Paper key={record.arbitrationId} variant="outlined" sx={warmNoticeSx}>
+                    <Stack spacing={0.6}>
+                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
+                        <Typography fontWeight={800}>{record.reason}</Typography>
+                        <Chip size="small" color="warning" label={complaintStatusMap[record.status] || '处理记录'} />
+                      </Stack>
+                      <Typography>{record.description}</Typography>
+                      <Typography sx={{ color: PORTRA_SURFACE.muted }} variant="body2">
+                        提交时间：{formatTime(record.createdAt)}
+                      </Typography>
+                    </Stack>
+                  </Paper>
+                ))}
+              </Stack>
+            )}
+            {!reviewToComplain && (
+              <PortraInfoBanner>收到评价后，可对不实评价发起投诉。</PortraInfoBanner>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ bgcolor: PORTRA_SURFACE.paperMuted }}>
+          <Button color="inherit" onClick={() => setReviewRecordsDialogOpen(false)}>关闭</Button>
+          {canReviewSelectedOrder && !myReview && (
+            <Button variant="contained" startIcon={<RateReviewRoundedIcon />} onClick={() => {
+              setReviewRecordsDialogOpen(false)
+              setShowReviewForm(true)
+            }}>
+              评价
+            </Button>
+          )}
+          {reviewToComplain && (
+            <Button color="warning" variant="outlined" startIcon={<GavelRoundedIcon />} onClick={() => {
+              setReviewRecordsDialogOpen(false)
+              setShowArbitrationForm(true)
+            }}>
+              投诉评价
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={showReviewForm} onClose={toggleReviewForm} fullWidth maxWidth="sm">
+        <DialogTitle>评价本次合作</DialogTitle>
+        <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
+          <Stack component="form" id="order-review-form" spacing={1.5} onSubmit={submitReview}>
+            <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center' }}>
+              <Typography fontWeight={800}>评分</Typography>
+              <Rating
+                value={reviewForm.rating}
+                onChange={(_, value) => setReviewForm({ ...reviewForm, rating: value || 5 })}
+              />
+            </Stack>
+            <TextField
+              label="评价内容"
+              value={reviewForm.content}
+              onChange={event => setReviewForm({ ...reviewForm, content: event.target.value })}
+              multiline
+              minRows={3}
+              required
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ bgcolor: PORTRA_SURFACE.paperMuted }}>
+          <Button color="inherit" onClick={toggleReviewForm}>取消</Button>
+          <Button type="submit" form="order-review-form" variant="contained" startIcon={<RateReviewRoundedIcon />} disabled={loading}>
+            提交评价
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={showArbitrationForm} onClose={toggleArbitrationForm} fullWidth maxWidth="sm">
+        <DialogTitle>投诉评价</DialogTitle>
+        <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
+          <Stack component="form" id="order-arbitration-form" spacing={1.5} onSubmit={submitArbitration}>
+            <TextField
+              select
+              label="投诉原因"
+              value={arbitrationForm.reason}
+              onChange={event => setArbitrationForm({ ...arbitrationForm, reason: event.target.value })}
+            >
+              <MenuItem value="评价内容不实">评价内容不实</MenuItem>
+              <MenuItem value="评价包含攻击性表述">评价包含攻击性表述</MenuItem>
+              <MenuItem value="评价与订单无关">评价与订单无关</MenuItem>
+              <MenuItem value="其他评价争议">其他评价争议</MenuItem>
+            </TextField>
+            <TextField
+              label="补充说明"
+              value={arbitrationForm.description}
+              onChange={event => setArbitrationForm({ ...arbitrationForm, description: event.target.value })}
+              multiline
+              minRows={3}
+              required
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ bgcolor: PORTRA_SURFACE.paperMuted }}>
+          <Button color="inherit" onClick={toggleArbitrationForm}>取消</Button>
+          <Button type="submit" form="order-arbitration-form" variant="contained" color="warning" startIcon={<GavelRoundedIcon />}>
+            提交投诉
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={deliveryUploadDialogOpen} onClose={closeDeliveryUploadDialog} fullWidth maxWidth="md">
         <DialogTitle>{selectedOrder?.status === 'REWORK_REQUIRED' ? '上传返修作品' : '上传作品'}</DialogTitle>
         <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
@@ -1561,7 +1660,7 @@ export function OrdersPage() {
         <DialogTitle>申请展示授权</DialogTitle>
         <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
           <Stack component="form" id="order-photo-authorization-form" spacing={1.5} onSubmit={submitPhotoAuthorizationRequest}>
-            <PortraInfoBanner>仅可选择图片作品用于展示授权，压缩包不会用于公开展示。</PortraInfoBanner>
+            <PortraInfoBanner>仅可选择图片用于展示授权，压缩包不会用于公开展示。</PortraInfoBanner>
             {deliveryFileOptions.length ? (
               <>
                 <Typography variant="body2" sx={{ color: PORTRA_SURFACE.muted, fontWeight: 850 }}>
@@ -1583,7 +1682,7 @@ export function OrdersPage() {
                 />
               </>
             ) : (
-              <PortraInfoBanner>暂无可授权的图片作品，请先上传图片交付文件。</PortraInfoBanner>
+              <PortraInfoBanner>暂无可授权图片，请先上传图片交付文件。</PortraInfoBanner>
             )}
           </Stack>
         </DialogContent>
