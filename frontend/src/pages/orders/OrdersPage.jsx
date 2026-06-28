@@ -83,7 +83,6 @@ import { EmptyOrderCard } from './components/EmptyOrderCard.jsx'
 import { InfoRows } from './components/InfoRows.jsx'
 import { OrderCurrentTaskCard } from './components/OrderCurrentTaskCard.jsx'
 import { OrderDeliverySummaryCard } from './components/OrderDeliverySummaryCard.jsx'
-import { OrderFollowupCards } from './components/OrderFollowupCards.jsx'
 import { OrderSummaryCard } from './components/OrderSummaryCard.jsx'
 import { OrderTimelineCard } from './components/OrderTimelineCard.jsx'
 import { ReviewList } from './components/ReviewList.jsx'
@@ -522,8 +521,8 @@ export function OrdersPage() {
   const [reworkDialogOpen, setReworkDialogOpen] = useState(false)
   const [deliveryUploadDialogOpen, setDeliveryUploadDialogOpen] = useState(false)
   const [photoAuthorizationDialogOpen, setPhotoAuthorizationDialogOpen] = useState(false)
-  const [authorizationRecordsDialogOpen, setAuthorizationRecordsDialogOpen] = useState(false)
-  const [reviewRecordsDialogOpen, setReviewRecordsDialogOpen] = useState(false)
+  const [, setAuthorizationRecordsDialogOpen] = useState(false)
+  const [, setReviewRecordsDialogOpen] = useState(false)
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
   const [previewDelivery, setPreviewDelivery] = useState(null)
   const [previewUrl, setPreviewUrl] = useState('')
@@ -972,7 +971,7 @@ export function OrdersPage() {
   async function submitFollowUp(event) {
     event?.preventDefault?.()
     if (!followUpTargetReview?.reviewId || !followUpContent.trim()) {
-      setNotice({ type: 'warning', text: '请先填写追评内容。' })
+      feedback.warning('请先填写追评内容。')
       return
     }
     const result = await run(async () => reviewApi.followUp(
@@ -1162,6 +1161,10 @@ export function OrdersPage() {
     () => new Set(photoAuthorizationForm.fileIds.map(Number)),
     [photoAuthorizationForm.fileIds]
   )
+  const deliveryFileNameMap = useMemo(
+    () => new Map(deliveryFileOptions.map(file => [Number(file.fileId), file.fileName])),
+    [deliveryFileOptions]
+  )
   const deliveryBatches = useMemo(() => buildDeliveryBatches(deliveryRecords, selectedOrder), [deliveryRecords, selectedOrder])
   const latestDeliveryBatch = useMemo(() => getLatestDeliveryBatch(deliveryBatches), [deliveryBatches])
   const latestDeliveryUploadTime = useMemo(() => getLatestDeliveryUploadTime(deliveryRecords), [deliveryRecords])
@@ -1173,7 +1176,6 @@ export function OrdersPage() {
   const selectedOrderPerspective = selectedOrder ? getOrderPerspective(selectedOrder, currentUser) : ''
   const selectedCounterpartyLabel = selectedOrder ? getCounterpartyLabel(selectedOrder, currentUser) : ''
   const selectedOrderLocation = quoteSnapshot?.location || selectedOrder?.shootLocation || '未填写'
-  const selectedOrderServiceContent = sanitizeSeedText(quoteSnapshot?.serviceContent || selectedOrder?.serviceContent, '校园约拍服务')
   const selectedOrderTitle = selectedOrder ? formatOrderTitle(selectedOrder, quoteSnapshot) : ''
   const selectedOrderConversationId = selectedOrder?.conversationId
   const selectedOrderMetaText = selectedOrder ? buildOrderMetaText(selectedOrder, selectedCounterpartyLabel, selectedOrderLocation) : ''
@@ -1190,67 +1192,13 @@ export function OrdersPage() {
     deliveryRecords,
     currentUser
   }) : []
-  const followupItems = selectedOrder ? [
-    {
-      key: 'delivery',
-      kind: 'delivery',
-      title: '交付作品',
-      status: latestDeliveryBatch ? formatDeliveryBatchContent(latestDeliveryBatch) : canUploadDelivery ? '待上传' : '等待作品',
-      tone: latestDeliveryBatch ? 'success' : canUploadDelivery ? 'warning' : 'default',
-      description: latestDeliveryBatch
-        ? '查看本单已交付的图片和文件。'
-        : canUploadDelivery
-          ? '拍摄已结束，请上传本单成片。'
-          : '作品交付后会在这里出现入口。',
-      primaryAction: latestDeliveryBatch ? {
-        label: '查看作品',
-        onClick: () => openDeliveryBatch(latestDeliveryBatch),
-        disabled: !latestDeliveryBatch.deliveryId || !selectedOrder?.orderId
-      } : canUploadDelivery ? {
-        label: selectedOrder.status === 'REWORK_REQUIRED' ? '上传返修作品' : '上传作品',
-        onClick: () => setDeliveryUploadDialogOpen(true),
-        disabled: loading
-      } : null
-    },
-    {
-      key: 'authorization',
-      kind: 'authorization',
-      title: '展示授权',
-      status: formatAuthorizationSummary(photoAuthorizations),
-      tone: getAuthorizationFollowupTone(photoAuthorizations),
-      description: '客户同意后，摄影师才能将本订单图片作为客片展示。',
-      primaryAction: photoAuthorizations.length ? {
-        label: '查看授权记录',
-        onClick: () => setAuthorizationRecordsDialogOpen(true)
-      } : canRequestPhotoAuthorization ? {
-        label: '申请展示授权',
-        onClick: () => setPhotoAuthorizationDialogOpen(true)
-      } : null,
-      secondaryAction: photoAuthorizations.length && canRequestPhotoAuthorization ? {
-        label: '再次申请',
-        onClick: () => setPhotoAuthorizationDialogOpen(true)
-      } : null
-    },
-    {
-      key: 'review',
-      kind: 'review',
-      title: '评价与投诉',
-      status: formatReviewFollowupStatus({ canReview: canReviewSelectedOrder, myReview, reviewToComplain, orderReviews, arbitrations }),
-      tone: getReviewFollowupTone({ canReview: canReviewSelectedOrder, myReview, reviewToComplain, orderReviews, arbitrations }),
-      description: getReviewFollowupDescription({ canReview: canReviewSelectedOrder, myReview, reviewToComplain, orderReviews }),
-      primaryAction: canReviewSelectedOrder && !myReview ? {
-        label: '评价',
-        onClick: toggleReviewForm
-      } : (orderReviews.length || arbitrations.length) ? {
-        label: '查看评价',
-        onClick: () => setReviewRecordsDialogOpen(true)
-      } : null,
-      secondaryAction: reviewToComplain ? {
-        label: '投诉评价',
-        onClick: toggleArbitrationForm
-      } : null
-    }
-  ] : []
+  const statusTimelineItems = statusLogs.map((log, index) => ({
+    id: log.logId || `${log.toStatus || 'status'}-${index}`,
+    title: `${formatOrderStatus(log.toStatus)}${log.reason ? `：${log.reason}` : ''}`,
+    description: log.operatorRole ? `操作方：${log.operatorRole}` : '',
+    time: formatTime(log.createdAt),
+    tone: ['REFUNDED', 'CANCELLED'].includes(log.toStatus) ? 'danger' : 'primary'
+  }))
   const canReturnToConversation = Boolean(explicitReturnToConversation)
   const canContactCounterparty = !canReturnToConversation && Boolean(selectedOrderConversationId)
   useEffect(() => {
@@ -2025,6 +1973,14 @@ const orderArchiveHeroSx = {
     borderRadius: 999,
     bgcolor: PORTRA_SURFACE.portraBlue
   }
+}
+
+const archiveSectionSx = {
+  p: { xs: 1.7, md: 2.1 },
+  bgcolor: PORTRA_SURFACE.paper,
+  borderColor: PORTRA_SURFACE.borderSubtle,
+  borderRadius: PORTRA_RADIUS.panel,
+  boxShadow: PORTRA_SHADOW.soft
 }
 
 const subCardSx = {

@@ -39,7 +39,9 @@ public class CreditController {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
         List<CreditRecord> records = creditService.getCreditHistory(user.getId());
         CreditSnapshotService.CreditSnapshot snapshot = creditSnapshotService.getSnapshot(user.getId());
-        BigDecimal currentScore = user.getCreditScore();
+        BigDecimal currentScore = user.getCreditScore() != null
+                ? user.getCreditScore()
+                : snapshot.creditScore();
 
         return Result.success(new CreditSummaryResponse(
                 user.getId(),

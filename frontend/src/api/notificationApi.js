@@ -59,10 +59,6 @@ function pickFirstText(...values) {
   return values.map(value => String(value || '').trim()).find(Boolean) || ''
 }
 
-function resolveOrderId(item, metadata) {
-  return metadata.orderId ?? item?.orderId ?? item?.targetId ?? item?.relatedId ?? item?.sourceId ?? ''
-}
-
 function resolveActorName(item, metadata) {
   return pickFirstText(
     metadata.actorNickname,
@@ -86,7 +82,7 @@ function resolveOrderSubject(item, metadata) {
   )
 }
 
-function buildNotificationTitle(item, metadata) {
+function buildNotificationTitle(item, _metadata) {
   const type = normalizeText(item?.type)
   const eventType = normalizeText(item?.eventType)
   const relatedType = normalizeText(item?.relatedType)

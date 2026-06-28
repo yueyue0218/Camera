@@ -1,5 +1,7 @@
 package com.action.camera.message;
 
+import com.action.camera.application.OrderDisplayService;
+import com.action.camera.application.UserDisplayService;
 import com.action.camera.common.Result;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
@@ -24,7 +26,9 @@ import com.action.camera.message.repository.MessageRepository;
 import com.action.camera.message.repository.QuoteRepository;
 import com.action.camera.message.service.ConversationService;
 import com.action.camera.message.service.MessageService;
+import com.action.camera.message.service.MessagePresenceService;
 import com.action.camera.message.service.QuoteService;
+import com.action.camera.notification.service.NotificationService;
 import com.action.camera.order.entity.Order;
 import com.action.camera.order.enums.EscrowStatus;
 import com.action.camera.order.enums.OrderStatus;
@@ -45,6 +49,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -77,13 +83,35 @@ class ConversationQuoteControllerTest {
     @Mock
     private PlatformTransactionManager transactionManager;
 
+    @Mock
+    private NotificationService notificationService;
+
+    @Mock
+    private UserDisplayService userDisplayService;
+
+    @Mock
+    private OrderDisplayService orderDisplayService;
+
+    @Mock
+    private MessagePresenceService messagePresenceService;
+
     private ConversationController conversationController;
 
     private QuoteController quoteController;
 
     @BeforeEach
     void setUp() {
-        MessageService messageService = new MessageService(conversationRepository, messageRepository);
+        lenient().when(messagePresenceService.shouldCreateMessageNotification(any(), any())).thenReturn(true);
+        lenient().when(userDisplayService.resolveDisplayName(any(), any())).thenReturn("Portra 用户");
+        lenient().when(orderDisplayService.resolveOrderSubject(anyLong())).thenReturn("这笔订单");
+        MessageService messageService = new MessageService(
+                conversationRepository,
+                messageRepository,
+                notificationService,
+                userDisplayService,
+                orderDisplayService,
+                messagePresenceService
+        );
         ConversationService conversationService = new ConversationService(
                 conversationRepository, messageService, transactionManager);
         QuoteService quoteService = new QuoteService(quoteRepository, conversationRepository, orderService);

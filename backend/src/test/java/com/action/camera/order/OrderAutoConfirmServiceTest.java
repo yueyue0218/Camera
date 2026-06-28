@@ -1,5 +1,7 @@
 package com.action.camera.order;
 
+import com.action.camera.application.OrderDisplayService;
+import com.action.camera.application.UserDisplayService;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.delivery.repository.DeliveryRepository;
 import com.action.camera.order.entity.Order;
@@ -53,11 +55,24 @@ class OrderAutoConfirmServiceTest {
     @Mock
     private DeliveryRepository deliveryRepository;
 
+    @Mock
+    private UserDisplayService userDisplayService;
+
+    @Mock
+    private OrderDisplayService orderDisplayService;
+
     private OrderService orderService;
 
     @BeforeEach
     void setUp() {
-        orderService = new OrderService(orderRepository, paymentRecordRepository, orderStatusLogRepository, deliveryRepository);
+        orderService = new OrderService(
+                orderRepository,
+                paymentRecordRepository,
+                orderStatusLogRepository,
+                deliveryRepository,
+                userDisplayService,
+                orderDisplayService
+        );
     }
 
     @Test
