@@ -1,7 +1,7 @@
 import { Box, Stack, Typography } from '@mui/material'
 
-const FILLED_STAR = '★'
-const EMPTY_STAR = '☆'
+const FILLED_STAR = '\u2605'
+const EMPTY_STAR = '\u2606'
 
 export function ReviewStarsDisplay({
   value,

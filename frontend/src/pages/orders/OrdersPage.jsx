@@ -87,7 +87,6 @@ import { DeliveryUploadPanel } from '../deliveries/components/DeliveryUploadPane
 import { buildDeliveryBatches, flattenDeliveryFiles, isAuthorizableDeliveryFile } from '../deliveries/deliveryDisplay.js'
 import {
   addDays,
-  complaintStatusMap,
   formatEscrowStatus,
   formatOrderStatus,
   formatOrderTitle,
@@ -498,10 +497,23 @@ export function OrdersPage() {
   const location = useLocation()
   const navigate = useWorkflowNavigate()
   const { currentUser } = useAuth()
+  const orderSearch = useMemo(() => new URLSearchParams(location.search), [location.search])
   const focusOrderId = useMemo(() => {
-    const value = new URLSearchParams(location.search).get('orderId')
+    const value = orderSearch.get('orderId')
     return normalizeOrderId(location.state?.orderId) || normalizeOrderId(value)
-  }, [location.search, location.state])
+  }, [orderSearch, location.state])
+  const focusSection = useMemo(
+    () => String(location.state?.section || orderSearch.get('section') || '').trim().toLowerCase(),
+    [location.state, orderSearch]
+  )
+  const focusedReviewId = useMemo(
+    () => String(location.state?.reviewId || orderSearch.get('reviewId') || '').trim(),
+    [location.state, orderSearch]
+  )
+  const focusedComplaintId = useMemo(
+    () => String(location.state?.complaintId || orderSearch.get('complaintId') || '').trim(),
+    [location.state, orderSearch]
+  )
   const explicitReturnToConversation = useMemo(() => getExplicitReturnToConversation(location), [location.search, location.state])
   const orderListSurface = useMemo(() => isOrderListSurface(location), [location.search, location.state])
   const [orders, setOrders] = useState([])
@@ -523,6 +535,9 @@ export function OrdersPage() {
   const [showReviewForm, setShowReviewForm] = useState(false)
   const [arbitrations, setArbitrations] = useState([])
   const [showArbitrationForm, setShowArbitrationForm] = useState(false)
+  const [followUpDialogOpen, setFollowUpDialogOpen] = useState(false)
+  const [followUpReview, setFollowUpReview] = useState(null)
+  const [followUpContent, setFollowUpContent] = useState('')
   const [sentInvitations, setSentInvitations] = useState([])
   const statusFilter = ''
   const [pageLoading, setPageLoading] = useState(false)
@@ -708,6 +723,9 @@ export function OrdersPage() {
         setReviewRecordsDialogOpen(false)
         setShowReviewForm(false)
         setShowArbitrationForm(false)
+        setFollowUpDialogOpen(false)
+        setFollowUpReview(null)
+        setFollowUpContent('')
       }
       if (updateUrl) {
         const searchConversationId = new URLSearchParams(location.search).get('conversationId')
@@ -971,6 +989,20 @@ export function OrdersPage() {
     }
   }
 
+  async function submitFollowUp(event) {
+    event.preventDefault()
+    if (!selectedOrder?.orderId || !followUpReview?.reviewId || !followUpContent.trim()) return
+    const result = await run(async () => (
+      reviewApi.followUp(followUpReview.reviewId, { content: followUpContent.trim() }, currentUser)
+    ), '追评已提交')
+    if (result) {
+      setOrderReviews(mergeReviewLists([result], orderReviews, getLocalReviewsByOrder(selectedOrder.orderId)))
+      setFollowUpDialogOpen(false)
+      setFollowUpReview(null)
+      setFollowUpContent('')
+    }
+  }
+
   async function openOrderWithDraftGuard(orderOrId) {
     const nextOrderId = normalizeOrderId(typeof orderOrId === 'object' ? orderOrId.orderId : orderOrId)
     const currentOrderId = normalizeOrderId(selectedOrder?.orderId)
@@ -1011,6 +1043,9 @@ export function OrdersPage() {
     setReviewRecordsDialogOpen(false)
     setShowReviewForm(false)
     setShowArbitrationForm(false)
+    setFollowUpDialogOpen(false)
+    setFollowUpReview(null)
+    setFollowUpContent('')
   }
 
   async function closeReworkDialog() {
@@ -1066,6 +1101,19 @@ export function OrdersPage() {
       return
     }
     setShowArbitrationForm(true)
+  }
+
+  function openFollowUpDialog(review) {
+    setFollowUpReview(review)
+    setFollowUpContent('')
+    setFollowUpDialogOpen(true)
+  }
+
+  function closeFollowUpDialog() {
+    if (loading) return
+    setFollowUpDialogOpen(false)
+    setFollowUpReview(null)
+    setFollowUpContent('')
   }
 
   const selectedOrderWorkflow = useMemo(() => deriveOrderWorkflowState(selectedOrder, {
@@ -1205,6 +1253,12 @@ export function OrdersPage() {
     setShowReviewForm(true)
     feedback.info('评价功能入口已打开')
   }, [location.state, selectedOrder?.orderId, canReviewSelectedOrder, myReview, feedback])
+  useEffect(() => {
+    if (!selectedOrder?.orderId) return
+    if (focusSection === 'reviews' || focusedReviewId || focusedComplaintId) {
+      setReviewRecordsDialogOpen(true)
+    }
+  }, [selectedOrder?.orderId, focusSection, focusedReviewId, focusedComplaintId])
 
   function openDeliveryBatch(batch) {
     const succeeded = goToDeliveryGallery(navigate, {
@@ -1531,47 +1585,46 @@ export function OrdersPage() {
       <Dialog open={reviewRecordsDialogOpen} onClose={() => setReviewRecordsDialogOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>评价与投诉</DialogTitle>
         <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
-          <Stack spacing={1.6}>
-            <ReviewList reviews={orderReviews} emptyText="该订单还没有评价" />
-            {arbitrations.length > 0 && (
-              <Stack spacing={1}>
-                <Typography variant="overline" sx={overlineSx}>投诉记录</Typography>
-                {arbitrations.map(record => (
-                  <Paper key={record.arbitrationId} variant="outlined" sx={warmNoticeSx}>
-                    <Stack spacing={0.6}>
-                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between' }}>
-                        <Typography fontWeight={800}>{record.reason}</Typography>
-                        <Chip size="small" color="warning" label={complaintStatusMap[record.status] || '处理记录'} />
-                      </Stack>
-                      <Typography>{record.description}</Typography>
-                      <Typography sx={{ color: PORTRA_SURFACE.muted }} variant="body2">
-                        提交时间：{formatTime(record.createdAt)}
-                      </Typography>
-                    </Stack>
-                  </Paper>
-                ))}
-              </Stack>
-            )}
-            {!reviewToComplain && (
-              <PortraInfoBanner>收到评价后，可对不实评价发起投诉。</PortraInfoBanner>
-            )}
+          <Stack spacing={1.35}>
+            <PortraInfoBanner>
+              {canReviewSelectedOrder && !myReview
+                ? '本次合作已完成，可以在这里留下评价，并在后续补充追评。'
+                : reviewToComplain
+                  ? '如遇到不实评价，可在对应评价卡片里发起申诉；处理结果会单独记录在下方。'
+                  : '这里集中展示本次合作的评价、追加追评与申诉处理记录。'}
+            </PortraInfoBanner>
+            <ReviewList
+              reviews={orderReviews}
+              complaints={arbitrations}
+              emptyText="该订单还没有评价"
+              currentUserId={currentUser.userId}
+              focusedReviewId={focusedReviewId}
+              focusedComplaintId={focusedComplaintId}
+              complainableReviewId={reviewToComplain?.reviewId}
+              onFollowUp={openFollowUpDialog}
+              onComplain={review => {
+                if (!reviewToComplain || String(reviewToComplain.reviewId) !== String(review.reviewId)) return
+                setReviewRecordsDialogOpen(false)
+                toggleArbitrationForm()
+              }}
+            />
           </Stack>
         </DialogContent>
         <DialogActions sx={{ bgcolor: PORTRA_SURFACE.paperMuted }}>
           <Button color="inherit" onClick={() => setReviewRecordsDialogOpen(false)}>关闭</Button>
           {canReviewSelectedOrder && !myReview && (
-            <Button variant="contained" startIcon={<RateReviewRoundedIcon />} onClick={() => {
+            <Button variant="contained" size="small" startIcon={<RateReviewRoundedIcon />} onClick={() => {
               setReviewRecordsDialogOpen(false)
               setShowReviewForm(true)
-            }}>
+            }} sx={{ borderRadius: 999, px: 1.6 }}>
               评价
             </Button>
           )}
           {reviewToComplain && (
-            <Button color="warning" variant="outlined" startIcon={<GavelRoundedIcon />} onClick={() => {
+            <Button color="warning" size="small" variant="outlined" startIcon={<GavelRoundedIcon />} onClick={() => {
               setReviewRecordsDialogOpen(false)
               setShowArbitrationForm(true)
-            }}>
+            }} sx={{ borderRadius: 999, px: 1.55 }}>
               投诉评价
             </Button>
           )}
@@ -1582,6 +1635,7 @@ export function OrdersPage() {
         <DialogTitle>评价本次合作</DialogTitle>
         <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
           <Stack component="form" id="order-review-form" spacing={1.5} onSubmit={submitReview}>
+            <PortraInfoBanner>评分会影响对方在平台上的合作信用，请基于真实履约体验填写。</PortraInfoBanner>
             <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center' }}>
               <Typography fontWeight={800}>评分</Typography>
               <Rating
@@ -1611,6 +1665,7 @@ export function OrdersPage() {
         <DialogTitle>投诉评价</DialogTitle>
         <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
           <Stack component="form" id="order-arbitration-form" spacing={1.5} onSubmit={submitArbitration}>
+            <PortraInfoBanner>请说明你认为评价不实或存在争议的原因，处理结果会记录在本次约拍的评价区。</PortraInfoBanner>
             <TextField
               select
               label="投诉原因"
@@ -1636,6 +1691,29 @@ export function OrdersPage() {
           <Button color="inherit" onClick={toggleArbitrationForm}>取消</Button>
           <Button type="submit" form="order-arbitration-form" variant="contained" color="warning" startIcon={<GavelRoundedIcon />}>
             提交投诉
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={followUpDialogOpen} onClose={closeFollowUpDialog} fullWidth maxWidth="sm">
+        <DialogTitle>追加追评</DialogTitle>
+        <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
+          <Stack component="form" id="order-follow-up-form" spacing={1.35} onSubmit={submitFollowUp}>
+            <PortraInfoBanner>补充你对这次合作的后续感受，追评会直接展示在原评价下方。</PortraInfoBanner>
+            <TextField
+              label="追评内容"
+              value={followUpContent}
+              onChange={event => setFollowUpContent(event.target.value)}
+              multiline
+              minRows={3}
+              required
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ bgcolor: PORTRA_SURFACE.paperMuted }}>
+          <Button color="inherit" onClick={closeFollowUpDialog}>取消</Button>
+          <Button type="submit" form="order-follow-up-form" variant="contained" startIcon={<RateReviewRoundedIcon />} disabled={loading || !followUpContent.trim()}>
+            提交追评
           </Button>
         </DialogActions>
       </Dialog>

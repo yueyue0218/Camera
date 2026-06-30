@@ -3,7 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, Typography } from '@mui/material'
 import { useAuth } from '../../AuthContext.jsx'
 import { creditApi, reviewApi } from '../../api/index.js'
-import { ReviewScore } from '../reviews/ReviewPage.jsx'
+import { ReviewArchiveCard } from '../../components/reviews/ReviewArchiveCard.jsx'
+import { buildOrderNavigationTarget } from '../../utils/orderNavigation.js'
 import '../profile/profile.css'
 import './credit.css'
 
@@ -58,9 +59,39 @@ function normalizeRecords(value) {
 }
 
 function getRecordOrderId(record) {
+  if (record.relatedOrderId) return record.relatedOrderId
   if (record.orderId) return record.orderId
   const sourceType = String(record.sourceType || '').toUpperCase()
   return sourceType.includes('ORDER') ? record.sourceId : null
+}
+
+function getReviewJumpTarget(review) {
+  if (!review?.orderId) return null
+  return buildOrderNavigationTarget(review.orderId, {
+    section: 'reviews',
+    reviewId: review.reviewId
+  })
+}
+
+function getRecordReviewJumpTarget(record) {
+  const orderId = getRecordOrderId(record)
+  if (!orderId) return null
+  const sourceType = String(record.sourceType || '').toUpperCase()
+  const eventType = String(record.eventType || '').toUpperCase()
+  const sourceId = record.sourceId
+  if (sourceType.includes('ARBITRATION') || eventType.includes('ARBITRATION') || eventType.includes('COMPLAINT')) {
+    return buildOrderNavigationTarget(orderId, {
+      section: 'reviews',
+      complaintId: sourceId
+    })
+  }
+  if (sourceType.includes('REVIEW') || eventType.includes('REVIEW')) {
+    return buildOrderNavigationTarget(orderId, {
+      section: 'reviews',
+      reviewId: sourceId
+    })
+  }
+  return null
 }
 
 function recordMetaLabel(record, orderId) {
@@ -255,24 +286,19 @@ export function CreditDetailPage() {
           ) : reviews.length > 0 ? (
             <Stack spacing={1.2} style={{ marginTop: 8 }}>
               {reviews.map((review, index) => (
-                <div
+                <ReviewArchiveCard
                   key={review.reviewId || index}
-                  className="credit-note credit-note--neutral"
-                  style={{ cursor: review.reviewId ? 'pointer' : 'default' }}
-                  onClick={() => review.reviewId && navigate(`/reviews/${review.reviewId}`)}
-                >
-                  <div className="credit-note-body" style={{ width: '100%' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <span style={{ fontSize: 12, color: '#6e737b' }}>
-                        来自 {review.reviewerNickname || `用户 ${review.reviewerId}`} · {formatTime(review.createdAt)}
-                      </span>
-                      <ReviewScore value={review.rating} />
-                    </div>
-                    <Typography className="credit-note-detail" style={{ fontStyle: 'italic' }}>
-                      "{review.content || '对方没有留下文字评价'}"
-                    </Typography>
-                  </div>
-                </div>
+                  review={{
+                    ...review,
+                    replyTime: review.replyTime ? formatTime(review.replyTime) : ''
+                  }}
+                  timeText={formatTime(review.createdAt)}
+                  actionLabel="查看本次约拍评价区"
+                  onAction={item => {
+                    const target = getReviewJumpTarget(item)
+                    if (target) navigate(target.to, { state: target.state })
+                  }}
+                />
               ))}
             </Stack>
           ) : (
@@ -309,6 +335,7 @@ export function CreditDetailPage() {
                 const detail = recordDetail(record, delta)
                 const metaLabel = recordMetaLabel(record, orderId)
                 const toneClass = negative ? 'credit-note--negative' : positive ? 'credit-note--positive' : 'credit-note--neutral'
+                const reviewTarget = getRecordReviewJumpTarget(record)
 
                 return (
                   <Paper
@@ -316,13 +343,13 @@ export function CreditDetailPage() {
                     elevation={0}
                     className={`credit-note ${toneClass}`}
                     style={{ '--credit-note-index': index }}
-                    role={orderId ? 'button' : undefined}
-                    tabIndex={orderId ? 0 : undefined}
-                    onClick={orderId ? () => navigate(`/orders?orderId=${orderId}`) : undefined}
-                    onKeyDown={orderId ? event => {
+                    role={reviewTarget ? 'button' : undefined}
+                    tabIndex={reviewTarget ? 0 : undefined}
+                    onClick={reviewTarget ? () => navigate(reviewTarget.to, { state: reviewTarget.state }) : undefined}
+                    onKeyDown={reviewTarget ? event => {
                       if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault()
-                        navigate(`/orders?orderId=${orderId}`)
+                        navigate(reviewTarget.to, { state: reviewTarget.state })
                       }
                     } : undefined}
                   >
@@ -350,6 +377,28 @@ export function CreditDetailPage() {
                       <Typography className="credit-note-detail">
                         变更前 {beforeScore} · 变更后 {afterScore}
                       </Typography>
+                      {reviewTarget ? (
+                        <Button
+                          variant="text"
+                          size="small"
+                          onClick={event => {
+                            event.stopPropagation()
+                            navigate(reviewTarget.to, { state: reviewTarget.state })
+                          }}
+                          sx={{
+                            mt: 0.35,
+                            alignSelf: 'flex-start',
+                            minHeight: 30,
+                            px: 0.35,
+                            color: '#1d4ed8',
+                            fontWeight: 900,
+                            borderRadius: 999,
+                            '&:hover': { bgcolor: 'rgba(29, 78, 216, .06)' }
+                          }}
+                        >
+                          {String(record.sourceType || '').toUpperCase().includes('ARBITRATION') ? '查看处理记录' : '查看相关评价'}
+                        </Button>
+                      ) : null}
                     </div>
                     <div className="credit-note-meta">
                       <div>{formatTime(record.createdAt)}</div>

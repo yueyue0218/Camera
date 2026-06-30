@@ -11,7 +11,7 @@ import {
   readUserProfiles,
   toggleFollow as toggleFollowLocal,
 } from './utils/profileUtils.js'
-import { ReviewScore } from '../reviews/ReviewPage.jsx'
+import { ReviewArchiveCard } from '../../components/reviews/ReviewArchiveCard.jsx'
 import { buildOrderNavigationTarget } from '../../utils/orderNavigation.js'
 import './profile.css'
 
@@ -200,7 +200,10 @@ export function PublicProfilePage() {
 
   function openReviewCard(review) {
     if (review?.orderId) {
-      const target = buildOrderNavigationTarget(review.orderId, { section: 'reviews' })
+      const target = buildOrderNavigationTarget(review.orderId, {
+        section: 'reviews',
+        reviewId: review.reviewId
+      })
       if (target) {
         navigate(target.to, { state: target.state })
         return
@@ -230,33 +233,16 @@ export function PublicProfilePage() {
 
   function ReviewCard({ r }) {
     return (
-      <div
-        className="review-card"
-        role="button"
-        tabIndex={0}
-        style={{ cursor: 'pointer', marginTop: 12 }}
-        onClick={() => openReviewCard(r)}
-        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openReviewCard(r) } }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 8 }}>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 900, color: '#1d2530' }}>
-              {r.direction === 'CUSTOMER_TO_PROVIDER' ? '客户评价摄影师' : '摄影师评价客户'}
-            </div>
-            <div style={{ fontSize: 12, color: '#6e737b', marginTop: 4 }}>
-              订单 #{r.orderId || '-'} · {formatShortTime(r.createdAt)}
-            </div>
-          </div>
-          <ReviewScore value={r.rating} />
-        </div>
-        <div style={{ fontSize: 13, color: '#6e737b', marginBottom: 8 }}>
-          {r.reviewerNickname || 'Portra 用户'} → {r.targetUserNickname || 'Portra 用户'}
-        </div>
-        <blockquote style={{ margin: 0 }}>"{r.content || '对方没有留下文字评价'}"</blockquote>
-        {r.replyContent && (
-          <div className="review-reply"><span>追评</span><p>{r.replyContent}</p></div>
-        )}
-      </div>
+      <ReviewArchiveCard
+        review={{
+          ...r,
+          replyTime: r.replyTime ? formatShortTime(r.replyTime) : ''
+        }}
+        timeText={formatShortTime(r.createdAt)}
+        actionLabel="查看本次约拍评价区"
+        onAction={openReviewCard}
+        sx={{ mt: 1.2 }}
+      />
     )
   }
 

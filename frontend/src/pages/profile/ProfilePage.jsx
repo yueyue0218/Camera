@@ -2,15 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import {
-  creditApi, demandApi, fileApi, momentApi, orderApi, reviewApi, userApi, conversationApi
+  creditApi, demandApi, fileApi, momentApi, orderApi, userApi, conversationApi
 } from '../../api.js'
 import { servicePackageApi } from '../../api/servicePackageApi.js'
-import { ReviewStarsDisplay } from '../../components/reviews/ReviewStarsDisplay.jsx'
-import { buildOrderNavigationTarget } from '../../utils/orderNavigation.js'
 import {
   formatShortTime, formatTime,
-  getLocalReviewsByTarget, getOrderSnapshotsForUser,
-  isApiUnavailable, mergeReviewLists,
+  getOrderSnapshotsForUser,
+  isApiUnavailable,
   readFollows, readPortfolioItems, readSavedPhotos,
   saveConversationRecord, saveOrderSnapshots, saveUserProfile,
   addPortfolioItem, buildPortfolioWorks
@@ -88,7 +86,6 @@ export function ProfilePage() {
   const [myInterests, setMyInterests] = useState([])
   const [myShowcases, setMyShowcases] = useState([])
   const [profileOrders, setProfileOrders] = useState([])
-  const [receivedReviews, setReceivedReviews] = useState([])
   const [creditSummary, setCreditSummary] = useState(null)
   const [portfolioItems, setPortfolioItems] = useState([])
   const [notice, setNotice] = useState(null)
@@ -160,7 +157,7 @@ export function ProfilePage() {
       cleanup.push(() => { el.removeEventListener('mousemove', move); el.removeEventListener('mouseleave', leave) })
     })
     return () => cleanup.forEach(fn => fn())
-  }, [activeTab, moments, profileOrders, receivedReviews])
+  }, [activeTab, moments, profileOrders])
 
   useEffect(() => { loadProfileData() }, [currentUser.userId, currentUser.role])
 
@@ -202,10 +199,9 @@ export function ProfilePage() {
   }, [currentUser.userId])
 
   async function loadProfileData() {
-    const [myProfileRes, momRes, revRes, credRes, ordRes, followersRes] = await Promise.allSettled([
+    const [myProfileRes, momRes, credRes, ordRes, followersRes] = await Promise.allSettled([
       userApi.me(currentUser),
       momentApi.list({}, currentUser),
-      reviewApi.listByUser(currentUser.userId, currentUser),
       creditApi.summary(currentUser.userId, currentUser),
       orderApi.list({ role: isProvider ? 'provider' : 'customer' }, currentUser),
       userApi.followers(currentUser.userId, currentUser)
@@ -253,10 +249,6 @@ export function ProfilePage() {
       })
     }
     setMoments(momRes.status === 'fulfilled' ? momRes.value : [])
-    setReceivedReviews(mergeReviewLists(
-      revRes.status === 'fulfilled' ? revRes.value : [],
-      getLocalReviewsByTarget(currentUser.userId)
-    ))
     setCreditSummary(credRes.status === 'fulfilled' ? credRes.value : null)
     const orders = ordRes.status === 'fulfilled' ? ordRes.value : getOrderSnapshotsForUser(currentUser.userId)
     setProfileOrders(orders)
@@ -445,18 +437,6 @@ export function ProfilePage() {
   function handleTabClick(id) {
     setActiveTab(id)
     requestAnimationFrame(syncHeight)
-  }
-
-  function openReviewCard(review) {
-    if (review?.orderId) {
-      const target = buildOrderNavigationTarget(review.orderId, { section: 'reviews' })
-      if (target) {
-        navigate(target.to, { state: target.state })
-        return
-      }
-      return
-    }
-    navigate('/reviews')
   }
 
   const tabs = [
@@ -791,76 +771,6 @@ export function ProfilePage() {
 
           {/* Right: Side stack */}
           <aside className="side-stack" style={{height:'auto',minHeight:'var(--dashboard-left-card-height)',overflow:'visible'}}>
-            <section className="panel-card">
-              <button className="credit-stamp credit-stamp-button" type="button" onClick={() => navigate('/profile/credit')}>
-                <b>{formatCreditScore(creditScore)}</b>
-                <span>Portra Credit</span>
-              </button>
-              <div className="todo-list">
-                <div className="todo" style={{cursor:'pointer'}} onClick={() => handleTabClick(isProvider ? 'intent' : 'demands')}>
-                  <div>
-                    <strong>{isProvider ? '橱窗管理' : '我的需求'}</strong>
-                    <br /><small>{isProvider ? '管理约拍服务包' : '等待摄影师响应'}</small>
-                  </div>
-                  <span className="status yellow">{isProvider ? 0 : openDemandsCount}</span>
-                </div>
-                <div className="todo">
-                  <div><strong>进行中订单</strong><br /><small>可进入会话</small></div>
-                  <span className="status">{ongoingOrders}</span>
-                </div>
-                <div className="todo">
-                  <div><strong>历史评价</strong><br /><small>最近新增</small></div>
-                  <span className="status orange">{receivedReviews.length}</span>
-                </div>
-              </div>
-            </section>
-            <section className="panel-card">
-              <div className="section-head" style={{ marginBottom: 14 }}>
-                <div>
-                  <h2 style={{ fontSize: 18 }}>历史评价预览</h2>
-                  <p>最近收到的评价会先显示在这里。</p>
-                </div>
-                <button className="archive-all" type="button" onClick={() => navigate('/reviews')}>
-                  查看全部 →
-                </button>
-              </div>
-              {receivedReviews.length ? (
-                <div style={{ display: 'grid', gap: 12 }}>
-                  {receivedReviews.slice(0, 2).map(review => (
-                    <button
-                      key={review.reviewId || `${review.orderId}-${review.createdAt}`}
-                      type="button"
-                      onClick={() => openReviewCard(review)}
-                      style={{
-                        textAlign: 'left',
-                        border: '1px solid rgba(13,47,178,.12)',
-                        borderRadius: 18,
-                        padding: '14px 15px',
-                        background: '#fffdf8',
-                        boxShadow: '0 10px 22px rgba(25,30,45,.05)',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 10 }}>
-                        <div>
-                          <div style={{ fontWeight: 900, color: '#1d2530' }}>{review.direction === 'CUSTOMER_TO_PROVIDER' ? '客户评价摄影师' : '摄影师评价客户'}</div>
-                          <div style={{ fontSize: 12, color: '#6e737b', marginTop: 4 }}>订单 #{review.orderId || '-'}</div>
-                        </div>
-                        <ReviewStarsDisplay value={review.rating} emphasize />
-                      </div>
-                      <div style={{ fontSize: 13, color: '#6e737b', marginBottom: 8 }}>
-                        {review.reviewerNickname || 'Portra 用户'} → {review.targetUserNickname || 'Portra 用户'}
-                      </div>
-                      <div style={{ color: '#30343a', lineHeight: 1.75 }}>
-                        {review.content || '对方没有留下文字评价'}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="pp-empty"><h3>暂无评价</h3><p>完成合作后，这里会显示最近收到的评价。</p></div>
-              )}
-            </section>
           </aside>
         </div>
 
