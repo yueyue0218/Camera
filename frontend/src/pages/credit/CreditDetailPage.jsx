@@ -353,8 +353,6 @@ export function CreditDetailPage() {
                       }
                     } : undefined}
                   >
-                    <span className="credit-note-thread" aria-hidden="true" />
-                    <span className="credit-note-pin" aria-hidden="true" />
                     <div className="credit-note-delta">
                       <strong>{positive ? '+' : ''}{delta.toFixed(1)}</strong>
                       <span>分数变化</span>

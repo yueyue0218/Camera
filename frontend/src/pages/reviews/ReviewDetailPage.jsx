@@ -34,7 +34,10 @@ export function ReviewDetailPage() {
   }, [reviewId, currentUser])
 
   if (orderId) {
-    const target = buildOrderNavigationTarget(orderId, { section: 'reviews' })
+    const target = buildOrderNavigationTarget(orderId, {
+      section: 'reviews',
+      reviewId
+    })
     if (target) {
       return <Navigate to={target.to} replace state={target.state} />
     }
