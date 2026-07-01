@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { Box, Button, Chip, Divider, Paper, Stack, Typography } from '@mui/material'
+import { Box, Button, Chip, Paper, Stack, Typography } from '@mui/material'
 import { ReviewStarsDisplay } from '../../../components/reviews/ReviewStarsDisplay.jsx'
 import { ReviewAvatar, reviewDisplayName, reviewRoleHint, reviewRoleLabel } from '../../../components/reviews/ReviewArchiveCard.jsx'
 import { formatTime } from '../utils/orderStatusUtils.js'
@@ -72,25 +72,25 @@ export function ReviewList({
             }}
             variant="outlined"
             sx={{
-              p: 1.55,
-              bgcolor: '#fffdf8',
-              borderColor: isReviewFocused ? 'rgba(29, 78, 216, .28)' : 'rgba(18, 44, 98, .10)',
-              borderRadius: 3.1,
-              boxShadow: isReviewFocused ? '0 0 0 2px rgba(29, 78, 216, .08)' : '0 8px 18px rgba(28, 38, 64, .04)'
+              p: 1.8,
+              bgcolor: '#fcf8ef',
+              borderColor: isReviewFocused ? 'rgba(83, 112, 171, .24)' : 'rgba(169, 145, 108, .14)',
+              borderRadius: 3.2,
+              boxShadow: isReviewFocused ? '0 0 0 2px rgba(83, 112, 171, .08)' : '0 10px 22px rgba(43, 50, 74, .04)'
             }}
           >
-            <Stack spacing={1.1}>
-              <Stack direction="row" spacing={1.1} sx={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.2 }}>
-                <Stack direction="row" spacing={1.05} sx={{ minWidth: 0, flex: 1 }}>
+            <Stack spacing={1.2}>
+              <Stack direction="row" spacing={1.2} sx={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.35 }}>
+                <Stack direction="row" spacing={1.15} sx={{ minWidth: 0, flex: 1 }}>
                   <ReviewAvatar
                     userId={review.reviewerId}
                     roleHint={reviewRoleHint(review.direction)}
                     displayName={review.reviewerNickname}
-                    size={40}
+                    size={42}
                   />
-                  <Stack spacing={0.36} sx={{ minWidth: 0, flex: 1 }}>
-                    <Stack direction="row" spacing={0.7} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.55 }}>
-                      <Typography sx={{ color: '#1f2937', fontWeight: 900, lineHeight: 1.2 }}>
+                  <Stack spacing={0.42} sx={{ minWidth: 0, flex: 1 }}>
+                    <Stack direction="row" spacing={0.72} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.55 }}>
+                      <Typography sx={{ color: '#1f2937', fontSize: 15, fontWeight: 900, lineHeight: 1.2 }}>
                         {reviewDisplayName(review.reviewerNickname)}
                       </Typography>
                       <Chip
@@ -100,8 +100,8 @@ export function ReviewList({
                           height: 24,
                           borderRadius: 999,
                           fontWeight: 800,
-                          bgcolor: 'rgba(29, 78, 216, .08)',
-                          color: '#1d4ed8',
+                          bgcolor: 'rgba(216, 228, 246, .92)',
+                          color: '#466287',
                           '& .MuiChip-label': { px: 1.05 }
                         }}
                       />
@@ -112,44 +112,35 @@ export function ReviewList({
                   </Stack>
                 </Stack>
 
-                <Stack spacing={0.85} sx={{ alignItems: 'flex-end', minWidth: 118, flexShrink: 0 }}>
-                  <ReviewStarsDisplay value={review.rating} emphasize />
-                  {review.complaintStatus ? (
-                    <Chip
-                      size="small"
-                      label={formatComplaintStatus(review.complaintStatus)}
-                      sx={complaintBadgeSx(review.complaintStatus)}
-                    />
-                  ) : null}
-                </Stack>
+                <ReviewStarsDisplay value={review.rating} emphasize sx={{ minWidth: 96, flexShrink: 0, pt: 0.2, mr: 0.2 }} />
               </Stack>
 
-              <Paper
-                variant="outlined"
+              <Box
                 sx={{
-                  p: 1.18,
-                  bgcolor: '#fffaf0',
-                  borderColor: 'rgba(191, 167, 122, .18)',
-                  borderRadius: 2.45
+                  px: 1.2,
+                  py: 1,
+                  bgcolor: 'rgba(246, 238, 225, .96)',
+                  borderRadius: 2.45,
+                  boxShadow: 'inset 0 0 0 1px rgba(191, 167, 122, .12)'
                 }}
               >
                 <Typography sx={{ color: '#2a3240', lineHeight: 1.82, whiteSpace: 'pre-wrap', fontWeight: 600 }}>
                   {review.content || '对方没有留下文字评价'}
                 </Typography>
-              </Paper>
+              </Box>
 
-              <Typography variant="body2" sx={{ color: '#7c8695', pl: 0.15 }}>
+              <Typography variant="body2" sx={{ color: '#8490a0', pl: 0.1 }}>
                 评价对象：<Box component="span" sx={{ color: '#243041', fontWeight: 800 }}>{reviewDisplayName(review.targetUserNickname)}</Box>
               </Typography>
 
               {review.replyContent ? (
-                <Paper
-                  variant="outlined"
+                <Box
                   sx={{
-                    p: 1.05,
-                    bgcolor: '#f4f8ff',
-                    borderColor: 'rgba(29, 78, 216, .14)',
-                    borderRadius: 2.3
+                    px: 1.15,
+                    py: 0.95,
+                    bgcolor: 'rgba(238, 244, 252, .96)',
+                    borderRadius: 2.35,
+                    boxShadow: 'inset 0 0 0 1px rgba(152, 180, 224, .14)'
                   }}
                 >
                   <Stack spacing={0.45}>
@@ -165,97 +156,69 @@ export function ReviewList({
                       </Typography>
                     ) : null}
                   </Stack>
-                </Paper>
+                </Box>
               ) : null}
 
               {reviewComplaints.length ? (
-                <Paper
-                  variant="outlined"
-                  sx={{
-                    p: 1.08,
-                    bgcolor: '#faf7f1',
-                    borderColor: 'rgba(152, 120, 79, .14)',
-                    borderRadius: 2.6
-                  }}
-                >
-                  <Stack spacing={0.95}>
-                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-                      <Typography sx={{ color: '#6d5a40', fontSize: 12, fontWeight: 900, letterSpacing: '.06em' }}>
-                        申诉记录
-                      </Typography>
-                      {review.complaintStatus ? (
-                        <Chip size="small" label={formatComplaintStatus(review.complaintStatus)} sx={complaintBadgeSx(review.complaintStatus)} />
-                      ) : null}
-                    </Stack>
-                    {reviewComplaints.map(item => {
-                      const complaintKey = String(item.complaintId || item.arbitrationId)
-                      const isComplaintFocused = focusedComplaintId && String(focusedComplaintId) === complaintKey
-                      return (
-                        <Paper
-                          key={complaintKey}
-                          ref={node => {
-                            if (node) complaintRefs.current.set(complaintKey, node)
-                            else complaintRefs.current.delete(complaintKey)
-                          }}
-                          variant="outlined"
-                          sx={{
-                            p: 1,
-                            bgcolor: '#fffdfa',
-                            borderColor: isComplaintFocused ? 'rgba(214, 141, 53, .28)' : 'rgba(138, 114, 84, .14)',
-                            borderRadius: 2.3,
-                            boxShadow: isComplaintFocused ? '0 0 0 2px rgba(214, 141, 53, .08)' : 'none'
-                          }}
-                        >
-                          <Stack spacing={0.75}>
-                            <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
-                              <Typography sx={{ color: '#3f3528', fontWeight: 900 }}>
-                                处理结果
-                              </Typography>
-                              <Chip size="small" label={formatComplaintOutcome(item)} sx={complaintBadgeSx(item.arbitrationResult || item.status)} />
-                            </Stack>
-
-                            <ComplaintLine label="申诉理由" value={item.reason || '评价申诉记录'} />
-                            {item.description ? <ComplaintLine label="补充说明" value={item.description} /> : null}
-
-                            {item.arbitrationComment ? (
-                              <Paper
-                                variant="outlined"
-                                sx={{
-                                  p: 0.92,
-                                  bgcolor: '#fff7ea',
-                                  borderColor: 'rgba(214, 141, 53, .18)',
-                                  borderRadius: 2
-                                }}
-                              >
-                                <Stack spacing={0.35}>
-                                  <Typography sx={{ color: '#8b5f22', fontSize: 12, fontWeight: 900 }}>
-                                    处理说明
-                                  </Typography>
-                                  <Typography sx={{ color: '#52473e', lineHeight: 1.68, whiteSpace: 'pre-wrap' }}>
-                                    {item.arbitrationComment}
-                                  </Typography>
-                                </Stack>
-                              </Paper>
-                            ) : null}
-
-                            <Divider sx={{ borderColor: 'rgba(138, 114, 84, .12)' }} />
-
-                            <Stack direction="row" spacing={1.1} sx={{ flexWrap: 'wrap', rowGap: 0.35 }}>
-                              <Typography variant="body2" sx={{ color: '#84786d' }}>
-                                提交时间：{formatTime(item.createdAt)}
-                              </Typography>
-                              {item.handledAt ? (
-                                <Typography variant="body2" sx={{ color: '#84786d' }}>
-                                  处理时间：{formatTime(item.handledAt)}
-                                </Typography>
-                              ) : null}
-                            </Stack>
+                <Stack spacing={0.85}>
+                  {reviewComplaints.map(item => {
+                    const complaintKey = String(item.complaintId || item.arbitrationId)
+                    const isComplaintFocused = focusedComplaintId && String(focusedComplaintId) === complaintKey
+                    return (
+                      <Box
+                        key={complaintKey}
+                        ref={node => {
+                          if (node) complaintRefs.current.set(complaintKey, node)
+                          else complaintRefs.current.delete(complaintKey)
+                        }}
+                        sx={{
+                          px: 1.18,
+                          py: 1.05,
+                          bgcolor: 'rgba(240, 245, 251, .88)',
+                          borderRadius: 2.55,
+                          boxShadow: isComplaintFocused
+                            ? 'inset 0 0 0 1px rgba(100, 132, 191, .24), 0 0 0 2px rgba(100, 132, 191, .08)'
+                            : 'inset 0 0 0 1px rgba(147, 172, 208, .18)'
+                        }}
+                      >
+                        <Stack spacing={0.78}>
+                          <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+                            <Typography sx={{ color: '#31425f', fontWeight: 900 }}>
+                              处理结果
+                            </Typography>
+                            <Chip size="small" label={formatComplaintOutcome(item)} sx={complaintBadgeSx(item.arbitrationResult || item.status)} />
                           </Stack>
-                        </Paper>
-                      )
-                    })}
-                  </Stack>
-                </Paper>
+
+                          <ComplaintMeta label="申诉理由" value={item.reason || '评价申诉记录'} />
+
+                          <Box
+                            sx={{
+                              px: 1,
+                              py: 0.88,
+                              bgcolor: 'rgba(252, 247, 239, .95)',
+                              borderRadius: 2.1,
+                              boxShadow: 'inset 0 0 0 1px rgba(191, 167, 122, .12)'
+                            }}
+                          >
+                            <Stack spacing={0.28}>
+                              <Typography sx={{ color: '#8b6c3b', fontSize: 12, fontWeight: 900 }}>
+                                处理说明
+                              </Typography>
+                              <Typography sx={{ color: '#52473e', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                                {item.arbitrationComment || '暂无处理说明'}
+                              </Typography>
+                            </Stack>
+                          </Box>
+
+                          <Stack spacing={0.3}>
+                            <ComplaintMeta compact label="提交时间" value={formatTime(item.createdAt)} />
+                            <ComplaintMeta compact label="处理时间" value={item.handledAt ? formatTime(item.handledAt) : '待处理'} />
+                          </Stack>
+                        </Stack>
+                      </Box>
+                    )
+                  })}
+                </Stack>
               ) : null}
 
               {(canFollowUp || canComplain) ? (
@@ -265,8 +228,7 @@ export function ReviewList({
                   sx={{
                     flexWrap: 'wrap',
                     rowGap: 0.7,
-                    pt: 0.25,
-                    borderTop: '1px solid rgba(18, 44, 98, .08)'
+                    pt: 0.2
                   }}
                 >
                   {canFollowUp ? (
@@ -289,16 +251,22 @@ export function ReviewList({
   )
 }
 
-function ComplaintLine({ label, value }) {
+function ComplaintMeta({ label, value, compact = false }) {
   return (
-    <Box>
-      <Typography sx={{ color: '#8a7660', fontSize: 12, fontWeight: 900 }}>
+    <Stack spacing={0.18} sx={{ alignItems: 'flex-start' }}>
+      <Typography sx={{ color: compact ? '#8b95a3' : '#69778a', fontSize: 12, fontWeight: 900 }}>
         {label}
       </Typography>
-      <Typography sx={{ mt: 0.18, color: '#574d42', lineHeight: 1.68, whiteSpace: 'pre-wrap' }}>
+      <Typography
+        sx={{
+          color: compact ? '#5f6977' : '#415062',
+          lineHeight: compact ? 1.55 : 1.68,
+          whiteSpace: 'pre-wrap'
+        }}
+      >
         {value}
       </Typography>
-    </Box>
+    </Stack>
   )
 }
 
@@ -328,15 +296,21 @@ function complaintBadgeSx(status) {
     height: 24,
     borderRadius: 999,
     fontWeight: 800,
-    bgcolor: approved ? 'rgba(22, 163, 74, .10)' : rejected ? 'rgba(239, 68, 68, .10)' : active ? 'rgba(29, 78, 216, .08)' : 'rgba(107, 114, 128, .10)',
-    color: approved ? '#15803d' : rejected ? '#dc2626' : active ? '#1d4ed8' : '#5b6472',
+    bgcolor: approved
+      ? 'rgba(222, 242, 229, .95)'
+      : rejected
+        ? 'rgba(252, 231, 231, .95)'
+        : active
+          ? 'rgba(225, 235, 249, .95)'
+          : 'rgba(235, 240, 246, .95)',
+    color: approved ? '#1f7a4d' : rejected ? '#c04848' : active ? '#466287' : '#5b6472',
     '& .MuiChip-label': { px: 1.05 }
   }
 }
 
 const miniActionSx = {
   minHeight: 30,
-  px: 0.35,
+  px: 0.7,
   color: '#1d4ed8',
   fontWeight: 900,
   borderRadius: 999,
@@ -345,9 +319,10 @@ const miniActionSx = {
 
 const miniOutlinedSx = {
   minHeight: 30,
-  px: 1.1,
+  px: 1.15,
   color: '#4b5563',
-  borderColor: 'rgba(107, 114, 128, .26)',
+  borderColor: 'rgba(107, 114, 128, .24)',
+  bgcolor: 'rgba(252, 250, 245, .82)',
   fontWeight: 850,
   borderRadius: 999,
   '&:hover': { borderColor: 'rgba(29, 78, 216, .24)', color: '#1d4ed8', bgcolor: 'rgba(29, 78, 216, .03)' }

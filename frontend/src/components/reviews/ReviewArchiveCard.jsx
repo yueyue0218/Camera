@@ -137,25 +137,26 @@ export function ReviewArchiveCard({
     <Paper
       variant="outlined"
       sx={{
-        p: 1.45,
-        borderRadius: 3.2,
-        bgcolor: '#fffdf8',
-        borderColor: 'rgba(22, 52, 118, .10)',
-        boxShadow: '0 8px 18px rgba(28, 38, 64, .04)',
+        p: 1.8,
+        borderRadius: 3.35,
+        bgcolor: '#fcf8ef',
+        borderColor: 'rgba(169, 145, 108, .14)',
+        boxShadow: '0 10px 22px rgba(43, 50, 74, .04)',
         ...sx
       }}
     >
-      <Stack spacing={1.05}>
-        <Stack direction="row" spacing={1.1} sx={{ alignItems: 'flex-start', justifyContent: 'space-between', gap: 1.2 }}>
-          <Stack direction="row" spacing={1.05} sx={{ minWidth: 0, alignItems: 'flex-start' }}>
+      <Stack spacing={1.2}>
+        <Stack direction="row" spacing={1.2} sx={{ alignItems: 'flex-start', justifyContent: 'space-between', gap: 1.4 }}>
+          <Stack direction="row" spacing={1.15} sx={{ minWidth: 0, alignItems: 'flex-start', flex: 1 }}>
             <ReviewAvatar
               userId={review?.reviewerId}
               roleHint={reviewRoleHint(review?.direction)}
               displayName={reviewerName}
+              size={42}
             />
-            <Stack spacing={0.38} sx={{ minWidth: 0 }}>
-              <Stack direction="row" spacing={0.7} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.55 }}>
-                <Typography sx={{ fontWeight: 900, color: '#1f2937', lineHeight: 1.2 }}>
+            <Stack spacing={0.42} sx={{ minWidth: 0, flex: 1 }}>
+              <Stack direction="row" spacing={0.72} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.55 }}>
+                <Typography sx={{ fontSize: 15, fontWeight: 900, color: '#1f2937', lineHeight: 1.2 }}>
                   {reviewerName}
                 </Typography>
                 <Chip
@@ -165,8 +166,8 @@ export function ReviewArchiveCard({
                     height: 24,
                     borderRadius: 999,
                     fontWeight: 800,
-                    bgcolor: 'rgba(29, 78, 216, .08)',
-                    color: '#1d4ed8',
+                    bgcolor: 'rgba(216, 228, 246, .92)',
+                    color: '#466287',
                     '& .MuiChip-label': { px: 1.05 }
                   }}
                 />
@@ -177,35 +178,35 @@ export function ReviewArchiveCard({
             </Stack>
           </Stack>
 
-          <ReviewStarsDisplay value={review?.rating} emphasize sx={{ flexShrink: 0, pt: 0.15 }} />
+          <ReviewStarsDisplay value={review?.rating} emphasize sx={{ flexShrink: 0, pt: 0.2, mr: 0.2 }} />
         </Stack>
 
-        <Paper
-          variant="outlined"
+        <Box
           sx={{
-            p: 1.15,
-            bgcolor: '#fffaf0',
-            borderColor: 'rgba(191, 167, 122, .18)',
-            borderRadius: 2.4
+            px: 1.2,
+            py: 1,
+            bgcolor: 'rgba(246, 238, 225, .96)',
+            borderRadius: 2.45,
+            boxShadow: 'inset 0 0 0 1px rgba(191, 167, 122, .12)'
           }}
         >
           <Typography sx={{ color: '#2a3240', lineHeight: 1.8, whiteSpace: 'pre-wrap', fontWeight: 600 }}>
             {review?.content || '对方没有留下文字评价'}
           </Typography>
-        </Paper>
+        </Box>
 
-        <Typography variant="body2" sx={{ color: '#7c8695', pl: 0.15 }}>
+        <Typography variant="body2" sx={{ color: '#8490a0', pl: 0.1 }}>
           评价对象：<Box component="span" sx={{ color: '#243041', fontWeight: 800 }}>{targetName}</Box>
         </Typography>
 
         {review?.replyContent ? (
-          <Paper
-            variant="outlined"
+          <Box
             sx={{
-              p: 1.05,
-              bgcolor: '#f4f8ff',
-              borderColor: 'rgba(29, 78, 216, .14)',
-              borderRadius: 2.3
+              px: 1.15,
+              py: 0.95,
+              bgcolor: 'rgba(238, 244, 252, .96)',
+              borderRadius: 2.35,
+              boxShadow: 'inset 0 0 0 1px rgba(152, 180, 224, .14)'
             }}
           >
             <Stack spacing={0.45}>
@@ -221,11 +222,11 @@ export function ReviewArchiveCard({
                 </Typography>
               ) : null}
             </Stack>
-          </Paper>
+          </Box>
         ) : null}
 
         {onAction ? (
-          <Box sx={{ pt: 0.25, borderTop: '1px solid rgba(18, 44, 98, .08)' }}>
+          <Box sx={{ pt: 0.2 }}>
             <Button
               variant="text"
               size="small"
@@ -235,7 +236,7 @@ export function ReviewArchiveCard({
               sx={{
                 alignSelf: 'flex-start',
                 minHeight: 30,
-                px: 0.35,
+                px: 0.7,
                 color: '#1d4ed8',
                 fontWeight: 900,
                 borderRadius: 999,
