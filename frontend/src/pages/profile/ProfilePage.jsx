@@ -406,6 +406,7 @@ export function ProfilePage() {
   const TERMINAL_STATUSES = ['COMPLETED','REVIEWED','CANCELLED','REFUNDED','APPEALING']
   const historicalOrders = profileOrders.filter(o => ['COMPLETED','REVIEWED'].includes(o.status)).length
   const ongoingOrders = profileOrders.filter(o => !TERMINAL_STATUSES.includes(o.status)).length
+  const reviewedOrders = profileOrders.filter(o => o.status === 'REVIEWED').length
   const openDemandsCount = myDemands.filter(d => d.status === 'OPEN' || !d.status).length
   const creditScore = creditSummary?.creditScore ?? null
   const billableOrders = profileOrders.filter(o => o.status !== 'REFUNDED').length
@@ -771,6 +772,29 @@ export function ProfilePage() {
 
           {/* Right: Side stack */}
           <aside className="side-stack" style={{height:'auto',minHeight:'var(--dashboard-left-card-height)',overflow:'visible'}}>
+            <section className="panel-card">
+              <button className="credit-stamp credit-stamp-button" type="button" onClick={() => navigate('/profile/credit')}>
+                <b>{formatCreditScore(creditScore)}</b>
+                <span>Portra Credit</span>
+              </button>
+              <div className="todo-list">
+                <div className="todo" style={{cursor:'pointer'}} onClick={() => handleTabClick(isProvider ? 'intent' : 'demands')}>
+                  <div>
+                    <strong>{isProvider ? '橱窗管理' : '我的需求'}</strong>
+                    <br /><small>{isProvider ? '管理约拍服务包' : '等待摄影师响应'}</small>
+                  </div>
+                  <span className="status yellow">{isProvider ? 0 : openDemandsCount}</span>
+                </div>
+                <div className="todo">
+                  <div><strong>进行中订单</strong><br /><small>可进入会话</small></div>
+                  <span className="status">{ongoingOrders}</span>
+                </div>
+                <div className="todo">
+                  <div><strong>历史评价</strong><br /><small>最近新增</small></div>
+                  <span className="status orange">{reviewedOrders}</span>
+                </div>
+              </div>
+            </section>
           </aside>
         </div>
 

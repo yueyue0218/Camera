@@ -1,9 +1,13 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Box, Button, Chip, Paper, Stack, Typography } from '@mui/material'
+import { useAuth } from '../../../AuthContext.jsx'
+import { userApi } from '../../../api.js'
 import { ReviewStarsDisplay } from '../../../components/reviews/ReviewStarsDisplay.jsx'
 import { ReviewAvatar, reviewDisplayName, reviewRoleHint, reviewRoleLabel } from '../../../components/reviews/ReviewArchiveCard.jsx'
 import { formatTime } from '../utils/orderStatusUtils.js'
 import { EmptyOrderCard } from './EmptyOrderCard.jsx'
+
+const reviewNameCache = new Map()
 
 export function ReviewList({
   reviews,
@@ -81,36 +85,7 @@ export function ReviewList({
           >
             <Stack spacing={1.2}>
               <Stack direction="row" spacing={1.2} sx={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.35 }}>
-                <Stack direction="row" spacing={1.15} sx={{ minWidth: 0, flex: 1 }}>
-                  <ReviewAvatar
-                    userId={review.reviewerId}
-                    roleHint={reviewRoleHint(review.direction)}
-                    displayName={review.reviewerNickname}
-                    size={42}
-                  />
-                  <Stack spacing={0.42} sx={{ minWidth: 0, flex: 1 }}>
-                    <Stack direction="row" spacing={0.72} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.55 }}>
-                      <Typography sx={{ color: '#1f2937', fontSize: 15, fontWeight: 900, lineHeight: 1.2 }}>
-                        {reviewDisplayName(review.reviewerNickname)}
-                      </Typography>
-                      <Chip
-                        size="small"
-                        label={reviewRoleLabel(review.direction)}
-                        sx={{
-                          height: 24,
-                          borderRadius: 999,
-                          fontWeight: 800,
-                          bgcolor: 'rgba(216, 228, 246, .92)',
-                          color: '#466287',
-                          '& .MuiChip-label': { px: 1.05 }
-                        }}
-                      />
-                    </Stack>
-                    <Typography variant="body2" sx={{ color: '#7b8391' }}>
-                      {formatTime(review.createdAt)}
-                    </Typography>
-                  </Stack>
-                </Stack>
+                <ReviewerIdentityBlock review={review} />
 
                 <ReviewStarsDisplay value={review.rating} emphasize sx={{ minWidth: 96, flexShrink: 0, pt: 0.2, mr: 0.2 }} />
               </Stack>
@@ -129,8 +104,8 @@ export function ReviewList({
                 </Typography>
               </Box>
 
-              <Typography variant="body2" sx={{ color: '#8490a0', pl: 0.1 }}>
-                评价对象：<Box component="span" sx={{ color: '#243041', fontWeight: 800 }}>{reviewDisplayName(review.targetUserNickname)}</Box>
+              <Typography variant="body2" sx={{ color: '#8490a0', textAlign: 'left' }}>
+                评价对象：<Box component="span" sx={{ color: '#243041', fontWeight: 800 }}><ResolvedReviewName userId={review.targetUserId} roleHint={reviewTargetRoleHint(review.direction)} fallbackName={review.targetUserNickname} /></Box>
               </Typography>
 
               {review.replyContent ? (
@@ -189,14 +164,16 @@ export function ReviewList({
                             <Chip size="small" label={formatComplaintOutcome(item)} sx={complaintBadgeSx(item.arbitrationResult || item.status)} />
                           </Stack>
 
-                          <ComplaintMeta label="申诉理由" value={item.reason || '评价申诉记录'} />
+                          {formatComplaintReason(item) ? (
+                            <ComplaintMeta label="申诉理由" value={formatComplaintReason(item)} />
+                          ) : null}
 
                           <Box
                             sx={{
-                              px: 1,
-                              py: 0.88,
+                              px: 1.15,
+                              py: 0.95,
                               bgcolor: 'rgba(252, 247, 239, .95)',
-                              borderRadius: 2.1,
+                              borderRadius: 2.25,
                               boxShadow: 'inset 0 0 0 1px rgba(191, 167, 122, .12)'
                             }}
                           >
@@ -204,13 +181,13 @@ export function ReviewList({
                               <Typography sx={{ color: '#8b6c3b', fontSize: 12, fontWeight: 900 }}>
                                 处理说明
                               </Typography>
-                              <Typography sx={{ color: '#52473e', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                              <Typography sx={{ color: '#52473e', lineHeight: 1.72, whiteSpace: 'pre-wrap', textAlign: 'left' }}>
                                 {item.arbitrationComment || '暂无处理说明'}
                               </Typography>
                             </Stack>
                           </Box>
 
-                          <Stack spacing={0.3}>
+                          <Stack spacing={0.45}>
                             <ComplaintMeta compact label="提交时间" value={formatTime(item.createdAt)} />
                             <ComplaintMeta compact label="处理时间" value={item.handledAt ? formatTime(item.handledAt) : '待处理'} />
                           </Stack>
@@ -251,9 +228,50 @@ export function ReviewList({
   )
 }
 
+function ReviewerIdentityBlock({ review }) {
+  const reviewerName = useResolvedReviewName(review.reviewerId, reviewRoleHint(review.direction), review.reviewerNickname)
+
+  return (
+    <Stack direction="row" spacing={1.15} sx={{ minWidth: 0, flex: 1, alignItems: 'flex-start' }}>
+      <ReviewAvatar
+        userId={review.reviewerId}
+        roleHint={reviewRoleHint(review.direction)}
+        displayName={reviewerName}
+        size={42}
+      />
+      <Stack spacing={0.42} sx={{ minWidth: 0, flex: 1, alignItems: 'flex-start' }}>
+        <Stack direction="row" spacing={0.72} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.55 }}>
+          <Typography sx={{ color: '#1f2937', fontSize: 15, fontWeight: 900, lineHeight: 1.2, textAlign: 'left' }}>
+            {reviewerName}
+          </Typography>
+          <Chip
+            size="small"
+            label={reviewRoleLabel(review.direction)}
+            sx={{
+              height: 24,
+              borderRadius: 999,
+              fontWeight: 800,
+              bgcolor: 'rgba(216, 228, 246, .92)',
+              color: '#466287',
+              '& .MuiChip-label': { px: 1.05 }
+            }}
+          />
+        </Stack>
+        <Typography variant="body2" sx={{ color: '#7b8391', textAlign: 'left' }}>
+          {formatTime(review.createdAt)}
+        </Typography>
+      </Stack>
+    </Stack>
+  )
+}
+
+function ResolvedReviewName({ userId, roleHint, fallbackName }) {
+  return useResolvedReviewName(userId, roleHint, fallbackName)
+}
+
 function ComplaintMeta({ label, value, compact = false }) {
   return (
-    <Stack spacing={0.18} sx={{ alignItems: 'flex-start' }}>
+    <Stack spacing={0.18} sx={{ alignItems: 'flex-start', width: '100%' }}>
       <Typography sx={{ color: compact ? '#8b95a3' : '#69778a', fontSize: 12, fontWeight: 900 }}>
         {label}
       </Typography>
@@ -261,13 +279,90 @@ function ComplaintMeta({ label, value, compact = false }) {
         sx={{
           color: compact ? '#5f6977' : '#415062',
           lineHeight: compact ? 1.55 : 1.68,
-          whiteSpace: 'pre-wrap'
+          whiteSpace: 'pre-wrap',
+          textAlign: 'left',
+          width: '100%'
         }}
       >
         {value}
       </Typography>
     </Stack>
   )
+}
+
+function useResolvedReviewName(userId, roleHint, fallbackName) {
+  const { currentUser } = useAuth()
+  const cacheKey = `${userId || 'unknown'}:${roleHint || ''}`
+  const [resolvedName, setResolvedName] = useState(() => {
+    const cachedName = reviewNameCache.get(cacheKey)
+    return reviewDisplayName(cachedName || fallbackName)
+  })
+
+  useEffect(() => {
+    const cachedName = reviewNameCache.get(cacheKey)
+    if (cachedName) {
+      setResolvedName(reviewDisplayName(cachedName))
+      return
+    }
+    setResolvedName(reviewDisplayName(fallbackName))
+  }, [cacheKey, fallbackName])
+
+  useEffect(() => {
+    let active = true
+
+    async function loadDisplayName() {
+      if (!userId || !currentUser) {
+        setResolvedName(reviewDisplayName(fallbackName))
+        return
+      }
+      if (reviewNameCache.has(cacheKey)) {
+        setResolvedName(reviewDisplayName(reviewNameCache.get(cacheKey)))
+        return
+      }
+      try {
+        const brief = await userApi.brief(userId, currentUser, roleHint || undefined)
+        const nextName = reviewDisplayName(brief?.nickname || fallbackName)
+        reviewNameCache.set(cacheKey, nextName)
+        if (active) setResolvedName(nextName)
+      } catch {
+        if (active) setResolvedName(reviewDisplayName(fallbackName))
+      }
+    }
+
+    loadDisplayName()
+    return () => { active = false }
+  }, [cacheKey, currentUser, fallbackName, roleHint, userId])
+
+  return resolvedName
+}
+
+function reviewTargetRoleHint(direction) {
+  const value = String(direction || '').trim().toUpperCase()
+  if (value === 'CUSTOMER_TO_PROVIDER') return 'PROVIDER'
+  if (value === 'PROVIDER_TO_CUSTOMER') return 'CUSTOMER'
+  return ''
+}
+
+function formatComplaintReason(item) {
+  const reason = String(item?.reason || '').trim()
+  const comment = String(item?.arbitrationComment || '').trim()
+  if (!reason) return '评价申诉记录'
+  if (!comment) return reason
+  if (normalizeInlineText(reason) === normalizeInlineText(comment)) return ''
+
+  const delimiterIndex = Math.max(reason.indexOf('：'), reason.indexOf(':'))
+  if (delimiterIndex > -1) {
+    const head = reason.slice(0, delimiterIndex).trim()
+    const tail = reason.slice(delimiterIndex + 1).trim()
+    if (tail && normalizeInlineText(tail) === normalizeInlineText(comment)) {
+      return head
+    }
+  }
+  return reason
+}
+
+function normalizeInlineText(value) {
+  return String(value || '').replace(/\s+/g, '').trim()
 }
 
 function formatComplaintStatus(status) {
