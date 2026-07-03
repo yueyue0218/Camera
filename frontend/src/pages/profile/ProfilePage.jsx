@@ -2,13 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import {
-  creditApi, demandApi, fileApi, momentApi, orderApi, reviewApi, userApi, conversationApi
+  creditApi, demandApi, fileApi, momentApi, orderApi, userApi, conversationApi
 } from '../../api.js'
 import { servicePackageApi } from '../../api/servicePackageApi.js'
 import {
   formatShortTime, formatTime,
-  getLocalReviewsByTarget, getOrderSnapshotsForUser,
-  isApiUnavailable, mergeReviewLists,
+  getOrderSnapshotsForUser,
+  isApiUnavailable,
   readFollows, readPortfolioItems, readSavedPhotos,
   saveConversationRecord, saveOrderSnapshots, saveUserProfile,
   addPortfolioItem, buildPortfolioWorks
@@ -86,7 +86,6 @@ export function ProfilePage() {
   const [myInterests, setMyInterests] = useState([])
   const [myShowcases, setMyShowcases] = useState([])
   const [profileOrders, setProfileOrders] = useState([])
-  const [receivedReviews, setReceivedReviews] = useState([])
   const [creditSummary, setCreditSummary] = useState(null)
   const [portfolioItems, setPortfolioItems] = useState([])
   const [notice, setNotice] = useState(null)
@@ -158,7 +157,7 @@ export function ProfilePage() {
       cleanup.push(() => { el.removeEventListener('mousemove', move); el.removeEventListener('mouseleave', leave) })
     })
     return () => cleanup.forEach(fn => fn())
-  }, [activeTab, moments, profileOrders, receivedReviews])
+  }, [activeTab, moments, profileOrders])
 
   useEffect(() => { loadProfileData() }, [currentUser.userId, currentUser.role])
 
@@ -200,10 +199,9 @@ export function ProfilePage() {
   }, [currentUser.userId])
 
   async function loadProfileData() {
-    const [myProfileRes, momRes, revRes, credRes, ordRes, followersRes] = await Promise.allSettled([
+    const [myProfileRes, momRes, credRes, ordRes, followersRes] = await Promise.allSettled([
       userApi.me(currentUser),
       momentApi.list({}, currentUser),
-      reviewApi.listByUser(currentUser.userId, currentUser),
       creditApi.summary(currentUser.userId, currentUser),
       orderApi.list({ role: isProvider ? 'provider' : 'customer' }, currentUser),
       userApi.followers(currentUser.userId, currentUser)
@@ -251,10 +249,6 @@ export function ProfilePage() {
       })
     }
     setMoments(momRes.status === 'fulfilled' ? momRes.value : [])
-    setReceivedReviews(mergeReviewLists(
-      revRes.status === 'fulfilled' ? revRes.value : [],
-      getLocalReviewsByTarget(currentUser.userId)
-    ))
     setCreditSummary(credRes.status === 'fulfilled' ? credRes.value : null)
     const orders = ordRes.status === 'fulfilled' ? ordRes.value : getOrderSnapshotsForUser(currentUser.userId)
     setProfileOrders(orders)
@@ -412,12 +406,13 @@ export function ProfilePage() {
   const TERMINAL_STATUSES = ['COMPLETED','REVIEWED','CANCELLED','REFUNDED','APPEALING']
   const historicalOrders = profileOrders.filter(o => ['COMPLETED','REVIEWED'].includes(o.status)).length
   const ongoingOrders = profileOrders.filter(o => !TERMINAL_STATUSES.includes(o.status)).length
+  const reviewedOrders = profileOrders.filter(o => o.status === 'REVIEWED').length
   const openDemandsCount = myDemands.filter(d => d.status === 'OPEN' || !d.status).length
   const creditScore = creditSummary?.creditScore ?? null
   const billableOrders = profileOrders.filter(o => o.status !== 'REFUNDED').length
   const completionRate = billableOrders > 0 ? Math.round((historicalOrders / billableOrders) * 100) : null
   const genderText = currentUser.gender === 'MALE' ? '男' : currentUser.gender === 'FEMALE' ? '女' : '保密'
-  const displayName = profileForm.nickname || currentUser.label || `用户${currentUser.userId}`
+  const displayName = profileForm.nickname || currentUser.label || currentUser.username || 'Portra 用户'
   const schoolPin = currentUser.school || 'Portra'
 
   const momentsByMonth = useMemo(() => {
@@ -443,19 +438,6 @@ export function ProfilePage() {
   function handleTabClick(id) {
     setActiveTab(id)
     requestAnimationFrame(syncHeight)
-  }
-
-  function openReviewCard(review) {
-    const reviewId = review?.reviewId
-    if (reviewId != null && !String(reviewId).startsWith('local')) {
-      navigate(`/reviews/${reviewId}`)
-      return
-    }
-    if (review?.orderId) {
-      navigate(`/orders?orderId=${review.orderId}`)
-      return
-    }
-    navigate('/reviews')
   }
 
   const tabs = [
@@ -809,7 +791,7 @@ export function ProfilePage() {
                 </div>
                 <div className="todo">
                   <div><strong>历史评价</strong><br /><small>最近新增</small></div>
-                  <span className="status orange">{receivedReviews.length}</span>
+                  <span className="status orange">{reviewedOrders}</span>
                 </div>
               </div>
             </section>
@@ -919,7 +901,7 @@ export function ProfilePage() {
                               : { background: `hsl(${(Number(uid) * 67) % 360},45%,68%)` }} />
                           <div>
                             <h4 style={{display:'flex',alignItems:'center',gap:8}}>
-                              {f.nickname || `用户 ${uid}`}
+                              {f.nickname || 'Portra 用户'}
                               <span className="role-badge" style={{fontSize:11,height:22,padding:'0 8px'}}>{roleLabel}</span>
                             </h4>
                             <p>{f.bio || f.description || (followListOpen === 'following' ? '已关注' : '关注了你')}</p>

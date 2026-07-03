@@ -240,7 +240,7 @@ class ReviewComplaintServiceTest {
                 .extracting("eventType", "scoreChange")
                 .contains(
                         org.assertj.core.groups.Tuple.tuple("REVIEW", 0),
-                        org.assertj.core.groups.Tuple.tuple("REVIEW_ARBITRATION", 0)
+                        org.assertj.core.groups.Tuple.tuple("REVIEW_ARBITRATION_APPROVED", 0)
                 );
     }
 
@@ -269,7 +269,7 @@ class ReviewComplaintServiceTest {
                 .extracting("eventType", "appliedScoreChange")
                 .contains(
                         org.assertj.core.groups.Tuple.tuple("REVIEW", 0),
-                        org.assertj.core.groups.Tuple.tuple("REVIEW_ARBITRATION", 0)
+                        org.assertj.core.groups.Tuple.tuple("REVIEW_ARBITRATION_APPROVED", 0)
                 );
     }
 

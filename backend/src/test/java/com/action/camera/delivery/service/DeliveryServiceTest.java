@@ -1,6 +1,8 @@
 package com.action.camera.delivery.service;
 
 import com.action.camera.application.FileService;
+import com.action.camera.application.OrderDisplayService;
+import com.action.camera.application.UserDisplayService;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
@@ -75,6 +77,12 @@ class DeliveryServiceTest {
     @Mock
     private TransactionTemplate txTemplate;
 
+    @Mock
+    private UserDisplayService userDisplayService;
+
+    @Mock
+    private OrderDisplayService orderDisplayService;
+
     private DeliveryService deliveryService;
 
     @BeforeEach
@@ -87,7 +95,9 @@ class DeliveryServiceTest {
                 orderQueryPort,
                 orderStatusPort,
                 orderService,
-                txTemplate
+                txTemplate,
+                userDisplayService,
+                orderDisplayService
         );
         UserContext.setUserId(PROVIDER_ID);
         UserContext.setCurrentRole(UserRole.PROVIDER);

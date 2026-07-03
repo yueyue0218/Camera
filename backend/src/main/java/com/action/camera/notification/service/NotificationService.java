@@ -15,9 +15,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class NotificationService {
+
+    private static final Pattern LONG_METADATA_PATTERN = Pattern.compile("\"%s\":(\\d+)");
 
     private final NotificationRepository notificationRepository;
 
@@ -139,9 +143,74 @@ public class NotificationService {
                 notification.getSourceId(),
                 notification.getDedupeKey(),
                 notification.getMetadataJson(),
+                resolveNavigationPath(notification),
                 notification.getIsRead(),
                 notification.getCreatedAt()
         );
+    }
+
+    private String resolveNavigationPath(Notification notification) {
+        String explicitPath = findMetadataString(notification.getMetadataJson(), "navigationPath");
+        if (explicitPath != null && explicitPath.startsWith("/")) {
+            return explicitPath;
+        }
+
+        String type = notification.getType() == null ? "" : notification.getType().trim().toUpperCase();
+        String eventType = notification.getEventType() == null ? "" : notification.getEventType().trim().toUpperCase();
+        Long orderId = findMetadataLong(notification.getMetadataJson(), "orderId");
+        Long conversationId = findMetadataLong(notification.getMetadataJson(), "conversationId");
+
+        if ((type.contains("MESSAGE") || eventType.contains("MESSAGE") || type.contains("CONVERSATION") || eventType.contains("CONVERSATION"))
+                && conversationId != null) {
+            return "/messages/" + conversationId;
+        }
+
+        if ((type.contains("REVIEW") || eventType.contains("REVIEW") || type.contains("COMPLAINT") || eventType.contains("COMPLAINT"))
+                && orderId != null) {
+            return buildOrderReviewPath(orderId);
+        }
+
+        if (("ORDER".equalsIgnoreCase(notification.getRelatedType()) || type.contains("ORDER") || eventType.contains("ORDER"))
+                && orderId == null) {
+            orderId = notification.getRelatedId();
+        }
+
+        if (orderId != null) {
+            return "/orders?orderId=" + orderId;
+        }
+        return null;
+    }
+
+    private String buildOrderReviewPath(Long orderId) {
+        return "/orders?orderId=" + orderId + "&section=reviews";
+    }
+
+    private Long findMetadataLong(String metadataJson, String key) {
+        if (isBlank(metadataJson) || isBlank(key)) {
+            return null;
+        }
+        Pattern pattern = Pattern.compile(String.format(LONG_METADATA_PATTERN.pattern(), Pattern.quote(key)));
+        Matcher matcher = pattern.matcher(metadataJson);
+        if (!matcher.find()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(matcher.group(1));
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private String findMetadataString(String metadataJson, String key) {
+        if (isBlank(metadataJson) || isBlank(key)) {
+            return null;
+        }
+        Pattern pattern = Pattern.compile("\"" + Pattern.quote(key) + "\":\"([^\"]+)\"");
+        Matcher matcher = pattern.matcher(metadataJson);
+        if (!matcher.find()) {
+            return null;
+        }
+        return matcher.group(1);
     }
 
     private Long requireCurrentUserId() {

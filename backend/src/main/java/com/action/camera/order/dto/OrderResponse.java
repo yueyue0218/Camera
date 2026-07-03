@@ -17,7 +17,9 @@ public class OrderResponse {
     private Long quoteId;
     private Long conversationId;
     private Long customerId;
+    private String customerNickname;
     private Long providerUserId;
+    private String providerNickname;
     private Long demandId;
     private Long servicePackageId;
     private OrderStatus status;
@@ -32,14 +34,16 @@ public class OrderResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public static OrderResponse from(Order order) {
+    public static OrderResponse from(Order order, String customerNickname, String providerNickname) {
         return new OrderResponse(
                 order.getId(),
                 order.getOrderNo(),
                 order.getQuoteId(),
                 order.getConversationId(),
                 order.getCustomerId(),
+                customerNickname,
                 order.getProviderUserId(),
+                providerNickname,
                 order.getDemandId(),
                 order.getServicePackageId(),
                 order.getStatus(),

@@ -290,7 +290,7 @@ function normalizeAuthorizationFiles(authorization = {}) {
   }))
 }
 
-function buildApplicantLabel(authorization = {}, order) {
+function buildApplicantLabel(_authorization = {}, _order) {
   return '摄影师'
 }
 

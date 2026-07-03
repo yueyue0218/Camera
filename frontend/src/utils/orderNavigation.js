@@ -11,8 +11,14 @@ export function buildOrderNavigationTarget(value, options = {}) {
   const conversationId = normalizeConversationId(options.conversationId)
   const returnTo = sanitizeOrderReturnPath(options.returnTo)
   const search = new URLSearchParams({ orderId: String(orderId) })
+  const section = sanitizeOrderSection(options.section)
+  const reviewId = normalizeEntityId(options.reviewId)
+  const complaintId = normalizeEntityId(options.complaintId)
   if (conversationId) search.set('conversationId', String(conversationId))
   if (returnTo) search.set('returnTo', returnTo)
+  if (section) search.set('section', section)
+  if (reviewId) search.set('reviewId', String(reviewId))
+  if (complaintId) search.set('complaintId', String(complaintId))
   if (options.source) search.set('source', String(options.source))
   if (options.orderSurface) search.set('surface', String(options.orderSurface))
   return {
@@ -21,6 +27,9 @@ export function buildOrderNavigationTarget(value, options = {}) {
       orderId,
       conversationId,
       returnTo,
+      section,
+      reviewId,
+      complaintId,
       ...(options.source ? { workflowSource: String(options.source) } : {}),
       ...(options.orderSurface ? { orderSurface: String(options.orderSurface) } : {})
     }
@@ -88,7 +97,20 @@ function normalizeUserId(value) {
   return Number.isFinite(id) && id > 0 ? id : null
 }
 
+function normalizeEntityId(value) {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  const numeric = Number(text)
+  if (Number.isFinite(numeric) && numeric > 0) return String(numeric)
+  return text.startsWith('local') || text.startsWith('arb-') ? text : ''
+}
+
 function sanitizeOrderReturnPath(value) {
   const text = String(value || '')
   return /^\/messages\/\d+$/.test(text) ? text : ''
+}
+
+function sanitizeOrderSection(value) {
+  const text = String(value || '').trim().toLowerCase()
+  return ['reviews'].includes(text) ? text : ''
 }

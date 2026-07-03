@@ -143,6 +143,30 @@ export function MessagesPage() {
     }
   }, [applyNotice, currentUserId, currentUserRole, loadConversations, location.search, requestUser])
 
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('conversationId')) return undefined
+    if (!requestUser || !currentUserId || !currentUserRole) return undefined
+
+    const reportPresence = active => {
+      conversationApi.reportPresence(null, active, requestUser, active ? {} : { keepalive: true }).catch(() => {})
+    }
+
+    reportPresence(true)
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === 'visible') reportPresence(true)
+    }, 8000)
+    const handleVisibilityChange = () => {
+      reportPresence(document.visibilityState === 'visible')
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      reportPresence(false)
+    }
+  }, [currentUserId, currentUserRole, location.search, requestUser])
+
   const handleRetry = useCallback(() => {
     setRetryVersion(version => version + 1)
   }, [])

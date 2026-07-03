@@ -11,7 +11,8 @@ import {
   readUserProfiles,
   toggleFollow as toggleFollowLocal,
 } from './utils/profileUtils.js'
-import { ReviewScore } from '../reviews/ReviewPage.jsx'
+import { ReviewArchiveCard } from '../../components/reviews/ReviewArchiveCard.jsx'
+import { buildOrderNavigationTarget } from '../../utils/orderNavigation.js'
 import './profile.css'
 
 function formatCreditScore(value) {
@@ -175,7 +176,7 @@ export function PublicProfilePage() {
   const role = publicProfile?.currentRole || storedProfile.role || 'CUSTOMER'
   const isProvider = role === 'PROVIDER'
   const pp = publicProfile?.providerProfile || {}
-  const nickname = publicProfile?.nickname || storedProfile.nickname || `用户${profileUserId}`
+  const nickname = publicProfile?.nickname || publicProfile?.username || publicProfile?.displayName || storedProfile.nickname || storedProfile.username || 'Portra 用户'
   const gender = publicProfile?.gender
   const bio = publicProfile?.bio || storedProfile.bio || ''
   const creditScore = creditSummary?.creditScore ?? null
@@ -198,13 +199,15 @@ export function PublicProfilePage() {
   )
 
   function openReviewCard(review) {
-    const reviewId = review?.reviewId
-    if (reviewId != null && !String(reviewId).startsWith('local')) {
-      navigate(`/reviews/${reviewId}`)
-      return
-    }
     if (review?.orderId) {
-      navigate(`/orders?orderId=${review.orderId}`)
+      const target = buildOrderNavigationTarget(review.orderId, {
+        section: 'reviews',
+        reviewId: review.reviewId
+      })
+      if (target) {
+        navigate(target.to, { state: target.state })
+        return
+      }
       return
     }
     navigate(`/users/${profileUserId}/reviews`)
@@ -230,25 +233,16 @@ export function PublicProfilePage() {
 
   function ReviewCard({ r }) {
     return (
-      <div
-        className="review-card"
-        role="button"
-        tabIndex={0}
-        style={{ cursor: 'pointer', marginTop: 12 }}
-        onClick={() => openReviewCard(r)}
-        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openReviewCard(r) } }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 8 }}>
-          <span style={{ fontSize: 13, color: '#6e737b', letterSpacing: '.08em' }}>
-            来自 {r.reviewerNickname || `用户 ${r.reviewerId}`} · {formatShortTime(r.createdAt)}
-          </span>
-          <ReviewScore value={r.rating} />
-        </div>
-        <blockquote style={{ margin: 0 }}>"{r.content || '对方没有留下文字评价'}"</blockquote>
-        {r.replyContent && (
-          <div className="review-reply"><span>追评</span><p>{r.replyContent}</p></div>
-        )}
-      </div>
+      <ReviewArchiveCard
+        review={{
+          ...r,
+          replyTime: r.replyTime ? formatShortTime(r.replyTime) : ''
+        }}
+        timeText={formatShortTime(r.createdAt)}
+        actionLabel="查看本次约拍评价区"
+        onAction={openReviewCard}
+        sx={{ mt: 1.2 }}
+      />
     )
   }
 
@@ -401,7 +395,9 @@ export function PublicProfilePage() {
                   <h2>{isProvider ? '历史评价' : '收到的评价'}</h2>
                   <p>{isProvider ? '来自约拍方的真实反馈，见证每一次约拍。' : '摄影师对 TA 的真实反馈，了解合作体验。'}</p>
                 </div>
-                <div className="section-mark">02</div>
+                <button className="archive-all" type="button" onClick={() => navigate(`/users/${profileUserId}/reviews`)}>
+                  全部历史评价 →
+                </button>
               </div>
               {(isProvider ? providerReviews : customerReviews).length
                 ? (isProvider ? providerReviews : customerReviews).slice(0, 6).map(r => (

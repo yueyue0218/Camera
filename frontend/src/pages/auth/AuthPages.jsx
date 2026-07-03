@@ -22,7 +22,7 @@ const ORANGE = '#f85104'
 const INK    = '#111015'
 const PAPER  = '#f2ede6'
 const MUTED  = '#60646c'
-const BG     = '#e6e2e0'
+const _BG    = '#e6e2e0'
 const WARM   = '#fffaf2'
 
 const SERIF = '"Bodoni 72","Didot","Bodoni MT",Georgia,serif'
@@ -167,7 +167,7 @@ function SuccessBanner({ text }) {
   )
 }
 
-function RoleToggle({ value, onChange }) {
+function _RoleToggle({ value, onChange }) {
   const options = [
     { key: 'CUSTOMER', label: '约拍方', hint: '我想拍照' },
     { key: 'PROVIDER', label: '摄影师', hint: '我来拍' }
@@ -227,7 +227,7 @@ function BackLink({ label, onClick }) {
 
 /* ── Filmstrip ─────────────────────────────────────────────── */
 
-function Filmstrip() {
+function _Filmstrip() {
   const h = 'clamp(120px, 16vh, 188px)'
   return (
     <div style={{
@@ -561,7 +561,7 @@ export function LoginChoicePage() {
     </div>
   )
 }
-function NavBtn({ children, onClick, primary }) {
+function _NavBtn({ children, onClick, primary }) {
   const [hov, setHov] = useState(false)
   return (
     <button

@@ -169,7 +169,7 @@ export function getCounterpartyProfile(conversation, currentUser) {
     storedProfile.displayName ||
     demoProfile.nickname ||
     demoProfile.displayName ||
-    (oppositeId ? `用户 ${oppositeId}` : '用户')
+    'Portra 用户'
   return {
     userId: oppositeId || null,
     nickname,

@@ -163,7 +163,8 @@ function resolveNotificationTarget(item) {
   const relatedId = item?.relatedId ?? item?.targetId ?? item?.sourceId ?? null
 
   if (isAppealNotification(item)) {
-    return relatedId ? `/review-complaints/${relatedId}` : '/reviews'
+    const orderId = metadata.orderId ?? item?.targetId ?? item?.relatedId ?? item?.sourceId
+    return orderId ? `/orders?orderId=${orderId}&section=reviews` : '/orders'
   }
 
   if (type.includes('DEMAND_RESPONSE') || eventType.includes('DEMAND_RESPONSE')) {
@@ -185,7 +186,7 @@ function resolveNotificationTarget(item) {
 
   if (isReviewNotification(item)) {
     const orderId = metadata.orderId
-    return orderId ? `/orders/${orderId}/reviews` : '/reviews'
+    return orderId ? `/orders?orderId=${orderId}&section=reviews` : '/orders'
   }
 
   if (type.includes('CREDIT') || eventType.includes('CREDIT')) {

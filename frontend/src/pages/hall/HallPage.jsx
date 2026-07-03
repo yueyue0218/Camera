@@ -12,7 +12,7 @@ import { DemandAside } from './components/HallAside.jsx'
 import { EmptyState, ErrorState, LoadingState } from './components/HallState.jsx'
 import { HallTabs } from './components/HallTabs.jsx'
 import { ServicePackageCard } from './components/ServicePackageCard.jsx'
-import { TIME_STYLE_OPTIONS, priceParamsFromBudget } from './components/hallUtils.js'
+import { priceParamsFromBudget } from './components/hallUtils.js'
 import { submitDemandResponse } from './utils/respondDemand.js'
 import '../portraHall.css'
 
@@ -54,6 +54,17 @@ function normalizeError(error) {
 
 function hasOwn(record, field) {
   return Object.prototype.hasOwnProperty.call(record || {}, field)
+}
+
+function appendUniqueById(current, additions, idField) {
+  const seen = new Set((current || []).map(record => Number(record?.[idField])).filter(Number.isFinite))
+  const uniqueAdditions = (additions || []).filter(record => {
+    const id = Number(record?.[idField])
+    if (!Number.isFinite(id) || seen.has(id)) return false
+    seen.add(id)
+    return true
+  })
+  return [...(current || []), ...uniqueAdditions]
 }
 
 function panelFromSearch(search) {
@@ -250,6 +261,9 @@ export function HallPage() {
   const [respondingDemandIds, setRespondingDemandIds] = useState(() => new Set())
   const demandRequestSeq = useRef(0)
   const serviceRequestSeq = useRef(0)
+  const interestRequestSeq = useRef(0)
+  const responsesRequestSeq = useRef(0)
+  const isMountedRef = useRef(false)
   const demandAppendInFlight = useRef(false)
   const serviceAppendInFlight = useRef(false)
   const demandSentinelRef = useRef(null)
@@ -258,6 +272,17 @@ export function HallPage() {
   const initialLoadSearchRef = useRef(null)
 
   const interestedIds = useMemo(() => new Set(interests.map(item => item.serviceId)), [interests])
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+      demandRequestSeq.current += 1
+      serviceRequestSeq.current += 1
+      interestRequestSeq.current += 1
+      responsesRequestSeq.current += 1
+    }
+  }, [])
 
   useEffect(() => {
     initialLoadSearchRef.current = location.search
@@ -489,9 +514,11 @@ export function HallPage() {
         ? await promoteDemandRecord(enrichedRecords, promoteId, size)
         : enrichedRecords
       const pageInfo = pageInfoFromResult(result, page, size)
-      if (requestId !== demandRequestSeq.current) return null
+      if (!isMountedRef.current || requestId !== demandRequestSeq.current) return null
       if (rememberCursor) rememberFeedCursor('demands', pageInfo)
-      setDemands(current => mode === 'append' ? [...current, ...visibleRecords] : visibleRecords)
+      setDemands(current => mode === 'append'
+        ? appendUniqueById(current, visibleRecords, 'demandId')
+        : visibleRecords)
       setDemandPagination(current => ({
         ...current,
         ...pageInfo,
@@ -504,8 +531,7 @@ export function HallPage() {
       return { ...pageInfo, recordCount: rawRecords.length }
     } catch (error) {
       const message = normalizeError(error)
-      if (requestId !== demandRequestSeq.current) return null
-      if (mode === 'replace') setDemands([])
+      if (!isMountedRef.current || requestId !== demandRequestSeq.current) return null
       setDemandPagination(current => ({
         ...current,
         loading: false,
@@ -534,9 +560,11 @@ export function HallPage() {
         ? await promoteServiceRecord(enrichedRecords, promoteId, size)
         : enrichedRecords
       const pageInfo = pageInfoFromResult(result, page, size)
-      if (requestId !== serviceRequestSeq.current) return null
+      if (!isMountedRef.current || requestId !== serviceRequestSeq.current) return null
       if (rememberCursor) rememberFeedCursor('showcases', pageInfo)
-      setServices(current => mode === 'append' ? [...current, ...visibleRecords] : visibleRecords)
+      setServices(current => mode === 'append'
+        ? appendUniqueById(current, visibleRecords, 'serviceId')
+        : visibleRecords)
       setServicePagination(current => ({
         ...current,
         ...pageInfo,
@@ -549,8 +577,7 @@ export function HallPage() {
       return { ...pageInfo, recordCount: rawRecords.length }
     } catch (error) {
       const message = normalizeError(error)
-      if (requestId !== serviceRequestSeq.current) return null
-      if (mode === 'replace') setServices([])
+      if (!isMountedRef.current || requestId !== serviceRequestSeq.current) return null
       setServicePagination(current => ({
         ...current,
         loading: false,
@@ -567,28 +594,32 @@ export function HallPage() {
   }
 
   async function loadInterests(nextFilters = filters) {
+    const requestId = ++interestRequestSeq.current
     if (currentUser.role !== 'CUSTOMER') {
-      setInterests([])
+      if (isMountedRef.current) setInterests([])
       return
     }
     try {
       const page = await servicePackageApi.myInterests({ page: 1, size: 50, timeTag: nextFilters.timeTag }, currentUser)
+      if (!isMountedRef.current || requestId !== interestRequestSeq.current) return
       setInterests(page?.records || [])
     } catch {
-      setInterests([])
+      if (isMountedRef.current && requestId === interestRequestSeq.current) setInterests([])
     }
   }
 
   async function loadMyResponses() {
+    const requestId = ++responsesRequestSeq.current
     if (currentUser.role !== 'PROVIDER') {
-      setRespondedDemandIds(new Set())
+      if (isMountedRef.current) setRespondedDemandIds(new Set())
       return
     }
     try {
       const responses = await demandApi.myResponses(currentUser)
+      if (!isMountedRef.current || requestId !== responsesRequestSeq.current) return
       setRespondedDemandIds(new Set((responses || []).map(item => Number(item.demandId)).filter(Number.isFinite)))
     } catch {
-      setRespondedDemandIds(new Set())
+      if (isMountedRef.current && requestId === responsesRequestSeq.current) setRespondedDemandIds(new Set())
     }
   }
 
@@ -672,12 +703,6 @@ export function HallPage() {
       loadServices({ nextFilters: requestFilters, page: nextPage, mode: 'replace' })
       loadInterests(requestFilters)
     }
-  }
-
-  function applyTimeFilter(timeTag) {
-    const nextFilters = { ...filters, timeTag }
-    setFilters(nextFilters)
-    applyFilters(nextFilters)
   }
 
   function applyHotStyle(type) {
@@ -962,18 +987,6 @@ export function HallPage() {
           <div className="section-title">
             <h2>橱窗大厅</h2>
             <span className="micro">按当前筛选展示推荐橱窗</span>
-          </div>
-          <div className="style-bar">
-            {TIME_STYLE_OPTIONS.map(option => (
-              <button
-                className={`style-pill ${filters.timeTag === option.value ? 'active' : ''}`}
-                key={option.label}
-                type="button"
-                onClick={() => applyTimeFilter(option.value)}
-              >
-                {option.label}
-              </button>
-            ))}
           </div>
           <div className="showcase-grid">{renderServices()}</div>
           {renderServiceFooter()}

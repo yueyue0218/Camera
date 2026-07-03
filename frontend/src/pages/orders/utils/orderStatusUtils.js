@@ -129,11 +129,15 @@ function normalizeComplaint(record) {
     reviewId: record.reviewId,
     orderId: Number(record.orderId),
     applicantId: Number(record.applicantId ?? record.complainantId),
+    complainantNickname: record.complainantNickname || '',
     respondentId: Number(record.respondentId),
+    respondentNickname: record.respondentNickname || '',
     reason: record.reason || '评价争议',
     description: record.description || record.arbitrationComment || record.evidenceFileIds || '',
     status: record.status || 'PENDING',
     arbitrationResult: record.arbitrationResult,
+    arbitrationComment: record.arbitrationComment || '',
+    handledByNickname: record.handledByNickname || '',
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     handledAt: record.handledAt
@@ -190,12 +194,17 @@ function normalizeReview(review) {
     reviewId: review.reviewId || review.id,
     orderId: Number(review.orderId),
     reviewerId: Number(review.reviewerId),
+    reviewerNickname: review.reviewerNickname || '',
     targetUserId: Number(review.targetUserId),
+    targetUserNickname: review.targetUserNickname || '',
     direction: review.direction,
     rating: Number(review.rating || 0),
     content: review.content || '',
     isVisible: review.isVisible ?? true,
-    createdAt: review.createdAt
+    createdAt: review.createdAt,
+    replyContent: review.replyContent || '',
+    replyTime: review.replyTime || null,
+    complaintStatus: review.complaintStatus || ''
   }
 }
 

@@ -1,5 +1,7 @@
 package com.action.camera.order;
 
+import com.action.camera.application.OrderDisplayService;
+import com.action.camera.application.UserDisplayService;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.Result;
 import com.action.camera.common.UserContext;
@@ -44,6 +46,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -74,15 +77,31 @@ class OrderControllerTest {
     @Mock
     private NotificationService notificationService;
 
+    @Mock
+    private UserDisplayService userDisplayService;
+
+    @Mock
+    private OrderDisplayService orderDisplayService;
+
     private OrderController orderController;
 
     private final List<OrderStatusLog> savedLogs = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
-        OrderService orderService = new OrderService(orderRepository, paymentRecordRepository, orderStatusLogRepository, deliveryRepository);
+        lenient().when(userDisplayService.resolveCustomerDisplayName(any())).thenReturn("客户");
+        lenient().when(userDisplayService.resolveProviderDisplayName(any())).thenReturn("摄影师");
+        lenient().when(orderDisplayService.resolveOrderSubject(any(Order.class))).thenReturn("这笔订单");
+        OrderService orderService = new OrderService(
+                orderRepository,
+                paymentRecordRepository,
+                orderStatusLogRepository,
+                deliveryRepository,
+                userDisplayService,
+                orderDisplayService
+        );
         ReflectionTestUtils.setField(orderService, "notificationService", notificationService);
-        orderController = new OrderController(orderService);
+        orderController = new OrderController(orderService, userDisplayService);
         savedLogs.clear();
     }
 
@@ -287,9 +306,15 @@ class OrderControllerTest {
         assertEquals("CUSTOMER", logCaptor.getValue().getOperatorRole());
         ArgumentCaptor<NotificationCreateRequest> notificationCaptor =
                 ArgumentCaptor.forClass(NotificationCreateRequest.class);
-        verify(notificationService, times(1)).createNotification(notificationCaptor.capture());
-        assertEquals("ORDER_COMPLETED", notificationCaptor.getValue().type());
-        assertEquals(PROVIDER_USER_ID, notificationCaptor.getValue().userId());
+        verify(notificationService, times(2)).createNotification(notificationCaptor.capture());
+        assertEquals(List.of("ORDER_COMPLETED", "ORDER_COMPLETED"),
+                notificationCaptor.getAllValues().stream()
+                        .map(NotificationCreateRequest::type)
+                        .toList());
+        assertEquals(List.of(PROVIDER_USER_ID, CUSTOMER_ID),
+                notificationCaptor.getAllValues().stream()
+                        .map(NotificationCreateRequest::userId)
+                        .toList());
     }
 
     @Test
@@ -317,7 +342,7 @@ class OrderControllerTest {
         ArgumentCaptor<NotificationCreateRequest> notificationCaptor =
                 ArgumentCaptor.forClass(NotificationCreateRequest.class);
         verify(notificationService, times(2)).createNotification(notificationCaptor.capture());
-        assertEquals(List.of("ORDER_CANCELLED", "ORDER_CANCELLED"),
+        assertEquals(List.of("ORDER_REFUNDED", "ORDER_REFUNDED"),
                 notificationCaptor.getAllValues().stream()
                         .map(NotificationCreateRequest::type)
                         .toList());

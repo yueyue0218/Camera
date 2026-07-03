@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { creditApi } from '../../api/creditApi.js'
 import { demandApi } from '../../api/demandApi.js'
@@ -14,6 +14,12 @@ import '../portraHall.css'
 
 function createStatus() {
   return { loading: true, error: '' }
+}
+
+function revokeObjectUrls(urls = []) {
+  urls
+    .filter(url => typeof url === 'string' && url.startsWith('blob:'))
+    .forEach(url => URL.revokeObjectURL(url))
 }
 
 function normalizeError(error) {
@@ -184,6 +190,7 @@ export function DemandDetailPage() {
   const [responding, setResponding] = useState(false)
   const [demandResponders, setDemandResponders] = useState([])
   const [actioningId, setActioningId] = useState(null)
+  const responderAvatarUrlsRef = useRef([])
   const referenceUrls = useFileObjectUrls(
     demand?.referenceFileIds,
     currentUser,
@@ -200,6 +207,7 @@ export function DemandDetailPage() {
 
   useEffect(() => {
     let ignored = false
+    const downloadedAvatarUrls = []
     async function loadDemand() {
       setStatus({ loading: true, error: '' })
       try {
@@ -218,12 +226,21 @@ export function DemandDetailPage() {
                   const brief = await userApi.brief(pid, currentUser)
                   let avatarData = brief?.avatarData || brief?.avatarUrl || ''
                   if (!avatarData && brief?.avatarFileId) {
-                    try { avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser) } catch { /**/ }
+                    try {
+                      avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser)
+                      if (avatarData) downloadedAvatarUrls.push(avatarData)
+                    } catch { /**/ }
                   }
                   return { ...r, nickname: brief?.nickname || r.nickname, avatarData, providerId: pid }
                 } catch { return { ...r, providerId: pid } }
               }))
-              if (!ignored) setDemandResponders(enrichedResps)
+              if (!ignored) {
+                revokeObjectUrls(responderAvatarUrlsRef.current)
+                responderAvatarUrlsRef.current = downloadedAvatarUrls.slice()
+                setDemandResponders(enrichedResps)
+              } else {
+                revokeObjectUrls(downloadedAvatarUrls)
+              }
             } catch { /**/ }
           }
         }
@@ -235,7 +252,12 @@ export function DemandDetailPage() {
       }
     }
     loadDemand()
-    return () => { ignored = true }
+    return () => {
+      ignored = true
+      revokeObjectUrls(downloadedAvatarUrls)
+      revokeObjectUrls(responderAvatarUrlsRef.current)
+      responderAvatarUrlsRef.current = []
+    }
   }, [currentUser, demandId])
 
   useEffect(() => {
@@ -475,6 +497,7 @@ export function ServicePackageDetailPage() {
   const [galleryDirection, setGalleryDirection] = useState('')
   const [galleryStep, setGalleryStep] = useState(0)
   const [lightboxIndex, setLightboxIndex] = useState(null)
+  const inlineNoticeTimerRef = useRef(null)
   const uploadedPortfolioUrls = useFileObjectUrls(
     [service?.portfolioIds, service?.images],
     currentUser,
@@ -490,6 +513,12 @@ export function ServicePackageDetailPage() {
   const providerProfileId = serviceProviderUserId(service)
   const portfolioImages = galleryImages(service, uploadedPortfolioUrls)
   useBodyRole(currentUser.role)
+
+  useEffect(() => {
+    return () => {
+      if (inlineNoticeTimerRef.current) window.clearTimeout(inlineNoticeTimerRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     setGalleryStart(0)
@@ -605,8 +634,12 @@ export function ServicePackageDetailPage() {
   }
 
   function showNotice(text, type = 'ok') {
+    if (inlineNoticeTimerRef.current) window.clearTimeout(inlineNoticeTimerRef.current)
     setInlineNotice({ text, type })
-    setTimeout(() => setInlineNotice(null), 3000)
+    inlineNoticeTimerRef.current = window.setTimeout(() => {
+      setInlineNotice(null)
+      inlineNoticeTimerRef.current = null
+    }, 3000)
   }
 
   async function toggleInterest() {

@@ -210,6 +210,11 @@
   cursor: pointer;
 }
 
+.credit-note[role="button"] .credit-note-delta,
+.credit-note[role="button"] .credit-note-delta * {
+  cursor: default;
+}
+
 .credit-note:nth-child(even) {
   animation-direction: normal, alternate-reverse;
 }
@@ -247,41 +252,6 @@
 
 .credit-note--neutral::before {
   background: linear-gradient(180deg, rgba(91, 96, 106, .72), rgba(91, 96, 106, .42));
-}
-
-.credit-note-thread {
-  position: absolute;
-  left: -16px;
-  top: -16px;
-  bottom: -16px;
-  width: 2px;
-  background: repeating-linear-gradient(180deg, rgba(13, 47, 178, .24) 0 10px, transparent 10px 18px);
-  opacity: .65;
-}
-
-.credit-note-pin {
-  position: absolute;
-  left: -24px;
-  top: 14px;
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(13, 47, 178, .38);
-  border-radius: 50%;
-  background: rgba(248, 243, 235, .98);
-  box-shadow: 0 8px 14px rgba(21, 19, 24, .08);
-  animation: creditPinDrop 360ms calc(min(var(--credit-note-index, 0) * 70ms, 560ms) + 420ms) ease-out both;
-}
-
-.credit-note-pin::after {
-  content: "";
-  position: absolute;
-  inset: 3px;
-  border-radius: 50%;
-  background: rgba(13, 47, 178, .7);
-}
-
-.credit-note--negative .credit-note-pin {
-  border-color: rgba(248, 81, 4, .34);
 }
 
 .credit-note-delta {
@@ -421,12 +391,6 @@
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-@keyframes creditPinDrop {
-  0% { opacity: 0; transform: translateY(-9px) scale(1.35); }
-  70% { opacity: 1; transform: translateY(2px) scale(.92); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-
 @media (max-width: 760px) {
   .credit-note {
     grid-template-columns: 1fr;
@@ -437,15 +401,6 @@
 
   .credit-note::before {
     width: 6px;
-  }
-
-  .credit-note-thread {
-    left: -12px;
-    transform: none;
-  }
-
-  .credit-note-pin {
-    left: -20px;
   }
 
   .credit-note-delta {
@@ -475,7 +430,6 @@
   .credit-hero-watermark,
   .credit-stamp-ring,
   .credit-note,
-  .credit-note-pin,
   .credit-detail-page .credit-hero-surface .profile-photo-wrap,
   .credit-detail-page .hero-side,
   .credit-detail-page .hero-side::after,

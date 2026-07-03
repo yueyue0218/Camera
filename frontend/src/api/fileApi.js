@@ -43,7 +43,7 @@ export const fileApi = {
     formData.append('visibility', visibility)
     return request('/files/images/batch', { method: 'POST', body: formData }, currentUser)
   },
-  async downloadObjectUrl(fileId, currentUser) {
+  async downloadObjectUrl(fileId, currentUser, options = {}) {
     const normalizedFileId = extractFileId(fileId)
     if (!normalizedFileId) throw new Error(`Invalid fileId: ${fileId}`)
     const headers = {
@@ -53,7 +53,10 @@ export const fileApi = {
         'X-User-Role': currentUser.role
       } : {})
     }
-    const response = await fetch(`${API_BASE}/files/${normalizedFileId}/download`, { headers })
+    const response = await fetch(`${API_BASE}/files/${normalizedFileId}/download`, {
+      headers,
+      signal: options.signal
+    })
     if (!response.ok) throw new Error(`Image load failed for fileId ${normalizedFileId}: ${response.status}`)
     const blob = await response.blob()
     return URL.createObjectURL(blob)

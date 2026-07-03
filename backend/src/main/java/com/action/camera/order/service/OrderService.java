@@ -1,5 +1,7 @@
 package com.action.camera.order.service;
 
+import com.action.camera.application.OrderDisplayService;
+import com.action.camera.application.UserDisplayService;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
@@ -76,6 +78,8 @@ public class OrderService {
     private final PaymentRecordRepository paymentRecordRepository;
     private final OrderStatusLogRepository orderStatusLogRepository;
     private final DeliveryRepository deliveryRepository;
+    private final UserDisplayService userDisplayService;
+    private final OrderDisplayService orderDisplayService;
 
     @Autowired(required = false)
     private ConversationRepository conversationRepository;
@@ -222,7 +226,9 @@ public class OrderService {
         OrderStatus fromStatus = order.getStatus();
         OrderStatus targetStatus = OrderStatus.REWORK_REQUIRED;
         ensureCanChangeStatus(fromStatus, targetStatus);
-        return applyStatusChange(order, fromStatus, targetStatus, customerId, "CUSTOMER", reworkReason(reason));
+        Order reworkOrder = applyStatusChange(order, fromStatus, targetStatus, customerId, "CUSTOMER", reworkReason(reason));
+        notifyReworkRequired(reworkOrder);
+        return reworkOrder;
     }
 
     @Transactional
@@ -374,7 +380,7 @@ public class OrderService {
             }
             ensureCanChangeStatus(order.getStatus(), OrderStatus.COMPLETED);
             markCompletedAndReleaseEscrow(order, now, true);
-            applyStatusChange(
+            Order completedOrder = applyStatusChange(
                     order,
                     OrderStatus.DELIVERED_PENDING_CONFIRM,
                     OrderStatus.COMPLETED,
@@ -382,6 +388,7 @@ public class OrderService {
                     SYSTEM_OPERATOR_ROLE,
                     AUTO_CONFIRM_REASON
             );
+            notifyOrderCompleted(completedOrder);
             confirmedCount++;
         }
         return confirmedCount;
@@ -451,7 +458,7 @@ public class OrderService {
             }
             ensureCanChangeStatus(OrderStatus.PENDING_DELIVERY, OrderStatus.REFUNDED);
             markRefunded(order, now);
-            applyStatusChange(
+            Order refundedOrder = applyStatusChange(
                     order,
                     OrderStatus.PENDING_DELIVERY,
                     OrderStatus.REFUNDED,
@@ -459,6 +466,7 @@ public class OrderService {
                     SYSTEM_OPERATOR_ROLE,
                     AUTO_REFUND_UNDELIVERED_REASON
             );
+            notifyOrderCancelled(refundedOrder);
             refundedCount++;
         }
         return refundedCount;
@@ -635,13 +643,14 @@ public class OrderService {
                     SYSTEM_OPERATOR_ROLE,
                     AUTO_SHOOTING_START_REASON
             );
+            notifyOrderShootingStarted(order);
             advancedCount++;
         }
         if (order.getStatus() == OrderStatus.SHOOTING
                 && order.getShootEndTime() != null
                 && !order.getShootEndTime().isAfter(now)) {
             ensureCanChangeStatus(OrderStatus.SHOOTING, OrderStatus.PENDING_DELIVERY);
-            applyStatusChange(
+            order = applyStatusChange(
                     order,
                     OrderStatus.SHOOTING,
                     OrderStatus.PENDING_DELIVERY,
@@ -649,6 +658,7 @@ public class OrderService {
                     SYSTEM_OPERATOR_ROLE,
                     AUTO_SHOOTING_END_REASON
             );
+            notifyOrderPendingDelivery(order);
             advancedCount++;
         }
         return advancedCount;
@@ -921,40 +931,102 @@ public class OrderService {
     }
 
     private void notifyOrderPaid(Order order) {
+        String customerName = customerDisplayName(order);
+        String providerName = providerDisplayName(order);
+        String orderSubject = orderDisplayService.resolveOrderSubject(order);
         createNotification(order.getProviderUserId(),
-                "Order paid",
-                "A customer has paid an order and the schedule has been locked.",
+                orderSubject + " 已进入待拍摄",
+                customerName + " 已完成支付，" + orderSubject + " 已进入待拍摄，请按约准备拍摄。",
                 "ORDER_PAID",
                 "ORDER",
                 order.getId());
         createNotification(order.getCustomerId(),
-                "Payment successful",
-                "Your order payment has succeeded.",
+                orderSubject + " 已进入待拍摄",
+                "你已完成对 " + providerName + " 的支付，" + orderSubject + " 已进入待拍摄。",
                 "ORDER_PAID",
                 "ORDER",
                 order.getId());
     }
 
     private void notifyOrderCancelled(Order order) {
+        boolean refunded = order.getStatus() == OrderStatus.REFUNDED;
+        String customerName = customerDisplayName(order);
+        String providerName = providerDisplayName(order);
+        String orderSubject = orderDisplayService.resolveOrderSubject(order);
+        String title = orderSubject + (refunded ? " 已退款" : " 已取消");
+        String providerContent = refunded
+                ? customerName + " 发起的" + orderSubject + "已退款，本次合作已结束。"
+                : customerName + " 已取消" + orderSubject + "，本次合作已结束。";
+        String customerContent = refunded
+                ? "你与 " + providerName + " 的" + orderSubject + "已退款。"
+                : "你与 " + providerName + " 的" + orderSubject + "已取消。";
+        createNotification(order.getProviderUserId(), title, providerContent, refunded ? "ORDER_REFUNDED" : "ORDER_CANCELLED", "ORDER", order.getId());
+        createNotification(order.getCustomerId(), title, customerContent, refunded ? "ORDER_REFUNDED" : "ORDER_CANCELLED", "ORDER", order.getId());
+    }
+
+    private void notifyOrderCompleted(Order order) {
+        String customerName = customerDisplayName(order);
+        String providerName = providerDisplayName(order);
+        String orderSubject = orderDisplayService.resolveOrderSubject(order);
         createNotification(order.getProviderUserId(),
-                "Order cancelled",
-                "An order has been cancelled and related schedule slots have been released.",
-                "ORDER_CANCELLED",
+                orderSubject + " 已完成",
+                customerName + " 已确认" + orderSubject + "完成，本次合作已结束。",
+                "ORDER_COMPLETED",
                 "ORDER",
                 order.getId());
         createNotification(order.getCustomerId(),
-                "Order cancelled",
-                "Your order has been cancelled.",
-                "ORDER_CANCELLED",
+                orderSubject + " 已完成",
+                "你与 " + providerName + " 的" + orderSubject + "已完成。",
+                "ORDER_COMPLETED",
                 "ORDER",
                 order.getId());
     }
 
-    private void notifyOrderCompleted(Order order) {
+    private void notifyOrderShootingStarted(Order order) {
+        String orderSubject = orderDisplayService.resolveOrderSubject(order);
+        createNotification(order.getCustomerId(),
+                orderSubject + " 已开始拍摄",
+                orderSubject + " 已进入拍摄中，可前往订单详情查看当前进展。",
+                "ORDER_SHOOTING_STARTED",
+                "ORDER",
+                order.getId());
         createNotification(order.getProviderUserId(),
-                "Order completed",
-                "A customer has confirmed order completion.",
-                "ORDER_COMPLETED",
+                orderSubject + " 已开始拍摄",
+                orderSubject + " 已进入拍摄中，请按约完成本次拍摄。",
+                "ORDER_SHOOTING_STARTED",
+                "ORDER",
+                order.getId());
+    }
+
+    private void notifyOrderPendingDelivery(Order order) {
+        String orderSubject = orderDisplayService.resolveOrderSubject(order);
+        createNotification(order.getCustomerId(),
+                orderSubject + " 已进入待交付",
+                orderSubject + " 的拍摄已结束，正在等待摄影师上传作品。",
+                "ORDER_PENDING_DELIVERY",
+                "ORDER",
+                order.getId());
+        createNotification(order.getProviderUserId(),
+                orderSubject + " 已进入待交付",
+                orderSubject + " 的拍摄已结束，请尽快上传作品。",
+                "ORDER_PENDING_DELIVERY",
+                "ORDER",
+                order.getId());
+    }
+
+    private void notifyReworkRequired(Order order) {
+        String customerName = customerDisplayName(order);
+        String orderSubject = orderDisplayService.resolveOrderSubject(order);
+        createNotification(order.getProviderUserId(),
+                orderSubject + " 收到返修要求",
+                customerName + " 针对" + orderSubject + "提交了返修说明，请前往订单详情处理。",
+                "ORDER_REWORK_REQUIRED",
+                "ORDER",
+                order.getId());
+        createNotification(order.getCustomerId(),
+                orderSubject + " 已进入返修中",
+                "你已针对" + orderSubject + "提交返修要求，等待摄影师重新上传作品。",
+                "ORDER_REWORK_REQUIRED",
                 "ORDER",
                 order.getId());
     }
@@ -972,5 +1044,13 @@ public class OrderService {
                 relatedType,
                 relatedId
         ));
+    }
+
+    private String customerDisplayName(Order order) {
+        return userDisplayService.resolveCustomerDisplayName(order.getCustomerId());
+    }
+
+    private String providerDisplayName(Order order) {
+        return userDisplayService.resolveProviderDisplayName(order.getProviderUserId());
     }
 }

@@ -11,6 +11,8 @@ import java.util.List;
 
 public interface DemandRepository extends JpaRepository<Demand, Long> {
 
+    List<Demand> findByStatus(DemandStatus status);
+
     @Query("""
             select d from Demand d
             where d.customerId = :customerId

@@ -3,7 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, Typography } from '@mui/material'
 import { useAuth } from '../../AuthContext.jsx'
 import { creditApi, reviewApi } from '../../api/index.js'
-import { ReviewScore } from '../reviews/ReviewPage.jsx'
+import { ReviewArchiveCard } from '../../components/reviews/ReviewArchiveCard.jsx'
+import { buildOrderNavigationTarget } from '../../utils/orderNavigation.js'
 import '../profile/profile.css'
 import './credit.css'
 
@@ -58,9 +59,39 @@ function normalizeRecords(value) {
 }
 
 function getRecordOrderId(record) {
+  if (record.relatedOrderId) return record.relatedOrderId
   if (record.orderId) return record.orderId
   const sourceType = String(record.sourceType || '').toUpperCase()
   return sourceType.includes('ORDER') ? record.sourceId : null
+}
+
+function getReviewJumpTarget(review) {
+  if (!review?.orderId) return null
+  return buildOrderNavigationTarget(review.orderId, {
+    section: 'reviews',
+    reviewId: review.reviewId
+  })
+}
+
+function getRecordReviewJumpTarget(record) {
+  const orderId = getRecordOrderId(record)
+  if (!orderId) return null
+  const sourceType = String(record.sourceType || '').toUpperCase()
+  const eventType = String(record.eventType || '').toUpperCase()
+  const sourceId = record.sourceId
+  if (sourceType.includes('ARBITRATION') || eventType.includes('ARBITRATION') || eventType.includes('COMPLAINT')) {
+    return buildOrderNavigationTarget(orderId, {
+      section: 'reviews',
+      complaintId: sourceId
+    })
+  }
+  if (sourceType.includes('REVIEW') || eventType.includes('REVIEW')) {
+    return buildOrderNavigationTarget(orderId, {
+      section: 'reviews',
+      reviewId: sourceId
+    })
+  }
+  return null
 }
 
 function recordMetaLabel(record, orderId) {
@@ -125,7 +156,7 @@ export function CreditDetailPage() {
         if (cancelled) return
         setSummary(summaryResult.status === 'fulfilled' ? summaryResult.value : null)
         setRecords(recordsResult.status === 'fulfilled' ? normalizeRecords(recordsResult.value) : [])
-        const failed = [summaryResult, recordsResult].find(r => r.status === 'rejected')
+        const failed = [summaryResult, recordsResult].find(result => result.status === 'rejected')
         setNotice(failed ? creditUnavailableMessage() : null)
       } else {
         const [summaryResult, reviewsResult] = await Promise.allSettled([
@@ -146,7 +177,7 @@ export function CreditDetailPage() {
 
     load()
     return () => { cancelled = true }
-  }, [targetUserId, isSelf])
+  }, [targetUserId, isSelf, currentUser])
 
   const score = useMemo(
     () => formatScore(summary?.creditScore),
@@ -192,7 +223,7 @@ export function CreditDetailPage() {
       <section className="profile-hero credit-hero-surface">
         <div className="credit-hero-watermark" aria-hidden="true">CREDIT</div>
 
-          <div className="profile-photo-wrap">
+        <div className="profile-photo-wrap">
           <div className="credit-stamp-ring" aria-hidden="true" />
           <div className="credit-score-plain">
             <b>{displayScore}</b>
@@ -254,21 +285,20 @@ export function CreditDetailPage() {
             <div className="pp-empty"><h3>加载中...</h3></div>
           ) : reviews.length > 0 ? (
             <Stack spacing={1.2} style={{ marginTop: 8 }}>
-              {reviews.map((r, i) => (
-                <div key={r.reviewId || i} className="credit-note credit-note--neutral" style={{ cursor: r.reviewId ? 'pointer' : 'default' }}
-                  onClick={() => r.reviewId && navigate(`/reviews/${r.reviewId}`)}>
-                  <div className="credit-note-body" style={{ width: '100%' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <span style={{ fontSize: 12, color: '#6e737b' }}>
-                        来自 {r.reviewerNickname || `用户 ${r.reviewerId}`} · {formatTime(r.createdAt)}
-                      </span>
-                      <ReviewScore value={r.rating} />
-                    </div>
-                    <Typography className="credit-note-detail" style={{ fontStyle: 'italic' }}>
-                      "{r.content || '对方没有留下文字评价'}"
-                    </Typography>
-                  </div>
-                </div>
+              {reviews.map((review, index) => (
+                <ReviewArchiveCard
+                  key={review.reviewId || index}
+                  review={{
+                    ...review,
+                    replyTime: review.replyTime ? formatTime(review.replyTime) : ''
+                  }}
+                  timeText={formatTime(review.createdAt)}
+                  actionLabel="查看本次约拍评价区"
+                  onAction={item => {
+                    const target = getReviewJumpTarget(item)
+                    if (target) navigate(target.to, { state: target.state })
+                  }}
+                />
               ))}
             </Stack>
           ) : (
@@ -278,90 +308,111 @@ export function CreditDetailPage() {
       )}
 
       {isSelf && (
-      <section className="panel-card credit-records-panel">
-        <div className="section-head">
-          <div>
-            <h2>分数变化</h2>
-            <p>按时间查看每一次分数变化，只保留你一眼能看懂的原因。</p>
+        <section className="panel-card credit-records-panel">
+          <div className="section-head">
+            <div>
+              <h2>分数变化</h2>
+              <p>按时间查看每一次分数变化，只保留你一眼能看懂的原因。</p>
+            </div>
+            <div className="section-mark">{hasRecords ? recordCount : '暂无'}</div>
           </div>
-          <div className="section-mark">{hasRecords ? recordCount : '暂无'}</div>
-        </div>
 
-        {loading ? (
-          <div className="pp-empty">
-            <h3>正在整理信用分</h3>
-            <p>请稍等，这里马上显示最新情况。</p>
-          </div>
-        ) : hasRecords ? (
-          <Stack spacing={1.35} className="credit-note-stack">
-            {records.map((record, index) => {
-              const delta = Number(record.appliedScoreChange ?? record.scoreChange ?? record.deltaScore ?? 0)
-              const positive = delta > 0
-              const negative = delta < 0
-              const orderId = getRecordOrderId(record)
-              const beforeScore = record.beforeScore != null ? formatScore(record.beforeScore) : '暂无'
-              const afterScore = record.scoreAfter != null ? formatScore(record.scoreAfter) : '暂无'
-              const title = recordTitle(record, delta)
-              const detail = recordDetail(record, delta)
-              const metaLabel = recordMetaLabel(record, orderId)
-              const toneClass = negative ? 'credit-note--negative' : positive ? 'credit-note--positive' : 'credit-note--neutral'
+          {loading ? (
+            <div className="pp-empty">
+              <h3>正在整理信用分</h3>
+              <p>请稍等，这里马上显示最新情况。</p>
+            </div>
+          ) : hasRecords ? (
+            <Stack spacing={1.35} className="credit-note-stack">
+              {records.map((record, index) => {
+                const delta = Number(record.appliedScoreChange ?? record.scoreChange ?? record.deltaScore ?? 0)
+                const positive = delta > 0
+                const negative = delta < 0
+                const orderId = getRecordOrderId(record)
+                const beforeScore = record.beforeScore != null ? formatScore(record.beforeScore) : '暂无'
+                const afterScore = record.scoreAfter != null ? formatScore(record.scoreAfter) : '暂无'
+                const title = recordTitle(record, delta)
+                const detail = recordDetail(record, delta)
+                const metaLabel = recordMetaLabel(record, orderId)
+                const toneClass = negative ? 'credit-note--negative' : positive ? 'credit-note--positive' : 'credit-note--neutral'
+                const reviewTarget = getRecordReviewJumpTarget(record)
 
-              return (
-                <Paper
-                  key={record.recordId || record.id || `${title}-${record.createdAt}-${index}`}
-                  elevation={0}
-                  className={`credit-note ${toneClass}`}
-                  style={{ '--credit-note-index': index }}
-                  role={orderId ? 'button' : undefined}
-                  tabIndex={orderId ? 0 : undefined}
-                  onClick={orderId ? () => navigate(`/orders?orderId=${orderId}`) : undefined}
-                  onKeyDown={orderId ? event => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      navigate(`/orders?orderId=${orderId}`)
-                    }
-                  } : undefined}
-                >
-                  <span className="credit-note-thread" aria-hidden="true" />
-                  <span className="credit-note-pin" aria-hidden="true" />
-                  <div className="credit-note-delta">
-                    <strong>{positive ? '+' : ''}{delta.toFixed(1)}</strong>
-                    <span>分数变化</span>
-                  </div>
-                  <div className="credit-note-body">
-                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                      <Typography className="credit-note-title">{title}</Typography>
-                      <Chip
-                        size="small"
-                        label={positive ? '加分' : negative ? '减分' : '记录'}
-                        sx={{
-                          height: 26,
-                          fontWeight: 800,
-                          bgcolor: negative ? 'rgba(248,81,4,.08)' : positive ? 'rgba(13,47,178,.08)' : 'rgba(91,96,106,.08)',
-                          color: negative ? '#c53b05' : positive ? 'primary.main' : '#5f6670'
-                        }}
-                      />
-                    </Stack>
-                    <Typography className="credit-note-detail">{detail}</Typography>
-                    <Typography className="credit-note-detail">
-                      变更前 {beforeScore} · 变更后 {afterScore}
-                    </Typography>
-                  </div>
-                  <div className="credit-note-meta">
-                    <div>{formatTime(record.createdAt)}</div>
-                    <div>{metaLabel}</div>
-                  </div>
-                </Paper>
-              )
-            })}
-          </Stack>
-        ) : (
-          <div className="pp-empty">
-            <h3>还没有分数变化</h3>
-            <p>完成合作或收到评价后，这里会出现变化说明。</p>
-          </div>
-        )}
-      </section>
+                return (
+                  <Paper
+                    key={record.recordId || record.id || `${title}-${record.createdAt}-${index}`}
+                    elevation={0}
+                    className={`credit-note ${toneClass}`}
+                    style={{ '--credit-note-index': index }}
+                    role={reviewTarget ? 'button' : undefined}
+                    tabIndex={reviewTarget ? 0 : undefined}
+                    onClick={reviewTarget ? () => navigate(reviewTarget.to, { state: reviewTarget.state }) : undefined}
+                    onKeyDown={reviewTarget ? event => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        navigate(reviewTarget.to, { state: reviewTarget.state })
+                      }
+                    } : undefined}
+                  >
+                    <div className="credit-note-delta">
+                      <strong>{positive ? '+' : ''}{delta.toFixed(1)}</strong>
+                      <span>分数变化</span>
+                    </div>
+                    <div className="credit-note-body">
+                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                        <Typography className="credit-note-title">{title}</Typography>
+                        <Chip
+                          size="small"
+                          label={positive ? '加分' : negative ? '减分' : '记录'}
+                          sx={{
+                            height: 26,
+                            fontWeight: 800,
+                            bgcolor: negative ? 'rgba(248,81,4,.08)' : positive ? 'rgba(13,47,178,.08)' : 'rgba(91,96,106,.08)',
+                            color: negative ? '#c53b05' : positive ? 'primary.main' : '#5f6670'
+                          }}
+                        />
+                      </Stack>
+                      <Typography className="credit-note-detail">{detail}</Typography>
+                      <Typography className="credit-note-detail">
+                        变更前 {beforeScore} · 变更后 {afterScore}
+                      </Typography>
+                      {reviewTarget ? (
+                        <Button
+                          variant="text"
+                          size="small"
+                          onClick={event => {
+                            event.stopPropagation()
+                            navigate(reviewTarget.to, { state: reviewTarget.state })
+                          }}
+                          sx={{
+                            mt: 0.35,
+                            alignSelf: 'flex-start',
+                            minHeight: 30,
+                            px: 0.35,
+                            color: '#1d4ed8',
+                            fontWeight: 900,
+                            borderRadius: 999,
+                            '&:hover': { bgcolor: 'rgba(29, 78, 216, .06)' }
+                          }}
+                        >
+                          {String(record.sourceType || '').toUpperCase().includes('ARBITRATION') ? '查看处理记录' : '查看相关评价'}
+                        </Button>
+                      ) : null}
+                    </div>
+                    <div className="credit-note-meta">
+                      <div>{formatTime(record.createdAt)}</div>
+                      <div>{metaLabel}</div>
+                    </div>
+                  </Paper>
+                )
+              })}
+            </Stack>
+          ) : (
+            <div className="pp-empty">
+              <h3>还没有分数变化</h3>
+              <p>完成合作或收到评价后，这里会出现变化说明。</p>
+            </div>
+          )}
+        </section>
       )}
 
       <Dialog open={rulesOpen} onClose={() => setRulesOpen(false)} maxWidth="sm" fullWidth>

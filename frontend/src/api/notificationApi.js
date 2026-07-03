@@ -59,10 +59,6 @@ function pickFirstText(...values) {
   return values.map(value => String(value || '').trim()).find(Boolean) || ''
 }
 
-function resolveOrderId(item, metadata) {
-  return metadata.orderId ?? item?.orderId ?? item?.targetId ?? item?.relatedId ?? item?.sourceId ?? ''
-}
-
 function resolveActorName(item, metadata) {
   return pickFirstText(
     metadata.actorNickname,
@@ -75,7 +71,18 @@ function resolveActorName(item, metadata) {
   )
 }
 
-function buildNotificationTitle(item, metadata) {
+function resolveOrderSubject(item, metadata) {
+  return pickFirstText(
+    metadata.orderSubject,
+    metadata.orderLabel,
+    metadata.orderName,
+    item?.orderSubject,
+    item?.orderLabel,
+    item?.orderName
+  )
+}
+
+function buildNotificationTitle(item, _metadata) {
   const type = normalizeText(item?.type)
   const eventType = normalizeText(item?.eventType)
   const relatedType = normalizeText(item?.relatedType)
@@ -112,7 +119,8 @@ function buildNotificationContent(item, metadata) {
   const type = normalizeText(item?.type)
   const eventType = normalizeText(item?.eventType)
   const actorName = resolveActorName(item, metadata)
-  const orderId = resolveOrderId(item, metadata)
+  const orderSubject = resolveOrderSubject(item, metadata)
+  const orderReference = orderSubject || '这笔订单'
 
   if (isAppealNotification(item)) {
     return '你的评价申诉有了新进展，点开查看详情。'
@@ -127,15 +135,15 @@ function buildNotificationContent(item, metadata) {
   }
 
   if (type.includes('ORDER_COMPLETED') || eventType.includes('ORDER_COMPLETED')) {
-    return orderId ? `订单 #${orderId} 已完成，点开查看详情。` : '有一笔订单已经完成，点开查看详情。'
+    return `${orderReference} 已完成，点开查看详情。`
   }
 
   if (type.includes('ORDER_STATUS_CHANGED') || eventType.includes('ORDER_STATUS_CHANGED') || isOrderNotification(item)) {
-    return orderId ? `订单 #${orderId} 有了新的进展，点开查看详情。` : '你的订单有了新的进展，点开查看详情。'
+    return `${orderReference} 有了新的进展，点开查看详情。`
   }
 
   if (type.includes('DELIVERY_UPLOADED') || eventType.includes('DELIVERY_UPLOADED')) {
-    return orderId ? `订单 #${orderId} 的作品已经上传，点开查看详情。` : '有新的作品已经上传，点开查看详情。'
+    return `${orderReference} 的作品已经上传，点开查看详情。`
   }
 
   if (type.includes('DEMAND_RESPONSE') || eventType.includes('DEMAND_RESPONSE')) {

@@ -1,5 +1,7 @@
 package com.action.camera.order;
 
+import com.action.camera.application.OrderDisplayService;
+import com.action.camera.application.UserDisplayService;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.delivery.repository.DeliveryRepository;
 import com.action.camera.message.entity.Quote;
@@ -76,13 +78,26 @@ class QuoteOrderFlowServiceTest {
     @Mock
     private DeliveryRepository deliveryRepository;
 
+    @Mock
+    private UserDisplayService userDisplayService;
+
+    @Mock
+    private OrderDisplayService orderDisplayService;
+
     private QuoteService quoteService;
 
     private OrderService orderService;
 
     @BeforeEach
     void setUp() {
-        orderService = new OrderService(orderRepository, paymentRecordRepository, orderStatusLogRepository, deliveryRepository);
+        orderService = new OrderService(
+                orderRepository,
+                paymentRecordRepository,
+                orderStatusLogRepository,
+                deliveryRepository,
+                userDisplayService,
+                orderDisplayService
+        );
         ReflectionTestUtils.setField(orderService, "conversationRepository", conversationRepository);
         quoteService = new QuoteService(quoteRepository, conversationRepository, orderService);
     }
@@ -138,7 +153,7 @@ class QuoteOrderFlowServiceTest {
         });
 
         Order order = quoteService.confirmQuote(QUOTE_ID, CUSTOMER_ID, "确认服务包报价");
-        OrderResponse response = OrderResponse.from(order);
+        OrderResponse response = OrderResponse.from(order, "客户", "摄影师");
 
         assertEquals(SERVICE_PACKAGE_ID, order.getServicePackageId());
         assertEquals(SERVICE_PACKAGE_ID, response.getServicePackageId());

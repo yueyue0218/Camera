@@ -1,6 +1,8 @@
 package com.action.camera.delivery.service;
 
 import com.action.camera.application.FileService;
+import com.action.camera.application.OrderDisplayService;
+import com.action.camera.application.UserDisplayService;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
@@ -75,6 +77,8 @@ public class DeliveryService {
     private final OrderStatusPort orderStatusPort;
     private final OrderService orderService;
     private final TransactionTemplate txTemplate;
+    private final UserDisplayService userDisplayService;
+    private final OrderDisplayService orderDisplayService;
 
     @org.springframework.beans.factory.annotation.Value("${camera.delivery.image.max-size-bytes:20971520}")
     private long maxDeliveryImageSizeBytes = DEFAULT_MAX_DELIVERY_IMAGE_SIZE_BYTES;
@@ -92,7 +96,9 @@ public class DeliveryService {
                            OrderQueryPort orderQueryPort,
                            OrderStatusPort orderStatusPort,
                            OrderService orderService,
-                           TransactionTemplate txTemplate) {
+                           TransactionTemplate txTemplate,
+                           UserDisplayService userDisplayService,
+                           OrderDisplayService orderDisplayService) {
         this.deliveryRepository = deliveryRepository;
         this.deliveryFileRepository = deliveryFileRepository;
         this.fileService = fileService;
@@ -101,6 +107,8 @@ public class DeliveryService {
         this.orderStatusPort = orderStatusPort;
         this.orderService = orderService;
         this.txTemplate = txTemplate;
+        this.userDisplayService = userDisplayService;
+        this.orderDisplayService = orderDisplayService;
     }
 
     // 注意：此方法不加 @Transactional。
@@ -381,10 +389,12 @@ public class DeliveryService {
         if (notificationService == null) {
             return;
         }
+        String providerName = userDisplayService.resolveProviderDisplayName(order.getProviderId());
+        String orderSubject = orderDisplayService.resolveOrderSubject(order.getOrderId());
         notificationService.createNotification(new NotificationCreateRequest(
                 order.getCustomerId(),
-                "Delivery uploaded",
-                "The provider has uploaded delivery files for your order.",
+                orderSubject + " 作品已上传",
+                providerName + " 已上传" + orderSubject + "的作品，请前往订单详情查看并确认。",
                 "DELIVERY_UPLOADED",
                 "ORDER",
                 order.getOrderId()

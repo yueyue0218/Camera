@@ -19,6 +19,16 @@ export const conversationApi = {
   messages(conversationId, currentUser) {
     return request(`/conversations/${conversationId}/messages`, {}, currentUser)
   },
+  reportPresence(conversationId, active = true, currentUser, options = {}) {
+    return request('/conversations/presence', {
+      method: 'POST',
+      body: JSON.stringify({
+        conversationId: Number.isFinite(Number(conversationId)) && Number(conversationId) > 0 ? Number(conversationId) : null,
+        active: active !== false
+      }),
+      ...options
+    }, currentUser)
+  },
   sendMessage(conversationId, content, currentUser, messageType = 'TEXT') {
     return request(`/conversations/${conversationId}/messages`, {
       method: 'POST',

@@ -1,5 +1,6 @@
 package com.action.camera.order.controller;
 
+import com.action.camera.application.UserDisplayService;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.Result;
 import com.action.camera.common.UserContext;
@@ -33,6 +34,7 @@ import java.util.Objects;
 public class OrderController {
 
     private final OrderService orderService;
+    private final UserDisplayService userDisplayService;
 
     @GetMapping("/orders")
     public Result<List<OrderResponse>> listMyOrders(
@@ -41,7 +43,7 @@ public class OrderController {
         Long operatorId = currentUserId();
         List<OrderResponse> orders = orderService.listMyOrders(operatorId, role, status)
                 .stream()
-                .map(OrderResponse::from)
+                .map(this::toOrderResponse)
                 .toList();
         return Result.success(orders);
     }
@@ -49,7 +51,7 @@ public class OrderController {
     @GetMapping("/orders/{orderId}")
     public Result<OrderResponse> getOrder(@PathVariable Long orderId) {
         Long operatorId = currentUserId();
-        return Result.success(OrderResponse.from(orderService.getOrderForUser(orderId, operatorId)));
+        return Result.success(toOrderResponse(orderService.getOrderForUser(orderId, operatorId)));
     }
 
     @PostMapping("/orders/{orderId}/payments")
@@ -145,5 +147,11 @@ public class OrderController {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
         return userId;
+    }
+
+    private OrderResponse toOrderResponse(Order order) {
+        String customerNickname = userDisplayService.resolveCustomerDisplayName(order.getCustomerId());
+        String providerNickname = userDisplayService.resolveProviderDisplayName(order.getProviderUserId());
+        return OrderResponse.from(order, customerNickname, providerNickname);
     }
 }

@@ -11,8 +11,8 @@ export const demoNotifications = [
   },
   {
     notificationId: 302,
-    title: '订单已更新',
-    content: '订单 #8106 已完成。',
+    title: '橱窗「轻复古街拍」已完成',
+    content: '橱窗「轻复古街拍」已完成。',
     type: 'ORDER_STATUS_CHANGED',
     relatedType: 'ORDER',
     relatedId: 8106,
@@ -41,8 +41,8 @@ export const demoNotifications = [
   },
   {
     notificationId: 305,
-    title: '订单已完成',
-    content: '订单 #8108 已完成，信用分也会随之更新。',
+    title: '需求「毕业照跟拍」已完成',
+    content: '需求「毕业照跟拍」已完成，信用分也会随之更新。',
     type: 'ORDER_COMPLETED',
     relatedType: 'ORDER',
     relatedId: 8108,
