@@ -71,10 +71,7 @@ export function MomentCard({
         <h2 onClick={() => onOpenMoment(moment)}>{moment.title || '未命名动态'}</h2>
         <p>{moment.content || '分享了一段被放慢的生活。'}</p>
 
-        <div
-          className={`moment-card__image ${coverImage ? '' : 'is-empty'}`}
-          onClick={() => onOpenMoment(moment)}
-        >
+        <div className={`moment-card__image ${coverImage ? '' : 'is-empty'}`} onClick={() => onOpenMoment(moment)}>
           {coverImage ? (
             <img src={coverImage} alt={moment.title || '动态封面'} />
           ) : (
