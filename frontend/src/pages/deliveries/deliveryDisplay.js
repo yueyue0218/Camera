@@ -19,7 +19,7 @@ export function buildDeliveryBatches(deliveries = [], order) {
         orderId: delivery.orderId || order?.orderId,
         deliveryId: getDeliveryId(delivery),
         round,
-        title: Number(round) > 1 ? `第 ${round} 次作品` : '作品记录',
+        title: Number(round) > 1 ? `第 ${round} 次作品` : '交付作品',
         description: formatDeliveryDescription(delivery),
         latestUploadTime: delivery.uploadTime || delivery.createdAt,
         files: []

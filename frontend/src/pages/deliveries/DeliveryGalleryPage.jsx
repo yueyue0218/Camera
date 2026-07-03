@@ -72,7 +72,7 @@ export function DeliveryGalleryPage() {
         setOrder(nextOrder)
         setDeliveries(Array.isArray(nextDeliveries) ? nextDeliveries : [])
       } catch (loadError) {
-        if (!cancelled) setError(loadError.message || '作品记录加载失败。')
+        if (!cancelled) setError(loadError.message || '作品相册加载失败。')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -241,7 +241,7 @@ export function DeliveryGalleryPage() {
   }
 
   if (error) {
-    return <PortraEmptyState title="作品记录加载失败" description={error} />
+    return <PortraEmptyState title="作品相册加载失败" description={error} />
   }
 
   if (!batch) {
@@ -255,13 +255,13 @@ export function DeliveryGalleryPage() {
         >
           {primaryBackIsConversation ? '返回沟通' : '返回订单'}
         </PortraContextActionButton>
-        <PortraEmptyState title="作品记录不存在" description="该作品记录可能不属于当前订单，或已经被移除。" />
+        <PortraEmptyState title="作品相册不存在" description="这组作品可能不属于当前订单，或已经被移除。" />
       </PortraWorkflowFrame>
     )
   }
 
   return (
-    <PortraWorkflowFrame spacing={2.2} maxWidth="gallery" sx={{ color: PORTRA_SURFACE.ink }}>
+    <PortraWorkflowFrame spacing={2.2} maxWidth="gallery" sx={{ color: PORTRA_SURFACE.ink, bgcolor: '#f5f1ea' }}>
       <Paper variant="outlined" sx={headerSx}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.4} sx={{ justifyContent: 'space-between', alignItems: { xs: 'stretch', md: 'center' } }}>
           <Stack spacing={0.8}>
@@ -307,7 +307,7 @@ export function DeliveryGalleryPage() {
                 onDownload={downloadFile}
               />
             ) : (
-              <PortraEmptyState title="暂无作品" description="该作品记录没有可展示的照片信息。" />
+              <PortraEmptyState title="暂无作品" description="这组交付还没有可展示的照片。" />
             )}
           </PortraTicketSection>
           <DeliveryActionBar
@@ -442,8 +442,8 @@ function InfoBlock({ label, value }) {
 const headerSx = {
   px: { xs: 1.5, md: 2 },
   py: 1.5,
-  bgcolor: PORTRA_SURFACE.paper,
-  borderColor: PORTRA_SURFACE.borderSubtle,
+  bgcolor: '#fffdf8',
+  borderColor: 'rgba(79, 70, 60, .10)',
   borderRadius: PORTRA_RADIUS.card,
   boxShadow: PORTRA_SHADOW.soft
 }
@@ -484,12 +484,12 @@ const galleryGridSx = {
 }
 
 const galleryPanelSx = {
-  p: { xs: 1.25, md: 1.6 },
+  p: { xs: 0, md: 0 },
   minWidth: 0,
-  bgcolor: PORTRA_SURFACE.paper,
-  borderColor: PORTRA_SURFACE.borderSubtle,
-  borderRadius: PORTRA_RADIUS.card,
-  boxShadow: PORTRA_SHADOW.soft
+  bgcolor: 'transparent',
+  borderColor: 'transparent',
+  borderRadius: 0,
+  boxShadow: 'none'
 }
 
 const sidePanelSx = {
@@ -497,8 +497,8 @@ const sidePanelSx = {
   minWidth: 0,
   position: { lg: 'sticky' },
   top: { lg: 18 },
-  bgcolor: PORTRA_SURFACE.paper,
-  borderColor: PORTRA_SURFACE.borderSubtle,
+  bgcolor: '#fffdf8',
+  borderColor: 'rgba(79, 70, 60, .10)',
   borderRadius: PORTRA_RADIUS.card,
   boxShadow: PORTRA_SHADOW.soft
 }

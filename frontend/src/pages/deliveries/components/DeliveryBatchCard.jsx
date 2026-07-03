@@ -91,7 +91,7 @@ export function DeliveryBatchCard({
           </Button>
         </Stack>
         {!hasGalleryTarget && (
-          <Typography variant="caption" sx={{ color: PORTRA_SURFACE.muted }}>作品记录暂不可查看</Typography>
+          <Typography variant="caption" sx={{ color: PORTRA_SURFACE.muted }}>作品暂不可查看</Typography>
         )}
       </Stack>
     </Root>

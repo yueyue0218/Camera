@@ -52,7 +52,7 @@ function MosaicTile({ file, previewUrl, loading, overlay, index, count }) {
       position: 'relative',
       minWidth: 0,
       minHeight: 0,
-      bgcolor: '#eef4ff',
+      bgcolor: '#f2eee7',
       gridRow: count === 3 && index === 0 ? '1 / span 2' : undefined
     }}>
       {previewUrl && image ? (
@@ -63,7 +63,7 @@ function MosaicTile({ file, previewUrl, loading, overlay, index, count }) {
           sx={{
             width: '100%',
             height: '100%',
-            objectFit: 'cover',
+            objectFit: count <= 1 ? 'contain' : 'cover',
             objectPosition: 'center',
             display: 'block'
           }}
@@ -87,7 +87,7 @@ function MosaicLoading() {
     <Box sx={{
       width: '100%',
       height: '100%',
-      bgcolor: '#edf4ff',
+      bgcolor: '#f2eee7',
       position: 'relative',
       overflow: 'hidden',
       '&::after': {
@@ -95,7 +95,7 @@ function MosaicLoading() {
         position: 'absolute',
         inset: 0,
         transform: 'translateX(-100%)',
-        background: 'linear-gradient(90deg, transparent, rgba(63,127,219,.16), transparent)',
+        background: 'linear-gradient(90deg, transparent, rgba(37,99,235,.12), transparent)',
         animation: 'portraMosaicLoading 1.05s ease-in-out infinite'
       },
       '@keyframes portraMosaicLoading': {
@@ -114,8 +114,8 @@ function MosaicPlaceholder({ label }) {
       minHeight: 72,
       display: 'grid',
       placeItems: 'center',
-      bgcolor: '#edf4ff',
-      color: 'rgba(63,127,219,.44)'
+      bgcolor: '#f2eee7',
+      color: 'rgba(37,99,235,.38)'
     }}>
       <Box sx={{ textAlign: 'center' }}>
         {file ? <InsertDriveFileRoundedIcon /> : <ImageRoundedIcon />}
@@ -137,7 +137,7 @@ function mosaicSx(count, conversation) {
     height: conversation ? { xs: 226, sm: 246 } : 86,
     minHeight: conversation ? 226 : 82,
     overflow: 'hidden',
-    bgcolor: '#fff'
+    bgcolor: '#fffdf8'
   }
 }
 

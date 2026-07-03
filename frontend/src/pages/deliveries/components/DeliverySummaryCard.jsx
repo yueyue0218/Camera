@@ -145,8 +145,8 @@ function conversationCardSx(clickable) {
     width: { xs: '100%', md: 420 },
     maxWidth: '100%',
     p: 0,
-    bgcolor: '#fff',
-    borderColor: 'rgba(205, 215, 232, .88)',
+    bgcolor: '#fffdf8',
+    borderColor: 'rgba(79, 70, 60, .10)',
     borderRadius: '22px',
     overflow: 'hidden',
     cursor: clickable ? 'pointer' : 'default',
@@ -154,7 +154,7 @@ function conversationCardSx(clickable) {
     transition: 'transform .16s ease, border-color .16s ease, box-shadow .16s ease',
     '&:hover': clickable ? {
       transform: 'translateY(-1px)',
-      borderColor: 'rgba(63, 127, 219, .46)',
+      borderColor: 'rgba(37, 99, 235, .30)',
       boxShadow: '0 14px 30px rgba(24, 38, 62, .075)'
     } : undefined
   }
@@ -176,8 +176,8 @@ const conversationIconSx = {
   borderRadius: '14px',
   display: 'grid',
   placeItems: 'center',
-  bgcolor: '#eaf2ff',
-  color: PORTRA_SURFACE.portraBlue,
+  bgcolor: 'rgba(37, 99, 235, .08)',
+  color: '#2563eb',
   flexShrink: 0
 }
 
@@ -206,22 +206,22 @@ const conversationButtonSx = {
   borderRadius: '14px',
   bgcolor: '#fff',
   color: PORTRA_SURFACE.ink,
-  borderColor: 'rgba(133, 148, 173, .32)',
+  borderColor: 'rgba(79, 70, 60, .18)',
   fontWeight: 950
 }
 
 function orderCardSx(clickable) {
   return {
     p: 1.15,
-    bgcolor: '#f7f9fd',
-    borderColor: 'rgba(205, 215, 232, .88)',
+    bgcolor: '#fffaf2',
+    borderColor: 'rgba(79, 70, 60, .10)',
     borderRadius: PORTRA_RADIUS.card,
     overflow: 'hidden',
     cursor: clickable ? 'pointer' : 'default',
     boxShadow: 'none',
     transition: 'border-color .16s ease, transform .16s ease',
     '&:hover': clickable ? {
-      borderColor: PORTRA_SURFACE.portraBlue,
+      borderColor: '#2563eb',
       transform: 'translateY(-1px)'
     } : undefined
   }

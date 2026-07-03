@@ -51,6 +51,18 @@ export function DeliveryFileGrid({
     return undefined
   }
 
+  if (!selectMode && !compact) {
+    return (
+      <BrowseDeliveryGallery
+        files={files}
+        previewUrls={previewUrls}
+        loadedPreviews={loadedPreviews}
+        onPreview={preview}
+        onDownload={download}
+      />
+    )
+  }
+
   return (
     <Box sx={{
       display: 'grid',
@@ -191,6 +203,64 @@ export function DeliveryFileGrid({
   )
 }
 
+function BrowseDeliveryGallery({ files, previewUrls, loadedPreviews, onPreview, onDownload }) {
+  const single = files.length === 1
+  return (
+    <Box sx={browseGallerySx(single)}>
+      {files.map((file, index) => {
+        const previewUrl = previewUrls[file.id]
+          || previewUrls[file.fileId]
+          || loadedPreviews.previewUrls[getPreviewKey(file)]
+        const loadingPreview = loadedPreviews.loadingIds.has(getPreviewKey(file))
+        const image = isImageDeliveryFile(file)
+        const zip = isZipDeliveryFile(file)
+        const hasFile = Boolean(getDeliveryFileId(file))
+        return image ? (
+          <Box
+            key={file.id || file.fileId || index}
+            role="button"
+            tabIndex={0}
+            onClick={() => onPreview(file, index)}
+            onKeyDown={event => {
+              if (event.key !== 'Enter' && event.key !== ' ') return
+              event.preventDefault()
+              onPreview(file, index)
+            }}
+            sx={browseImageCardSx(single)}
+          >
+            {previewUrl ? (
+              <Box component="img" src={previewUrl} alt={file.fileName || '交付作品'} sx={browseImageSx} />
+            ) : loadingPreview ? (
+              <Box sx={browsePlaceholderSx}>图片加载中</Box>
+            ) : (
+              <Box sx={browsePlaceholderSx}>暂无预览</Box>
+            )}
+          </Box>
+        ) : (
+          <Box
+            key={file.id || file.fileId || index}
+            role={hasFile ? 'button' : undefined}
+            tabIndex={hasFile ? 0 : undefined}
+            onClick={() => hasFile && onDownload(file, index)}
+            onKeyDown={event => {
+              if (!hasFile || (event.key !== 'Enter' && event.key !== ' ')) return
+              event.preventDefault()
+              onDownload(file, index)
+            }}
+            sx={browseFileCardSx}
+          >
+            {zip ? <FolderZipRoundedIcon sx={{ color: '#2563eb', fontSize: 34 }} /> : <InsertDriveFileRoundedIcon sx={{ color: '#6f6a62', fontSize: 34 }} />}
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ color: '#171717', fontWeight: 900 }} noWrap>{file.fileName || '交付文件'}</Typography>
+              <Typography variant="body2" sx={{ color: '#6f6a62' }}>{zip ? 'ZIP 压缩包' : '交付文件'} · 点击下载</Typography>
+            </Box>
+          </Box>
+        )
+      })}
+    </Box>
+  )
+}
+
 function getSelectionId(file) {
   return getDeliveryFileId(file) || file?.id
 }
@@ -201,4 +271,62 @@ const checkboxIconSx = {
   borderRadius: '50%',
   border: `2px solid ${PORTRA_SURFACE.borderSubtle}`,
   bgcolor: 'rgba(255,255,255,.92)'
+}
+
+function browseGallerySx(single) {
+  return {
+    display: 'grid',
+    gridTemplateColumns: single
+      ? { xs: 'minmax(0, 1fr)', md: 'minmax(0, min(100%, 720px))' }
+      : { xs: '1fr', sm: 'repeat(auto-fit, minmax(220px, 1fr))' },
+    gap: { xs: 1.4, md: 1.8 },
+    justifyContent: 'start',
+    alignItems: 'start'
+  }
+}
+
+function browseImageCardSx(single) {
+  return {
+    width: '100%',
+    maxWidth: single ? 720 : '100%',
+    overflow: 'hidden',
+    borderRadius: '16px',
+    bgcolor: 'transparent',
+    cursor: 'zoom-in',
+    transition: 'transform .16s ease, filter .16s ease',
+    '&:hover': {
+      transform: 'translateY(-2px)',
+      filter: 'brightness(.985)'
+    }
+  }
+}
+
+const browseImageSx = {
+  width: '100%',
+  height: 'auto',
+  display: 'block',
+  borderRadius: '16px',
+  boxShadow: '0 10px 26px rgba(43, 35, 24, .08)'
+}
+
+const browsePlaceholderSx = {
+  minHeight: 220,
+  display: 'grid',
+  placeItems: 'center',
+  borderRadius: '16px',
+  bgcolor: '#f2eee7',
+  color: '#6f6a62',
+  fontWeight: 850
+}
+
+const browseFileCardSx = {
+  p: 1.35,
+  display: 'flex',
+  gap: 1,
+  alignItems: 'center',
+  minHeight: 96,
+  borderRadius: '16px',
+  bgcolor: '#fffdf8',
+  border: '1px solid rgba(79, 70, 60, .10)',
+  cursor: 'pointer'
 }
