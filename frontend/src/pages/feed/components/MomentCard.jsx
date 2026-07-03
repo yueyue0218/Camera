@@ -39,7 +39,7 @@ export function MomentCard({
   const images = moment.imageDataList?.length
     ? moment.imageDataList
     : moment.imageData ? [moment.imageData] : []
-  const previewImages = images.slice(0, 3)
+  const coverImage = images[0] || ''
   const total = images.length
 
   return (
@@ -70,22 +70,29 @@ export function MomentCard({
       <div className="moment-card__main">
         <div className="moment-card__stamp">PORTRA FILE</div>
         <h2 onClick={() => onOpenMoment(moment)}>{moment.title || '未命名动态'}</h2>
-        <p>{moment.content || '分享了一段被放慢的生活。'}</p>
+        <p>{moment.content || '分享了一段值得回看的片段。'}</p>
 
-        {total > 0 ? (
-          <div className={`moment-card__filmstrip count-${Math.min(total, 3)}`} onClick={() => onOpenMoment(moment)}>
-            {previewImages.map((src, index) => (
-              <img key={`${momentId}-${index}`} src={src} alt={`${moment.title || '动态'} ${index + 1}`} />
-            ))}
-            {total > 3 && <span className="moment-card__film-count">+{total - 3}</span>}
-          </div>
-        ) : null}
+        <div
+          className={`moment-card__cover ${coverImage ? 'has-image' : 'is-empty'}`}
+          onClick={() => onOpenMoment(moment)}
+        >
+          {coverImage ? (
+            <img src={coverImage} alt={moment.title || '动态封面'} />
+          ) : (
+            <div className="moment-card__cover-placeholder">
+              <span>PORTRA FRAME</span>
+              <strong>暂无图片</strong>
+            </div>
+          )}
+          {total > 1 ? <span className="moment-card__cover-count">{total} 张</span> : null}
+        </div>
 
         <div className="moment-card__actions">
           <button
             type="button"
             className={`moment-action like ${moment.likedByCurrentUser ? 'active' : ''}`}
             onClick={() => onLike(momentId)}
+            aria-pressed={moment.likedByCurrentUser}
           >
             {moment.likedByCurrentUser ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
             <span>{moment.likeCount || 0}</span>
@@ -115,13 +122,13 @@ export function MomentCard({
               transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             >
               {isSelf && (
-                <MenuItem onClick={() => { onMenuClose(); onEdit(moment); }}>
+                <MenuItem onClick={() => { onMenuClose(); onEdit(moment) }}>
                   <EditRoundedIcon fontSize="small" sx={{ mr: 1 }} />
                   编辑动态
                 </MenuItem>
               )}
               {isSelf && (
-                <MenuItem onClick={() => { onMenuClose(); onDelete(moment); }} sx={{ color: 'error.main' }}>
+                <MenuItem onClick={() => { onMenuClose(); onDelete(moment) }} sx={{ color: 'error.main' }}>
                   <DeleteRoundedIcon fontSize="small" sx={{ mr: 1 }} />
                   删除动态
                 </MenuItem>

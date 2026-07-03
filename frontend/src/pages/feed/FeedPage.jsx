@@ -50,6 +50,11 @@ export function FeedPage() {
   const { currentUser } = useAuth()
   const currentRoleKey = String(currentUser.role || 'CUSTOMER').toUpperCase()
   const avatarUrlsRef = useRef([])
+  const authorProfilesRef = useRef({})
+  const likePendingRef = useRef(new Set())
+  const favoritePendingRef = useRef(new Set())
+  const followPendingRef = useRef(new Set())
+  const drawerRequestRef = useRef(0)
   const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState(null)
   const [scope, setScope] = useState('latest')
@@ -84,6 +89,10 @@ export function FeedPage() {
   )
 
   useEffect(() => {
+    authorProfilesRef.current = authorProfiles
+  }, [authorProfiles])
+
+  useEffect(() => {
     if (initialView === 'mine') {
       setViewMode('mine')
     }
@@ -98,104 +107,133 @@ export function FeedPage() {
     }
   }, [])
 
-  useEffect(() => {
-    let cancelled = false
+  function upsertAuthorProfiles(entries = {}) {
+    setAuthorProfiles(prev => {
+      const next = { ...prev, ...entries }
+      authorProfilesRef.current = next
+      return next
+    })
+  }
 
-    async function load() {
-      setLoading(true)
-      setNotice(null)
-      const params = viewMode === 'mine'
-        ? { authorId: currentUser.userId, authorRole: currentRoleKey }
-        : { scope }
-
-      const [momentsResult, customerFollowingResult, providerFollowingResult] = await Promise.allSettled([
-        momentApi.list(params, currentUser),
-        userApi.following(currentUser.userId, currentUser, 'CUSTOMER'),
-        userApi.following(currentUser.userId, currentUser, 'PROVIDER')
-      ])
-
-      if (cancelled) return
-
-      const nextMoments = normalizeMoments(momentsResult.status === 'fulfilled' ? momentsResult.value : [])
-      setMoments(nextMoments)
-      setNotice(momentsResult.status === 'rejected' ? { type: 'error', text: momentsResult.reason?.message || '动态加载失败' } : null)
-
-      const nextFollowing = emptyFollowState()
-      if (customerFollowingResult.status === 'fulfilled') {
-        customerFollowingResult.value.forEach(item => nextFollowing.CUSTOMER.add(Number(item.userId)))
-      }
-      if (providerFollowingResult.status === 'fulfilled') {
-        providerFollowingResult.value.forEach(item => nextFollowing.PROVIDER.add(Number(item.userId)))
-      }
-      setFollowingMap(nextFollowing)
-
-      await loadAuthorProfiles(nextMoments, cancelled)
-      setLoading(false)
+  function currentUserProfile() {
+    return {
+      nickname: currentUser.nickname || currentUser.label || `用户 ${currentUser.userId}`,
+      avatarData: currentUser.avatarData || ''
     }
+  }
 
-    async function loadAuthorProfiles(list, cancelledFlag) {
-      avatarUrlsRef.current.forEach(url => URL.revokeObjectURL(url))
-      avatarUrlsRef.current = []
-      const ids = uniqueAuthorIds(list, currentUser.userId)
-      const rolesById = new Map()
-      list.forEach(item => {
-        const authorId = Number(item.authorId)
-        if (!rolesById.has(authorId) && item.authorRole) {
-          rolesById.set(authorId, String(item.authorRole).toUpperCase())
+  async function hydrateFollowingState(cancelled = () => false) {
+    const [customerFollowingResult, providerFollowingResult] = await Promise.allSettled([
+      userApi.following(currentUser.userId, currentUser, 'CUSTOMER'),
+      userApi.following(currentUser.userId, currentUser, 'PROVIDER')
+    ])
+    if (cancelled()) return
+    const nextFollowing = emptyFollowState()
+    if (customerFollowingResult.status === 'fulfilled') {
+      customerFollowingResult.value.forEach(item => nextFollowing.CUSTOMER.add(Number(item.userId)))
+    }
+    if (providerFollowingResult.status === 'fulfilled') {
+      providerFollowingResult.value.forEach(item => nextFollowing.PROVIDER.add(Number(item.userId)))
+    }
+    setFollowingMap(nextFollowing)
+  }
+
+  async function hydrateAuthorProfiles(list, cancelled = () => false) {
+    const ids = uniqueAuthorIds(list, currentUser.userId).filter(id => !authorProfilesRef.current[id])
+    if (!ids.length) {
+      upsertAuthorProfiles({ [currentUser.userId]: currentUserProfile() })
+      return
+    }
+    const rolesById = new Map()
+    list.forEach(item => {
+      const authorId = Number(item.authorId)
+      if (!rolesById.has(authorId) && item.authorRole) {
+        rolesById.set(authorId, String(item.authorRole).toUpperCase())
+      }
+    })
+    const entries = await Promise.all(ids.map(async id => {
+      const authorRole = rolesById.get(id) || currentRoleKey
+      try {
+        const profile = await userApi.publicProfile(id, currentUser, authorRole)
+        let avatarData = ''
+        if (profile?.avatarFileId) {
+          try {
+            avatarData = await fileApi.downloadObjectUrl(profile.avatarFileId, currentUser)
+            avatarUrlsRef.current.push(avatarData)
+          } catch {
+            avatarData = ''
+          }
         }
-      })
-      const entries = await Promise.all(ids.map(async id => {
-        const authorRole = rolesById.get(id) || currentRoleKey
+        return [id, { nickname: profile?.nickname || `用户 ${id}`, avatarData }]
+      } catch {
         try {
-          const profile = await userApi.publicProfile(id, currentUser, authorRole)
+          const brief = await userApi.brief(id, currentUser)
           let avatarData = ''
-          if (profile?.avatarFileId) {
+          if (brief.avatarFileId) {
             try {
-              avatarData = await fileApi.downloadObjectUrl(profile.avatarFileId, currentUser)
+              avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser)
               avatarUrlsRef.current.push(avatarData)
             } catch {
               avatarData = ''
             }
           }
-          return [id, { nickname: profile?.nickname || `用户 ${id}`, avatarData }]
+          return [id, { nickname: brief.nickname || `用户 ${id}`, avatarData }]
         } catch {
-          try {
-            const brief = await userApi.brief(id, currentUser)
-            let avatarData = ''
-            if (brief.avatarFileId) {
-              try {
-                avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser)
-                avatarUrlsRef.current.push(avatarData)
-              } catch {
-                avatarData = ''
-              }
-            }
-            return [id, { nickname: brief.nickname || `用户 ${id}`, avatarData }]
-          } catch {
-            return [id, { nickname: `用户 ${id}`, avatarData: '' }]
-          }
+          return [id, { nickname: `用户 ${id}`, avatarData: '' }]
         }
-      }))
-      if (!cancelledFlag) {
-        const nextProfiles = {}
-        entries.forEach(([id, profile]) => {
-          nextProfiles[id] = profile
-        })
-        nextProfiles[currentUser.userId] = {
-          nickname: currentUser.nickname || currentUser.label || `用户 ${currentUser.userId}`,
-          avatarData: currentUser.avatarData || ''
-        }
-        setAuthorProfiles(nextProfiles)
+      }
+    }))
+    if (cancelled()) return
+    const nextProfiles = { [currentUser.userId]: currentUserProfile() }
+    entries.forEach(([id, profile]) => {
+      nextProfiles[id] = profile
+    })
+    upsertAuthorProfiles(nextProfiles)
+  }
+
+  async function loadFeed({ showLoading = true, cancelled = () => false } = {}) {
+    if (showLoading) {
+      setLoading(true)
+    }
+    setNotice(null)
+    const params = viewMode === 'mine'
+      ? { authorId: currentUser.userId, authorRole: currentRoleKey }
+      : { scope }
+
+    try {
+      const nextMoments = normalizeMoments(await momentApi.list(params, currentUser))
+      if (cancelled()) return
+      setMoments(nextMoments)
+      if (Number.isFinite(getMomentId(drawerMomentId)) && !nextMoments.some(moment => getMomentId(moment) === getMomentId(drawerMomentId))) {
+        setDrawerMomentId(null)
+      }
+      if (showLoading) {
+        setLoading(false)
+      }
+      void hydrateFollowingState(cancelled).catch(() => {})
+      void hydrateAuthorProfiles(nextMoments, cancelled).catch(() => {})
+    } catch (error) {
+      if (cancelled()) return
+      setMoments([])
+      setNotice({ type: 'error', text: error.message || '动态加载失败' })
+      if (showLoading) {
+        setLoading(false)
       }
     }
+  }
 
-    load()
+  useEffect(() => {
+    let cancelled = false
+    void loadFeed({ cancelled: () => cancelled })
     return () => {
       cancelled = true
-      avatarUrlsRef.current.forEach(url => URL.revokeObjectURL(url))
-      avatarUrlsRef.current = []
     }
   }, [currentUser.userId, currentRoleKey, currentUser.nickname, currentUser.label, currentUser.avatarData, scope, viewMode])
+
+  useEffect(() => () => {
+    avatarUrlsRef.current.forEach(url => URL.revokeObjectURL(url))
+    avatarUrlsRef.current = []
+  }, [])
 
   useEffect(() => {
     const currentDrawerMomentId = getMomentId(drawerMomentId)
@@ -266,95 +304,28 @@ export function FeedPage() {
   }
 
   async function refreshPage() {
-    setNotice(null)
-    const params = viewMode === 'mine'
-      ? { authorId: currentUser.userId, authorRole: currentRoleKey }
-      : { scope }
-    setLoading(true)
-    const [momentsResult, customerFollowingResult, providerFollowingResult] = await Promise.allSettled([
-      momentApi.list(params, currentUser),
-      userApi.following(currentUser.userId, currentUser, 'CUSTOMER'),
-      userApi.following(currentUser.userId, currentUser, 'PROVIDER')
-    ])
-    const nextMoments = normalizeMoments(momentsResult.status === 'fulfilled' ? momentsResult.value : [])
-    setMoments(nextMoments)
-    if (momentsResult.status === 'rejected') {
-      setNotice({ type: 'error', text: momentsResult.reason?.message || '动态加载失败' })
-    }
-    const nextFollowing = emptyFollowState()
-    if (customerFollowingResult.status === 'fulfilled') {
-      customerFollowingResult.value.forEach(item => nextFollowing.CUSTOMER.add(Number(item.userId)))
-    }
-    if (providerFollowingResult.status === 'fulfilled') {
-      providerFollowingResult.value.forEach(item => nextFollowing.PROVIDER.add(Number(item.userId)))
-    }
-    setFollowingMap(nextFollowing)
-    await (async () => {
-      avatarUrlsRef.current.forEach(url => URL.revokeObjectURL(url))
-      avatarUrlsRef.current = []
-      const ids = uniqueAuthorIds(nextMoments, currentUser.userId)
-      const rolesById = new Map()
-      nextMoments.forEach(item => {
-        const authorId = Number(item.authorId)
-        if (!rolesById.has(authorId) && item.authorRole) {
-          rolesById.set(authorId, String(item.authorRole).toUpperCase())
-        }
-      })
-      const entries = await Promise.all(ids.map(async id => {
-        const authorRole = rolesById.get(id) || currentRoleKey
-        try {
-          const profile = await userApi.publicProfile(id, currentUser, authorRole)
-          let avatarData = ''
-          if (profile?.avatarFileId) {
-            try {
-              avatarData = await fileApi.downloadObjectUrl(profile.avatarFileId, currentUser)
-              avatarUrlsRef.current.push(avatarData)
-            } catch {
-              avatarData = ''
-            }
-          }
-          return [id, { nickname: profile?.nickname || `用户 ${id}`, avatarData }]
-        } catch {
-          try {
-            const brief = await userApi.brief(id, currentUser)
-            let avatarData = ''
-            if (brief.avatarFileId) {
-              try {
-                avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser)
-                avatarUrlsRef.current.push(avatarData)
-              } catch {
-                avatarData = ''
-              }
-            }
-            return [id, { nickname: brief.nickname || `用户 ${id}`, avatarData }]
-          } catch {
-            return [id, { nickname: `用户 ${id}`, avatarData: '' }]
-          }
-        }
-      }))
-      const nextProfiles = {
-        [currentUser.userId]: {
-          nickname: currentUser.nickname || currentUser.label || `鐢ㄦ埛 ${currentUser.userId}`,
-          avatarData: currentUser.avatarData || ''
-        }
-      }
-      entries.forEach(([id, profile]) => {
-        nextProfiles[id] = profile
-      })
-      setAuthorProfiles(nextProfiles)
-    })()
-    if (Number.isFinite(getMomentId(drawerMomentId)) && !nextMoments.some(moment => getMomentId(moment) === getMomentId(drawerMomentId))) {
-      setDrawerMomentId(null)
-    }
-    setLoading(false)
+    await loadFeed()
   }
 
-  function openComposer(moment = null) {
+  async function openComposer(moment = null) {
     if (moment) {
+      let nextMoment = moment
+      const momentId = getMomentId(moment)
+      if (!Number.isFinite(momentId)) {
+        setNotice({ type: 'error', text: '动态 ID 缺失，无法编辑' })
+        return
+      }
+      try {
+        nextMoment = await momentApi.detail(momentId, currentUser)
+        mergeMoment(nextMoment)
+      } catch (error) {
+        setNotice({ type: 'error', text: error.message || '动态详情加载失败' })
+        return
+      }
       setComposerMode('edit')
-      setComposerMomentId(getMomentId(moment))
-      setComposerDraft({ title: moment.title || '', content: moment.content || '' })
-      setComposerImages((moment.imageDataList?.length ? moment.imageDataList : moment.imageData ? [moment.imageData] : []).slice(0, 9))
+      setComposerMomentId(momentId)
+      setComposerDraft({ title: nextMoment.title || '', content: nextMoment.content || '' })
+      setComposerImages((nextMoment.imageDataList?.length ? nextMoment.imageDataList : nextMoment.imageData ? [nextMoment.imageData] : []).slice(0, 9))
     } else {
       setComposerMode('create')
       setComposerMomentId(null)
@@ -364,8 +335,25 @@ export function FeedPage() {
     setComposerOpen(true)
   }
 
-  function openDrawer(momentOrMomentId) {
-    setDrawerMomentId(getMomentId(momentOrMomentId))
+  async function openDrawer(momentOrMomentId) {
+    const momentId = getMomentId(momentOrMomentId)
+    setDrawerMomentId(momentId)
+    if (!Number.isFinite(momentId)) return
+    const requestId = drawerRequestRef.current + 1
+    drawerRequestRef.current = requestId
+    setDrawerLoading(true)
+    try {
+      const nextMoment = await momentApi.detail(momentId, currentUser)
+      if (drawerRequestRef.current !== requestId) return
+      mergeMoment(nextMoment)
+    } catch (error) {
+      if (drawerRequestRef.current !== requestId) return
+      setNotice({ type: 'error', text: error.message || '动态详情加载失败' })
+    } finally {
+      if (drawerRequestRef.current === requestId) {
+        setDrawerLoading(false)
+      }
+    }
   }
 
   async function handleComposerSubmit() {
@@ -422,11 +410,31 @@ export function FeedPage() {
       setNotice({ type: 'error', text: '动态 ID 缺失，无法点赞' })
       return
     }
+    if (likePendingRef.current.has(momentId)) return
+    const target = moments.find(moment => getMomentId(moment) === momentId)
+    if (!target) return
+    const wasLiked = Boolean(target.likedByCurrentUser)
+    const previousCount = Number(target.likeCount || 0)
+    mergeMoment({
+      ...target,
+      likedByCurrentUser: !wasLiked,
+      likeCount: Math.max(0, previousCount + (wasLiked ? -1 : 1))
+    })
+    likePendingRef.current.add(momentId)
     try {
-      const nextMoment = await momentApi.like(momentId, currentUser)
+      const nextMoment = wasLiked
+        ? await momentApi.unlike(momentId, currentUser)
+        : await momentApi.like(momentId, currentUser)
       mergeMoment(nextMoment)
     } catch (error) {
+      mergeMoment({
+        ...target,
+        likedByCurrentUser: wasLiked,
+        likeCount: previousCount
+      })
       setNotice({ type: 'error', text: error.message })
+    } finally {
+      likePendingRef.current.delete(momentId)
     }
   }
 
@@ -436,17 +444,41 @@ export function FeedPage() {
       setNotice({ type: 'error', text: '动态 ID 缺失，无法收藏' })
       return
     }
+    if (favoritePendingRef.current.has(momentId)) return
+    const target = moments.find(moment => getMomentId(moment) === momentId)
+    if (!target) return
+    const wasFavorited = Boolean(target.favoritedByCurrentUser)
+    const previousCount = Number(target.favoriteCount || 0)
+    mergeMoment({
+      ...target,
+      favoritedByCurrentUser: !wasFavorited,
+      favoriteCount: Math.max(0, previousCount + (wasFavorited ? -1 : 1))
+    })
+    favoritePendingRef.current.add(momentId)
     try {
-      const nextMoment = await momentApi.favorite(momentId, currentUser)
+      const nextMoment = wasFavorited
+        ? await momentApi.unfavorite(momentId, currentUser)
+        : await momentApi.favorite(momentId, currentUser)
       mergeMoment(nextMoment)
     } catch (error) {
+      mergeMoment({
+        ...target,
+        favoritedByCurrentUser: wasFavorited,
+        favoriteCount: previousCount
+      })
       setNotice({ type: 'error', text: error.message })
+    } finally {
+      favoritePendingRef.current.delete(momentId)
     }
   }
 
   async function toggleFollow(authorId, authorRole) {
     const roleKey = (authorRole || 'CUSTOMER').toUpperCase()
     const followed = isFollowing(authorId)
+    const requestKey = `${roleKey}:${Number(authorId)}`
+    if (followPendingRef.current.has(requestKey)) return
+    followPendingRef.current.add(requestKey)
+    syncFollowState(authorId, authorRole, !followed)
     try {
       if (followed) {
         await userApi.unfollow(authorId, currentUser, roleKey)
@@ -454,9 +486,11 @@ export function FeedPage() {
         await userApi.follow(authorId, currentUser, roleKey)
       }
       setNotice({ type: 'success', text: followed ? '已取消关注' : '已关注' })
-      syncFollowState(authorId, authorRole, !followed)
     } catch (error) {
+      syncFollowState(authorId, authorRole, followed)
       setNotice({ type: 'error', text: error.message })
+    } finally {
+      followPendingRef.current.delete(requestKey)
     }
   }
 

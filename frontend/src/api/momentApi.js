@@ -25,13 +25,19 @@ export const momentApi = {
     return request(`/moments/${momentId}/like`, { method: 'POST' }, currentUser)
   },
   like(momentId, currentUser) {
-    return request(`/moments/${momentId}/like`, { method: 'POST' }, currentUser)
+    return request(`/moments/${momentId}/like`, { method: 'PUT' }, currentUser)
+  },
+  unlike(momentId, currentUser) {
+    return request(`/moments/${momentId}/like`, { method: 'DELETE' }, currentUser)
   },
   toggleFavorite(momentId, currentUser) {
     return request(`/moments/${momentId}/favorite`, { method: 'POST' }, currentUser)
   },
   favorite(momentId, currentUser) {
-    return request(`/moments/${momentId}/favorite`, { method: 'POST' }, currentUser)
+    return request(`/moments/${momentId}/favorite`, { method: 'PUT' }, currentUser)
+  },
+  unfavorite(momentId, currentUser) {
+    return request(`/moments/${momentId}/favorite`, { method: 'DELETE' }, currentUser)
   },
   delete(momentId, currentUser) {
     return request(`/moments/${momentId}`, { method: 'DELETE' }, currentUser)
