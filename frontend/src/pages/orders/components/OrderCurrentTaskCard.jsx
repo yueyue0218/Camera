@@ -90,8 +90,8 @@ export function OrderCurrentTaskCard({
 
 const cardSx = {
   p: { xs: 2.3, md: 3 },
-  bgcolor: '#fff',
-  borderColor: 'rgba(133, 148, 173, .16)',
+  bgcolor: '#fffdf8',
+  borderColor: 'rgba(79, 70, 60, .10)',
   borderRadius: '22px',
   boxShadow: 'none'
 }
@@ -103,8 +103,8 @@ const iconBoxSx = {
   placeItems: 'center',
   flexShrink: 0,
   borderRadius: '14px',
-  bgcolor: '#eaf1fb',
-  color: PORTRA_SURFACE.portraBlue
+  bgcolor: 'rgba(37, 99, 235, .08)',
+  color: '#2563eb'
 }
 
 const deadlineSx = {
@@ -114,15 +114,15 @@ const deadlineSx = {
   justifyContent: 'space-between',
   gap: 1,
   borderRadius: PORTRA_RADIUS.control,
-  bgcolor: '#f3f5fa'
+  bgcolor: '#f5f1ea'
 }
 
 const noticeSx = {
   px: 1.6,
   py: 1.2,
   borderRadius: PORTRA_RADIUS.control,
-  bgcolor: '#fff8e8',
-  border: '1px solid rgba(248, 81, 4, .16)',
+  bgcolor: '#fff4e5',
+  border: '1px solid rgba(249, 115, 22, .18)',
   color: '#9a4b00',
   fontWeight: 750,
   lineHeight: 1.65
@@ -134,7 +134,7 @@ const primaryButtonSx = {
   borderRadius: '14px',
   fontSize: 17,
   fontWeight: 950,
-  bgcolor: '#3f7fdb'
+  bgcolor: '#2563eb'
 }
 
 const secondaryButtonSx = {

@@ -24,7 +24,7 @@ export function OrderFollowupCards({ items = [] }) {
             后续事项
           </Typography>
           <Typography variant="body2" sx={{ mt: 0.35, color: PORTRA_SURFACE.muted, lineHeight: 1.6 }}>
-            查看作品、处理授权、评价与投诉都放在这里，主任务保持清爽。
+            查看作品、授权与评价。
           </Typography>
         </Box>
 
@@ -84,8 +84,8 @@ export function OrderFollowupCards({ items = [] }) {
 
 const sectionSx = {
   p: { xs: 2.1, md: 2.6 },
-  bgcolor: '#fff',
-  borderColor: 'rgba(15, 23, 42, .08)',
+  bgcolor: '#fffdf8',
+  borderColor: 'rgba(79, 70, 60, .10)',
   borderRadius: '22px',
   boxShadow: 'none'
 }
@@ -93,14 +93,14 @@ const sectionSx = {
 const gridSx = {
   display: 'grid',
   gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' },
-  gap: 1.2
+  gap: 1
 }
 
 const cardSx = {
-  p: 1.45,
-  minHeight: 170,
-  bgcolor: '#fbfdff',
-  borderColor: 'rgba(15, 23, 42, .08)',
+  p: 1.35,
+  minHeight: 150,
+  bgcolor: '#fffaf2',
+  borderColor: 'rgba(79, 70, 60, .09)',
   borderRadius: '18px',
   boxShadow: 'none'
 }
@@ -113,7 +113,7 @@ function iconSx(tone) {
     display: 'grid',
     placeItems: 'center',
     flexShrink: 0,
-    bgcolor: tone === 'warning' ? '#fff2e8' : tone === 'success' ? '#ecfdf3' : '#eaf2ff',
+    bgcolor: tone === 'warning' ? '#fff4e5' : tone === 'success' ? '#ecfdf3' : 'rgba(37, 99, 235, .08)',
     color: tone === 'warning' ? '#f97316' : tone === 'success' ? '#16a34a' : '#2563eb',
     '& svg': { fontSize: 21 }
   }
@@ -125,7 +125,7 @@ function statusSx(tone) {
     py: 0.35,
     borderRadius: 999,
     flexShrink: 0,
-    bgcolor: tone === 'warning' ? '#fff2e8' : tone === 'success' ? '#ecfdf3' : '#eef4ff',
+    bgcolor: tone === 'warning' ? '#fff4e5' : tone === 'success' ? '#ecfdf3' : 'rgba(37, 99, 235, .08)',
     color: tone === 'warning' ? '#f97316' : tone === 'success' ? '#16a34a' : '#2563eb',
     fontSize: 12,
     fontWeight: 900,

@@ -1145,10 +1145,10 @@ export function OrdersPage() {
       status: latestDeliveryBatch ? formatDeliveryBatchContent(latestDeliveryBatch) : canUploadDelivery ? '待上传' : '等待作品',
       tone: latestDeliveryBatch ? 'success' : canUploadDelivery ? 'warning' : 'default',
       description: latestDeliveryBatch
-        ? '查看本单已交付的图片和文件。'
+        ? '查看本次交付内容。'
         : canUploadDelivery
-          ? '拍摄已结束，请上传本单成片。'
-          : '作品交付后会在这里出现入口。',
+          ? '上传本单成片。'
+          : '作品交付后可查看。',
       primaryAction: latestDeliveryBatch ? {
         label: '查看作品',
         onClick: () => openDeliveryBatch(latestDeliveryBatch),
@@ -1165,7 +1165,7 @@ export function OrdersPage() {
       title: '展示授权',
       status: formatAuthorizationSummary(photoAuthorizations),
       tone: getAuthorizationFollowupTone(photoAuthorizations),
-      description: '客户同意后，摄影师才能将本订单图片作为客片展示。',
+      description: '申请将图片作为客片展示。',
       primaryAction: photoAuthorizations.length ? {
         label: '查看授权记录',
         onClick: () => setAuthorizationRecordsDialogOpen(true)
@@ -1728,10 +1728,10 @@ export function OrdersPage() {
 }
 
 const orderPageSx = {
-  color: PORTRA_SURFACE.ink,
+  color: '#171717',
   overflowWrap: 'anywhere',
   overflowX: 'hidden',
-  bgcolor: '#f3f6fb',
+  bgcolor: '#eee9e2',
   minHeight: 'calc(100dvh - 88px)',
   borderRadius: { xs: 0, md: '0' }
 }
@@ -1755,9 +1755,9 @@ const orderIndexPanelSx = {
   alignSelf: 'start',
   minWidth: 0,
   minHeight: { lg: 'calc(100dvh - 88px)' },
-  bgcolor: '#fff',
+  bgcolor: '#fffdf8',
   borderColor: 'transparent',
-  borderRight: { lg: '1px solid rgba(133, 148, 173, .18)' },
+  borderRight: { lg: '1px solid rgba(79, 70, 60, .10)' },
   borderRadius: 0,
   boxShadow: 'none'
 }
@@ -1809,14 +1809,14 @@ function OrderDetailSkeleton() {
 function orderIndexCardSx(selected) {
   return {
     cursor: 'pointer',
-    bgcolor: selected ? '#eaf2ff' : '#fff',
+    bgcolor: selected ? 'rgba(37, 99, 235, .08)' : 'transparent',
     borderColor: 'transparent',
     borderRadius: 0,
-    borderLeft: `4px solid ${selected ? PORTRA_SURFACE.portraBlue : 'transparent'}`,
+    borderLeft: `4px solid ${selected ? '#2563eb' : 'transparent'}`,
     boxShadow: 'none',
     transition: 'background-color 140ms ease, border-color 140ms ease',
     '&:hover': {
-      bgcolor: selected ? '#eaf2ff' : '#f6f8fc'
+      bgcolor: selected ? 'rgba(37, 99, 235, .08)' : 'rgba(255, 252, 246, .72)'
     }
   }
 }
