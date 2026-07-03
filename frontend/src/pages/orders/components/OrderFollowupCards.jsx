@@ -23,9 +23,6 @@ export function OrderFollowupCards({ items = [] }) {
           <Typography sx={{ color: PORTRA_SURFACE.ink, fontSize: 18, fontWeight: 950 }}>
             后续事项
           </Typography>
-          <Typography variant="body2" sx={{ mt: 0.35, color: PORTRA_SURFACE.muted, lineHeight: 1.6 }}>
-            查看作品、授权与评价。
-          </Typography>
         </Box>
 
         <Box sx={gridSx}>
@@ -84,7 +81,7 @@ export function OrderFollowupCards({ items = [] }) {
 
 const sectionSx = {
   p: { xs: 2.1, md: 2.6 },
-  bgcolor: '#fffdf8',
+  bgcolor: '#fffcf6',
   borderColor: 'rgba(79, 70, 60, .10)',
   borderRadius: '22px',
   boxShadow: 'none'
@@ -99,7 +96,7 @@ const gridSx = {
 const cardSx = {
   p: 1.35,
   minHeight: 150,
-  bgcolor: '#fffaf2',
+  bgcolor: '#fff8ee',
   borderColor: 'rgba(79, 70, 60, .09)',
   borderRadius: '18px',
   boxShadow: 'none'

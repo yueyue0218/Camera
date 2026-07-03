@@ -68,7 +68,7 @@ import {
 } from '../../components/portra/index.js'
 import { usePortraAsyncAction } from '../../hooks/usePortraAsyncAction.js'
 import { AuthorizationRequestCard } from '../../components/portra/AuthorizationRequestCard.jsx'
-import { PORTRA_RADIUS, PORTRA_SHADOW, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
+import { PORTRA_RADIUS, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
 import {
   canCustomerConfirm,
   canCustomerReviewPhotoAuthorization,
@@ -1809,7 +1809,7 @@ const orderPageSx = {
   color: '#171717',
   overflowWrap: 'anywhere',
   overflowX: 'hidden',
-  bgcolor: '#eee9e2',
+  bgcolor: '#f0ece5',
   minHeight: 'calc(100dvh - 88px)',
   borderRadius: { xs: 0, md: '0' }
 }
@@ -1833,7 +1833,7 @@ const orderIndexPanelSx = {
   alignSelf: 'start',
   minWidth: 0,
   minHeight: { lg: 'calc(100dvh - 88px)' },
-  bgcolor: '#fffdf8',
+  bgcolor: '#f5f1ea',
   borderColor: 'transparent',
   borderRight: { lg: '1px solid rgba(79, 70, 60, .10)' },
   borderRadius: 0,
@@ -1847,14 +1847,15 @@ const orderDetailWorkspaceSx = {
   mx: 'auto',
   px: { xs: 1.2, md: 4 },
   py: { xs: 1.8, md: 4 },
-  overflowWrap: 'anywhere'
+  overflowWrap: 'anywhere',
+  bgcolor: 'transparent'
 }
 
 function OrderIndexSkeleton() {
   return (
     <Stack spacing={1.2} aria-label="订单索引加载中">
       {[0, 1, 2].map(index => (
-        <Paper key={index} variant="outlined" sx={{ p: 1.4, borderRadius: PORTRA_RADIUS.card, borderColor: PORTRA_SURFACE.borderSoft, bgcolor: PORTRA_SURFACE.paper }}>
+        <Paper key={index} variant="outlined" sx={{ p: 1.4, borderRadius: PORTRA_RADIUS.card, borderColor: 'rgba(79, 70, 60, .10)', bgcolor: '#fffcf6' }}>
           <Skeleton variant="text" width={`${72 - index * 8}%`} height={24} />
           <Skeleton variant="text" width="54%" height={20} />
           <Skeleton variant="text" width="36%" height={18} />
@@ -1901,10 +1902,10 @@ function orderIndexCardSx(selected) {
 
 const orderArchiveHeroSx = {
   p: { xs: 2, md: 2.6 },
-  bgcolor: PORTRA_SURFACE.paper,
-  borderColor: PORTRA_SURFACE.borderSubtle,
+  bgcolor: '#fffcf6',
+  borderColor: 'rgba(79, 70, 60, .10)',
   borderRadius: PORTRA_RADIUS.panel,
-  boxShadow: PORTRA_SHADOW.soft,
+  boxShadow: '0 14px 34px rgba(43, 35, 24, .06)',
   position: 'relative',
   overflow: 'hidden',
   '&::before': {
@@ -1921,8 +1922,8 @@ const orderArchiveHeroSx = {
 
 const subCardSx = {
   p: 1.5,
-  bgcolor: PORTRA_SURFACE.paperSoft,
-  borderColor: PORTRA_SURFACE.borderSoft,
+  bgcolor: '#fffaf2',
+  borderColor: 'rgba(79, 70, 60, .10)',
   borderRadius: PORTRA_RADIUS.card,
   boxShadow: '0 1px 0 rgba(255, 255, 255, 0.68) inset'
 }

@@ -63,7 +63,7 @@ function MosaicTile({ file, previewUrl, loading, overlay, index, count }) {
           sx={{
             width: '100%',
             height: '100%',
-            objectFit: count <= 1 ? 'contain' : 'cover',
+            objectFit: 'contain',
             objectPosition: 'center',
             display: 'block'
           }}
@@ -134,10 +134,10 @@ function mosaicSx(count, conversation) {
     gridTemplateRows: getRows(count),
     gap: conversation ? '2px' : '3px',
     width: '100%',
-    height: conversation ? { xs: 226, sm: 246 } : 86,
-    minHeight: conversation ? 226 : 82,
+    height: conversation ? { xs: 204, sm: 218 } : 78,
+    minHeight: conversation ? 204 : 76,
     overflow: 'hidden',
-    bgcolor: '#fffdf8'
+    bgcolor: '#f2eee7'
   }
 }
 

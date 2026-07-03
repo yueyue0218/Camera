@@ -10,7 +10,7 @@ export function OrderTimelineCard({ items = [] }) {
             <Box key={item.id || item.title} sx={timelineItemSx}>
               <Box sx={dotSx(item.state)} />
               {index < items.length - 1 ? <Box sx={lineSx(item.state)} /> : null}
-              <Box sx={{ minWidth: 0, pb: index < items.length - 1 ? 1.6 : 0 }}>
+              <Box sx={{ minWidth: 0, pb: index < items.length - 1 ? 1.6 : 0, bgcolor: 'transparent' }}>
                 <Stack direction="row" spacing={0.9} sx={{ alignItems: 'center', minWidth: 0 }}>
                   <Typography sx={timelineTitleSx(item.state)}>
                     {item.title}
@@ -31,7 +31,7 @@ export function OrderTimelineCard({ items = [] }) {
 
 const cardSx = {
   p: { xs: 2.2, md: 2.7 },
-  bgcolor: '#fffdf8',
+  bgcolor: '#fffcf6',
   borderColor: 'rgba(79, 70, 60, .10)',
   borderRadius: '22px',
   boxShadow: 'none'
@@ -42,7 +42,8 @@ const timelineItemSx = {
   display: 'grid',
   gridTemplateColumns: '24px minmax(0, 1fr)',
   columnGap: 1.45,
-  minHeight: 54
+  minHeight: 54,
+  bgcolor: 'transparent'
 }
 
 function dotSx(state) {

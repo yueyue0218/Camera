@@ -36,7 +36,7 @@ export function DeliverySummaryCard({
               <ImageRoundedIcon sx={{ fontSize: 20 }} />
             </Box>
             <Box sx={{ minWidth: 0 }}>
-              <Typography sx={{ color: PORTRA_SURFACE.ink, fontSize: 18, fontWeight: 950, lineHeight: 1.22 }}>
+              <Typography sx={{ color: PORTRA_SURFACE.ink, fontSize: 17, fontWeight: 950, lineHeight: 1.22 }}>
                 {label || '作品已上传'}
               </Typography>
               {timeLabel && (
@@ -142,28 +142,28 @@ function formatDeliverySummaryCount(batch) {
 
 function conversationCardSx(clickable) {
   return {
-    width: { xs: '100%', md: 420 },
+    width: '100%',
     maxWidth: '100%',
     p: 0,
-    bgcolor: '#fffdf8',
-    borderColor: 'rgba(79, 70, 60, .10)',
-    borderRadius: '22px',
+    bgcolor: '#fffaf2',
+    borderColor: 'rgba(79, 70, 60, .12)',
+    borderRadius: '18px',
     overflow: 'hidden',
     cursor: clickable ? 'pointer' : 'default',
-    boxShadow: '0 10px 24px rgba(24, 38, 62, .055)',
+    boxShadow: '0 8px 22px rgba(43, 35, 24, .07)',
     transition: 'transform .16s ease, border-color .16s ease, box-shadow .16s ease',
     '&:hover': clickable ? {
       transform: 'translateY(-1px)',
       borderColor: 'rgba(37, 99, 235, .30)',
-      boxShadow: '0 14px 30px rgba(24, 38, 62, .075)'
+      boxShadow: '0 10px 24px rgba(43, 35, 24, .085)'
     } : undefined
   }
 }
 
 const conversationHeaderSx = {
-  minHeight: { xs: 72, sm: 80 },
-  px: { xs: 1.45, sm: 1.7 },
-  py: { xs: 1.15, sm: 1.35 },
+  minHeight: { xs: 64, sm: 68 },
+  px: { xs: 1.35, sm: 1.55 },
+  py: { xs: 1, sm: 1.1 },
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
@@ -171,9 +171,9 @@ const conversationHeaderSx = {
 }
 
 const conversationIconSx = {
-  width: 42,
-  height: 42,
-  borderRadius: '14px',
+  width: 38,
+  height: 38,
+  borderRadius: '13px',
   display: 'grid',
   placeItems: 'center',
   bgcolor: 'rgba(37, 99, 235, .08)',
@@ -182,7 +182,7 @@ const conversationIconSx = {
 }
 
 const conversationChipSx = {
-  height: 30,
+  height: 28,
   px: 0.65,
   borderRadius: 999,
   bgcolor: 'rgba(255, 240, 232, .92)',
@@ -192,19 +192,19 @@ const conversationChipSx = {
 }
 
 const conversationFooterSx = {
-  minHeight: { xs: 76, sm: 84 },
-  px: { xs: 1.45, sm: 1.7 },
-  py: { xs: 1.2, sm: 1.35 },
+  minHeight: { xs: 64, sm: 68 },
+  px: { xs: 1.35, sm: 1.55 },
+  py: { xs: 1, sm: 1.1 },
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 1
 }
 
 const conversationButtonSx = {
-  minHeight: 44,
-  px: 2,
-  borderRadius: '14px',
-  bgcolor: '#fff',
+  minHeight: 38,
+  px: 1.6,
+  borderRadius: '12px',
+  bgcolor: '#fffdf8',
   color: PORTRA_SURFACE.ink,
   borderColor: 'rgba(79, 70, 60, .18)',
   fontWeight: 950
@@ -213,7 +213,7 @@ const conversationButtonSx = {
 function orderCardSx(clickable) {
   return {
     p: 1.15,
-    bgcolor: '#fffaf2',
+    bgcolor: '#fff8ee',
     borderColor: 'rgba(79, 70, 60, .10)',
     borderRadius: PORTRA_RADIUS.card,
     overflow: 'hidden',

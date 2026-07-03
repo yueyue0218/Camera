@@ -122,8 +122,8 @@ function ThumbnailPlaceholder({ label }) {
 function getStripHeight(count, compact, gallery, summary) {
   if (summary) return 82
   if (gallery) return count <= 1 ? 260 : 276
-  if (count <= 1) return compact ? 180 : 220
-  return compact ? 184 : 228
+  if (count <= 1) return compact ? 142 : 220
+  return compact ? 150 : 228
 }
 
 function getGridColumns(count, compact) {
@@ -136,5 +136,5 @@ function getGridAutoRows(count, compact, gallery, summary) {
   if (summary) return count <= 1 ? 82 : 38
   if (count <= 1) return '1fr'
   if (gallery) return 132
-  return compact ? 90 : 108
+  return compact ? 72 : 108
 }

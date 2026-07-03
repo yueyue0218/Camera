@@ -229,7 +229,7 @@ function BrowseDeliveryGallery({ files, previewUrls, loadedPreviews, onPreview, 
             sx={browseImageCardSx(single)}
           >
             {previewUrl ? (
-              <Box component="img" src={previewUrl} alt={file.fileName || '交付作品'} sx={browseImageSx} />
+              <Box component="img" src={previewUrl} alt={file.fileName || '交付作品'} sx={browseImageSx(single)} />
             ) : loadingPreview ? (
               <Box sx={browsePlaceholderSx}>图片加载中</Box>
             ) : (
@@ -277,8 +277,8 @@ function browseGallerySx(single) {
   return {
     display: 'grid',
     gridTemplateColumns: single
-      ? { xs: 'minmax(0, 1fr)', md: 'minmax(0, min(100%, 720px))' }
-      : { xs: '1fr', sm: 'repeat(auto-fit, minmax(220px, 1fr))' },
+      ? { xs: 'minmax(0, 1fr)', md: 'minmax(0, min(100%, 640px))' }
+      : { xs: '1fr', sm: 'repeat(auto-fit, minmax(190px, 240px))' },
     gap: { xs: 1.4, md: 1.8 },
     justifyContent: 'start',
     alignItems: 'start'
@@ -288,11 +288,15 @@ function browseGallerySx(single) {
 function browseImageCardSx(single) {
   return {
     width: '100%',
-    maxWidth: single ? 720 : '100%',
+    maxWidth: single ? 640 : 240,
+    maxHeight: single ? { xs: 480, md: 580 } : 290,
     overflow: 'hidden',
     borderRadius: '16px',
-    bgcolor: 'transparent',
+    bgcolor: '#f2eee7',
     cursor: 'zoom-in',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     transition: 'transform .16s ease, filter .16s ease',
     '&:hover': {
       transform: 'translateY(-2px)',
@@ -301,12 +305,17 @@ function browseImageCardSx(single) {
   }
 }
 
-const browseImageSx = {
-  width: '100%',
-  height: 'auto',
-  display: 'block',
-  borderRadius: '16px',
-  boxShadow: '0 10px 26px rgba(43, 35, 24, .08)'
+function browseImageSx(single) {
+  return {
+    width: 'auto',
+    height: 'auto',
+    maxWidth: '100%',
+    maxHeight: single ? { xs: 480, md: 580 } : 290,
+    display: 'block',
+    objectFit: 'contain',
+    borderRadius: '16px',
+    boxShadow: single ? '0 10px 26px rgba(43, 35, 24, .08)' : '0 8px 18px rgba(43, 35, 24, .07)'
+  }
 }
 
 const browsePlaceholderSx = {

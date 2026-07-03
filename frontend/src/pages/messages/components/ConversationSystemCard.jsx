@@ -16,10 +16,10 @@ import { formatTime } from '../utils/conversationUtils.js'
 import { buildQuoteDisplayModel } from '../utils/quoteDisplayModel.js'
 import { getSafeDisplayText, PORTRA_COLORS, QUOTE_VISUAL } from '../MessageVisualTokens.js'
 import { EventAttachmentCard } from './EventAttachmentCard.jsx'
-import { MessageActorAvatar } from './MessageActorAvatar.jsx'
 import { QuoteMoneyText } from './QuoteMoneyText.jsx'
 import { DeliverySummaryCard } from '../../deliveries/components/DeliverySummaryCard.jsx'
 import { buildDeliveryBatches } from '../../deliveries/deliveryDisplay.js'
+import { ConversationEventFrame, conversationEventSurfaceSx } from './ConversationEventFrame.jsx'
 
 export function ConversationSystemItem({
   event,
@@ -163,50 +163,21 @@ function QuoteAttachmentCard({ event, actor, direction, quote, onOpenQuoteDetail
   const accent = self ? QUOTE_VISUAL.blue : QUOTE_VISUAL.coral
 
   return (
-    <Box sx={{ display: 'flex', justifyContent: self ? 'flex-end' : 'flex-start' }}>
-      <Stack
-        direction="row"
-        spacing={1.1}
-        sx={{
-          alignItems: 'flex-start',
-          width: { xs: '100%', md: '62%' },
-          minWidth: { xs: 0, md: 390 },
-          maxWidth: { xs: 'min(92vw, 500px)', md: 520 },
-          flexDirection: self ? 'row-reverse' : 'row'
-        }}
-      >
-        <MessageActorAvatar
-          actor={actor || event.actor}
-          dataKind="quote"
-          accent={accent}
-          fallbackText={self ? '我' : '对'}
-          sx={{ mt: 0.25, fontWeight: 950 }}
-        />
+    <ConversationEventFrame self={self} actor={actor || event.actor} accent={accent} dataKind="quote">
         <PortraTicketCard
           accent={accent}
           sx={{
-            flex: 1,
-            width: '100%',
-            minWidth: { xs: 0, md: 360 },
-            maxWidth: 480,
             px: 2.25,
             py: 2,
-            pl: 2.45,
-            bgcolor: self ? QUOTE_VISUAL.selfBg : QUOTE_VISUAL.peerBg,
-            borderColor: self ? QUOTE_VISUAL.selfBorder : QUOTE_VISUAL.peerBorder,
-            borderRadius: '16px',
-            boxShadow: '0 5px 14px rgba(18,22,34,.055), 0 1px 2px rgba(18,22,34,.045)',
+            pl: 2.35,
+            ...conversationEventSurfaceSx({ self, accent }),
+            bgcolor: self ? 'rgba(239, 243, 255, .90)' : '#fffaf2',
             '&::before': {
               inset: '0 auto 0 0',
-              width: 4,
+              width: 3,
               bgcolor: accent
             },
-            '&::after': { display: 'none' },
-            '&:hover': {
-              transform: 'none',
-              boxShadow: '0 6px 16px rgba(18,22,34,.07), 0 1px 2px rgba(18,22,34,.045)',
-              borderColor: self ? QUOTE_VISUAL.selfBorder : QUOTE_VISUAL.peerBorder
-            }
+            '&:hover': conversationEventSurfaceSx({ self, accent })['&:hover']
           }}
         >
           <Stack spacing={1.15}>
@@ -253,8 +224,7 @@ function QuoteAttachmentCard({ event, actor, direction, quote, onOpenQuoteDetail
             </Box>
           </Stack>
         </PortraTicketCard>
-      </Stack>
-    </Box>
+    </ConversationEventFrame>
   )
 }
 
@@ -378,23 +348,7 @@ function DeliveryEventCard({ event, actor, direction, actions, onOpenDeliveryGal
   const batch = buildDeliveryBatches([delivery], event?.meta?.order)[0]
   const self = (direction || event.side) === 'self'
   return (
-    <Box sx={{ display: 'flex', justifyContent: self ? 'flex-end' : 'flex-start' }}>
-      <Stack
-        direction="row"
-        spacing={1.05}
-        sx={{
-          alignItems: 'flex-start',
-          maxWidth: { xs: '100%', md: 'min(78%, 560px)' },
-          flexDirection: self ? 'row-reverse' : 'row'
-        }}
-      >
-        <MessageActorAvatar
-          actor={actor || event.actor}
-          dataKind="event"
-          accent={PORTRA_COLORS.blue}
-          fallbackText={self ? '我' : '对'}
-          sx={{ mt: 0.25, fontWeight: 950 }}
-        />
+    <ConversationEventFrame self={self} actor={actor || event.actor} accent={PORTRA_COLORS.blue} dataKind="event">
         <Stack spacing={0.85} sx={{ alignItems: self ? 'flex-end' : 'flex-start', minWidth: 0 }}>
           <DeliverySummaryCard
             batch={{
@@ -410,8 +364,7 @@ function DeliveryEventCard({ event, actor, direction, actions, onOpenDeliveryGal
           />
           {actions}
         </Stack>
-      </Stack>
-    </Box>
+    </ConversationEventFrame>
   )
 }
 

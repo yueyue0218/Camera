@@ -278,16 +278,34 @@ function buildAuthorizationModel(authorization = {}, order) {
 }
 
 function normalizeAuthorizationFiles(authorization = {}) {
-  const files = Array.isArray(authorization.files)
-    ? authorization.files
-    : Array.isArray(authorization.fileList) ? authorization.fileList : []
+  const files = [
+    authorization.files,
+    authorization.fileList,
+    authorization.selectedFiles,
+    authorization.selectedFileList,
+    authorization.authorizationFiles,
+    authorization.photoAuthorizationFiles,
+    authorization.deliveryFiles,
+    authorization.imageFiles
+  ].find(Array.isArray) || []
   return files.filter(Boolean).map((file, index) => ({
-    ...file,
-    id: file.id || file.fileId || `${authorization.id || 'authorization'}-${index}`,
-    fileId: file.fileId || file.id,
-    deliveryId: file.deliveryId || authorization.deliveryId,
-    orderId: file.orderId || authorization.orderId
+    ...normalizeAuthorizationFileRecord(file),
+    id: file.id || file.fileId || file.file?.id || file.fileInfo?.id || `${authorization.id || 'authorization'}-${index}`,
+    fileId: file.fileId || file.id || file.file?.id || file.fileInfo?.id,
+    deliveryId: file.deliveryId || file.delivery?.id || authorization.deliveryId,
+    orderId: file.orderId || file.order?.id || authorization.orderId
   }))
+}
+
+function normalizeAuthorizationFileRecord(file = {}) {
+  const nested = file.file || file.fileInfo || file.fileRecord || file.deliveryFile || {}
+  return {
+    ...nested,
+    ...file,
+    fileName: file.fileName || file.originalName || nested.fileName || nested.originalName,
+    mimeType: file.mimeType || file.contentType || nested.mimeType || nested.contentType,
+    fileSize: file.fileSize || file.size || nested.fileSize || nested.size
+  }
 }
 
 function buildApplicantLabel(_authorization = {}, _order) {

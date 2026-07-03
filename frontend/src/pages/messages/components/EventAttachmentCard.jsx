@@ -1,7 +1,7 @@
-import { Box, Stack, Typography } from '@mui/material'
+import { Stack, Typography } from '@mui/material'
 import { PortraTicketCard } from '../../../components/portra/index.js'
 import { PORTRA_COLORS } from '../MessageVisualTokens.js'
-import { MessageActorAvatar } from './MessageActorAvatar.jsx'
+import { ConversationEventFrame, conversationEventSurfaceSx } from './ConversationEventFrame.jsx'
 
 export function EventAttachmentCard({ side, direction, actor, title, summary, timestamp, children, actions }) {
   const self = (direction || side) === 'self'
@@ -10,41 +10,16 @@ export function EventAttachmentCard({ side, direction, actor, title, summary, ti
   const accent = self ? PORTRA_COLORS.blue : warning ? PORTRA_COLORS.orange : PORTRA_COLORS.subInk
 
   return (
-    <Box sx={{ display: 'flex', justifyContent: self ? 'flex-end' : 'flex-start' }}>
-      <Stack
-        direction="row"
-        spacing={1.05}
-        sx={{
-          alignItems: 'flex-start',
-          maxWidth: { xs: '100%', md: 'min(78%, 580px)' },
-          flexDirection: self ? 'row-reverse' : 'row'
-        }}
-      >
-        <MessageActorAvatar
-          actor={actor}
-          dataKind="event"
-          accent={accent}
-          fallbackText={self ? '我' : '对'}
-          sx={{ mt: 0.25, fontWeight: 950 }}
-        />
+    <ConversationEventFrame self={self} actor={actor} accent={accent} dataKind="event">
         <PortraTicketCard
           accent={accent}
           sx={{
-            width: { xs: 'min(100%, 540px)', md: 'min(560px, 100%)' },
-            maxWidth: '100%',
             px: 1.5,
             py: 1.22,
-            pl: self ? 1.5 : 2.2,
-            pr: self ? 2.2 : 1.5,
-            bgcolor: self ? 'rgba(231,235,250,.74)' : PORTRA_COLORS.paper,
-            borderColor: self ? 'rgba(13,47,178,.28)' : peer ? 'rgba(248,81,4,.22)' : PORTRA_COLORS.borderMuted,
-            borderRadius: self ? '10px 10px 4px 10px' : '10px 10px 10px 4px',
-            boxShadow: '0 2px 12px rgba(21,19,24,.07)',
-            '&::before': {
-              inset: self ? '0 0 0 auto' : '0 auto 0 0',
-              width: 4,
-              bgcolor: accent
-            },
+            pl: 1.75,
+            pr: 1.55,
+            ...conversationEventSurfaceSx({ self, accent }),
+            borderColor: peer ? 'rgba(248,81,4,.20)' : conversationEventSurfaceSx({ self, accent }).borderColor,
             '& .MuiButton-root': {
               minHeight: 30,
               borderRadius: 999,
@@ -63,7 +38,6 @@ export function EventAttachmentCard({ side, direction, actor, title, summary, ti
             {actions}
           </Stack>
         </PortraTicketCard>
-      </Stack>
-    </Box>
+    </ConversationEventFrame>
   )
 }

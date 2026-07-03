@@ -90,7 +90,7 @@ export function OrderCurrentTaskCard({
 
 const cardSx = {
   p: { xs: 2.3, md: 3 },
-  bgcolor: '#fffdf8',
+  bgcolor: '#fffcf6',
   borderColor: 'rgba(79, 70, 60, .10)',
   borderRadius: '22px',
   boxShadow: 'none'
@@ -114,7 +114,7 @@ const deadlineSx = {
   justifyContent: 'space-between',
   gap: 1,
   borderRadius: PORTRA_RADIUS.control,
-  bgcolor: '#f5f1ea'
+  bgcolor: '#f3efe8'
 }
 
 const noticeSx = {
