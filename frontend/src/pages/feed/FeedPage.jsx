@@ -309,12 +309,12 @@ export function FeedPage() {
 
   async function openComposer(moment = null) {
     if (moment) {
-      let nextMoment = moment
       const momentId = getMomentId(moment)
       if (!Number.isFinite(momentId)) {
         setNotice({ type: 'error', text: '动态 ID 缺失，无法编辑' })
         return
       }
+      let nextMoment
       try {
         nextMoment = await momentApi.detail(momentId, currentUser)
         mergeMoment(nextMoment)
