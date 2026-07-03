@@ -347,8 +347,8 @@ function getAuthorizationFollowupTone(records = []) {
 }
 
 function formatReviewFollowupStatus({ canReview, myReview, reviewToComplain, orderReviews = [], arbitrations = [] }) {
-  if (reviewToComplain) return '可投诉评价'
-  if (arbitrations.length) return '有投诉记录'
+  if (reviewToComplain) return '可发起申诉'
+  if (arbitrations.length) return '有申诉记录'
   if (myReview) return '已评价'
   if (canReview) return '可评价'
   if (orderReviews.length) return '已有评价'
@@ -357,17 +357,30 @@ function formatReviewFollowupStatus({ canReview, myReview, reviewToComplain, ord
 
 function getReviewFollowupTone(context) {
   const status = formatReviewFollowupStatus(context)
-  if (status === '可评价' || status === '可投诉评价') return 'warning'
+  if (status === '可评价' || status === '可发起申诉') return 'warning'
   if (status === '已评价' || status === '已有评价') return 'success'
   return 'default'
 }
 
-function getReviewFollowupDescription({ canReview, myReview, reviewToComplain, orderReviews = [] }) {
-  if (reviewToComplain) return '收到评价后，可对不实评价发起投诉。'
+function getReviewFollowupDescription({ canReview, myReview, reviewToComplain, orderReviews = [], arbitrations = [] }) {
+  if (reviewToComplain) return '收到评价后，如内容不实，可在这里发起申诉。'
+  if (arbitrations.length) return '申诉结果会记录在评价区，出结果后不再显示申诉入口。'
   if (myReview) return '你已完成本次合作评价。'
   if (canReview) return '本次合作已完成，可以留下评价。'
   if (orderReviews.length) return '这里保存本次合作的评价记录。'
   return '订单完成后可评价本次合作。'
+}
+
+function hasComplaintResult(item) {
+  const result = String(item?.arbitrationResult || '').trim().toUpperCase()
+  const status = String(item?.status || '').trim().toUpperCase()
+  return Boolean(
+    result
+    || item?.handledAt
+    || status === 'APPROVED'
+    || status === 'REJECTED'
+    || status === 'RESOLVED'
+  )
 }
 
 function buildOrderProgressItems({ order, statusLogs = [], deliveryRecords = [], currentUser }) {
@@ -981,7 +994,7 @@ export function OrdersPage() {
         }
       }
       return saveLocalArbitration(localRecord)
-    }, '评价投诉已提交')
+    }, '评价申诉已提交')
     if (result) {
       setArbitrations(mergeComplaints([result], arbitrations, getArbitrationsByOrder(selectedOrder.orderId)))
       setShowArbitrationForm(false)
@@ -1095,7 +1108,7 @@ export function OrdersPage() {
   async function toggleArbitrationForm() {
     if (showArbitrationForm) {
       const confirmed = await arbitrationDraft.confirmDiscard(feedback, {
-        message: '当前投诉说明尚未提交，关闭后将丢弃已填写内容。确定关闭吗？'
+        message: '当前申诉说明尚未提交，关闭后将丢弃已填写内容。确定关闭吗？'
       })
       if (confirmed) setShowArbitrationForm(false)
       return
@@ -1164,7 +1177,18 @@ export function OrdersPage() {
   const canReviewSelectedOrder = selectedOrder?.status === 'COMPLETED' && isOrderParticipant(selectedOrder, currentUser.userId)
   const currentReviewDirection = selectedOrder ? getOrderReviewDirection(selectedOrder, currentUser.userId) : ''
   const myReview = orderReviews.find(review => Number(review.reviewerId) === currentUser.userId || review.direction === currentReviewDirection)
-  const reviewToComplain = orderReviews.find(review => Number(review.targetUserId) === currentUser.userId && review.isVisible !== false)
+  const resolvedComplaintReviewIds = useMemo(() => {
+    const ids = new Set()
+    arbitrations.forEach(item => {
+      if (hasComplaintResult(item) && item?.reviewId) ids.add(String(item.reviewId))
+    })
+    return ids
+  }, [arbitrations])
+  const reviewToComplain = orderReviews.find(review => (
+    Number(review.targetUserId) === currentUser.userId
+    && review.isVisible !== false
+    && !resolvedComplaintReviewIds.has(String(review.reviewId || ''))
+  ))
   const selectedOrderPerspective = selectedOrder ? getOrderPerspective(selectedOrder, currentUser) : ''
   const selectedCounterpartyLabel = selectedOrder ? getCounterpartyLabel(selectedOrder, currentUser) : ''
   const selectedOrderLocation = quoteSnapshot?.location || selectedOrder?.shootLocation || '未填写'
@@ -1229,10 +1253,10 @@ export function OrdersPage() {
     {
       key: 'review',
       kind: 'review',
-      title: '评价与投诉',
+      title: '评价与申诉',
       status: formatReviewFollowupStatus({ canReview: canReviewSelectedOrder, myReview, reviewToComplain, orderReviews, arbitrations }),
       tone: getReviewFollowupTone({ canReview: canReviewSelectedOrder, myReview, reviewToComplain, orderReviews, arbitrations }),
-      description: getReviewFollowupDescription({ canReview: canReviewSelectedOrder, myReview, reviewToComplain, orderReviews }),
+      description: getReviewFollowupDescription({ canReview: canReviewSelectedOrder, myReview, reviewToComplain, orderReviews, arbitrations }),
       primaryAction: canReviewSelectedOrder && !myReview ? {
         label: '评价',
         onClick: toggleReviewForm
@@ -1241,7 +1265,7 @@ export function OrdersPage() {
         onClick: () => setReviewRecordsDialogOpen(true)
       } : null,
       secondaryAction: reviewToComplain ? {
-        label: '投诉评价',
+        label: '发起申诉',
         onClick: toggleArbitrationForm
       } : null
     }
@@ -1583,7 +1607,7 @@ export function OrdersPage() {
       </Dialog>
 
       <Dialog open={reviewRecordsDialogOpen} onClose={() => setReviewRecordsDialogOpen(false)} fullWidth maxWidth="md">
-        <DialogTitle>评价与投诉</DialogTitle>
+        <DialogTitle>评价与申诉</DialogTitle>
         <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
           <Stack spacing={1.35}>
             <PortraInfoBanner>
@@ -1625,7 +1649,7 @@ export function OrdersPage() {
               setReviewRecordsDialogOpen(false)
               setShowArbitrationForm(true)
             }} sx={{ borderRadius: 999, px: 1.55 }}>
-              投诉评价
+              发起申诉
             </Button>
           )}
         </DialogActions>
@@ -1662,13 +1686,13 @@ export function OrdersPage() {
       </Dialog>
 
       <Dialog open={showArbitrationForm} onClose={toggleArbitrationForm} fullWidth maxWidth="sm">
-        <DialogTitle>投诉评价</DialogTitle>
+        <DialogTitle>发起评价申诉</DialogTitle>
         <DialogContent dividers sx={{ bgcolor: PORTRA_SURFACE.paper }}>
           <Stack component="form" id="order-arbitration-form" spacing={1.5} onSubmit={submitArbitration}>
             <PortraInfoBanner>请说明你认为评价不实或存在争议的原因，处理结果会记录在本次约拍的评价区。</PortraInfoBanner>
             <TextField
               select
-              label="投诉原因"
+              label="申诉原因"
               value={arbitrationForm.reason}
               onChange={event => setArbitrationForm({ ...arbitrationForm, reason: event.target.value })}
             >
@@ -1690,7 +1714,7 @@ export function OrdersPage() {
         <DialogActions sx={{ bgcolor: PORTRA_SURFACE.paperMuted }}>
           <Button color="inherit" onClick={toggleArbitrationForm}>取消</Button>
           <Button type="submit" form="order-arbitration-form" variant="contained" color="warning" startIcon={<GavelRoundedIcon />}>
-            提交投诉
+            提交申诉
           </Button>
         </DialogActions>
       </Dialog>

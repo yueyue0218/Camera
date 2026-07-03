@@ -23,7 +23,7 @@ export function ReviewComplaintDetailPage() {
         if (!alive) return
         setOrderId(complaint?.orderId || null)
       } catch {
-        if (alive) setFeedback({ error: '评价申诉详情已并入订单详情页，当前记录暂时无法定位。' })
+        if (alive) setFeedback({ error: '这条申诉记录暂时打不开，请回到对应订单查看。' })
       } finally {
         if (alive) setLoading(false)
       }
@@ -46,10 +46,10 @@ export function ReviewComplaintDetailPage() {
   return (
     <Stack spacing={2}>
       <Feedback {...feedback} />
-      {loading ? <EmptyState>正在定位关联订单...</EmptyState> : null}
+      {loading ? <EmptyState>正在打开申诉记录...</EmptyState> : null}
       {!loading && !orderId ? (
         <Alert severity="info" sx={{ borderRadius: 3 }}>
-          独立评价申诉页已废弃。请从订单详情页的“评价与申诉”区域查看申诉记录和处理结果。
+          请从订单详情页的“评价与申诉”查看这条申诉记录和处理结果。
         </Alert>
       ) : null}
     </Stack>

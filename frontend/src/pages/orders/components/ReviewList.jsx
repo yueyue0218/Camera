@@ -57,7 +57,6 @@ export function ReviewList({
         const canFollowUp = (
           Number(review.reviewerId) === Number(currentUserId)
           && review.isVisible !== false
-          && !review.replyContent
           && !String(review.reviewId || '').startsWith('local')
         )
         const canComplain = (
@@ -215,7 +214,7 @@ export function ReviewList({
                   ) : null}
                   {canComplain ? (
                     <Button size="small" variant="outlined" color="inherit" onClick={() => onComplain?.(review)} sx={miniOutlinedSx}>
-                      投诉评价
+                      发起申诉
                     </Button>
                   ) : null}
                 </Stack>

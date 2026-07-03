@@ -238,7 +238,7 @@ class ReviewServiceTest {
     }
 
     @Test
-    void originalReviewerCanAddSingleFollowUpWithoutChangingCreditAgain() {
+    void originalReviewerCanAddFollowUpWithoutChangingCreditAgain() {
         UserContext.setUserId(CUSTOMER_ID);
         ReviewResponse review = reviewService.create(COMPLETED_ORDER_ID, new ReviewCreateRequest(5, "第一次评价"));
 
@@ -256,15 +256,15 @@ class ReviewServiceTest {
     }
 
     @Test
-    void duplicateFollowUpIsRejected() {
+    void repeatedFollowUpOverridesPreviousContent() {
         UserContext.setUserId(CUSTOMER_ID);
         ReviewResponse review = reviewService.create(COMPLETED_ORDER_ID, new ReviewCreateRequest(5, "第一次评价"));
         reviewService.followUp(review.reviewId(), new ReviewFollowUpRequest("第一次追评"));
+        ReviewResponse response = reviewService.followUp(review.reviewId(), new ReviewFollowUpRequest("重复追评"));
 
-        assertThatThrownBy(() -> reviewService.followUp(review.reviewId(), new ReviewFollowUpRequest("重复追评")))
-                .isInstanceOf(BusinessException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.DUPLICATE_OPERATION);
+        assertThat(response.replyContent()).isEqualTo("重复追评");
+        assertThat(response.replyTime()).isNotNull();
+        assertThat(creditRecordRepository.findByUserIdOrderByCreatedAtDesc(PROVIDER_ID)).hasSize(1);
     }
 
     @Test

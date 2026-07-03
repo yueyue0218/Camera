@@ -133,10 +133,6 @@ public class ReviewService {
         if (!Boolean.TRUE.equals(review.getIsVisible())) {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Hidden review cannot be followed up");
         }
-        if (!isBlank(review.getReplyContent())) {
-            throw new BusinessException(ErrorCode.DUPLICATE_OPERATION, "Follow-up review already exists");
-        }
-
         review.setReplyContent(request.content().trim());
         review.setReplyTime(LocalDateTime.now());
         Review savedReview = reviewRepository.save(review);
