@@ -123,11 +123,11 @@ export function MomentDetailCard({
       </div>
 
       <Typography className="moment-detail__title">{moment.title || '未命名动态'}</Typography>
-      <Typography className="moment-detail__content">{moment.content || '分享了一段值得回看的片段。'}</Typography>
+      <Typography className="moment-detail__content">{moment.content || '分享了一段被放慢的生活。'}</Typography>
 
       {images.length > 0 && (
         <div className="moment-detail__viewer" aria-label="动态图片">
-          {images.length > 1 && <div className="moment-detail__counter">{index + 1}/{images.length}</div>}
+          <div className="moment-detail__counter">{index + 1}/{images.length}</div>
           {images.length > 1 && (
             <IconButton
               className="moment-detail__nav moment-detail__nav--prev"
@@ -151,24 +151,11 @@ export function MomentDetailCard({
           <div ref={sliderRef} className="moment-detail__slides" onScroll={handleScroll}>
             {images.map((src, imageIndex) => (
               <figure key={`${momentId}-${imageIndex}`} className="moment-detail__slide">
-                <img src={src} alt={`${moment.title || '动态图片'} ${imageIndex + 1}`} />
+                <img src={src} alt={`${moment.title || '动态'} ${imageIndex + 1}`} />
               </figure>
             ))}
           </div>
-          {images.length > 1 && (
-            <div className="moment-detail__dots" aria-label="图片切换">
-              {images.map((_, imageIndex) => (
-                <button
-                  key={`${momentId}-dot-${imageIndex}`}
-                  type="button"
-                  className={`moment-detail__dot ${imageIndex === index ? 'is-active' : ''}`}
-                  onClick={() => scrollToIndex(imageIndex)}
-                  aria-label={`查看第 ${imageIndex + 1} 张`}
-                  aria-pressed={imageIndex === index}
-                />
-              ))}
-            </div>
-          )}
+          <div className="moment-detail__hint">使用左右按钮查看图片</div>
         </div>
       )}
 

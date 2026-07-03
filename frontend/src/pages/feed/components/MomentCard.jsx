@@ -40,7 +40,6 @@ export function MomentCard({
     ? moment.imageDataList
     : moment.imageData ? [moment.imageData] : []
   const coverImage = images[0] || ''
-  const total = images.length
 
   return (
     <Paper className="moment-card" elevation={0}>
@@ -70,21 +69,20 @@ export function MomentCard({
       <div className="moment-card__main">
         <div className="moment-card__stamp">PORTRA FILE</div>
         <h2 onClick={() => onOpenMoment(moment)}>{moment.title || '未命名动态'}</h2>
-        <p>{moment.content || '分享了一段值得回看的片段。'}</p>
+        <p>{moment.content || '分享了一段被放慢的生活。'}</p>
 
         <div
-          className={`moment-card__cover ${coverImage ? 'has-image' : 'is-empty'}`}
+          className={`moment-card__image ${coverImage ? '' : 'is-empty'}`}
           onClick={() => onOpenMoment(moment)}
         >
           {coverImage ? (
             <img src={coverImage} alt={moment.title || '动态封面'} />
           ) : (
-            <div className="moment-card__cover-placeholder">
-              <span>PORTRA FRAME</span>
+            <div className="moment-card__image-placeholder">
+              <span>PORTRA FILE</span>
               <strong>暂无图片</strong>
             </div>
           )}
-          {total > 1 ? <span className="moment-card__cover-count">{total} 张</span> : null}
         </div>
 
         <div className="moment-card__actions">
