@@ -974,27 +974,27 @@ body[data-role="photographer"] .aside-card.photographer-only {
 
 .showcase-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .showcase-card {
   position: relative;
   background: rgba(248,243,235,.92);
   border: 1px solid rgba(21,19,24,.13);
-  border-radius: 22px;
+  border-radius: 18px;
   box-shadow: var(--soft);
   overflow: hidden;
   transition: .22s;
 }
 
 .showcase-card:hover {
-  transform: translateY(-5px);
+  transform: translateY(-4px);
   box-shadow: var(--shadow);
 }
 
 .work-cover {
-  height: 320px;
+  height: 256px;
   position: relative;
   overflow: hidden;
   background: var(--placeholder-art, #ddd0c5);
@@ -1031,39 +1031,39 @@ body[data-role="photographer"] .aside-card.photographer-only {
 
 .price-tag {
   position: absolute;
-  right: 12px;
-  top: 12px;
+  right: 10px;
+  top: 10px;
   z-index: 3;
   background: var(--yellow);
   border-radius: 999px;
-  padding: 7px 10px;
-  font-size: 12px;
+  padding: 6px 9px;
+  font-size: 11px;
   font-weight: 800;
 }
 
 .city-tag {
   position: absolute;
-  left: 12px;
-  bottom: 12px;
+  left: 10px;
+  bottom: 10px;
   z-index: 3;
   background: rgba(248,243,235,.9);
   border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 12px;
+  padding: 5px 9px;
+  font-size: 11px;
 }
 
 .show-info {
   box-sizing: border-box;
-  min-height: 64px;
+  min-height: 56px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
     "provider"
     "reasons";
   align-items: center;
-  column-gap: 8px;
-  row-gap: 6px;
-  padding: 7px 10px;
+  column-gap: 6px;
+  row-gap: 5px;
+  padding: 6px 8px;
 }
 
 .provider-card-row,
@@ -1076,7 +1076,7 @@ body[data-role="photographer"] .aside-card.photographer-only {
 
 .showcase-card .provider-card-row {
   grid-area: provider;
-  gap: 7px;
+  gap: 6px;
   min-width: 0;
   margin-bottom: 0;
 }
@@ -1134,8 +1134,8 @@ body[data-role="photographer"] .aside-card.photographer-only {
 }
 
 .showcase-card .provider-avatar {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border-width: 2px;
 }
 
@@ -1155,7 +1155,7 @@ body[data-role="photographer"] .aside-card.photographer-only {
 }
 
 .showcase-card .provider-name {
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.1;
   color: #4a4f58;
   white-space: nowrap;
@@ -1178,9 +1178,9 @@ body[data-role="photographer"] .aside-card.photographer-only {
 
 .showcase-title {
   min-width: 0;
-  font-size: 18px;
+  font-size: 15px;
   line-height: 1.15;
-  margin: 5px 0 0;
+  margin: 4px 0 0;
   font-weight: 780;
   letter-spacing: .04em;
   color: #30343b;

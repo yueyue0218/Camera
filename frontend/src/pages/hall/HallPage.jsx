@@ -12,7 +12,7 @@ import { DemandAside } from './components/HallAside.jsx'
 import { EmptyState, ErrorState, LoadingState } from './components/HallState.jsx'
 import { HallTabs } from './components/HallTabs.jsx'
 import { ServicePackageCard } from './components/ServicePackageCard.jsx'
-import { TIME_STYLE_OPTIONS, priceParamsFromBudget } from './components/hallUtils.js'
+import { priceParamsFromBudget } from './components/hallUtils.js'
 import { submitDemandResponse } from './utils/respondDemand.js'
 import '../portraHall.css'
 
@@ -705,12 +705,6 @@ export function HallPage() {
     }
   }
 
-  function applyTimeFilter(timeTag) {
-    const nextFilters = { ...filters, timeTag }
-    setFilters(nextFilters)
-    applyFilters(nextFilters)
-  }
-
   function applyHotStyle(type) {
     const nextFilters = { ...filters, type }
     setFilters(nextFilters)
@@ -993,18 +987,6 @@ export function HallPage() {
           <div className="section-title">
             <h2>橱窗大厅</h2>
             <span className="micro">按当前筛选展示推荐橱窗</span>
-          </div>
-          <div className="style-bar">
-            {TIME_STYLE_OPTIONS.map(option => (
-              <button
-                className={`style-pill ${filters.timeTag === option.value ? 'active' : ''}`}
-                key={option.label}
-                type="button"
-                onClick={() => applyTimeFilter(option.value)}
-              >
-                {option.label}
-              </button>
-            ))}
           </div>
           <div className="showcase-grid">{renderServices()}</div>
           {renderServiceFooter()}
