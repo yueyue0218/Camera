@@ -3,6 +3,7 @@ import { deriveConversationActions } from './workbenchState.js'
 import { buildConversationPreview, getConversationActivityTime } from './messagePreviewFormatter.js'
 import { isConversationUnread } from './conversationReadState.js'
 import { resolveConversationParticipants } from './participantResolver.js'
+import { sanitizeConversationDisplayText } from './conversationUtils.js'
 
 const ACTION_BADGE_TYPES = new Set([
   'CONFIRM_QUOTE',
@@ -48,8 +49,8 @@ export function buildConversationListItems({
         needsMyAction,
         unread,
         activityTime: getConversationActivityTime(conversation),
-        title: getSafeDisplayText(
-          participant.peerDisplayName,
+        title: sanitizeConversationDisplayText(
+          getSafeDisplayText(participant.peerDisplayName, 'Portra 用户'),
           'Portra 用户'
         )
       }

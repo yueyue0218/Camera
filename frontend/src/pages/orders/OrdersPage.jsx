@@ -1833,7 +1833,7 @@ const orderPageSx = {
   color: '#171717',
   overflowWrap: 'anywhere',
   overflowX: 'hidden',
-  bgcolor: '#f0ece5',
+  bgcolor: '#f2eee7',
   minHeight: 'calc(100dvh - 88px)',
   borderRadius: { xs: 0, md: '0' }
 }
@@ -1849,7 +1849,8 @@ const orderGridSx = {
   gap: { xs: 1.6, lg: 0 },
   alignItems: 'start',
   minWidth: 0,
-  overflowX: 'hidden'
+  overflowX: 'hidden',
+  bgcolor: '#f2eee7'
 }
 
 const orderIndexPanelSx = {
@@ -1857,7 +1858,7 @@ const orderIndexPanelSx = {
   alignSelf: 'start',
   minWidth: 0,
   minHeight: { lg: 'calc(100dvh - 88px)' },
-  bgcolor: '#f5f1ea',
+  bgcolor: '#fffdf8',
   borderColor: 'transparent',
   borderRight: { lg: '1px solid rgba(79, 70, 60, .10)' },
   borderRadius: 0,
@@ -1929,27 +1930,17 @@ const orderArchiveHeroSx = {
   bgcolor: '#fffcf6',
   borderColor: 'rgba(79, 70, 60, .10)',
   borderRadius: PORTRA_RADIUS.panel,
-  boxShadow: '0 14px 34px rgba(43, 35, 24, .06)',
+  boxShadow: 'none',
   position: 'relative',
-  overflow: 'hidden',
-  '&::before': {
-    content: '""',
-    position: 'absolute',
-    left: 24,
-    top: 0,
-    width: 66,
-    height: 4,
-    borderRadius: 999,
-    bgcolor: PORTRA_SURFACE.portraBlue
-  }
+  overflow: 'hidden'
 }
 
 const subCardSx = {
   p: 1.5,
-  bgcolor: '#fffaf2',
+  bgcolor: '#fffcf6',
   borderColor: 'rgba(79, 70, 60, .10)',
   borderRadius: PORTRA_RADIUS.card,
-  boxShadow: '0 1px 0 rgba(255, 255, 255, 0.68) inset'
+  boxShadow: 'none'
 }
 
 const warmNoticeSx = {

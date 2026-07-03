@@ -238,7 +238,7 @@ export function ConversationActionDialogs({
         <DialogTitle sx={dialogTitleSx}>申请展示授权</DialogTitle>
         <DialogContent sx={dialogContentSx}>
           <Stack component="form" id="authorization-dialog-form" spacing={2} sx={{ pt: 1 }} onSubmit={event => submitAndClose(onSubmitPhotoAuthorization, event)}>
-            <DialogContentText>请选择已经上传的图片作品，并说明希望展示这些照片的用途。压缩包不会用于公开展示。</DialogContentText>
+            <DialogContentText>请选择已交付的照片，并说明希望展示这些照片的用途。压缩包不会用于公开展示。</DialogContentText>
             {deliveryFiles.length ? (
               <Stack spacing={1}>
                 <Typography sx={{ color: PORTRA_COLORS.faintInk, fontSize: 12, fontWeight: 900 }}>
@@ -253,7 +253,7 @@ export function ConversationActionDialogs({
                 />
               </Stack>
             ) : (
-              <DialogContentText>暂无可授权的图片作品，请先上传图片交付文件。</DialogContentText>
+              <DialogContentText>暂无可授权的照片，请先上传图片交付文件。</DialogContentText>
             )}
             <TextField
               label="申请说明"

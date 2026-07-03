@@ -286,7 +286,10 @@ function normalizeAuthorizationFiles(authorization = {}) {
     authorization.authorizationFiles,
     authorization.photoAuthorizationFiles,
     authorization.deliveryFiles,
-    authorization.imageFiles
+    authorization.imageFiles,
+    authorization.delivery?.files,
+    authorization.deliveryRecord?.files,
+    authorization.deliveryResponse?.files
   ].find(Array.isArray) || []
   return files.filter(Boolean).map((file, index) => ({
     ...normalizeAuthorizationFileRecord(file),
@@ -299,13 +302,23 @@ function normalizeAuthorizationFiles(authorization = {}) {
 
 function normalizeAuthorizationFileRecord(file = {}) {
   const nested = file.file || file.fileInfo || file.fileRecord || file.deliveryFile || {}
+  const fileName = file.fileName || file.originalName || nested.fileName || nested.originalName || ''
+  const mimeType = file.mimeType || file.contentType || nested.mimeType || nested.contentType || ''
   return {
     ...nested,
     ...file,
-    fileName: file.fileName || file.originalName || nested.fileName || nested.originalName,
-    mimeType: file.mimeType || file.contentType || nested.mimeType || nested.contentType,
+    fileName,
+    mimeType,
+    fileType: file.fileType || nested.fileType || inferAuthorizationFileType(fileName, mimeType),
     fileSize: file.fileSize || file.size || nested.fileSize || nested.size
   }
+}
+
+function inferAuthorizationFileType(fileName, mimeType) {
+  const type = String(mimeType || '').toLowerCase()
+  const name = String(fileName || '').toLowerCase()
+  if (type.includes('zip') || /\.zip$/i.test(name)) return 'ZIP'
+  return 'IMAGE'
 }
 
 function buildApplicantLabel(_authorization = {}, _order) {

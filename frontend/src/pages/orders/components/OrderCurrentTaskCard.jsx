@@ -108,13 +108,16 @@ const iconBoxSx = {
 }
 
 const deadlineSx = {
-  px: 1.6,
-  py: 1.25,
+  px: 0,
+  py: 0.85,
   display: 'flex',
   justifyContent: 'space-between',
+  alignItems: 'center',
   gap: 1,
-  borderRadius: PORTRA_RADIUS.control,
-  bgcolor: '#f3efe8'
+  borderRadius: 0,
+  bgcolor: 'transparent',
+  borderTop: '1px solid rgba(79, 70, 60, .10)',
+  borderBottom: '1px solid rgba(79, 70, 60, .10)'
 }
 
 const noticeSx = {

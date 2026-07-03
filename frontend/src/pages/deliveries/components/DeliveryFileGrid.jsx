@@ -277,10 +277,10 @@ function browseGallerySx(single) {
   return {
     display: 'grid',
     gridTemplateColumns: single
-      ? { xs: 'minmax(0, 1fr)', md: 'minmax(0, min(100%, 640px))' }
-      : { xs: '1fr', sm: 'repeat(auto-fit, minmax(190px, 240px))' },
+      ? { xs: 'minmax(0, min(100%, 420px))', md: 'minmax(0, min(100%, 520px))' }
+      : { xs: 'repeat(auto-fit, minmax(160px, 1fr))', sm: 'repeat(auto-fit, minmax(170px, 220px))' },
     gap: { xs: 1.4, md: 1.8 },
-    justifyContent: 'start',
+    justifyContent: single ? 'center' : 'start',
     alignItems: 'start'
   }
 }
@@ -288,8 +288,8 @@ function browseGallerySx(single) {
 function browseImageCardSx(single) {
   return {
     width: '100%',
-    maxWidth: single ? 640 : 240,
-    maxHeight: single ? { xs: 480, md: 580 } : 290,
+    maxWidth: single ? 520 : 220,
+    maxHeight: single ? { xs: 360, md: 430 } : 250,
     overflow: 'hidden',
     borderRadius: '16px',
     bgcolor: '#f2eee7',
@@ -310,7 +310,7 @@ function browseImageSx(single) {
     width: 'auto',
     height: 'auto',
     maxWidth: '100%',
-    maxHeight: single ? { xs: 480, md: 580 } : 290,
+    maxHeight: single ? { xs: 360, md: 430 } : 250,
     display: 'block',
     objectFit: 'contain',
     borderRadius: '16px',

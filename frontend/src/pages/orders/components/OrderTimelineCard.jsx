@@ -7,10 +7,23 @@ export function OrderTimelineCard({ items = [] }) {
         <Typography sx={{ color: '#9a948a', fontWeight: 950 }}>订单进度</Typography>
         <Stack spacing={0}>
           {items.map((item, index) => (
-            <Box key={item.id || item.title} sx={timelineItemSx}>
+            <Box
+              key={item.id || item.title}
+              className={`order-timeline-item order-timeline-item-${item.state || 'upcoming'}`}
+              sx={timelineItemSx}
+            >
               <Box sx={dotSx(item.state)} />
               {index < items.length - 1 ? <Box sx={lineSx(item.state)} /> : null}
-              <Box sx={{ minWidth: 0, pb: index < items.length - 1 ? 1.6 : 0, bgcolor: 'transparent' }}>
+              <Box
+                className="order-timeline-copy"
+                sx={{
+                  minWidth: 0,
+                  pb: index < items.length - 1 ? 1.6 : 0,
+                  bgcolor: 'transparent !important',
+                  backgroundImage: 'none !important',
+                  boxShadow: 'none !important'
+                }}
+              >
                 <Stack direction="row" spacing={0.9} sx={{ alignItems: 'center', minWidth: 0 }}>
                   <Typography sx={timelineTitleSx(item.state)}>
                     {item.title}
@@ -43,7 +56,11 @@ const timelineItemSx = {
   gridTemplateColumns: '24px minmax(0, 1fr)',
   columnGap: 1.45,
   minHeight: 54,
-  bgcolor: 'transparent'
+  bgcolor: 'transparent !important',
+  backgroundImage: 'none !important',
+  boxShadow: 'none !important',
+  '&::before': { display: 'none' },
+  '&::after': { display: 'none' }
 }
 
 function dotSx(state) {

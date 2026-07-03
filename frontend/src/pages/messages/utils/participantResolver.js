@@ -213,7 +213,14 @@ function normalizeUserId(value) {
 }
 
 function pickText(...values) {
-  return values.map(value => String(value || '').trim()).find(Boolean) || ''
+  return values
+    .map(value => String(value || '').trim())
+    .find(value => value && !hasMojibakeText(value)) || ''
+}
+
+function hasMojibakeText(value) {
+  return /[\uFFFD]/.test(value)
+    || /(?:闯€|â|Ã|Â|¤|€¦|€\?|å|ç|æ)/.test(value)
 }
 
 function roleLabel(role) {

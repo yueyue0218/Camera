@@ -33,6 +33,7 @@ export function DeliveryCoverMosaic({
             file={file}
             previewUrl={previewUrl}
             loading={loading}
+            conversation={conversation}
             index={index}
             count={visible.length}
             overlay={index === visible.length - 1 && extraCount > 0 ? `+${extraCount}` : ''}
@@ -45,7 +46,7 @@ export function DeliveryCoverMosaic({
   )
 }
 
-function MosaicTile({ file, previewUrl, loading, overlay, index, count }) {
+function MosaicTile({ file, previewUrl, loading, overlay, index, count, conversation }) {
   const image = getDeliveryFileId(file) && isImageDeliveryFile(file)
   return (
     <Box sx={{
@@ -63,7 +64,7 @@ function MosaicTile({ file, previewUrl, loading, overlay, index, count }) {
           sx={{
             width: '100%',
             height: '100%',
-            objectFit: 'contain',
+            objectFit: conversation ? 'cover' : 'contain',
             objectPosition: 'center',
             display: 'block'
           }}
@@ -134,8 +135,8 @@ function mosaicSx(count, conversation) {
     gridTemplateRows: getRows(count),
     gap: conversation ? '2px' : '3px',
     width: '100%',
-    height: conversation ? { xs: 204, sm: 218 } : 78,
-    minHeight: conversation ? 204 : 76,
+    height: conversation ? { xs: 176, sm: 188 } : 78,
+    minHeight: conversation ? 176 : 76,
     overflow: 'hidden',
     bgcolor: '#f2eee7'
   }

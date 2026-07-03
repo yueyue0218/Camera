@@ -43,7 +43,12 @@ export function formatDate(value) {
 }
 
 export function readConversationRecords() {
-  return readJsonStorage(CONVERSATION_STORAGE_KEY, [])
+  const records = readJsonStorage(CONVERSATION_STORAGE_KEY, [])
+  const filtered = records.filter(record => !isLocalMojibakeConversation(record))
+  if (filtered.length !== records.length) {
+    writeJsonStorage(CONVERSATION_STORAGE_KEY, filtered)
+  }
+  return filtered
 }
 
 export function saveConversationRecord(conversation, meta = {}) {
@@ -143,6 +148,32 @@ export function buildConversationFallback(conversationId) {
     scene: '约拍沟通',
     lastMessage: ''
   }
+}
+
+export function hasMojibakeText(value) {
+  const text = String(value || '')
+  if (!text) return false
+  return /[\uFFFD]/.test(text)
+    || /(?:闯€|â|Ã|Â|¤|€¦|€\?|å|ç|æ)/.test(text)
+}
+
+export function sanitizeConversationDisplayText(value, fallback = 'Portra 用户') {
+  const text = String(value || '').trim()
+  if (!text || hasMojibakeText(text)) return fallback
+  return text
+}
+
+function isLocalMojibakeConversation(record = {}) {
+  const localOnly = record.isLocal || !record.backendConversationId
+  if (!localOnly) return false
+  return [
+    record.scene,
+    record.title,
+    record.sourceTitle,
+    record.lastMessage,
+    record.counterpartyNickname,
+    record.otherUserNickname
+  ].some(hasMojibakeText)
 }
 
 export function getOppositeUserId(conversation, currentUserId) {

@@ -14,7 +14,7 @@ export function ConversationEventFrame({
     <Box sx={{ display: 'flex', justifyContent: self ? 'flex-end' : 'flex-start', px: { xs: 0.25, sm: 0.5 } }}>
       <Stack
         direction="row"
-        spacing={1.25}
+        spacing={1.55}
         sx={{
           alignItems: 'flex-start',
           maxWidth: { xs: '100%', md: 'min(82%, 488px)' },
@@ -29,7 +29,7 @@ export function ConversationEventFrame({
           fallbackText={fallbackText || (self ? '我' : '对')}
           sx={{ mt: 0.35, fontWeight: 950, flexShrink: 0 }}
         />
-        <Box sx={{ width: { xs: 'min(calc(100vw - 104px), 420px)', sm: 420 }, maxWidth: '100%', minWidth: 0 }}>
+        <Box sx={{ width: { xs: 'min(calc(100vw - 112px), 400px)', sm: 400 }, maxWidth: '100%', minWidth: 0 }}>
           {children}
         </Box>
       </Stack>
@@ -40,7 +40,7 @@ export function ConversationEventFrame({
 export function conversationEventSurfaceSx({ self = false, accent = PORTRA_SURFACE.portraBlue } = {}) {
   return {
     width: '100%',
-    maxWidth: 420,
+    maxWidth: 400,
     bgcolor: self ? 'rgba(239, 243, 255, .88)' : '#fffaf2',
     borderColor: self ? 'rgba(29, 78, 216, .24)' : 'rgba(79, 70, 60, .12)',
     borderRadius: '18px',
