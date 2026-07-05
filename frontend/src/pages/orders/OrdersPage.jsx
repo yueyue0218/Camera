@@ -45,6 +45,7 @@ import { getOrderActionVisibility } from '../../utils/orderActionVisibility.js'
 import { useWorkflowNavigate } from '../../hooks/useWorkflowNavigate.js'
 import { useWorkflowDraft } from '../../hooks/useWorkflowDraft.js'
 import { buildWorkflowCacheKey, readWorkflowViewState, writeWorkflowViewState } from '../../utils/workflowViewCache.js'
+import { REWORK_REQUIREMENT_MAX_LENGTH, getReworkRequirementHelperText } from '../../utils/workflowLimits.js'
 import {
   getExplicitReturnToConversation,
   navigateBackToConversation
@@ -808,6 +809,10 @@ export function OrdersPage() {
     const trimmedRequirement = reworkRequirement.trim()
     if (!trimmedRequirement) {
       feedback.warning('请填写返修要求')
+      return
+    }
+    if (trimmedRequirement.length > REWORK_REQUIREMENT_MAX_LENGTH) {
+      feedback.warning(`返修要求不能超过 ${REWORK_REQUIREMENT_MAX_LENGTH} 字`)
       return
     }
     const result = await run(async () => orderApi.requestRework(
@@ -1814,6 +1819,8 @@ export function OrdersPage() {
               onChange={event => setReworkRequirement(event.target.value)}
               multiline
               minRows={4}
+              inputProps={{ maxLength: REWORK_REQUIREMENT_MAX_LENGTH }}
+              helperText={getReworkRequirementHelperText(reworkRequirement)}
               required
             />
           </Stack>

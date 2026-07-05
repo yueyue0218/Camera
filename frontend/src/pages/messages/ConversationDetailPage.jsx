@@ -10,6 +10,7 @@ import { getNextOrderWorkflowRefreshDelay } from '../../utils/orderWorkflowModel
 import { useWorkflowNavigate } from '../../hooks/useWorkflowNavigate.js'
 import { useWorkflowDraft } from '../../hooks/useWorkflowDraft.js'
 import { buildWorkflowCacheKey, mergeWorkflowViewState, readWorkflowViewState, writeWorkflowViewState } from '../../utils/workflowViewCache.js'
+import { REWORK_REQUIREMENT_MAX_LENGTH } from '../../utils/workflowLimits.js'
 import {
   navigateToDeliveryFromConversation,
   navigateToOrderFromConversation,
@@ -620,6 +621,10 @@ export function ConversationDetailPage() {
     const reason = reworkRequirement.trim()
     if (!reason) {
       feedback.warning('请填写返修要求')
+      return false
+    }
+    if (reason.length > REWORK_REQUIREMENT_MAX_LENGTH) {
+      feedback.warning(`返修要求不能超过 ${REWORK_REQUIREMENT_MAX_LENGTH} 字`)
       return false
     }
     const result = await run(async () => orderApi.requestRework(currentOrder.orderId, reason, currentUser), '返修请求已提交')
