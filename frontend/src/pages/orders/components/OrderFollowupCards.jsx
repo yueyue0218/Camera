@@ -5,6 +5,7 @@ import GavelRoundedIcon from '@mui/icons-material/GavelRounded'
 import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
 import RateReviewRoundedIcon from '@mui/icons-material/RateReviewRounded'
 import { PORTRA_SURFACE } from '../../../theme/portraSurfaceTokens.js'
+import { ORDER_WORKFLOW_COLORS, getOrderWorkflowTone } from '../orderWorkflowTokens.js'
 
 const iconMap = {
   delivery: <CollectionsRoundedIcon />,
@@ -81,8 +82,8 @@ export function OrderFollowupCards({ items = [] }) {
 
 const sectionSx = {
   p: { xs: 2.1, md: 2.6 },
-  bgcolor: '#fffcf6',
-  borderColor: 'rgba(79, 70, 60, .10)',
+  bgcolor: ORDER_WORKFLOW_COLORS.paper,
+  borderColor: ORDER_WORKFLOW_COLORS.border,
   borderRadius: '22px',
   boxShadow: 'none'
 }
@@ -96,13 +97,14 @@ const gridSx = {
 const cardSx = {
   p: 1.35,
   minHeight: 150,
-  bgcolor: '#fff8ee',
-  borderColor: 'rgba(79, 70, 60, .09)',
+  bgcolor: ORDER_WORKFLOW_COLORS.paperMuted,
+  borderColor: ORDER_WORKFLOW_COLORS.borderSubtle,
   borderRadius: '18px',
   boxShadow: 'none'
 }
 
 function iconSx(tone) {
+  const colors = getOrderWorkflowTone(tone)
   return {
     width: 38,
     height: 38,
@@ -110,20 +112,21 @@ function iconSx(tone) {
     display: 'grid',
     placeItems: 'center',
     flexShrink: 0,
-    bgcolor: tone === 'warning' ? '#fff4e5' : tone === 'success' ? '#ecfdf3' : 'rgba(37, 99, 235, .08)',
-    color: tone === 'warning' ? '#f97316' : tone === 'success' ? '#16a34a' : '#2563eb',
+    bgcolor: colors.bg,
+    color: colors.color,
     '& svg': { fontSize: 21 }
   }
 }
 
 function statusSx(tone) {
+  const colors = getOrderWorkflowTone(tone)
   return {
     px: 0.85,
     py: 0.35,
     borderRadius: 999,
     flexShrink: 0,
-    bgcolor: tone === 'warning' ? '#fff4e5' : tone === 'success' ? '#ecfdf3' : 'rgba(37, 99, 235, .08)',
-    color: tone === 'warning' ? '#f97316' : tone === 'success' ? '#16a34a' : '#2563eb',
+    bgcolor: colors.bg,
+    color: colors.color,
     fontSize: 12,
     fontWeight: 900,
     lineHeight: 1.2
@@ -134,8 +137,8 @@ const actionSx = {
   minHeight: 34,
   borderRadius: '11px',
   fontWeight: 900,
-  borderColor: 'rgba(37, 99, 235, .26)',
-  color: '#2563eb'
+  borderColor: 'rgba(13, 47, 178, .26)',
+  color: ORDER_WORKFLOW_COLORS.primary
 }
 
 const secondaryActionSx = {

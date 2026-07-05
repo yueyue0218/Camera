@@ -70,6 +70,7 @@ import {
 import { usePortraAsyncAction } from '../../hooks/usePortraAsyncAction.js'
 import { AuthorizationRequestCard } from '../../components/portra/AuthorizationRequestCard.jsx'
 import { PORTRA_RADIUS, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
+import { ORDER_WORKFLOW_COLORS, getWorkflowStatusDotColor } from './orderWorkflowTokens.js'
 import {
   canCustomerConfirm,
   canCustomerReviewPhotoAuthorization,
@@ -217,10 +218,7 @@ function orderStatusDotSx(status) {
 }
 
 function getOrderStatusDotColor(status) {
-  if (['COMPLETED'].includes(status)) return '#4fbd78'
-  if (['CANCELLED', 'REFUNDED'].includes(status)) return '#c4cedd'
-  if (['PENDING_DELIVERY', 'DELIVERED_PENDING_CONFIRM', 'REWORK_REQUIRED', 'APPEALING'].includes(status)) return '#f05a24'
-  return PORTRA_SURFACE.portraBlue
+  return getWorkflowStatusDotColor(status)
 }
 
 function isImageDelivery(record) {
@@ -1923,7 +1921,7 @@ function orderIndexCardSx(selected) {
     bgcolor: selected ? 'rgba(37, 99, 235, .08)' : 'transparent',
     borderColor: 'transparent',
     borderRadius: 0,
-    borderLeft: `4px solid ${selected ? '#2563eb' : 'transparent'}`,
+    borderLeft: `4px solid ${selected ? ORDER_WORKFLOW_COLORS.primary : 'transparent'}`,
     boxShadow: 'none',
     transition: 'background-color 140ms ease, border-color 140ms ease',
     '&:hover': {
