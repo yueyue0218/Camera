@@ -161,25 +161,19 @@ function QuoteAttachmentCard({ event, actor, direction, quote, onOpenQuoteDetail
   const self = (direction || event.side) === 'self'
   const model = buildQuoteDisplayModel(quote, event)
   const accent = self ? QUOTE_VISUAL.blue : QUOTE_VISUAL.coral
+  const surfaceSx = conversationEventSurfaceSx({ self, accent })
 
   return (
     <ConversationEventFrame self={self} actor={actor || event.actor} accent={accent} dataKind="quote">
-        <PortraTicketCard
-          accent={accent}
-          sx={{
-            px: 2.25,
-            py: 2,
-            pl: 2.35,
-            ...conversationEventSurfaceSx({ self, accent }),
-            bgcolor: self ? 'rgba(239, 243, 255, .90)' : '#fffaf2',
-            '&::before': {
-              inset: '0 auto 0 0',
-              width: 3,
-              bgcolor: accent
-            },
-            '&:hover': conversationEventSurfaceSx({ self, accent })['&:hover']
-          }}
-        >
+      <PortraTicketCard
+        accent={accent}
+        sx={{
+          px: 2.25,
+          py: 2,
+          pl: 2.35,
+          ...surfaceSx
+        }}
+      >
           <Stack spacing={1.15}>
             <Stack direction="row" spacing={1.5} sx={{ justifyContent: 'space-between', alignItems: 'flex-start', minWidth: 0 }}>
               <Typography sx={{ color: QUOTE_VISUAL.ink, fontSize: 16, fontWeight: 700, lineHeight: 1.35 }}>
@@ -223,7 +217,7 @@ function QuoteAttachmentCard({ event, actor, direction, quote, onOpenQuoteDetail
               </PortraSecondaryAction>
             </Box>
           </Stack>
-        </PortraTicketCard>
+      </PortraTicketCard>
     </ConversationEventFrame>
   )
 }
