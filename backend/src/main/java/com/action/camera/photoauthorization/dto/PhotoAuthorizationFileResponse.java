@@ -14,6 +14,8 @@ public class PhotoAuthorizationFileResponse {
 
     private Long fileId;
 
+    private Long deliveryId;
+
     private String fileName;
 
     private String fileType;
@@ -39,6 +41,7 @@ public class PhotoAuthorizationFileResponse {
         return PhotoAuthorizationFileResponse.builder()
                 .id(file.getId())
                 .fileId(file.getFileId())
+                .deliveryId(deliveryFile == null ? null : deliveryFile.getDeliveryId())
                 .fileName(record == null ? null : record.getOriginalName())
                 .fileType(deliveryFile == null ? null : deliveryFile.getFileType())
                 .mimeType(record == null ? null : record.getMimeType())

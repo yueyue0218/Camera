@@ -107,6 +107,7 @@ class PhotoAuthorizationServiceTest {
         assertNull(response.getAuthorizedAt());
         assertEquals(List.of(FILE_ID, SECOND_FILE_ID),
                 response.getFiles().stream().map(file -> file.getFileId()).toList());
+        assertEquals(DELIVERY_ID, response.getFiles().get(0).getDeliveryId());
         assertEquals("photo-1.jpg", response.getFiles().get(0).getFileName());
         assertEquals("IMAGE", response.getFiles().get(0).getFileType());
         assertEquals("image/jpeg", response.getFiles().get(0).getMimeType());
