@@ -11,6 +11,10 @@ const CONVERSATION_STORAGE_KEY = 'camera-p4-conversations'
 const LOCAL_MESSAGE_STORAGE_KEY = 'camera-p4-local-messages'
 const SAVED_PHOTO_STORAGE_KEY = 'camera-p4-saved-photos'
 const USER_PROFILE_STORAGE_KEY = 'camera-p4-user-profiles'
+const CONVERSATION_CACHE_VERSION = 2
+const LOCAL_MESSAGE_CACHE_VERSION = 1
+const CONVERSATION_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
+const LOCAL_MESSAGE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 export const roleMap = {
   CUSTOMER: USER_ROLE_LABELS.CUSTOMER,
@@ -44,8 +48,9 @@ export function formatDate(value) {
 
 export function readConversationRecords() {
   const records = readJsonStorage(CONVERSATION_STORAGE_KEY, [])
-  const filtered = records.filter(record => !isLocalMojibakeConversation(record))
-  if (filtered.length !== records.length) {
+  const recordList = Array.isArray(records) ? records : []
+  const filtered = recordList.filter(isValidCachedConversation)
+  if (filtered.length !== recordList.length || !Array.isArray(records)) {
     writeJsonStorage(CONVERSATION_STORAGE_KEY, filtered)
   }
   return filtered
@@ -58,6 +63,9 @@ export function saveConversationRecord(conversation, meta = {}) {
   const now = new Date().toISOString()
   const record = {
     ...previous,
+    cacheVersion: CONVERSATION_CACHE_VERSION,
+    cachedAt: now,
+    expiresAt: new Date(Date.now() + CONVERSATION_CACHE_TTL_MS).toISOString(),
     conversationId,
     backendConversationId: conversation.isLocal ? null : Number(conversation.conversationId),
     isLocal: Boolean(conversation.isLocal),
@@ -94,10 +102,11 @@ export function getConversationRecordsForUser(currentUser, activeRole = currentU
 }
 
 export function mergeConversationRecords(remoteConversations, currentUser, activeRole = currentUser?.role) {
-  const localRecords = getConversationRecordsForUser(currentUser, activeRole)
-  const merged = new Map(localRecords.map(record => [String(record.conversationId), record]))
+  const localFallbackRecords = getConversationRecordsForUser(currentUser, activeRole).filter(record => record.isLocal)
+  const merged = new Map(localFallbackRecords.map(record => [String(record.conversationId), record]))
+  const remoteList = Array.isArray(remoteConversations) ? remoteConversations : []
 
-  remoteConversations.forEach(conversation => {
+  remoteList.forEach(conversation => {
     const conversationId = String(conversation.conversationId)
     const previous = merged.get(conversationId)
     const record = saveConversationRecord(conversation, {
@@ -137,7 +146,11 @@ export function updateConversationLastMessage(conversationId, content, meta = {}
 
 export function buildConversationFallback(conversationId) {
   const isLocal = String(conversationId).startsWith('local-')
+  const now = new Date().toISOString()
   return {
+    cacheVersion: CONVERSATION_CACHE_VERSION,
+    cachedAt: now,
+    expiresAt: new Date(Date.now() + CONVERSATION_CACHE_TTL_MS).toISOString(),
     conversationId: String(conversationId),
     backendConversationId: isLocal ? null : Number(conversationId),
     isLocal,
@@ -167,6 +180,36 @@ function isLocalMojibakeConversation(record = {}) {
   const localOnly = record.isLocal || !record.backendConversationId
   if (!localOnly) return false
   return [
+    record.scene,
+    record.title,
+    record.sourceTitle,
+    record.lastMessage,
+    record.counterpartyNickname,
+    record.otherUserNickname
+  ].some(hasMojibakeText)
+}
+
+function isFreshCacheRecord(record = {}, ttlMs = CONVERSATION_CACHE_TTL_MS) {
+  const cachedAt = new Date(record.cachedAt || record.updatedAt || record.createdAt || 0).getTime()
+  const expiresAt = new Date(record.expiresAt || 0).getTime()
+  const now = Date.now()
+  if (Number.isFinite(expiresAt) && expiresAt > 0) return expiresAt > now
+  return Number.isFinite(cachedAt) && cachedAt > 0 && now - cachedAt <= ttlMs
+}
+
+function isValidCachedConversation(record = {}) {
+  if (!record || record.cacheVersion !== CONVERSATION_CACHE_VERSION || !isFreshCacheRecord(record)) return false
+  if (isLocalMojibakeConversation(record)) return false
+  const conversationId = String(record.conversationId || '').trim()
+  if (!conversationId || hasMojibakeText(conversationId)) return false
+  const isLocal = Boolean(record.isLocal) || conversationId.startsWith('local-')
+  const backendConversationId = Number(record.backendConversationId ?? conversationId)
+  if (!isLocal && (!Number.isFinite(backendConversationId) || backendConversationId <= 0)) return false
+  const participantAId = Number(record.participantAId)
+  const participantBId = Number(record.participantBId)
+  if (!Number.isFinite(participantAId) || participantAId <= 0) return false
+  if (!Number.isFinite(participantBId) || participantBId <= 0) return false
+  return ![
     record.scene,
     record.title,
     record.sourceTitle,
@@ -214,7 +257,39 @@ export function getConversationPeer(conversation, currentUser) {
 }
 
 function getLocalMessageStore() {
-  return readJsonStorage(LOCAL_MESSAGE_STORAGE_KEY, {})
+  const raw = readJsonStorage(LOCAL_MESSAGE_STORAGE_KEY, {})
+  const conversations = raw?.cacheVersion === LOCAL_MESSAGE_CACHE_VERSION && raw?.conversations
+    ? raw.conversations
+    : raw
+  const nextStore = {}
+  Object.entries(conversations || {}).forEach(([conversationId, messages]) => {
+    if (!String(conversationId).startsWith('local-')) return
+    const validMessages = (Array.isArray(messages) ? messages : []).filter(message =>
+      isValidLocalMessage(message, conversationId)
+    )
+    if (validMessages.length) nextStore[conversationId] = validMessages
+  })
+  if (JSON.stringify(conversations || {}) !== JSON.stringify(nextStore) || raw?.cacheVersion !== LOCAL_MESSAGE_CACHE_VERSION) {
+    writeLocalMessageStore(nextStore)
+  }
+  return nextStore
+}
+
+function writeLocalMessageStore(conversations) {
+  writeJsonStorage(LOCAL_MESSAGE_STORAGE_KEY, {
+    cacheVersion: LOCAL_MESSAGE_CACHE_VERSION,
+    cachedAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + LOCAL_MESSAGE_CACHE_TTL_MS).toISOString(),
+    conversations
+  })
+}
+
+function isValidLocalMessage(message = {}, conversationId) {
+  if (!message || String(message.conversationId) !== String(conversationId)) return false
+  if (!String(message.messageId || '').trim()) return false
+  if (!Number.isFinite(Number(message.senderId))) return false
+  if (hasMojibakeText(message.content)) return false
+  return isFreshCacheRecord(message, LOCAL_MESSAGE_CACHE_TTL_MS)
 }
 
 export function getLocalMessages(conversationId) {
@@ -231,11 +306,14 @@ export function addLocalMessage(conversationId, message) {
     senderId: Number(message.senderId),
     messageType: message.messageType || 'TEXT',
     content: message.content,
+    cacheVersion: LOCAL_MESSAGE_CACHE_VERSION,
+    cachedAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + LOCAL_MESSAGE_CACHE_TTL_MS).toISOString(),
     createdAt: new Date().toISOString()
   }
   const nextMessages = [...(store[id] || []), nextMessage]
   store[id] = nextMessages
-  writeJsonStorage(LOCAL_MESSAGE_STORAGE_KEY, store)
+  writeLocalMessageStore(store)
   return nextMessages
 }
 
