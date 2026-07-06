@@ -38,9 +38,13 @@ export function ConversationThread({
   onOpenDeliveryGallery,
   onContentChange,
   onSendMessage,
+  pendingAttachment,
   onRetryMessage,
   onChooseMessageImage,
+  onChooseMessageFile,
+  onRemoveAttachment,
   onSaveSubmittedPhoto,
+  onDownloadAttachment,
   onPayOrder,
   onCancelOrder,
   onConfirmOrder,
@@ -177,15 +181,17 @@ export function ConversationThread({
             if (!message) return null
             const mine = direction === 'self'
             const isImage = message.messageType === 'IMAGE'
-            const canSaveSubmittedPhoto = isImage && Number(message.senderId) === Number(conversation?.participantBId)
+            const canSaveSubmittedPhoto = isImage && !message.fileId && Number(message.senderId) === Number(conversation?.participantBId)
             return (
               <MessageBubble
                 key={message.messageId || item.key}
                 message={message}
                 mine={mine}
                 actor={resolveActorDisplay(item.actor)}
+                currentUser={currentUser}
                 canSaveSubmittedPhoto={canSaveSubmittedPhoto}
                 onSaveSubmittedPhoto={() => onSaveSubmittedPhoto(message)}
+                onDownloadAttachment={() => onDownloadAttachment?.(message)}
                 onRetry={() => onRetryMessage?.(message)}
               />
             )
@@ -233,7 +239,10 @@ export function ConversationThread({
           onOpenOrderArchive={onOpenOrderArchive}
           onContentChange={onContentChange}
           onSendMessage={onSendMessage}
+          pendingAttachment={pendingAttachment}
           onChooseMessageImage={onChooseMessageImage}
+          onChooseMessageFile={onChooseMessageFile}
+          onRemoveAttachment={onRemoveAttachment}
           onUnavailableTool={onUnavailableTool}
           onOpenAction={onOpenAction}
         />

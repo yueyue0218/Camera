@@ -4,7 +4,7 @@ import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
-import { conversationApi, deliveryApi, orderApi, photoAuthorizationApi, quoteApi } from '../../api.js'
+import { conversationApi, deliveryApi, fileApi, orderApi, photoAuthorizationApi, quoteApi } from '../../api.js'
 import { goToUserProfile } from '../../utils/orderNavigation.js'
 import { getNextOrderWorkflowRefreshDelay } from '../../utils/orderWorkflowModel.js'
 import { useWorkflowNavigate } from '../../hooks/useWorkflowNavigate.js'
@@ -114,6 +114,8 @@ export function ConversationDetailPage() {
   const [deliveryRecords, setDeliveryRecords] = useState([])
   const [photoAuthorizations, setPhotoAuthorizations] = useState([])
   const [content, setContent] = useState('')
+  const [pendingAttachment, setPendingAttachment] = useState(null)
+  const [messageSending, setMessageSending] = useState(false)
   const [quoteForm, setQuoteForm] = useState(() => createDefaultQuoteForm())
   const [showQuoteForm, setShowQuoteForm] = useState(false)
   const [editingQuotationId, setEditingQuotationId] = useState(null)
@@ -138,6 +140,10 @@ export function ConversationDetailPage() {
   const setReworkRequirement = reworkDraft.setValue
   const photoAuthorizationForm = photoAuthorizationDraft.value || createPhotoAuthorizationDraft()
   const setPhotoAuthorizationForm = photoAuthorizationDraft.setValue
+
+  useEffect(() => () => {
+    if (pendingAttachment?.previewUrl) URL.revokeObjectURL(pendingAttachment.previewUrl)
+  }, [pendingAttachment])
   const authorizationRemarks = authorizationRemarkDraft.value || {}
   const setAuthorizationRemarks = authorizationRemarkDraft.setValue
   const { run: runWorkflowAction, loading: actionLoading } = usePortraAsyncAction({
@@ -345,9 +351,42 @@ export function ConversationDetailPage() {
     setPhotoAuthorizations(authorizations || [])
   }
 
+  function chooseMessageAttachment(file, requestedKind) {
+    if (!file) return
+    const image = String(file.type || '').toLowerCase().startsWith('image/')
+    if (requestedKind === 'IMAGE' && !image) {
+      feedback.warning('请选择图片文件')
+      return
+    }
+    setPendingAttachment(previous => {
+      if (previous?.previewUrl) URL.revokeObjectURL(previous.previewUrl)
+      return {
+        file,
+        name: file.name || '附件',
+        size: file.size || 0,
+        mimeType: file.type || 'application/octet-stream',
+        kind: image ? 'IMAGE' : 'FILE',
+        previewUrl: image ? URL.createObjectURL(file) : ''
+      }
+    })
+  }
+
+  function removePendingAttachment() {
+    setPendingAttachment(previous => {
+      if (previous?.previewUrl) URL.revokeObjectURL(previous.previewUrl)
+      return null
+    })
+  }
+
   async function sendMessage() {
-    if (!conversation || !content.trim()) return
+    if (!conversation || messageSending) return
     const text = content.trim()
+    const attachment = pendingAttachment
+    if (!text && !attachment) return
+    if (conversation.isLocal && attachment) {
+      feedback.warning('本地临时会话暂不支持附件，请进入正式会话后发送。')
+      return
+    }
     if (conversation.isLocal) {
       const nextMessages = addLocalMessage(conversation.conversationId, {
         senderId: getCurrentUserId(currentUser),
@@ -362,50 +401,75 @@ export function ConversationDetailPage() {
       setContent('')
       return
     }
-    const optimisticMessage = createOptimisticMessage(conversation, currentUser, text, 'TEXT')
+    const optimisticMessage = createOptimisticMessage(conversation, currentUser, text, attachment ? attachment.kind : 'TEXT', attachment)
     setMessages(previous => [...previous, optimisticMessage])
-    setContent('')
-    updateConversationLastMessage(conversation.conversationId, text, {
+    setMessageSending(true)
+    updateConversationLastMessage(conversation.conversationId, formatMessagePreviewText(optimisticMessage), {
       senderId: getCurrentUserId(currentUser),
-      messageType: 'TEXT',
+      messageType: optimisticMessage.messageType,
       latestMessage: optimisticMessage,
       createdAt: optimisticMessage.createdAt
     })
     try {
-      const sent = await conversationApi.sendMessage(conversation.backendConversationId || conversation.conversationId, text, currentUser, 'TEXT')
+      const uploaded = attachment
+        ? await fileApi.upload(attachment.file, { bizType: 'MESSAGE_ATTACHMENT', visibility: 'PRIVATE' }, currentUser)
+        : null
+      const sent = await conversationApi.sendMessage(conversation.backendConversationId || conversation.conversationId, {
+        content: text,
+        fileId: uploaded?.fileId || null,
+        messageType: attachment ? attachment.kind : 'TEXT'
+      }, currentUser)
       setMessages(previous => replaceTemporaryMessage(previous, optimisticMessage.messageId, sent))
       if (sent) {
-        updateConversationLastMessage(conversation.conversationId, sent.content || text, {
+        const normalizedSent = normalizeRemoteMessage(sent)
+        updateConversationLastMessage(conversation.conversationId, formatMessagePreviewText(normalizedSent), {
           senderId: sent.senderId ?? optimisticMessage.senderId,
           messageType: sent.messageType || 'TEXT',
-          latestMessage: normalizeRemoteMessage(sent),
+          latestMessage: normalizedSent,
           createdAt: sent.createdAt || optimisticMessage.createdAt
         })
       }
+      setContent('')
+      removePendingAttachment()
     } catch (error) {
       setMessages(previous => markTemporaryMessageFailed(previous, optimisticMessage.messageId, error))
+    } finally {
+      setMessageSending(false)
     }
   }
 
   async function retryMessage(message) {
-    if (!conversation || !message?.content || conversation.isLocal) return
+    if (!conversation || conversation.isLocal || messageSending) return
+    if (!message?.content && !message?.attachment && !message?.fileId) return
     const tempId = message.clientTempId || message.messageId
     setMessages(previous => previous.map(item => String(item.messageId) === String(tempId)
       ? { ...item, deliveryStatus: 'sending', errorMessage: '' }
       : item))
+    setMessageSending(true)
     try {
-      const sent = await conversationApi.sendMessage(conversation.backendConversationId || conversation.conversationId, message.content, currentUser, message.messageType || 'TEXT')
+      const attachment = message.attachment || null
+      const uploaded = attachment?.file
+        ? await fileApi.upload(attachment.file, { bizType: 'MESSAGE_ATTACHMENT', visibility: 'PRIVATE' }, currentUser)
+        : null
+      const sent = await conversationApi.sendMessage(conversation.backendConversationId || conversation.conversationId, {
+        content: message.content || '',
+        fileId: uploaded?.fileId || message.fileId || attachment?.fileId || null,
+        messageType: message.messageType || attachment?.kind || 'TEXT'
+      }, currentUser)
       setMessages(previous => replaceTemporaryMessage(previous, tempId, sent))
       if (sent) {
-        updateConversationLastMessage(conversation.conversationId, sent.content || message.content, {
+        const normalizedSent = normalizeRemoteMessage(sent)
+        updateConversationLastMessage(conversation.conversationId, formatMessagePreviewText(normalizedSent), {
           senderId: sent.senderId ?? message.senderId,
           messageType: sent.messageType || 'TEXT',
-          latestMessage: normalizeRemoteMessage(sent),
+          latestMessage: normalizedSent,
           createdAt: sent.createdAt || message.createdAt
         })
       }
     } catch (error) {
       setMessages(previous => markTemporaryMessageFailed(previous, tempId, error))
+    } finally {
+      setMessageSending(false)
     }
   }
 
@@ -420,6 +484,23 @@ export function ConversationDetailPage() {
       createdAt: message.createdAt
     })
     feedback.success('照片已保存')
+  }
+
+  async function downloadMessageAttachment(message) {
+    const fileId = message?.fileId || message?.attachment?.fileId
+    if (!fileId) return
+    try {
+      const url = await fileApi.downloadObjectUrl(fileId, currentUser)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = message.fileName || message.attachment?.fileName || message.attachment?.name || `附件-${fileId}`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 1500)
+    } catch (error) {
+      feedback.error(error?.message || '附件下载失败，请稍后重试。')
+    }
   }
 
   async function createQuote(event) {
@@ -951,8 +1032,8 @@ export function ConversationDetailPage() {
             photoAuthorizations={photoAuthorizations}
             timeline={viewModel.timeline}
             content={content}
-            loading={loading}
-            imageSending={false}
+            loading={loading || messageSending}
+            imageSending={messageSending}
             canSeeQuoteEntry={canSeeQuoteEntry}
             canCreateQuote={canCreateQuote}
             showQuoteForm={showQuoteForm}
@@ -977,8 +1058,12 @@ export function ConversationDetailPage() {
             onContentChange={setContent}
             onSendMessage={sendMessage}
             onRetryMessage={retryMessage}
-            onChooseMessageImage={() => showUnavailableTool('图片')}
+            pendingAttachment={pendingAttachment}
+            onChooseMessageImage={file => chooseMessageAttachment(file, 'IMAGE')}
+            onChooseMessageFile={file => chooseMessageAttachment(file, 'FILE')}
+            onRemoveAttachment={removePendingAttachment}
             onSaveSubmittedPhoto={saveSubmittedPhoto}
+            onDownloadAttachment={downloadMessageAttachment}
             onPayOrder={openPaymentDialog}
             onCancelOrder={cancelCurrentOrder}
             onConfirmOrder={confirmCurrentOrder}
@@ -1068,9 +1153,17 @@ function getLatestMessage(messages = []) {
     .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0))[0] || null
 }
 
-function createOptimisticMessage(conversation, currentUser, content, messageType) {
+function createOptimisticMessage(conversation, currentUser, content, messageType, attachment = null) {
   const conversationId = conversation?.backendConversationId || conversation?.conversationId
   const tempId = `temp-${Date.now()}-${Math.round(Math.random() * 100000)}`
+  const normalizedAttachment = attachment ? {
+    file: attachment.file,
+    fileName: attachment.name,
+    mimeType: attachment.mimeType,
+    size: attachment.size,
+    kind: attachment.kind,
+    localPreviewUrl: attachment.previewUrl
+  } : null
   return {
     messageId: tempId,
     clientTempId: tempId,
@@ -1078,6 +1171,13 @@ function createOptimisticMessage(conversation, currentUser, content, messageType
     senderId: getCurrentUserId(currentUser),
     messageType,
     content,
+    fileId: null,
+    fileName: normalizedAttachment?.fileName || null,
+    mimeType: normalizedAttachment?.mimeType || null,
+    size: normalizedAttachment?.size || null,
+    fileType: normalizedAttachment?.kind || null,
+    attachmentKind: normalizedAttachment?.kind || null,
+    attachment: normalizedAttachment,
     createdAt: new Date().toISOString(),
     optimistic: true,
     deliveryStatus: 'sending'
@@ -1153,10 +1253,18 @@ function isMatchingTemporaryMessage(localMessage, remoteMessage) {
   if (Number(localMessage.senderId) !== Number(remoteMessage.senderId)) return false
   if (String(localMessage.messageType || 'TEXT') !== String(remoteMessage.messageType || 'TEXT')) return false
   if (String(localMessage.content || '') !== String(remoteMessage.content || '')) return false
+  if (localMessage.fileName && remoteMessage.fileName && String(localMessage.fileName) !== String(remoteMessage.fileName)) return false
   const localTime = new Date(localMessage.createdAt || 0).getTime()
   const remoteTime = new Date(remoteMessage.createdAt || 0).getTime()
   if (!Number.isFinite(localTime) || !Number.isFinite(remoteTime)) return true
   return Math.abs(remoteTime - localTime) < 2 * 60 * 1000
+}
+
+function formatMessagePreviewText(message = {}) {
+  const type = String(message.messageType || message.attachmentKind || '').toUpperCase()
+  if (type === 'IMAGE') return '[图片]'
+  if (type === 'FILE') return `[附件] ${message.fileName || message.attachment?.fileName || message.attachment?.name || ''}`.trim()
+  return String(message.content || '').trim() || '还没有消息'
 }
 
 function isTemporaryMessageId(value) {
