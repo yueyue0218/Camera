@@ -7,7 +7,6 @@ import { useAuth } from '../../AuthContext.jsx'
 import { conversationApi, deliveryApi, orderApi, photoAuthorizationApi, quoteApi } from '../../api.js'
 import { goToUserProfile } from '../../utils/orderNavigation.js'
 import { useWorkflowNavigate } from '../../hooks/useWorkflowNavigate.js'
-import { useWorkflowDraft } from '../../hooks/useWorkflowDraft.js'
 import { mergeWorkflowViewState } from '../../utils/workflowViewCache.js'
 import { REWORK_REQUIREMENT_MAX_LENGTH } from '../../utils/workflowLimits.js'
 import {
@@ -22,48 +21,27 @@ import { MessageWorkbenchErrorBoundary } from './components/MessageWorkbenchErro
 import { useConversationRealtime } from './hooks/useConversationRealtime.js'
 import { useConversationData } from './hooks/useConversationData.js'
 import { useMessageSending } from './hooks/useMessageSending.js'
+import { useConversationDrafts } from './hooks/useConversationDrafts.js'
 import { OrderCompletionDialog, PortraActionLink, PortraStatusPill, PortraWorkbenchFrame, PortraWorkflowFrame, usePortraFeedback } from '../../components/portra/index.js'
 import { PORTRA_LAYOUT } from '../../theme/portraSurfaceTokens.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from './MessageVisualTokens.js'
 import { getOppositeUserId } from './utils/conversationUtils.js'
 import {
-  buildConversationWorkbenchViewModel,
   getCurrentUserId,
   getUserRoleInConversation
 } from './utils/workbenchState.js'
 import {
   buildQuotePayload,
-  canEditQuote,
   createDefaultQuoteForm,
   createQuoteFormFromQuote,
   getQuoteConfirmationErrorText,
-  getQuoteEntryHint,
 } from './utils/quoteUtils.js'
 import { validateQuoteFormModel } from './utils/quoteFormModel.js'
+import { buildConversationDetailViewModel } from './utils/conversationViewModel.js'
 
 const DETAIL_SHELL_HEIGHT = {
   xs: 'calc(100dvh - 212px)',
   md: 'calc(100dvh - 154px)'
-}
-
-function createDeliveryDraft() {
-  return { files: [], remark: '' }
-}
-
-function createPhotoAuthorizationDraft() {
-  return { fileIds: [], remark: '' }
-}
-
-function isDeliveryDraftDirty(value) {
-  return Boolean((Array.isArray(value?.files) && value.files.length) || String(value?.remark || '').trim())
-}
-
-function isPhotoAuthorizationDraftDirty(value) {
-  return Boolean((Array.isArray(value?.fileIds) && value.fileIds.length) || String(value?.remark || '').trim())
-}
-
-function hasAuthorizationRemarkDraft(value) {
-  return Object.values(value || {}).some(remark => String(remark || '').trim())
 }
 
 export function ConversationDetailPage() {
@@ -120,20 +98,22 @@ export function ConversationDetailPage() {
   const [activeQuote, setActiveQuote] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('WECHAT')
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
-  const orderDraftScope = `conversation:${conversationId}:order:${currentOrder?.orderId || 'none'}`
-  const deliveryDraft = useWorkflowDraft(`${orderDraftScope}:delivery`, createDeliveryDraft, isDeliveryDraftDirty)
-  const reworkDraft = useWorkflowDraft(`${orderDraftScope}:rework`, () => '', value => String(value || '').trim().length > 0)
-  const photoAuthorizationDraft = useWorkflowDraft(`${orderDraftScope}:photo-authorization`, createPhotoAuthorizationDraft, isPhotoAuthorizationDraftDirty)
-  const authorizationRemarkDraft = useWorkflowDraft(`${orderDraftScope}:authorization-remarks`, () => ({}), hasAuthorizationRemarkDraft)
-  const deliveryForm = deliveryDraft.value || createDeliveryDraft()
-  const setDeliveryForm = deliveryDraft.setValue
-  const reworkRequirement = reworkDraft.value || ''
-  const setReworkRequirement = reworkDraft.setValue
-  const photoAuthorizationForm = photoAuthorizationDraft.value || createPhotoAuthorizationDraft()
-  const setPhotoAuthorizationForm = photoAuthorizationDraft.setValue
-
-  const authorizationRemarks = authorizationRemarkDraft.value || {}
-  const setAuthorizationRemarks = authorizationRemarkDraft.setValue
+  const {
+    deliveryDraft,
+    reworkDraft,
+    photoAuthorizationDraft,
+    deliveryForm,
+    setDeliveryForm,
+    reworkRequirement,
+    setReworkRequirement,
+    photoAuthorizationForm,
+    setPhotoAuthorizationForm,
+    authorizationRemarks,
+    setAuthorizationRemarks
+  } = useConversationDrafts({
+    conversationId,
+    orderId: currentOrder?.orderId
+  })
 
   async function createQuote(event) {
     event.preventDefault()
@@ -471,16 +451,18 @@ export function ConversationDetailPage() {
 
   const currentUserId = getCurrentUserId(currentUser)
   const counterparty = participantModel
-  const viewModel = buildConversationWorkbenchViewModel({
+  const viewModel = buildConversationDetailViewModel({
     conversation,
     currentUser,
-    activeRole: currentUser.role,
     messages,
     quotes,
-    order: currentOrder,
+    currentOrder,
     statusLogs,
-    deliveries: deliveryRecords,
-    authorizations: photoAuthorizations,
+    deliveryRecords,
+    photoAuthorizations,
+    activeQuote,
+    editingQuotationId,
+    showQuoteForm
   })
   const actions = viewModel.actions
   useConversationRealtime({
@@ -527,19 +509,15 @@ export function ConversationDetailPage() {
       }
     }
   }, [actions.roleMismatch, conversation, currentUser, navigate, switchRole])
-  const editingQuote = editingQuotationId
-    ? quotes.find(quote => String(quote.quotationId) === String(editingQuotationId))
-    : null
-  const canCreateQuote = actions.canSendQuote
-  const canEditSelectedQuote = editingQuote
-    && canEditQuote(editingQuote, conversation, currentUser)
-  const canSubmitQuoteForm = editingQuotationId ? canEditSelectedQuote : canCreateQuote
-  const canSeeQuoteEntry = !currentOrder && (actions.canSendQuote || actions.canEditQuote || showQuoteForm)
-  const quoteEntryHint = currentOrder ? '' : getQuoteEntryHint(conversation, currentUser, quotes)
-  const activeQuoteIsPending = activeQuote?.status === 'PENDING_CONFIRM' && String(activeQuote.quotationId) === String(actions.pendingQuote?.quotationId)
-  const activeQuoteCanConfirm = activeQuoteIsPending && actions.canConfirmQuote
-  const activeQuoteCanReject = activeQuoteIsPending && actions.canRejectQuote
-  const activeQuoteCanResend = activeQuote?.status === 'REJECTED' && actions.canSendQuote
+  const {
+    canCreateQuote,
+    canSubmitQuoteForm,
+    canSeeQuoteEntry,
+    quoteEntryHint,
+    activeQuoteCanConfirm,
+    activeQuoteCanReject,
+    activeQuoteCanResend
+  } = viewModel
 
   return (
     <MessageWorkbenchErrorBoundary resetKey={`${conversationId}-${currentUser.role}`}>
