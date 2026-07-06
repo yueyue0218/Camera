@@ -36,7 +36,7 @@ export function DeliverySummaryCard({
               <ImageRoundedIcon sx={{ fontSize: 20 }} />
             </Box>
             <Box sx={{ minWidth: 0 }}>
-              <Typography sx={{ color: PORTRA_SURFACE.ink, fontSize: 17, fontWeight: 950, lineHeight: 1.22 }}>
+              <Typography sx={{ color: PORTRA_SURFACE.ink, fontSize: 16, fontWeight: 950, lineHeight: 1.22 }}>
                 {label || '作品已上传'}
               </Typography>
               {timeLabel && (
@@ -147,23 +147,23 @@ function conversationCardSx(clickable) {
     p: 0,
     bgcolor: '#fffaf2',
     borderColor: 'rgba(79, 70, 60, .12)',
-    borderRadius: '18px',
+    borderRadius: '16px',
     overflow: 'hidden',
     cursor: clickable ? 'pointer' : 'default',
-    boxShadow: '0 8px 22px rgba(43, 35, 24, .07)',
+    boxShadow: '0 6px 16px rgba(43, 35, 24, .055)',
     transition: 'transform .16s ease, border-color .16s ease, box-shadow .16s ease',
     '&:hover': clickable ? {
       transform: 'translateY(-1px)',
       borderColor: 'rgba(37, 99, 235, .30)',
-      boxShadow: '0 10px 24px rgba(43, 35, 24, .085)'
+      boxShadow: '0 8px 20px rgba(43, 35, 24, .07)'
     } : undefined
   }
 }
 
 const conversationHeaderSx = {
-  minHeight: { xs: 64, sm: 68 },
+  minHeight: { xs: 54, sm: 58 },
   px: { xs: 1.35, sm: 1.55 },
-  py: { xs: 1, sm: 1.1 },
+  py: { xs: 0.8, sm: 0.9 },
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
@@ -171,9 +171,9 @@ const conversationHeaderSx = {
 }
 
 const conversationIconSx = {
-  width: 38,
-  height: 38,
-  borderRadius: '13px',
+  width: 34,
+  height: 34,
+  borderRadius: '11px',
   display: 'grid',
   placeItems: 'center',
   bgcolor: 'rgba(37, 99, 235, .08)',
@@ -192,9 +192,9 @@ const conversationChipSx = {
 }
 
 const conversationFooterSx = {
-  minHeight: { xs: 64, sm: 68 },
+  minHeight: { xs: 52, sm: 56 },
   px: { xs: 1.35, sm: 1.55 },
-  py: { xs: 1, sm: 1.1 },
+  py: { xs: 0.78, sm: 0.9 },
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 1
