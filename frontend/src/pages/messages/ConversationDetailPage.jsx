@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Alert, Avatar, Box, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material'
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
-import { conversationApi, deliveryApi, fileApi, orderApi, photoAuthorizationApi, quoteApi } from '../../api.js'
+import { conversationApi, deliveryApi, orderApi, photoAuthorizationApi, quoteApi } from '../../api.js'
 import { goToUserProfile } from '../../utils/orderNavigation.js'
 import { useWorkflowNavigate } from '../../hooks/useWorkflowNavigate.js'
 import { useWorkflowDraft } from '../../hooks/useWorkflowDraft.js'
@@ -21,14 +21,11 @@ import { QuoteDraftDialog } from './components/QuoteDraftDialog.jsx'
 import { MessageWorkbenchErrorBoundary } from './components/MessageWorkbenchErrorBoundary.jsx'
 import { useConversationRealtime } from './hooks/useConversationRealtime.js'
 import { useConversationData } from './hooks/useConversationData.js'
+import { useMessageSending } from './hooks/useMessageSending.js'
 import { OrderCompletionDialog, PortraActionLink, PortraStatusPill, PortraWorkbenchFrame, PortraWorkflowFrame, usePortraFeedback } from '../../components/portra/index.js'
 import { PORTRA_LAYOUT } from '../../theme/portraSurfaceTokens.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from './MessageVisualTokens.js'
-import {
-  addLocalMessage,
-  getOppositeUserId,
-  updateConversationLastMessage
-} from './utils/conversationUtils.js'
+import { getOppositeUserId } from './utils/conversationUtils.js'
 import {
   buildConversationWorkbenchViewModel,
   getCurrentUserId,
@@ -43,13 +40,6 @@ import {
   getQuoteEntryHint,
 } from './utils/quoteUtils.js'
 import { validateQuoteFormModel } from './utils/quoteFormModel.js'
-import {
-  createOptimisticMessage,
-  formatMessagePreviewText,
-  markTemporaryMessageFailed,
-  normalizeRemoteMessage,
-  replaceTemporaryMessage
-} from './utils/conversationMessageState.js'
 
 const DETAIL_SHELL_HEIGHT = {
   xs: 'calc(100dvh - 212px)',
@@ -81,6 +71,7 @@ export function ConversationDetailPage() {
   const navigate = useWorkflowNavigate()
   const rawNavigate = useNavigate()
   const { currentUser, switchRole } = useAuth()
+  const feedback = usePortraFeedback()
   const {
     conversation,
     messages,
@@ -102,11 +93,24 @@ export function ConversationDetailPage() {
     refreshConversationData,
     refreshConversationMessages
   } = useConversationData({ conversationId, currentUser })
-  const [content, setContent] = useState('')
-  const [pendingAttachment, setPendingAttachment] = useState(null)
-  const pendingAttachmentRef = useRef(null)
-  const messagesRef = useRef([])
-  const [messageSending, setMessageSending] = useState(false)
+  const {
+    content,
+    setContent,
+    pendingAttachment,
+    messageSending,
+    chooseMessageAttachment,
+    removePendingAttachment,
+    sendMessage,
+    retryMessage,
+    downloadMessageAttachment,
+    releaseMessageLocalPreview
+  } = useMessageSending({
+    conversation,
+    currentUser,
+    messages,
+    setMessages,
+    feedback
+  })
   const [quoteForm, setQuoteForm] = useState(() => createDefaultQuoteForm())
   const [showQuoteForm, setShowQuoteForm] = useState(false)
   const [editingQuotationId, setEditingQuotationId] = useState(null)
@@ -116,7 +120,6 @@ export function ConversationDetailPage() {
   const [activeQuote, setActiveQuote] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('WECHAT')
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
-  const feedback = usePortraFeedback()
   const orderDraftScope = `conversation:${conversationId}:order:${currentOrder?.orderId || 'none'}`
   const deliveryDraft = useWorkflowDraft(`${orderDraftScope}:delivery`, createDeliveryDraft, isDeliveryDraftDirty)
   const reworkDraft = useWorkflowDraft(`${orderDraftScope}:rework`, () => '', value => String(value || '').trim().length > 0)
@@ -129,182 +132,8 @@ export function ConversationDetailPage() {
   const photoAuthorizationForm = photoAuthorizationDraft.value || createPhotoAuthorizationDraft()
   const setPhotoAuthorizationForm = photoAuthorizationDraft.setValue
 
-  useEffect(() => {
-    pendingAttachmentRef.current = pendingAttachment
-  }, [pendingAttachment])
-
-  useEffect(() => {
-    messagesRef.current = messages
-  }, [messages])
-
-  useEffect(() => () => {
-    const previewUrls = new Set([
-      pendingAttachmentRef.current?.previewUrl,
-      ...messagesRef.current.map(message => message?.attachment?.localPreviewUrl)
-    ].filter(Boolean))
-    previewUrls.forEach(url => URL.revokeObjectURL(url))
-  }, [])
   const authorizationRemarks = authorizationRemarkDraft.value || {}
   const setAuthorizationRemarks = authorizationRemarkDraft.setValue
-
-  function chooseMessageAttachment(file, requestedKind) {
-    if (!file) return
-    const image = String(file.type || '').toLowerCase().startsWith('image/')
-    if (requestedKind === 'IMAGE' && !image) {
-      feedback.warning('请选择图片文件')
-      return
-    }
-    setPendingAttachment(previous => {
-      if (previous?.previewUrl) URL.revokeObjectURL(previous.previewUrl)
-      return {
-        file,
-        name: file.name || '附件',
-        size: file.size || 0,
-        mimeType: file.type || 'application/octet-stream',
-        kind: image ? 'IMAGE' : 'FILE',
-        previewUrl: image ? URL.createObjectURL(file) : ''
-      }
-    })
-  }
-
-  function clearPendingAttachment({ revokePreview = true } = {}) {
-    setPendingAttachment(previous => {
-      if (revokePreview && previous?.previewUrl) URL.revokeObjectURL(previous.previewUrl)
-      return null
-    })
-  }
-
-  function removePendingAttachment() {
-    clearPendingAttachment()
-  }
-
-  async function sendMessage() {
-    if (!conversation || messageSending) return
-    const text = content.trim()
-    const attachment = pendingAttachment
-    if (!text && !attachment) return
-    if (conversation.isLocal && attachment) {
-      feedback.warning('本地临时会话暂不支持附件，请进入正式会话后发送。')
-      return
-    }
-    if (conversation.isLocal) {
-      const nextMessages = addLocalMessage(conversation.conversationId, {
-        senderId: getCurrentUserId(currentUser),
-        messageType: 'TEXT',
-        content: text
-      })
-      updateConversationLastMessage(conversation.conversationId, text, {
-        senderId: getCurrentUserId(currentUser),
-        messageType: 'TEXT'
-      })
-      setMessages(nextMessages)
-      setContent('')
-      return
-    }
-    const optimisticMessage = createOptimisticMessage(conversation, currentUser, text, attachment ? attachment.kind : 'TEXT', attachment)
-    setMessages(previous => [...previous, optimisticMessage])
-    setMessageSending(true)
-    updateConversationLastMessage(conversation.conversationId, formatMessagePreviewText(optimisticMessage), {
-      senderId: getCurrentUserId(currentUser),
-      messageType: optimisticMessage.messageType,
-      latestMessage: optimisticMessage,
-      createdAt: optimisticMessage.createdAt
-    })
-    try {
-      const uploaded = attachment
-        ? await fileApi.upload(attachment.file, { bizType: 'MESSAGE_ATTACHMENT', visibility: 'PRIVATE' }, currentUser)
-        : null
-      const sent = await conversationApi.sendMessage(conversation.backendConversationId || conversation.conversationId, {
-        content: text,
-        fileId: uploaded?.fileId || null,
-        messageType: attachment ? attachment.kind : 'TEXT'
-      }, currentUser)
-      setMessages(previous => replaceTemporaryMessage(previous, optimisticMessage.messageId, sent))
-      if (sent) {
-        const normalizedSent = normalizeRemoteMessage(sent)
-        updateConversationLastMessage(conversation.conversationId, formatMessagePreviewText(normalizedSent), {
-          senderId: sent.senderId ?? optimisticMessage.senderId,
-          messageType: sent.messageType || 'TEXT',
-          latestMessage: normalizedSent,
-          createdAt: sent.createdAt || optimisticMessage.createdAt
-        })
-      }
-      setContent('')
-      clearPendingAttachment({ revokePreview: false })
-    } catch (error) {
-      setMessages(previous => markTemporaryMessageFailed(previous, optimisticMessage.messageId, error))
-    } finally {
-      setMessageSending(false)
-    }
-  }
-
-  async function retryMessage(message) {
-    if (!conversation || conversation.isLocal || messageSending) return
-    if (!message?.content && !message?.attachment && !message?.fileId) return
-    const tempId = message.clientTempId || message.messageId
-    setMessages(previous => previous.map(item => String(item.messageId) === String(tempId)
-      ? { ...item, deliveryStatus: 'sending', errorMessage: '' }
-      : item))
-    setMessageSending(true)
-    try {
-      const attachment = message.attachment || null
-      const uploaded = attachment?.file
-        ? await fileApi.upload(attachment.file, { bizType: 'MESSAGE_ATTACHMENT', visibility: 'PRIVATE' }, currentUser)
-        : null
-      const sent = await conversationApi.sendMessage(conversation.backendConversationId || conversation.conversationId, {
-        content: message.content || '',
-        fileId: uploaded?.fileId || message.fileId || attachment?.fileId || null,
-        messageType: message.messageType || attachment?.kind || 'TEXT'
-      }, currentUser)
-      setMessages(previous => replaceTemporaryMessage(previous, tempId, sent))
-      if (sent) {
-        const normalizedSent = normalizeRemoteMessage(sent)
-        updateConversationLastMessage(conversation.conversationId, formatMessagePreviewText(normalizedSent), {
-          senderId: sent.senderId ?? message.senderId,
-          messageType: sent.messageType || 'TEXT',
-          latestMessage: normalizedSent,
-          createdAt: sent.createdAt || message.createdAt
-        })
-      }
-    } catch (error) {
-      setMessages(previous => markTemporaryMessageFailed(previous, tempId, error))
-    } finally {
-      setMessageSending(false)
-    }
-  }
-
-  async function downloadMessageAttachment(message) {
-    const fileId = message?.fileId || message?.attachment?.fileId
-    if (!fileId) return
-    try {
-      const url = await fileApi.downloadObjectUrl(fileId, currentUser)
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = message.fileName || message.attachment?.fileName || message.attachment?.name || `附件-${fileId}`
-      document.body.appendChild(anchor)
-      anchor.click()
-      anchor.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 1500)
-    } catch (error) {
-      feedback.error(error?.message || '附件下载失败，请稍后重试。')
-    }
-  }
-
-  function releaseMessageLocalPreview(message, localPreviewUrl) {
-    if (!message?.messageId || !localPreviewUrl) return
-    setMessages(previous => previous.map(item => {
-      if (String(item.messageId) !== String(message.messageId)) return item
-      if (item.attachment?.localPreviewUrl !== localPreviewUrl) return item
-      return {
-        ...item,
-        attachment: {
-          ...item.attachment,
-          localPreviewUrl: ''
-        }
-      }
-    }))
-    URL.revokeObjectURL(localPreviewUrl)
-  }
 
   async function createQuote(event) {
     event.preventDefault()
