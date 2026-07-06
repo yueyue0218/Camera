@@ -71,11 +71,7 @@ public class ConversationController {
     @GetMapping("/conversations/{conversationId}/messages")
     public Result<List<MessageResponse>> listMessages(@PathVariable Long conversationId) {
         Long operatorId = currentUserId();
-        List<MessageResponse> messages = messageService.listMessages(conversationId, operatorId)
-                .stream()
-                .map(MessageResponse::from)
-                .toList();
-        return Result.success(messages);
+        return Result.success(messageService.listMessageResponses(conversationId, operatorId));
     }
 
     @PostMapping("/conversations/presence")
@@ -94,9 +90,10 @@ public class ConversationController {
                 conversationId,
                 operatorId,
                 request.getMessageType(),
-                request.getContent()
+                request.getContent(),
+                request.getFileId()
         );
-        return Result.success(MessageResponse.from(message));
+        return Result.success(messageService.toResponse(message));
     }
 
     @GetMapping("/conversations/{conversationId}/quotations")

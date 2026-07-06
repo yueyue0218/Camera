@@ -7,4 +7,5 @@ public class SendTextMessageRequest {
 
     private String messageType;
     private String content;
+    private Long fileId;
 }
