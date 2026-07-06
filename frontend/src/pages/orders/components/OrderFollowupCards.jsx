@@ -37,7 +37,18 @@ export function OrderFollowupCards({ items = [] }) {
                       <Typography sx={{ color: PORTRA_SURFACE.ink, fontWeight: 950, lineHeight: 1.35 }}>
                         {item.title}
                       </Typography>
-                      <Typography variant="body2" sx={{ mt: 0.25, color: PORTRA_SURFACE.muted, lineHeight: 1.55 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          mt: 0.2,
+                          color: PORTRA_SURFACE.muted,
+                          lineHeight: 1.45,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden'
+                        }}
+                      >
                         {item.description}
                       </Typography>
                     </Box>
@@ -81,10 +92,10 @@ export function OrderFollowupCards({ items = [] }) {
 }
 
 const sectionSx = {
-  p: { xs: 2.1, md: 2.6 },
+  p: { xs: 1.6, md: 1.9 },
   bgcolor: ORDER_WORKFLOW_COLORS.paper,
   borderColor: ORDER_WORKFLOW_COLORS.border,
-  borderRadius: '22px',
+  borderRadius: '18px',
   boxShadow: 'none'
 }
 
@@ -95,55 +106,55 @@ const gridSx = {
 }
 
 const cardSx = {
-  p: 1.35,
-  minHeight: 150,
-  bgcolor: ORDER_WORKFLOW_COLORS.paperMuted,
+  p: 1.05,
+  minHeight: 118,
+  bgcolor: '#fffdf8',
   borderColor: ORDER_WORKFLOW_COLORS.borderSubtle,
-  borderRadius: '18px',
+  borderRadius: '14px',
   boxShadow: 'none'
 }
 
 function iconSx(tone) {
   const colors = getOrderWorkflowTone(tone)
   return {
-    width: 38,
-    height: 38,
-    borderRadius: '13px',
+    width: 32,
+    height: 32,
+    borderRadius: '10px',
     display: 'grid',
     placeItems: 'center',
     flexShrink: 0,
     bgcolor: colors.bg,
     color: colors.color,
-    '& svg': { fontSize: 21 }
+    '& svg': { fontSize: 18 }
   }
 }
 
 function statusSx(tone) {
   const colors = getOrderWorkflowTone(tone)
   return {
-    px: 0.85,
-    py: 0.35,
+    px: 0.7,
+    py: 0.28,
     borderRadius: 999,
     flexShrink: 0,
     bgcolor: colors.bg,
     color: colors.color,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 900,
     lineHeight: 1.2
   }
 }
 
 const actionSx = {
-  minHeight: 34,
-  borderRadius: '11px',
+  minHeight: 30,
+  borderRadius: '10px',
   fontWeight: 900,
   borderColor: 'rgba(13, 47, 178, .26)',
   color: ORDER_WORKFLOW_COLORS.primary
 }
 
 const secondaryActionSx = {
-  minHeight: 34,
-  borderRadius: '11px',
+  minHeight: 30,
+  borderRadius: '10px',
   fontWeight: 850,
   color: PORTRA_SURFACE.muted
 }

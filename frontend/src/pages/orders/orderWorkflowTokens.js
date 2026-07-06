@@ -20,7 +20,7 @@ export const ORDER_WORKFLOW_COLORS = {
   disabled: '#c4cedd',
   upcoming: '#d8d2c8',
   timelineComplete: PORTRA_SURFACE.portraBlue,
-  timelineCompleteLine: 'rgba(13, 47, 178, .20)',
+  timelineCompleteLine: 'rgba(154, 148, 138, .18)',
   timelineUpcomingLine: 'rgba(154, 148, 138, .22)'
 }
 
