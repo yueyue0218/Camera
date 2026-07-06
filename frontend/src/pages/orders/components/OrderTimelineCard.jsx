@@ -14,15 +14,7 @@ export function OrderTimelineCard({ items = [] }) {
             >
               <Box sx={dotSx(item.state)} />
               {index < items.length - 1 ? <Box sx={lineSx(item.state)} /> : null}
-              <Box
-                sx={{
-                  minWidth: 0,
-                  pb: index < items.length - 1 ? 1.6 : 0,
-                  bgcolor: 'transparent',
-                  backgroundImage: 'none',
-                  boxShadow: 'none'
-                }}
-              >
+              <Box sx={contentSx(index < items.length - 1)}>
                 <Stack direction="row" spacing={0.9} sx={{ alignItems: 'center', minWidth: 0 }}>
                   <Typography sx={timelineTitleSx(item.state)}>
                     {item.title}
@@ -52,14 +44,28 @@ const cardSx = {
 const timelineItemSx = {
   position: 'relative',
   display: 'grid',
-  gridTemplateColumns: '24px minmax(0, 1fr)',
-  columnGap: 1.45,
-  minHeight: 54,
-  bgcolor: 'transparent',
-  backgroundImage: 'none',
+  gridTemplateColumns: '20px minmax(0, 1fr)',
+  columnGap: 1.25,
+  minHeight: 50,
+  background: 'none',
+  backgroundColor: 'transparent',
   boxShadow: 'none',
+  border: 0,
   '&::before': { display: 'none' },
   '&::after': { display: 'none' }
+}
+
+function contentSx(hasNext) {
+  return {
+    minWidth: 0,
+    pb: hasNext ? 1.45 : 0,
+    background: 'none',
+    backgroundColor: 'transparent',
+    backgroundImage: 'none',
+    border: 0,
+    borderRadius: 0,
+    boxShadow: 'none'
+  }
 }
 
 function dotSx(state) {
@@ -67,7 +73,7 @@ function dotSx(state) {
     width: 12,
     height: 12,
     mt: 0.48,
-    ml: 0.55,
+    ml: 0.45,
     borderRadius: '50%',
     bgcolor: state === 'current'
       ? ORDER_WORKFLOW_COLORS.warning
@@ -81,11 +87,12 @@ function dotSx(state) {
 function lineSx(state) {
   return {
     position: 'absolute',
-    left: 10.5,
+    left: 9.5,
     top: 18,
     bottom: 0,
     width: 1,
-    bgcolor: state === 'upcoming' ? ORDER_WORKFLOW_COLORS.timelineUpcomingLine : ORDER_WORKFLOW_COLORS.timelineCompleteLine
+    background: 'none',
+    borderLeft: `1px solid ${state === 'upcoming' ? ORDER_WORKFLOW_COLORS.timelineUpcomingLine : ORDER_WORKFLOW_COLORS.timelineCompleteLine}`
   }
 }
 

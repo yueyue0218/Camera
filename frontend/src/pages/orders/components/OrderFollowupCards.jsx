@@ -29,27 +29,13 @@ export function OrderFollowupCards({ items = [] }) {
         <Box sx={gridSx}>
           {items.map(item => (
             <Paper key={item.key} variant="outlined" sx={cardSx}>
-              <Stack spacing={1.1} sx={{ height: '100%' }}>
-                <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
-                  <Stack direction="row" spacing={1} sx={{ minWidth: 0 }}>
+              <Stack spacing={0.9} sx={{ height: '100%' }}>
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                  <Stack direction="row" spacing={0.9} sx={{ minWidth: 0, alignItems: 'center' }}>
                     <Box sx={iconSx(item.tone)}>{item.icon || iconMap[item.kind] || iconMap.delivery}</Box>
                     <Box sx={{ minWidth: 0 }}>
                       <Typography sx={{ color: PORTRA_SURFACE.ink, fontWeight: 950, lineHeight: 1.35 }}>
                         {item.title}
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          mt: 0.2,
-                          color: PORTRA_SURFACE.muted,
-                          lineHeight: 1.45,
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden'
-                        }}
-                      >
-                        {item.description}
                       </Typography>
                     </Box>
                   </Stack>
@@ -69,18 +55,6 @@ export function OrderFollowupCards({ items = [] }) {
                       {item.primaryAction.label}
                     </Button>
                   ) : null}
-                  {item.secondaryAction ? (
-                    <Button
-                      size="small"
-                      color="inherit"
-                      variant="text"
-                      onClick={item.secondaryAction.onClick}
-                      disabled={item.secondaryAction.disabled}
-                      sx={secondaryActionSx}
-                    >
-                      {item.secondaryAction.label}
-                    </Button>
-                  ) : null}
                 </Stack>
               </Stack>
             </Paper>
@@ -92,7 +66,7 @@ export function OrderFollowupCards({ items = [] }) {
 }
 
 const sectionSx = {
-  p: { xs: 1.6, md: 1.9 },
+  p: { xs: 1.35, md: 1.55 },
   bgcolor: ORDER_WORKFLOW_COLORS.paper,
   borderColor: ORDER_WORKFLOW_COLORS.border,
   borderRadius: '18px',
@@ -106,8 +80,8 @@ const gridSx = {
 }
 
 const cardSx = {
-  p: 1.05,
-  minHeight: 118,
+  p: 0.95,
+  minHeight: 92,
   bgcolor: '#fffdf8',
   borderColor: ORDER_WORKFLOW_COLORS.borderSubtle,
   borderRadius: '14px',
@@ -150,11 +124,4 @@ const actionSx = {
   fontWeight: 900,
   borderColor: 'rgba(13, 47, 178, .26)',
   color: ORDER_WORKFLOW_COLORS.primary
-}
-
-const secondaryActionSx = {
-  minHeight: 30,
-  borderRadius: '10px',
-  fontWeight: 850,
-  color: PORTRA_SURFACE.muted
 }
