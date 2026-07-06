@@ -54,6 +54,7 @@ export function AuthorizationRequestCard({
 
   const compact = variant === 'message'
   const inline = chrome === 'none'
+  const messageInline = compact && inline
   const canOpenDelivery = Boolean(model.deliveryTarget && onOpenDelivery)
   const files = model.files
   const Root = inline ? Box : PortraTicketCard
@@ -98,7 +99,7 @@ export function AuthorizationRequestCard({
           ...sx
         }}
       >
-        <Stack spacing={0.9}>
+        <Stack spacing={messageInline ? 0.72 : 0.9}>
           <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
             <Box sx={{ minWidth: 0 }}>
               {!inline && (
@@ -111,16 +112,22 @@ export function AuthorizationRequestCard({
                   摄影师申请作品展示授权
                 </Typography>
               )}
-              <Typography variant="body2" sx={{ mt: 0.35, color: PORTRA_SURFACE.muted, lineHeight: 1.45 }}>
+              <Typography variant="body2" sx={{ mt: messageInline ? 0 : 0.35, color: PORTRA_SURFACE.muted, lineHeight: 1.45 }}>
                 {model.summary}
               </Typography>
             </Box>
             <PortraStatusPill label={model.statusLabel} />
           </Stack>
-          {files.length > 0 && <DeliveryThumbnailStrip files={files} variant="message" mode="contain" />}
+          {files.length > 0 && (
+            <DeliveryThumbnailStrip
+              files={files}
+              variant={messageInline ? 'messageCompact' : 'message'}
+              mode="contain"
+            />
+          )}
           <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
-            <Typography variant="caption" sx={{ color: PORTRA_SURFACE.faint, fontWeight: 800 }}>
-              点击查看授权详情
+            <Typography variant="caption" sx={{ color: PORTRA_SURFACE.faint, fontWeight: 800, minWidth: 0 }}>
+              {messageInline ? model.fileMetaText || '作品授权详情' : '点击查看授权详情'}
             </Typography>
             <Button
               size="small"
@@ -131,7 +138,7 @@ export function AuthorizationRequestCard({
                 setOpen(true)
               }}
             >
-              查看详情
+              {messageInline ? '查看授权' : '查看详情'}
             </Button>
           </Stack>
         </Stack>

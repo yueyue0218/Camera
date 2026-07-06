@@ -41,8 +41,8 @@ export function conversationEventSurfaceSx({ self = false, accent = PORTRA_SURFA
   return {
     width: '100%',
     maxWidth: 400,
-    bgcolor: self ? 'rgba(239, 243, 255, .88)' : '#fffaf2',
-    borderColor: self ? 'rgba(29, 78, 216, .24)' : 'rgba(79, 70, 60, .12)',
+    bgcolor: '#fffaf2',
+    borderColor: self ? 'rgba(29, 78, 216, .16)' : 'rgba(79, 70, 60, .12)',
     borderRadius: '18px',
     boxShadow: '0 8px 22px rgba(43, 35, 24, .07)',
     '&::before': {
@@ -54,7 +54,7 @@ export function conversationEventSurfaceSx({ self = false, accent = PORTRA_SURFA
     '&:hover': {
       transform: 'none',
       boxShadow: '0 10px 24px rgba(43, 35, 24, .085)',
-      borderColor: self ? 'rgba(29, 78, 216, .30)' : 'rgba(79, 70, 60, .16)'
+      borderColor: self ? 'rgba(29, 78, 216, .22)' : 'rgba(79, 70, 60, .16)'
     }
   }
 }
