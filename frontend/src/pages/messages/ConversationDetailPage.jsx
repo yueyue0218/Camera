@@ -88,8 +88,7 @@ export function ConversationDetailPage() {
     setReworkRequirement,
     photoAuthorizationForm,
     setPhotoAuthorizationForm,
-    authorizationRemarks,
-    setAuthorizationRemarks
+    authorizationRemarks
   } = useConversationDrafts({
     conversationId,
     orderId: currentOrder?.orderId
