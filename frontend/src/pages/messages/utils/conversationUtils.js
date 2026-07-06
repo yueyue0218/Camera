@@ -15,6 +15,7 @@ const CONVERSATION_CACHE_VERSION = 2
 const LOCAL_MESSAGE_CACHE_VERSION = 1
 const CONVERSATION_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const LOCAL_MESSAGE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
+const LEAKED_TEST_CONVERSATION_PATTERN = /\b(?:online-check|provider reply message)\b/i
 
 export const roleMap = {
   CUSTOMER: USER_ROLE_LABELS.CUSTOMER,
@@ -107,6 +108,7 @@ export function mergeConversationRecords(remoteConversations, currentUser, activ
   const remoteList = Array.isArray(remoteConversations) ? remoteConversations : []
 
   remoteList.forEach(conversation => {
+    if (!isDisplayableConversationRecord(conversation)) return
     const conversationId = String(conversation.conversationId)
     const previous = merged.get(conversationId)
     const record = saveConversationRecord(conversation, {
@@ -115,6 +117,7 @@ export function mergeConversationRecords(remoteConversations, currentUser, activ
       location: previous?.location || '',
       lastMessage: previous?.lastMessage || (conversation.lastMessageTime ? '最近有新消息' : '点击进入对话')
     })
+    if (!isDisplayableConversationRecord(record)) return
     merged.set(conversationId, record)
   })
 
@@ -170,9 +173,16 @@ export function hasMojibakeText(value) {
     || /(?:闯€|â|Ã|Â|¤|€¦|€\?|å|ç|æ)/.test(text)
 }
 
+export function isDisplayableConversationRecord(record = {}) {
+  if (!record) return false
+  return !getConversationDisplayTextFields(record).some(value =>
+    hasMojibakeText(value) || LEAKED_TEST_CONVERSATION_PATTERN.test(String(value || ''))
+  )
+}
+
 export function sanitizeConversationDisplayText(value, fallback = 'Portra 用户') {
   const text = String(value || '').trim()
-  if (!text || hasMojibakeText(text)) return fallback
+  if (!text || hasMojibakeText(text) || LEAKED_TEST_CONVERSATION_PATTERN.test(text)) return fallback
   return text
 }
 
@@ -209,14 +219,29 @@ function isValidCachedConversation(record = {}) {
   const participantBId = Number(record.participantBId)
   if (!Number.isFinite(participantAId) || participantAId <= 0) return false
   if (!Number.isFinite(participantBId) || participantBId <= 0) return false
-  return ![
+  return isDisplayableConversationRecord(record)
+}
+
+function getConversationDisplayTextFields(record = {}) {
+  return [
     record.scene,
     record.title,
     record.sourceTitle,
+    record.subtitle,
+    record.summary,
     record.lastMessage,
+    record.content,
     record.counterpartyNickname,
-    record.otherUserNickname
-  ].some(hasMojibakeText)
+    record.otherUserNickname,
+    record.customerNickname,
+    record.customerName,
+    record.customerDisplayName,
+    record.providerNickname,
+    record.providerName,
+    record.providerDisplayName,
+    record.latestMessage?.content,
+    record.lastMessageObject?.content
+  ]
 }
 
 export function getOppositeUserId(conversation, currentUserId) {

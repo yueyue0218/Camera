@@ -10,6 +10,7 @@ import { ConversationList } from './components/ConversationList.jsx'
 import { MessagesSectionHeader } from './components/MessagesSectionHeader.jsx'
 import {
   getConversationRecordsForUser,
+  isDisplayableConversationRecord,
   mergeConversationRecords,
   saveConversationRecord
 } from './utils/conversationUtils.js'
@@ -237,6 +238,7 @@ async function hydrateConversationPreviews(conversations, currentUser) {
       latestQuotes: quotes,
       updatedAt
     }
+    if (!isDisplayableConversationRecord(nextConversation)) return null
     saveConversationRecord(nextConversation, {
       latestMessage,
       lastMessageObject: latestMessage,
@@ -246,7 +248,9 @@ async function hydrateConversationPreviews(conversations, currentUser) {
     })
     return nextConversation
   }))
-  return entries.map((entry, index) => entry.status === 'fulfilled' ? entry.value : conversations[index])
+  return entries
+    .map((entry, index) => entry.status === 'fulfilled' ? entry.value : conversations[index])
+    .filter(isDisplayableConversationRecord)
 }
 
 function buildMessageListNotice(error, scope) {
