@@ -169,14 +169,21 @@ class FileAccessPolicyTest {
         when(messageRepository.findByFileId(FILE_ID)).thenReturn(List.of(message));
         when(conversationRepository.findAllById(any())).thenReturn(List.of(conversation));
 
-        assertThatCode(() -> policy.assertCanDownload(privateFile("CERTIFICATION"), CUSTOMER_ID, UserRole.CUSTOMER))
+        assertThatCode(() -> policy.assertCanDownload(privateFile("MESSAGE_ATTACHMENT"), CUSTOMER_ID, UserRole.CUSTOMER))
                 .doesNotThrowAnyException();
+        assertThatCode(() -> policy.assertCanDownload(privateFile("MESSAGE_ATTACHMENT"), PROVIDER_ID, UserRole.PROVIDER))
+                .doesNotThrowAnyException();
+        assertThatThrownBy(() -> policy.assertCanDownload(privateFile("MESSAGE_ATTACHMENT"), OUTSIDER_ID, UserRole.CUSTOMER))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.FORBIDDEN);
     }
 
     @Test
     void publicWhitelistRejectsUnknownBizTypeAndKeepsPrivateRequestPrivate() {
         assertThat(policy.resolveVisibility("SERVICE_PORTFOLIO", "PUBLIC")).isEqualTo("PUBLIC");
         assertThat(policy.resolveVisibility("AVATAR", "PRIVATE")).isEqualTo("PRIVATE");
+        assertThat(policy.resolveVisibility("MESSAGE_ATTACHMENT", "PUBLIC")).isEqualTo("PRIVATE");
         assertThatThrownBy(() -> policy.resolveVisibility("UNRELATED_IMAGE", "PUBLIC"))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")

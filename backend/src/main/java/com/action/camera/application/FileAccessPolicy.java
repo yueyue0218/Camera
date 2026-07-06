@@ -45,6 +45,7 @@ public class FileAccessPolicy {
     private static final Set<String> PRIVATE_BIZ_TYPES = Set.of(
             "DELIVERY",
             "PHOTO_AUTHORIZATION",
+            "MESSAGE_ATTACHMENT",
             "REVIEW_EVIDENCE",
             "CERTIFICATION"
     );
@@ -56,6 +57,7 @@ public class FileAccessPolicy {
             "PUBLISH_IMAGE",
             "DELIVERY",
             "PHOTO_AUTHORIZATION",
+            "MESSAGE_ATTACHMENT",
             "REVIEW_EVIDENCE",
             "CERTIFICATION"
     );
@@ -154,7 +156,6 @@ public class FileAccessPolicy {
                                 || authorization.getExpireTime().isAfter(LocalDateTime.now())));
     }
 
-    // The message schema already has file_id; this only defines access for future attachment support.
     private boolean canAccessConversationFile(Long fileId, Long userId) {
         if (fileId == null || userId == null) {
             return false;
