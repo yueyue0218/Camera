@@ -43,8 +43,8 @@ export function ConversationThread({
   onChooseMessageImage,
   onChooseMessageFile,
   onRemoveAttachment,
-  onSaveSubmittedPhoto,
   onDownloadAttachment,
+  onMessageImageRemoteReady,
   onPayOrder,
   onCancelOrder,
   onConfirmOrder,
@@ -180,8 +180,6 @@ export function ConversationThread({
             const message = item.meta?.message
             if (!message) return null
             const mine = direction === 'self'
-            const isImage = message.messageType === 'IMAGE'
-            const canSaveSubmittedPhoto = isImage && !message.fileId && Number(message.senderId) === Number(conversation?.participantBId)
             return (
               <MessageBubble
                 key={message.messageId || item.key}
@@ -189,9 +187,8 @@ export function ConversationThread({
                 mine={mine}
                 actor={resolveActorDisplay(item.actor)}
                 currentUser={currentUser}
-                canSaveSubmittedPhoto={canSaveSubmittedPhoto}
-                onSaveSubmittedPhoto={() => onSaveSubmittedPhoto(message)}
                 onDownloadAttachment={() => onDownloadAttachment?.(message)}
+                onImageRemoteReady={onMessageImageRemoteReady}
                 onRetry={() => onRetryMessage?.(message)}
               />
             )
