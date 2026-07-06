@@ -6,15 +6,13 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { conversationApi, deliveryApi, fileApi, orderApi, photoAuthorizationApi, quoteApi } from '../../api.js'
 import { goToUserProfile } from '../../utils/orderNavigation.js'
-import { getNextOrderWorkflowRefreshDelay } from '../../utils/orderWorkflowModel.js'
 import { useWorkflowNavigate } from '../../hooks/useWorkflowNavigate.js'
 import { useWorkflowDraft } from '../../hooks/useWorkflowDraft.js'
-import { buildWorkflowCacheKey, mergeWorkflowViewState, readWorkflowViewState, writeWorkflowViewState } from '../../utils/workflowViewCache.js'
+import { mergeWorkflowViewState } from '../../utils/workflowViewCache.js'
 import { REWORK_REQUIREMENT_MAX_LENGTH } from '../../utils/workflowLimits.js'
 import {
   navigateToDeliveryFromConversation,
-  navigateToOrderFromConversation,
-  rememberLastConversation
+  navigateToOrderFromConversation
 } from '../../utils/conversationNavigation.js'
 import { ConversationThread } from './components/ConversationThread.jsx'
 import { ConversationWorkbenchPanel } from './components/ConversationWorkbenchPanel.jsx'
@@ -22,58 +20,40 @@ import { ConversationActionDialogs } from './components/ConversationActionDialog
 import { QuoteDraftDialog } from './components/QuoteDraftDialog.jsx'
 import { MessageWorkbenchErrorBoundary } from './components/MessageWorkbenchErrorBoundary.jsx'
 import { useConversationRealtime } from './hooks/useConversationRealtime.js'
+import { useConversationData } from './hooks/useConversationData.js'
 import { OrderCompletionDialog, PortraActionLink, PortraStatusPill, PortraWorkbenchFrame, PortraWorkflowFrame, usePortraFeedback } from '../../components/portra/index.js'
-import { usePortraAsyncAction } from '../../hooks/usePortraAsyncAction.js'
 import { PORTRA_LAYOUT } from '../../theme/portraSurfaceTokens.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from './MessageVisualTokens.js'
 import {
   addLocalMessage,
-  buildConversationFallback,
-  findConversationRecord,
-  getLocalMessages,
   getOppositeUserId,
-  saveConversationRecord,
   updateConversationLastMessage
 } from './utils/conversationUtils.js'
-import { markConversationRead } from './utils/conversationReadState.js'
-import {
-  loadConversationPeerProfile,
-  resolveConversationParticipants
-} from './utils/participantResolver.js'
 import {
   buildConversationWorkbenchViewModel,
   getCurrentUserId,
-  getUserRoleInConversation,
-  selectConversationOrder
+  getUserRoleInConversation
 } from './utils/workbenchState.js'
 import {
   buildQuotePayload,
   canEditQuote,
   createDefaultQuoteForm,
   createQuoteFormFromQuote,
-  getCWorkbenchErrorText,
   getQuoteConfirmationErrorText,
   getQuoteEntryHint,
 } from './utils/quoteUtils.js'
 import { validateQuoteFormModel } from './utils/quoteFormModel.js'
+import {
+  createOptimisticMessage,
+  formatMessagePreviewText,
+  markTemporaryMessageFailed,
+  normalizeRemoteMessage,
+  replaceTemporaryMessage
+} from './utils/conversationMessageState.js'
 
 const DETAIL_SHELL_HEIGHT = {
   xs: 'calc(100dvh - 212px)',
   md: 'calc(100dvh - 154px)'
-}
-
-function isLocalConversationId(value) {
-  return String(value || '').startsWith('local-')
-}
-
-function sameConversationId(conversation, conversationId) {
-  return String(conversation?.conversationId || '') === String(conversationId || '')
-}
-
-function canUseConversationRecord(conversation, currentUser, conversationId) {
-  if (!conversation || !sameConversationId(conversation, conversationId)) return false
-  if (conversation.isLocal) return true
-  return Boolean(getUserRoleInConversation(conversation, currentUser))
 }
 
 function createDeliveryDraft() {
@@ -96,22 +76,32 @@ function hasAuthorizationRemarkDraft(value) {
   return Object.values(value || {}).some(remark => String(remark || '').trim())
 }
 
-function findConversationById(conversations = [], conversationId) {
-  return conversations.find(item => sameConversationId(item, conversationId)) || null
-}
-
 export function ConversationDetailPage() {
   const { conversationId } = useParams()
   const navigate = useWorkflowNavigate()
   const rawNavigate = useNavigate()
   const { currentUser, switchRole } = useAuth()
-  const [conversation, setConversation] = useState(null)
-  const [messages, setMessages] = useState([])
-  const [quotes, setQuotes] = useState([])
-  const [currentOrder, setCurrentOrder] = useState(null)
-  const [statusLogs, setStatusLogs] = useState([])
-  const [deliveryRecords, setDeliveryRecords] = useState([])
-  const [photoAuthorizations, setPhotoAuthorizations] = useState([])
+  const {
+    conversation,
+    messages,
+    setMessages,
+    quotes,
+    currentOrder,
+    statusLogs,
+    deliveryRecords,
+    photoAuthorizations,
+    notice,
+    setNotice,
+    setPageLoading,
+    loading,
+    viewCacheKey,
+    cachedViewState,
+    participantModel,
+    run,
+    loadConversationData,
+    refreshConversationData,
+    refreshConversationMessages
+  } = useConversationData({ conversationId, currentUser })
   const [content, setContent] = useState('')
   const [pendingAttachment, setPendingAttachment] = useState(null)
   const pendingAttachmentRef = useRef(null)
@@ -122,13 +112,10 @@ export function ConversationDetailPage() {
   const [editingQuotationId, setEditingQuotationId] = useState(null)
   const [quoteValidationErrors, setQuoteValidationErrors] = useState([])
   const [quoteFieldErrors, setQuoteFieldErrors] = useState({})
-  const [notice, setNotice] = useState(null)
-  const [pageLoading, setPageLoading] = useState(false)
   const [activeAction, setActiveAction] = useState(null)
   const [activeQuote, setActiveQuote] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('WECHAT')
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
-  const [peerProfile, setPeerProfile] = useState(null)
   const feedback = usePortraFeedback()
   const orderDraftScope = `conversation:${conversationId}:order:${currentOrder?.orderId || 'none'}`
   const deliveryDraft = useWorkflowDraft(`${orderDraftScope}:delivery`, createDeliveryDraft, isDeliveryDraftDirty)
@@ -159,210 +146,6 @@ export function ConversationDetailPage() {
   }, [])
   const authorizationRemarks = authorizationRemarkDraft.value || {}
   const setAuthorizationRemarks = authorizationRemarkDraft.setValue
-  const { run: runWorkflowAction, loading: actionLoading } = usePortraAsyncAction({
-    errorMessage: getCWorkbenchErrorText
-  })
-  const loading = pageLoading || actionLoading
-  const viewCacheKey = buildWorkflowCacheKey('message-detail', conversationId, currentUser.role)
-  const cachedViewState = readWorkflowViewState(viewCacheKey) || {}
-
-  useEffect(() => {
-    rememberLastConversation(conversationId, {
-      orderId: currentOrder?.orderId,
-      role: currentUser.role
-    })
-  }, [conversationId, currentOrder?.orderId, currentUser.role])
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function initializeConversation() {
-      const stored = findConversationRecord(conversationId)
-      const cached = readWorkflowViewState(viewCacheKey)
-      const cachedConversation = canUseConversationRecord(cached?.conversation, currentUser, conversationId)
-        ? cached.conversation
-        : null
-      const storedConversation = canUseConversationRecord(stored, currentUser, conversationId)
-        ? stored
-        : null
-      const localFallback = !cachedConversation && !storedConversation && isLocalConversationId(conversationId)
-        ? buildConversationFallback(conversationId)
-        : null
-      const initialConversation = cachedConversation || storedConversation || localFallback
-
-      if (initialConversation) {
-        if (cancelled) return
-        setConversation(initialConversation)
-        if (cachedConversation) {
-          setMessages(Array.isArray(cached?.messages) ? cached.messages : [])
-          setQuotes(Array.isArray(cached?.quotes) ? cached.quotes : [])
-          if (cached?.currentOrder) {
-            setCurrentOrder(cached.currentOrder)
-            setStatusLogs(Array.isArray(cached?.statusLogs) ? cached.statusLogs : [])
-            setDeliveryRecords(Array.isArray(cached?.deliveryRecords) ? cached.deliveryRecords : [])
-            setPhotoAuthorizations(Array.isArray(cached?.photoAuthorizations) ? cached.photoAuthorizations : [])
-          } else {
-            clearOrderWorkbench()
-          }
-        } else {
-          setMessages([])
-          setQuotes([])
-          clearOrderWorkbench()
-        }
-        if (initialConversation.isLocal) {
-          loadConversationData(initialConversation)
-          return
-        }
-      }
-
-      setPageLoading(true)
-      setNotice(null)
-      setMessages([])
-      setQuotes([])
-      clearOrderWorkbench()
-      try {
-        const remoteConversations = await conversationApi.list(currentUser)
-        const remoteConversation = findConversationById(remoteConversations || [], conversationId)
-        if (!remoteConversation) {
-          throw new Error('会话不存在或当前身份无权查看')
-        }
-        const hydratedConversation = saveConversationRecord(remoteConversation)
-        if (cancelled) return
-        setConversation(hydratedConversation)
-        await loadConversationData(hydratedConversation)
-      } catch (error) {
-        if (cancelled) return
-        setConversation(null)
-        setNotice({
-          type: 'error',
-          text: getCWorkbenchErrorText(error, '会话不存在或当前身份无权查看')
-        })
-      } finally {
-        if (!cancelled) setPageLoading(false)
-      }
-    }
-
-    initializeConversation()
-    return () => {
-      cancelled = true
-    }
-  }, [conversationId, getCurrentUserId(currentUser), currentUser.role, currentUser.token])
-
-  useEffect(() => {
-    if (!conversation) return
-    writeWorkflowViewState(viewCacheKey, {
-      ...(readWorkflowViewState(viewCacheKey) || {}),
-      conversation,
-      messages,
-      quotes,
-      currentOrder,
-      statusLogs,
-      deliveryRecords,
-      photoAuthorizations
-    })
-  }, [viewCacheKey, conversation, messages, quotes, currentOrder, statusLogs, deliveryRecords, photoAuthorizations])
-
-  const participantModel = resolveConversationParticipants(conversation, currentUser, peerProfile)
-
-  useEffect(() => {
-    let cancelled = false
-    let objectUrl = ''
-    setPeerProfile(null)
-    if (!participantModel.peerUserId) return undefined
-    loadConversationPeerProfile(participantModel.peerUserId, participantModel.peerRole, currentUser)
-      .then(profile => {
-        if (cancelled || !profile) return
-        objectUrl = profile.avatarObjectUrl || ''
-        setPeerProfile(profile)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
-    }
-  }, [participantModel.peerUserId, participantModel.peerRole, currentUser.token])
-
-  async function run(action, successText) {
-    setNotice(null)
-    return runWorkflowAction(action, {
-      successMessage: successText
-    })
-  }
-
-  async function loadConversationData(record = conversation) {
-    if (!record) return
-    if (record.isLocal) {
-      setMessages(getLocalMessages(record.conversationId))
-      setQuotes([])
-      clearOrderWorkbench()
-      return
-    }
-    await run(async () => {
-      await refreshConversationData(record)
-    })
-  }
-
-  async function refreshConversationData(record = conversation, preferredOrderId = null) {
-    if (!record || record.isLocal) return
-    const [nextMessages, nextQuotes, nextOrders] = await Promise.all([
-      conversationApi.messages(record.backendConversationId || record.conversationId, currentUser),
-      conversationApi.quotes(record.backendConversationId || record.conversationId, currentUser),
-      orderApi.list({}, currentUser)
-    ])
-    setMessages(previous => mergeConversationMessages(previous, nextMessages))
-    setQuotes(nextQuotes)
-    const latestMessage = getLatestMessage(nextMessages)
-    saveConversationRecord(record, {
-      latestMessage,
-      lastMessageObject: latestMessage,
-      latestMessageSenderId: latestMessage?.senderId ?? null,
-      latestQuotes: nextQuotes || [],
-      updatedAt: latestMessage?.createdAt || record.updatedAt
-    })
-    const selectedOrder = preferredOrderId
-      ? { orderId: preferredOrderId }
-      : selectConversationOrder(nextOrders || [], record, nextQuotes || [])
-    if (selectedOrder?.orderId) {
-      await loadOrderWorkbench(selectedOrder.orderId)
-    } else {
-      clearOrderWorkbench()
-    }
-  }
-
-  async function refreshConversationMessages(record = conversation) {
-    if (!record || record.isLocal) return
-    const nextMessages = await conversationApi.messages(record.backendConversationId || record.conversationId, currentUser)
-    setMessages(previous => mergeConversationMessages(previous, nextMessages))
-    const latestMessage = getLatestMessage(nextMessages)
-    if (latestMessage) {
-      saveConversationRecord(record, {
-        latestMessage,
-        lastMessageObject: latestMessage,
-        latestMessageSenderId: latestMessage.senderId ?? null,
-        updatedAt: latestMessage.createdAt || record.updatedAt
-      })
-    }
-  }
-
-  function clearOrderWorkbench() {
-    setCurrentOrder(null)
-    setStatusLogs([])
-    setDeliveryRecords([])
-    setPhotoAuthorizations([])
-  }
-
-  async function loadOrderWorkbench(orderId) {
-    const [detail, logs, deliveries, authorizations] = await Promise.all([
-      orderApi.detail(orderId, currentUser),
-      orderApi.statusLogs(orderId, currentUser),
-      deliveryApi.listByOrder(orderId, currentUser),
-      photoAuthorizationApi.listByOrder(orderId, currentUser)
-    ])
-    setCurrentOrder(detail)
-    setStatusLogs(logs || [])
-    setDeliveryRecords(deliveries || [])
-    setPhotoAuthorizations(authorizations || [])
-  }
 
   function chooseMessageAttachment(file, requestedKind) {
     if (!file) return
@@ -880,7 +663,7 @@ export function ConversationDetailPage() {
   useEffect(() => {
     if (!currentUser?.token || !currentUserId) return undefined
 
-    const backendConversationId = !isLocalConversationId(conversationId)
+    const backendConversationId = !String(conversationId || '').startsWith('local-')
       ? Number(conversation?.backendConversationId || conversation?.conversationId || conversationId)
       : null
     const normalizedConversationId = Number.isFinite(backendConversationId) && backendConversationId > 0
@@ -905,36 +688,6 @@ export function ConversationDetailPage() {
       reportPresence(false)
     }
   }, [conversation?.backendConversationId, conversation?.conversationId, conversationId, currentUser, currentUserId])
-  useEffect(() => {
-    if (!conversation) return
-    const latestMessage = getLatestMessage(messages)
-    markConversationRead({
-      ...conversation,
-      latestMessage,
-      latestMessageSenderId: latestMessage?.senderId ?? conversation.latestMessageSenderId,
-      updatedAt: latestMessage?.createdAt || conversation.updatedAt
-    }, currentUser)
-  }, [conversation?.conversationId, currentUser?.userId, currentUser?.id, messages.length])
-  useEffect(() => {
-    if (!conversation || conversation.isLocal || !currentOrder?.orderId) return undefined
-    const refreshCurrentOrder = () => refreshConversationData(conversation, currentOrder.orderId)
-    const intervalId = window.setInterval(refreshCurrentOrder, 30000)
-    const refreshDelay = getNextOrderWorkflowRefreshDelay(currentOrder)
-    const timeoutId = refreshDelay ? window.setTimeout(refreshCurrentOrder, refreshDelay) : null
-    return () => {
-      window.clearInterval(intervalId)
-      if (timeoutId) window.clearTimeout(timeoutId)
-    }
-  }, [
-    conversation?.conversationId,
-    conversation?.isLocal,
-    currentOrder?.orderId,
-    currentOrder?.status,
-    currentOrder?.shootStartTime,
-    currentOrder?.shootEndTime,
-    currentOrder?.startTime,
-    currentOrder?.endTime
-  ])
   useEffect(() => {
     if (conversation && actions.roleMismatch) {
       const correctRole = getUserRoleInConversation(conversation, currentUser)
@@ -1165,174 +918,6 @@ export function ConversationDetailPage() {
     </PortraWorkflowFrame>
     </MessageWorkbenchErrorBoundary>
   )
-}
-
-function getLatestMessage(messages = []) {
-  return [...(Array.isArray(messages) ? messages : [])]
-    .filter(Boolean)
-    .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0))[0] || null
-}
-
-function createOptimisticMessage(conversation, currentUser, content, messageType, attachment = null) {
-  const conversationId = conversation?.backendConversationId || conversation?.conversationId
-  const tempId = `temp-${Date.now()}-${Math.round(Math.random() * 100000)}`
-  const normalizedAttachment = attachment ? {
-    file: attachment.file,
-    fileName: attachment.name,
-    mimeType: attachment.mimeType,
-    size: attachment.size,
-    kind: attachment.kind,
-    localPreviewUrl: attachment.previewUrl
-  } : null
-  return {
-    messageId: tempId,
-    clientTempId: tempId,
-    conversationId,
-    senderId: getCurrentUserId(currentUser),
-    messageType,
-    content,
-    fileId: null,
-    fileName: normalizedAttachment?.fileName || null,
-    mimeType: normalizedAttachment?.mimeType || null,
-    size: normalizedAttachment?.size || null,
-    fileType: normalizedAttachment?.kind || null,
-    attachmentKind: normalizedAttachment?.kind || null,
-    attachment: normalizedAttachment,
-    createdAt: new Date().toISOString(),
-    optimistic: true,
-    deliveryStatus: 'sending'
-  }
-}
-
-function normalizeRemoteMessages(messages = []) {
-  return (Array.isArray(messages) ? messages : []).filter(Boolean).map(normalizeRemoteMessage)
-}
-
-function normalizeRemoteMessage(message) {
-  if (!message) return message
-  return {
-    ...message,
-    deliveryStatus: 'sent',
-    optimistic: false,
-    errorMessage: ''
-  }
-}
-
-function mergeConversationMessages(previous = [], incoming = []) {
-  const next = [...(Array.isArray(previous) ? previous : [])]
-  normalizeRemoteMessages(incoming).forEach(remoteMessage => {
-    const remoteIndex = next.findIndex(item => isSamePersistedMessage(item, remoteMessage))
-    if (remoteIndex >= 0) {
-      next[remoteIndex] = mergeSentMessageWithLocalPreview(
-        { ...next[remoteIndex], ...remoteMessage, deliveryStatus: 'sent', optimistic: false },
-        next[remoteIndex]
-      )
-      return
-    }
-    const localIndex = next.findIndex(item => isMatchingTemporaryMessage(item, remoteMessage))
-    if (localIndex >= 0) {
-      next[localIndex] = mergeSentMessageWithLocalPreview(remoteMessage, next[localIndex])
-      return
-    }
-    next.push(remoteMessage)
-  })
-  return sortMessages(next)
-}
-
-function replaceTemporaryMessage(previous = [], tempId, sentMessage) {
-  if (!sentMessage) return markTemporaryMessageFailed(previous, tempId)
-  const normalized = normalizeRemoteMessage(sentMessage)
-  return sortMessages(previous.map(message => {
-    if (String(message.messageId) === String(tempId) || String(message.clientTempId) === String(tempId)) {
-      return mergeSentMessageWithLocalPreview(normalized, message)
-    }
-    return message
-  }))
-}
-
-function mergeSentMessageWithLocalPreview(sentMessage, localMessage) {
-  const normalized = normalizeRemoteMessage(sentMessage)
-  const localPreviewUrl = localMessage?.attachment?.localPreviewUrl || ''
-  if (!localPreviewUrl) return normalized
-  return {
-    ...normalized,
-    fileName: normalized.fileName || localMessage.fileName || localMessage.attachment?.fileName || null,
-    mimeType: normalized.mimeType || localMessage.mimeType || localMessage.attachment?.mimeType || null,
-    size: normalized.size || localMessage.size || localMessage.attachment?.size || null,
-    fileType: normalized.fileType || localMessage.fileType || localMessage.attachment?.kind || null,
-    attachmentKind: normalized.attachmentKind || localMessage.attachmentKind || localMessage.attachment?.kind || null,
-    attachment: {
-      ...(localMessage.attachment || {}),
-      file: null,
-      fileId: normalized.fileId || localMessage.fileId || localMessage.attachment?.fileId || null,
-      fileName: normalized.fileName || localMessage.fileName || localMessage.attachment?.fileName || '',
-      mimeType: normalized.mimeType || localMessage.mimeType || localMessage.attachment?.mimeType || '',
-      size: normalized.size || localMessage.size || localMessage.attachment?.size || 0,
-      kind: normalized.attachmentKind || normalized.fileType || localMessage.attachment?.kind || localMessage.messageType,
-      localPreviewUrl
-    }
-  }
-}
-
-function markTemporaryMessageFailed(previous = [], tempId, error) {
-  const message = getSendErrorMessage(error)
-  return previous.map(item => {
-    if (String(item.messageId) === String(tempId) || String(item.clientTempId) === String(tempId)) {
-      return {
-        ...item,
-        deliveryStatus: 'failed',
-        optimistic: true,
-        errorMessage: message
-      }
-    }
-    return item
-  })
-}
-
-function isSamePersistedMessage(left, right) {
-  if (!left?.messageId || !right?.messageId) return false
-  if (isTemporaryMessageId(left.messageId) || isTemporaryMessageId(right.messageId)) return false
-  return String(left.messageId) === String(right.messageId)
-}
-
-function isMatchingTemporaryMessage(localMessage, remoteMessage) {
-  if (!localMessage || !remoteMessage || !isTemporaryMessageId(localMessage.messageId)) return false
-  if (Number(localMessage.senderId) !== Number(remoteMessage.senderId)) return false
-  if (String(localMessage.messageType || 'TEXT') !== String(remoteMessage.messageType || 'TEXT')) return false
-  if (String(localMessage.content || '') !== String(remoteMessage.content || '')) return false
-  if (localMessage.fileName && remoteMessage.fileName && String(localMessage.fileName) !== String(remoteMessage.fileName)) return false
-  const localTime = new Date(localMessage.createdAt || 0).getTime()
-  const remoteTime = new Date(remoteMessage.createdAt || 0).getTime()
-  if (!Number.isFinite(localTime) || !Number.isFinite(remoteTime)) return true
-  return Math.abs(remoteTime - localTime) < 2 * 60 * 1000
-}
-
-function formatMessagePreviewText(message = {}) {
-  const type = String(message.messageType || message.attachmentKind || '').toUpperCase()
-  if (type === 'IMAGE') {
-    const text = String(message.content || '').replace(/\s+/g, ' ').trim()
-    return text ? `[图片] ${text}` : '[图片]'
-  }
-  if (type === 'FILE') return `[附件] ${message.fileName || message.attachment?.fileName || message.attachment?.name || ''}`.trim()
-  return String(message.content || '').trim() || '还没有消息'
-}
-
-function isTemporaryMessageId(value) {
-  return String(value || '').startsWith('temp-')
-}
-
-function sortMessages(messages = []) {
-  return [...messages].sort((left, right) => {
-    const leftTime = new Date(left?.createdAt || 0).getTime()
-    const rightTime = new Date(right?.createdAt || 0).getTime()
-    return (Number.isFinite(leftTime) ? leftTime : 0) - (Number.isFinite(rightTime) ? rightTime : 0)
-  })
-}
-
-function getSendErrorMessage(error) {
-  if (error?.isNetworkError) return '网络连接异常，点击重试。'
-  if (error?.status === 401 || error?.status === 403) return '登录状态或权限异常，请刷新后重试。'
-  return error?.message || '发送失败，点击重试。'
 }
 
 const noticeSx = {
