@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Alert, Avatar, Box, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material'
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
@@ -28,7 +28,6 @@ import { PORTRA_LAYOUT } from '../../theme/portraSurfaceTokens.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from './MessageVisualTokens.js'
 import {
   addLocalMessage,
-  addSavedPhoto,
   buildConversationFallback,
   findConversationRecord,
   getLocalMessages,
@@ -115,6 +114,8 @@ export function ConversationDetailPage() {
   const [photoAuthorizations, setPhotoAuthorizations] = useState([])
   const [content, setContent] = useState('')
   const [pendingAttachment, setPendingAttachment] = useState(null)
+  const pendingAttachmentRef = useRef(null)
+  const messagesRef = useRef([])
   const [messageSending, setMessageSending] = useState(false)
   const [quoteForm, setQuoteForm] = useState(() => createDefaultQuoteForm())
   const [showQuoteForm, setShowQuoteForm] = useState(false)
@@ -141,9 +142,21 @@ export function ConversationDetailPage() {
   const photoAuthorizationForm = photoAuthorizationDraft.value || createPhotoAuthorizationDraft()
   const setPhotoAuthorizationForm = photoAuthorizationDraft.setValue
 
-  useEffect(() => () => {
-    if (pendingAttachment?.previewUrl) URL.revokeObjectURL(pendingAttachment.previewUrl)
+  useEffect(() => {
+    pendingAttachmentRef.current = pendingAttachment
   }, [pendingAttachment])
+
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
+
+  useEffect(() => () => {
+    const previewUrls = new Set([
+      pendingAttachmentRef.current?.previewUrl,
+      ...messagesRef.current.map(message => message?.attachment?.localPreviewUrl)
+    ].filter(Boolean))
+    previewUrls.forEach(url => URL.revokeObjectURL(url))
+  }, [])
   const authorizationRemarks = authorizationRemarkDraft.value || {}
   const setAuthorizationRemarks = authorizationRemarkDraft.setValue
   const { run: runWorkflowAction, loading: actionLoading } = usePortraAsyncAction({
@@ -371,11 +384,15 @@ export function ConversationDetailPage() {
     })
   }
 
-  function removePendingAttachment() {
+  function clearPendingAttachment({ revokePreview = true } = {}) {
     setPendingAttachment(previous => {
-      if (previous?.previewUrl) URL.revokeObjectURL(previous.previewUrl)
+      if (revokePreview && previous?.previewUrl) URL.revokeObjectURL(previous.previewUrl)
       return null
     })
+  }
+
+  function removePendingAttachment() {
+    clearPendingAttachment()
   }
 
   async function sendMessage() {
@@ -430,7 +447,7 @@ export function ConversationDetailPage() {
         })
       }
       setContent('')
-      removePendingAttachment()
+      clearPendingAttachment({ revokePreview: false })
     } catch (error) {
       setMessages(previous => markTemporaryMessageFailed(previous, optimisticMessage.messageId, error))
     } finally {
@@ -473,19 +490,6 @@ export function ConversationDetailPage() {
     }
   }
 
-  function saveSubmittedPhoto(message) {
-    if (!message?.content || !conversation) return
-    addSavedPhoto({
-      photoId: `message-${message.messageId}`,
-      source: 'conversation-submission',
-      title: `${conversation.scene || '沟通'} 提交照片`,
-      imageData: message.content,
-      authorId: message.senderId,
-      createdAt: message.createdAt
-    })
-    feedback.success('照片已保存')
-  }
-
   async function downloadMessageAttachment(message) {
     const fileId = message?.fileId || message?.attachment?.fileId
     if (!fileId) return
@@ -501,6 +505,22 @@ export function ConversationDetailPage() {
     } catch (error) {
       feedback.error(error?.message || '附件下载失败，请稍后重试。')
     }
+  }
+
+  function releaseMessageLocalPreview(message, localPreviewUrl) {
+    if (!message?.messageId || !localPreviewUrl) return
+    setMessages(previous => previous.map(item => {
+      if (String(item.messageId) !== String(message.messageId)) return item
+      if (item.attachment?.localPreviewUrl !== localPreviewUrl) return item
+      return {
+        ...item,
+        attachment: {
+          ...item.attachment,
+          localPreviewUrl: ''
+        }
+      }
+    }))
+    URL.revokeObjectURL(localPreviewUrl)
   }
 
   async function createQuote(event) {
@@ -1062,8 +1082,8 @@ export function ConversationDetailPage() {
             onChooseMessageImage={file => chooseMessageAttachment(file, 'IMAGE')}
             onChooseMessageFile={file => chooseMessageAttachment(file, 'FILE')}
             onRemoveAttachment={removePendingAttachment}
-            onSaveSubmittedPhoto={saveSubmittedPhoto}
             onDownloadAttachment={downloadMessageAttachment}
+            onMessageImageRemoteReady={releaseMessageLocalPreview}
             onPayOrder={openPaymentDialog}
             onCancelOrder={cancelCurrentOrder}
             onConfirmOrder={confirmCurrentOrder}
@@ -1203,12 +1223,15 @@ function mergeConversationMessages(previous = [], incoming = []) {
   normalizeRemoteMessages(incoming).forEach(remoteMessage => {
     const remoteIndex = next.findIndex(item => isSamePersistedMessage(item, remoteMessage))
     if (remoteIndex >= 0) {
-      next[remoteIndex] = { ...next[remoteIndex], ...remoteMessage, deliveryStatus: 'sent', optimistic: false }
+      next[remoteIndex] = mergeSentMessageWithLocalPreview(
+        { ...next[remoteIndex], ...remoteMessage, deliveryStatus: 'sent', optimistic: false },
+        next[remoteIndex]
+      )
       return
     }
     const localIndex = next.findIndex(item => isMatchingTemporaryMessage(item, remoteMessage))
     if (localIndex >= 0) {
-      next[localIndex] = remoteMessage
+      next[localIndex] = mergeSentMessageWithLocalPreview(remoteMessage, next[localIndex])
       return
     }
     next.push(remoteMessage)
@@ -1221,10 +1244,34 @@ function replaceTemporaryMessage(previous = [], tempId, sentMessage) {
   const normalized = normalizeRemoteMessage(sentMessage)
   return sortMessages(previous.map(message => {
     if (String(message.messageId) === String(tempId) || String(message.clientTempId) === String(tempId)) {
-      return normalized
+      return mergeSentMessageWithLocalPreview(normalized, message)
     }
     return message
   }))
+}
+
+function mergeSentMessageWithLocalPreview(sentMessage, localMessage) {
+  const normalized = normalizeRemoteMessage(sentMessage)
+  const localPreviewUrl = localMessage?.attachment?.localPreviewUrl || ''
+  if (!localPreviewUrl) return normalized
+  return {
+    ...normalized,
+    fileName: normalized.fileName || localMessage.fileName || localMessage.attachment?.fileName || null,
+    mimeType: normalized.mimeType || localMessage.mimeType || localMessage.attachment?.mimeType || null,
+    size: normalized.size || localMessage.size || localMessage.attachment?.size || null,
+    fileType: normalized.fileType || localMessage.fileType || localMessage.attachment?.kind || null,
+    attachmentKind: normalized.attachmentKind || localMessage.attachmentKind || localMessage.attachment?.kind || null,
+    attachment: {
+      ...(localMessage.attachment || {}),
+      file: null,
+      fileId: normalized.fileId || localMessage.fileId || localMessage.attachment?.fileId || null,
+      fileName: normalized.fileName || localMessage.fileName || localMessage.attachment?.fileName || '',
+      mimeType: normalized.mimeType || localMessage.mimeType || localMessage.attachment?.mimeType || '',
+      size: normalized.size || localMessage.size || localMessage.attachment?.size || 0,
+      kind: normalized.attachmentKind || normalized.fileType || localMessage.attachment?.kind || localMessage.messageType,
+      localPreviewUrl
+    }
+  }
 }
 
 function markTemporaryMessageFailed(previous = [], tempId, error) {
@@ -1262,7 +1309,10 @@ function isMatchingTemporaryMessage(localMessage, remoteMessage) {
 
 function formatMessagePreviewText(message = {}) {
   const type = String(message.messageType || message.attachmentKind || '').toUpperCase()
-  if (type === 'IMAGE') return '[图片]'
+  if (type === 'IMAGE') {
+    const text = String(message.content || '').replace(/\s+/g, ' ').trim()
+    return text ? `[图片] ${text}` : '[图片]'
+  }
   if (type === 'FILE') return `[附件] ${message.fileName || message.attachment?.fileName || message.attachment?.name || ''}`.trim()
   return String(message.content || '').trim() || '还没有消息'
 }
