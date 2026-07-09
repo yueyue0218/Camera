@@ -78,6 +78,8 @@ npm install && npm run dev
 
 完整演示流程（账号注册、双角色切换、完整订单链路）见 → [`docs/P4/DEMO_GUIDE.md`](docs/P4/DEMO_GUIDE.md)
 
+演示前建议阅读 [`docs/P4/DEMO_GUIDE.md#二十三性能与体验验收说明`](docs/P4/DEMO_GUIDE.md#二十三性能与体验验收说明)：其中说明了会话列表、聊天详情、图片消息即时预览、作品相册缩略图、Vite chunk warning 和线上演示预热建议。当前优化目标是减少白屏、闪烁和发送无反馈，不代表所有页面已完成生产级性能治理。
+
 ---
 
 ## 线上访问
@@ -123,6 +125,7 @@ npm install && npm run dev
 |---|---|
 | [`docs/P4/DEMO_GUIDE.md`](docs/P4/DEMO_GUIDE.md) | 本地运行与完整演示说明（24 节，含所有功能路径） |
 | [`docs/P4/BUG_FIX_LOG.md`](docs/P4/BUG_FIX_LOG.md) | 四名成员 Bug 修复日志 |
+| [`docs/P4/FINAL_REGRESSION_NOTES.md`](docs/P4/FINAL_REGRESSION_NOTES.md) | C 模块最终回归与性能体验稳定化记录 |
 | [`docs/P4/SPRINT_BOARD.md`](docs/P4/SPRINT_BOARD.md) | Sprint 任务看板（全部完成） |
 | [`docs/P4/CI_RUN_RECORD.md`](docs/P4/CI_RUN_RECORD.md) | CI 流水线运行记录 |
 | [`docs/P4/coverage/README.md`](docs/P4/coverage/README.md) | JaCoCo 覆盖率报告摘要 |

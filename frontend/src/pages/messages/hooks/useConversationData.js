@@ -100,6 +100,14 @@ export function useConversationData({ conversationId, currentUser }) {
           loadConversationData(initialConversation)
           return
         }
+        setPageLoading(!cachedConversation)
+        setNotice(null)
+        try {
+          await loadConversationData(initialConversation)
+        } finally {
+          if (!cancelled) setPageLoading(false)
+        }
+        return
       }
 
       setPageLoading(true)

@@ -99,27 +99,29 @@ export function DeliveryGalleryPage() {
     const urls = {}
     async function loadPreviews() {
       const imageFiles = files.filter(file => file.fileId && isImageDeliveryFile(file))
+      setPreviewUrls({})
       await Promise.all(imageFiles.map(async file => {
         try {
           const url = await fileApi.downloadObjectUrl(file.fileId, currentUser)
-          if (!cancelled) urls[file.id] = url
+          urls[file.id] = url
+          if (!cancelled) {
+            setPreviewUrls(previous => ({
+              ...previous,
+              [file.id]: url,
+              [file.fileId]: url
+            }))
+          }
         } catch {
           // Preview is optional. The gallery keeps a stable placeholder when a file cannot be rendered.
         }
       }))
-      if (!cancelled) setPreviewUrls(urls)
     }
-    setPreviewUrls({})
     loadPreviews()
     return () => {
       cancelled = true
       Object.values(urls).forEach(url => URL.revokeObjectURL(url))
     }
   }, [fileKey, currentUser])
-
-  useEffect(() => () => {
-    Object.values(previewUrls).forEach(url => URL.revokeObjectURL(url))
-  }, [previewUrls])
 
   function toggleSelected(file) {
     const fileId = getGallerySelectionId(file)

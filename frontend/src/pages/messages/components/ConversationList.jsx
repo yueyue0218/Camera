@@ -31,8 +31,7 @@ export function ConversationList({ conversations, currentUser, onOpenConversatio
         const profile = await loadConversationPeerProfile(peerUserId, peerRole, currentUser)
         if (profile?.avatarObjectUrl) avatarObjectUrlsRef.current.push(profile.avatarObjectUrl)
         return [peerUserId, profile]
-      } catch (error) {
-        console.debug('[messages] failed to load conversation list peer profile', { peerUserId, error })
+      } catch {
         return [peerUserId, null]
       }
     })).then(entries => {

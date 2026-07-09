@@ -12,7 +12,7 @@ export function DeliveryFileGrid({
   files = [],
   mode = 'browse',
   compact = false,
-  previewUrls = {},
+  previewUrls,
   selectedFileIds,
   selectedIds = new Set(),
   onToggleSelect,
@@ -25,7 +25,8 @@ export function DeliveryFileGrid({
   const { currentUser } = useAuth()
   const selectMode = mode === 'select'
   const selectedSet = selectedFileIds || selectedIds || new Set()
-  const shouldLoadPreviews = !previewUrls || !Object.keys(previewUrls).length
+  const externalPreviewUrls = previewUrls || {}
+  const shouldLoadPreviews = previewUrls == null
   const loadedPreviews = useDeliveryFilePreviews(files, currentUser, { enabled: shouldLoadPreviews })
 
   function isSelected(file) {
@@ -77,8 +78,8 @@ export function DeliveryFileGrid({
     }}>
       {files.map((file, index) => {
         const selected = isSelected(file)
-        const previewUrl = previewUrls[file.id]
-          || previewUrls[file.fileId]
+        const previewUrl = externalPreviewUrls[file.id]
+          || externalPreviewUrls[file.fileId]
           || loadedPreviews.previewUrls[getPreviewKey(file)]
         const loadingPreview = loadedPreviews.loadingIds.has(getPreviewKey(file))
         const image = isImageDeliveryFile(file)
@@ -205,11 +206,12 @@ export function DeliveryFileGrid({
 
 function BrowseDeliveryGallery({ files, previewUrls, loadedPreviews, onPreview, onDownload }) {
   const single = files.length === 1
+  const externalPreviewUrls = previewUrls || {}
   return (
     <Box sx={browseGallerySx(single)}>
       {files.map((file, index) => {
-        const previewUrl = previewUrls[file.id]
-          || previewUrls[file.fileId]
+        const previewUrl = externalPreviewUrls[file.id]
+          || externalPreviewUrls[file.fileId]
           || loadedPreviews.previewUrls[getPreviewKey(file)]
         const loadingPreview = loadedPreviews.loadingIds.has(getPreviewKey(file))
         const image = isImageDeliveryFile(file)

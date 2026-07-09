@@ -22,11 +22,8 @@ export function useConversationRealtime({
       running = true
       try {
         await refreshRef.current?.()
-      } catch (error) {
-        console.debug('[messages] realtime refresh skipped', {
-          conversationId,
-          message: error?.message
-        })
+      } catch {
+        // Background refresh is best-effort; visible errors are handled by explicit actions.
       } finally {
         running = false
       }

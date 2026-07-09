@@ -117,18 +117,15 @@ export function useOrdersData({
   async function loadOrders(nextFocusOrderId = selectedOrder?.orderId, options = {}) {
     const { preserveDrafts = true } = options
     await run(async () => {
-      const nextOrders = await orderApi.list({
-        role: currentUser.role === 'PROVIDER' ? 'provider' : 'customer',
-        status: statusFilter
-      }, currentUser)
-      let nextInvitations = []
-      if (currentUser.role === 'PROVIDER') {
-        try {
-          nextInvitations = await demandApi.sentInvitations(currentUser)
-        } catch {
-          nextInvitations = []
-        }
-      }
+      const [nextOrders, nextInvitations] = await Promise.all([
+        orderApi.list({
+          role: currentUser.role === 'PROVIDER' ? 'provider' : 'customer',
+          status: statusFilter
+        }, currentUser),
+        currentUser.role === 'PROVIDER'
+          ? demandApi.sentInvitations(currentUser).catch(() => [])
+          : Promise.resolve([])
+      ])
       const roleOrders = asArray(nextOrders).filter(order => currentUser.role === 'PROVIDER'
         ? Number(order.providerUserId) === Number(currentUser.userId)
         : Number(order.customerId) === Number(currentUser.userId))
@@ -167,12 +164,14 @@ export function useOrdersData({
         feedback.warning('订单信息暂时不可用，请刷新后重试。')
         return false
       }
-      const logs = asArray(await optionalOrderData(() => orderApi.statusLogs(orderId, currentUser)))
-      const deliveries = asArray(await optionalOrderData(() => deliveryApi.listByOrder(orderId, currentUser)))
-      const authorizations = asArray(await optionalOrderData(() => photoAuthorizationApi.listByOrder(orderId, currentUser)))
+      const [logs, deliveries, authorizations, remoteReviews] = await Promise.all([
+        optionalOrderData(() => orderApi.statusLogs(orderId, currentUser)),
+        optionalOrderData(() => deliveryApi.listByOrder(orderId, currentUser)),
+        optionalOrderData(() => photoAuthorizationApi.listByOrder(orderId, currentUser)),
+        optionalOrderData(() => reviewApi.listByOrder(orderId, currentUser), [])
+      ])
       let reviews = asArray(getLocalReviewsByOrder(orderId))
-      const remoteReviews = asArray(await optionalOrderData(() => reviewApi.listByOrder(orderId, currentUser), []))
-      reviews = mergeReviewLists(remoteReviews, reviews)
+      reviews = mergeReviewLists(asArray(remoteReviews), reviews)
       let complaints = asArray(getArbitrationsByOrder(orderId))
       const complaintReviewIds = reviews
         .map(review => review.reviewId)
@@ -187,9 +186,9 @@ export function useOrdersData({
       }
       setSelectedOrder(detail)
       saveOrderSnapshots([detail])
-      setStatusLogs(logs)
-      setDeliveryRecords(deliveries)
-      setPhotoAuthorizations(authorizations)
+      setStatusLogs(asArray(logs))
+      setDeliveryRecords(asArray(deliveries))
+      setPhotoAuthorizations(asArray(authorizations))
       setOrderReviews(reviews)
       setArbitrations(complaints)
       if (!preserveDrafts) {

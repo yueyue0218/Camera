@@ -92,6 +92,14 @@ export function MessagesPage() {
           ...conversation,
           activeOrder: selectConversationOrder(ordersForRole, conversation, [])
         }))
+        const baseWithKnownPreviews = baseConversations.map(conversation => {
+          const known = lastKnownConversationsRef.current.find(item => (
+            String(item.conversationId || '') === String(conversation.conversationId || '')
+          ))
+          return known ? { ...known, ...conversation, activeOrder: conversation.activeOrder } : conversation
+        })
+        lastKnownConversationsRef.current = baseWithKnownPreviews
+        setConversations(baseWithKnownPreviews)
         const nextConversations = await hydrateConversationPreviews(baseConversations, requestUser)
         if (requestVersionRef.current !== requestVersion) return
         lastKnownConversationsRef.current = nextConversations

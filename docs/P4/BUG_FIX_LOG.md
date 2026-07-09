@@ -288,6 +288,10 @@ C 线负责前端 UI 组件、交互流程、导航跳转、样式统一、报�
 | C-BUILD-01 | `vite build` 产物未开启代码分割，所有模块打包进一个 JS 文件（约 2.4MB） | 首屏加载时间超过 5 秒 | 已配置 `manualChunks` 将 vendor、页面路由分开打包，首屏 JS 降至约 300KB |
 | C-BUILD-02 | 图片资源未压缩直接提交到 git，仓库体积增长快 | 克隆仓库和 CI 拉取耗时长 | 已接入 `vite-plugin-imagemin`，构建时自动压缩图片 |
 | C-BUILD-03 | 环境变量 `VITE_API_BASE` 在本地未配置时 undefined，接口请求发到 `undefined/api/...` | 本地新拉取项目启动后所有请求失败 | 已在 `client.js` 加 fallback `http://localhost:8080`，同时在 README 说明 `.env.local` 配置方式 |
+| C-BUILD-04 | 消息、订单、作品相册等重型工作流页面仍由路由文件 eager import | 任意页面首次进入都可能提前加载过多工作流代码，Vite chunk warning 持续出现 | 已对 `/messages`、`/messages/:conversationId`、`/orders`、作品相册和旧交付页做路由级 `React.lazy`，并提供轻量加载反馈；chunk warning 后续仍可继续细分 |
+| C-BUILD-05 | 会话详情命中缓存后仍在后台刷新前清空消息和工作台状态 | 用户点进聊天时短暂空白或像在等待网络 | 已改为 stale-while-revalidate：先展示缓存消息和订单工作台，再后台刷新远端数据 |
+| C-BUILD-06 | 订单详情的状态日志、作品、授权、评价等附属数据串行加载 | 订单切换和详情打开体感偏慢 | 已将互不依赖的详情附属请求并行执行，同时保留草稿保护和原有状态判断 |
+| C-BUILD-07 | 作品相册父页面和文件网格同时下载缩略图，且旧清理逻辑可能提前 revoke objectURL | 相册首屏多余请求、缩略图闪烁或迟迟不出现 | 已避免重复缩略图下载，改为逐张渲染预览，并把 objectURL 生命周期收束到加载 effect |
 
 ---
 
