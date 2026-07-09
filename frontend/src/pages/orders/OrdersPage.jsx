@@ -43,7 +43,6 @@ import { ORDER_SURFACES, WORKFLOW_SOURCES, buildOrderListTarget, isOrderListSurf
 import { deriveOrderWorkflowState, getNextOrderWorkflowRefreshDelay } from '../../utils/orderWorkflowModel.js'
 import { getOrderActionVisibility } from '../../utils/orderActionVisibility.js'
 import { useWorkflowNavigate } from '../../hooks/useWorkflowNavigate.js'
-import { useWorkflowDraft } from '../../hooks/useWorkflowDraft.js'
 import { buildWorkflowCacheKey, readWorkflowViewState, writeWorkflowViewState } from '../../utils/workflowViewCache.js'
 import { REWORK_REQUIREMENT_MAX_LENGTH, getReworkRequirementHelperText } from '../../utils/workflowLimits.js'
 import {
@@ -84,6 +83,7 @@ import { OrderFollowupCards } from './components/OrderFollowupCards.jsx'
 import { OrderSummaryCard } from './components/OrderSummaryCard.jsx'
 import { OrderTimelineCard } from './components/OrderTimelineCard.jsx'
 import { ReviewList } from './components/ReviewList.jsx'
+import { useOrderDrafts } from './hooks/useOrderDrafts.js'
 import { DeliveryFileGrid } from '../deliveries/components/DeliveryFileGrid.jsx'
 import { DeliveryUploadPanel } from '../deliveries/components/DeliveryUploadPanel.jsx'
 import { buildDeliveryBatches, flattenDeliveryFiles, isAuthorizableDeliveryFile } from '../deliveries/deliveryDisplay.js'
@@ -469,42 +469,6 @@ function asArray(value) {
   return Array.isArray(value) ? value : []
 }
 
-function createDeliveryDraft() {
-  return { files: [], remark: '' }
-}
-
-function createPhotoAuthorizationDraft() {
-  return { fileIds: [], remark: '' }
-}
-
-function createReviewDraft() {
-  return { rating: 5, content: '沟通顺畅，履约体验很好。' }
-}
-
-function createArbitrationDraft() {
-  return { reason: '评价内容不实', description: '' }
-}
-
-function isDeliveryDraftDirty(value) {
-  return Boolean((Array.isArray(value?.files) && value.files.length) || String(value?.remark || '').trim())
-}
-
-function isPhotoAuthorizationDraftDirty(value) {
-  return Boolean((Array.isArray(value?.fileIds) && value.fileIds.length) || String(value?.remark || '').trim())
-}
-
-function isReviewDraftDirty(value) {
-  return Number(value?.rating || 5) !== 5 || String(value?.content || '').trim() !== '沟通顺畅，履约体验很好。'
-}
-
-function isArbitrationDraftDirty(value) {
-  return String(value?.reason || '') !== '评价内容不实' || String(value?.description || '').trim().length > 0
-}
-
-function hasAuthorizationRemarkDraft(value) {
-  return Object.values(value || {}).some(remark => String(remark || '').trim())
-}
-
 export function OrdersPage() {
   const location = useLocation()
   const navigate = useWorkflowNavigate()
@@ -554,25 +518,29 @@ export function OrdersPage() {
   const statusFilter = ''
   const [pageLoading, setPageLoading] = useState(false)
   const feedback = usePortraFeedback()
-  const orderDraftScope = `order:${selectedOrder?.orderId || focusOrderId || 'none'}`
-  const deliveryDraft = useWorkflowDraft(`${orderDraftScope}:delivery`, createDeliveryDraft, isDeliveryDraftDirty)
-  const reworkDraft = useWorkflowDraft(`${orderDraftScope}:rework`, () => '', value => String(value || '').trim().length > 0)
-  const photoAuthorizationDraft = useWorkflowDraft(`${orderDraftScope}:photo-authorization`, createPhotoAuthorizationDraft, isPhotoAuthorizationDraftDirty)
-  const authorizationRemarkDraft = useWorkflowDraft(`${orderDraftScope}:authorization-remarks`, () => ({}), hasAuthorizationRemarkDraft)
-  const reviewDraft = useWorkflowDraft(`${orderDraftScope}:review`, createReviewDraft, isReviewDraftDirty)
-  const arbitrationDraft = useWorkflowDraft(`${orderDraftScope}:arbitration`, createArbitrationDraft, isArbitrationDraftDirty)
-  const deliveryForm = deliveryDraft.value || createDeliveryDraft()
-  const setDeliveryForm = deliveryDraft.setValue
-  const reworkRequirement = reworkDraft.value || ''
-  const setReworkRequirement = reworkDraft.setValue
-  const photoAuthorizationForm = photoAuthorizationDraft.value || createPhotoAuthorizationDraft()
-  const setPhotoAuthorizationForm = photoAuthorizationDraft.setValue
-  const authorizationRemarks = authorizationRemarkDraft.value || {}
-  const setAuthorizationRemarks = authorizationRemarkDraft.setValue
-  const reviewForm = reviewDraft.value || createReviewDraft()
-  const setReviewForm = reviewDraft.setValue
-  const arbitrationForm = arbitrationDraft.value || createArbitrationDraft()
-  const setArbitrationForm = arbitrationDraft.setValue
+  const {
+    deliveryDraft,
+    reworkDraft,
+    photoAuthorizationDraft,
+    authorizationRemarkDraft,
+    reviewDraft,
+    arbitrationDraft,
+    deliveryForm,
+    setDeliveryForm,
+    reworkRequirement,
+    setReworkRequirement,
+    photoAuthorizationForm,
+    setPhotoAuthorizationForm,
+    authorizationRemarks,
+    setAuthorizationRemarks,
+    reviewForm,
+    setReviewForm,
+    arbitrationForm,
+    setArbitrationForm
+  } = useOrderDrafts({
+    orderId: selectedOrder?.orderId,
+    fallbackOrderId: focusOrderId
+  })
   const { run: runWorkflowAction, loading: actionLoading } = usePortraAsyncAction({
     errorMessage: error => error?.message || '操作失败，请稍后重试。'
   })
