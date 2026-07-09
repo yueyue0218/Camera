@@ -72,6 +72,7 @@ import { OrderSummaryCard } from './components/OrderSummaryCard.jsx'
 import { OrderTimelineCard } from './components/OrderTimelineCard.jsx'
 import { ReviewList } from './components/ReviewList.jsx'
 import { useOrderActions } from './hooks/useOrderActions.js'
+import { useOrderDialogs } from './hooks/useOrderDialogs.js'
 import { useOrderDrafts } from './hooks/useOrderDrafts.js'
 import { useOrdersData } from './hooks/useOrdersData.js'
 import { DeliveryFileGrid } from '../deliveries/components/DeliveryFileGrid.jsx'
@@ -208,21 +209,38 @@ export function OrdersPage() {
   )
   const explicitReturnToConversation = useMemo(() => getExplicitReturnToConversation(location), [location.search, location.state])
   const orderListSurface = useMemo(() => isOrderListSurface(location), [location.search, location.state])
-  const [reworkDialogOpen, setReworkDialogOpen] = useState(false)
-  const [deliveryUploadDialogOpen, setDeliveryUploadDialogOpen] = useState(false)
-  const [photoAuthorizationDialogOpen, setPhotoAuthorizationDialogOpen] = useState(false)
-  const [authorizationRecordsDialogOpen, setAuthorizationRecordsDialogOpen] = useState(false)
-  const [reviewRecordsDialogOpen, setReviewRecordsDialogOpen] = useState(false)
-  const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
-  const [previewDelivery, setPreviewDelivery] = useState(null)
-  const [previewUrl, setPreviewUrl] = useState('')
-  const [previewLoading, setPreviewLoading] = useState(false)
-  const [previewError, setPreviewError] = useState('')
-  const [showReviewForm, setShowReviewForm] = useState(false)
-  const [showArbitrationForm, setShowArbitrationForm] = useState(false)
-  const [followUpDialogOpen, setFollowUpDialogOpen] = useState(false)
-  const [followUpReview, setFollowUpReview] = useState(null)
-  const [followUpContent, setFollowUpContent] = useState('')
+  const {
+    reworkDialogOpen,
+    setReworkDialogOpen,
+    deliveryUploadDialogOpen,
+    setDeliveryUploadDialogOpen,
+    photoAuthorizationDialogOpen,
+    setPhotoAuthorizationDialogOpen,
+    authorizationRecordsDialogOpen,
+    setAuthorizationRecordsDialogOpen,
+    reviewRecordsDialogOpen,
+    setReviewRecordsDialogOpen,
+    completionDialogOpen,
+    setCompletionDialogOpen,
+    previewDelivery,
+    setPreviewDelivery,
+    previewUrl,
+    setPreviewUrl,
+    previewLoading,
+    setPreviewLoading,
+    previewError,
+    setPreviewError,
+    showReviewForm,
+    setShowReviewForm,
+    showArbitrationForm,
+    setShowArbitrationForm,
+    followUpDialogOpen,
+    setFollowUpDialogOpen,
+    followUpReview,
+    setFollowUpReview,
+    followUpContent,
+    setFollowUpContent
+  } = useOrderDialogs()
   const statusFilter = ''
   const feedback = usePortraFeedback()
   const { run: runWorkflowAction, loading: actionLoading } = usePortraAsyncAction({
