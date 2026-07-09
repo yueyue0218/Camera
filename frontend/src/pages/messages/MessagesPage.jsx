@@ -12,6 +12,7 @@ import {
   getConversationRecordsForUser,
   isDisplayableConversationRecord,
   mergeConversationRecords,
+  normalizeConversationList,
   saveConversationRecord
 } from './utils/conversationUtils.js'
 import { getCWorkbenchErrorText } from './utils/quoteUtils.js'
@@ -35,7 +36,11 @@ export function MessagesPage() {
     role: currentUserRole,
     token: currentUserToken
   } : null, [currentUserId, currentUserRole, currentUserToken])
-  const [conversations, setConversations] = useState(() => getConversationRecordsForUser(requestUser, currentUserRole))
+  const [conversations, setConversations] = useState(() => normalizeConversationState(
+    getConversationRecordsForUser(requestUser, currentUserRole),
+    requestUser,
+    currentUserRole
+  ))
   const [notice, setNotice] = useState(null)
   const [retryVersion, setRetryVersion] = useState(0)
   const lastKnownConversationsRef = useRef(conversations)
@@ -52,7 +57,11 @@ export function MessagesPage() {
   }, [location.search, navigate])
 
   useEffect(() => {
-    const initialConversations = getConversationRecordsForUser(requestUser, currentUserRole)
+    const initialConversations = normalizeConversationState(
+      getConversationRecordsForUser(requestUser, currentUserRole),
+      requestUser,
+      currentUserRole
+    )
     lastKnownConversationsRef.current = initialConversations
     setConversations(initialConversations)
     setNotice(null)
@@ -80,7 +89,7 @@ export function MessagesPage() {
       if (requestVersionRef.current !== requestVersion) return
 
       if (conversationResult.status === 'fulfilled') {
-        const conversationsForRole = filterConversationsByActiveRole(
+        const conversationsForRole = normalizeConversationState(
           mergeConversationRecords(conversationResult.value || [], requestUser, currentUserRole),
           requestUser,
           currentUserRole
@@ -92,15 +101,20 @@ export function MessagesPage() {
           ...conversation,
           activeOrder: selectConversationOrder(ordersForRole, conversation, [])
         }))
-        const baseWithKnownPreviews = baseConversations.map(conversation => {
-          const known = lastKnownConversationsRef.current.find(item => (
+        const knownConversations = normalizeConversationState(
+          lastKnownConversationsRef.current,
+          requestUser,
+          currentUserRole
+        )
+        const baseWithKnownPreviews = normalizeConversationState(baseConversations.map(conversation => {
+          const known = knownConversations.find(item => (
             String(item.conversationId || '') === String(conversation.conversationId || '')
           ))
           return known ? { ...known, ...conversation, activeOrder: conversation.activeOrder } : conversation
-        })
+        }), requestUser, currentUserRole)
         lastKnownConversationsRef.current = baseWithKnownPreviews
         setConversations(baseWithKnownPreviews)
-        const nextConversations = await hydrateConversationPreviews(baseConversations, requestUser)
+        const nextConversations = await hydrateConversationPreviews(baseWithKnownPreviews, requestUser)
         if (requestVersionRef.current !== requestVersion) return
         lastKnownConversationsRef.current = nextConversations
         setConversations(nextConversations)
@@ -110,11 +124,18 @@ export function MessagesPage() {
         return
       }
 
-      const fallbackConversations = lastKnownConversationsRef.current.length
-        ? lastKnownConversationsRef.current
-        : getConversationRecordsForUser(requestUser, currentUserRole)
+      const fallbackConversations = normalizeConversationState(
+        lastKnownConversationsRef.current.length
+          ? lastKnownConversationsRef.current
+          : getConversationRecordsForUser(requestUser, currentUserRole),
+        requestUser,
+        currentUserRole
+      )
       lastKnownConversationsRef.current = fallbackConversations
-      setConversations(previous => previous.length ? previous : fallbackConversations)
+      setConversations(previous => {
+        const safePrevious = normalizeConversationState(previous, requestUser, currentUserRole)
+        return safePrevious.length ? safePrevious : fallbackConversations
+      })
       applyNotice(buildMessageListNotice(conversationResult.reason, 'conversations'))
     } finally {
       loadingRef.current = false
@@ -213,8 +234,9 @@ const noticeSx = {
 }
 
 async function hydrateConversationPreviews(conversations, currentUser) {
-  if (!Array.isArray(conversations) || !conversations.length) return []
-  const entries = await Promise.allSettled(conversations.map(async conversation => {
+  const inputConversations = normalizeConversationState(conversations, currentUser, currentUser?.role)
+  if (!inputConversations.length) return []
+  const entries = await Promise.allSettled(inputConversations.map(async conversation => {
     if (conversation.isLocal) return conversation
     const backendConversationId = conversation.backendConversationId || conversation.conversationId
     const [messageResult, quoteResult] = await Promise.allSettled([
@@ -247,18 +269,30 @@ async function hydrateConversationPreviews(conversations, currentUser) {
       updatedAt
     }
     if (!isDisplayableConversationRecord(nextConversation)) return null
-    saveConversationRecord(nextConversation, {
+    const savedConversation = saveConversationRecord(nextConversation, {
       latestMessage,
       lastMessageObject: latestMessage,
       latestMessageSenderId: latestMessage?.senderId ?? null,
       latestQuotes: quotes,
       updatedAt
     })
-    return nextConversation
+    return savedConversation || nextConversation
   }))
-  return entries
-    .map((entry, index) => entry.status === 'fulfilled' ? entry.value : conversations[index])
-    .filter(isDisplayableConversationRecord)
+  return normalizeConversationState(entries
+    .map((entry, index) => entry.status === 'fulfilled' ? entry.value : inputConversations[index])
+    .filter(isDisplayableConversationRecord), currentUser, currentUser?.role)
+}
+
+function normalizeConversationState(conversations, currentUser, activeRole) {
+  return filterConversationsByActiveRole(
+    normalizeConversationList(conversations, {
+      currentUser,
+      activeRole,
+      allowLocal: true
+    }),
+    currentUser,
+    activeRole
+  )
 }
 
 function buildMessageListNotice(error, scope) {

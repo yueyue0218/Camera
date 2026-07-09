@@ -4,7 +4,7 @@ import { buildUserProfileTarget } from '../../../utils/orderNavigation.js'
 import { getCurrentUserId } from './workbenchState.js'
 
 const USER_PROFILE_STORAGE_KEY = 'camera-p4-user-profiles'
-const LEAKED_TEST_DISPLAY_PATTERN = /\b(?:online-check|provider reply message)\b/i
+const LEAKED_TEST_DISPLAY_PATTERN = /(?:online[-_\s]*check|provider\s+reply\s+message)/i
 
 export function resolveConversationParticipants(conversation, currentUser, profileOverride = null) {
   const currentUserId = getCurrentUserId(currentUser)
