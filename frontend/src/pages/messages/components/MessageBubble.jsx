@@ -5,9 +5,8 @@ import InsertDriveFileRoundedIcon from '@mui/icons-material/InsertDriveFileRound
 import { formatTime } from '../utils/conversationUtils.js'
 import { fileApi } from '../../../api/fileApi.js'
 import { getSafeDisplayText, PORTRA_COLORS, PORTRA_RADII, PORTRA_SHADOWS } from '../MessageVisualTokens.js'
-import { MessageActorAvatar } from './MessageActorAvatar.jsx'
 
-export function MessageBubble({ message, mine, actor, currentUser, onDownloadAttachment, onImageRemoteReady, onRetry }) {
+export function MessageBubble({ message, mine, currentUser, onDownloadAttachment, onImageRemoteReady, onRetry }) {
   if (!message) return null
   const attachment = getMessageAttachment(message)
   const isImage = attachment?.kind === 'IMAGE' || message.messageType === 'IMAGE'
@@ -15,73 +14,54 @@ export function MessageBubble({ message, mine, actor, currentUser, onDownloadAtt
   const deliveryStatus = message.deliveryStatus || (message.optimistic ? 'sending' : 'sent')
   const sending = deliveryStatus === 'sending'
   const failed = deliveryStatus === 'failed'
-  const avatarAccent = mine ? PORTRA_COLORS.blue : PORTRA_COLORS.subInk
   return (
-    <Box sx={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: 1.05 }}>
-      {!mine && (
-        <MessageActorAvatar
-          actor={actor}
-          dataKind="bubble"
-          accent={avatarAccent}
-          fallbackText="对"
-        />
-      )}
-      <Stack spacing={0.38} sx={bubbleStackSx(isImage, mine)}>
-        {isImage && hasAttachment ? (
-          <Stack spacing={0.65} sx={{ alignItems: mine ? 'flex-end' : 'flex-start' }}>
-            <AttachmentImage
-              attachment={attachment}
-              message={message}
-              currentUser={currentUser}
-              sending={sending}
-              failed={failed}
-              onRetry={onRetry}
-              onRemoteReady={onImageRemoteReady}
-            />
-            {message.content && (
-              <Paper elevation={0} sx={textBubbleSx(mine, true)}>
-                <Typography sx={messageTextSx}>{getSafeDisplayText(message.content, '')}</Typography>
-              </Paper>
-            )}
-          </Stack>
-        ) : hasAttachment ? (
-          <AttachmentFileCard attachment={attachment} mine={mine} onDownload={onDownloadAttachment} disabled={sending} />
-        ) : (
-          <Paper elevation={0} sx={textBubbleSx(mine)}>
-            <Typography sx={messageTextSx}>{getSafeDisplayText(message.content, '消息内容')}</Typography>
-          </Paper>
-        )}
-        <Stack direction="row" spacing={0.8} sx={{ alignItems: 'center', px: 0.4 }}>
-          <Typography variant="caption" sx={{ color: failed ? '#b42318' : PORTRA_COLORS.faintInk, fontSize: 12 }}>
-            {formatTime(message.createdAt)}
-          </Typography>
-          {sending && (
-            <Stack direction="row" spacing={0.45} sx={{ alignItems: 'center', color: PORTRA_COLORS.faintInk }}>
-              <CircularProgress size={11} thickness={5} sx={{ color: PORTRA_COLORS.faintInk }} />
-              <Typography variant="caption" sx={{ fontSize: 12, color: PORTRA_COLORS.faintInk }}>发送中</Typography>
-            </Stack>
-          )}
-          {failed && (
-            <Button
-              size="small"
-              color="error"
-              onClick={onRetry}
-              sx={{ minHeight: 22, px: 0.6, py: 0, fontSize: 12, fontWeight: 850 }}
-            >
-              发送失败，点击重试
-            </Button>
+    <Stack spacing={0.38} sx={bubbleStackSx(isImage, mine)}>
+      {isImage && hasAttachment ? (
+        <Stack spacing={0.65} sx={{ alignItems: mine ? 'flex-end' : 'flex-start' }}>
+          <AttachmentImage
+            attachment={attachment}
+            message={message}
+            currentUser={currentUser}
+            sending={sending}
+            failed={failed}
+            onRetry={onRetry}
+            onRemoteReady={onImageRemoteReady}
+          />
+          {message.content && (
+            <Paper elevation={0} sx={textBubbleSx(mine, true)}>
+              <Typography sx={messageTextSx}>{getSafeDisplayText(message.content, '')}</Typography>
+            </Paper>
           )}
         </Stack>
-      </Stack>
-      {mine && (
-        <MessageActorAvatar
-          actor={actor}
-          dataKind="bubble"
-          accent={avatarAccent}
-          fallbackText="我"
-        />
+      ) : hasAttachment ? (
+        <AttachmentFileCard attachment={attachment} mine={mine} onDownload={onDownloadAttachment} disabled={sending} />
+      ) : (
+        <Paper elevation={0} sx={textBubbleSx(mine)}>
+          <Typography sx={messageTextSx}>{getSafeDisplayText(message.content, '消息内容')}</Typography>
+        </Paper>
       )}
-    </Box>
+      <Stack direction="row" spacing={0.8} sx={{ alignItems: 'center', justifyContent: mine ? 'flex-end' : 'flex-start', px: 0.4 }}>
+        <Typography variant="caption" sx={{ color: failed ? '#b42318' : PORTRA_COLORS.faintInk, fontSize: 12 }}>
+          {formatTime(message.createdAt)}
+        </Typography>
+        {sending && (
+          <Stack direction="row" spacing={0.45} sx={{ alignItems: 'center', color: PORTRA_COLORS.faintInk }}>
+            <CircularProgress size={11} thickness={5} sx={{ color: PORTRA_COLORS.faintInk }} />
+            <Typography variant="caption" sx={{ fontSize: 12, color: PORTRA_COLORS.faintInk }}>发送中</Typography>
+          </Stack>
+        )}
+        {failed && (
+          <Button
+            size="small"
+            color="error"
+            onClick={onRetry}
+            sx={{ minHeight: 22, px: 0.6, py: 0, fontSize: 12, fontWeight: 850 }}
+          >
+            发送失败，点击重试
+          </Button>
+        )}
+      </Stack>
+    </Stack>
   )
 }
 
@@ -327,7 +307,8 @@ function downloadButtonSx(mine) {
 
 function bubbleStackSx(isImage, mine) {
   return {
-    maxWidth: isImage ? 'min(78vw, 380px)' : { xs: '86%', md: 'min(64%, 620px)' },
+    width: isImage ? 'fit-content' : '100%',
+    maxWidth: '100%',
     alignItems: mine ? 'flex-end' : 'flex-start'
   }
 }

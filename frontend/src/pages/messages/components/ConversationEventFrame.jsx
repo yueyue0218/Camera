@@ -1,6 +1,6 @@
-import { Box, Stack } from '@mui/material'
+import { Box } from '@mui/material'
 import { PORTRA_SURFACE } from '../../../theme/portraSurfaceTokens.js'
-import { MessageActorAvatar } from './MessageActorAvatar.jsx'
+import { ConversationMessageRow } from './ConversationMessageRow.jsx'
 
 export function ConversationEventFrame({
   self = false,
@@ -11,36 +11,31 @@ export function ConversationEventFrame({
   children
 }) {
   return (
-    <Box sx={{ display: 'flex', justifyContent: self ? 'flex-end' : 'flex-start', px: { xs: 0.25, sm: 0.5 } }}>
-      <Stack
-        direction="row"
-        spacing={1.55}
+    <ConversationMessageRow
+      direction={self ? 'self' : 'peer'}
+      actor={actor}
+      variant="event"
+      accent={accent}
+      dataKind={dataKind}
+      fallbackText={fallbackText || (self ? '我' : '对')}
+    >
+      <Box
         sx={{
-          alignItems: 'flex-start',
-          maxWidth: { xs: '100%', md: 'min(82%, 488px)' },
-          width: { xs: '100%', sm: 'auto' },
-          flexDirection: self ? 'row-reverse' : 'row'
+          width: '100%',
+          maxWidth: '100%',
+          minWidth: 0
         }}
       >
-        <MessageActorAvatar
-          actor={actor}
-          dataKind={dataKind}
-          accent={accent}
-          fallbackText={fallbackText || (self ? '我' : '对')}
-          sx={{ mt: 0.35, fontWeight: 950, flexShrink: 0 }}
-        />
-        <Box sx={{ width: { xs: 'min(calc(100vw - 112px), 400px)', sm: 400 }, maxWidth: '100%', minWidth: 0 }}>
-          {children}
-        </Box>
-      </Stack>
-    </Box>
+        {children}
+      </Box>
+    </ConversationMessageRow>
   )
 }
 
 export function conversationEventSurfaceSx({ self = false, accent = PORTRA_SURFACE.portraBlue } = {}) {
   return {
     width: '100%',
-    maxWidth: 400,
+    maxWidth: '100%',
     bgcolor: '#fffaf2',
     borderColor: self ? 'rgba(29, 78, 216, .16)' : 'rgba(79, 70, 60, .12)',
     borderRadius: '18px',

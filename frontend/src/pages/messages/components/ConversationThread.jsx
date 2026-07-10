@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Box, Button, Paper, Skeleton, Stack, Typography } from '@mui/material'
 import { ConversationComposer } from './ConversationComposer.jsx'
+import { ConversationMessageRow } from './ConversationMessageRow.jsx'
 import { ConversationSystemItem } from './ConversationSystemCard.jsx'
 import { MessageBubble } from './MessageBubble.jsx'
 import { MessageWorkbenchErrorBoundary } from './MessageWorkbenchErrorBoundary.jsx'
@@ -181,16 +182,23 @@ export function ConversationThread({
             if (!message) return null
             const mine = direction === 'self'
             return (
-              <MessageBubble
+              <ConversationMessageRow
                 key={message.messageId || item.key}
-                message={message}
-                mine={mine}
                 actor={resolveActorDisplay(item.actor)}
-                currentUser={currentUser}
-                onDownloadAttachment={() => onDownloadAttachment?.(message)}
-                onImageRemoteReady={onMessageImageRemoteReady}
-                onRetry={() => onRetryMessage?.(message)}
-              />
+                direction={mine ? 'self' : 'peer'}
+                variant="message"
+                accent={mine ? PORTRA_COLORS.blue : PORTRA_COLORS.subInk}
+                dataKind="bubble"
+              >
+                <MessageBubble
+                  message={message}
+                  mine={mine}
+                  currentUser={currentUser}
+                  onDownloadAttachment={() => onDownloadAttachment?.(message)}
+                  onImageRemoteReady={onMessageImageRemoteReady}
+                  onRetry={() => onRetryMessage?.(message)}
+                />
+              </ConversationMessageRow>
             )
           })}
           {!loading && !safeTimeline.length && (
