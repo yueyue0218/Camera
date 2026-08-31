@@ -79,6 +79,67 @@ test('public hall records receive only public status', () => {
   )
 })
 
+test('hall filtering never invents removed or reported records', () => {
+  const items = normalizeAdminHallItems([{ demandId: 1 }], [{ serviceId: 2 }])
+  assert.deepEqual(items.filter(item => item.type === 'demand').map(item => item.id), [1])
+  assert.deepEqual(items.filter(item => item.status === 'REMOVED'), [])
+  assert.deepEqual(items.filter(item => item.status === 'REPORTED'), [])
+})
+
+test('admin hall request params stay on public read-only lists', async () => {
+  const adminData = await import('../src/pages/admin/adminData.js')
+  assert.equal(typeof adminData.buildAdminHallRequestParams, 'function')
+  assert.deepEqual(adminData.buildAdminHallRequestParams('  夜景  '), {
+    demands: { page: 1, size: 20, status: 'OPEN', keyword: '夜景' },
+    services: { page: 1, size: 20, keyword: '夜景' }
+  })
+})
+
+test('admin hall cards expose only read-only navigation and disabled moderation', async () => {
+  const previousWindow = globalThis.window
+  globalThis.window = { location: { hostname: 'localhost' } }
+  const { createServer } = await import('vite')
+  const vite = await createServer({ appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } })
+
+  try {
+    await assert.doesNotReject(async () => {
+      const { AdminHallCard } = await vite.ssrLoadModule('/src/pages/admin/components/AdminHallCard.jsx')
+      const [{ createElement }, { renderToStaticMarkup }, { MemoryRouter }] = await Promise.all([
+        import('react'),
+        import('react-dom/server'),
+        import('react-router-dom')
+      ])
+      const markup = renderToStaticMarkup(createElement(
+        MemoryRouter,
+        null,
+        createElement(AdminHallCard, {
+          item: {
+            type: 'demand',
+            id: 7,
+            status: 'PUBLIC',
+            record: { demandId: 7, customerId: 42, title: '夜景约拍', description: '城墙边拍摄' }
+          },
+          currentUser: { userId: 1, role: 'ADMIN' },
+          onOpen: () => {},
+          onOpenPublisher: () => {}
+        })
+      ))
+
+      assert.match(markup, /公开展示/)
+      assert.match(markup, />查看详情<\/button>/)
+      assert.match(markup, />查看发布者<\/button>/)
+      assert.match(markup, /<button[^>]*disabled=""[^>]*>下架<\/button>/)
+      assert.match(markup, /<button[^>]*disabled=""[^>]*>恢复展示<\/button>/)
+      assert.equal((markup.match(/接口待接入/g) || []).length, 2)
+      assert.doesNotMatch(markup, /<button[^>]*>(?:响应|预约|编辑|发布)[^<]*<\/button>/)
+    })
+  } finally {
+    await vite.close()
+    if (previousWindow === undefined) delete globalThis.window
+    else globalThis.window = previousWindow
+  }
+})
+
 test('moment search matches title content and hydrated author name', () => {
   const moments = [
     { momentId: 1, authorId: 10, title: '夜景', content: '南京城墙' },

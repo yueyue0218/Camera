@@ -9,6 +9,15 @@ export function normalizeAdminHallItems(demands = [], services = []) {
   ]
 }
 
+export function buildAdminHallRequestParams(keyword = '') {
+  const normalizedKeyword = String(keyword).trim()
+  const keywordParam = normalizedKeyword ? { keyword: normalizedKeyword } : {}
+  return {
+    demands: { page: 1, size: 20, status: 'OPEN', ...keywordParam },
+    services: { page: 1, size: 20, ...keywordParam }
+  }
+}
+
 export function filterAdminMoments(moments = [], profiles = {}, keyword = '') {
   const normalizedKeyword = String(keyword).trim().toLocaleLowerCase('zh-CN')
   if (!normalizedKeyword) return moments

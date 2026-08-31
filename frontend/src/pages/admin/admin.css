@@ -586,6 +586,201 @@
   }
 }
 
+.admin-hall-toolbar {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.2fr) minmax(230px, .8fr) minmax(300px, 1fr);
+  gap: 18px;
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid var(--portra-line);
+  border-radius: 24px;
+  background: rgba(248, 243, 235, .88);
+  box-shadow: var(--portra-soft);
+}
+
+.admin-hall-search,
+.admin-filter-group {
+  min-width: 0;
+}
+
+.admin-hall-search > label,
+.admin-filter-group > span {
+  display: block;
+  margin-bottom: 9px;
+  color: var(--portra-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .1em;
+}
+
+.admin-hall-search > div {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-hall-search input {
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--portra-line);
+  border-radius: 999px;
+  background: #fffaf2;
+  color: var(--portra-ink);
+  font: inherit;
+}
+
+.admin-hall-search input:focus-visible {
+  border-color: var(--portra-blue);
+  outline: 3px solid rgba(13, 47, 178, .12);
+}
+
+.admin-filter-group > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-filter-button {
+  min-height: 40px;
+  padding: 0 13px;
+  border: 1px solid var(--portra-line);
+  border-radius: 999px;
+  background: #fffaf2;
+  color: var(--portra-muted);
+  font-weight: 750;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.admin-filter-button:hover:not(:disabled) {
+  border-color: rgba(13, 47, 178, .3);
+  color: var(--portra-blue);
+}
+
+.admin-filter-button:focus-visible,
+.admin-inline-error button:focus-visible {
+  outline: 3px solid rgba(13, 47, 178, .25);
+  outline-offset: 2px;
+}
+
+.admin-filter-button.is-active {
+  border-color: var(--portra-blue);
+  background: var(--portra-blue);
+  color: #fff;
+}
+
+.admin-filter-button:disabled {
+  border-style: dashed;
+  background: rgba(21, 19, 24, .04);
+  color: rgba(21, 19, 24, .4);
+  cursor: not-allowed;
+}
+
+.admin-filter-option {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-filter-option small {
+  color: var(--portra-muted);
+  font-size: 10px;
+  text-align: center;
+}
+
+.admin-hall-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 20px 2px 12px;
+  color: var(--portra-muted);
+  font-size: 13px;
+}
+
+.admin-hall-summary p {
+  margin: 0;
+}
+
+.admin-hall-summary strong {
+  color: var(--portra-blue);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-inline-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(196, 52, 36, .2);
+  border-radius: 16px;
+  background: rgba(255, 240, 235, .82);
+  color: #7a332b;
+  font-size: 13px;
+}
+
+.admin-inline-error button {
+  padding: 6px 9px;
+  border: 0;
+  background: transparent;
+  color: var(--portra-blue);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.admin-hall-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 16px;
+}
+
+.admin-hall-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--portra-line);
+  border-radius: 26px;
+  background: rgba(248, 243, 235, .72);
+  box-shadow: var(--portra-soft);
+}
+
+.admin-hall-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--portra-line);
+  color: var(--portra-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+.admin-hall-card-content {
+  min-width: 0;
+  padding: 14px;
+}
+
+.admin-hall-card-content .ticket-card,
+.admin-hall-card-content .showcase-card {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.admin-hall-card-actions {
+  padding: 14px 16px 16px;
+  border-top: 1px solid var(--portra-line);
+  background: rgba(242, 237, 230, .74);
+}
+
+.admin-hall-card-actions .admin-action-bar {
+  justify-content: flex-end;
+}
+
 @media (max-width: 900px) {
   .admin-stat-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -601,6 +796,10 @@
 
   .admin-overview-panel--pending {
     grid-column: auto;
+  }
+
+  .admin-hall-toolbar {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -635,5 +834,15 @@
 
   .admin-record-meta {
     justify-items: start;
+  }
+
+  .admin-hall-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-hall-summary,
+  .admin-inline-error {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
