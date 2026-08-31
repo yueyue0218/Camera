@@ -1119,6 +1119,460 @@
   color: var(--portra-muted);
 }
 
+.admin-user-section-kicker {
+  display: block;
+  color: var(--portra-blue);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .16em;
+}
+
+.admin-user-lookup {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, .8fr);
+  align-items: end;
+  gap: 28px;
+  margin-top: 24px;
+  padding: 24px;
+  border: 1px solid var(--portra-line);
+  border-radius: 24px;
+  background: rgba(248, 243, 235, .88);
+  box-shadow: var(--portra-soft);
+}
+
+.admin-user-lookup h2,
+.admin-pending-filters h2,
+.admin-report-legend h2 {
+  margin: 6px 0 0;
+  font-family: Didot, "Bodoni 72", Georgia, serif;
+  font-size: clamp(25px, 3vw, 34px);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+  scroll-margin-top: 96px;
+  text-wrap: balance;
+}
+
+.admin-user-lookup > div > p {
+  margin: 10px 0 0;
+  color: var(--portra-muted);
+  line-height: 1.65;
+}
+
+.admin-user-lookup form > label,
+.admin-pending-filter-grid label > span,
+.admin-report-toolbar label > span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--portra-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+.admin-user-lookup form > div {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-user-lookup input,
+.admin-pending-filter-grid input,
+.admin-pending-filter-grid select,
+.admin-report-toolbar input,
+.admin-report-toolbar select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--portra-line);
+  border-radius: 999px;
+  background: #fffaf2;
+  color: var(--portra-ink);
+  font: inherit;
+}
+
+.admin-user-lookup input:focus-visible {
+  border-color: var(--portra-blue);
+  outline: 3px solid rgba(13, 47, 178, .16);
+}
+
+.admin-user-result {
+  margin-top: 18px;
+}
+
+.admin-user-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid var(--portra-line);
+  border-radius: 22px;
+  background: rgba(248, 243, 235, .86);
+  box-shadow: var(--portra-soft);
+}
+
+.admin-user-card-avatar {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  overflow: hidden;
+  border: 1px solid rgba(13, 47, 178, .2);
+  border-radius: 50%;
+  background: #fffaf2;
+  color: var(--portra-blue);
+  font-family: Didot, "Bodoni 72", Georgia, serif;
+  font-size: 30px;
+}
+
+.admin-user-card-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.admin-user-card-main {
+  min-width: 0;
+}
+
+.admin-user-card-id {
+  color: var(--portra-blue);
+  font-size: 10px;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .1em;
+}
+
+.admin-user-card h2 {
+  margin: 5px 0 0;
+  font-family: Didot, "Bodoni 72", Georgia, serif;
+  font-size: 28px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.admin-user-card p {
+  margin: 5px 0 0;
+  color: var(--portra-muted);
+}
+
+.admin-pending-filters,
+.admin-report-legend {
+  margin-top: 28px;
+  padding: 24px;
+  border: 1px dashed var(--portra-line);
+  border-radius: 24px;
+  background: rgba(242, 237, 230, .68);
+}
+
+.admin-pending-filters > header,
+.admin-report-legend > header,
+.admin-user-public-panel > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.admin-pending-filters fieldset {
+  min-width: 0;
+  margin: 20px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.admin-pending-filters legend {
+  margin-bottom: 12px;
+  color: var(--portra-muted);
+  font-size: 12px;
+}
+
+.admin-pending-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-pending-filter-grid label {
+  min-width: 0;
+}
+
+.admin-pending-filter-grid input:disabled,
+.admin-pending-filter-grid select:disabled,
+.admin-report-toolbar input:disabled,
+.admin-report-toolbar select:disabled {
+  border-style: dashed;
+  background: rgba(21, 19, 24, .035);
+  color: rgba(21, 19, 24, .4);
+  cursor: not-allowed;
+}
+
+.admin-pending-filter-grid small,
+.admin-report-toolbar small {
+  display: block;
+  margin-top: 5px;
+  color: var(--portra-muted);
+  font-size: 10px;
+}
+
+.admin-user-profile-hero {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) minmax(260px, .7fr);
+  gap: 24px;
+  margin-top: 24px;
+  padding: 24px;
+  border: 1px solid var(--portra-line);
+  border-radius: 28px;
+  background:
+    linear-gradient(120deg, rgba(248, 243, 235, .96), rgba(242, 237, 230, .86));
+  box-shadow: var(--portra-soft);
+}
+
+.admin-user-profile-photo {
+  display: grid;
+  place-items: center;
+  min-height: 220px;
+  overflow: hidden;
+  border: 10px solid #fffaf2;
+  border-bottom-width: 28px;
+  border-radius: 5px;
+  background: #e8dfd2;
+  color: var(--portra-blue);
+  font-family: Didot, "Bodoni 72", Georgia, serif;
+  font-size: 64px;
+  box-shadow: 0 14px 26px rgba(21, 19, 24, .12);
+  transform: rotate(-1deg);
+}
+
+.admin-user-profile-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.admin-user-profile-copy {
+  align-self: center;
+  min-width: 0;
+}
+
+.admin-user-profile-copy h2 {
+  margin: 8px 0 0;
+  font-family: Didot, "Bodoni 72", Georgia, serif;
+  font-size: clamp(40px, 5vw, 66px);
+  font-weight: 500;
+  line-height: .95;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.admin-user-profile-copy > p {
+  margin: 18px 0 0;
+  color: var(--portra-muted);
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.admin-user-profile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.admin-user-profile-meta span {
+  padding: 6px 10px;
+  border: 1px solid var(--portra-line);
+  border-radius: 999px;
+  background: rgba(255, 250, 242, .72);
+  color: var(--portra-muted);
+  font-size: 11px;
+}
+
+.admin-user-facts {
+  min-width: 0;
+  padding: 18px;
+  border-left: 1px solid var(--portra-line);
+}
+
+.admin-user-facts h3 {
+  margin: 0 0 14px;
+  font-size: 12px;
+  letter-spacing: .1em;
+}
+
+.admin-user-facts dl {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+}
+
+.admin-user-facts dl > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--portra-line);
+}
+
+.admin-user-facts dt,
+.admin-user-facts dd {
+  margin: 0;
+}
+
+.admin-user-facts dt {
+  color: var(--portra-muted);
+  font-size: 11px;
+}
+
+.admin-user-facts dd {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-user-facts small {
+  grid-column: 1 / -1;
+  color: var(--portra-muted);
+  font-size: 9px;
+  text-align: right;
+}
+
+.admin-user-facts .is-pending dd {
+  color: rgba(21, 19, 24, .42);
+}
+
+.admin-user-profile-actions {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--portra-line);
+  border-radius: 20px;
+  background: rgba(242, 237, 230, .68);
+}
+
+.admin-user-profile-actions .admin-action-bar {
+  justify-content: flex-end;
+}
+
+.admin-user-public-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.admin-user-public-panel {
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid var(--portra-line);
+  border-radius: 22px;
+  background: rgba(248, 243, 235, .82);
+  box-shadow: var(--portra-soft);
+}
+
+.admin-user-public-panel > header h2 {
+  margin: 5px 0 0;
+  font-family: Didot, "Bodoni 72", Georgia, serif;
+  font-size: 30px;
+  font-weight: 500;
+}
+
+.admin-user-public-panel > header > small {
+  max-width: 200px;
+  color: #7a332b;
+  text-align: right;
+}
+
+.admin-user-credit-panel {
+  grid-column: 1 / -1;
+}
+
+.admin-user-credit-panel > p {
+  color: var(--portra-muted);
+}
+
+.admin-user-content-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.admin-user-content-list > div {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--portra-line);
+  border-radius: 16px;
+  background: rgba(255, 250, 242, .72);
+}
+
+.admin-user-content-list strong,
+.admin-user-content-list p {
+  overflow-wrap: anywhere;
+}
+
+.admin-user-content-list p {
+  margin: 7px 0;
+  color: var(--portra-muted);
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.admin-user-content-list time {
+  color: var(--portra-muted);
+  font-size: 10px;
+}
+
+.admin-report-toolbar {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.2fr) repeat(2, minmax(180px, .7fr));
+  gap: 14px;
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px dashed var(--portra-line);
+  border-radius: 22px;
+  background: rgba(242, 237, 230, .68);
+}
+
+.admin-report-legend dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 20px 0 0;
+}
+
+.admin-report-legend dl > div {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--portra-line);
+  border-radius: 16px;
+  background: rgba(255, 250, 242, .68);
+}
+
+.admin-report-legend dt {
+  font-weight: 800;
+}
+
+.admin-report-legend dd {
+  margin: 6px 0 0;
+  color: var(--portra-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.admin-report-disabled-actions {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.admin-report-disabled-actions > span {
+  margin-right: 10px;
+  color: var(--portra-muted);
+  font-size: 10px;
+}
+
 @media (max-width: 900px) {
   .admin-stat-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1142,6 +1596,22 @@
 
   .admin-feed-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .admin-user-lookup,
+  .admin-user-profile-hero,
+  .admin-report-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-user-facts {
+    border-top: 1px solid var(--portra-line);
+    border-left: 0;
+  }
+
+  .admin-pending-filter-grid,
+  .admin-report-legend dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1224,5 +1694,41 @@
 
   .admin-feed-detail-images {
     grid-template-columns: 1fr;
+  }
+
+  .admin-user-lookup form > div,
+  .admin-user-card {
+    align-items: flex-start;
+    grid-template-columns: 1fr;
+  }
+
+  .admin-user-lookup form > div,
+  .admin-pending-filters > header,
+  .admin-report-legend > header,
+  .admin-user-public-panel > header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-user-card {
+    justify-items: start;
+  }
+
+  .admin-user-public-grid,
+  .admin-pending-filter-grid,
+  .admin-report-legend dl {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-user-credit-panel {
+    grid-column: auto;
+  }
+
+  .admin-user-profile-photo {
+    width: min(190px, 100%);
+  }
+
+  .admin-user-profile-actions .admin-action-bar {
+    justify-content: flex-start;
   }
 }

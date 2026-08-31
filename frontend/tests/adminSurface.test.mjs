@@ -9,6 +9,7 @@ import {
 } from '../src/pages/admin/adminSurfaceConfig.js'
 import {
   buildAdminDashboardStats,
+  buildAdminUserFacts,
   filterAdminMoments,
   normalizeAdminHallItems,
   parseExactUserId
@@ -209,6 +210,67 @@ test('user lookup accepts positive integer ids only', () => {
   assert.equal(parseExactUserId('42'), 42)
   assert.equal(parseExactUserId('0'), null)
   assert.equal(parseExactUserId('abc'), null)
+})
+
+test('admin user facts keep unsupported account fields unknown', () => {
+  const facts = buildAdminUserFacts({ userId: 9, currentRole: 'PROVIDER' }, { creditScore: 4.8 }, 3)
+  assert.equal(facts.find(item => item.key === 'userId').value, 9)
+  assert.equal(facts.find(item => item.key === 'contentCount').value, 3)
+  assert.equal(facts.find(item => item.key === 'accountStatus').value, null)
+  assert.equal(facts.find(item => item.key === 'reportCount').value, null)
+})
+
+test('admin user facts do not turn unavailable public content into zero', () => {
+  const facts = buildAdminUserFacts({ userId: 9 }, undefined, null)
+  assert.equal(facts.find(item => item.key === 'creditScore').value, null)
+  assert.equal(facts.find(item => item.key === 'contentCount').value, null)
+})
+
+test('admin user lookup card exposes only the real profile navigation', async () => {
+  const { createServer } = await import('vite')
+  const vite = await createServer({ appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } })
+
+  try {
+    const { AdminUserCard } = await vite.ssrLoadModule('/src/pages/admin/components/AdminUserCard.jsx')
+    const [{ createElement }, { renderToStaticMarkup }] = await Promise.all([
+      import('react'),
+      import('react-dom/server')
+    ])
+    const markup = renderToStaticMarkup(createElement(AdminUserCard, {
+      user: { userId: 9, nickname: '林摄影', currentRole: 'PROVIDER' },
+      onOpen: () => {}
+    }))
+
+    assert.match(markup, /用户 #9/)
+    assert.match(markup, /林摄影/)
+    assert.match(markup, /摄影师/)
+    assert.match(markup, />查看主页<\/button>/)
+    assert.doesNotMatch(markup, /限制账号|解除限制|处理举报/)
+  } finally {
+    await vite.close()
+  }
+})
+
+test('reports surface exposes structure without usable controls or fake records', async () => {
+  const { createServer } = await import('vite')
+  const vite = await createServer({ appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } })
+
+  try {
+    const { AdminReportsPage } = await vite.ssrLoadModule('/src/pages/admin/AdminReportsPage.jsx')
+    const [{ createElement }, { renderToStaticMarkup }] = await Promise.all([
+      import('react'),
+      import('react-dom/server')
+    ])
+    const markup = renderToStaticMarkup(createElement(AdminReportsPage))
+
+    assert.match(markup, /举报接口待接入，当前仅完成前端页面结构。/)
+    assert.match(markup, /<input[^>]*disabled=""/)
+    assert.match(markup, /<button[^>]*disabled=""[^>]*>查看举报<\/button>/)
+    assert.match(markup, /<button[^>]*disabled=""[^>]*>处理举报<\/button>/)
+    assert.doesNotMatch(markup, /data-report-id=/)
+  } finally {
+    await vite.close()
+  }
 })
 
 test('unknown dashboard values remain unknown instead of becoming zero', () => {

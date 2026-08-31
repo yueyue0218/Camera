@@ -45,6 +45,35 @@ export function parseExactUserId(value) {
   return Number.isSafeInteger(userId) && userId > 0 ? userId : null
 }
 
+function adminUserFact(key, label, value, helper = '', unavailableHelper = '接口待接入') {
+  const available = value !== null && value !== undefined
+  return {
+    key,
+    label,
+    value: available ? value : null,
+    displayValue: available ? String(value) : '—',
+    helper: available ? helper : unavailableHelper,
+    available
+  }
+}
+
+export function buildAdminUserFacts(user = {}, credit, contentCount = 0) {
+  const creditScore = credit?.creditScore ?? credit?.score ?? null
+  const normalizedContentCount = contentCount === null || contentCount === undefined
+    ? null
+    : (Number.isFinite(Number(contentCount)) ? Number(contentCount) : null)
+  return [
+    adminUserFact('userId', '用户 ID', user?.userId ?? user?.id ?? null),
+    adminUserFact('role', '当前角色', user?.currentRole ?? user?.role ?? null),
+    adminUserFact('creditScore', '信用分', creditScore, '', '公开信用暂不可用'),
+    adminUserFact('contentCount', '公开动态', normalizedContentCount, '', '公开动态暂不可用'),
+    adminUserFact('accountStatus', '账号状态', null),
+    adminUserFact('certificationStatus', '认证管理状态', null),
+    adminUserFact('reportCount', '举报次数', null),
+    adminUserFact('handlingRecords', '处理记录', null)
+  ]
+}
+
 function formatCount(value) {
   return value === null ? '—' : new Intl.NumberFormat('zh-CN').format(value)
 }
