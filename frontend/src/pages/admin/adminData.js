@@ -74,6 +74,41 @@ export function buildAdminUserFacts(user = {}, credit, contentCount = 0) {
   ]
 }
 
+export function buildCertificationReviewBody(result, reason = '') {
+  const normalizedResult = String(result || '').trim().toUpperCase()
+  if (!['APPROVED', 'REJECTED'].includes(normalizedResult)) {
+    throw new Error('认证审核结果无效')
+  }
+
+  const normalizedReason = String(reason || '').trim()
+  if (normalizedResult === 'REJECTED' && !normalizedReason) {
+    throw new Error('请填写驳回原因')
+  }
+
+  return { result: normalizedResult, reason: normalizedReason }
+}
+
+export function buildCertificationListQueries(type = 'ALL', status = 'PENDING') {
+  const normalizedType = String(type || 'ALL').trim().toUpperCase()
+  const normalizedStatus = String(status || 'PENDING').trim().toUpperCase()
+  const types = normalizedType === 'ALL'
+    ? ['REAL_NAME', 'STUDENT']
+    : [normalizedType]
+
+  return types.map((certificationType) => ({
+    type: certificationType,
+    ...(normalizedStatus === 'PENDING' ? {} : { status: normalizedStatus }),
+  }))
+}
+
+export function shouldUseAdminDemoFixtures(isDev, search = '') {
+  return Boolean(isDev) && new URLSearchParams(search).get('demo') === '1'
+}
+
+export async function loadCertificationSource({ demoMode, loadReal, loadDemo }) {
+  return demoMode ? loadDemo() : loadReal()
+}
+
 function formatCount(value) {
   return value === null ? '—' : new Intl.NumberFormat('zh-CN').format(value)
 }

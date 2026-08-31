@@ -1732,3 +1732,285 @@
     justify-content: flex-start;
   }
 }
+
+.admin-certification-toolbar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, .75fr)) minmax(180px, .5fr);
+  align-items: end;
+  gap: 16px;
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid var(--portra-line);
+  border-radius: 24px;
+  background: rgba(248, 243, 235, .88);
+  box-shadow: var(--portra-soft);
+}
+
+.admin-certification-toolbar label > span,
+.admin-certification-summary > span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--portra-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+.admin-certification-toolbar select {
+  box-sizing: border-box;
+  width: 100%;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--portra-line);
+  border-radius: 999px;
+  background: #fffaf2;
+  color: var(--portra-ink);
+  font: inherit;
+}
+
+.admin-certification-toolbar select:focus-visible,
+.admin-certification-card button:focus-visible,
+.admin-certification-detail button:focus-visible {
+  outline: 3px solid rgba(13, 47, 178, .25);
+  outline-offset: 2px;
+}
+
+.admin-certification-summary {
+  min-height: 42px;
+  text-align: right;
+}
+
+.admin-certification-summary > span {
+  margin-bottom: 3px;
+}
+
+.admin-certification-summary strong {
+  color: var(--portra-blue);
+  font-family: Didot, "Bodoni 72", Georgia, serif;
+  font-size: 25px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.admin-certification-success {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(28, 126, 83, .22);
+  border-radius: 16px;
+  background: rgba(28, 126, 83, .08);
+  color: #176b47;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.admin-certification-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.admin-certification-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--portra-line);
+  border-radius: 24px;
+  background: rgba(248, 243, 235, .84);
+  box-shadow: var(--portra-soft);
+}
+
+.admin-certification-card > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--portra-line);
+  color: var(--portra-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+.admin-certification-card-body {
+  padding: 22px;
+}
+
+.admin-certification-id {
+  margin: 0;
+  color: var(--portra-blue);
+  font-size: 10px;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .13em;
+}
+
+.admin-certification-card h2 {
+  margin: 8px 0 18px;
+  font-family: Didot, "Bodoni 72", Georgia, serif;
+  font-size: 38px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.admin-certification-card dl,
+.admin-certification-detail dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.admin-certification-card dl > div,
+.admin-certification-detail dl > div {
+  display: grid;
+  grid-template-columns: minmax(110px, .5fr) minmax(0, 1fr);
+  gap: 14px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--portra-line);
+}
+
+.admin-certification-card dt,
+.admin-certification-card dd,
+.admin-certification-detail dt,
+.admin-certification-detail dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-certification-card dt,
+.admin-certification-detail dt {
+  color: var(--portra-muted);
+  font-size: 11px;
+}
+
+.admin-certification-card dd,
+.admin-certification-detail dd {
+  font-size: 13px;
+  font-weight: 750;
+  text-align: right;
+}
+
+.admin-certification-card > footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 16px 16px;
+  border-top: 1px solid var(--portra-line);
+  background: rgba(242, 237, 230, .74);
+}
+
+.admin-certification-card > footer small {
+  flex-basis: 100%;
+  color: var(--portra-muted);
+  font-size: 10px;
+  text-align: right;
+}
+
+.admin-certification-detail-backdrop {
+  position: fixed;
+  z-index: 130;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(21, 19, 24, .5);
+}
+
+.admin-certification-detail {
+  width: min(680px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  padding: 26px;
+  border: 1px solid var(--portra-line);
+  border-radius: 24px;
+  background: var(--portra-paper);
+  box-shadow: var(--portra-shadow);
+  overscroll-behavior: contain;
+}
+
+.admin-certification-detail > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.admin-certification-detail > header span {
+  color: var(--portra-blue);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .14em;
+}
+
+.admin-certification-detail h2 {
+  margin: 5px 0 0;
+  font-family: Didot, "Bodoni 72", Georgia, serif;
+  font-size: 34px;
+  font-weight: 500;
+}
+
+.admin-certification-dialog-error {
+  position: fixed;
+  z-index: 140;
+  right: 24px;
+  bottom: 24px;
+  max-width: min(440px, calc(100% - 48px));
+  padding: 13px 16px;
+  border: 1px solid rgba(196, 52, 36, .24);
+  border-radius: 14px;
+  background: #fff0eb;
+  color: #7a332b;
+  box-shadow: var(--portra-shadow);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .admin-certification-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-certification-summary {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+}
+
+@media (max-width: 620px) {
+  .admin-certification-toolbar,
+  .admin-certification-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-certification-card > footer,
+  .admin-certification-detail > header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-certification-card > footer {
+    justify-content: flex-start;
+  }
+
+  .admin-certification-card > footer small {
+    text-align: left;
+  }
+
+  .admin-certification-detail {
+    padding: 22px 18px;
+  }
+
+  .admin-certification-card dl > div,
+  .admin-certification-detail dl > div {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .admin-certification-card dd,
+  .admin-certification-detail dd {
+    text-align: left;
+  }
+}

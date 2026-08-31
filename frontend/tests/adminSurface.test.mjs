@@ -9,10 +9,14 @@ import {
 } from '../src/pages/admin/adminSurfaceConfig.js'
 import {
   buildAdminDashboardStats,
+  buildCertificationListQueries,
+  buildCertificationReviewBody,
   buildAdminUserFacts,
   filterAdminMoments,
   normalizeAdminHallItems,
-  parseExactUserId
+  loadCertificationSource,
+  parseExactUserId,
+  shouldUseAdminDemoFixtures
 } from '../src/pages/admin/adminData.js'
 
 test('admin navigation uses the approved order and routes', () => {
@@ -271,6 +275,41 @@ test('reports surface exposes structure without usable controls or fake records'
   } finally {
     await vite.close()
   }
+})
+
+test('certification rejection trims and requires a reason', () => {
+  assert.deepEqual(buildCertificationReviewBody('APPROVED', ''), { result: 'APPROVED', reason: '' })
+  assert.deepEqual(buildCertificationReviewBody('REJECTED', '  证件模糊  '), { result: 'REJECTED', reason: '证件模糊' })
+  assert.throws(() => buildCertificationReviewBody('REJECTED', '   '), /请填写驳回原因/)
+})
+
+test('certification list queries request both types and preserve pending mappings', () => {
+  assert.deepEqual(buildCertificationListQueries('ALL', 'PENDING'), [
+    { type: 'REAL_NAME' },
+    { type: 'STUDENT' }
+  ])
+  assert.deepEqual(buildCertificationListQueries('STUDENT', 'APPROVED'), [
+    { type: 'STUDENT', status: 'APPROVED' }
+  ])
+})
+
+test('certification fixtures require both dev mode and demo query', () => {
+  assert.equal(shouldUseAdminDemoFixtures(true, '?demo=1'), true)
+  assert.equal(shouldUseAdminDemoFixtures(false, '?demo=1'), false)
+  assert.equal(shouldUseAdminDemoFixtures(true, '?demo=0'), false)
+})
+
+test('production certification request failures never fall back to fixtures', async () => {
+  let fixtureCalls = 0
+  await assert.rejects(
+    loadCertificationSource({
+      demoMode: false,
+      loadReal: async () => { throw new Error('真实接口失败') },
+      loadDemo: async () => { fixtureCalls += 1; return [{ id: 1 }] }
+    }),
+    /真实接口失败/
+  )
+  assert.equal(fixtureCalls, 0)
 })
 
 test('unknown dashboard values remain unknown instead of becoming zero', () => {
