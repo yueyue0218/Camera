@@ -18,11 +18,19 @@ export function buildAdminHallRequestParams(keyword = '') {
   }
 }
 
-export function filterAdminMoments(moments = [], profiles = {}, keyword = '') {
-  const normalizedKeyword = String(keyword).trim().toLocaleLowerCase('zh-CN')
-  if (!normalizedKeyword) return moments
+export function buildAdminFeedRequestParams() {
+  return { scope: 'latest' }
+}
 
-  return moments.filter(moment => {
+export function filterAdminMoments(moments = [], profiles = {}, keyword = '', authorId = null) {
+  const normalizedAuthorId = Number(authorId)
+  const authorMoments = Number.isSafeInteger(normalizedAuthorId) && normalizedAuthorId > 0
+    ? moments.filter(moment => Number(moment.authorId) === normalizedAuthorId)
+    : moments
+  const normalizedKeyword = String(keyword).trim().toLocaleLowerCase('zh-CN')
+  if (!normalizedKeyword) return authorMoments
+
+  return authorMoments.filter(moment => {
     const authorName = profiles[moment.authorId]?.nickname || ''
     return [authorName, moment.title, moment.content]
       .some(value => String(value || '').toLocaleLowerCase('zh-CN').includes(normalizedKeyword))

@@ -150,6 +150,61 @@ test('moment search matches title content and hydrated author name', () => {
   assert.deepEqual(filterAdminMoments(moments, profiles, '咖啡').map(item => item.momentId), [2])
 })
 
+test('admin feed can narrow public moments to one author id', () => {
+  const moments = [{ momentId: 1, authorId: 10 }, { momentId: 2, authorId: 11 }]
+  assert.deepEqual(filterAdminMoments(moments, {}, '', 11).map(item => item.momentId), [2])
+})
+
+test('admin feed request params stay on the public latest list', async () => {
+  const adminData = await import('../src/pages/admin/adminData.js')
+  assert.equal(typeof adminData.buildAdminFeedRequestParams, 'function')
+  assert.deepEqual(adminData.buildAdminFeedRequestParams(), { scope: 'latest' })
+})
+
+test('admin moment cards keep engagement read-only and moderation disabled', async () => {
+  const { createServer } = await import('vite')
+  const vite = await createServer({ appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } })
+
+  try {
+    const { AdminMomentCard } = await vite.ssrLoadModule('/src/pages/admin/components/AdminMomentCard.jsx')
+    const [{ createElement }, { renderToStaticMarkup }] = await Promise.all([
+      import('react'),
+      import('react-dom/server')
+    ])
+    const markup = renderToStaticMarkup(createElement(AdminMomentCard, {
+      moment: {
+        momentId: 8,
+        authorId: 42,
+        authorRole: 'PROVIDER',
+        title: '雨夜胶片',
+        content: '记录城市里的蓝色时刻。',
+        imageDataList: ['https://example.test/rain.jpg'],
+        likeCount: 12,
+        favoriteCount: 3,
+        createdAt: '2026-08-30T12:00:00Z'
+      },
+      author: { nickname: '林摄影', avatarData: '' },
+      onOpen: () => {},
+      onOpenAuthor: () => {}
+    }))
+
+    assert.match(markup, /No\. 000008/)
+    assert.match(markup, /林摄影/)
+    assert.match(markup, /雨夜胶片/)
+    assert.match(markup, /12 个赞/)
+    assert.match(markup, /3 个收藏/)
+    assert.match(markup, /<img[^>]*width="640"[^>]*height="360"[^>]*loading="lazy"/)
+    assert.match(markup, />查看详情<\/button>/)
+    assert.match(markup, />查看作者<\/button>/)
+    assert.match(markup, /<button[^>]*disabled=""[^>]*>下架动态<\/button>/)
+    assert.match(markup, /<button[^>]*disabled=""[^>]*>恢复展示<\/button>/)
+    assert.equal((markup.match(/接口待接入/g) || []).length, 2)
+    assert.doesNotMatch(markup, /<button[^>]*>(?:点赞|收藏|关注|编辑|删除)[^<]*<\/button>/)
+  } finally {
+    await vite.close()
+  }
+})
+
 test('user lookup accepts positive integer ids only', () => {
   assert.equal(parseExactUserId('42'), 42)
   assert.equal(parseExactUserId('0'), null)
