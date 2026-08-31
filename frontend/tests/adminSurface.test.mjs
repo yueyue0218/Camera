@@ -18,6 +18,7 @@ import {
   loadComplaintSource,
   normalizeAdminHallItems,
   loadCertificationSource,
+  loadPendingCertificationOverview,
   parseExactUserId,
   refreshComplaintSurfaces,
   shouldUseAdminDemoFixtures
@@ -295,6 +296,19 @@ test('certification list queries request both types and preserve pending mapping
   assert.deepEqual(buildCertificationListQueries('STUDENT', 'APPROVED'), [
     { type: 'STUDENT', status: 'APPROVED' }
   ])
+})
+
+test('admin overview loads pending certification records from both certification types', async () => {
+  const queries = []
+  const records = await loadPendingCertificationOverview(async params => {
+    queries.push(params)
+    return params.type === 'REAL_NAME'
+      ? [{ id: 1, type: 'REAL_NAME', status: 'PENDING' }]
+      : [{ id: 2, type: 'STUDENT', status: 'PENDING_REVIEW' }]
+  })
+
+  assert.deepEqual(queries, [{ type: 'REAL_NAME' }, { type: 'STUDENT' }])
+  assert.deepEqual(records.map(item => item.type), ['REAL_NAME', 'STUDENT'])
 })
 
 test('certification fixtures require both dev mode and demo query', () => {

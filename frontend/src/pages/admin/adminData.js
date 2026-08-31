@@ -101,6 +101,14 @@ export function buildCertificationListQueries(type = 'ALL', status = 'PENDING') 
   }))
 }
 
+export async function loadPendingCertificationOverview(listCertifications, currentUser) {
+  const responses = await Promise.all(
+    buildCertificationListQueries('ALL', 'PENDING')
+      .map(params => listCertifications(params, currentUser))
+  )
+  return responses.flatMap(response => Array.isArray(response) ? response : [])
+}
+
 export function shouldUseAdminDemoFixtures(isDev, search = '') {
   return Boolean(isDev) && new URLSearchParams(search).get('demo') === '1'
 }

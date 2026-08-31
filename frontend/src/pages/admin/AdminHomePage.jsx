@@ -7,7 +7,7 @@ import {
   demoAdminDashboard,
   demoCertifications
 } from '../../mocks/dline/adminFixtures.js'
-import { buildAdminDashboardStats } from './adminData.js'
+import { buildAdminDashboardStats, loadPendingCertificationOverview } from './adminData.js'
 import { AdminEmptyState } from './components/AdminEmptyState.jsx'
 import { AdminModeBanner } from './components/AdminModeBanner.jsx'
 import { AdminStatCard } from './components/AdminStatCard.jsx'
@@ -67,7 +67,7 @@ export function AdminHomePage() {
           ? [demoAdminDashboard, demoCertifications, demoAdminComplaints]
           : await Promise.all([
             adminApi.dashboard(currentUser),
-            adminApi.listCertifications({ status: 'PENDING' }, currentUser),
+            loadPendingCertificationOverview(adminApi.listCertifications, currentUser),
             adminApi.listReviewComplaints({ status: 'PENDING' }, currentUser)
           ])
 
