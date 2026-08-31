@@ -109,6 +109,39 @@ export async function loadCertificationSource({ demoMode, loadReal, loadDemo }) 
   return demoMode ? loadDemo() : loadReal()
 }
 
+export function buildComplaintArbitrationBody(result, comment = '') {
+  const normalizedResult = String(result || '').trim().toUpperCase()
+  if (!['REJECTED', 'REVIEW_HIDDEN'].includes(normalizedResult)) {
+    throw new Error('评价申诉处理结果无效')
+  }
+
+  const normalizedComment = String(comment || '').trim()
+  if (normalizedResult === 'REVIEW_HIDDEN' && !normalizedComment) {
+    throw new Error('请填写处理说明')
+  }
+
+  return { result: normalizedResult, comment: normalizedComment }
+}
+
+export function enrichComplaintsWithReviewContext(complaints = [], contextByReviewId = {}) {
+  return complaints.map(complaint => {
+    const result = contextByReviewId[complaint.reviewId]
+    if (result?.status === 'fulfilled') {
+      return { ...complaint, review: result.value, reviewContextMessage: '' }
+    }
+    return { ...complaint, review: null, reviewContextMessage: '评价详情暂不可用' }
+  })
+}
+
+export async function loadComplaintSource({ demoMode, loadReal, loadDemo }) {
+  return demoMode ? loadDemo() : loadReal()
+}
+
+export async function refreshComplaintSurfaces({ loadComplaints, loadDashboard }) {
+  const [complaints] = await Promise.all([loadComplaints(), loadDashboard()])
+  return complaints
+}
+
 function formatCount(value) {
   return value === null ? '—' : new Intl.NumberFormat('zh-CN').format(value)
 }

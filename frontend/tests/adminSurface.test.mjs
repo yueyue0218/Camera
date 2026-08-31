@@ -9,13 +9,17 @@ import {
 } from '../src/pages/admin/adminSurfaceConfig.js'
 import {
   buildAdminDashboardStats,
+  buildComplaintArbitrationBody,
   buildCertificationListQueries,
   buildCertificationReviewBody,
   buildAdminUserFacts,
   filterAdminMoments,
+  enrichComplaintsWithReviewContext,
+  loadComplaintSource,
   normalizeAdminHallItems,
   loadCertificationSource,
   parseExactUserId,
+  refreshComplaintSurfaces,
   shouldUseAdminDemoFixtures
 } from '../src/pages/admin/adminData.js'
 
@@ -310,6 +314,52 @@ test('production certification request failures never fall back to fixtures', as
     /真实接口失败/
   )
   assert.equal(fixtureCalls, 0)
+})
+
+test('hiding a review requires a trimmed processing comment', () => {
+  assert.deepEqual(buildComplaintArbitrationBody('REJECTED', ''), { result: 'REJECTED', comment: '' })
+  assert.deepEqual(buildComplaintArbitrationBody('REVIEW_HIDDEN', '  内容违规  '), { result: 'REVIEW_HIDDEN', comment: '内容违规' })
+  assert.throws(() => buildComplaintArbitrationBody('REVIEW_HIDDEN', '  '), /请填写处理说明/)
+})
+
+test('failed review detail keeps the complaint visible without invented context', () => {
+  const complaints = [
+    { complaintId: 1, reviewId: 10 },
+    { complaintId: 2, reviewId: 11 }
+  ]
+  const enriched = enrichComplaintsWithReviewContext(complaints, {
+    10: { status: 'fulfilled', value: { reviewId: 10, rating: 4, content: '真实评价' } },
+    11: { status: 'rejected', reason: new Error('detail failed') }
+  })
+
+  assert.equal(enriched.length, 2)
+  assert.deepEqual(enriched[0].review, { reviewId: 10, rating: 4, content: '真实评价' })
+  assert.equal(enriched[1].review, null)
+  assert.equal(enriched[1].reviewContextMessage, '评价详情暂不可用')
+})
+
+test('production complaint request failures never fall back to fixtures', async () => {
+  let fixtureCalls = 0
+  await assert.rejects(
+    loadComplaintSource({
+      demoMode: false,
+      loadReal: async () => { throw new Error('真实申诉接口失败') },
+      loadDemo: async () => { fixtureCalls += 1; return [{ complaintId: 1 }] }
+    }),
+    /真实申诉接口失败/
+  )
+  assert.equal(fixtureCalls, 0)
+})
+
+test('successful complaint arbitration refreshes queue and dashboard before success', async () => {
+  const refreshed = []
+  const complaints = await refreshComplaintSurfaces({
+    loadComplaints: async () => { refreshed.push('complaints'); return [{ complaintId: 7 }] },
+    loadDashboard: async () => { refreshed.push('dashboard'); return { pendingArbitrationCount: 2 } }
+  })
+
+  assert.deepEqual(complaints, [{ complaintId: 7 }])
+  assert.deepEqual(refreshed.sort(), ['complaints', 'dashboard'])
 })
 
 test('unknown dashboard values remain unknown instead of becoming zero', () => {
