@@ -101,6 +101,82 @@ test('unknown dashboard values remain unknown instead of becoming zero', () => {
   assert.equal(stats.find(item => item.key === 'removed').value, null)
 })
 
+test('dashboard stats distinguish real zero from unavailable data', () => {
+  const stats = buildAdminDashboardStats({
+    totalUsers: 0,
+    todayGmvCent: 238800,
+    pendingAuditCount: 0,
+    pendingArbitrationCount: 1
+  })
+  assert.equal(stats.find(item => item.key === 'users').value, 0)
+  assert.equal(stats.find(item => item.key === 'gmv').displayValue, '¥2,388')
+  assert.equal(stats.find(item => item.key === 'reports').value, null)
+})
+
+test('shared admin controls preserve disabled moderation contracts', async () => {
+  const { createServer } = await import('vite')
+  const vite = await createServer({ appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } })
+
+  try {
+    await assert.doesNotReject(async () => {
+      const { AdminActionBar } = await vite.ssrLoadModule('/src/pages/admin/components/AdminActionBar.jsx')
+      const { AdminStatCard } = await vite.ssrLoadModule('/src/pages/admin/components/AdminStatCard.jsx')
+      const { ModerationReasonDialog } = await vite.ssrLoadModule('/src/pages/admin/components/ModerationReasonDialog.jsx')
+      const requiredModules = [
+        '/src/pages/admin/components/AdminModeBanner.jsx',
+        '/src/pages/admin/components/AdminStatusTag.jsx',
+        '/src/pages/admin/components/AdminEmptyState.jsx'
+      ]
+      await Promise.all(requiredModules.map(path => vite.ssrLoadModule(path)))
+
+      const actionBar = AdminActionBar({
+        actions: [{
+          key: 'remove',
+          label: '下架',
+          disabled: true,
+          hint: '接口待接入',
+          onClick: () => assert.fail('disabled admin action must not run')
+        }]
+      })
+      const [actionItem] = actionBar.props.children
+      const [button, hint] = actionItem.props.children
+      assert.equal(button.props.disabled, true)
+      assert.equal(button.props.onClick, undefined)
+      assert.equal(hint.props.children, '接口待接入')
+
+      const [{ createElement }, { renderToStaticMarkup }, { MemoryRouter }] = await Promise.all([
+        import('react'),
+        import('react-dom/server'),
+        import('react-router-dom')
+      ])
+      const statMarkup = renderToStaticMarkup(createElement(
+        MemoryRouter,
+        null,
+        createElement(AdminStatCard, {
+          stat: { label: '平台用户', displayValue: '0', helper: '真实值', available: true },
+          to: '/admin/users'
+        })
+      ))
+      assert.match(statMarkup, /href="\/admin\/users"/)
+
+      const dialog = ModerationReasonDialog({
+        open: true,
+        title: '确认下架',
+        description: '请填写原因',
+        value: '   ',
+        onChange: () => {},
+        onCancel: () => {},
+        onConfirm: () => {},
+        submitting: false,
+        required: true
+      })
+      assert.equal(dialog.props['data-confirm-disabled'], true)
+    })
+  } finally {
+    await vite.close()
+  }
+})
+
 test('reserved admin api methods throw endpoint-pending errors without fetching', async () => {
   const previousWindow = globalThis.window
   const previousFetch = globalThis.fetch
