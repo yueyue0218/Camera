@@ -1,0 +1,16 @@
+.admin-surface {
+  min-height: calc(100vh - 72px);
+}
+
+.admin-page {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 32px 0 64px;
+}
+
+.admin-page > h1 {
+  margin: 0;
+  color: var(--ink, #1f242b);
+  font-size: clamp(28px, 4vw, 44px);
+  letter-spacing: -0.04em;
+}

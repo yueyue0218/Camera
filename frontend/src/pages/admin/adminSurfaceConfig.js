@@ -31,6 +31,10 @@ export function getAdminActiveKey(pathname = '') {
   return match?.key || 'dashboard'
 }
 
+export function resolveNavbarActivePath({ adminSurface = false, locationPathname = '', activePath = '' } = {}) {
+  return adminSurface ? (locationPathname || activePath) : activePath
+}
+
 export function getLegacyAdminTarget(search = '') {
   const params = new URLSearchParams(search)
   const route = {

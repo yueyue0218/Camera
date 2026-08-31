@@ -4,7 +4,8 @@ import {
   ADMIN_CAPABILITIES,
   ADMIN_NAV_ITEMS,
   getAdminActiveKey,
-  getLegacyAdminTarget
+  getLegacyAdminTarget,
+  resolveNavbarActivePath
 } from '../src/pages/admin/adminSurfaceConfig.js'
 import {
   buildAdminDashboardStats,
@@ -32,6 +33,28 @@ test('nested admin paths select one admin navigation item', () => {
   assert.equal(getAdminActiveKey('/admin/users/42'), 'users')
   assert.equal(getAdminActiveKey('/admin/complaints'), 'complaints')
   assert.equal(getAdminActiveKey('/admin'), 'dashboard')
+})
+
+test('admin route matching never maps ordinary platform paths', () => {
+  assert.equal(getAdminActiveKey('/hall'), 'dashboard')
+  assert.equal(getAdminActiveKey('/feed'), 'dashboard')
+  assert.equal(getAdminActiveKey('/users/42'), 'dashboard')
+})
+
+test('admin navbar resolves active state from location pathname', () => {
+  assert.equal(resolveNavbarActivePath({
+    adminSurface: true,
+    locationPathname: '/admin/feed',
+    activePath: '/admin'
+  }), '/admin/feed')
+})
+
+test('ordinary navbar continues to resolve active state from activePath', () => {
+  assert.equal(resolveNavbarActivePath({
+    adminSurface: false,
+    locationPathname: '/users/42',
+    activePath: '/profile'
+  }), '/profile')
 })
 
 test('legacy admin tabs map to product routes and preserve demo mode', () => {
