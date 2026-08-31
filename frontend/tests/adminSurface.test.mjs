@@ -100,3 +100,40 @@ test('unknown dashboard values remain unknown instead of becoming zero', () => {
   assert.equal(stats.find(item => item.key === 'reports').value, null)
   assert.equal(stats.find(item => item.key === 'removed').value, null)
 })
+
+test('reserved admin api methods throw endpoint-pending errors without fetching', async () => {
+  const previousWindow = globalThis.window
+  const previousFetch = globalThis.fetch
+  const { createServer } = await import('vite')
+  const vite = await createServer({ appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } })
+  globalThis.window = { location: { hostname: 'localhost' } }
+  let fetchCalled = false
+  globalThis.fetch = async () => { fetchCalled = true }
+
+  try {
+    const { adminApi } = await vite.ssrLoadModule('/src/api/adminApi.js')
+    const cases = [
+      [() => adminApi.listReports({}, {}), '/admin/reports'],
+      [() => adminApi.takeDownMoment(8, { reason: '违规' }, {}), '/admin/moments/8/take-down'],
+      [() => adminApi.listHallItems({}, {}), '/admin/hall-items'],
+      [() => adminApi.takeDownHallItem('demand', 7, { reason: '违规' }, {}), '/admin/hall-items/demand/7/take-down'],
+      [() => adminApi.restoreHallItem('service', 9, {}, {}), '/admin/hall-items/service/9/restore'],
+      [() => adminApi.listMoments({}, {}), '/admin/moments'],
+      [() => adminApi.restoreMoment(8, {}, {}), '/admin/moments/8/restore'],
+      [() => adminApi.listUsers({}, {}), '/admin/users'],
+      [() => adminApi.getUserAdminProfile(42, {}), '/admin/users/42'],
+      [() => adminApi.resolveReport(6, { resolution: 'dismissed' }, {}), '/admin/reports/6/resolve']
+    ]
+
+    for (const [invoke, path] of cases) {
+      assert.throws(invoke, new RegExp(`后端接口待接入：${path}`))
+    }
+    assert.equal(fetchCalled, false)
+  } finally {
+    await vite.close()
+    if (previousWindow === undefined) delete globalThis.window
+    else globalThis.window = previousWindow
+    if (previousFetch === undefined) delete globalThis.fetch
+    else globalThis.fetch = previousFetch
+  }
+})
