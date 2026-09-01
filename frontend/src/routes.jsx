@@ -6,7 +6,17 @@ import { DemandDetailPage, HallPage, ServicePackageDetailPage } from './pages/ha
 import { PublishPage, PublishServicePackagePage } from './pages/demand/index.js'
 import { FeedPage, MomentDetailPage } from './pages/feed/index.js'
 import { ProfilePage, PublicProfilePage } from './pages/profile/index.js'
-import { AdminPage } from './pages/admin/index.jsx'
+import {
+  AdminCertificationPage,
+  AdminComplaintPage,
+  AdminFeedPage,
+  AdminHallPage,
+  AdminLayout,
+  AdminLegacyEntry,
+  AdminReportsPage,
+  AdminUserProfilePage,
+  AdminUsersPage
+} from './pages/admin/index.jsx'
 import { CreditDetailPage } from './pages/credit/index.jsx'
 import { NotificationListPage } from './pages/notifications/NotificationListPage.jsx'
 import { ReviewPage, UserReviewsPage } from './pages/reviews/ReviewPage.jsx'
@@ -78,7 +88,16 @@ export function AppRoutes() {
       <Route path="/users/:userId" element={<PublicProfilePage />} />
       <Route path="/users/:userId/credit" element={<CreditDetailPage />} />
       <Route path="/users/:userId/reviews" element={<UserReviewsPage />} />
-      <Route path="/admin" element={<RequireAdminRoute><AdminPage /></RequireAdminRoute>} />
+      <Route path="/admin" element={<RequireAdminRoute><AdminLayout /></RequireAdminRoute>}>
+        <Route index element={<AdminLegacyEntry />} />
+        <Route path="hall" element={<AdminHallPage />} />
+        <Route path="feed" element={<AdminFeedPage />} />
+        <Route path="users" element={<AdminUsersPage />} />
+        <Route path="users/:userId" element={<AdminUserProfilePage />} />
+        <Route path="reports" element={<AdminReportsPage />} />
+        <Route path="certifications" element={<AdminCertificationPage />} />
+        <Route path="complaints" element={<AdminComplaintPage />} />
+      </Route>
       {import.meta.env.DEV && DevDLineUiPreview ? (
         <Route path="/dev/dline-ui-preview" element={<Suspense fallback={null}><DevDLineUiPreview /></Suspense>} />
       ) : null}

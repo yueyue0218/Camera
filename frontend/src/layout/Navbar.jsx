@@ -5,6 +5,11 @@ import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded'
 import { notificationApi } from '../api/index.js'
 import { useWorkflowNavigate } from '../hooks/useWorkflowNavigate.js'
 import { PORTRA_STATE_EVENT } from '../pages/portra/PortraPages.jsx'
+import {
+  ADMIN_NAV_ITEMS,
+  getAdminActiveKey,
+  resolveNavbarActivePath
+} from '../pages/admin/adminSurfaceConfig.js'
 import { getMessageNavTarget } from '../utils/conversationNavigation.js'
 
 const defaultNavItems = [
@@ -14,23 +19,15 @@ const defaultNavItems = [
   { label: '个人', path: '/profile', key: 'profile' }
 ]
 
-const adminNavItems = [
-  { label: '概览', path: '/admin', key: 'dashboard' },
-  { label: '认证', path: '/admin?tab=certifications', key: 'certifications' },
-  { label: '申诉', path: '/admin?tab=complaints', key: 'complaints' },
-  { label: '个人', path: '/profile?from=admin', key: 'profile' }
-]
-
 function formatUnreadBadge(count) {
   if (!count) return ''
   return count > 99 ? '99+' : String(count)
 }
 
-function activeKeyFromPath(pathname, adminSurface, adminTab) {
+function activeKeyFromPath(pathname, adminSurface) {
   if (adminSurface) {
     if (pathname.startsWith('/profile')) return 'profile'
-    if (adminTab === 'certifications' || adminTab === 'complaints') return adminTab
-    return 'dashboard'
+    return getAdminActiveKey(pathname)
   }
 
   if (pathname.startsWith('/feed') || pathname.startsWith('/moments')) return 'feed'
@@ -43,8 +40,7 @@ export function Navbar({
   activePath,
   currentUser,
   logout,
-  adminSurface = false,
-  adminTab = 'dashboard'
+  adminSurface = false
 }) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -52,9 +48,14 @@ export function Navbar({
   const [unreadCount, setUnreadCount] = useState(0)
   const [bellRinging, setBellRinging] = useState(false)
   const initializedRef = useRef(false)
-  const activeKey = activeKeyFromPath(activePath, adminSurface, adminTab)
   const currentPathname = location.pathname || activePath
-  const items = adminSurface ? adminNavItems : defaultNavItems
+  const navbarActivePath = resolveNavbarActivePath({
+    adminSurface,
+    locationPathname: currentPathname,
+    activePath
+  })
+  const activeKey = activeKeyFromPath(navbarActivePath, adminSurface)
+  const items = adminSurface ? ADMIN_NAV_ITEMS : defaultNavItems
 
   useEffect(() => {
     if (adminSurface) {
