@@ -1,5 +1,6 @@
 package com.action.camera.integration;
 
+import com.action.camera.common.JwtUtil;
 import com.action.camera.message.entity.Conversation;
 import com.action.camera.message.entity.Quote;
 import com.action.camera.message.enums.QuoteStatus;
@@ -47,6 +48,9 @@ class OrderFlowIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private JwtUtil jwtUtil;
 
     @Autowired
     private ConversationRepository conversationRepository;
@@ -318,14 +322,14 @@ class OrderFlowIntegrationTest {
 
     private HttpEntity<String> asCustomer(String body) {
         HttpHeaders h = new HttpHeaders();
-        h.set("X-User-Id", "1001");
+        h.setBearerAuth(jwtUtil.generateToken(1001L));
         h.setContentType(MediaType.APPLICATION_JSON);
         return new HttpEntity<>(body, h);
     }
 
     private HttpEntity<String> asProvider(String body) {
         HttpHeaders h = new HttpHeaders();
-        h.set("X-User-Id", "2001");
+        h.setBearerAuth(jwtUtil.generateToken(2001L));
         h.setContentType(MediaType.APPLICATION_JSON);
         return new HttpEntity<>(body, h);
     }
@@ -336,7 +340,7 @@ class OrderFlowIntegrationTest {
                     "VALUES (9999, 'Stranger', 'CUSTOMER', 'ACTIVE', 80.00, NOW(), NOW())");
         }
         HttpHeaders h = new HttpHeaders();
-        h.set("X-User-Id", userId);
+        h.setBearerAuth(jwtUtil.generateToken(Long.valueOf(userId)));
         h.setContentType(MediaType.APPLICATION_JSON);
         return new HttpEntity<>(body, h);
     }

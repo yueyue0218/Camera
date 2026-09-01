@@ -272,7 +272,7 @@ class ServicePackageShowcaseContractTest {
         ResponseEntity<Map> forgedHeaderDetail = rest.exchange(
                 "/service-packages/" + serviceId,
                 HttpMethod.GET,
-                providerEntity(null),
+                forgedProviderHeaderEntity(),
                 Map.class);
         assertThat(anonymousDetail.getBody().get("code")).isEqualTo(40401);
         assertThat(nonOwnerDetail.getBody().get("code")).isEqualTo(40401);
@@ -342,8 +342,7 @@ class ServicePackageShowcaseContractTest {
 
     private HttpEntity<String> customerEntity(Long customerId, String body) {
         HttpHeaders headers = new HttpHeaders();
-        headers.set("X-User-Id", customerId.toString());
-        headers.set("X-User-Role", "CUSTOMER");
+        headers.setBearerAuth(jwtUtil.generateToken(customerId));
         headers.setContentType(MediaType.APPLICATION_JSON);
         return new HttpEntity<>(body, headers);
     }
@@ -354,10 +353,16 @@ class ServicePackageShowcaseContractTest {
 
     private HttpEntity<String> providerEntity(Long providerId, String body) {
         HttpHeaders headers = new HttpHeaders();
-        headers.set("X-User-Id", providerId.toString());
-        headers.set("X-User-Role", "PROVIDER");
+        headers.setBearerAuth(jwtUtil.generateToken(providerId));
         headers.setContentType(MediaType.APPLICATION_JSON);
         return new HttpEntity<>(body, headers);
+    }
+
+    private HttpEntity<String> forgedProviderHeaderEntity() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-User-Id", PROVIDER_ID.toString());
+        headers.set("X-User-Role", "PROVIDER");
+        return new HttpEntity<>(null, headers);
     }
 
     private HttpEntity<String> bearerEntity(Long userId) {

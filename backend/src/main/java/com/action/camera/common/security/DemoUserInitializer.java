@@ -3,6 +3,7 @@ package com.action.camera.common.security;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Component;
  * Seeds the two demo users used by the local frontend.
  */
 @Component
+@Profile({"dev", "smoke"})
 public class DemoUserInitializer implements ApplicationRunner {
 
     private static final long DEMO_CUSTOMER_ID = 1001L;
@@ -19,7 +21,7 @@ public class DemoUserInitializer implements ApplicationRunner {
     private final boolean seedDemoUsers;
 
     public DemoUserInitializer(JdbcTemplate jdbcTemplate,
-                               @Value("${camera.demo.seed-users:true}") boolean seedDemoUsers) {
+                               @Value("${camera.demo.seed-users:false}") boolean seedDemoUsers) {
         this.jdbcTemplate = jdbcTemplate;
         this.seedDemoUsers = seedDemoUsers;
     }

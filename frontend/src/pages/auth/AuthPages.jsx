@@ -601,7 +601,7 @@ export function LoginInfoPage() {
   usePortraStyles()
   const navigate   = useNavigate()
   const location   = useLocation()
-  const { isAuthenticated, currentUser, completeLogin, loginWithDemo } = useAuth()
+  const { isAuthenticated, currentUser, completeLogin } = useAuth()
   const [email, setEmail]     = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]     = useState('')
@@ -645,11 +645,6 @@ export function LoginInfoPage() {
       })
       navigate(postLoginHome, { replace: true })
     } catch (err) {
-      if (!isAdminEntry && err.canUseDemoLogin) {
-        loginWithDemo({})
-        navigate('/hall', { replace: true })
-        return
-      }
       setError(err.message || '登录失败，请重试')
     } finally {
       setLoading(false)

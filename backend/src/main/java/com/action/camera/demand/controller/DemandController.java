@@ -3,7 +3,7 @@ package com.action.camera.demand.controller;
 import com.action.camera.common.Result;
 import com.action.camera.common.page.PageResult;
 import com.action.camera.common.security.CurrentUser;
-import com.action.camera.common.security.MockCurrentUserProvider;
+import com.action.camera.common.security.CurrentUserProvider;
 import com.action.camera.demand.dto.AcceptDemandResponseResult;
 import com.action.camera.demand.dto.AcceptedDemandResponseSnapshot;
 import com.action.camera.demand.dto.CreateDemandRequest;
@@ -31,9 +31,9 @@ import java.util.List;
 public class DemandController {
 
     private final DemandService demandService;
-    private final MockCurrentUserProvider currentUserProvider;
+    private final CurrentUserProvider currentUserProvider;
 
-    public DemandController(DemandService demandService, MockCurrentUserProvider currentUserProvider) {
+    public DemandController(DemandService demandService, CurrentUserProvider currentUserProvider) {
         this.demandService = demandService;
         this.currentUserProvider = currentUserProvider;
     }

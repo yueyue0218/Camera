@@ -59,27 +59,19 @@ function tokenSubject(token) {
   }
 }
 
-function isDemoToken(token) {
-  return typeof token === 'string' && token.startsWith('demo-token-')
-}
-
-function normalizedUserId(session, demoUser) {
-  const token = session.token || session.accessToken
-  if (isDemoToken(token)) {
-    return Number(demoUser.userId)
-  }
+function normalizedUserId(session) {
   const value = tokenSubject(session.token || session.accessToken)
     || session.user.userId
     || session.user.id
     || session.user.user?.userId
     || session.user.user?.id
-    || demoUser.userId
   const number = Number(value)
-  return Number.isFinite(number) ? number : Number(demoUser.userId)
+  return Number.isFinite(number) && number > 0 ? number : null
 }
 
 function normalizeAdminSession(session) {
   const rawToken = session.token || session.accessToken || ''
+  if (!rawToken || rawToken.startsWith('demo-token-')) return null
   const value = tokenSubject(rawToken)
     || session.user.userId
     || session.user.id
@@ -109,9 +101,12 @@ function normalizeAdminSession(session) {
 function normalizeSession(session) {
   if (!session?.user) return null
   if (session.user.role === 'ADMIN') return normalizeAdminSession(session)
+  const rawToken = session.token || session.accessToken || ''
+  if (!rawToken || rawToken.startsWith('demo-token-')) return null
   const role = session.user.role === 'PROVIDER' ? 'PROVIDER' : 'CUSTOMER'
   const demoUser = USERS[roleToUserKey(role)]
-  const userId = normalizedUserId(session, demoUser)
+  const userId = normalizedUserId(session)
+  if (!userId) return null
   const storedProfile = readUserProfiles()[String(userId)] || {}
   const availability = session.user.availability || storedProfile.availability || demoUser.availability || ''
   const cityCode = session.user.cityCode || storedProfile.cityCode || ''
@@ -129,13 +124,8 @@ function normalizeSession(session) {
   const isProvider = role === 'PROVIDER'
   const nickname = isProvider ? (providerNickname || customerNickname) : customerNickname
   const bio = isProvider ? providerBio : customerBio
-  const rawToken = session.token || session.accessToken
-  const token = isDemoToken(rawToken)
-    ? `demo-token-${role.toLowerCase()}-${userId}`
-    : (rawToken || `demo-token-${role.toLowerCase()}-${userId}`)
-
   return {
-    token,
+    token: rawToken,
     refreshToken: session.refreshToken || '',
     user: {
       ...demoUser,
@@ -190,32 +180,6 @@ export function AuthProvider({ children }) {
     return normalized
   }
 
-  function loginWithDemo({ role, mobile }) {
-    const demoUser = USERS[roleToUserKey(role)]
-    return completeLogin({
-      token: `demo-token-${demoUser.role.toLowerCase()}-${demoUser.userId}`,
-      user: {
-        ...demoUser,
-        mobile: mobile || demoUser.mobile
-      }
-    })
-  }
-
-  function setUserKey(nextUserKey) {
-    if (!USERS[nextUserKey]) return
-    const demoUser = USERS[nextUserKey]
-    const storedProfile = readUserProfiles()[String(demoUser.userId)] || {}
-    const nextSession = normalizeSession({
-      ...session,
-      user: {
-        ...demoUser,
-        ...storedProfile
-      }
-    })
-    setSession(nextSession)
-    persistSession(nextSession)
-  }
-
   function updateProfile(partial) {
     if (!session) return null
     // Route nickname/bio updates to the correct role-specific field,
@@ -259,9 +223,7 @@ export function AuthProvider({ children }) {
     currentUser,
     isAuthenticated: Boolean(session),
     completeLogin,
-    loginWithDemo,
     logout,
-    setUserKey,
     switchRole,
     updateProfile
   }), [session, userKey, currentUser])

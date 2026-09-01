@@ -2,7 +2,7 @@ export const API_BASE = import.meta.env.VITE_API_BASE_URL || `http://${window.lo
 export const AUTH_TIMEOUT_MESSAGE = '登录超时，请重新登录'
 
 function jwtHasExpired(token) {
-  if (!token || typeof token !== 'string' || token.startsWith('demo-token-')) return false
+  if (!token || typeof token !== 'string') return false
   const parts = token.split('.')
   if (parts.length !== 3) return false
   try {
@@ -44,10 +44,6 @@ export async function request(path, options = {}, currentUser) {
     ...(!isFormDataBody ? { 'Content-Type': 'application/json' } : {}),
     ...(currentUser?.token ? {
       Authorization: `Bearer ${currentUser.token}`
-    } : {}),
-    ...(currentUser ? {
-      'X-User-Id': String(currentUser.userId),
-      'X-User-Role': currentUser.role
     } : {}),
     ...(options.headers || {})
   }

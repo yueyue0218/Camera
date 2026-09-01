@@ -37,28 +37,11 @@ public class AuthInterceptor implements HandlerInterceptor {
             return true;
         }
         if (isPublicB1B2Get(request)) {
-            authenticateOptionalDemoOrBearer(request);
+            authenticateOptionalBearer(request);
             return true;
         }
 
-        String demoUserId = request.getHeader("X-User-Id");
         String authHeader = request.getHeader("Authorization");
-        boolean demoHeaderAuth = authHeader == null
-                || authHeader.isBlank()
-                || authHeader.startsWith("Bearer demo-token-");
-        if (demoHeaderAuth && demoUserId != null && !demoUserId.isBlank()) {
-            try {
-                Long userId = parseUserId(demoUserId);
-                ensureKnownUser(userId);
-                UserContext.setUserId(userId);
-                UserRole role = resolveDemoRole(request, userId, isProtectedB1B2RoleRoute(request));
-                enforceProtectedRouteRole(request, role);
-                return true;
-            } catch (NumberFormatException e) {
-                throw new BusinessException(ErrorCode.UNAUTHORIZED);
-            }
-        }
-
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
@@ -78,28 +61,6 @@ public class AuthInterceptor implements HandlerInterceptor {
         return true;
     }
 
-    private Long parseUserId(String value) {
-        long userId = Long.parseLong(value.trim());
-        if (userId <= 0) {
-            throw new NumberFormatException("user id must be positive");
-        }
-        return userId;
-    }
-
-    private UserRole resolveDemoRole(HttpServletRequest request, Long userId, boolean requireExplicitRole) {
-        String demoRole = request.getHeader("X-User-Role");
-        if (demoRole != null && !demoRole.isBlank()) {
-            UserRole role = UserRole.parse(demoRole, null);
-            UserContext.setCurrentRole(role);
-            UserContext.setAdmin(role == UserRole.ADMIN);
-            return role;
-        }
-        if (requireExplicitRole) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "X-User-Role is required for this operation");
-        }
-        return loadAndSetRole(userId).orElse(null);
-    }
-
     private boolean isPublicB1B2Get(HttpServletRequest request) {
         if (!"GET".equalsIgnoreCase(request.getMethod())) {
             return false;
@@ -108,6 +69,7 @@ public class AuthInterceptor implements HandlerInterceptor {
         return uri.equals("/service-packages")
                 || uri.equals("/services")
                 || uri.equals("/demands")
+                || uri.matches("^/api/v1/providers/\\d+/profile$")
                 || uri.matches("^/files/\\d+/download$")
                 || uri.matches("^/(service-packages|services|demands)/\\d+$");
     }
@@ -211,23 +173,8 @@ public class AuthInterceptor implements HandlerInterceptor {
         return null;
     }
 
-    private void authenticateOptionalDemoOrBearer(HttpServletRequest request) {
+    private void authenticateOptionalBearer(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
-        String demoUserId = request.getHeader("X-User-Id");
-        if (authHeader != null && authHeader.startsWith("Bearer demo-token-")
-                && demoUserId != null && !demoUserId.isBlank()) {
-            try {
-                Long userId = parseUserId(demoUserId);
-                if (!userRepository.existsById(userId)) {
-                    return;
-                }
-                UserContext.setUserId(userId);
-                resolveDemoRole(request, userId, false);
-                return;
-            } catch (NumberFormatException e) {
-                throw new BusinessException(ErrorCode.UNAUTHORIZED);
-            }
-        }
         if (authHeader == null || authHeader.isBlank()) {
             return;
         }
@@ -266,9 +213,4 @@ public class AuthInterceptor implements HandlerInterceptor {
                 });
     }
 
-    private void ensureKnownUser(Long userId) {
-        if (!userRepository.existsById(userId)) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED);
-        }
-    }
 }

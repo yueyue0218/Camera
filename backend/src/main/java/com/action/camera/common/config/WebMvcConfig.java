@@ -22,13 +22,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .excludePathPatterns(
                         "/test/**",
                         "/auth/**",
-                        "/sessions",
-                        "/sessions/**",
                         "/admin/login",
                         "/users/register",
                         "/users/login",
-                        "/messages/**",
-                        "/api/v1/providers/*/profile"
+                        "/messages/**"
                 );
     }
 

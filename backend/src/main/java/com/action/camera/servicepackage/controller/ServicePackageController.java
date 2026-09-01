@@ -3,7 +3,7 @@ package com.action.camera.servicepackage.controller;
 import com.action.camera.common.Result;
 import com.action.camera.common.page.PageResult;
 import com.action.camera.common.security.CurrentUser;
-import com.action.camera.common.security.MockCurrentUserProvider;
+import com.action.camera.common.security.CurrentUserProvider;
 import com.action.camera.servicepackage.dto.CreateServicePackageRequest;
 import com.action.camera.servicepackage.dto.CreateServicePackageResult;
 import com.action.camera.servicepackage.dto.ReserveServicePackageRequest;
@@ -35,10 +35,10 @@ import java.util.List;
 public class ServicePackageController {
 
     private final ServicePackageService servicePackageService;
-    private final MockCurrentUserProvider currentUserProvider;
+    private final CurrentUserProvider currentUserProvider;
 
     public ServicePackageController(ServicePackageService servicePackageService,
-                                    MockCurrentUserProvider currentUserProvider) {
+                                    CurrentUserProvider currentUserProvider) {
         this.servicePackageService = servicePackageService;
         this.currentUserProvider = currentUserProvider;
     }

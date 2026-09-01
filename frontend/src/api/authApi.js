@@ -35,17 +35,10 @@ export const authApi = {
   },
   async login({ email, password }) {
     const studentNo = studentNoFromEmail(email)
-    try {
-      return await request('/users/login', {
-        method: 'POST',
-        body: JSON.stringify({ studentNo, password, role: 'CUSTOMER' })
-      })
-    } catch (error) {
-      if (error.isNetworkError || error.status === 404) {
-        error.canUseDemoLogin = true
-      }
-      throw error
-    }
+    return request('/users/login', {
+      method: 'POST',
+      body: JSON.stringify({ studentNo, password, role: 'CUSTOMER' })
+    })
   },
   adminLogin({ email, password }) {
     return request('/admin/login', {

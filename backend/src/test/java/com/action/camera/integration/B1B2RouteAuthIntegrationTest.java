@@ -1,5 +1,6 @@
 package com.action.camera.integration;
 
+import com.action.camera.common.JwtUtil;
 import com.action.camera.demand.repository.DemandRepository;
 import com.action.camera.servicepackage.repository.ServicePackageRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +43,9 @@ class B1B2RouteAuthIntegrationTest {
     @Autowired
     private JdbcTemplate jdbc;
 
+    @Autowired
+    private JwtUtil jwtUtil;
+
     @BeforeEach
     void cleanDatabase() {
         demandRepository.deleteAll();
@@ -63,7 +67,7 @@ class B1B2RouteAuthIntegrationTest {
 
         ResponseEntity<Map> missingRoleCreate =
                 rest.exchange("/demands", HttpMethod.POST, entityWithUserOnly("1001", demandBody()), Map.class);
-        assertThat(missingRoleCreate.getBody().get("code")).isEqualTo(40301);
+        assertThat(missingRoleCreate.getBody().get("code")).isEqualTo(40101);
 
         ResponseEntity<Map> providerCreate =
                 rest.exchange("/demands", HttpMethod.POST, userEntity("2001", "PROVIDER", demandBody()), Map.class);
@@ -99,7 +103,7 @@ class B1B2RouteAuthIntegrationTest {
 
         ResponseEntity<Map> missingRoleCreate =
                 rest.exchange("/services", HttpMethod.POST, entityWithUserOnly("2001", servicePackageBody()), Map.class);
-        assertThat(missingRoleCreate.getBody().get("code")).isEqualTo(40301);
+        assertThat(missingRoleCreate.getBody().get("code")).isEqualTo(40101);
 
         ResponseEntity<Map> customerCreate =
                 rest.exchange("/services", HttpMethod.POST,
@@ -123,7 +127,7 @@ class B1B2RouteAuthIntegrationTest {
     }
 
     @Test
-    void publicHallGetAcceptsDemoHeadersEvenWhenDemoTokenIsPresent() {
+    void publicHallGetRejectsRemovedDemoTokenEvenWithForgedHeaders() {
         Long serviceId = numberValue(data(rest.exchange("/service-packages", HttpMethod.POST,
                 userEntity("2001", "PROVIDER", servicePackageBody()), Map.class)), "serviceId");
         Long demandId = numberValue(data(rest.exchange("/demands", HttpMethod.POST,
@@ -136,13 +140,13 @@ class B1B2RouteAuthIntegrationTest {
         HttpEntity<String> demoEntity = new HttpEntity<>(null, headers);
 
         assertThat(rest.exchange("/service-packages", HttpMethod.GET, demoEntity, Map.class)
-                .getBody().get("code")).isEqualTo(200);
+                .getBody().get("code")).isEqualTo(40101);
         assertThat(rest.exchange("/service-packages/" + serviceId, HttpMethod.GET, demoEntity, Map.class)
-                .getBody().get("code")).isEqualTo(200);
+                .getBody().get("code")).isEqualTo(40101);
         assertThat(rest.exchange("/demands", HttpMethod.GET, demoEntity, Map.class)
-                .getBody().get("code")).isEqualTo(200);
+                .getBody().get("code")).isEqualTo(40101);
         assertThat(rest.exchange("/demands/" + demandId, HttpMethod.GET, demoEntity, Map.class)
-                .getBody().get("code")).isEqualTo(200);
+                .getBody().get("code")).isEqualTo(40101);
     }
 
     @Test
@@ -225,8 +229,7 @@ class B1B2RouteAuthIntegrationTest {
 
     private HttpEntity<String> userEntity(String userId, String role, String body) {
         HttpHeaders headers = new HttpHeaders();
-        headers.set("X-User-Id", userId);
-        headers.set("X-User-Role", role);
+        headers.setBearerAuth(jwtUtil.generateToken(Long.valueOf(userId)));
         headers.setContentType(MediaType.APPLICATION_JSON);
         return new HttpEntity<>(body, headers);
     }

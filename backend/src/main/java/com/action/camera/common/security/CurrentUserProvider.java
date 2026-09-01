@@ -9,19 +9,18 @@ import org.springframework.stereotype.Component;
 import java.util.Optional;
 
 /**
- * Temporary P4 current-user provider.
+ * Resolves the authenticated user populated by the JWT interceptor.
  *
- * A module will replace this with JWT/NJU identity authentication later. For
- * now, local frontend and API tests pass X-User-Id / X-User-Role headers.
+ * The request parameter remains for controller API compatibility, but request
+ * headers are deliberately ignored: identity and role only come from the
+ * server-validated UserContext.
  */
 @Component
-public class MockCurrentUserProvider {
-
-    private static final long DEFAULT_CUSTOMER_ID = 1001L;
+public class CurrentUserProvider {
 
     public CurrentUser getCurrentUser(HttpServletRequest request) {
         return getCurrentUserIfPresent(request)
-                .orElseGet(() -> new CurrentUser(DEFAULT_CUSTOMER_ID, UserRole.CUSTOMER));
+                .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
     }
 
     public Optional<CurrentUser> getCurrentUserIfPresent(HttpServletRequest request) {
@@ -32,20 +31,5 @@ public class MockCurrentUserProvider {
             return Optional.of(new CurrentUser(contextUserId, resolvedRole, UserContext.isAdmin()));
         }
         return Optional.empty();
-    }
-
-    private Long readUserId(String value) {
-        if (value == null || value.isBlank()) {
-            return DEFAULT_CUSTOMER_ID;
-        }
-        try {
-            long parsed = Long.parseLong(value.trim());
-            if (parsed <= 0) {
-                throw new NumberFormatException("user id must be positive");
-            }
-            return parsed;
-        } catch (NumberFormatException e) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "X-User-Id 必须是正整数");
-        }
     }
 }

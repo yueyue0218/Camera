@@ -1,5 +1,6 @@
 package com.action.camera.integration;
 
+import com.action.camera.common.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +28,9 @@ class AuthAndSessionIntegrationTest {
     @Autowired
     private JdbcTemplate jdbc;
 
+    @Autowired
+    private JwtUtil jwtUtil;
+
     @BeforeEach
     void seedDemoUsers() {
         jdbc.execute("DELETE FROM users WHERE id IN (1001, 2001)");
@@ -44,55 +48,21 @@ class AuthAndSessionIntegrationTest {
     }
 
     @Test
-    void session_customerLogin_succeeds() {
+    void removedSessionEndpoint_doesNotIssueCustomerDemoToken() {
         String body = "{\"loginType\":\"MOBILE\",\"mobile\":\"13800138001\",\"verifyCode\":\"123456\",\"role\":\"CUSTOMER\"}";
         HttpEntity<String> entity = jsonEntity(body);
         ResponseEntity<Map> resp = rest.exchange("/sessions", HttpMethod.POST, entity, Map.class);
 
-        assertThat(resp.getBody().get("code")).isEqualTo(200);
-        Map<String, Object> data = (Map<String, Object>) resp.getBody().get("data");
-        assertThat(data.get("token")).isNotNull().isNotEqualTo("");
-        Map<String, Object> user = (Map<String, Object>) data.get("user");
-        assertThat(((Number) user.get("userId")).longValue()).isEqualTo(1001L);
+        assertThat(resp.getBody().get("code")).isEqualTo(40101);
     }
 
     @Test
-    void session_providerLogin_succeeds() {
+    void removedSessionEndpoint_doesNotIssueProviderDemoToken() {
         String body = "{\"loginType\":\"MOBILE\",\"mobile\":\"13900139002\",\"verifyCode\":\"654321\",\"role\":\"PROVIDER\"}";
         HttpEntity<String> entity = jsonEntity(body);
         ResponseEntity<Map> resp = rest.exchange("/sessions", HttpMethod.POST, entity, Map.class);
 
-        assertThat(resp.getBody().get("code")).isEqualTo(200);
-        Map<String, Object> data = (Map<String, Object>) resp.getBody().get("data");
-        Map<String, Object> user = (Map<String, Object>) data.get("user");
-        assertThat(((Number) user.get("userId")).longValue()).isEqualTo(2001L);
-    }
-
-    @Test
-    void session_invalidMobileFormat_rejectsWith40001() {
-        String body = "{\"loginType\":\"MOBILE\",\"mobile\":\"abc123\",\"verifyCode\":\"123456\"}";
-        HttpEntity<String> entity = jsonEntity(body);
-        ResponseEntity<Map> resp = rest.exchange("/sessions", HttpMethod.POST, entity, Map.class);
-
-        assertThat(resp.getBody().get("code")).isEqualTo(40001);
-    }
-
-    @Test
-    void session_adminRole_rejectsWith40301() {
-        String body = "{\"loginType\":\"MOBILE\",\"mobile\":\"13800138001\",\"verifyCode\":\"123456\",\"role\":\"ADMIN\"}";
-        HttpEntity<String> entity = jsonEntity(body);
-        ResponseEntity<Map> resp = rest.exchange("/sessions", HttpMethod.POST, entity, Map.class);
-
-        assertThat(resp.getBody().get("code")).isEqualTo(40301);
-    }
-
-    @Test
-    void session_fiveDigitVerifyCode_rejectsWith40002() {
-        String body = "{\"loginType\":\"MOBILE\",\"mobile\":\"13800138001\",\"verifyCode\":\"12345\"}";
-        HttpEntity<String> entity = jsonEntity(body);
-        ResponseEntity<Map> resp = rest.exchange("/sessions", HttpMethod.POST, entity, Map.class);
-
-        assertThat(resp.getBody().get("code")).isEqualTo(40002);
+        assertThat(resp.getBody().get("code")).isEqualTo(40101);
     }
 
     @Test
@@ -102,10 +72,32 @@ class AuthAndSessionIntegrationTest {
     }
 
     @Test
-    void protectedEndpoint_withXUserId_succeeds() {
+    void protectedEndpoint_withForgedXUserId_returns401() {
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-User-Id", "1001");
         ResponseEntity<Map> resp = rest.exchange("/users/me", HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+
+        assertThat(resp.getBody().get("code")).isEqualTo(40101);
+    }
+
+    @Test
+    void protectedEndpoint_withForgedAdminHeaders_returns401() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-User-Id", "1001");
+        headers.set("X-User-Role", "ADMIN");
+        ResponseEntity<Map> resp = rest.exchange("/users/me", HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+
+        assertThat(resp.getBody().get("code")).isEqualTo(40101);
+    }
+
+    @Test
+    void protectedEndpoint_withSignedBearerToken_succeeds() {
+        ResponseEntity<Map> resp = rest.exchange(
+                "/users/me",
+                HttpMethod.GET,
+                bearerEntity(1001L, null),
+                Map.class
+        );
 
         assertThat(resp.getBody().get("code")).isEqualTo(200);
         assertThat(resp.getBody().get("data")).isNotNull();
@@ -124,9 +116,12 @@ class AuthAndSessionIntegrationTest {
 
     @Test
     void getUserBrief_validId_succeeds() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-User-Id", "1001");
-        ResponseEntity<Map> resp = rest.exchange("/users/1001/brief", HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+        ResponseEntity<Map> resp = rest.exchange(
+                "/users/1001/brief",
+                HttpMethod.GET,
+                bearerEntity(1001L, null),
+                Map.class
+        );
 
         assertThat(resp.getBody().get("code")).isEqualTo(200);
         Map<String, Object> data = (Map<String, Object>) resp.getBody().get("data");
@@ -135,18 +130,22 @@ class AuthAndSessionIntegrationTest {
 
     @Test
     void switchRole_customerToProvider_succeeds() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-User-Id", "1001");
-        headers.setContentType(MediaType.APPLICATION_JSON);
         String body = "{\"role\":\"PROVIDER\"}";
         ResponseEntity<Map> resp = rest.exchange("/users/me/role", HttpMethod.POST,
-                new HttpEntity<>(body, headers), Map.class);
+                bearerEntity(1001L, body), Map.class);
 
         assertThat(resp.getBody().get("code")).isEqualTo(200);
     }
 
     private HttpEntity<String> jsonEntity(String body) {
         HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return new HttpEntity<>(body, headers);
+    }
+
+    private HttpEntity<String> bearerEntity(Long userId, String body) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(jwtUtil.generateToken(userId));
         headers.setContentType(MediaType.APPLICATION_JSON);
         return new HttpEntity<>(body, headers);
     }

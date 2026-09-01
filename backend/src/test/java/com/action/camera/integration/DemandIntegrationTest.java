@@ -160,7 +160,7 @@ class DemandIntegrationTest {
         ResponseEntity<Map> stranger = rest.exchange("/demands/" + demandId, HttpMethod.GET,
                 bearerEntity(1002L), Map.class);
         ResponseEntity<Map> forgedHeader = rest.exchange("/demands/" + demandId, HttpMethod.GET,
-                userEntity("1001", "CUSTOMER", null), Map.class);
+                forgedCustomerHeaderEntity(), Map.class);
         ResponseEntity<Map> publicList = rest.getForEntity("/demands", Map.class);
 
         assertThat(anonymous.getBody().get("code")).isEqualTo(40301);
@@ -349,26 +349,30 @@ class DemandIntegrationTest {
 
     private HttpEntity<String> asCustomer(String body) {
         HttpHeaders h = new HttpHeaders();
-        h.set("X-User-Id", "1001");
-        h.set("X-User-Role", "CUSTOMER");
+        h.setBearerAuth(jwtUtil.generateToken(1001L));
         h.setContentType(MediaType.APPLICATION_JSON);
         return new HttpEntity<>(body, h);
     }
 
     private HttpEntity<String> asProvider(String body) {
         HttpHeaders h = new HttpHeaders();
-        h.set("X-User-Id", "2001");
-        h.set("X-User-Role", "PROVIDER");
+        h.setBearerAuth(jwtUtil.generateToken(2001L));
         h.setContentType(MediaType.APPLICATION_JSON);
         return new HttpEntity<>(body, h);
     }
 
     private HttpEntity<Object> userEntity(String userId, String role, String body) {
         HttpHeaders h = new HttpHeaders();
-        h.set("X-User-Id", userId);
-        h.set("X-User-Role", role);
+        h.setBearerAuth(jwtUtil.generateToken(Long.valueOf(userId)));
         h.setContentType(MediaType.APPLICATION_JSON);
         return new HttpEntity<>(body, h);
+    }
+
+    private HttpEntity<Object> forgedCustomerHeaderEntity() {
+        HttpHeaders h = new HttpHeaders();
+        h.set("X-User-Id", "1001");
+        h.set("X-User-Role", "CUSTOMER");
+        return new HttpEntity<>(null, h);
     }
 
     private HttpEntity<String> bearerEntity(Long userId) {

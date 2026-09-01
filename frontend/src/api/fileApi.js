@@ -47,11 +47,7 @@ export const fileApi = {
     const normalizedFileId = extractFileId(fileId)
     if (!normalizedFileId) throw new Error(`Invalid fileId: ${fileId}`)
     const headers = {
-      ...(currentUser?.token ? { Authorization: `Bearer ${currentUser.token}` } : {}),
-      ...(currentUser ? {
-        'X-User-Id': String(currentUser.userId),
-        'X-User-Role': currentUser.role
-      } : {})
+      ...(currentUser?.token ? { Authorization: `Bearer ${currentUser.token}` } : {})
     }
     const response = await fetch(`${API_BASE}/files/${normalizedFileId}/download`, {
       headers,

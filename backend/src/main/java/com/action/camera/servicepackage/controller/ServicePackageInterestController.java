@@ -3,7 +3,7 @@ package com.action.camera.servicepackage.controller;
 import com.action.camera.common.Result;
 import com.action.camera.common.page.PageResult;
 import com.action.camera.common.security.CurrentUser;
-import com.action.camera.common.security.MockCurrentUserProvider;
+import com.action.camera.common.security.CurrentUserProvider;
 import com.action.camera.servicepackage.dto.ServicePackageCardDto;
 import com.action.camera.servicepackage.service.ServicePackageService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,10 +15,10 @@ import org.springframework.web.bind.annotation.RestController;
 public class ServicePackageInterestController {
 
     private final ServicePackageService servicePackageService;
-    private final MockCurrentUserProvider currentUserProvider;
+    private final CurrentUserProvider currentUserProvider;
 
     public ServicePackageInterestController(ServicePackageService servicePackageService,
-                                            MockCurrentUserProvider currentUserProvider) {
+                                            CurrentUserProvider currentUserProvider) {
         this.servicePackageService = servicePackageService;
         this.currentUserProvider = currentUserProvider;
     }

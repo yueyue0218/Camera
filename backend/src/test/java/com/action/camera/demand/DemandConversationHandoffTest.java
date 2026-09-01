@@ -2,7 +2,7 @@ package com.action.camera.demand;
 
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.security.CurrentUser;
-import com.action.camera.common.security.MockCurrentUserProvider;
+import com.action.camera.common.security.CurrentUserProvider;
 import com.action.camera.common.security.UserRole;
 import com.action.camera.demand.controller.DemandController;
 import com.action.camera.demand.domain.DemandResponseStatus;
@@ -220,7 +220,7 @@ class DemandConversationHandoffTest {
     void invitationEndpointsAreNotMappedAndCannotCreateResponsesOrConversations() throws Exception {
         DemandDto demand = demandService.createDemand(CUSTOMER, demandRequest());
         MockMvc mockMvc = MockMvcBuilders
-                .standaloneSetup(new DemandController(demandService, new MockCurrentUserProvider()))
+                .standaloneSetup(new DemandController(demandService, new CurrentUserProvider()))
                 .build();
 
         List<MockHttpServletRequestBuilder> invitationRequests = List.of(
@@ -234,9 +234,7 @@ class DemandConversationHandoffTest {
         );
 
         for (MockHttpServletRequestBuilder request : invitationRequests) {
-            int status = mockMvc.perform(request
-                            .header("X-User-Id", CUSTOMER.getUserId())
-                            .header("X-User-Role", CUSTOMER.getRole().name()))
+            int status = mockMvc.perform(request)
                     .andReturn()
                     .getResponse()
                     .getStatus();
