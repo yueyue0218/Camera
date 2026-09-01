@@ -1,5 +1,8 @@
 package com.action.camera.servicepackage.domain;
 
+import com.action.camera.admin.domain.ModerationStatus;
+import com.action.camera.common.ErrorCode;
+import com.action.camera.common.exception.BusinessException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
@@ -27,7 +30,8 @@ import java.util.List;
 @Table(name = "service_packages", indexes = {
         @Index(name = "idx_service_package_status", columnList = "status"),
         @Index(name = "idx_service_package_provider", columnList = "provider_id,status"),
-        @Index(name = "idx_service_package_hall", columnList = "status,city_code,scene,base_price_cent")
+        @Index(name = "idx_service_package_hall", columnList = "status,city_code,scene,base_price_cent"),
+        @Index(name = "idx_service_packages_moderation_public", columnList = "moderation_status,status,created_at")
 })
 public class ServicePackage {
 
@@ -113,6 +117,19 @@ public class ServicePackage {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "moderation_status", nullable = false, length = 20)
+    private ModerationStatus moderationStatus = ModerationStatus.VISIBLE;
+
+    @Column(name = "moderated_by")
+    private Long moderatedBy;
+
+    @Column(name = "moderated_at")
+    private LocalDateTime moderatedAt;
+
+    @Column(name = "moderation_reason", length = 500)
+    private String moderationReason;
+
     public void markOffline() {
         this.status = ServicePackageStatus.OFFLINE;
         this.isAvailable = false;
@@ -123,6 +140,18 @@ public class ServicePackage {
         this.hiddenByProvider = true;
         this.hiddenAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
+    }
+
+    public void takeDown(Long adminId, String reason, LocalDateTime now) {
+        changeModeration(ModerationStatus.VISIBLE, ModerationStatus.HIDDEN, adminId, reason, now);
+    }
+
+    public void restore(Long adminId, String reason, LocalDateTime now) {
+        changeModeration(ModerationStatus.HIDDEN, ModerationStatus.VISIBLE, adminId, reason, now);
+    }
+
+    public boolean isModerationVisible() {
+        return ModerationStatus.VISIBLE.equals(moderationStatus);
     }
 
     @PrePersist
@@ -158,6 +187,9 @@ public class ServicePackage {
         if (timeTags == null) {
             timeTags = List.of();
         }
+        if (moderationStatus == null) {
+            moderationStatus = ModerationStatus.VISIBLE;
+        }
     }
 
     @PreUpdate
@@ -165,6 +197,37 @@ public class ServicePackage {
         updatedAt = LocalDateTime.now();
         if (hiddenByProvider == null) {
             hiddenByProvider = false;
+        }
+        if (moderationStatus == null) {
+            moderationStatus = ModerationStatus.VISIBLE;
+        }
+    }
+
+    private void changeModeration(ModerationStatus expected,
+                                  ModerationStatus target,
+                                  Long adminId,
+                                  String reason,
+                                  LocalDateTime now) {
+        ModerationStatus current = moderationStatus == null ? ModerationStatus.VISIBLE : moderationStatus;
+        if (!expected.equals(current)) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Content moderation state has already changed");
+        }
+        validateModerationInputs(adminId, reason, now);
+        moderationStatus = target;
+        moderatedBy = adminId;
+        moderatedAt = now;
+        moderationReason = reason.trim();
+    }
+
+    private void validateModerationInputs(Long adminId, String reason, LocalDateTime now) {
+        if (adminId == null || adminId <= 0 || now == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Administrator and moderation time are required");
+        }
+        if (reason == null || reason.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Moderation reason is required");
+        }
+        if (reason.trim().length() > 500) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Moderation reason is too long");
         }
     }
 }

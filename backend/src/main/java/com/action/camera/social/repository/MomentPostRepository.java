@@ -1,8 +1,13 @@
 package com.action.camera.social.repository;
 
+import com.action.camera.admin.domain.ModerationStatus;
 import com.action.camera.social.domain.MomentPost;
 import com.action.camera.social.domain.MomentStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
@@ -11,6 +16,12 @@ import java.util.Optional;
 public interface MomentPostRepository extends JpaRepository<MomentPost, Long> {
 
     List<MomentPost> findByStatusOrderByCreatedAtDesc(MomentStatus status);
+
+    long countByModerationStatus(ModerationStatus moderationStatus);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select m from MomentPost m where m.id = :id")
+    Optional<MomentPost> findByIdForUpdate(@Param("id") Long id);
 
     List<MomentPost> findByAuthorIdInAndStatusOrderByCreatedAtDesc(Collection<Long> authorIds, MomentStatus status);
 
