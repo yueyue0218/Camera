@@ -1,5 +1,6 @@
 package com.action.camera.servicepackage.service;
 
+import com.action.camera.admin.dto.ModerationView;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.page.PageResult;
@@ -165,6 +166,7 @@ public class ServicePackageService {
         List<ServicePackage> packages = servicePackageRepository.findByStatus(ServicePackageStatus.ONLINE);
         List<ServicePackage> baseCandidates = packages.stream()
                 .filter(servicePackage -> servicePackage.getStatus() == ServicePackageStatus.ONLINE)
+                .filter(ServicePackage::isModerationVisible)
                 .filter(servicePackage -> !Boolean.TRUE.equals(servicePackage.getHiddenByProvider()))
                 .filter(servicePackage -> normalizedCity == null
                         || servicePackage.getCityCode().equalsIgnoreCase(normalizedCity))
@@ -233,11 +235,18 @@ public class ServicePackageService {
     @Transactional(readOnly = true)
     public ServicePackageDetailDto getServiceDetail(Long serviceId, CurrentUser currentUser) {
         ServicePackage servicePackage = getServicePackage(serviceId);
+        boolean privileged = canViewRestrictedServicePackage(servicePackage, currentUser);
+        if (!servicePackage.isModerationVisible() && !privileged) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "Service package not found: " + serviceId);
+        }
         if (servicePackage.getStatus() == ServicePackageStatus.OFFLINE
-                && !canViewOfflineServicePackage(servicePackage, currentUser)) {
+                && !privileged) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "Service package is offline");
         }
-        return ServicePackageMapper.toDetail(servicePackage, photographerInfo(servicePackage.getProviderId()));
+        return ServicePackageMapper.toDetail(
+                servicePackage,
+                photographerInfo(servicePackage.getProviderId()),
+                privileged ? moderationView(servicePackage) : null);
     }
 
     @Transactional
@@ -252,7 +261,8 @@ public class ServicePackageService {
         applyUpdate(servicePackage, request);
         ensureCompleteServicePackage(servicePackage);
         ServicePackage saved = servicePackageRepository.save(servicePackage);
-        return ServicePackageMapper.toDetail(saved, photographerInfo(saved.getProviderId()));
+        return ServicePackageMapper.toDetail(
+                saved, photographerInfo(saved.getProviderId()), moderationView(saved));
     }
 
     @Transactional
@@ -261,7 +271,8 @@ public class ServicePackageService {
         ServicePackage servicePackage = getOwnedServicePackage(serviceId, currentUser.getUserId());
         servicePackage.markOffline();
         ServicePackage saved = servicePackageRepository.save(servicePackage);
-        return ServicePackageMapper.toDetail(saved, photographerInfo(saved.getProviderId()));
+        return ServicePackageMapper.toDetail(
+                saved, photographerInfo(saved.getProviderId()), moderationView(saved));
     }
 
     @Transactional(readOnly = true)
@@ -272,7 +283,9 @@ public class ServicePackageService {
         return packages.stream()
                 .map(servicePackage -> ServicePackageMapper.toCard(
                         servicePackage,
-                        photographerInfos.get(servicePackage.getProviderId())))
+                        photographerInfos.get(servicePackage.getProviderId()),
+                        null,
+                        moderationView(servicePackage)))
                 .toList();
     }
 
@@ -306,7 +319,7 @@ public class ServicePackageService {
     @Transactional
     public ServicePackageInterestDto addInterest(Long serviceId, CurrentUser currentUser) {
         ensureCustomer(currentUser);
-        ServicePackage servicePackage = getOnlineServicePackage(serviceId);
+        ServicePackage servicePackage = getPublicInteractiveServicePackage(serviceId);
         if (Objects.equals(servicePackage.getProviderId(), currentUser.getUserId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Provider cannot add interest to own service package");
         }
@@ -361,6 +374,7 @@ public class ServicePackageService {
         List<ServicePackage> packages = serviceIds.stream()
                 .map(packageById::get)
                 .filter(Objects::nonNull)
+                .filter(ServicePackage::isModerationVisible)
                 .filter(servicePackage -> normalizedTimeTag == null
                         || servicePackage.getTimeTags().contains(normalizedTimeTag))
                 .toList();
@@ -380,7 +394,7 @@ public class ServicePackageService {
                                                    CurrentUser currentUser,
                                                    StartServicePackageChatRequest request) {
         ensureCustomer(currentUser);
-        ServicePackage servicePackage = getOnlineServicePackage(serviceId);
+        ServicePackage servicePackage = getPublicInteractiveServicePackage(serviceId);
         if (Objects.equals(servicePackage.getProviderId(), currentUser.getUserId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Provider cannot start chat for own service package");
         }
@@ -410,10 +424,14 @@ public class ServicePackageService {
                         "Service package not found: " + serviceId));
     }
 
-    private ServicePackage getOnlineServicePackage(Long serviceId) {
+    private ServicePackage getPublicInteractiveServicePackage(Long serviceId) {
         ServicePackage servicePackage = getServicePackage(serviceId);
-        if (servicePackage.getStatus() != ServicePackageStatus.ONLINE) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Service package is not online");
+        if (servicePackage.getStatus() != ServicePackageStatus.ONLINE
+                || !servicePackage.isModerationVisible()
+                || Boolean.TRUE.equals(servicePackage.getHiddenByProvider())
+                || !Boolean.TRUE.equals(servicePackage.getIsAvailable())) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                    "Service package is not publicly interactive");
         }
         return servicePackage;
     }
@@ -894,10 +912,17 @@ public class ServicePackageService {
         return value == null || value.isBlank();
     }
 
-    private boolean canViewOfflineServicePackage(ServicePackage servicePackage, CurrentUser currentUser) {
+    private boolean canViewRestrictedServicePackage(ServicePackage servicePackage, CurrentUser currentUser) {
         return currentUser != null
                 && currentUser.getUserId() != null
                 && (currentUser.isAdmin() || Objects.equals(servicePackage.getProviderId(), currentUser.getUserId()));
+    }
+
+    private ModerationView moderationView(ServicePackage servicePackage) {
+        return new ModerationView(
+                servicePackage.getModerationStatus(),
+                servicePackage.getModeratedAt(),
+                servicePackage.getModerationReason());
     }
 
     private List<String> normalizeTags(List<String> tags) {

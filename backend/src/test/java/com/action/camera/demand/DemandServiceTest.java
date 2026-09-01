@@ -1,5 +1,7 @@
 package com.action.camera.demand;
 
+import com.action.camera.admin.domain.ModerationStatus;
+import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.page.PageResult;
 import com.action.camera.common.security.CurrentUser;
@@ -1006,6 +1008,87 @@ class DemandServiceTest {
 
         assertThatThrownBy(() -> demandService.getAcceptedSnapshot(response.getResponseId(), provider))
                 .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void hiddenDemandIsAbsentFromPublicList() {
+        DemandDto created = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        Demand demand = demandRepository.findById(created.getDemandId()).orElseThrow();
+        demand.takeDown(admin.getUserId(), "policy", LocalDateTime.now());
+        demandRepository.saveAndFlush(demand);
+
+        PageResult<DemandDto> page = demandService.listDemands(1, 10, null, null, null);
+
+        assertThat(page.getRecords()).extracting(DemandDto::getDemandId)
+                .doesNotContain(created.getDemandId());
+        assertThat(page.getTotal()).isZero();
+    }
+
+    @Test
+    void hiddenDemandDetailIsNotFoundForOtherUserButVisibleToOwner() {
+        DemandDto created = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        Demand demand = demandRepository.findById(created.getDemandId()).orElseThrow();
+        demand.takeDown(admin.getUserId(), "policy", LocalDateTime.now());
+        demandRepository.saveAndFlush(demand);
+
+        assertThatThrownBy(() -> demandService.getDemand(created.getDemandId(), otherCustomer))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+        DemandDto ownerDetail = demandService.getDemand(created.getDemandId(), customer);
+        assertThat(ownerDetail.getModeration()).isNotNull();
+        assertThat(ownerDetail.getModeration().status()).isEqualTo(ModerationStatus.HIDDEN);
+    }
+
+    @Test
+    void hiddenDemandRejectsNewResponse() {
+        DemandDto created = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        Demand demand = demandRepository.findById(created.getDemandId()).orElseThrow();
+        demand.takeDown(admin.getUserId(), "policy", LocalDateTime.now());
+        demandRepository.saveAndFlush(demand);
+
+        assertThatThrownBy(() -> demandService.respondToDemand(
+                created.getDemandId(), provider, responseRequest("should be blocked")))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.STATUS_CONFLICT);
+        assertThat(responseRepository.findByDemandId(created.getDemandId())).isEmpty();
+    }
+
+    @Test
+    void hiddenDemandRejectsAcceptingPendingResponseButAllowsRejectingIt() {
+        DemandDto created = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandResponseDto response = demandService.respondToDemand(
+                created.getDemandId(), provider, responseRequest("pending response"));
+        Demand demand = demandRepository.findById(created.getDemandId()).orElseThrow();
+        demand.takeDown(admin.getUserId(), "policy", LocalDateTime.now());
+        demandRepository.saveAndFlush(demand);
+
+        assertThatThrownBy(() -> demandService.acceptResponse(
+                created.getDemandId(), response.getResponseId(), customer))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.STATUS_CONFLICT);
+
+        DemandResponseDto rejected = demandService.rejectResponse(
+                created.getDemandId(), response.getResponseId(), customer);
+        assertThat(rejected.getStatus()).isEqualTo(DemandResponseStatus.REJECTED.name());
+    }
+
+    @Test
+    void hiddenDemandDoesNotBreakAcceptedSnapshot() {
+        DemandDto created = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandResponseDto response = demandService.respondToDemand(
+                created.getDemandId(), provider, responseRequest("accepted response"));
+        demandService.acceptResponse(created.getDemandId(), response.getResponseId(), customer);
+        Demand demand = demandRepository.findById(created.getDemandId()).orElseThrow();
+        demand.takeDown(admin.getUserId(), "policy", LocalDateTime.now());
+        demandRepository.saveAndFlush(demand);
+
+        AcceptedDemandResponseSnapshot snapshot = demandService.getAcceptedSnapshot(response.getResponseId(), provider);
+
+        assertThat(snapshot.getDemandId()).isEqualTo(created.getDemandId());
+        assertThat(snapshot.getResponseStatus()).isEqualTo(DemandResponseStatus.ACCEPTED.name());
     }
 
     @Test

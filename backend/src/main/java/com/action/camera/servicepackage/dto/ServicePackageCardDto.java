@@ -1,5 +1,6 @@
 package com.action.camera.servicepackage.dto;
 
+import com.action.camera.admin.dto.ModerationView;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -63,4 +64,6 @@ public class ServicePackageCardDto {
     private LocalDateTime updatedAt;
 
     private List<String> recommendReasons;
+
+    private ModerationView moderation;
 }

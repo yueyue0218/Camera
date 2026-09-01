@@ -1,5 +1,6 @@
 package com.action.camera.demand.service;
 
+import com.action.camera.admin.dto.ModerationView;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.page.PageResult;
@@ -161,6 +162,7 @@ public class DemandService {
             return new PageResult<>(List.of(), safePage, safeSize, 0);
         }
         List<Demand> candidates = demandRepository.findByStatus(publicStatus).stream()
+                .filter(Demand::isModerationVisible)
                 .filter(demand -> !Boolean.TRUE.equals(demand.getHiddenByCustomer()))
                 .filter(demand -> normalizedCity == null || equalsIgnoreCase(demand.getCityCode(), normalizedCity))
                 .filter(demand -> normalizedScene == null || equalsIgnoreCase(demand.getScene(), normalizedScene))
@@ -239,7 +241,11 @@ public class DemandService {
     @Transactional(readOnly = true)
     public DemandDto getDemand(Long demandId, CurrentUser user) {
         Demand demand = findDemand(demandId);
-        if (user != null && (user.isAdmin() || demand.getCustomerId().equals(user.getUserId()))) {
+        boolean ownerOrAdmin = isOwner(user, demand) || isAdmin(user);
+        if (!demand.isModerationVisible() && !ownerOrAdmin) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "需求不存在");
+        }
+        if (ownerOrAdmin) {
             return toOwnerDemandDto(demand);
         }
         if (demand.getStatus() == DemandStatus.OPEN) {
@@ -251,10 +257,7 @@ public class DemandService {
     @Transactional
     public DemandResponseDto respondToDemand(Long demandId, CurrentUser user, CreateDemandResponseRequest request) {
         requireProvider(user);
-        Demand demand = findDemand(demandId);
-        if (!demand.getStatus().equals(DemandStatus.OPEN)) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "only open demands can be responded");
-        }
+        Demand demand = requirePublicInteractiveDemand(demandId);
         if (demand.getCustomerId().equals(user.getUserId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "provider cannot respond to own demand");
         }
@@ -368,7 +371,7 @@ public class DemandService {
 
     private AcceptedDemandResponseSnapshot acceptResponseAndBuildSnapshot(Long demandId, Long responseId, CurrentUser user) {
         requireCustomer(user);
-        Demand demand = findDemand(demandId);
+        Demand demand = requirePublicInteractiveDemand(demandId);
         if (!demand.getCustomerId().equals(user.getUserId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "only demand owner can accept responses");
         }
@@ -406,7 +409,12 @@ public class DemandService {
                 customerInfo(demand.getCustomerId()),
                 countResponses(demand.getId(), DemandResponseStatus.PENDING_CUSTOMER_ACCEPT),
                 countResponses(demand.getId(), DemandResponseStatus.ACCEPTED),
-                countResponses(demand.getId(), DemandResponseStatus.REJECTED)
+                countResponses(demand.getId(), DemandResponseStatus.REJECTED),
+                null,
+                new ModerationView(
+                        demand.getModerationStatus(),
+                        demand.getModeratedAt(),
+                        demand.getModerationReason())
         );
     }
 
@@ -449,6 +457,26 @@ public class DemandService {
         }
         return demandRepository.findById(demandId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "demand not found"));
+    }
+
+    private Demand requirePublicInteractiveDemand(Long demandId) {
+        Demand demand = findDemand(demandId);
+        if (demand.getStatus() != DemandStatus.OPEN
+                || !demand.isModerationVisible()
+                || Boolean.TRUE.equals(demand.getHiddenByCustomer())) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "current demand is not publicly interactive");
+        }
+        return demand;
+    }
+
+    private boolean isOwner(CurrentUser user, Demand demand) {
+        return user != null
+                && user.getUserId() != null
+                && demand.getCustomerId().equals(user.getUserId());
+    }
+
+    private boolean isAdmin(CurrentUser user) {
+        return user != null && user.isAdmin();
     }
 
     private DemandResponse findResponse(Long responseId) {

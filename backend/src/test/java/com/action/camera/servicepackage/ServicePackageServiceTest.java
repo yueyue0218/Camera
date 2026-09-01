@@ -1,5 +1,7 @@
 package com.action.camera.servicepackage;
 
+import com.action.camera.admin.domain.ModerationStatus;
+import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.page.PageResult;
 import com.action.camera.common.security.CurrentUser;
@@ -323,6 +325,74 @@ class ServicePackageServiceTest {
         assertThat(commandCaptor.getValue().getSourceType()).isEqualTo(ConversationService.SOURCE_TYPE_SERVICE_PACKAGE);
         assertThat(commandCaptor.getValue().getSourceId()).isEqualTo(SERVICE_ID);
         assertThat(commandCaptor.getValue().getOrderId()).isNull();
+    }
+
+    @Test
+    void hiddenServiceIsAbsentFromPublicList() {
+        ServicePackage hidden = servicePackage(SERVICE_ID, ServicePackageStatus.ONLINE, true);
+        hidden.takeDown(9001L, "policy", LocalDateTime.now());
+        when(servicePackageRepository.findByStatus(ServicePackageStatus.ONLINE)).thenReturn(List.of(hidden));
+
+        PageResult<ServicePackageCardDto> result = servicePackageService.listServices(
+                1, 10, null, null, null, null, null, null, null);
+
+        assertThat(result.getRecords()).isEmpty();
+        assertThat(result.getTotal()).isZero();
+    }
+
+    @Test
+    void hiddenServiceDetailIsNotFoundForOtherUserButVisibleToProvider() {
+        ServicePackage hidden = servicePackage(SERVICE_ID, ServicePackageStatus.ONLINE, true);
+        hidden.takeDown(9001L, "policy", LocalDateTime.now());
+        when(servicePackageRepository.findById(SERVICE_ID)).thenReturn(Optional.of(hidden));
+        when(userRepository.findById(PROVIDER_ID)).thenReturn(Optional.of(providerUser()));
+
+        assertThatThrownBy(() -> servicePackageService.getServiceDetail(SERVICE_ID, customer()))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+        ServicePackageDetailDto providerDetail = servicePackageService.getServiceDetail(SERVICE_ID, provider());
+        assertThat(providerDetail.getModeration()).isNotNull();
+        assertThat(providerDetail.getModeration().status()).isEqualTo(ModerationStatus.HIDDEN);
+    }
+
+    @Test
+    void hiddenServiceRejectsReserveStartChatAndAddInterest() {
+        ServicePackage hidden = servicePackage(SERVICE_ID, ServicePackageStatus.ONLINE, true);
+        hidden.takeDown(9001L, "policy", LocalDateTime.now());
+        when(servicePackageRepository.findById(SERVICE_ID)).thenReturn(Optional.of(hidden));
+
+        assertThatThrownBy(() -> servicePackageService.reserveServicePackage(SERVICE_ID, customer(), null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.STATUS_CONFLICT);
+        assertThatThrownBy(() -> servicePackageService.startChat(SERVICE_ID, customer(), null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.STATUS_CONFLICT);
+        assertThatThrownBy(() -> servicePackageService.addInterest(SERVICE_ID, customer()))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.STATUS_CONFLICT);
+        verify(conversationService, never()).createConversationWithInitialMessage(any());
+        verify(interestRepository, never()).save(any());
+    }
+
+    @Test
+    void hiddenServiceAllowsCancelInterestAndDisappearsFromMyInterests() {
+        ServicePackage hidden = servicePackage(SERVICE_ID, ServicePackageStatus.ONLINE, true);
+        hidden.takeDown(9001L, "policy", LocalDateTime.now());
+        ServicePackageInterest interest = interest(CUSTOMER_ID, SERVICE_ID);
+        when(interestRepository.findByUserIdOrderByCreatedAtDesc(CUSTOMER_ID)).thenReturn(List.of(interest));
+        when(servicePackageRepository.findAllById(List.of(SERVICE_ID))).thenReturn(List.of(hidden));
+
+        servicePackageService.cancelInterest(SERVICE_ID, customer());
+        PageResult<ServicePackageCardDto> result =
+                servicePackageService.listMyInterests(customer(), 1, 10, null);
+
+        verify(interestRepository).deleteByUserIdAndServicePackageId(CUSTOMER_ID, SERVICE_ID);
+        assertThat(result.getRecords()).isEmpty();
+        assertThat(result.getTotal()).isZero();
     }
 
     private CurrentUser customer() {

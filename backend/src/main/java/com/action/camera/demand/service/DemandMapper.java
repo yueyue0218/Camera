@@ -1,5 +1,6 @@
 package com.action.camera.demand.service;
 
+import com.action.camera.admin.dto.ModerationView;
 import com.action.camera.demand.domain.Demand;
 import com.action.camera.demand.domain.DemandResponse;
 import com.action.camera.demand.dto.DemandDto;
@@ -43,6 +44,23 @@ final class DemandMapper {
                                  Integer acceptedCount,
                                  Integer rejectedCount,
                                  java.util.List<String> recommendReasons) {
+        return toDemandDto(
+                demand,
+                customerInfo,
+                pendingCount,
+                acceptedCount,
+                rejectedCount,
+                recommendReasons,
+                null);
+    }
+
+    static DemandDto toDemandDto(Demand demand,
+                                 CustomerInfo customerInfo,
+                                 Integer pendingCount,
+                                 Integer acceptedCount,
+                                 Integer rejectedCount,
+                                 java.util.List<String> recommendReasons,
+                                 ModerationView moderation) {
         return new DemandDto(
                 demand.getId(),
                 demand.getCustomerId(),
@@ -67,7 +85,8 @@ final class DemandMapper {
                 demand.getReferenceFileIds(),
                 recommendReasons,
                 demand.getCreatedAt(),
-                demand.getUpdatedAt()
+                demand.getUpdatedAt(),
+                moderation
         );
     }
 

@@ -1,5 +1,8 @@
 package com.action.camera.servicepackage;
 
+import com.action.camera.order.repository.OrderRepository;
+import com.action.camera.order.service.ServicePackageUsageService;
+import com.action.camera.message.repository.QuoteRepository;
 import com.action.camera.servicepackage.controller.ServicePackageController;
 import com.action.camera.servicepackage.controller.ServicePackageInterestController;
 import com.action.camera.servicepackage.domain.ServicePackage;
@@ -20,6 +23,8 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class ServicePackageFlowTest {
 
@@ -105,6 +110,21 @@ class ServicePackageFlowTest {
                         "UserRepository"
                 )
                 .doesNotContain("ScheduleService", "OrderService", "PaymentService");
+    }
+
+    @Test
+    void hiddenServiceDoesNotBreakExistingOrderUsage() {
+        ServicePackage servicePackage = new ServicePackage();
+        servicePackage.setId(991L);
+        servicePackage.setStatus(ServicePackageStatus.ONLINE);
+        servicePackage.takeDown(9001L, "policy", java.time.LocalDateTime.now());
+        QuoteRepository quoteRepository = mock(QuoteRepository.class);
+        OrderRepository orderRepository = mock(OrderRepository.class);
+        when(orderRepository.existsByServicePackageId(servicePackage.getId())).thenReturn(true);
+        ServicePackageUsageService usageService = new ServicePackageUsageService(quoteRepository, orderRepository);
+
+        assertThat(usageService.hasAnyQuoteOrOrderForServicePackage(servicePackage.getId())).isTrue();
+        assertThat(servicePackage.getStatus()).isEqualTo(ServicePackageStatus.ONLINE);
     }
 
     private boolean hasAnnotation(String methodName,
