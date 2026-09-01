@@ -4,6 +4,7 @@ import CloudUploadRoundedIcon from '@mui/icons-material/CloudUploadRounded'
 import InfoRoundedIcon from '@mui/icons-material/InfoRounded'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 import { PORTRA_RADIUS, PORTRA_SURFACE } from '../../../theme/portraSurfaceTokens.js'
+import { ORDER_WORKFLOW_COLORS, getOrderWorkflowTone } from '../orderWorkflowTokens.js'
 
 const iconMap = {
   confirm: <CheckCircleRoundedIcon />,
@@ -90,8 +91,8 @@ export function OrderCurrentTaskCard({
 
 const cardSx = {
   p: { xs: 2.3, md: 3 },
-  bgcolor: '#fffcf6',
-  borderColor: 'rgba(79, 70, 60, .10)',
+  bgcolor: ORDER_WORKFLOW_COLORS.paper,
+  borderColor: ORDER_WORKFLOW_COLORS.border,
   borderRadius: '22px',
   boxShadow: 'none'
 }
@@ -103,8 +104,8 @@ const iconBoxSx = {
   placeItems: 'center',
   flexShrink: 0,
   borderRadius: '14px',
-  bgcolor: 'rgba(37, 99, 235, .08)',
-  color: '#2563eb'
+  bgcolor: ORDER_WORKFLOW_COLORS.primaryWash,
+  color: ORDER_WORKFLOW_COLORS.primary
 }
 
 const deadlineSx = {
@@ -116,17 +117,17 @@ const deadlineSx = {
   gap: 1,
   borderRadius: 0,
   bgcolor: 'transparent',
-  borderTop: '1px solid rgba(79, 70, 60, .10)',
-  borderBottom: '1px solid rgba(79, 70, 60, .10)'
+  borderTop: `1px solid ${ORDER_WORKFLOW_COLORS.border}`,
+  borderBottom: `1px solid ${ORDER_WORKFLOW_COLORS.border}`
 }
 
 const noticeSx = {
   px: 1.6,
   py: 1.2,
   borderRadius: PORTRA_RADIUS.control,
-  bgcolor: '#fff4e5',
+  bgcolor: ORDER_WORKFLOW_COLORS.warningSoft,
   border: '1px solid rgba(249, 115, 22, .18)',
-  color: '#9a4b00',
+  color: ORDER_WORKFLOW_COLORS.warningText,
   fontWeight: 750,
   lineHeight: 1.65
 }
@@ -137,7 +138,7 @@ const primaryButtonSx = {
   borderRadius: '14px',
   fontSize: 17,
   fontWeight: 950,
-  bgcolor: '#2563eb'
+  bgcolor: ORDER_WORKFLOW_COLORS.primary
 }
 
 const secondaryButtonSx = {
@@ -150,10 +151,10 @@ const secondaryButtonSx = {
 }
 
 function chipSx(tone) {
-  const danger = tone === 'danger' || tone === 'warning'
+  const colors = getOrderWorkflowTone(tone)
   return {
-    bgcolor: danger ? '#fff0e8' : '#edf4ff',
-    color: danger ? PORTRA_SURFACE.warmOrange : PORTRA_SURFACE.portraBlue,
+    bgcolor: colors.bg,
+    color: colors.color,
     fontWeight: 900,
     borderRadius: '999px'
   }

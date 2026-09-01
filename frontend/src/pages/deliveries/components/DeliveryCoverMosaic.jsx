@@ -64,9 +64,10 @@ function MosaicTile({ file, previewUrl, loading, overlay, index, count, conversa
           sx={{
             width: '100%',
             height: '100%',
-            objectFit: conversation ? 'cover' : 'contain',
+            objectFit: 'contain',
             objectPosition: 'center',
-            display: 'block'
+            display: 'block',
+            bgcolor: PORTRA_SURFACE.paper
           }}
         />
       ) : loading && image ? (
@@ -135,8 +136,8 @@ function mosaicSx(count, conversation) {
     gridTemplateRows: getRows(count),
     gap: conversation ? '2px' : '3px',
     width: '100%',
-    height: conversation ? { xs: 176, sm: 188 } : 78,
-    minHeight: conversation ? 176 : 76,
+    height: conversation ? { xs: 142, sm: 154 } : 78,
+    minHeight: conversation ? 142 : 76,
     overflow: 'hidden',
     bgcolor: '#f2eee7'
   }

@@ -77,6 +77,14 @@ export function formatMessagePreview(message = {}) {
     const text = String(message.content || '').replace(/\s+/g, ' ').trim()
     return text || '还没有消息'
   }
+  if (type === 'IMAGE') {
+    const text = String(message.content || '').replace(/\s+/g, ' ').trim()
+    return text ? `[图片] ${text}` : '[图片]'
+  }
+  if (type === 'FILE') {
+    const name = String(message.fileName || message.attachment?.fileName || message.attachment?.name || '').trim()
+    return name ? `[附件] ${name}` : '[附件]'
+  }
   if (MESSAGE_TYPE_PREVIEWS[type]) return MESSAGE_TYPE_PREVIEWS[type]
   return '[消息]'
 }

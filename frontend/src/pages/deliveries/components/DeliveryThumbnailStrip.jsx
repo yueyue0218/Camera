@@ -11,9 +11,10 @@ export function DeliveryThumbnailStrip({ files = [], previewUrls = {}, variant =
   const visible = files.slice(0, 4)
   const extraCount = Math.max(0, files.length - visible.length)
   const summary = variant === 'orderSummary'
-  const compact = variant === 'message' || variant === 'sidePanel'
+  const messageCompact = variant === 'messageCompact'
+  const compact = variant === 'message' || messageCompact || variant === 'sidePanel'
   const gallery = variant === 'gallery'
-  const height = getStripHeight(visible.length, compact, gallery, summary)
+  const height = getStripHeight(visible.length, compact, gallery, summary, messageCompact)
   const shouldLoadPreviews = !previewUrls || !Object.keys(previewUrls).length
   const loadedPreviews = useDeliveryFilePreviews(visible, currentUser, { enabled: shouldLoadPreviews })
 
@@ -22,8 +23,10 @@ export function DeliveryThumbnailStrip({ files = [], previewUrls = {}, variant =
       sx={{
         display: 'grid',
         gridTemplateColumns: getGridColumns(visible.length, compact),
-        gridAutoRows: getGridAutoRows(visible.length, compact, gallery, summary),
+        gridAutoRows: getGridAutoRows(visible.length, compact, gallery, summary, messageCompact),
         gap: 0.6,
+        width: messageCompact && visible.length <= 1 ? 164 : '100%',
+        maxWidth: '100%',
         height,
         minHeight: 0,
         borderRadius: PORTRA_RADIUS.control,
@@ -119,9 +122,10 @@ function ThumbnailPlaceholder({ label }) {
   )
 }
 
-function getStripHeight(count, compact, gallery, summary) {
+function getStripHeight(count, compact, gallery, summary, messageCompact) {
   if (summary) return 82
   if (gallery) return count <= 1 ? 260 : 276
+  if (messageCompact) return count <= 1 ? 126 : 132
   if (count <= 1) return compact ? 142 : 220
   return compact ? 150 : 228
 }
@@ -132,9 +136,10 @@ function getGridColumns(count, compact) {
   return 'repeat(2, minmax(0, 1fr))'
 }
 
-function getGridAutoRows(count, compact, gallery, summary) {
+function getGridAutoRows(count, compact, gallery, summary, messageCompact) {
   if (summary) return count <= 1 ? 82 : 38
   if (count <= 1) return '1fr'
   if (gallery) return 132
+  if (messageCompact) return 63
   return compact ? 72 : 108
 }

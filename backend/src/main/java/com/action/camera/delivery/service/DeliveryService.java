@@ -139,6 +139,7 @@ public class DeliveryService {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT, "订单当前状态不允许上传交付文件");
         }
 
+        int nextDeliveryRound = resolveNextDeliveryRound(orderId);
         List<UploadedDeliveryFile> uploadedFiles = uploadDeliveryFiles(uploadFiles, currentUserId);
 
         // 在独立事务中保存交付记录后立即提交，释放 deliveries→orders FK 共享锁，
@@ -150,7 +151,7 @@ public class DeliveryService {
             saved = txTemplate.execute(status -> {
                 Delivery delivery = new Delivery();
                 delivery.setOrderId(orderId);
-                delivery.setDeliveryRound(1);
+                delivery.setDeliveryRound(nextDeliveryRound);
                 delivery.setIsLatest(true);
                 delivery.setOriginalCount(countFilesOfType(uploadedFiles, IMAGE_FILE_TYPE));
                 delivery.setRefinedCount(countFilesOfType(uploadedFiles, IMAGE_FILE_TYPE));
@@ -212,6 +213,15 @@ public class DeliveryService {
                 orderStatus,
                 uploadedFiles.stream().map(UploadedDeliveryFile::toResponse).toList()
         );
+    }
+
+    private int resolveNextDeliveryRound(Long orderId) {
+        return deliveryRepository.findByOrderIdOrderByUploadTimeDesc(orderId).stream()
+                .map(Delivery::getDeliveryRound)
+                .filter(round -> round != null && round > 0)
+                .max(Integer::compareTo)
+                .map(round -> round + 1)
+                .orElse(1);
     }
 
     private void rollbackSavedDelivery(Long deliveryId, List<UploadedDeliveryFile> uploadedFiles) {

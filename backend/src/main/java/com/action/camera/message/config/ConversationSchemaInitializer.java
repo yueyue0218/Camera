@@ -36,6 +36,7 @@ public class ConversationSchemaInitializer implements ApplicationRunner {
                 return;
             }
             ensureConversationOrderId();
+            ensureMessageFileId();
             ensureConversationIndexes();
             ensureHiddenConversationTable();
         } catch (Exception ex) {
@@ -62,6 +63,13 @@ public class ConversationSchemaInitializer implements ApplicationRunner {
                 "idx_conversation_b_time",
                 "index idx_conversation_b_time (participant_b_id, last_message_time)"
         );
+    }
+
+    private void ensureMessageFileId() {
+        if (tableExists("messages") && !columnExists("messages", "file_id")) {
+            jdbcTemplate.execute("alter table messages add column file_id bigint null after content");
+            log.info("Added messages.file_id for message attachment compatibility");
+        }
     }
 
     private void ensureConversationSourceUniqueKey() {

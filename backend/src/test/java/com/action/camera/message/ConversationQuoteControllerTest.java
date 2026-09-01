@@ -33,6 +33,7 @@ import com.action.camera.order.entity.Order;
 import com.action.camera.order.enums.EscrowStatus;
 import com.action.camera.order.enums.OrderStatus;
 import com.action.camera.order.service.OrderService;
+import com.action.camera.repository.FileRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -95,6 +96,9 @@ class ConversationQuoteControllerTest {
     @Mock
     private MessagePresenceService messagePresenceService;
 
+    @Mock
+    private FileRepository fileRepository;
+
     private ConversationController conversationController;
 
     private QuoteController quoteController;
@@ -110,7 +114,8 @@ class ConversationQuoteControllerTest {
                 notificationService,
                 userDisplayService,
                 orderDisplayService,
-                messagePresenceService
+                messagePresenceService,
+                fileRepository
         );
         ConversationService conversationService = new ConversationService(
                 conversationRepository, messageService, transactionManager);

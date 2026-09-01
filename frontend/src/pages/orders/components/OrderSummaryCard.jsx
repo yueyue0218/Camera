@@ -1,6 +1,7 @@
 import { Box, Chip, Divider, Paper, Stack, Typography } from '@mui/material'
 import CameraAltRoundedIcon from '@mui/icons-material/CameraAltRounded'
 import { PORTRA_RADIUS, PORTRA_SURFACE } from '../../../theme/portraSurfaceTokens.js'
+import { ORDER_WORKFLOW_COLORS } from '../orderWorkflowTokens.js'
 
 export function OrderSummaryCard({
   title,
@@ -60,8 +61,8 @@ export function OrderSummaryCard({
 
 const cardSx = {
   p: { xs: 2.3, md: 3 },
-  bgcolor: '#fffcf6',
-  borderColor: 'rgba(79, 70, 60, .10)',
+  bgcolor: ORDER_WORKFLOW_COLORS.paper,
+  borderColor: ORDER_WORKFLOW_COLORS.border,
   borderRadius: '22px',
   boxShadow: 'none'
 }

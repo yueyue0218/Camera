@@ -24,6 +24,7 @@ import { QuoteMoneyText } from './QuoteMoneyText.jsx'
 import { DeliveryUploadDialog } from '../../deliveries/components/DeliveryUploadDialog.jsx'
 import { DeliveryFileGrid } from '../../deliveries/components/DeliveryFileGrid.jsx'
 import { flattenDeliveryFiles, isAuthorizableDeliveryFile } from '../../deliveries/deliveryDisplay.js'
+import { REWORK_REQUIREMENT_MAX_LENGTH, getReworkRequirementHelperText } from '../../../utils/workflowLimits.js'
 
 export function ConversationActionDialogs({
   activeAction,
@@ -224,6 +225,8 @@ export function ConversationActionDialogs({
               onChange={event => onReworkRequirementChange(event.target.value)}
               multiline
               minRows={4}
+              inputProps={{ maxLength: REWORK_REQUIREMENT_MAX_LENGTH }}
+              helperText={getReworkRequirementHelperText(reworkRequirement)}
               required
             />
           </Stack>

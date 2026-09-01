@@ -5,6 +5,7 @@ import GavelRoundedIcon from '@mui/icons-material/GavelRounded'
 import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
 import RateReviewRoundedIcon from '@mui/icons-material/RateReviewRounded'
 import { PORTRA_SURFACE } from '../../../theme/portraSurfaceTokens.js'
+import { ORDER_WORKFLOW_COLORS, getOrderWorkflowTone } from '../orderWorkflowTokens.js'
 
 const iconMap = {
   delivery: <CollectionsRoundedIcon />,
@@ -28,16 +29,13 @@ export function OrderFollowupCards({ items = [] }) {
         <Box sx={gridSx}>
           {items.map(item => (
             <Paper key={item.key} variant="outlined" sx={cardSx}>
-              <Stack spacing={1.1} sx={{ height: '100%' }}>
-                <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
-                  <Stack direction="row" spacing={1} sx={{ minWidth: 0 }}>
+              <Stack spacing={0.9} sx={{ height: '100%' }}>
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                  <Stack direction="row" spacing={0.9} sx={{ minWidth: 0, alignItems: 'center' }}>
                     <Box sx={iconSx(item.tone)}>{item.icon || iconMap[item.kind] || iconMap.delivery}</Box>
                     <Box sx={{ minWidth: 0 }}>
                       <Typography sx={{ color: PORTRA_SURFACE.ink, fontWeight: 950, lineHeight: 1.35 }}>
                         {item.title}
-                      </Typography>
-                      <Typography variant="body2" sx={{ mt: 0.25, color: PORTRA_SURFACE.muted, lineHeight: 1.55 }}>
-                        {item.description}
                       </Typography>
                     </Box>
                   </Stack>
@@ -57,18 +55,6 @@ export function OrderFollowupCards({ items = [] }) {
                       {item.primaryAction.label}
                     </Button>
                   ) : null}
-                  {item.secondaryAction ? (
-                    <Button
-                      size="small"
-                      color="inherit"
-                      variant="text"
-                      onClick={item.secondaryAction.onClick}
-                      disabled={item.secondaryAction.disabled}
-                      sx={secondaryActionSx}
-                    >
-                      {item.secondaryAction.label}
-                    </Button>
-                  ) : null}
                 </Stack>
               </Stack>
             </Paper>
@@ -80,10 +66,10 @@ export function OrderFollowupCards({ items = [] }) {
 }
 
 const sectionSx = {
-  p: { xs: 2.1, md: 2.6 },
-  bgcolor: '#fffcf6',
-  borderColor: 'rgba(79, 70, 60, .10)',
-  borderRadius: '22px',
+  p: { xs: 1.35, md: 1.55 },
+  bgcolor: ORDER_WORKFLOW_COLORS.paper,
+  borderColor: ORDER_WORKFLOW_COLORS.border,
+  borderRadius: '18px',
   boxShadow: 'none'
 }
 
@@ -94,53 +80,48 @@ const gridSx = {
 }
 
 const cardSx = {
-  p: 1.35,
-  minHeight: 150,
-  bgcolor: '#fff8ee',
-  borderColor: 'rgba(79, 70, 60, .09)',
-  borderRadius: '18px',
+  p: 0.95,
+  minHeight: 92,
+  bgcolor: '#fffdf8',
+  borderColor: ORDER_WORKFLOW_COLORS.borderSubtle,
+  borderRadius: '14px',
   boxShadow: 'none'
 }
 
 function iconSx(tone) {
+  const colors = getOrderWorkflowTone(tone)
   return {
-    width: 38,
-    height: 38,
-    borderRadius: '13px',
+    width: 32,
+    height: 32,
+    borderRadius: '10px',
     display: 'grid',
     placeItems: 'center',
     flexShrink: 0,
-    bgcolor: tone === 'warning' ? '#fff4e5' : tone === 'success' ? '#ecfdf3' : 'rgba(37, 99, 235, .08)',
-    color: tone === 'warning' ? '#f97316' : tone === 'success' ? '#16a34a' : '#2563eb',
-    '& svg': { fontSize: 21 }
+    bgcolor: colors.bg,
+    color: colors.color,
+    '& svg': { fontSize: 18 }
   }
 }
 
 function statusSx(tone) {
+  const colors = getOrderWorkflowTone(tone)
   return {
-    px: 0.85,
-    py: 0.35,
+    px: 0.7,
+    py: 0.28,
     borderRadius: 999,
     flexShrink: 0,
-    bgcolor: tone === 'warning' ? '#fff4e5' : tone === 'success' ? '#ecfdf3' : 'rgba(37, 99, 235, .08)',
-    color: tone === 'warning' ? '#f97316' : tone === 'success' ? '#16a34a' : '#2563eb',
-    fontSize: 12,
+    bgcolor: colors.bg,
+    color: colors.color,
+    fontSize: 11,
     fontWeight: 900,
     lineHeight: 1.2
   }
 }
 
 const actionSx = {
-  minHeight: 34,
-  borderRadius: '11px',
+  minHeight: 30,
+  borderRadius: '10px',
   fontWeight: 900,
-  borderColor: 'rgba(37, 99, 235, .26)',
-  color: '#2563eb'
-}
-
-const secondaryActionSx = {
-  minHeight: 34,
-  borderRadius: '11px',
-  fontWeight: 850,
-  color: PORTRA_SURFACE.muted
+  borderColor: 'rgba(13, 47, 178, .26)',
+  color: ORDER_WORKFLOW_COLORS.primary
 }

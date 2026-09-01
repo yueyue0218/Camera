@@ -21,9 +21,7 @@ export function MessageActorAvatar({
     event.stopPropagation()
     if (canOpenProfile) {
       navigate(profilePath)
-      return
     }
-    console.debug('[messages] actor avatar missing profile path', { actor })
   }
 
   return (

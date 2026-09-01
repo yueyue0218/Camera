@@ -30,9 +30,16 @@ export const conversationApi = {
     }, currentUser)
   },
   sendMessage(conversationId, content, currentUser, messageType = 'TEXT') {
+    const body = typeof content === 'object' && content !== null
+      ? {
+          messageType: content.messageType || messageType,
+          content: content.content || '',
+          fileId: content.fileId || null
+        }
+      : { messageType, content }
     return request(`/conversations/${conversationId}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ messageType, content })
+      body: JSON.stringify(body)
     }, currentUser)
   },
   quotes(conversationId, currentUser, status) {

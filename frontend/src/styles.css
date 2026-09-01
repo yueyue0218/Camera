@@ -333,6 +333,7 @@
 .review-reply span { color: var(--portra-blue); font-size: 11px; letter-spacing: .12em; }
 .review-reply p { margin: 0; color: #4f5866; line-height: 1.8; }
 .review-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.portra-route-loading { min-height: 180px; display: grid; place-items: center; color: #6f6a62; font-weight: 850; }
 @media (max-width: 1040px) { .credit-page .credit-hero { grid-template-columns: 1fr; } .credit-summary-grid, .credit-review-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 760px) { .credit-summary-grid, .credit-review-grid { grid-template-columns: 1fr; } .credit-preview-card { grid-template-columns: 1fr; } .credit-preview-visual { min-height: 124px; } }
 @media (prefers-reduced-motion: reduce) { .credit-preview-card, .credit-summary-card, .credit-review-card, .review-item { transition: none; animation: none; } .credit-preview-card:hover, .credit-preview-card:active, .credit-summary-card.clickable:hover, .credit-review-card:hover, .review-item:hover { transform: none; } }

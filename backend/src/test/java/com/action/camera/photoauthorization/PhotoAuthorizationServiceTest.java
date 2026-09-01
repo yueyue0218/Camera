@@ -6,6 +6,7 @@ import com.action.camera.delivery.entity.Delivery;
 import com.action.camera.delivery.entity.DeliveryFile;
 import com.action.camera.delivery.repository.DeliveryFileRepository;
 import com.action.camera.delivery.repository.DeliveryRepository;
+import com.action.camera.domain.FileRecord;
 import com.action.camera.order.entity.Order;
 import com.action.camera.order.enums.EscrowStatus;
 import com.action.camera.order.enums.OrderStatus;
@@ -17,6 +18,7 @@ import com.action.camera.photoauthorization.entity.PhotoAuthorizationFile;
 import com.action.camera.photoauthorization.repository.PhotoAuthorizationFileRepository;
 import com.action.camera.photoauthorization.repository.PhotoAuthorizationRepository;
 import com.action.camera.photoauthorization.service.PhotoAuthorizationService;
+import com.action.camera.repository.FileRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,6 +52,7 @@ class PhotoAuthorizationServiceTest {
     private static final Long DELIVERY_ID = 9001L;
     private static final Long FILE_ID = 5001L;
     private static final Long SECOND_FILE_ID = 5002L;
+    private static final Long ZIP_FILE_ID = 5003L;
     private static final Long AUTHORIZATION_ID = 6001L;
 
     @Mock
@@ -67,6 +70,9 @@ class PhotoAuthorizationServiceTest {
     @Mock
     private PhotoAuthorizationFileRepository photoAuthorizationFileRepository;
 
+    @Mock
+    private FileRepository fileRepository;
+
     private PhotoAuthorizationService photoAuthorizationService;
 
     @BeforeEach
@@ -76,7 +82,8 @@ class PhotoAuthorizationServiceTest {
                 deliveryRepository,
                 deliveryFileRepository,
                 photoAuthorizationRepository,
-                photoAuthorizationFileRepository
+                photoAuthorizationFileRepository,
+                fileRepository
         );
     }
 
@@ -100,6 +107,12 @@ class PhotoAuthorizationServiceTest {
         assertNull(response.getAuthorizedAt());
         assertEquals(List.of(FILE_ID, SECOND_FILE_ID),
                 response.getFiles().stream().map(file -> file.getFileId()).toList());
+        assertEquals(DELIVERY_ID, response.getFiles().get(0).getDeliveryId());
+        assertEquals("photo-1.jpg", response.getFiles().get(0).getFileName());
+        assertEquals("IMAGE", response.getFiles().get(0).getFileType());
+        assertEquals("image/jpeg", response.getFiles().get(0).getMimeType());
+        assertEquals(1024L, response.getFiles().get(0).getSize());
+        assertEquals(1024L, response.getFiles().get(0).getFileSize());
 
         ArgumentCaptor<PhotoAuthorization> authorizationCaptor = ArgumentCaptor.forClass(PhotoAuthorization.class);
         verify(photoAuthorizationRepository).save(authorizationCaptor.capture());
@@ -216,6 +229,27 @@ class PhotoAuthorizationServiceTest {
                 ));
 
         assertEquals(ErrorCode.VALIDATION_ERROR, exception.getErrorCode());
+        verify(photoAuthorizationRepository, never()).save(any(PhotoAuthorization.class));
+    }
+
+    @Test
+    void zipDeliveryFileCannotBeRequestedForPhotoAuthorization() {
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
+        when(deliveryRepository.findByOrderIdOrderByUploadTimeDesc(ORDER_ID)).thenReturn(List.of(delivery()));
+        when(deliveryFileRepository.findByDeliveryIdInAndFileIdIn(
+                eq(List.of(DELIVERY_ID)),
+                eq(new LinkedHashSet<>(List.of(ZIP_FILE_ID)))
+        )).thenReturn(List.of(deliveryFile(ZIP_FILE_ID, "ZIP")));
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> photoAuthorizationService.requestAuthorization(
+                        ORDER_ID,
+                        PROVIDER_ID,
+                        request(List.of(ZIP_FILE_ID), null)
+                ));
+
+        assertEquals(ErrorCode.VALIDATION_ERROR, exception.getErrorCode());
+        assertTrue(exception.getMessage().contains("图片作品"));
         verify(photoAuthorizationRepository, never()).save(any(PhotoAuthorization.class));
     }
 
@@ -405,6 +439,11 @@ class PhotoAuthorizationServiceTest {
             file.setId(file.getFileId() + 100);
             return file;
         });
+        when(fileRepository.findAllById(List.of(FILE_ID, SECOND_FILE_ID)))
+                .thenReturn(List.of(fileRecord(FILE_ID, "photo-1.jpg", "image/jpeg", 1024L),
+                        fileRecord(SECOND_FILE_ID, "photo-2.png", "image/png", 2048L)));
+        when(deliveryFileRepository.findByFileIdIn(List.of(FILE_ID, SECOND_FILE_ID)))
+                .thenReturn(List.of(deliveryFile(FILE_ID), deliveryFile(SECOND_FILE_ID)));
     }
 
     private PhotoAuthorizationRequest request(List<Long> fileIds, String remark) {
@@ -434,12 +473,26 @@ class PhotoAuthorizationServiceTest {
     }
 
     private DeliveryFile deliveryFile(Long fileId) {
+        return deliveryFile(fileId, "IMAGE");
+    }
+
+    private DeliveryFile deliveryFile(Long fileId, String fileType) {
         DeliveryFile file = new DeliveryFile();
         file.setId(fileId + 200);
         file.setDeliveryId(DELIVERY_ID);
         file.setFileId(fileId);
+        file.setFileType(fileType);
         file.setSortOrder(fileId.equals(FILE_ID) ? 0 : 1);
         return file;
+    }
+
+    private FileRecord fileRecord(Long fileId, String name, String mimeType, Long size) {
+        FileRecord record = new FileRecord();
+        record.setId(fileId);
+        record.setOriginalName(name);
+        record.setMimeType(mimeType);
+        record.setFileSize(size);
+        return record;
     }
 
     private PhotoAuthorization authorization(String status) {

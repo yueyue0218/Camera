@@ -25,7 +25,7 @@ import {
 } from '../../utils/displayFormatters.js'
 import { PORTRA_RADIUS, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
 import { DeliveryThumbnailStrip } from '../../pages/deliveries/components/DeliveryThumbnailStrip.jsx'
-import { getDeliveryFileId } from '../../pages/deliveries/deliveryDisplay.js'
+import { getDeliveryFileId, isImageDeliveryFile } from '../../pages/deliveries/deliveryDisplay.js'
 import { PortraPrimaryAction, PortraSecondaryAction, PortraStatusPill, PortraTicketCard } from './PortraBusinessPrimitives.jsx'
 
 const AUTHORIZATION_STATUS_LABELS = {
@@ -54,6 +54,7 @@ export function AuthorizationRequestCard({
 
   const compact = variant === 'message'
   const inline = chrome === 'none'
+  const messageInline = compact && inline
   const canOpenDelivery = Boolean(model.deliveryTarget && onOpenDelivery)
   const files = model.files
   const Root = inline ? Box : PortraTicketCard
@@ -98,7 +99,7 @@ export function AuthorizationRequestCard({
           ...sx
         }}
       >
-        <Stack spacing={0.9}>
+        <Stack spacing={messageInline ? 0.72 : 0.9}>
           <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
             <Box sx={{ minWidth: 0 }}>
               {!inline && (
@@ -111,16 +112,22 @@ export function AuthorizationRequestCard({
                   摄影师申请作品展示授权
                 </Typography>
               )}
-              <Typography variant="body2" sx={{ mt: 0.35, color: PORTRA_SURFACE.muted, lineHeight: 1.45 }}>
+              <Typography variant="body2" sx={{ mt: messageInline ? 0 : 0.35, color: PORTRA_SURFACE.muted, lineHeight: 1.45 }}>
                 {model.summary}
               </Typography>
             </Box>
             <PortraStatusPill label={model.statusLabel} />
           </Stack>
-          {files.length > 0 && <DeliveryThumbnailStrip files={files} variant="message" mode="contain" />}
+          {files.length > 0 && (
+            <DeliveryThumbnailStrip
+              files={files}
+              variant={messageInline ? 'messageCompact' : 'message'}
+              mode="contain"
+            />
+          )}
           <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
-            <Typography variant="caption" sx={{ color: PORTRA_SURFACE.faint, fontWeight: 800 }}>
-              点击查看授权详情
+            <Typography variant="caption" sx={{ color: PORTRA_SURFACE.faint, fontWeight: 800, minWidth: 0 }}>
+              {messageInline ? model.fileMetaText || '作品授权详情' : '点击查看授权详情'}
             </Typography>
             <Button
               size="small"
@@ -131,7 +138,7 @@ export function AuthorizationRequestCard({
                 setOpen(true)
               }}
             >
-              查看详情
+              {messageInline ? '查看授权' : '查看详情'}
             </Button>
           </Stack>
         </Stack>
@@ -163,6 +170,11 @@ export function AuthorizationRequestCard({
               {files.length > 0 ? (
                 <>
                   <DeliveryThumbnailStrip files={files} variant="orderSection" mode="contain" />
+                  {model.fileMetaText && (
+                    <Typography variant="caption" sx={{ color: PORTRA_SURFACE.faint, fontWeight: 800 }}>
+                      {model.fileMetaText}
+                    </Typography>
+                  )}
                   <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap', rowGap: 0.75 }}>
                     {files.map((file, index) => (
                       <Chip
@@ -177,7 +189,7 @@ export function AuthorizationRequestCard({
                 </>
               ) : (
                 <Typography variant="body2" sx={{ color: PORTRA_SURFACE.muted }}>
-                  当前接口未返回具体照片，可从订单作品记录进入查看。
+                  {canOpenDelivery ? '当前授权记录暂未返回可预览图片，可前往作品详情查看。' : '当前授权记录暂未返回可预览图片，可从订单作品记录查看。'}
                 </Typography>
               )}
               {canOpenDelivery && (
@@ -269,6 +281,7 @@ function buildAuthorizationModel(authorization = {}, order) {
     statusLabel: AUTHORIZATION_STATUS_LABELS[status] || '授权状态已更新',
     summary: summaryParts.join(' · '),
     files,
+    fileMetaText: buildAuthorizationFileMetaText(files),
     usageLabel,
     applicantLabel: buildApplicantLabel(authorization, order),
     requestTime: formatDateTime(authorization.createdAt || authorization.requestedAt || authorization.authorizedAt || order?.updatedAt, '待同步'),
@@ -291,26 +304,32 @@ function normalizeAuthorizationFiles(authorization = {}) {
     authorization.deliveryRecord?.files,
     authorization.deliveryResponse?.files
   ].find(Array.isArray) || []
-  return files.filter(Boolean).map((file, index) => ({
-    ...normalizeAuthorizationFileRecord(file),
-    id: file.id || file.fileId || file.file?.id || file.fileInfo?.id || `${authorization.id || 'authorization'}-${index}`,
-    fileId: file.fileId || file.id || file.file?.id || file.fileInfo?.id,
-    deliveryId: file.deliveryId || file.delivery?.id || authorization.deliveryId,
-    orderId: file.orderId || file.order?.id || authorization.orderId
-  }))
+  return files
+    .filter(Boolean)
+    .map((file, index) => normalizeAuthorizationFileRecord(file, authorization, index))
+    .filter(file => getDeliveryFileId(file) && isImageDeliveryFile(file))
 }
 
-function normalizeAuthorizationFileRecord(file = {}) {
-  const nested = file.file || file.fileInfo || file.fileRecord || file.deliveryFile || {}
+function normalizeAuthorizationFileRecord(file = {}, authorization = {}, index = 0) {
+  const nested = file.file || file.fileInfo || file.fileRecord || {}
+  const deliveryFile = file.deliveryFile || file.delivery || {}
   const fileName = file.fileName || file.originalName || nested.fileName || nested.originalName || ''
   const mimeType = file.mimeType || file.contentType || nested.mimeType || nested.contentType || ''
+  const fileSize = file.fileSize || file.size || nested.fileSize || nested.size || null
+  const fileId = getPositiveId(file.fileId || nested.fileId || nested.id)
   return {
     ...nested,
     ...file,
+    id: file.id || `${authorization.id || 'authorization'}-${fileId || index}`,
+    fileId,
+    deliveryId: getPositiveId(file.deliveryId || deliveryFile.deliveryId || authorization.deliveryId),
+    orderId: file.orderId || file.order?.id || authorization.orderId,
     fileName,
     mimeType,
-    fileType: file.fileType || nested.fileType || inferAuthorizationFileType(fileName, mimeType),
-    fileSize: file.fileSize || file.size || nested.fileSize || nested.size
+    fileType: file.fileType || deliveryFile.fileType || nested.fileType || inferAuthorizationFileType(fileName, mimeType),
+    size: fileSize,
+    fileSize,
+    sortOrder: file.sortOrder ?? deliveryFile.sortOrder
   }
 }
 
@@ -318,7 +337,33 @@ function inferAuthorizationFileType(fileName, mimeType) {
   const type = String(mimeType || '').toLowerCase()
   const name = String(fileName || '').toLowerCase()
   if (type.includes('zip') || /\.zip$/i.test(name)) return 'ZIP'
-  return 'IMAGE'
+  if (type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(name)) return 'IMAGE'
+  return ''
+}
+
+function getPositiveId(value) {
+  const id = Number(value)
+  return Number.isFinite(id) && id > 0 ? id : null
+}
+
+function buildAuthorizationFileMetaText(files = []) {
+  if (!files.length) return ''
+  const mimeTypes = Array.from(new Set(files.map(file => file.mimeType).filter(Boolean)))
+  const totalSize = files
+    .map(file => Number(file.fileSize || file.size || 0))
+    .filter(size => Number.isFinite(size) && size > 0)
+    .reduce((sum, size) => sum + size, 0)
+  return [
+    `${files.length} 张图片`,
+    mimeTypes.slice(0, 2).join(' / '),
+    totalSize > 0 ? formatFileSize(totalSize) : ''
+  ].filter(Boolean).join(' · ')
+}
+
+function formatFileSize(size) {
+  if (size >= 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`
+  if (size >= 1024) return `${Math.round(size / 1024)} KB`
+  return `${size} B`
 }
 
 function buildApplicantLabel(_authorization = {}, _order) {
@@ -326,8 +371,8 @@ function buildApplicantLabel(_authorization = {}, _order) {
 }
 
 function getAuthorizationDeliveryTarget(authorization = {}, order, files = []) {
-  const file = files.find(item => item.deliveryId || getDeliveryFileId(item)) || null
-  const deliveryId = authorization.deliveryId || file?.deliveryId || getDeliveryFileId(file)
+  const file = files.find(item => item.deliveryId) || null
+  const deliveryId = authorization.deliveryId || file?.deliveryId
   const orderId = authorization.orderId || file?.orderId || order?.orderId
   if (!orderId || !deliveryId) return null
   return { orderId, deliveryId }

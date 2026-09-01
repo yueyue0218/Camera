@@ -1,8 +1,10 @@
-import { Box, Button, Stack, TextField, Typography } from '@mui/material'
+import { useRef, useState } from 'react'
+import { Box, Button, IconButton, Popover, Stack, TextField, Typography } from '@mui/material'
 import AttachFileRoundedIcon from '@mui/icons-material/AttachFileRounded'
 import AddPhotoAlternateRoundedIcon from '@mui/icons-material/AddPhotoAlternateRounded'
 import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import EmojiEmotionsRoundedIcon from '@mui/icons-material/EmojiEmotionsRounded'
 import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
 import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded'
@@ -38,10 +40,16 @@ export function ConversationComposer({
   onOpenOrderArchive,
   onContentChange,
   onSendMessage,
+  pendingAttachment,
   onChooseMessageImage,
+  onChooseMessageFile,
+  onRemoveAttachment,
   onUnavailableTool,
   onOpenAction
 }) {
+  const imageInputRef = useRef(null)
+  const fileInputRef = useRef(null)
+  const [emojiAnchor, setEmojiAnchor] = useState(null)
   const pendingQuote = actions.pendingQuote
   const orderAction = buildOrderAction(orderId)
   const canOpenOrderArchive = Boolean(orderAction && typeof onOpenOrderArchive === 'function')
@@ -63,6 +71,22 @@ export function ConversationComposer({
     || actions.canReviewPhotoAuthorization
     || actions.canViewDispute
   )
+  const sendingDisabled = loading || imageSending
+  const canSend = Boolean(content.trim() || pendingAttachment) && !sendingDisabled
+  const chooseImage = event => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (file) onChooseMessageImage?.(file)
+  }
+  const chooseFile = event => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (file) onChooseMessageFile?.(file)
+  }
+  const insertEmoji = emoji => {
+    onContentChange(`${content || ''}${emoji}`)
+    setEmojiAnchor(null)
+  }
   return (
     <Box sx={{ px: { xs: 1.1, md: 1.35 }, pt: 0.68, pb: 0.72, bgcolor: PORTRA_COLORS.paper, borderTop: `1px solid ${PORTRA_COLORS.borderMuted}`, boxShadow: '0 -1px 0 rgba(255, 255, 255, 0.62) inset' }}>
       <Stack spacing={0.62}>
@@ -162,12 +186,29 @@ export function ConversationComposer({
 
         <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center', flexWrap: 'wrap', minHeight: 30 }}>
           <Typography variant="caption" sx={{ mr: 0.5, color: PORTRA_COLORS.faintInk, fontWeight: 750 }}>沟通工具</Typography>
-          <MessageToolbarButton title="当前接口暂不支持发送图片，作品请通过订单上传" unavailable onClick={() => onUnavailableTool('图片')}>
+          <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={chooseImage} />
+          <input ref={fileInputRef} type="file" hidden onChange={chooseFile} />
+          <MessageToolbarButton title="发送图片" onClick={() => imageInputRef.current?.click()} disabled={sendingDisabled}>
             <ImageRoundedIcon fontSize="small" />
           </MessageToolbarButton>
-          <MessageToolbarButton title="附件发送需要消息附件接口支持" unavailable onClick={() => onUnavailableTool('附件')}><AttachFileRoundedIcon fontSize="small" /></MessageToolbarButton>
-          <MessageToolbarButton title="表情面板暂未接入" unavailable onClick={() => onUnavailableTool('表情')}><EmojiEmotionsRoundedIcon fontSize="small" /></MessageToolbarButton>
-          <MessageToolbarButton title="补款能力暂未接入" unavailable onClick={() => onUnavailableTool('补款')}><AccountBalanceWalletRoundedIcon fontSize="small" /></MessageToolbarButton>
+          <MessageToolbarButton title="发送附件" onClick={() => fileInputRef.current?.click()} disabled={sendingDisabled}><AttachFileRoundedIcon fontSize="small" /></MessageToolbarButton>
+          <MessageToolbarButton title="插入表情" onClick={event => setEmojiAnchor(event.currentTarget)} disabled={sendingDisabled}><EmojiEmotionsRoundedIcon fontSize="small" /></MessageToolbarButton>
+          <Popover
+            open={Boolean(emojiAnchor)}
+            anchorEl={emojiAnchor}
+            onClose={() => setEmojiAnchor(null)}
+            anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
+            transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+          >
+            <Stack direction="row" spacing={0.45} sx={{ p: 0.8, bgcolor: PORTRA_COLORS.paper }}>
+              {['😀', '😊', '👌', '👍', '🙏', '📷', '✨', '❤️'].map(emoji => (
+                <Button key={emoji} size="small" onClick={() => insertEmoji(emoji)} sx={emojiButtonSx}>
+                  {emoji}
+                </Button>
+              ))}
+            </Stack>
+          </Popover>
+          <MessageToolbarButton title="补款功能将作为订单交易能力单独设计" unavailable onClick={() => onUnavailableTool('补款')}><AccountBalanceWalletRoundedIcon fontSize="small" /></MessageToolbarButton>
           {actions.canOpenOrder && canOpenOrderArchive && (
             <MessageToolbarButton title="查看订单" data-message-order-entry="composer-toolbar" onClick={openOrderArchive}><ReceiptLongRoundedIcon fontSize="small" /></MessageToolbarButton>
           )}
@@ -175,6 +216,27 @@ export function ConversationComposer({
             <MessageToolbarButton title="平台协助" onClick={() => onUnavailableTool('平台协助')}><SupportAgentRoundedIcon fontSize="small" /></MessageToolbarButton>
           )}
         </Stack>
+
+        {pendingAttachment && (
+          <Stack direction="row" spacing={0.9} sx={pendingAttachmentSx}>
+            {pendingAttachment.previewUrl ? (
+              <Box component="img" src={pendingAttachment.previewUrl} alt={pendingAttachment.name} sx={pendingImageSx} />
+            ) : (
+              <Box sx={pendingFileIconSx}><AttachFileRoundedIcon fontSize="small" /></Box>
+            )}
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Typography sx={{ color: PORTRA_COLORS.ink, fontSize: 13, fontWeight: 900 }} noWrap>
+                {pendingAttachment.name}
+              </Typography>
+              <Typography variant="caption" sx={{ color: PORTRA_COLORS.faintInk }}>
+                {pendingAttachment.kind === 'IMAGE' ? '图片' : '附件'} · {formatFileSize(pendingAttachment.size)}
+              </Typography>
+            </Box>
+            <IconButton size="small" onClick={onRemoveAttachment} disabled={sendingDisabled} sx={{ color: PORTRA_COLORS.faintInk }}>
+              <CloseRoundedIcon fontSize="small" />
+            </IconButton>
+          </Stack>
+        )}
 
         <Stack data-message-composer-input-row="true" direction="row" spacing={1} sx={{ alignItems: 'flex-end' }}>
           <TextField
@@ -185,10 +247,11 @@ export function ConversationComposer({
             placeholder="和对方继续沟通拍摄细节"
             value={content}
             onChange={event => onContentChange(event.target.value)}
+            disabled={sendingDisabled}
             onKeyDown={event => {
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault()
-                onSendMessage()
+                if (canSend) onSendMessage()
               }
             }}
             sx={{
@@ -206,7 +269,7 @@ export function ConversationComposer({
           <Button
             variant="contained"
             onClick={onSendMessage}
-            disabled={!content.trim() || loading}
+            disabled={!canSend}
             aria-label="发送"
             sx={{
               minWidth: 44,
@@ -224,4 +287,49 @@ export function ConversationComposer({
       </Stack>
     </Box>
   )
+}
+
+function formatFileSize(size) {
+  const value = Number(size || 0)
+  if (!Number.isFinite(value) || value <= 0) return '未知大小'
+  if (value >= 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`
+  if (value >= 1024) return `${Math.round(value / 1024)} KB`
+  return `${value} B`
+}
+
+const pendingAttachmentSx = {
+  alignItems: 'center',
+  p: 0.75,
+  borderRadius: PORTRA_RADII.control,
+  bgcolor: PORTRA_COLORS.page,
+  border: `1px solid ${PORTRA_COLORS.borderMuted}`
+}
+
+const pendingImageSx = {
+  width: 42,
+  height: 42,
+  borderRadius: '10px',
+  objectFit: 'cover',
+  bgcolor: PORTRA_COLORS.paperMuted,
+  flexShrink: 0
+}
+
+const pendingFileIconSx = {
+  width: 42,
+  height: 42,
+  borderRadius: '10px',
+  display: 'grid',
+  placeItems: 'center',
+  bgcolor: PORTRA_COLORS.paperMuted,
+  color: PORTRA_COLORS.blue,
+  flexShrink: 0
+}
+
+const emojiButtonSx = {
+  minWidth: 32,
+  width: 32,
+  height: 32,
+  p: 0,
+  fontSize: 18,
+  borderRadius: '9px'
 }

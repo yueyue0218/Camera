@@ -4,6 +4,7 @@ import { buildUserProfileTarget } from '../../../utils/orderNavigation.js'
 import { getCurrentUserId } from './workbenchState.js'
 
 const USER_PROFILE_STORAGE_KEY = 'camera-p4-user-profiles'
+const LEAKED_TEST_DISPLAY_PATTERN = /(?:online[-_\s]*check|provider\s+reply\s+message)/i
 
 export function resolveConversationParticipants(conversation, currentUser, profileOverride = null) {
   const currentUserId = getCurrentUserId(currentUser)
@@ -215,7 +216,7 @@ function normalizeUserId(value) {
 function pickText(...values) {
   return values
     .map(value => String(value || '').trim())
-    .find(value => value && !hasMojibakeText(value)) || ''
+    .find(value => value && !hasMojibakeText(value) && !LEAKED_TEST_DISPLAY_PATTERN.test(value)) || ''
 }
 
 function hasMojibakeText(value) {

@@ -31,6 +31,7 @@ import { DeliveryFileGrid } from './components/DeliveryFileGrid.jsx'
 import { DeliveryPreviewViewer } from './components/DeliveryPreviewViewer.jsx'
 import { useWorkflowNavigate } from '../../hooks/useWorkflowNavigate.js'
 import { buildWorkflowCacheKey, readWorkflowViewState, writeWorkflowViewState } from '../../utils/workflowViewCache.js'
+import { REWORK_REQUIREMENT_MAX_LENGTH, getReworkRequirementHelperText } from '../../utils/workflowLimits.js'
 
 export function DeliveryGalleryPage() {
   const { orderId, deliveryId } = useParams()
@@ -98,27 +99,29 @@ export function DeliveryGalleryPage() {
     const urls = {}
     async function loadPreviews() {
       const imageFiles = files.filter(file => file.fileId && isImageDeliveryFile(file))
+      setPreviewUrls({})
       await Promise.all(imageFiles.map(async file => {
         try {
           const url = await fileApi.downloadObjectUrl(file.fileId, currentUser)
-          if (!cancelled) urls[file.id] = url
+          urls[file.id] = url
+          if (!cancelled) {
+            setPreviewUrls(previous => ({
+              ...previous,
+              [file.id]: url,
+              [file.fileId]: url
+            }))
+          }
         } catch {
           // Preview is optional. The gallery keeps a stable placeholder when a file cannot be rendered.
         }
       }))
-      if (!cancelled) setPreviewUrls(urls)
     }
-    setPreviewUrls({})
     loadPreviews()
     return () => {
       cancelled = true
       Object.values(urls).forEach(url => URL.revokeObjectURL(url))
     }
   }, [fileKey, currentUser])
-
-  useEffect(() => () => {
-    Object.values(previewUrls).forEach(url => URL.revokeObjectURL(url))
-  }, [previewUrls])
 
   function toggleSelected(file) {
     const fileId = getGallerySelectionId(file)
@@ -195,8 +198,8 @@ export function DeliveryGalleryPage() {
       feedback.warning('请填写返修要求。')
       return
     }
-    if (reason.length > 500) {
-      feedback.warning('返修要求不能超过 500 字。')
+    if (reason.length > REWORK_REQUIREMENT_MAX_LENGTH) {
+      feedback.warning(`返修要求不能超过 ${REWORK_REQUIREMENT_MAX_LENGTH} 字。`)
       return
     }
     setActionLoading(true)
@@ -392,8 +395,8 @@ export function DeliveryGalleryPage() {
               onChange={event => setReworkRequirement(event.target.value)}
               multiline
               minRows={4}
-              inputProps={{ maxLength: 500 }}
-              helperText={`${reworkRequirement.length}/500`}
+              inputProps={{ maxLength: REWORK_REQUIREMENT_MAX_LENGTH }}
+              helperText={getReworkRequirementHelperText(reworkRequirement)}
               required
             />
           </Stack>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Box, Button, Paper, Skeleton, Stack, Typography } from '@mui/material'
 import { ConversationComposer } from './ConversationComposer.jsx'
+import { ConversationMessageRow } from './ConversationMessageRow.jsx'
 import { ConversationSystemItem } from './ConversationSystemCard.jsx'
 import { MessageBubble } from './MessageBubble.jsx'
 import { MessageWorkbenchErrorBoundary } from './MessageWorkbenchErrorBoundary.jsx'
@@ -38,9 +39,13 @@ export function ConversationThread({
   onOpenDeliveryGallery,
   onContentChange,
   onSendMessage,
+  pendingAttachment,
   onRetryMessage,
   onChooseMessageImage,
-  onSaveSubmittedPhoto,
+  onChooseMessageFile,
+  onRemoveAttachment,
+  onDownloadAttachment,
+  onMessageImageRemoteReady,
   onPayOrder,
   onCancelOrder,
   onConfirmOrder,
@@ -176,18 +181,24 @@ export function ConversationThread({
             const message = item.meta?.message
             if (!message) return null
             const mine = direction === 'self'
-            const isImage = message.messageType === 'IMAGE'
-            const canSaveSubmittedPhoto = isImage && Number(message.senderId) === Number(conversation?.participantBId)
             return (
-              <MessageBubble
+              <ConversationMessageRow
                 key={message.messageId || item.key}
-                message={message}
-                mine={mine}
                 actor={resolveActorDisplay(item.actor)}
-                canSaveSubmittedPhoto={canSaveSubmittedPhoto}
-                onSaveSubmittedPhoto={() => onSaveSubmittedPhoto(message)}
-                onRetry={() => onRetryMessage?.(message)}
-              />
+                direction={mine ? 'self' : 'peer'}
+                variant="message"
+                accent={mine ? PORTRA_COLORS.blue : PORTRA_COLORS.subInk}
+                dataKind="bubble"
+              >
+                <MessageBubble
+                  message={message}
+                  mine={mine}
+                  currentUser={currentUser}
+                  onDownloadAttachment={() => onDownloadAttachment?.(message)}
+                  onImageRemoteReady={onMessageImageRemoteReady}
+                  onRetry={() => onRetryMessage?.(message)}
+                />
+              </ConversationMessageRow>
             )
           })}
           {!loading && !safeTimeline.length && (
@@ -233,7 +244,10 @@ export function ConversationThread({
           onOpenOrderArchive={onOpenOrderArchive}
           onContentChange={onContentChange}
           onSendMessage={onSendMessage}
+          pendingAttachment={pendingAttachment}
           onChooseMessageImage={onChooseMessageImage}
+          onChooseMessageFile={onChooseMessageFile}
+          onRemoveAttachment={onRemoveAttachment}
           onUnavailableTool={onUnavailableTool}
           onOpenAction={onOpenAction}
         />

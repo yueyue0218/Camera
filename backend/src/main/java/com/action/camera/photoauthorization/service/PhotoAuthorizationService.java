@@ -11,10 +11,13 @@ import com.action.camera.order.enums.OrderStatus;
 import com.action.camera.order.repository.OrderRepository;
 import com.action.camera.photoauthorization.dto.PhotoAuthorizationRequest;
 import com.action.camera.photoauthorization.dto.PhotoAuthorizationResponse;
+import com.action.camera.photoauthorization.dto.PhotoAuthorizationResponse.FileMetadata;
 import com.action.camera.photoauthorization.entity.PhotoAuthorization;
 import com.action.camera.photoauthorization.entity.PhotoAuthorizationFile;
 import com.action.camera.photoauthorization.repository.PhotoAuthorizationFileRepository;
 import com.action.camera.photoauthorization.repository.PhotoAuthorizationRepository;
+import com.action.camera.domain.FileRecord;
+import com.action.camera.repository.FileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,12 +41,14 @@ import java.util.stream.Collectors;
 public class PhotoAuthorizationService {
 
     private static final int MAX_REMARK_LENGTH = 500;
+    private static final String DELIVERY_FILE_TYPE_IMAGE = "IMAGE";
 
     private final OrderRepository orderRepository;
     private final DeliveryRepository deliveryRepository;
     private final DeliveryFileRepository deliveryFileRepository;
     private final PhotoAuthorizationRepository photoAuthorizationRepository;
     private final PhotoAuthorizationFileRepository photoAuthorizationFileRepository;
+    private final FileRepository fileRepository;
 
     @Transactional
     public PhotoAuthorizationResponse requestAuthorization(
@@ -79,7 +84,7 @@ public class PhotoAuthorizationService {
             savedFiles.add(photoAuthorizationFileRepository.save(authorizationFile));
         }
 
-        return PhotoAuthorizationResponse.from(savedAuthorization, savedFiles);
+        return PhotoAuthorizationResponse.from(savedAuthorization, savedFiles, buildFileMetadata(savedFiles));
     }
 
     @Transactional
@@ -93,7 +98,8 @@ public class PhotoAuthorizationService {
         authorization.setRemark(normalizeRemark(remark));
         authorization.setAuthorizedAt(LocalDateTime.now());
         PhotoAuthorization savedAuthorization = photoAuthorizationRepository.save(authorization);
-        return PhotoAuthorizationResponse.from(savedAuthorization, findFilesByAuthorizationIds(List.of(authorizationId)));
+        List<PhotoAuthorizationFile> files = findFilesByAuthorizationIds(List.of(authorizationId));
+        return PhotoAuthorizationResponse.from(savedAuthorization, files, buildFileMetadata(files));
     }
 
     @Transactional
@@ -106,7 +112,8 @@ public class PhotoAuthorizationService {
         authorization.setStatus(PhotoAuthorization.STATUS_REJECTED);
         authorization.setRemark(normalizeRemark(remark));
         PhotoAuthorization savedAuthorization = photoAuthorizationRepository.save(authorization);
-        return PhotoAuthorizationResponse.from(savedAuthorization, findFilesByAuthorizationIds(List.of(authorizationId)));
+        List<PhotoAuthorizationFile> files = findFilesByAuthorizationIds(List.of(authorizationId));
+        return PhotoAuthorizationResponse.from(savedAuthorization, files, buildFileMetadata(files));
     }
 
     @Transactional(readOnly = true)
@@ -237,7 +244,18 @@ public class PhotoAuthorizationService {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR,
                     "Only delivery files of this order can be authorized");
         }
+        List<Long> nonImageFileIds = requestedFileIds.stream()
+                .filter(fileId -> !isImageDeliveryFile(files.get(fileId)))
+                .toList();
+        if (!nonImageFileIds.isEmpty()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR,
+                    "只能申请展示授权图片作品，压缩包或其他文件不能用于公开展示");
+        }
         return files;
+    }
+
+    private boolean isImageDeliveryFile(DeliveryFile file) {
+        return file != null && DELIVERY_FILE_TYPE_IMAGE.equalsIgnoreCase(file.getFileType());
     }
 
     private void ensureNoExistingAuthorization(Long orderId, Collection<Long> requestedFileIds) {
@@ -284,11 +302,53 @@ public class PhotoAuthorizationService {
                         .stream()
                         .collect(Collectors.groupingBy(PhotoAuthorizationFile::getAuthorizationId, HashMap::new,
                                 Collectors.toList()));
+        Map<Long, FileMetadata> metadataByFileId =
+                buildFileMetadata(filesByAuthorizationId.values().stream()
+                        .flatMap(Collection::stream)
+                        .toList());
         return authorizations.stream()
-                .map(authorization -> PhotoAuthorizationResponse.from(
-                        authorization,
-                        filesByAuthorizationId.getOrDefault(authorization.getId(), List.of())
-                ))
+                .map(authorization -> {
+                    List<PhotoAuthorizationFile> files =
+                            filesByAuthorizationId.getOrDefault(authorization.getId(), List.of());
+                    return PhotoAuthorizationResponse.from(authorization, files, metadataByFileId);
+                })
                 .toList();
+    }
+
+    private Map<Long, FileMetadata> buildFileMetadata(
+            List<PhotoAuthorizationFile> authorizationFiles
+    ) {
+        if (authorizationFiles == null || authorizationFiles.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> fileIds = authorizationFiles.stream()
+                .map(PhotoAuthorizationFile::getFileId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (fileIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, FileRecord> recordsById = new HashMap<>();
+        Iterable<FileRecord> records = fileRepository.findAllById(fileIds);
+        if (records != null) {
+            records.forEach(record -> recordsById.put(record.getId(), record));
+        }
+        List<DeliveryFile> deliveryFiles = deliveryFileRepository.findByFileIdIn(fileIds);
+        Map<Long, DeliveryFile> deliveryFilesByFileId = (deliveryFiles == null ? List.<DeliveryFile>of() : deliveryFiles)
+                .stream()
+                .collect(Collectors.toMap(
+                        DeliveryFile::getFileId,
+                        Function.identity(),
+                        (first, ignored) -> first
+                ));
+        return fileIds.stream()
+                .collect(Collectors.toMap(
+                        Function.identity(),
+                        fileId -> new FileMetadata(
+                                recordsById.get(fileId),
+                                deliveryFilesByFileId.get(fileId)
+                        )
+                ));
     }
 }

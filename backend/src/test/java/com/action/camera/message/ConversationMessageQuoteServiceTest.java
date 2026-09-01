@@ -3,6 +3,7 @@ package com.action.camera.message;
 import com.action.camera.application.OrderDisplayService;
 import com.action.camera.application.UserDisplayService;
 import com.action.camera.common.exception.BusinessException;
+import com.action.camera.domain.FileRecord;
 import com.action.camera.message.entity.Conversation;
 import com.action.camera.message.entity.Message;
 import com.action.camera.message.entity.Quote;
@@ -20,6 +21,7 @@ import com.action.camera.message.service.MessagePresenceService;
 import com.action.camera.message.service.QuoteService;
 import com.action.camera.notification.service.NotificationService;
 import com.action.camera.order.service.OrderService;
+import com.action.camera.repository.FileRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -84,6 +86,9 @@ class ConversationMessageQuoteServiceTest {
     @Mock
     private MessagePresenceService messagePresenceService;
 
+    @Mock
+    private FileRepository fileRepository;
+
     private ConversationService conversationService;
 
     private MessageService messageService;
@@ -101,7 +106,8 @@ class ConversationMessageQuoteServiceTest {
                 notificationService,
                 userDisplayService,
                 orderDisplayService,
-                messagePresenceService
+                messagePresenceService,
+                fileRepository
         );
         conversationService = new ConversationService(conversationRepository, messageService, transactionManager);
         quoteService = new QuoteService(quoteRepository, conversationRepository, orderService);
@@ -240,6 +246,68 @@ class ConversationMessageQuoteServiceTest {
 
         assertThrows(BusinessException.class,
                 () -> messageService.sendTextMessage(CONVERSATION_ID, CUSTOMER_ID, "  "));
+
+        verify(messageRepository, never()).save(any(Message.class));
+    }
+
+    @Test
+    void participantCanSendImageAttachmentWithoutText() {
+        Conversation conversation = conversation();
+        FileRecord attachment = messageAttachment(81L, CUSTOMER_ID, "sample.jpg", "image/jpeg");
+        when(conversationRepository.findById(CONVERSATION_ID)).thenReturn(Optional.of(conversation));
+        when(fileRepository.findById(81L)).thenReturn(Optional.of(attachment));
+        when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> {
+            Message message = invocation.getArgument(0);
+            message.setId(11L);
+            return message;
+        });
+        when(conversationRepository.save(any(Conversation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Message message = messageService.sendMessage(CONVERSATION_ID, CUSTOMER_ID, null, " ", 81L);
+
+        assertEquals(MessageService.MESSAGE_TYPE_IMAGE, message.getMessageType());
+        assertEquals(81L, message.getFileId());
+        assertEquals(null, message.getContent());
+    }
+
+    @Test
+    void participantCanSendFileAttachmentWithCaption() {
+        Conversation conversation = conversation();
+        FileRecord attachment = messageAttachment(82L, CUSTOMER_ID, "notes.pdf", "application/pdf");
+        when(conversationRepository.findById(CONVERSATION_ID)).thenReturn(Optional.of(conversation));
+        when(fileRepository.findById(82L)).thenReturn(Optional.of(attachment));
+        when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> {
+            Message message = invocation.getArgument(0);
+            message.setId(12L);
+            return message;
+        });
+        when(conversationRepository.save(any(Conversation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Message message = messageService.sendMessage(CONVERSATION_ID, CUSTOMER_ID, "TEXT", "  说明文件  ", 82L);
+
+        assertEquals(MessageService.MESSAGE_TYPE_FILE, message.getMessageType());
+        assertEquals(82L, message.getFileId());
+        assertEquals("说明文件", message.getContent());
+    }
+
+    @Test
+    void messageWithNeitherContentNorAttachmentCannotBeSent() {
+        when(conversationRepository.findById(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
+
+        assertThrows(BusinessException.class,
+                () -> messageService.sendMessage(CONVERSATION_ID, CUSTOMER_ID, null, "  ", null));
+
+        verify(messageRepository, never()).save(any(Message.class));
+    }
+
+    @Test
+    void senderCannotAttachAnotherUsersFile() {
+        FileRecord attachment = messageAttachment(83L, PROVIDER_USER_ID, "private.pdf", "application/pdf");
+        when(conversationRepository.findById(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
+        when(fileRepository.findById(83L)).thenReturn(Optional.of(attachment));
+
+        assertThrows(BusinessException.class,
+                () -> messageService.sendMessage(CONVERSATION_ID, CUSTOMER_ID, null, "", 83L));
 
         verify(messageRepository, never()).save(any(Message.class));
     }
@@ -497,6 +565,18 @@ class ConversationMessageQuoteServiceTest {
         command.setExpireTime(LocalDateTime.now().plusDays(1));
         command.setRemark("Basic retouch included");
         return command;
+    }
+
+    private FileRecord messageAttachment(Long fileId, Long uploaderId, String filename, String mimeType) {
+        FileRecord file = new FileRecord();
+        file.setId(fileId);
+        file.setUploaderId(uploaderId);
+        file.setOriginalName(filename);
+        file.setMimeType(mimeType);
+        file.setFileSize(128L);
+        file.setBizType(MessageService.BIZ_TYPE_MESSAGE_ATTACHMENT);
+        file.setVisibility("PRIVATE");
+        return file;
     }
 
     private void assertQuoteHasSqlRequiredFields(Quote quote) {

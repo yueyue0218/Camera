@@ -5,9 +5,6 @@ import { LoginChoicePage, LoginInfoPage, RegisterPage } from './pages/auth/index
 import { DemandDetailPage, HallPage, ServicePackageDetailPage } from './pages/hall/index.js'
 import { PublishPage, PublishServicePackagePage } from './pages/demand/index.js'
 import { FeedPage, MomentDetailPage } from './pages/feed/index.js'
-import { ConversationDetailPage, MessagesPage } from './pages/messages/index.js'
-import { OrdersPage } from './pages/orders/index.js'
-import { DeliveryGalleryPage } from './pages/deliveries/index.js'
 import { ProfilePage, PublicProfilePage } from './pages/profile/index.js'
 import {
   AdminCertificationPage,
@@ -20,7 +17,6 @@ import {
   AdminUserProfilePage,
   AdminUsersPage
 } from './pages/admin/index.jsx'
-import { DeliveryPage } from './pages/delivery/DeliveryPage.jsx'
 import { CreditDetailPage } from './pages/credit/index.jsx'
 import { NotificationListPage } from './pages/notifications/NotificationListPage.jsx'
 import { ReviewPage, UserReviewsPage } from './pages/reviews/ReviewPage.jsx'
@@ -31,6 +27,23 @@ import { PortraRouteTransition } from './components/portra/index.js'
 const DevDLineUiPreview = import.meta.env.DEV
   ? lazy(() => import('./pages/dev/index.jsx').then(module => ({ default: module.DLineUiPreview })))
   : null
+const MessagesPage = lazy(() => loadNamedRoute(() => import('./pages/messages/index.js'), 'MessagesPage'))
+const ConversationDetailPage = lazy(() => loadNamedRoute(() => import('./pages/messages/index.js'), 'ConversationDetailPage'))
+const OrdersPage = lazy(() => loadNamedRoute(() => import('./pages/orders/index.js'), 'OrdersPage'))
+const DeliveryGalleryPage = lazy(() => loadNamedRoute(() => import('./pages/deliveries/index.js'), 'DeliveryGalleryPage'))
+const DeliveryPage = lazy(() => loadNamedRoute(() => import('./pages/delivery/DeliveryPage.jsx'), 'DeliveryPage'))
+
+function loadNamedRoute(loader, exportName) {
+  return loader().then(module => ({ default: module[exportName] }))
+}
+
+function RouteLoadingFallback() {
+  return <div className="portra-route-loading" role="status" aria-label="页面加载中">页面加载中...</div>
+}
+
+function withRouteSuspense(element) {
+  return <Suspense fallback={<RouteLoadingFallback />}>{element}</Suspense>
+}
 
 function RequireAdminRoute({ children }) {
   const { isAuthenticated, currentUser } = useAuth()
@@ -60,11 +73,11 @@ export function AppRoutes() {
       <Route path="/publish/service-package" element={<PublishServicePackagePage />} />
       <Route path="/feed" element={<FeedPage />} />
       <Route path="/moments/:momentId" element={<MomentDetailPage />} />
-      <Route path="/messages" element={<PortraRouteTransition><MessagesPage /></PortraRouteTransition>} />
-      <Route path="/messages/:conversationId" element={<PortraRouteTransition><ConversationDetailPage /></PortraRouteTransition>} />
-      <Route path="/orders" element={<PortraRouteTransition><OrdersPage /></PortraRouteTransition>} />
-      <Route path="/orders/:orderId/deliveries/:deliveryId" element={<PortraRouteTransition><DeliveryGalleryPage /></PortraRouteTransition>} />
-      <Route path="/orders/:orderId/delivery" element={<DeliveryPage />} />
+      <Route path="/messages" element={withRouteSuspense(<PortraRouteTransition><MessagesPage /></PortraRouteTransition>)} />
+      <Route path="/messages/:conversationId" element={withRouteSuspense(<PortraRouteTransition><ConversationDetailPage /></PortraRouteTransition>)} />
+      <Route path="/orders" element={withRouteSuspense(<PortraRouteTransition><OrdersPage /></PortraRouteTransition>)} />
+      <Route path="/orders/:orderId/deliveries/:deliveryId" element={withRouteSuspense(<PortraRouteTransition><DeliveryGalleryPage /></PortraRouteTransition>)} />
+      <Route path="/orders/:orderId/delivery" element={withRouteSuspense(<DeliveryPage />)} />
       <Route path="/orders/:orderId/reviews" element={<ReviewPage />} />
       <Route path="/reviews/:reviewId" element={<ReviewDetailPage />} />
       <Route path="/reviews" element={<UserReviewsPage />} />

@@ -11,6 +11,12 @@ const CONVERSATION_STORAGE_KEY = 'camera-p4-conversations'
 const LOCAL_MESSAGE_STORAGE_KEY = 'camera-p4-local-messages'
 const SAVED_PHOTO_STORAGE_KEY = 'camera-p4-saved-photos'
 const USER_PROFILE_STORAGE_KEY = 'camera-p4-user-profiles'
+const CONVERSATION_CACHE_VERSION = 2
+const LOCAL_MESSAGE_CACHE_VERSION = 1
+const CONVERSATION_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
+const LOCAL_MESSAGE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
+const LOCAL_PENDING_CONVERSATION_TTL_MS = 24 * 60 * 60 * 1000
+const LEAKED_TEST_CONVERSATION_PATTERN = /(?:online[-_\s]*check|provider\s+reply\s+message)/i
 
 export const roleMap = {
   CUSTOMER: USER_ROLE_LABELS.CUSTOMER,
@@ -44,42 +50,60 @@ export function formatDate(value) {
 
 export function readConversationRecords() {
   const records = readJsonStorage(CONVERSATION_STORAGE_KEY, [])
-  const filtered = records.filter(record => !isLocalMojibakeConversation(record))
-  if (filtered.length !== records.length) {
+  const recordList = Array.isArray(records) ? records : []
+  const filtered = normalizeConversationList(
+    recordList.filter(isValidCachedConversation),
+    { allowLocal: true }
+  )
+  if (filtered.length !== recordList.length || !Array.isArray(records)) {
     writeJsonStorage(CONVERSATION_STORAGE_KEY, filtered)
   }
   return filtered
 }
 
 export function saveConversationRecord(conversation, meta = {}) {
+  const sourceConversation = sanitizeConversationSummary(conversation, { allowLocal: true })
+  const unsafeConversationId = String(conversation?.conversationId || '').trim()
+  if (!sourceConversation) {
+    if (unsafeConversationId) removeConversationRecord(unsafeConversationId)
+    return null
+  }
   const records = readConversationRecords()
-  const conversationId = String(conversation.conversationId)
+  const conversationId = String(sourceConversation.conversationId)
   const previous = records.find(record => String(record.conversationId) === conversationId)
   const now = new Date().toISOString()
   const record = {
     ...previous,
+    cacheVersion: CONVERSATION_CACHE_VERSION,
+    cachedAt: now,
+    expiresAt: new Date(Date.now() + CONVERSATION_CACHE_TTL_MS).toISOString(),
     conversationId,
-    backendConversationId: conversation.isLocal ? null : Number(conversation.conversationId),
-    isLocal: Boolean(conversation.isLocal),
-    participantAId: Number(conversation.participantAId ?? meta.customerId ?? USERS.customer.userId),
-    participantBId: Number(conversation.participantBId ?? meta.providerUserId ?? meta.providerId ?? USERS.provider.userId),
-    sourceType: conversation.sourceType || previous?.sourceType || 'DEMAND_RESPONSE',
-    sourceId: conversation.sourceId ?? previous?.sourceId ?? meta.demandId,
-    demandId: meta.demandId ?? previous?.demandId ?? conversation.sourceId,
+    backendConversationId: sourceConversation.isLocal ? null : Number(sourceConversation.backendConversationId || sourceConversation.conversationId),
+    isLocal: Boolean(sourceConversation.isLocal),
+    participantAId: Number(sourceConversation.participantAId ?? meta.customerId ?? previous?.participantAId),
+    participantBId: Number(sourceConversation.participantBId ?? meta.providerUserId ?? meta.providerId ?? previous?.participantBId),
+    sourceType: sourceConversation.sourceType || previous?.sourceType || 'DEMAND_RESPONSE',
+    sourceId: sourceConversation.sourceId ?? previous?.sourceId ?? meta.demandId,
+    demandId: meta.demandId ?? previous?.demandId ?? sourceConversation.sourceId,
     scene: meta.scene || previous?.scene || '约拍需求沟通',
     location: meta.location || previous?.location || '',
-    lastMessage: meta.lastMessage || conversation.lastMessage || previous?.lastMessage || '点击进入对话',
-    latestMessage: meta.latestMessage || conversation.latestMessage || previous?.latestMessage || null,
-    latestMessageSenderId: meta.latestMessageSenderId ?? conversation.latestMessageSenderId ?? previous?.latestMessageSenderId ?? null,
-    latestQuotes: meta.latestQuotes || conversation.latestQuotes || previous?.latestQuotes || [],
-    lastMessageObject: meta.lastMessageObject || conversation.lastMessageObject || previous?.lastMessageObject || null,
+    lastMessage: meta.lastMessage || sourceConversation.lastMessage || previous?.lastMessage || '点击进入对话',
+    latestMessage: meta.latestMessage || sourceConversation.latestMessage || previous?.latestMessage || null,
+    latestMessageSenderId: meta.latestMessageSenderId ?? sourceConversation.latestMessageSenderId ?? previous?.latestMessageSenderId ?? null,
+    latestQuotes: meta.latestQuotes || sourceConversation.latestQuotes || previous?.latestQuotes || [],
+    lastMessageObject: meta.lastMessageObject || sourceConversation.lastMessageObject || previous?.lastMessageObject || null,
     interfaceNote: meta.interfaceNote || previous?.interfaceNote || '',
-    updatedAt: meta.updatedAt || conversation.lastMessageTime || conversation.updatedAt || conversation.createdAt || now
+    updatedAt: meta.updatedAt || sourceConversation.lastMessageTime || sourceConversation.updatedAt || sourceConversation.createdAt || now
+  }
+  const sanitizedRecord = sanitizeConversationSummary(record, { allowLocal: true })
+  if (!sanitizedRecord) {
+    removeConversationRecord(conversationId)
+    return null
   }
   const nextRecords = records.filter(item => String(item.conversationId) !== conversationId)
-  nextRecords.unshift(record)
+  nextRecords.unshift(sanitizedRecord)
   writeJsonStorage(CONVERSATION_STORAGE_KEY, nextRecords)
-  return record
+  return sanitizedRecord
 }
 
 export function findConversationRecord(conversationId) {
@@ -94,10 +118,18 @@ export function getConversationRecordsForUser(currentUser, activeRole = currentU
 }
 
 export function mergeConversationRecords(remoteConversations, currentUser, activeRole = currentUser?.role) {
-  const localRecords = getConversationRecordsForUser(currentUser, activeRole)
-  const merged = new Map(localRecords.map(record => [String(record.conversationId), record]))
+  const localFallbackRecords = normalizeConversationList(
+    getConversationRecordsForUser(currentUser, activeRole),
+    { currentUser, activeRole, allowLocal: true }
+  ).filter(isPendingLocalConversation)
+  const merged = new Map(localFallbackRecords.map(record => [String(record.conversationId), record]))
+  const remoteList = normalizeConversationList(remoteConversations, {
+    currentUser,
+    activeRole,
+    allowLocal: false
+  })
 
-  remoteConversations.forEach(conversation => {
+  remoteList.forEach(conversation => {
     const conversationId = String(conversation.conversationId)
     const previous = merged.get(conversationId)
     const record = saveConversationRecord(conversation, {
@@ -106,10 +138,15 @@ export function mergeConversationRecords(remoteConversations, currentUser, activ
       location: previous?.location || '',
       lastMessage: previous?.lastMessage || (conversation.lastMessageTime ? '最近有新消息' : '点击进入对话')
     })
+    if (!record) return
     merged.set(conversationId, record)
   })
 
-  return filterConversationsByActiveRole(Array.from(merged.values())
+  return filterConversationsByActiveRole(normalizeConversationList(Array.from(merged.values()), {
+    currentUser,
+    activeRole,
+    allowLocal: true
+  })
     .filter(record => Number(record.participantAId) === getCurrentUserId(currentUser) || Number(record.participantBId) === getCurrentUserId(currentUser))
     .sort((left, right) => new Date(right.updatedAt || 0) - new Date(left.updatedAt || 0)), currentUser, activeRole)
 }
@@ -137,7 +174,11 @@ export function updateConversationLastMessage(conversationId, content, meta = {}
 
 export function buildConversationFallback(conversationId) {
   const isLocal = String(conversationId).startsWith('local-')
+  const now = new Date().toISOString()
   return {
+    cacheVersion: CONVERSATION_CACHE_VERSION,
+    cachedAt: now,
+    expiresAt: new Date(Date.now() + CONVERSATION_CACHE_TTL_MS).toISOString(),
     conversationId: String(conversationId),
     backendConversationId: isLocal ? null : Number(conversationId),
     isLocal,
@@ -157,9 +198,66 @@ export function hasMojibakeText(value) {
     || /(?:闯€|â|Ã|Â|¤|€¦|€\?|å|ç|æ)/.test(text)
 }
 
+export function normalizeConversationList(conversations = [], options = {}) {
+  if (!Array.isArray(conversations)) return []
+  const deduped = new Map()
+  conversations.forEach(conversation => {
+    const sanitized = sanitizeConversationSummary(conversation, options)
+    if (!sanitized) return
+    deduped.set(String(sanitized.conversationId), sanitized)
+  })
+  return Array.from(deduped.values())
+    .sort((left, right) => new Date(right.updatedAt || right.lastMessageTime || right.createdAt || 0) - new Date(left.updatedAt || left.lastMessageTime || left.createdAt || 0))
+}
+
+export function isValidConversationSummary(conversation = {}, options = {}) {
+  return Boolean(sanitizeConversationSummary(conversation, options))
+}
+
+export function sanitizeConversationSummary(conversation = {}, options = {}) {
+  if (!conversation || typeof conversation !== 'object') return null
+  if (!isDisplayableConversationRecord(conversation)) return null
+
+  const conversationId = normalizeConversationId(conversation.conversationId ?? conversation.id)
+  if (!conversationId) return null
+
+  const isLocal = Boolean(conversation.isLocal) || conversationId.startsWith('local-')
+  if (isLocal && options.allowLocal === false) return null
+
+  const backendConversationId = normalizeBackendConversationId(
+    conversation.backendConversationId ?? conversation.id ?? conversation.conversationId,
+    isLocal
+  )
+  if (!isLocal && !backendConversationId) return null
+
+  const participantAId = normalizeParticipantId(conversation.participantAId ?? conversation.customerId)
+  const participantBId = normalizeParticipantId(conversation.participantBId ?? conversation.providerUserId ?? conversation.providerId)
+  if (!participantAId || !participantBId) return null
+
+  const currentUserId = getCurrentUserId(options.currentUser)
+  if (currentUserId && participantAId !== currentUserId && participantBId !== currentUserId) return null
+  if (isLocal && !isPendingLocalConversation({ ...conversation, conversationId, participantAId, participantBId })) return null
+
+  return {
+    ...conversation,
+    conversationId,
+    backendConversationId: isLocal ? null : backendConversationId,
+    isLocal,
+    participantAId,
+    participantBId
+  }
+}
+
+export function isDisplayableConversationRecord(record = {}) {
+  if (!record) return false
+  return !getConversationDisplayTextFields(record).some(value =>
+    hasMojibakeText(value) || LEAKED_TEST_CONVERSATION_PATTERN.test(String(value || ''))
+  )
+}
+
 export function sanitizeConversationDisplayText(value, fallback = 'Portra 用户') {
   const text = String(value || '').trim()
-  if (!text || hasMojibakeText(text)) return fallback
+  if (!text || hasMojibakeText(text) || LEAKED_TEST_CONVERSATION_PATTERN.test(text)) return fallback
   return text
 }
 
@@ -174,6 +272,89 @@ function isLocalMojibakeConversation(record = {}) {
     record.counterpartyNickname,
     record.otherUserNickname
   ].some(hasMojibakeText)
+}
+
+function isFreshCacheRecord(record = {}, ttlMs = CONVERSATION_CACHE_TTL_MS) {
+  const cachedAt = new Date(record.cachedAt || record.updatedAt || record.createdAt || 0).getTime()
+  const expiresAt = new Date(record.expiresAt || 0).getTime()
+  const now = Date.now()
+  if (Number.isFinite(expiresAt) && expiresAt > 0) return expiresAt > now
+  return Number.isFinite(cachedAt) && cachedAt > 0 && now - cachedAt <= ttlMs
+}
+
+function isPendingLocalConversation(record = {}) {
+  const conversationId = String(record.conversationId || '').trim()
+  if (!conversationId.startsWith('local-')) return false
+  if (!isDisplayableConversationRecord(record)) return false
+  if (!normalizeParticipantId(record.participantAId) || !normalizeParticipantId(record.participantBId)) return false
+  return isFreshCacheRecord(record, LOCAL_PENDING_CONVERSATION_TTL_MS)
+}
+
+function isValidCachedConversation(record = {}) {
+  if (!record || record.cacheVersion !== CONVERSATION_CACHE_VERSION || !isFreshCacheRecord(record)) return false
+  if (isLocalMojibakeConversation(record)) return false
+  const conversationId = String(record.conversationId || '').trim()
+  if (!conversationId || hasMojibakeText(conversationId)) return false
+  const isLocal = Boolean(record.isLocal) || conversationId.startsWith('local-')
+  const backendConversationId = Number(record.backendConversationId ?? conversationId)
+  if (!isLocal && (!Number.isFinite(backendConversationId) || backendConversationId <= 0)) return false
+  const participantAId = Number(record.participantAId)
+  const participantBId = Number(record.participantBId)
+  if (!Number.isFinite(participantAId) || participantAId <= 0) return false
+  if (!Number.isFinite(participantBId) || participantBId <= 0) return false
+  return isDisplayableConversationRecord(record)
+}
+
+function removeConversationRecord(conversationId) {
+  const id = String(conversationId || '').trim()
+  if (!id) return
+  const records = readJsonStorage(CONVERSATION_STORAGE_KEY, [])
+  if (!Array.isArray(records)) return
+  const nextRecords = records.filter(record => String(record?.conversationId || '') !== id)
+  if (nextRecords.length !== records.length) {
+    writeJsonStorage(CONVERSATION_STORAGE_KEY, nextRecords)
+  }
+}
+
+function normalizeConversationId(value) {
+  const id = String(value || '').trim()
+  if (!id || hasMojibakeText(id) || LEAKED_TEST_CONVERSATION_PATTERN.test(id)) return ''
+  if (id.startsWith('local-')) return id
+  const numericId = Number(id)
+  return Number.isFinite(numericId) && numericId > 0 ? String(numericId) : ''
+}
+
+function normalizeBackendConversationId(value, isLocal) {
+  if (isLocal) return null
+  const id = Number(value)
+  return Number.isFinite(id) && id > 0 ? id : null
+}
+
+function normalizeParticipantId(value) {
+  const id = Number(value)
+  return Number.isFinite(id) && id > 0 ? id : null
+}
+
+function getConversationDisplayTextFields(record = {}) {
+  return [
+    record.scene,
+    record.title,
+    record.sourceTitle,
+    record.subtitle,
+    record.summary,
+    record.lastMessage,
+    record.content,
+    record.counterpartyNickname,
+    record.otherUserNickname,
+    record.customerNickname,
+    record.customerName,
+    record.customerDisplayName,
+    record.providerNickname,
+    record.providerName,
+    record.providerDisplayName,
+    record.latestMessage?.content,
+    record.lastMessageObject?.content
+  ]
 }
 
 export function getOppositeUserId(conversation, currentUserId) {
@@ -214,7 +395,39 @@ export function getConversationPeer(conversation, currentUser) {
 }
 
 function getLocalMessageStore() {
-  return readJsonStorage(LOCAL_MESSAGE_STORAGE_KEY, {})
+  const raw = readJsonStorage(LOCAL_MESSAGE_STORAGE_KEY, {})
+  const conversations = raw?.cacheVersion === LOCAL_MESSAGE_CACHE_VERSION && raw?.conversations
+    ? raw.conversations
+    : raw
+  const nextStore = {}
+  Object.entries(conversations || {}).forEach(([conversationId, messages]) => {
+    if (!String(conversationId).startsWith('local-')) return
+    const validMessages = (Array.isArray(messages) ? messages : []).filter(message =>
+      isValidLocalMessage(message, conversationId)
+    )
+    if (validMessages.length) nextStore[conversationId] = validMessages
+  })
+  if (JSON.stringify(conversations || {}) !== JSON.stringify(nextStore) || raw?.cacheVersion !== LOCAL_MESSAGE_CACHE_VERSION) {
+    writeLocalMessageStore(nextStore)
+  }
+  return nextStore
+}
+
+function writeLocalMessageStore(conversations) {
+  writeJsonStorage(LOCAL_MESSAGE_STORAGE_KEY, {
+    cacheVersion: LOCAL_MESSAGE_CACHE_VERSION,
+    cachedAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + LOCAL_MESSAGE_CACHE_TTL_MS).toISOString(),
+    conversations
+  })
+}
+
+function isValidLocalMessage(message = {}, conversationId) {
+  if (!message || String(message.conversationId) !== String(conversationId)) return false
+  if (!String(message.messageId || '').trim()) return false
+  if (!Number.isFinite(Number(message.senderId))) return false
+  if (hasMojibakeText(message.content)) return false
+  return isFreshCacheRecord(message, LOCAL_MESSAGE_CACHE_TTL_MS)
 }
 
 export function getLocalMessages(conversationId) {
@@ -231,11 +444,14 @@ export function addLocalMessage(conversationId, message) {
     senderId: Number(message.senderId),
     messageType: message.messageType || 'TEXT',
     content: message.content,
+    cacheVersion: LOCAL_MESSAGE_CACHE_VERSION,
+    cachedAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + LOCAL_MESSAGE_CACHE_TTL_MS).toISOString(),
     createdAt: new Date().toISOString()
   }
   const nextMessages = [...(store[id] || []), nextMessage]
   store[id] = nextMessages
-  writeJsonStorage(LOCAL_MESSAGE_STORAGE_KEY, store)
+  writeLocalMessageStore(store)
   return nextMessages
 }
 

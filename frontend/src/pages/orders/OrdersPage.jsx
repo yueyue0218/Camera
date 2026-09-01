@@ -27,35 +27,24 @@ import PaidRoundedIcon from '@mui/icons-material/PaidRounded'
 import RateReviewRoundedIcon from '@mui/icons-material/RateReviewRounded'
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
 import { useAuth } from '../../AuthContext.jsx'
-import {
-  demandApi,
-  deliveryApi,
-  fileApi,
-  orderApi,
-  photoAuthorizationApi,
-  reviewApi,
-  reviewComplaintApi
-} from '../../api.js'
-import { buildOrderNavigationTarget, goToOrderConversation, normalizeOrderId } from '../../utils/orderNavigation.js'
+import { fileApi } from '../../api.js'
+import { goToOrderConversation, normalizeOrderId } from '../../utils/orderNavigation.js'
 import { goToDeliveryGallery } from '../../utils/deliveryNavigation.js'
 import { PRODUCT_ACTION_COPY } from '../../utils/productCopy.js'
-import { ORDER_SURFACES, WORKFLOW_SOURCES, buildOrderListTarget, isOrderListSurface } from '../../utils/workflowNavigation.js'
-import { deriveOrderWorkflowState, getNextOrderWorkflowRefreshDelay } from '../../utils/orderWorkflowModel.js'
+import { WORKFLOW_SOURCES, buildOrderListTarget, isOrderListSurface } from '../../utils/workflowNavigation.js'
+import { deriveOrderWorkflowState } from '../../utils/orderWorkflowModel.js'
 import { getOrderActionVisibility } from '../../utils/orderActionVisibility.js'
 import { useWorkflowNavigate } from '../../hooks/useWorkflowNavigate.js'
-import { useWorkflowDraft } from '../../hooks/useWorkflowDraft.js'
-import { buildWorkflowCacheKey, readWorkflowViewState, writeWorkflowViewState } from '../../utils/workflowViewCache.js'
+import { REWORK_REQUIREMENT_MAX_LENGTH, getReworkRequirementHelperText } from '../../utils/workflowLimits.js'
 import {
   getExplicitReturnToConversation,
   navigateBackToConversation
 } from '../../utils/conversationNavigation.js'
 import { centToYuan } from '../../utils/index.js'
 import {
-  formatDateOnly,
   formatDeliveryDescription,
   formatDeliveryTitle,
   formatFileDisplayName,
-  formatPhotoUsageScope,
 } from '../../utils/displayFormatters.js'
 import {
   PortraActionButton,
@@ -69,8 +58,8 @@ import {
 import { usePortraAsyncAction } from '../../hooks/usePortraAsyncAction.js'
 import { AuthorizationRequestCard } from '../../components/portra/AuthorizationRequestCard.jsx'
 import { PORTRA_RADIUS, PORTRA_SURFACE } from '../../theme/portraSurfaceTokens.js'
+import { ORDER_WORKFLOW_COLORS } from './orderWorkflowTokens.js'
 import {
-  canCustomerConfirm,
   canCustomerReviewPhotoAuthorization,
   canShowOrderNormalActions
 } from './orderActions.js'
@@ -82,38 +71,43 @@ import { OrderFollowupCards } from './components/OrderFollowupCards.jsx'
 import { OrderSummaryCard } from './components/OrderSummaryCard.jsx'
 import { OrderTimelineCard } from './components/OrderTimelineCard.jsx'
 import { ReviewList } from './components/ReviewList.jsx'
+import { useOrderActions } from './hooks/useOrderActions.js'
+import { useOrderDialogs } from './hooks/useOrderDialogs.js'
+import { useOrderDrafts } from './hooks/useOrderDrafts.js'
+import { useOrdersData } from './hooks/useOrdersData.js'
 import { DeliveryFileGrid } from '../deliveries/components/DeliveryFileGrid.jsx'
 import { DeliveryUploadPanel } from '../deliveries/components/DeliveryUploadPanel.jsx'
 import { buildDeliveryBatches, flattenDeliveryFiles, isAuthorizableDeliveryFile } from '../deliveries/deliveryDisplay.js'
 import {
-  addDays,
-  formatEscrowStatus,
   formatOrderStatus,
   formatOrderTitle,
-  formatRefundStatus,
-  formatSettlementStatus,
   formatTime,
-  getArbitrationsByOrder,
   getLatestDeliveryUploadTime,
-  getLocalReviewsByOrder,
   getOrderReviewDirection,
-  getReviewTargetUserId,
-  isApiUnavailable,
   isOrderParticipant,
-  mergeComplaints,
-  mergeReviewLists,
   parseQuoteSnapshot,
-  saveLocalArbitration,
-  saveLocalReview,
   sanitizeSeedText,
-  saveOrderSnapshots
+  addDays
 } from './utils/orderStatusUtils.js'
-function parseInputDate(value) {
-  if (!value) return null
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? null : date
-}
-
+import {
+  buildOrderMetaText,
+  buildOrderProgressItems,
+  buildOrderSummaryRows,
+  formatAuthorizationSummary,
+  formatDeadlineDistance,
+  formatDeliveryBatchContent,
+  formatOrderIndexDate,
+  formatQuoteCount,
+  getAuthorizationFollowupTone,
+  getCounterpartyLabel,
+  getLatestDeliveryBatch,
+  getOrderPerspective,
+  getOrderStatusDotColor,
+  getReviewFollowupTone,
+  formatReviewFollowupStatus,
+  hasComplaintResult,
+  parseInputDate
+} from './utils/orderDetailViewModel.js'
 function getOrderAction(order, currentUser, actionVisibility) {
   if ((actionVisibility || getOrderActionVisibility(order, currentUser)).canPay) {
     return {
@@ -169,40 +163,9 @@ function isOrderCustomer(order, currentUser) {
     && Number(order.customerId) === Number(currentUser.userId)
 }
 
-function getOrderPerspective(order, currentUser) {
-  if (!order || !currentUser) return ''
-  if (Number(order.customerId) === Number(currentUser.userId)) return '客户'
-  if (Number(order.providerUserId) === Number(currentUser.userId)) return '摄影师'
-  return '协作方'
-}
-
-function getCounterpartyLabel(order, currentUser) {
-  if (!order || !currentUser) return '对方未确认'
-  if (Number(order.customerId) === Number(currentUser.userId)) {
-    return '摄影师'
-  }
-  if (Number(order.providerUserId) === Number(currentUser.userId)) {
-    return '客户'
-  }
-  return '订单参与方'
-}
-
 const deliveryStatusLabelMap = {
   DELIVERED: '已上传作品',
   REWORKED: '返修作品'
-}
-
-function getSettlementRefundLabel(order) {
-  return `${formatSettlementStatus(order?.settlementStatus)} / ${formatRefundStatus(order?.refundStatus)}`
-}
-
-function formatOrderTimeRange(order) {
-  return `${formatTime(order?.shootStartTime)} 至 ${formatTime(order?.shootEndTime)}`
-}
-
-function formatOrderIndexDate(order) {
-  const label = formatDateOnly(order?.shootStartTime || order?.createdAt, '')
-  return label ? label.slice(5).replace('-', '/') : '待定'
 }
 
 function orderStatusDotSx(status) {
@@ -215,297 +178,15 @@ function orderStatusDotSx(status) {
   }
 }
 
-function getOrderStatusDotColor(status) {
-  if (['COMPLETED'].includes(status)) return '#4fbd78'
-  if (['CANCELLED', 'REFUNDED'].includes(status)) return '#c4cedd'
-  if (['PENDING_DELIVERY', 'DELIVERED_PENDING_CONFIRM', 'REWORK_REQUIRED', 'APPEALING'].includes(status)) return '#f05a24'
-  return PORTRA_SURFACE.portraBlue
-}
-
 function isImageDelivery(record) {
   const text = `${record?.mimeType || ''} ${record?.contentType || ''} ${record?.fileName || ''}`.toLowerCase()
   return /image\//.test(text) || /\.(png|jpe?g|webp|gif|bmp)$/i.test(text)
-}
-
-function formatQuoteCount(quoteSnapshot) {
-  const originalCount = quoteSnapshot?.originalCount
-  const refinedCount = quoteSnapshot?.refinedCount
-  if (originalCount === undefined && refinedCount === undefined) return '未填写'
-  return `${originalCount ?? 0} / ${refinedCount ?? 0}`
-}
-
-function buildOrderMetaText(order, counterpartyLabel, locationLabel) {
-  const timeText = formatOrderTimeRange(order)
-  return [counterpartyLabel, timeText, locationLabel].filter(Boolean).join(' · ')
-}
-
-function buildOrderSummaryRows({ order, quoteSnapshot, deliveryText, estimatedAutoConfirmTime }) {
-  if (estimatedAutoConfirmTime) {
-    return [
-      {
-        label: '交付内容',
-        value: deliveryText || '按约定交付'
-      },
-      {
-        label: '照片用途',
-        value: formatPhotoUsageScope(quoteSnapshot?.photoUsageScope)
-      },
-      {
-        label: '结算状态',
-        value: formatEscrowStatus(order?.escrowStatus)
-      },
-      {
-        label: '自动确认',
-        value: formatShortDateTime(estimatedAutoConfirmTime)
-      }
-    ]
-  }
-
-  return [
-    {
-      label: '成片截止',
-      value: formatTime(order?.deliveryDeadline),
-      tone: isDeadlineClose(order?.deliveryDeadline) ? 'warning' : undefined
-    },
-    {
-      label: '交付内容',
-      value: deliveryText || '按约定交付'
-    },
-    {
-      label: '结算状态',
-      value: formatEscrowStatus(order?.escrowStatus)
-    },
-    {
-      label: '照片用途',
-      value: formatPhotoUsageScope(quoteSnapshot?.photoUsageScope)
-    }
-  ]
-}
-
-function formatDeliveryBatchContent(batch) {
-  if (!batch) return '等待上传'
-  const imageCount = Number(batch.imageCount || 0)
-  const zipCount = Number(batch.zipCount || 0)
-  const parts = []
-  if (imageCount) parts.push(`${imageCount} 张图片`)
-  if (zipCount) parts.push(`${zipCount} 个压缩包`)
-  return parts.length ? parts.join(' · ') : '已上传作品'
-}
-
-function getLatestDeliveryBatch(batches = []) {
-  return [...batches].sort((left, right) => {
-    const leftTime = left?.latestUploadTime ? new Date(left.latestUploadTime).getTime() : 0
-    const rightTime = right?.latestUploadTime ? new Date(right.latestUploadTime).getTime() : 0
-    return rightTime - leftTime
-  })[0] || null
-}
-
-function formatDeadlineDistance(value) {
-  const deadline = parseInputDate(value)
-  if (!deadline) return '未设置截止时间'
-  const diff = deadline.getTime() - Date.now()
-  if (diff <= 0) return '已到截止时间'
-  const hours = Math.floor(diff / (60 * 60 * 1000))
-  const days = Math.floor(hours / 24)
-  const remainHours = hours % 24
-  if (days > 0) return `${days} 天 ${remainHours} 小时`
-  if (hours > 0) return `${hours} 小时`
-  const minutes = Math.max(1, Math.floor(diff / (60 * 1000)))
-  return `${minutes} 分钟`
-}
-
-function formatShortDateTime(value) {
-  const date = parseInputDate(value)
-  if (!date) return '待同步'
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const hour = String(date.getHours()).padStart(2, '0')
-  const minute = String(date.getMinutes()).padStart(2, '0')
-  return `${month}/${day} ${hour}:${minute}`
-}
-
-function isDeadlineClose(value) {
-  const deadline = parseInputDate(value)
-  if (!deadline) return false
-  return deadline.getTime() - Date.now() < 24 * 60 * 60 * 1000
-}
-
-function formatAuthorizationSummary(records = []) {
-  if (!records.length) return '暂无申请'
-  const latest = records[0]
-  const status = String(latest.status || latest.authorizationStatus || '').toUpperCase()
-  if (status === 'APPROVED' || status === 'GRANTED') return '已同意'
-  if (status === 'REJECTED') return '已拒绝'
-  return '待客户确认'
-}
-
-function getAuthorizationFollowupTone(records = []) {
-  const label = formatAuthorizationSummary(records)
-  if (label === '已同意') return 'success'
-  if (label === '待客户确认') return 'warning'
-  return 'default'
-}
-
-function formatReviewFollowupStatus({ canReview, myReview, reviewToComplain, orderReviews = [], arbitrations = [] }) {
-  if (reviewToComplain) return '可发起申诉'
-  if (arbitrations.length) return '有申诉记录'
-  if (myReview) return '已评价'
-  if (canReview) return '可评价'
-  if (orderReviews.length) return '已有评价'
-  return '暂未开放'
-}
-
-function getReviewFollowupTone(context) {
-  const status = formatReviewFollowupStatus(context)
-  if (status === '可评价' || status === '可发起申诉') return 'warning'
-  if (status === '已评价' || status === '已有评价') return 'success'
-  return 'default'
-}
-
-function getReviewFollowupDescription({ canReview, myReview, reviewToComplain, orderReviews = [], arbitrations = [] }) {
-  if (reviewToComplain) return '收到评价后，如内容不实，可在这里发起申诉。'
-  if (arbitrations.length) return '申诉结果会记录在评价区，出结果后不再显示申诉入口。'
-  if (myReview) return '你已完成本次合作评价。'
-  if (canReview) return '本次合作已完成，可以留下评价。'
-  if (orderReviews.length) return '这里保存本次合作的评价记录。'
-  return '订单完成后可评价本次合作。'
-}
-
-function hasComplaintResult(item) {
-  const result = String(item?.arbitrationResult || '').trim().toUpperCase()
-  const status = String(item?.status || '').trim().toUpperCase()
-  return Boolean(
-    result
-    || item?.handledAt
-    || status === 'APPROVED'
-    || status === 'REJECTED'
-    || status === 'RESOLVED'
-  )
-}
-
-function buildOrderProgressItems({ order, statusLogs = [], deliveryRecords = [], currentUser }) {
-  const status = order?.status || ''
-  const hasDelivery = deliveryRecords.length > 0 || ['DELIVERED_PENDING_CONFIRM', 'REWORK_REQUIRED', 'COMPLETED'].includes(status)
-  const isCustomer = Number(order?.customerId) === Number(currentUser?.userId)
-  const completedStatuses = new Set(['COMPLETED'])
-  const refundedOrCancelled = ['CANCELLED', 'REFUNDED'].includes(status)
-  const steps = [
-    {
-      id: 'payment',
-      title: '支付成功',
-      complete: status !== 'PENDING_PAYMENT',
-      time: findStatusTime(statusLogs, ['PAID_PENDING_SHOOT', 'SHOOTING', 'PENDING_DELIVERY', 'DELIVERED_PENDING_CONFIRM', 'COMPLETED'])
-    },
-    {
-      id: 'shoot-start',
-      title: '拍摄开始',
-      complete: ['SHOOTING', 'PENDING_DELIVERY', 'DELIVERED_PENDING_CONFIRM', 'REWORK_REQUIRED', 'COMPLETED'].includes(status),
-      current: status === 'SHOOTING',
-      time: formatShortDateTime(order?.shootStartTime)
-    },
-    {
-      id: 'shoot-end',
-      title: '拍摄结束',
-      complete: ['PENDING_DELIVERY', 'DELIVERED_PENDING_CONFIRM', 'REWORK_REQUIRED', 'COMPLETED'].includes(status),
-      current: status === 'PENDING_DELIVERY',
-      time: formatShortDateTime(order?.shootEndTime)
-    },
-    {
-      id: 'delivery',
-      title: hasDelivery ? '摄影师上传作品' : '待上传作品',
-      complete: hasDelivery,
-      current: status === 'PENDING_DELIVERY',
-      time: hasDelivery ? findStatusTime(statusLogs, ['DELIVERED_PENDING_CONFIRM', 'REWORK_REQUIRED', 'COMPLETED']) : ''
-    },
-    {
-      id: 'confirm',
-      title: isCustomer ? '待你确认' : '待客户确认',
-      complete: completedStatuses.has(status),
-      current: status === 'DELIVERED_PENDING_CONFIRM',
-      time: completedStatuses.has(status) ? findStatusTime(statusLogs, ['COMPLETED']) : ''
-    },
-    {
-      id: 'complete',
-      title: refundedOrCancelled ? formatOrderStatus(status) : '订单完成',
-      complete: completedStatuses.has(status) || refundedOrCancelled,
-      current: completedStatuses.has(status) || refundedOrCancelled,
-      time: completedStatuses.has(status) || refundedOrCancelled ? findStatusTime(statusLogs, [status]) : ''
-    }
-  ]
-
-  return steps.map(step => ({
-    ...step,
-    state: step.current ? 'current' : step.complete ? 'complete' : 'upcoming'
-  }))
-}
-
-function findStatusTime(statusLogs = [], statuses = []) {
-  const match = statusLogs.find(log => statuses.includes(log.toStatus))
-  return match?.createdAt ? formatTime(match.createdAt) : ''
 }
 
 function isBeforeShootStart(order) {
   const shootStartTime = parseInputDate(order?.shootStartTime)
   return Boolean(shootStartTime) && new Date() < shootStartTime
 }
-async function complaintApiSafeList(reviewId, currentUser) {
-  try {
-    return await reviewComplaintApi.listByReview(reviewId, currentUser)
-  } catch (error) {
-    if (isApiUnavailable(error)) return []
-    throw error
-  }
-}
-
-async function optionalOrderData(action, fallback = []) {
-  try {
-    return await action()
-  } catch (error) {
-    if (isApiUnavailable(error) || error.status === 403 || error.status === 404) return fallback
-    return fallback
-  }
-}
-
-function asArray(value) {
-  return Array.isArray(value) ? value : []
-}
-
-function createDeliveryDraft() {
-  return { files: [], remark: '' }
-}
-
-function createPhotoAuthorizationDraft() {
-  return { fileIds: [], remark: '' }
-}
-
-function createReviewDraft() {
-  return { rating: 5, content: '沟通顺畅，履约体验很好。' }
-}
-
-function createArbitrationDraft() {
-  return { reason: '评价内容不实', description: '' }
-}
-
-function isDeliveryDraftDirty(value) {
-  return Boolean((Array.isArray(value?.files) && value.files.length) || String(value?.remark || '').trim())
-}
-
-function isPhotoAuthorizationDraftDirty(value) {
-  return Boolean((Array.isArray(value?.fileIds) && value.fileIds.length) || String(value?.remark || '').trim())
-}
-
-function isReviewDraftDirty(value) {
-  return Number(value?.rating || 5) !== 5 || String(value?.content || '').trim() !== '沟通顺畅，履约体验很好。'
-}
-
-function isArbitrationDraftDirty(value) {
-  return String(value?.reason || '') !== '评价内容不实' || String(value?.description || '').trim().length > 0
-}
-
-function hasAuthorizationRemarkDraft(value) {
-  return Object.values(value || {}).some(remark => String(remark || '').trim())
-}
-
 export function OrdersPage() {
   const location = useLocation()
   const navigate = useWorkflowNavigate()
@@ -529,298 +210,104 @@ export function OrdersPage() {
   )
   const explicitReturnToConversation = useMemo(() => getExplicitReturnToConversation(location), [location.search, location.state])
   const orderListSurface = useMemo(() => isOrderListSurface(location), [location.search, location.state])
-  const [orders, setOrders] = useState([])
-  const [selectedOrder, setSelectedOrder] = useState(null)
-  const [statusLogs, setStatusLogs] = useState([])
-  const [deliveryRecords, setDeliveryRecords] = useState([])
-  const [reworkDialogOpen, setReworkDialogOpen] = useState(false)
-  const [deliveryUploadDialogOpen, setDeliveryUploadDialogOpen] = useState(false)
-  const [photoAuthorizationDialogOpen, setPhotoAuthorizationDialogOpen] = useState(false)
-  const [authorizationRecordsDialogOpen, setAuthorizationRecordsDialogOpen] = useState(false)
-  const [reviewRecordsDialogOpen, setReviewRecordsDialogOpen] = useState(false)
-  const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
-  const [previewDelivery, setPreviewDelivery] = useState(null)
-  const [previewUrl, setPreviewUrl] = useState('')
-  const [previewLoading, setPreviewLoading] = useState(false)
-  const [previewError, setPreviewError] = useState('')
-  const [photoAuthorizations, setPhotoAuthorizations] = useState([])
-  const [orderReviews, setOrderReviews] = useState([])
-  const [showReviewForm, setShowReviewForm] = useState(false)
-  const [arbitrations, setArbitrations] = useState([])
-  const [showArbitrationForm, setShowArbitrationForm] = useState(false)
-  const [followUpDialogOpen, setFollowUpDialogOpen] = useState(false)
-  const [followUpReview, setFollowUpReview] = useState(null)
-  const [followUpContent, setFollowUpContent] = useState('')
-  const [sentInvitations, setSentInvitations] = useState([])
+  const {
+    reworkDialogOpen,
+    setReworkDialogOpen,
+    deliveryUploadDialogOpen,
+    setDeliveryUploadDialogOpen,
+    photoAuthorizationDialogOpen,
+    setPhotoAuthorizationDialogOpen,
+    authorizationRecordsDialogOpen,
+    setAuthorizationRecordsDialogOpen,
+    reviewRecordsDialogOpen,
+    setReviewRecordsDialogOpen,
+    completionDialogOpen,
+    setCompletionDialogOpen,
+    previewDelivery,
+    setPreviewDelivery,
+    previewUrl,
+    setPreviewUrl,
+    previewLoading,
+    setPreviewLoading,
+    previewError,
+    setPreviewError,
+    showReviewForm,
+    setShowReviewForm,
+    showArbitrationForm,
+    setShowArbitrationForm,
+    followUpDialogOpen,
+    setFollowUpDialogOpen,
+    followUpReview,
+    setFollowUpReview,
+    followUpContent,
+    setFollowUpContent
+  } = useOrderDialogs()
   const statusFilter = ''
-  const [pageLoading, setPageLoading] = useState(false)
   const feedback = usePortraFeedback()
-  const orderDraftScope = `order:${selectedOrder?.orderId || focusOrderId || 'none'}`
-  const deliveryDraft = useWorkflowDraft(`${orderDraftScope}:delivery`, createDeliveryDraft, isDeliveryDraftDirty)
-  const reworkDraft = useWorkflowDraft(`${orderDraftScope}:rework`, () => '', value => String(value || '').trim().length > 0)
-  const photoAuthorizationDraft = useWorkflowDraft(`${orderDraftScope}:photo-authorization`, createPhotoAuthorizationDraft, isPhotoAuthorizationDraftDirty)
-  const authorizationRemarkDraft = useWorkflowDraft(`${orderDraftScope}:authorization-remarks`, () => ({}), hasAuthorizationRemarkDraft)
-  const reviewDraft = useWorkflowDraft(`${orderDraftScope}:review`, createReviewDraft, isReviewDraftDirty)
-  const arbitrationDraft = useWorkflowDraft(`${orderDraftScope}:arbitration`, createArbitrationDraft, isArbitrationDraftDirty)
-  const deliveryForm = deliveryDraft.value || createDeliveryDraft()
-  const setDeliveryForm = deliveryDraft.setValue
-  const reworkRequirement = reworkDraft.value || ''
-  const setReworkRequirement = reworkDraft.setValue
-  const photoAuthorizationForm = photoAuthorizationDraft.value || createPhotoAuthorizationDraft()
-  const setPhotoAuthorizationForm = photoAuthorizationDraft.setValue
-  const authorizationRemarks = authorizationRemarkDraft.value || {}
-  const setAuthorizationRemarks = authorizationRemarkDraft.setValue
-  const reviewForm = reviewDraft.value || createReviewDraft()
-  const setReviewForm = reviewDraft.setValue
-  const arbitrationForm = arbitrationDraft.value || createArbitrationDraft()
-  const setArbitrationForm = arbitrationDraft.setValue
   const { run: runWorkflowAction, loading: actionLoading } = usePortraAsyncAction({
     errorMessage: error => error?.message || '操作失败，请稍后重试。'
   })
-  const loading = pageLoading || actionLoading
-  const viewCacheKey = buildWorkflowCacheKey('orders', currentUser.userId, currentUser.role)
-
-  useEffect(() => {
-    const cached = readWorkflowViewState(viewCacheKey)
-    if (!cached) return
-    if (Array.isArray(cached.orders)) setOrders(cached.orders)
-    if (cached.selectedOrder) setSelectedOrder(cached.selectedOrder)
-    if (Array.isArray(cached.statusLogs)) setStatusLogs(cached.statusLogs)
-    if (Array.isArray(cached.deliveryRecords)) setDeliveryRecords(cached.deliveryRecords)
-    if (Array.isArray(cached.photoAuthorizations)) setPhotoAuthorizations(cached.photoAuthorizations)
-    if (Array.isArray(cached.orderReviews)) setOrderReviews(cached.orderReviews)
-    if (Array.isArray(cached.arbitrations)) setArbitrations(cached.arbitrations)
-  }, [viewCacheKey])
-
-  useEffect(() => {
-    loadOrders(focusOrderId)
-  }, [currentUser.userId, currentUser.role, statusFilter, focusOrderId, orderListSurface])
-
-  useEffect(() => {
-    writeWorkflowViewState(viewCacheKey, {
-      orders,
-      selectedOrder,
-      statusLogs,
-      deliveryRecords,
-      photoAuthorizations,
-      orderReviews,
-      arbitrations
-    })
-  }, [viewCacheKey, orders, selectedOrder, statusLogs, deliveryRecords, photoAuthorizations, orderReviews, arbitrations])
-
-  useEffect(() => {
-    if (!selectedOrder?.orderId) return undefined
-    const refreshCurrentOrder = () => loadOrders(selectedOrder.orderId)
-    const intervalId = window.setInterval(refreshCurrentOrder, 30000)
-    const refreshDelay = getNextOrderWorkflowRefreshDelay(selectedOrder)
-    const timeoutId = refreshDelay ? window.setTimeout(refreshCurrentOrder, refreshDelay) : null
-    return () => {
-      window.clearInterval(intervalId)
-      if (timeoutId) window.clearTimeout(timeoutId)
-    }
-  }, [
-    selectedOrder?.orderId,
-    selectedOrder?.status,
-    selectedOrder?.shootStartTime,
-    selectedOrder?.shootEndTime,
-    selectedOrder?.startTime,
-    selectedOrder?.endTime,
-    currentUser.userId,
-    currentUser.role
-  ])
-
-  useEffect(() => () => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl)
-  }, [previewUrl])
-
   async function run(action, successText) {
     return runWorkflowAction(action, {
       successMessage: successText
     })
   }
+  const {
+    orders,
+    selectedOrder,
+    statusLogs,
+    deliveryRecords,
+    photoAuthorizations,
+    setPhotoAuthorizations,
+    orderReviews,
+    setOrderReviews,
+    arbitrations,
+    setArbitrations,
+    sentInvitations,
+    pageLoading,
+    loadOrders,
+    openOrder,
+    clearOrderSelection
+  } = useOrdersData({
+    currentUser,
+    focusOrderId,
+    statusFilter,
+    orderListSurface,
+    location,
+    navigate,
+    explicitReturnToConversation,
+    feedback,
+    run,
+    onResetOrderUi: clearCurrentOrderDrafts
+  })
+  const {
+    deliveryDraft,
+    reworkDraft,
+    photoAuthorizationDraft,
+    authorizationRemarkDraft,
+    reviewDraft,
+    arbitrationDraft,
+    deliveryForm,
+    setDeliveryForm,
+    reworkRequirement,
+    setReworkRequirement,
+    photoAuthorizationForm,
+    setPhotoAuthorizationForm,
+    authorizationRemarks,
+    setAuthorizationRemarks,
+    reviewForm,
+    setReviewForm,
+    arbitrationForm,
+    setArbitrationForm
+  } = useOrderDrafts({
+    orderId: selectedOrder?.orderId,
+    fallbackOrderId: focusOrderId
+  })
+  const loading = pageLoading || actionLoading
 
-  async function loadOrders(focusOrderId = selectedOrder?.orderId, options = {}) {
-    const { preserveDrafts = true } = options
-    await run(async () => {
-      const nextOrders = await orderApi.list({
-        role: currentUser.role === 'PROVIDER' ? 'provider' : 'customer',
-        status: statusFilter
-      }, currentUser)
-      let nextInvitations = []
-      if (currentUser.role === 'PROVIDER') {
-        try {
-          nextInvitations = await demandApi.sentInvitations(currentUser)
-        } catch {
-          nextInvitations = []
-        }
-      }
-      const roleOrders = asArray(nextOrders).filter(order => currentUser.role === 'PROVIDER'
-        ? Number(order.providerUserId) === Number(currentUser.userId)
-        : Number(order.customerId) === Number(currentUser.userId))
-      setOrders(roleOrders)
-      saveOrderSnapshots(roleOrders)
-      setSentInvitations(asArray(nextInvitations))
-      if (focusOrderId && roleOrders.some(order => Number(order.orderId) === Number(focusOrderId))) {
-        const focusedOrder = roleOrders.find(order => Number(order.orderId) === Number(focusOrderId))
-        await openOrder(focusedOrder || focusOrderId, false, { preserveDrafts })
-      } else if (roleOrders.length && !orderListSurface) {
-        await openOrder(roleOrders[0], false, { preserveDrafts })
-      } else {
-        setSelectedOrder(null)
-        setStatusLogs([])
-        setDeliveryRecords([])
-        setPhotoAuthorizations([])
-        setOrderReviews([])
-        setArbitrations([])
-      }
-    })
-  }
-
-  async function openOrder(orderOrId, updateUrl = true, options = {}) {
-    const { preserveDrafts = false } = options
-    const orderId = normalizeOrderId(typeof orderOrId === 'object' ? orderOrId.orderId : orderOrId)
-    const fallbackOrder = typeof orderOrId === 'object' ? orderOrId : orders.find(order => Number(order.orderId) === Number(orderId))
-    if (!orderId) {
-      feedback.warning('订单信息暂时不可用，请刷新后重试。')
-      return false
-    }
-    setPageLoading(true)
-    try {
-      let detail = fallbackOrder || null
-      try {
-        detail = await orderApi.detail(orderId, currentUser) || detail
-      } catch (error) {
-        if (!detail || (!isApiUnavailable(error) && error.status !== 403 && error.status !== 404)) throw error
-        feedback.warning('订单详情接口暂时不可用，已先展示订单列表中的档案信息。')
-      }
-      if (!detail) {
-        feedback.warning('订单信息暂时不可用，请刷新后重试。')
-        return false
-      }
-      const logs = asArray(await optionalOrderData(() => orderApi.statusLogs(orderId, currentUser)))
-      const deliveries = asArray(await optionalOrderData(() => deliveryApi.listByOrder(orderId, currentUser)))
-      const authorizations = asArray(await optionalOrderData(() => photoAuthorizationApi.listByOrder(orderId, currentUser)))
-      let reviews = asArray(getLocalReviewsByOrder(orderId))
-      const remoteReviews = asArray(await optionalOrderData(() => reviewApi.listByOrder(orderId, currentUser), []))
-      reviews = mergeReviewLists(remoteReviews, reviews)
-      let complaints = asArray(getArbitrationsByOrder(orderId))
-      const complaintReviewIds = reviews
-        .map(review => review.reviewId)
-        .filter(reviewId => reviewId && !String(reviewId).startsWith('local'))
-      if (complaintReviewIds.length) {
-        try {
-          const remoteComplaints = await Promise.all(complaintReviewIds.map(reviewId => complaintApiSafeList(reviewId, currentUser)))
-          complaints = mergeComplaints(complaints, remoteComplaints.flat())
-        } catch {
-          complaints = mergeComplaints(complaints)
-        }
-      }
-      setSelectedOrder(detail)
-      saveOrderSnapshots([detail])
-      setStatusLogs(logs)
-      setDeliveryRecords(deliveries)
-      setPhotoAuthorizations(authorizations)
-      setOrderReviews(reviews)
-      setArbitrations(complaints)
-      if (!preserveDrafts) {
-        deliveryDraft.clearDraft()
-        reworkDraft.clearDraft()
-        photoAuthorizationDraft.clearDraft()
-        authorizationRemarkDraft.clearDraft()
-        reviewDraft.clearDraft()
-        arbitrationDraft.clearDraft()
-        setReworkDialogOpen(false)
-        setDeliveryUploadDialogOpen(false)
-        setPhotoAuthorizationDialogOpen(false)
-        setAuthorizationRecordsDialogOpen(false)
-        setReviewRecordsDialogOpen(false)
-        setShowReviewForm(false)
-        setShowArbitrationForm(false)
-        setFollowUpDialogOpen(false)
-        setFollowUpReview(null)
-        setFollowUpContent('')
-      }
-      if (updateUrl) {
-        const searchConversationId = new URLSearchParams(location.search).get('conversationId')
-        const target = buildOrderNavigationTarget(orderId, {
-          conversationId: detail.conversationId || location.state?.conversationId || searchConversationId,
-          returnTo: explicitReturnToConversation,
-          source: explicitReturnToConversation ? WORKFLOW_SOURCES.conversation : WORKFLOW_SOURCES.order,
-          orderSurface: ORDER_SURFACES.detail
-        })
-        if (target) navigate(target.to, { replace: true, state: target.state })
-      }
-      return true
-    } catch (error) {
-      feedback.error(error.message || '订单详情暂时无法打开，请刷新后重试。')
-      return false
-    } finally {
-      setPageLoading(false)
-    }
-  }
-
-  async function operateOrder(action) {
-    if (!selectedOrder) return
-    const result = await run(async () => {
-      if (action.kind === 'pay') {
-        return orderApi.mockPay(selectedOrder.orderId, selectedOrder.amountCent, currentUser)
-      }
-      if (action.kind === 'transition' && action.targetStatus === 'COMPLETED' && actionVisibility.canConfirmDelivery && canCustomerConfirm(selectedOrder, currentUser, { deliveries: deliveryRecords })) {
-        return orderApi.transition(selectedOrder.orderId, 'COMPLETED', action.reason, currentUser)
-      }
-      throw new Error('当前状态不支持这个操作。')
-    }, action.successText)
-    if (result) {
-      await loadOrders(selectedOrder.orderId)
-      if (action.kind === 'transition' && action.targetStatus === 'COMPLETED') {
-        setCompletionDialogOpen(true)
-      }
-    }
-  }
-
-  function openReviewFromCompletion() {
-    setCompletionDialogOpen(false)
-    setShowReviewForm(true)
-    feedback.info('评价功能入口已打开')
-  }
-
-  async function submitDelivery(event) {
-    event?.preventDefault?.()
-    const files = Array.isArray(deliveryForm.files) ? deliveryForm.files : deliveryForm.file ? [deliveryForm.file] : []
-    if (!selectedOrder || !files.length) return false
-    const result = await run(async () => deliveryApi.upload(
-      selectedOrder.orderId,
-      files,
-      deliveryForm.remark.trim(),
-      currentUser
-    ), selectedOrder.status === 'REWORK_REQUIRED' ? '返修作品已发送给客户验收' : '交付作品已发送给客户验收')
-    if (result) {
-      deliveryDraft.clearDraft()
-      setDeliveryUploadDialogOpen(false)
-      await loadOrders(selectedOrder.orderId, { preserveDrafts: true })
-    }
-    return Boolean(result)
-  }
-
-  async function submitRework(event) {
-    event.preventDefault()
-    if (!selectedOrder) return
-    const trimmedRequirement = reworkRequirement.trim()
-    if (!trimmedRequirement) {
-      feedback.warning('请填写返修要求')
-      return
-    }
-    const result = await run(async () => orderApi.requestRework(
-      selectedOrder.orderId,
-      trimmedRequirement,
-      currentUser
-    ), '返修请求已提交')
-    if (result) {
-      reworkDraft.clearDraft()
-      setReworkDialogOpen(false)
-      await loadOrders(selectedOrder.orderId, { preserveDrafts: true })
-    }
-  }
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+  }, [previewUrl])
 
   async function openDeliveryPreview(record) {
     setPreviewDelivery(record)
@@ -873,147 +360,6 @@ export function OrdersPage() {
       return true
     }, '下载已开始')
     return Boolean(result)
-  }
-
-  async function cancelSelectedOrder(cancelAction) {
-    if (!selectedOrder || !cancelAction) return
-    const confirmed = await feedback.confirm({
-      title: cancelAction.title || '确认取消订单',
-      message: cancelAction.confirmText,
-      confirmText: cancelAction.label || '确认取消',
-      tone: 'danger'
-    })
-    if (!confirmed) return
-    const result = await run(async () => orderApi.cancel(
-      selectedOrder.orderId,
-      { reason: cancelAction.reason },
-      currentUser
-    ), cancelAction.successText)
-    if (result) {
-      await loadOrders(selectedOrder.orderId)
-    }
-  }
-
-  async function submitPhotoAuthorizationRequest(event) {
-    event.preventDefault()
-    if (!selectedOrder || !photoAuthorizationForm.fileIds.length) return
-    const result = await run(async () => photoAuthorizationApi.request(selectedOrder.orderId, {
-      fileIds: photoAuthorizationForm.fileIds,
-      remark: photoAuthorizationForm.remark.trim()
-    }, currentUser), '展示授权申请已发送')
-    if (result) {
-      photoAuthorizationDraft.clearDraft()
-      setPhotoAuthorizationDialogOpen(false)
-      setPhotoAuthorizations(await photoAuthorizationApi.listByOrder(selectedOrder.orderId, currentUser))
-    }
-  }
-
-  function togglePhotoAuthorizationFile(file) {
-    const fileId = Number(file?.fileId)
-    if (!fileId) return
-    const next = new Set(photoAuthorizationForm.fileIds.map(Number))
-    if (next.has(fileId)) next.delete(fileId)
-    else next.add(fileId)
-    setPhotoAuthorizationForm({
-      ...photoAuthorizationForm,
-      fileIds: Array.from(next)
-    })
-  }
-
-  async function handlePhotoAuthorizationDecision(authorization, decision, decisionRemark = '') {
-    if (!selectedOrder) return
-    const remark = (decisionRemark || authorizationRemarks[authorization.id] || '').trim()
-    if (decision === 'reject' && !remark) {
-      feedback.warning('请填写拒绝原因')
-      return false
-    }
-    const action = decision === 'approve' ? photoAuthorizationApi.approve : photoAuthorizationApi.reject
-    const successText = decision === 'approve' ? '已同意展示授权' : '已拒绝展示授权'
-    const result = await run(async () => action(authorization.id, { remark }, currentUser), successText)
-    if (result) {
-      authorizationRemarkDraft.setValue(previous => ({ ...previous, [authorization.id]: '' }))
-      setPhotoAuthorizations(await photoAuthorizationApi.listByOrder(selectedOrder.orderId, currentUser))
-    }
-    return Boolean(result)
-  }
-
-  async function submitReview(event) {
-    event.preventDefault()
-    if (!selectedOrder) return
-    const direction = getOrderReviewDirection(selectedOrder, currentUser.userId)
-    const targetUserId = getReviewTargetUserId(selectedOrder, currentUser.userId)
-    const result = await run(async () => {
-      try {
-        return await reviewApi.create(selectedOrder.orderId, {
-          rating: reviewForm.rating,
-          content: reviewForm.content.trim()
-        }, currentUser)
-      } catch (error) {
-        if (!error.isNetworkError && error.status !== 404 && error.code !== 50001) {
-          throw error
-        }
-        return saveLocalReview({
-          orderId: selectedOrder.orderId,
-          reviewerId: currentUser.userId,
-          targetUserId,
-          direction,
-          rating: reviewForm.rating,
-          content: reviewForm.content.trim()
-        })
-      }
-    }, '评价已提交')
-    if (result) {
-      setOrderReviews(mergeReviewLists([result], orderReviews, getLocalReviewsByOrder(selectedOrder.orderId)))
-      setShowReviewForm(false)
-      reviewDraft.clearDraft()
-    }
-  }
-
-  async function submitArbitration(event) {
-    event.preventDefault()
-    if (!selectedOrder) return
-    const reason = `${arbitrationForm.reason}${arbitrationForm.description.trim() ? `：${arbitrationForm.description.trim()}` : ''}`
-    const localRecord = {
-      orderId: selectedOrder.orderId,
-      reviewId: reviewToComplain?.reviewId,
-      applicantId: currentUser.userId,
-      respondentId: reviewToComplain?.reviewerId || getReviewTargetUserId(selectedOrder, currentUser.userId),
-      reason,
-      description: arbitrationForm.description.trim(),
-      status: 'PENDING'
-    }
-    const result = await run(async () => {
-      if (reviewToComplain?.reviewId && !String(reviewToComplain.reviewId).startsWith('local')) {
-        try {
-          return await reviewComplaintApi.create(reviewToComplain.reviewId, {
-            reason,
-            evidenceFileIds: ''
-          }, currentUser)
-        } catch (error) {
-          if (!isApiUnavailable(error)) throw error
-        }
-      }
-      return saveLocalArbitration(localRecord)
-    }, '评价申诉已提交')
-    if (result) {
-      setArbitrations(mergeComplaints([result], arbitrations, getArbitrationsByOrder(selectedOrder.orderId)))
-      setShowArbitrationForm(false)
-      arbitrationDraft.clearDraft()
-    }
-  }
-
-  async function submitFollowUp(event) {
-    event.preventDefault()
-    if (!selectedOrder?.orderId || !followUpReview?.reviewId || !followUpContent.trim()) return
-    const result = await run(async () => (
-      reviewApi.followUp(followUpReview.reviewId, { content: followUpContent.trim() }, currentUser)
-    ), '追评已提交')
-    if (result) {
-      setOrderReviews(mergeReviewLists([result], orderReviews, getLocalReviewsByOrder(selectedOrder.orderId)))
-      setFollowUpDialogOpen(false)
-      setFollowUpReview(null)
-      setFollowUpContent('')
-    }
   }
 
   async function openOrderWithDraftGuard(orderOrId) {
@@ -1189,10 +535,60 @@ export function OrdersPage() {
     && review.isVisible !== false
     && !resolvedComplaintReviewIds.has(String(review.reviewId || ''))
   ))
+  const {
+    operateOrder,
+    openReviewFromCompletion,
+    submitDelivery,
+    submitRework,
+    cancelSelectedOrder,
+    submitPhotoAuthorizationRequest,
+    togglePhotoAuthorizationFile,
+    handlePhotoAuthorizationDecision,
+    submitReview,
+    submitArbitration,
+    submitFollowUp
+  } = useOrderActions({
+    selectedOrder,
+    currentUser,
+    actionVisibility,
+    deliveryRecords,
+    deliveryForm,
+    deliveryDraft,
+    reworkRequirement,
+    reworkDraft,
+    photoAuthorizationForm,
+    setPhotoAuthorizationForm,
+    photoAuthorizationDraft,
+    authorizationRemarks,
+    authorizationRemarkDraft,
+    reviewForm,
+    reviewDraft,
+    arbitrationForm,
+    arbitrationDraft,
+    reviewToComplain,
+    orderReviews,
+    setOrderReviews,
+    arbitrations,
+    setArbitrations,
+    followUpReview,
+    followUpContent,
+    setFollowUpContent,
+    setCompletionDialogOpen,
+    setDeliveryUploadDialogOpen,
+    setReworkDialogOpen,
+    setPhotoAuthorizationDialogOpen,
+    setPhotoAuthorizations,
+    setShowReviewForm,
+    setShowArbitrationForm,
+    setFollowUpDialogOpen,
+    setFollowUpReview,
+    feedback,
+    run,
+    loadOrders
+  })
   const selectedOrderPerspective = selectedOrder ? getOrderPerspective(selectedOrder, currentUser) : ''
   const selectedCounterpartyLabel = selectedOrder ? getCounterpartyLabel(selectedOrder, currentUser) : ''
   const selectedOrderLocation = quoteSnapshot?.location || selectedOrder?.shootLocation || '未填写'
-  const selectedOrderServiceContent = sanitizeSeedText(quoteSnapshot?.serviceContent || selectedOrder?.serviceContent, '校园约拍服务')
   const selectedOrderTitle = selectedOrder ? formatOrderTitle(selectedOrder, quoteSnapshot) : ''
   const selectedOrderConversationId = selectedOrder?.conversationId
   const selectedOrderMetaText = selectedOrder ? buildOrderMetaText(selectedOrder, selectedCounterpartyLabel, selectedOrderLocation) : ''
@@ -1216,11 +612,6 @@ export function OrdersPage() {
       title: '交付作品',
       status: latestDeliveryBatch ? formatDeliveryBatchContent(latestDeliveryBatch) : canUploadDelivery ? '待上传' : '等待作品',
       tone: latestDeliveryBatch ? 'success' : canUploadDelivery ? 'warning' : 'default',
-      description: latestDeliveryBatch
-        ? '查看本次交付内容。'
-        : canUploadDelivery
-          ? '上传本单成片。'
-          : '作品交付后可查看。',
       primaryAction: latestDeliveryBatch ? {
         label: '查看作品',
         onClick: () => openDeliveryBatch(latestDeliveryBatch),
@@ -1237,7 +628,6 @@ export function OrdersPage() {
       title: '展示授权',
       status: formatAuthorizationSummary(photoAuthorizations),
       tone: getAuthorizationFollowupTone(photoAuthorizations),
-      description: '申请将图片作为客片展示。',
       primaryAction: photoAuthorizations.length ? {
         label: '查看授权记录',
         onClick: () => setAuthorizationRecordsDialogOpen(true)
@@ -1256,7 +646,6 @@ export function OrdersPage() {
       title: '评价与申诉',
       status: formatReviewFollowupStatus({ canReview: canReviewSelectedOrder, myReview, reviewToComplain, orderReviews, arbitrations }),
       tone: getReviewFollowupTone({ canReview: canReviewSelectedOrder, myReview, reviewToComplain, orderReviews, arbitrations }),
-      description: getReviewFollowupDescription({ canReview: canReviewSelectedOrder, myReview, reviewToComplain, orderReviews, arbitrations }),
       primaryAction: canReviewSelectedOrder && !myReview ? {
         label: '评价',
         onClick: toggleReviewForm
@@ -1409,12 +798,7 @@ export function OrdersPage() {
 
   function returnToOrderList() {
     const target = buildOrderListTarget()
-    setSelectedOrder(null)
-    setStatusLogs([])
-    setDeliveryRecords([])
-    setPhotoAuthorizations([])
-    setOrderReviews([])
-    setArbitrations([])
+    clearOrderSelection()
     navigate(target.to, { state: target.state })
   }
 
@@ -1814,6 +1198,8 @@ export function OrdersPage() {
               onChange={event => setReworkRequirement(event.target.value)}
               multiline
               minRows={4}
+              inputProps={{ maxLength: REWORK_REQUIREMENT_MAX_LENGTH }}
+              helperText={getReworkRequirementHelperText(reworkRequirement)}
               required
             />
           </Stack>
@@ -1916,7 +1302,7 @@ function orderIndexCardSx(selected) {
     bgcolor: selected ? 'rgba(37, 99, 235, .08)' : 'transparent',
     borderColor: 'transparent',
     borderRadius: 0,
-    borderLeft: `4px solid ${selected ? '#2563eb' : 'transparent'}`,
+    borderLeft: `4px solid ${selected ? ORDER_WORKFLOW_COLORS.primary : 'transparent'}`,
     boxShadow: 'none',
     transition: 'background-color 140ms ease, border-color 140ms ease',
     '&:hover': {

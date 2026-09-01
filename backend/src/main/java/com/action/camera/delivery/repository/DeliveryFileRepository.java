@@ -17,5 +17,7 @@ public interface DeliveryFileRepository extends JpaRepository<DeliveryFile, Long
 
     List<DeliveryFile> findByFileId(Long fileId);
 
+    List<DeliveryFile> findByFileIdIn(Collection<Long> fileIds);
+
     void deleteByDeliveryId(Long deliveryId);
 }

@@ -12,7 +12,7 @@ export function DeliveryFileGrid({
   files = [],
   mode = 'browse',
   compact = false,
-  previewUrls = {},
+  previewUrls,
   selectedFileIds,
   selectedIds = new Set(),
   onToggleSelect,
@@ -25,7 +25,8 @@ export function DeliveryFileGrid({
   const { currentUser } = useAuth()
   const selectMode = mode === 'select'
   const selectedSet = selectedFileIds || selectedIds || new Set()
-  const shouldLoadPreviews = !previewUrls || !Object.keys(previewUrls).length
+  const externalPreviewUrls = previewUrls || {}
+  const shouldLoadPreviews = previewUrls == null
   const loadedPreviews = useDeliveryFilePreviews(files, currentUser, { enabled: shouldLoadPreviews })
 
   function isSelected(file) {
@@ -77,8 +78,8 @@ export function DeliveryFileGrid({
     }}>
       {files.map((file, index) => {
         const selected = isSelected(file)
-        const previewUrl = previewUrls[file.id]
-          || previewUrls[file.fileId]
+        const previewUrl = externalPreviewUrls[file.id]
+          || externalPreviewUrls[file.fileId]
           || loadedPreviews.previewUrls[getPreviewKey(file)]
         const loadingPreview = loadedPreviews.loadingIds.has(getPreviewKey(file))
         const image = isImageDeliveryFile(file)
@@ -129,7 +130,7 @@ export function DeliveryFileGrid({
               overflow: 'hidden'
             }}>
               {previewUrl && image ? (
-                <Box component="img" src={previewUrl} alt={file.fileName} sx={{ width: '100%', height: '100%', objectFit: compact || selectMode ? 'cover' : 'contain', display: 'block' }} />
+                <Box component="img" src={previewUrl} alt={file.fileName} sx={{ width: '100%', height: '100%', objectFit: selectMode ? 'contain' : compact ? 'cover' : 'contain', display: 'block' }} />
               ) : loadingPreview && image ? (
                 <Stack spacing={0.5} sx={{ height: '100%', alignItems: 'center', justifyContent: 'center', color: PORTRA_SURFACE.muted }}>
                   <Typography variant="caption" sx={{ fontWeight: 800 }}>缩略图加载中</Typography>
@@ -205,11 +206,12 @@ export function DeliveryFileGrid({
 
 function BrowseDeliveryGallery({ files, previewUrls, loadedPreviews, onPreview, onDownload }) {
   const single = files.length === 1
+  const externalPreviewUrls = previewUrls || {}
   return (
     <Box sx={browseGallerySx(single)}>
       {files.map((file, index) => {
-        const previewUrl = previewUrls[file.id]
-          || previewUrls[file.fileId]
+        const previewUrl = externalPreviewUrls[file.id]
+          || externalPreviewUrls[file.fileId]
           || loadedPreviews.previewUrls[getPreviewKey(file)]
         const loadingPreview = loadedPreviews.loadingIds.has(getPreviewKey(file))
         const image = isImageDeliveryFile(file)
