@@ -8,59 +8,60 @@ function buildQuery(params = {}) {
   return query.toString() ? `?${query.toString()}` : ''
 }
 
-function endpointPending(path) {
-  throw new Error(`后端接口待接入：${path}`)
-}
-
 export const adminApi = {
   listHallItems(params = {}, currentUser) {
-    void params
-    void currentUser
-    return endpointPending('/admin/hall-items')
+    return request(`/admin/hall-items${buildQuery(params)}`, {}, currentUser)
   },
   takeDownHallItem(type, id, body, currentUser) {
-    void body
-    void currentUser
-    return endpointPending(`/admin/hall-items/${type}/${id}/take-down`)
+    return request(`/admin/hall-items/${type}/${id}/take-down`, {
+      method: 'PATCH',
+      body: JSON.stringify(body)
+    }, currentUser)
   },
   restoreHallItem(type, id, body, currentUser) {
-    void body
-    void currentUser
-    return endpointPending(`/admin/hall-items/${type}/${id}/restore`)
+    return request(`/admin/hall-items/${type}/${id}/restore`, {
+      method: 'PATCH',
+      body: JSON.stringify(body)
+    }, currentUser)
   },
   listMoments(params = {}, currentUser) {
-    void params
-    void currentUser
-    return endpointPending('/admin/moments')
+    return request(`/admin/moments${buildQuery(params)}`, {}, currentUser)
   },
   takeDownMoment(momentId, body, currentUser) {
-    void body
-    void currentUser
-    return endpointPending(`/admin/moments/${momentId}/take-down`)
+    return request(`/admin/moments/${momentId}/take-down`, {
+      method: 'PATCH',
+      body: JSON.stringify(body)
+    }, currentUser)
   },
   restoreMoment(momentId, body, currentUser) {
-    void body
-    void currentUser
-    return endpointPending(`/admin/moments/${momentId}/restore`)
+    return request(`/admin/moments/${momentId}/restore`, {
+      method: 'PATCH',
+      body: JSON.stringify(body)
+    }, currentUser)
   },
   listUsers(params = {}, currentUser) {
-    void params
-    void currentUser
-    return endpointPending('/admin/users')
+    return request(`/admin/users${buildQuery(params)}`, {}, currentUser)
   },
   getUserAdminProfile(userId, currentUser) {
-    void currentUser
-    return endpointPending(`/admin/users/${userId}`)
+    return request(`/admin/users/${userId}`, {}, currentUser)
+  },
+  updateUserStatus(userId, body, currentUser) {
+    return request(`/admin/users/${userId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify(body)
+    }, currentUser)
   },
   listReports(params = {}, currentUser) {
-    void params
-    void currentUser
-    return endpointPending('/admin/reports')
+    return request(`/admin/reports${buildQuery(params)}`, {}, currentUser)
+  },
+  getReport(reportId, currentUser) {
+    return request(`/admin/reports/${reportId}`, {}, currentUser)
   },
   resolveReport(reportId, body, currentUser) {
-    void body
-    void currentUser
-    return endpointPending(`/admin/reports/${reportId}/resolve`)
+    return request(`/admin/reports/${reportId}/resolve`, {
+      method: 'PATCH',
+      body: JSON.stringify(body)
+    }, currentUser)
   },
   dashboard(currentUser) {
     return request('/admin/dashboard', {}, currentUser)

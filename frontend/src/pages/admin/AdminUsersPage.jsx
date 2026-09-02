@@ -1,132 +1,19 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
-import { userApi } from '../../api/userApi.js'
-import { parseExactUserId } from './adminData.js'
+import { adminApi } from '../../api/adminApi.js'
+import { resetAdminPage } from './adminData.js'
 import { AdminEmptyState } from './components/AdminEmptyState.jsx'
 import { AdminModeBanner } from './components/AdminModeBanner.jsx'
 import { AdminUserCard } from './components/AdminUserCard.jsx'
 
-const pendingFilters = [
-  { key: 'nickname', label: '昵称', placeholder: '按昵称搜索…' },
-  { key: 'phone', label: '手机号后四位', placeholder: '例如：1234…' },
-  { key: 'role', label: '角色', type: 'select', options: ['全部角色'] },
-  { key: 'certification', label: '认证状态', type: 'select', options: ['全部状态'] },
-  { key: 'report', label: '举报状态', type: 'select', options: ['全部状态'] },
-  { key: 'restriction', label: '账号限制', type: 'select', options: ['全部状态'] }
-]
-
+const asPage = (v, f) => Array.isArray(v) ? { records: v, ...f, total: v.length } : { records: v?.records || [], page: v?.page || f.page, size: v?.size || f.size, total: v?.total || 0 }
+function Pager({ data, onPage }) { const pages = Math.max(1, Math.ceil(data.total / data.size)); return <nav className="admin-pagination"><button type="button" disabled={data.page <= 1} onClick={() => onPage(data.page - 1)}>上一页</button><span>{data.page} / {pages}</span><button type="button" disabled={data.page >= pages} onClick={() => onPage(data.page + 1)}>下一页</button></nav> }
 export function AdminUsersPage() {
-  const { currentUser } = useAuth()
-  const navigate = useNavigate()
-  const [userIdValue, setUserIdValue] = useState('')
-  const [result, setResult] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  async function submitLookup(event) {
-    event.preventDefault()
-    const userId = parseExactUserId(userIdValue)
-    if (!userId) {
-      setResult(null)
-      setError('请输入有效的正整数用户 ID。')
-      return
-    }
-
-    setLoading(true)
-    setError('')
-    setResult(null)
-    try {
-      const brief = await userApi.brief(userId, currentUser)
-      setResult({ ...brief, userId: brief?.userId || userId })
-    } catch (requestError) {
-      setError(requestError?.message || `未能读取用户 #${userId} 的公开概要。`)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <main className="admin-page">
-      <AdminModeBanner
-        title="用户管理"
-        description="当前只支持按用户 ID 精确读取公开概要；用户列表、组合搜索和管理筛选等待后端接口接入。"
-      />
-
-      <section className="admin-user-lookup" aria-labelledby="admin-user-lookup-title">
-        <div>
-          <span className="admin-user-section-kicker">精确查询</span>
-          <h2 id="admin-user-lookup-title">按用户 ID 查看管理员主页</h2>
-          <p>此操作只调用公开用户概要接口，不请求管理员用户列表。</p>
-        </div>
-        <form onSubmit={submitLookup}>
-          <label htmlFor="admin-user-id">用户 ID</label>
-          <div>
-            <input
-              id="admin-user-id"
-              name="admin-user-id"
-              type="text"
-              inputMode="numeric"
-              autoComplete="off"
-              spellCheck="false"
-              placeholder="例如：42…"
-              value={userIdValue}
-              onChange={event => setUserIdValue(event.target.value)}
-            />
-            <button className="admin-button" type="submit" disabled={loading}>
-              {loading ? '查询中…' : '查询用户'}
-            </button>
-          </div>
-        </form>
-      </section>
-
-      {error ? <div className="admin-inline-error" role="alert">{error}</div> : null}
-
-      {result ? (
-        <section className="admin-user-result" aria-label="用户查询结果">
-          <AdminUserCard
-            user={result}
-            onOpen={() => navigate(`/admin/users/${result.userId}`)}
-          />
-        </section>
-      ) : null}
-
-      {!result && !error && !loading ? (
-        <AdminEmptyState title="等待精确用户 ID" description="输入用户 ID 后读取真实公开概要。" />
-      ) : null}
-
-      <section className="admin-pending-filters" aria-labelledby="admin-user-filters-title">
-        <header>
-          <div>
-            <span className="admin-user-section-kicker">用户列表筛选</span>
-            <h2 id="admin-user-filters-title">组合查询</h2>
-          </div>
-          <span className="admin-mode-badge">接口待接入</span>
-        </header>
-        <fieldset disabled>
-          <legend>以下筛选需要管理员用户列表接口</legend>
-          <div className="admin-pending-filter-grid">
-            {pendingFilters.map(filter => (
-              <label key={filter.key}>
-                <span>{filter.label}</span>
-                {filter.type === 'select' ? (
-                  <select name={`admin-user-${filter.key}`} defaultValue="">
-                    <option value="">{filter.options[0]}</option>
-                  </select>
-                ) : (
-                  <input
-                    name={`admin-user-${filter.key}`}
-                    type="text"
-                    autoComplete="off"
-                    placeholder={filter.placeholder}
-                  />
-                )}
-                <small>接口待接入</small>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      </section>
-    </main>
-  )
+  const { currentUser } = useAuth(); const navigate = useNavigate(); const requestId = useRef(0); const [keyword, setKeyword] = useState(''); const [role, setRole] = useState(''); const [status, setStatus] = useState(''); const [page, setPage] = useState(1); const [data, setData] = useState({ records: [], page: 1, size: 20, total: 0 }); const [loading, setLoading] = useState(true); const [error, setError] = useState('')
+  const load = useCallback(() => adminApi.listUsers({ page, size: 20, ...(keyword.trim() ? { keyword: keyword.trim() } : {}), ...(role ? { role } : {}), ...(status ? { status } : {}) }, currentUser), [currentUser, keyword, page, role, status])
+  const refresh = useCallback(async () => { const token = ++requestId.current; const value = asPage(await load(), { page, size: 20 }); if (token === requestId.current) setData(value); return value }, [load, page])
+  useEffect(() => { const token = ++requestId.current; setLoading(true); setError(''); setData({ records: [], page, size: 20, total: 0 }); load().then(v => { if (token === requestId.current) setData(asPage(v, { page, size: 20 })) }).catch(e => { if (token === requestId.current) { setData({ records: [], page, size: 20, total: 0 }); setError(e.message || '用户列表加载失败。') } }).finally(() => { if (token === requestId.current) setLoading(false) }) }, [load, page])
+  const filter = (next = {}) => { setPage(resetAdminPage()); if ('keyword' in next) setKeyword(next.keyword); if ('role' in next) setRole(next.role); if ('status' in next) setStatus(next.status) }
+  return <main className="admin-page"><AdminModeBanner title="用户管理" description="读取真实管理员用户分页列表。" /><section className="admin-user-lookup"><label>关键词<input value={keyword} onChange={e => filter({ keyword: e.target.value })} /></label><label>角色<select value={role} onChange={e => filter({ role: e.target.value })}><option value="">全部</option><option value="CUSTOMER">客户</option><option value="PROVIDER">摄影师</option><option value="ADMIN">管理员</option></select></label><label>状态<select value={status} onChange={e => filter({ status: e.target.value })}><option value="">全部</option><option value="ACTIVE">正常</option><option value="DISABLED">已限制</option></select></label></section>{error ? <div className="admin-inline-error">{error}<button type="button" onClick={() => refresh().catch(() => {})}>重试</button></div> : null}{loading ? <AdminEmptyState title="正在读取用户…" /> : null}{!loading && !error && !data.records.length ? <AdminEmptyState title="暂无符合条件的用户" /> : null}<section className="admin-user-result">{data.records.map(user => <AdminUserCard key={user.userId} user={user} onOpen={() => navigate(`/admin/users/${user.userId}`)} />)}</section><Pager data={data} onPage={setPage} /></main>
 }

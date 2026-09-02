@@ -8,19 +8,21 @@ export const ADMIN_NAV_ITEMS = [
   { label: '概览', path: '/admin', key: 'dashboard' }
 ]
 
-const endpointPending = { available: false, message: '接口待接入' }
+const available = { available: true, message: '' }
 
 export const ADMIN_CAPABILITIES = {
-  listHallItems: endpointPending,
-  takeDownHallItem: endpointPending,
-  restoreHallItem: endpointPending,
-  listMoments: endpointPending,
-  takeDownMoment: endpointPending,
-  restoreMoment: endpointPending,
-  listUsers: endpointPending,
-  getUserAdminProfile: endpointPending,
-  listReports: endpointPending,
-  resolveReport: endpointPending
+  listHallItems: available,
+  takeDownHallItem: available,
+  restoreHallItem: available,
+  listMoments: available,
+  takeDownMoment: available,
+  restoreMoment: available,
+  listUsers: available,
+  getUserAdminProfile: available,
+  updateUserStatus: available,
+  listReports: available,
+  getReport: available,
+  resolveReport: available
 }
 
 export function getAdminActiveKey(pathname = '') {

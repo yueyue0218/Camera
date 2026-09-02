@@ -4,6 +4,8 @@ public record AdminDashboardResponse(
         long totalUsers,
         long todayGmvCent,
         long pendingAuditCount,
-        long pendingArbitrationCount
+        long pendingArbitrationCount,
+        long pendingReportCount,
+        long removedContentCount
 ) {
 }

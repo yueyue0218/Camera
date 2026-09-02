@@ -16,7 +16,7 @@ import { AdminStatusTag } from './components/AdminStatusTag.jsx'
 const quickLinks = [
   { key: 'hall', label: '浏览大厅', description: '查看公开需求与服务', path: '/admin/hall' },
   { key: 'feed', label: '浏览动态', description: '查看平台公开动态', path: '/admin/feed' },
-  { key: 'reports', label: '举报处理', description: '结构已预留，接口待接入', path: '/admin/reports', pending: true },
+  { key: 'reports', label: '举报处理', description: '进入真实举报处理队列', path: '/admin/reports' },
   { key: 'certifications', label: '认证审核', description: '进入真实待审队列', path: '/admin/certifications' },
   { key: 'complaints', label: '评价申诉', description: '进入真实申诉队列', path: '/admin/complaints' }
 ]
@@ -227,13 +227,9 @@ export function AdminHomePage() {
                   <p className="admin-eyebrow">RECENT REPORTS</p>
                   <h2>最近举报</h2>
                 </div>
-                <AdminStatusTag status="PENDING_API" />
+                <Link to="/admin/reports">查看队列</Link>
               </header>
-              <AdminEmptyState
-                pending
-                title="举报列表接口待接入"
-                description="当前不会生成模拟举报记录，也不会显示伪造的处理结果。"
-              />
+              <AdminEmptyState title="举报请在举报处理页查看" description="待处理总数来自真实管理概览。" />
             </article>
           </section>
         </>

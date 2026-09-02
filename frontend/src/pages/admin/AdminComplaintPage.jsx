@@ -5,6 +5,8 @@ import { adminApi } from '../../api/adminApi.js'
 import { reviewApi } from '../../api/reviewApi.js'
 import {
   buildComplaintArbitrationBody,
+  complaintActionCopy,
+  completeAdminMutation,
   enrichComplaintsWithReviewContext,
   loadComplaintSource,
   refreshComplaintSurfaces,
@@ -253,15 +255,21 @@ export function AdminComplaintPage() {
     setError('')
     setSuccess('')
     try {
-      await adminApi.arbitrateReviewComplaint(item.complaintId, body, currentUser)
-      const refreshedItems = await refreshComplaintSurfaces({
-        loadComplaints: requestItems,
-        loadDashboard: () => adminApi.dashboard(currentUser),
-      })
-      setItems(refreshedItems)
+      const outcome = await completeAdminMutation(
+        () => adminApi.arbitrateReviewComplaint(item.complaintId, body, currentUser),
+        async () => {
+          const refreshedItems = await refreshComplaintSurfaces({
+            loadComplaints: requestItems,
+            loadDashboard: () => adminApi.dashboard(currentUser),
+          })
+          setItems(refreshedItems)
+        },
+      )
       setActionState({ item: null, result: '', comment: '', submitting: false, error: '' })
       const resultLabel = arbitrationLabels[body.result] || body.result
-      setSuccess(`申诉 #${item.complaintId} 已按“${resultLabel}”处理，列表已刷新。`)
+      setSuccess(outcome.refreshed
+        ? `申诉 #${item.complaintId} 已按“${resultLabel}”处理，列表已刷新。`
+        : `申诉 #${item.complaintId} 已成功处理，但刷新失败；请刷新列表确认。`)
     } catch (requestError) {
       setActionState(current => ({
         ...current,
@@ -271,11 +279,7 @@ export function AdminComplaintPage() {
     }
   }
 
-  const actionRequiresComment = actionState.result === 'REVIEW_HIDDEN'
-  const actionTitle = actionRequiresComment ? '隐藏原评价' : '维持原评价'
-  const actionDescription = actionRequiresComment
-    ? '隐藏评价会撤销其信用影响，请填写清楚的处理说明。'
-    : '确认维持原评价；处理说明选填，并会写入真实申诉记录。'
+  const actionCopy = complaintActionCopy(actionState.result)
 
   return (
     <main className="admin-page">
@@ -407,10 +411,10 @@ export function AdminComplaintPage() {
 
       <ModerationReasonDialog
         open={Boolean(actionState.item)}
-        title={actionTitle}
-        description={actionDescription}
+        title={actionCopy.title}
+        description={actionCopy.description}
         value={actionState.comment}
-        required={actionRequiresComment}
+        required={actionCopy.required}
         submitting={actionState.submitting}
         onChange={comment => setActionState(current => ({ ...current, comment, error: '' }))}
         onCancel={() => setActionState({ item: null, result: '', comment: '', submitting: false, error: '' })}
