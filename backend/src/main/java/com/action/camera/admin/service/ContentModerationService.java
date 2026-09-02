@@ -2,12 +2,15 @@ package com.action.camera.admin.service;
 
 import com.action.camera.admin.dto.AdminHallItemResponse;
 import com.action.camera.admin.dto.AdminHallItemType;
+import com.action.camera.admin.dto.AdminMomentResponse;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.demand.domain.Demand;
 import com.action.camera.demand.repository.DemandRepository;
 import com.action.camera.servicepackage.domain.ServicePackage;
 import com.action.camera.servicepackage.repository.ServicePackageRepository;
+import com.action.camera.social.domain.MomentPost;
+import com.action.camera.social.repository.MomentPostRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,19 +22,25 @@ public class ContentModerationService {
     private final AdminPermissionService adminPermissionService;
     private final AdminAuditService adminAuditService;
     private final AdminHallService adminHallService;
+    private final AdminMomentService adminMomentService;
     private final DemandRepository demandRepository;
     private final ServicePackageRepository servicePackageRepository;
+    private final MomentPostRepository momentPostRepository;
 
     public ContentModerationService(AdminPermissionService adminPermissionService,
                                     AdminAuditService adminAuditService,
                                     AdminHallService adminHallService,
+                                    AdminMomentService adminMomentService,
                                     DemandRepository demandRepository,
-                                    ServicePackageRepository servicePackageRepository) {
+                                    ServicePackageRepository servicePackageRepository,
+                                    MomentPostRepository momentPostRepository) {
         this.adminPermissionService = adminPermissionService;
         this.adminAuditService = adminAuditService;
         this.adminHallService = adminHallService;
+        this.adminMomentService = adminMomentService;
         this.demandRepository = demandRepository;
         this.servicePackageRepository = servicePackageRepository;
+        this.momentPostRepository = momentPostRepository;
     }
 
     @Transactional
@@ -42,6 +51,16 @@ public class ContentModerationService {
     @Transactional
     public AdminHallItemResponse restoreHallItem(AdminHallItemType type, Long id, String reason) {
         return changeVisibility(type, id, reason, true);
+    }
+
+    @Transactional
+    public AdminMomentResponse takeDownMoment(Long id, String reason) {
+        return changeMomentVisibility(id, reason, false);
+    }
+
+    @Transactional
+    public AdminMomentResponse restoreMoment(Long id, String reason) {
+        return changeMomentVisibility(id, reason, true);
     }
 
     private AdminHallItemResponse changeVisibility(AdminHallItemType type,
@@ -101,6 +120,25 @@ public class ContentModerationService {
         adminAuditService.record(
                 "SERVICE_PACKAGE", id, adminId, restore ? "RESTORE" : "TAKE_DOWN", reason);
         return adminHallService.toResponse(servicePackage);
+    }
+
+    private AdminMomentResponse changeMomentVisibility(Long id, String reason, boolean restore) {
+        Long adminId = adminPermissionService.requireAdmin();
+        if (id == null || id <= 0) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Moment id must be positive");
+        }
+        String normalizedReason = normalizeReason(reason);
+        LocalDateTime now = LocalDateTime.now();
+        MomentPost moment = momentPostRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Moment not found: " + id));
+        if (restore) {
+            moment.restore(adminId, normalizedReason, now);
+        } else {
+            moment.takeDown(adminId, normalizedReason, now);
+        }
+        momentPostRepository.save(moment);
+        adminAuditService.record("MOMENT", id, adminId, restore ? "RESTORE" : "TAKE_DOWN", normalizedReason);
+        return adminMomentService.toResponse(moment);
     }
 
     private String normalizeReason(String reason) {

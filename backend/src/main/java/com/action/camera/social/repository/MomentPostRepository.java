@@ -17,6 +17,9 @@ public interface MomentPostRepository extends JpaRepository<MomentPost, Long> {
 
     List<MomentPost> findByStatusOrderByCreatedAtDesc(MomentStatus status);
 
+    List<MomentPost> findByStatusAndModerationStatusOrderByCreatedAtDesc(
+            MomentStatus status, ModerationStatus moderationStatus);
+
     long countByModerationStatus(ModerationStatus moderationStatus);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -25,15 +28,30 @@ public interface MomentPostRepository extends JpaRepository<MomentPost, Long> {
 
     List<MomentPost> findByAuthorIdInAndStatusOrderByCreatedAtDesc(Collection<Long> authorIds, MomentStatus status);
 
+    List<MomentPost> findByAuthorIdInAndStatusAndModerationStatusOrderByCreatedAtDesc(
+            Collection<Long> authorIds, MomentStatus status, ModerationStatus moderationStatus);
+
     List<MomentPost> findByAuthorIdOrderByCreatedAtDesc(Long authorId);
 
     List<MomentPost> findByAuthorIdAndStatusOrderByCreatedAtDesc(Long authorId, MomentStatus status);
+
+    List<MomentPost> findByAuthorIdAndStatusAndModerationStatusOrderByCreatedAtDesc(
+            Long authorId, MomentStatus status, ModerationStatus moderationStatus);
 
     Optional<MomentPost> findByIdAndStatus(Long id, MomentStatus status);
 
     long countByAuthorIdAndStatus(Long authorId, MomentStatus status);
 
+    long countByAuthorIdAndStatusAndModerationStatus(
+            Long authorId, MomentStatus status, ModerationStatus moderationStatus);
+
     List<MomentPost> findByAuthorIdAndAuthorRoleAndStatusOrderByCreatedAtDesc(Long authorId, String authorRole, MomentStatus status);
 
+    List<MomentPost> findByAuthorIdAndAuthorRoleAndStatusAndModerationStatusOrderByCreatedAtDesc(
+            Long authorId, String authorRole, MomentStatus status, ModerationStatus moderationStatus);
+
     long countByAuthorIdAndAuthorRoleAndStatus(Long authorId, String authorRole, MomentStatus status);
+
+    long countByAuthorIdAndAuthorRoleAndStatusAndModerationStatus(
+            Long authorId, String authorRole, MomentStatus status, ModerationStatus moderationStatus);
 }
