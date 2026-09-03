@@ -1,80 +1,21 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useAuth } from '../../AuthContext.jsx'
+import { adminApi } from '../../api/adminApi.js'
+import { buildReportResolutionBody, completeAdminMutation, reportResolutionOptions, resetAdminPage } from './adminData.js'
 import { AdminEmptyState } from './components/AdminEmptyState.jsx'
 import { AdminModeBanner } from './components/AdminModeBanner.jsx'
+import { ModerationReasonDialog } from './components/ModerationReasonDialog.jsx'
 
-const reportFields = [
-  ['举报编号', '接口返回后显示'],
-  ['内容类型', '动态 / 需求 / 服务橱窗 / 用户'],
-  ['举报对象', '内容编号与发布者'],
-  ['举报原因', '后端原始原因'],
-  ['举报时间', '后端创建时间'],
-  ['处理状态', '待处理 / 已处理']
-]
-
+const asPage = (v, f) => Array.isArray(v) ? { records: v, ...f, total: v.length } : { records: v?.records || [], page: v?.page || f.page, size: v?.size || f.size, total: v?.total || 0 }
+function Pager({ data, onPage }) { const pages = Math.max(1, Math.ceil(data.total / data.size)); return <nav className="admin-pagination"><button type="button" disabled={data.page <= 1} onClick={() => onPage(data.page - 1)}>上一页</button><span>{data.page} / {pages}</span><button type="button" disabled={data.page >= pages} onClick={() => onPage(data.page + 1)}>下一页</button></nav> }
+const labels = { TAKE_DOWN: '下架内容', RESTORE: '恢复展示', RESTRICT_USER: '限制账号', REVIEW_HIDDEN: '隐藏评价', IGNORE: '忽略举报' }
 export function AdminReportsPage() {
-  return (
-    <main className="admin-page">
-      <AdminModeBanner
-        title="举报处理"
-        description="当前展示举报处理工作区结构；举报列表、详情与处理接口尚未接入。"
-      />
-
-      <section className="admin-report-toolbar" aria-label="举报筛选">
-        <label>
-          <span>搜索举报</span>
-          <input
-            name="admin-report-search"
-            type="search"
-            autoComplete="off"
-            placeholder="举报编号、内容编号或用户 ID…"
-            disabled
-          />
-          <small>接口待接入</small>
-        </label>
-        <label>
-          <span>内容类型</span>
-          <select name="admin-report-type" defaultValue="" disabled>
-            <option value="">全部类型</option>
-          </select>
-          <small>接口待接入</small>
-        </label>
-        <label>
-          <span>处理状态</span>
-          <select name="admin-report-status" defaultValue="" disabled>
-            <option value="">全部状态</option>
-          </select>
-          <small>接口待接入</small>
-        </label>
-      </section>
-
-      <section className="admin-report-legend" aria-labelledby="admin-report-legend-title">
-        <header>
-          <div>
-            <span className="admin-user-section-kicker">举报卡片字段</span>
-            <h2 id="admin-report-legend-title">待接入数据结构</h2>
-          </div>
-          <span className="admin-mode-badge">接口待接入</span>
-        </header>
-        <dl>
-          {reportFields.map(([label, description]) => (
-            <div key={label}>
-              <dt>{label}</dt>
-              <dd>{description}</dd>
-            </div>
-          ))}
-        </dl>
-        <div className="admin-report-disabled-actions" aria-label="举报操作预览">
-          <button className="admin-button" type="button" disabled>查看举报</button>
-          <span>接口待接入</span>
-          <button className="admin-button admin-button--danger" type="button" disabled>处理举报</button>
-          <span>接口待接入</span>
-        </div>
-      </section>
-
-      <AdminEmptyState
-        title="举报接口待接入，当前仅完成前端页面结构。"
-        description="未生成 demo 举报数据，也未请求管理员举报列表。"
-        pending
-      />
-    </main>
-  )
+  const { currentUser } = useAuth(); const requestId = useRef(0); const [keyword, setKeyword] = useState(''); const [targetType, setTargetType] = useState(''); const [status, setStatus] = useState('PENDING'); const [page, setPage] = useState(1); const [data, setData] = useState({ records: [], page: 1, size: 20, total: 0 }); const [detail, setDetail] = useState(null); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [success, setSuccess] = useState(''); const [action, setAction] = useState({ report: null, resolution: '', comment: '', submitting: false, error: '' })
+  const load = useCallback(() => adminApi.listReports({ page, size: 20, ...(keyword.trim() ? { keyword: keyword.trim() } : {}), ...(targetType ? { targetType } : {}), ...(status ? { status } : {}) }, currentUser), [currentUser, keyword, page, status, targetType])
+  const refresh = useCallback(async () => { const token = ++requestId.current; const value = asPage(await load(), { page, size: 20 }); if (token === requestId.current) setData(value); return value }, [load, page])
+  useEffect(() => { const token = ++requestId.current; setLoading(true); setError(''); setData({ records: [], page, size: 20, total: 0 }); load().then(v => { if (token === requestId.current) setData(asPage(v, { page, size: 20 })) }).catch(e => { if (token === requestId.current) { setData({ records: [], page, size: 20, total: 0 }); setError(e.message || '举报列表加载失败。') } }).finally(() => { if (token === requestId.current) setLoading(false) }) }, [load, page])
+  const filter = next => { setPage(resetAdminPage()); if ('keyword' in next) setKeyword(next.keyword); if ('targetType' in next) setTargetType(next.targetType); if ('status' in next) setStatus(next.status) }
+  async function open(reportId) { try { setDetail(await adminApi.getReport(reportId, currentUser)) } catch (e) { setError(e.message || '举报详情加载失败。') } }
+  async function submit() { let body; try { body = buildReportResolutionBody(action.resolution, action.comment) } catch (e) { setAction(v => ({ ...v, error: e.message })); return }; setAction(v => ({ ...v, submitting: true, error: '' })); try { const outcome = await completeAdminMutation(() => adminApi.resolveReport(action.report.reportId, body, currentUser), () => Promise.all([refresh(), adminApi.dashboard(currentUser)])); setAction({ report: null, resolution: '', comment: '', submitting: false, error: '' }); setDetail(outcome.response); setSuccess(outcome.refreshed ? '举报已成功处理，列表已刷新。' : '举报已成功处理，但刷新失败；请刷新列表确认。') } catch (e) { setAction(v => ({ ...v, submitting: false, error: e.message || '举报处理失败。' })) } }
+  return <main className="admin-page"><AdminModeBanner title="举报处理" description="读取真实举报列表、详情并提交处理结果。" /><section className="admin-report-toolbar"><label>搜索<input value={keyword} onChange={e => filter({ keyword: e.target.value })} /></label><label>类型<select value={targetType} onChange={e => filter({ targetType: e.target.value })}><option value="">全部</option>{['USER', 'DEMAND', 'SERVICE_PACKAGE', 'MOMENT', 'REVIEW'].map(v => <option key={v}>{v}</option>)}</select></label><label>状态<select value={status} onChange={e => filter({ status: e.target.value })}><option value="">全部</option><option value="PENDING">待处理</option><option value="RESOLVED">已处理</option></select></label></section>{success ? <div className="admin-complaint-success">{success}</div> : null}{error ? <div className="admin-inline-error">{error}<button type="button" onClick={() => refresh().catch(() => {})}>重试</button></div> : null}{loading ? <AdminEmptyState title="正在读取举报…" /> : null}{!loading && !error && !data.records.length ? <AdminEmptyState title="暂无符合条件的举报" /> : null}<section className="admin-report-list">{data.records.map(report => <article key={report.reportId} data-report-id={report.reportId}><h2>举报 #{report.reportId}</h2><p>{report.targetType} #{report.targetId} · {report.status}</p><p>{report.reason}</p><button className="admin-button" type="button" onClick={() => open(report.reportId)}>查看举报</button>{report.status === 'PENDING' ? reportResolutionOptions(report.targetType).map(resolution => <button className="admin-button admin-button--danger" key={resolution} type="button" onClick={() => setAction({ report, resolution, comment: '', submitting: false, error: '' })}>{labels[resolution]}</button>) : null}</article>)}</section><Pager data={data} onPage={setPage} />{detail ? <section className="admin-report-legend" role="dialog"><h2>举报详情 #{detail.reportId}</h2><p>{detail.description || '无补充说明'}</p><p>{detail.adminComment || ''}</p><button type="button" onClick={() => setDetail(null)}>关闭</button></section> : null}<ModerationReasonDialog open={Boolean(action.report)} title={`处理举报 #${action.report?.reportId || ''}`} description={action.error || '请填写处理说明。'} value={action.comment} required submitting={action.submitting} onChange={comment => setAction(v => ({ ...v, comment, error: '' }))} onCancel={() => !action.submitting && setAction({ report: null, resolution: '', comment: '', submitting: false, error: '' })} onConfirm={submit} /></main>
 }

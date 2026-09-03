@@ -23,6 +23,7 @@ export function AdminUserCard({ user, onOpen }) {
         <span className="admin-user-card-id">用户 #{userId}</span>
         <h2>{nickname}</h2>
         <p>{roleLabel(user?.currentRole || user?.role)}</p>
+        <small>{user?.status || '状态未知'} · 待处理举报 {user?.pendingReportCount ?? 0}</small>
       </div>
       <AdminActionBar actions={[{ key: 'open', label: '查看主页', onClick: onOpen }]} />
     </article>

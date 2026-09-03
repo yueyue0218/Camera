@@ -1257,6 +1257,10 @@
   color: var(--portra-muted);
 }
 
+.admin-user-card small {
+  color: var(--portra-muted);
+}
+
 .admin-pending-filters,
 .admin-report-legend {
   margin-top: 28px;

@@ -19,7 +19,7 @@ export function buildAdminHallRequestParams(keyword = '') {
 }
 
 export function buildAdminFeedRequestParams() {
-  return { scope: 'latest' }
+  return { page: 1, size: 20 }
 }
 
 export function filterAdminMoments(moments = [], profiles = {}, keyword = '', authorId = null) {
@@ -124,11 +124,73 @@ export function buildComplaintArbitrationBody(result, comment = '') {
   }
 
   const normalizedComment = String(comment || '').trim()
-  if (normalizedResult === 'REVIEW_HIDDEN' && !normalizedComment) {
+  if (!normalizedComment) {
     throw new Error('请填写处理说明')
   }
 
   return { result: normalizedResult, comment: normalizedComment }
+}
+
+export function buildModerationReasonBody(reason = '') {
+  const normalizedReason = String(reason || '').trim()
+  if (!normalizedReason) throw new Error('请填写处理原因')
+  return { reason: normalizedReason }
+}
+
+export function buildUserStatusBody(status, reason = '') {
+  const normalizedStatus = String(status || '').trim().toUpperCase()
+  if (!['ACTIVE', 'DISABLED'].includes(normalizedStatus)) throw new Error('账号状态无效')
+  const normalizedReason = String(reason || '').trim()
+  if (!normalizedReason) throw new Error('请填写处理原因')
+  return { status: normalizedStatus, reason: normalizedReason }
+}
+
+export function buildReportResolutionBody(resolution, adminComment = '') {
+  const normalizedResolution = String(resolution || '').trim().toUpperCase()
+  if (!['IGNORE', 'TAKE_DOWN', 'RESTORE', 'RESTRICT_USER', 'REVIEW_HIDDEN'].includes(normalizedResolution)) {
+    throw new Error('举报处理结果无效')
+  }
+  const normalizedComment = String(adminComment || '').trim()
+  if (!normalizedComment) throw new Error('请填写处理说明')
+  return { resolution: normalizedResolution, adminComment: normalizedComment }
+}
+
+export function openAdminDetail(setDetail, item) {
+  return () => setDetail(item)
+}
+
+export function reportResolutionOptions(targetType) {
+  const type = String(targetType || '').trim().toUpperCase()
+  if (['DEMAND', 'SERVICE_PACKAGE', 'MOMENT'].includes(type)) return ['TAKE_DOWN', 'RESTORE', 'IGNORE']
+  if (type === 'USER') return ['RESTRICT_USER', 'IGNORE']
+  if (type === 'REVIEW') return ['REVIEW_HIDDEN', 'IGNORE']
+  return ['IGNORE']
+}
+
+export function complaintActionCopy(result) {
+  if (String(result).toUpperCase() === 'REVIEW_HIDDEN') {
+    return { title: '隐藏原评价', description: '隐藏评价会撤销其信用影响，请填写清楚的处理说明。', required: true }
+  }
+  return { title: '维持原评价', description: '确认维持原评价；请填写处理说明，并会写入真实申诉记录。', required: true }
+}
+
+export function createLatestRequestGate() {
+  let latest = 0
+  return { begin: () => ++latest, isCurrent: token => token === latest }
+}
+
+export function resetAdminPage() {
+  return 1
+}
+
+export async function completeAdminMutation(mutate, refresh) {
+  const response = await mutate()
+  try {
+    await refresh()
+    return { response, refreshed: true, refreshError: null }
+  } catch (refreshError) {
+    return { response, refreshed: false, refreshError }
+  }
 }
 
 export function enrichComplaintsWithReviewContext(complaints = [], contextByReviewId = {}) {
@@ -185,7 +247,7 @@ export function buildAdminDashboardStats(data = {}) {
     dashboardStat({ key: 'gmv', label: '今日成交', value: data.todayGmvCent ?? null, helper: '今日已完成订单金额', path: '/admin', currency: true }),
     dashboardStat({ key: 'certifications', label: '待审核认证', value: data.pendingAuditCount ?? null, helper: '等待管理员审核', path: '/admin/certifications' }),
     dashboardStat({ key: 'complaints', label: '待处理申诉', value: data.pendingArbitrationCount ?? null, helper: '等待管理员处理', path: '/admin/complaints' }),
-    dashboardStat({ key: 'reports', label: '待处理举报', value: null, helper: '', path: '/admin/reports' }),
-    dashboardStat({ key: 'removed', label: '已下架内容', value: null, helper: '', path: '/admin/hall' })
+    dashboardStat({ key: 'reports', label: '待处理举报', value: data.pendingReportCount ?? null, helper: '等待管理员处理', path: '/admin/reports' }),
+    dashboardStat({ key: 'removed', label: '已下架内容', value: data.removedContentCount ?? null, helper: '管理员下架内容总数', path: '/admin/hall' })
   ]
 }

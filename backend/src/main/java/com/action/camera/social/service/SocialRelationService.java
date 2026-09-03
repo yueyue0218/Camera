@@ -1,5 +1,6 @@
 package com.action.camera.social.service;
 
+import com.action.camera.admin.domain.ModerationStatus;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.security.CurrentUser;
@@ -133,7 +134,8 @@ public class SocialRelationService {
         long followerCount = userFollowRepository.countByFollowingUserIdAndTargetRole(userId, resolvedRole);
         long followingCount = userFollowRepository.countByFollowerIdAndTargetRole(userId, resolvedRole);
         boolean followedByCurrentUser = userFollowRepository.existsByFollowerIdAndFollowingUserId(currentUserId, userId);
-        long momentCount = momentPostRepository.countByAuthorIdAndAuthorRoleAndStatus(userId, resolvedRole, MomentStatus.PUBLISHED);
+        long momentCount = momentPostRepository.countByAuthorIdAndAuthorRoleAndStatusAndModerationStatus(
+                userId, resolvedRole, MomentStatus.PUBLISHED, ModerationStatus.VISIBLE);
 
         ProviderProfilePublicVO providerProfile = isProvider
                 ? providerProfileMapper.selectPublicProfile(userId)

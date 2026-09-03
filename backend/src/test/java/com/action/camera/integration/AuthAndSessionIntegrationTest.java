@@ -104,6 +104,19 @@ class AuthAndSessionIntegrationTest {
     }
 
     @Test
+    void protectedEndpoint_withDisabledSignedBearer_returns401() {
+        String token = jwtUtil.generateToken(1001L);
+        jdbc.update("UPDATE users SET status = 'DISABLED' WHERE id = 1001");
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+
+        ResponseEntity<Map> resp = rest.exchange(
+                "/users/me", HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+
+        assertThat(resp.getBody().get("code")).isEqualTo(40101);
+    }
+
+    @Test
     void protectedEndpoint_withUnknownXUserId_returns401() {
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-User-Id", "910003");

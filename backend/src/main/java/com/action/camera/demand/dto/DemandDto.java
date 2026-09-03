@@ -1,5 +1,7 @@
 package com.action.camera.demand.dto;
 
+import com.action.camera.admin.dto.ModerationView;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -30,6 +32,7 @@ public class DemandDto {
     private final List<String> recommendReasons;
     private final LocalDateTime createdAt;
     private final LocalDateTime updatedAt;
+    private final ModerationView moderation;
 
     public DemandDto(Long demandId,
                      Long customerId,
@@ -124,6 +127,7 @@ public class DemandDto {
         this.recommendReasons = List.of();
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.moderation = null;
     }
 
     public DemandDto(Long demandId,
@@ -179,6 +183,37 @@ public class DemandDto {
                      List<String> recommendReasons,
                      LocalDateTime createdAt,
                      LocalDateTime updatedAt) {
+        this(demandId, customerId, customerNickname, customerAvatarFileId, scene, styleTags, expectedDate,
+                timeSlot, timeDescription, timeTags, cityCode, location, budgetMinCent, budgetMaxCent,
+                description, status, responseCount, pendingCount, acceptedCount, rejectedCount,
+                referenceFileIds, recommendReasons, createdAt, updatedAt, null);
+    }
+
+    public DemandDto(Long demandId,
+                     Long customerId,
+                     String customerNickname,
+                     Long customerAvatarFileId,
+                     String scene,
+                     List<String> styleTags,
+                     LocalDate expectedDate,
+                     String timeSlot,
+                     String timeDescription,
+                     List<String> timeTags,
+                     String cityCode,
+                     String location,
+                     Integer budgetMinCent,
+                     Integer budgetMaxCent,
+                     String description,
+                     String status,
+                     int responseCount,
+                     Integer pendingCount,
+                     Integer acceptedCount,
+                     Integer rejectedCount,
+                     List<Long> referenceFileIds,
+                     List<String> recommendReasons,
+                     LocalDateTime createdAt,
+                     LocalDateTime updatedAt,
+                     ModerationView moderation) {
         this.demandId = demandId;
         this.customerId = customerId;
         this.customerNickname = customerNickname;
@@ -203,6 +238,7 @@ public class DemandDto {
         this.recommendReasons = recommendReasons == null ? List.of() : recommendReasons;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.moderation = moderation;
     }
 
     public Long getDemandId() {
@@ -299,5 +335,9 @@ public class DemandDto {
 
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
+    }
+
+    public ModerationView getModeration() {
+        return moderation;
     }
 }

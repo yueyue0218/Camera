@@ -9,6 +9,15 @@ import {
 } from '../src/pages/admin/adminSurfaceConfig.js'
 import {
   buildAdminDashboardStats,
+  buildModerationReasonBody,
+  buildReportResolutionBody,
+  buildUserStatusBody,
+  complaintActionCopy,
+  completeAdminMutation,
+  createLatestRequestGate,
+  openAdminDetail,
+  reportResolutionOptions,
+  resetAdminPage,
   buildComplaintArbitrationBody,
   buildCertificationListQueries,
   buildCertificationReviewBody,
@@ -73,10 +82,13 @@ test('legacy admin tabs map to product routes and preserve demo mode', () => {
   assert.equal(getLegacyAdminTarget('?demo=1'), '')
 })
 
-test('unsupported moderation capabilities are never marked available', () => {
-  assert.equal(ADMIN_CAPABILITIES.takeDownHallItem.available, false)
-  assert.equal(ADMIN_CAPABILITIES.restoreMoment.available, false)
-  assert.equal(ADMIN_CAPABILITIES.resolveReport.message, '接口待接入')
+test('all completed governance capabilities are available', () => {
+  for (const key of [
+    'takeDownHallItem', 'restoreHallItem',
+    'takeDownMoment', 'restoreMoment',
+    'listUsers', 'getUserAdminProfile', 'updateUserStatus',
+    'listReports', 'getReport', 'resolveReport'
+  ]) assert.equal(ADMIN_CAPABILITIES[key].available, true)
 })
 
 test('public hall records receive only public status', () => {
@@ -105,7 +117,7 @@ test('admin hall request params stay on public read-only lists', async () => {
   })
 })
 
-test('admin hall cards expose only read-only navigation and disabled moderation', async () => {
+test('admin hall cards render admin response fields and eligible moderation action', async () => {
   const previousWindow = globalThis.window
   globalThis.window = { location: { hostname: 'localhost' } }
   const { createServer } = await import('vite')
@@ -124,10 +136,12 @@ test('admin hall cards expose only read-only navigation and disabled moderation'
         null,
         createElement(AdminHallCard, {
           item: {
-            type: 'demand',
+            type: 'DEMAND',
             id: 7,
-            status: 'PUBLIC',
-            record: { demandId: 7, customerId: 42, title: '夜景约拍', description: '城墙边拍摄' }
+            moderationStatus: 'VISIBLE',
+            publisherId: 42,
+            title: '夜景约拍',
+            description: '城墙边拍摄'
           },
           currentUser: { userId: 1, role: 'ADMIN' },
           onOpen: () => {},
@@ -135,12 +149,12 @@ test('admin hall cards expose only read-only navigation and disabled moderation'
         })
       ))
 
-      assert.match(markup, /公开展示/)
+      assert.match(markup, /VISIBLE/)
       assert.match(markup, />查看详情<\/button>/)
       assert.match(markup, />查看发布者<\/button>/)
-      assert.match(markup, /<button[^>]*disabled=""[^>]*>下架<\/button>/)
+      assert.match(markup, />下架<\/button>/)
       assert.match(markup, /<button[^>]*disabled=""[^>]*>恢复展示<\/button>/)
-      assert.equal((markup.match(/接口待接入/g) || []).length, 2)
+      assert.equal((markup.match(/接口待接入/g) || []).length, 0)
       assert.doesNotMatch(markup, /<button[^>]*>(?:响应|预约|编辑|发布)[^<]*<\/button>/)
     })
   } finally {
@@ -165,13 +179,13 @@ test('admin feed can narrow public moments to one author id', () => {
   assert.deepEqual(filterAdminMoments(moments, {}, '', 11).map(item => item.momentId), [2])
 })
 
-test('admin feed request params stay on the public latest list', async () => {
+test('admin feed request params use the administrator page contract', async () => {
   const adminData = await import('../src/pages/admin/adminData.js')
   assert.equal(typeof adminData.buildAdminFeedRequestParams, 'function')
-  assert.deepEqual(adminData.buildAdminFeedRequestParams(), { scope: 'latest' })
+  assert.deepEqual(adminData.buildAdminFeedRequestParams(), { page: 1, size: 20 })
 })
 
-test('admin moment cards keep engagement read-only and moderation disabled', async () => {
+test('admin moment cards keep engagement read-only and expose eligible moderation', async () => {
   const { createServer } = await import('vite')
   const vite = await createServer({ appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } })
 
@@ -199,16 +213,15 @@ test('admin moment cards keep engagement read-only and moderation disabled', asy
     }))
 
     assert.match(markup, /No\. 000008/)
-    assert.match(markup, /林摄影/)
     assert.match(markup, /雨夜胶片/)
     assert.match(markup, /12 个赞/)
     assert.match(markup, /3 个收藏/)
     assert.match(markup, /<img[^>]*width="640"[^>]*height="360"[^>]*loading="lazy"/)
     assert.match(markup, />查看详情<\/button>/)
     assert.match(markup, />查看作者<\/button>/)
-    assert.match(markup, /<button[^>]*disabled=""[^>]*>下架动态<\/button>/)
+    assert.match(markup, />下架动态<\/button>/)
     assert.match(markup, /<button[^>]*disabled=""[^>]*>恢复展示<\/button>/)
-    assert.equal((markup.match(/接口待接入/g) || []).length, 2)
+    assert.equal((markup.match(/接口待接入/g) || []).length, 0)
     assert.doesNotMatch(markup, /<button[^>]*>(?:点赞|收藏|关注|编辑|删除)[^<]*<\/button>/)
   } finally {
     await vite.close()
@@ -254,32 +267,19 @@ test('admin user lookup card exposes only the real profile navigation', async ()
     assert.match(markup, /林摄影/)
     assert.match(markup, /摄影师/)
     assert.match(markup, />查看主页<\/button>/)
-    assert.doesNotMatch(markup, /限制账号|解除限制|处理举报/)
+    assert.doesNotMatch(markup, /限制账号|解除限制/)
   } finally {
     await vite.close()
   }
 })
 
-test('reports surface exposes structure without usable controls or fake records', async () => {
-  const { createServer } = await import('vite')
-  const vite = await createServer({ appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } })
-
-  try {
-    const { AdminReportsPage } = await vite.ssrLoadModule('/src/pages/admin/AdminReportsPage.jsx')
-    const [{ createElement }, { renderToStaticMarkup }] = await Promise.all([
-      import('react'),
-      import('react-dom/server')
-    ])
-    const markup = renderToStaticMarkup(createElement(AdminReportsPage))
-
-    assert.match(markup, /举报接口待接入，当前仅完成前端页面结构。/)
-    assert.match(markup, /<input[^>]*disabled=""/)
-    assert.match(markup, /<button[^>]*disabled=""[^>]*>查看举报<\/button>/)
-    assert.match(markup, /<button[^>]*disabled=""[^>]*>处理举报<\/button>/)
-    assert.doesNotMatch(markup, /data-report-id=/)
-  } finally {
-    await vite.close()
-  }
+test('reports surface loads real report APIs rather than pending placeholders', async () => {
+  const { readFile } = await import('node:fs/promises')
+  const source = await readFile(new URL('../src/pages/admin/AdminReportsPage.jsx', import.meta.url), 'utf8')
+  assert.match(source, /adminApi\.listReports/)
+  assert.match(source, /adminApi\.getReport/)
+  assert.match(source, /adminApi\.resolveReport/)
+  assert.doesNotMatch(source, /接口待接入/)
 })
 
 test('certification rejection trims and requires a reason', () => {
@@ -330,8 +330,17 @@ test('production certification request failures never fall back to fixtures', as
   assert.equal(fixtureCalls, 0)
 })
 
+test('take-down restore account and report bodies require trimmed explanations', () => {
+  assert.deepEqual(buildModerationReasonBody('  违规  '), { reason: '违规' })
+  assert.deepEqual(buildUserStatusBody('DISABLED', '  风险账号  '), { status: 'DISABLED', reason: '风险账号' })
+  assert.deepEqual(buildReportResolutionBody('IGNORE', '  不成立  '), { resolution: 'IGNORE', adminComment: '不成立' })
+  assert.deepEqual(buildComplaintArbitrationBody('REJECTED', '  证据不足  '), { result: 'REJECTED', comment: '证据不足' })
+  assert.throws(() => buildModerationReasonBody('   '), /请填写处理原因/)
+  assert.throws(() => buildComplaintArbitrationBody('REJECTED', '   '), /请填写处理说明/)
+})
+
 test('hiding a review requires a trimmed processing comment', () => {
-  assert.deepEqual(buildComplaintArbitrationBody('REJECTED', ''), { result: 'REJECTED', comment: '' })
+  assert.deepEqual(buildComplaintArbitrationBody('REJECTED', '维持原评价'), { result: 'REJECTED', comment: '维持原评价' })
   assert.deepEqual(buildComplaintArbitrationBody('REVIEW_HIDDEN', '  内容违规  '), { result: 'REVIEW_HIDDEN', comment: '内容违规' })
   assert.throws(() => buildComplaintArbitrationBody('REVIEW_HIDDEN', '  '), /请填写处理说明/)
 })
@@ -380,6 +389,58 @@ test('unknown dashboard values remain unknown instead of becoming zero', () => {
   const stats = buildAdminDashboardStats({ totalUsers: 12, pendingAuditCount: 3, pendingArbitrationCount: 2 })
   assert.equal(stats.find(item => item.key === 'reports').value, null)
   assert.equal(stats.find(item => item.key === 'removed').value, null)
+})
+
+test('dashboard uses real report and removed counts', () => {
+  const stats = buildAdminDashboardStats({ pendingReportCount: 4, removedContentCount: 7 })
+  assert.equal(stats.find(item => item.key === 'reports').value, 4)
+  assert.equal(stats.find(item => item.key === 'removed').value, 7)
+})
+
+test('admin-local detail opener commits the selected admin response', () => {
+  let selected = null
+  const item = { id: 7, title: '真实大厅记录' }
+  openAdminDetail(value => { selected = value }, item)()
+  assert.equal(selected, item)
+})
+
+test('content reports expose both take-down and restore resolutions', () => {
+  assert.deepEqual(reportResolutionOptions('DEMAND'), ['TAKE_DOWN', 'RESTORE', 'IGNORE'])
+  assert.deepEqual(reportResolutionOptions('SERVICE_PACKAGE'), ['TAKE_DOWN', 'RESTORE', 'IGNORE'])
+  assert.deepEqual(reportResolutionOptions('MOMENT'), ['TAKE_DOWN', 'RESTORE', 'IGNORE'])
+})
+
+test('complaint action copy keeps required comments separate from review hiding', () => {
+  assert.deepEqual(complaintActionCopy('REJECTED'), {
+    title: '维持原评价', description: '确认维持原评价；请填写处理说明，并会写入真实申诉记录。', required: true
+  })
+  assert.deepEqual(complaintActionCopy('REVIEW_HIDDEN'), {
+    title: '隐藏原评价', description: '隐藏评价会撤销其信用影响，请填写清楚的处理说明。', required: true
+  })
+})
+
+test('latest request gate rejects stale deferred list results', () => {
+  const gate = createLatestRequestGate()
+  const first = gate.begin()
+  const second = gate.begin()
+  assert.equal(gate.isCurrent(first), false)
+  assert.equal(gate.isCurrent(second), true)
+})
+
+test('changing a management filter resets pagination to the first page', () => {
+  assert.equal(resetAdminPage(), 1)
+})
+
+test('successful governance patch reports refresh failure without resubmitting', async () => {
+  let mutations = 0
+  const result = await completeAdminMutation(
+    async () => { mutations += 1; return { id: 7, moderationStatus: 'HIDDEN' } },
+    async () => { throw new Error('列表刷新失败') }
+  )
+  assert.equal(mutations, 1)
+  assert.equal(result.response.moderationStatus, 'HIDDEN')
+  assert.equal(result.refreshed, false)
+  assert.match(result.refreshError.message, /列表刷新失败/)
 })
 
 test('dashboard stats distinguish real zero from unavailable data', () => {
@@ -458,34 +519,68 @@ test('shared admin controls preserve disabled moderation contracts', async () =>
   }
 })
 
-test('reserved admin api methods throw endpoint-pending errors without fetching', async () => {
+test('admin API sends every completed governance request contract', async () => {
   const previousWindow = globalThis.window
   const previousFetch = globalThis.fetch
   const { createServer } = await import('vite')
   const vite = await createServer({ appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } })
   globalThis.window = { location: { hostname: 'localhost' } }
-  let fetchCalled = false
-  globalThis.fetch = async () => { fetchCalled = true }
+  const calls = []
+  globalThis.fetch = async (url, options) => {
+    calls.push([url, options])
+    return { ok: true, status: 200, statusText: 'OK', text: async () => JSON.stringify({ code: 200, data: {} }) }
+  }
 
   try {
     const { adminApi } = await vite.ssrLoadModule('/src/api/adminApi.js')
     const cases = [
-      [() => adminApi.listReports({}, {}), '/admin/reports'],
-      [() => adminApi.takeDownMoment(8, { reason: '违规' }, {}), '/admin/moments/8/take-down'],
-      [() => adminApi.listHallItems({}, {}), '/admin/hall-items'],
-      [() => adminApi.takeDownHallItem('demand', 7, { reason: '违规' }, {}), '/admin/hall-items/demand/7/take-down'],
-      [() => adminApi.restoreHallItem('service', 9, {}, {}), '/admin/hall-items/service/9/restore'],
-      [() => adminApi.listMoments({}, {}), '/admin/moments'],
-      [() => adminApi.restoreMoment(8, {}, {}), '/admin/moments/8/restore'],
-      [() => adminApi.listUsers({}, {}), '/admin/users'],
-      [() => adminApi.getUserAdminProfile(42, {}), '/admin/users/42'],
-      [() => adminApi.resolveReport(6, { resolution: 'dismissed' }, {}), '/admin/reports/6/resolve']
+      [() => adminApi.listHallItems({ page: 2, keyword: '夜景' }, {}), 'GET', '/admin/hall-items?page=2&keyword=%E5%A4%9C%E6%99%AF'],
+      [() => adminApi.takeDownHallItem('DEMAND', 7, { reason: '违规' }, {}), 'PATCH', '/admin/hall-items/DEMAND/7/take-down', { reason: '违规' }],
+      [() => adminApi.restoreHallItem('SERVICE_PACKAGE', 9, { reason: '恢复' }, {}), 'PATCH', '/admin/hall-items/SERVICE_PACKAGE/9/restore', { reason: '恢复' }],
+      [() => adminApi.listMoments({ page: 3, status: 'VISIBLE' }, {}), 'GET', '/admin/moments?page=3&status=VISIBLE'],
+      [() => adminApi.takeDownMoment(8, { reason: '违规' }, {}), 'PATCH', '/admin/moments/8/take-down', { reason: '违规' }],
+      [() => adminApi.restoreMoment(8, { reason: '恢复' }, {}), 'PATCH', '/admin/moments/8/restore', { reason: '恢复' }],
+      [() => adminApi.listUsers({ page: 2, role: 'PROVIDER' }, {}), 'GET', '/admin/users?page=2&role=PROVIDER'],
+      [() => adminApi.getUserAdminProfile(42, {}), 'GET', '/admin/users/42'],
+      [() => adminApi.updateUserStatus(42, { status: 'DISABLED', reason: '风险' }, {}), 'PATCH', '/admin/users/42/status', { status: 'DISABLED', reason: '风险' }],
+      [() => adminApi.listReports({ page: 3, status: 'PENDING' }, {}), 'GET', '/admin/reports?page=3&status=PENDING'],
+      [() => adminApi.getReport(6, {}), 'GET', '/admin/reports/6'],
+      [() => adminApi.resolveReport(6, { resolution: 'IGNORE', adminComment: '不成立' }, {}), 'PATCH', '/admin/reports/6/resolve', { resolution: 'IGNORE', adminComment: '不成立' }]
     ]
 
-    for (const [invoke, path] of cases) {
-      assert.throws(invoke, new RegExp(`后端接口待接入：${path}`))
+    for (const [invoke, method, path, body] of cases) {
+      await invoke()
+      const [url, options] = calls.at(-1)
+      assert.equal(url, `http://localhost:8080${path}`)
+      assert.equal(options.method || 'GET', method)
+      assert.equal(options.body, body === undefined ? undefined : JSON.stringify(body))
     }
-    assert.equal(fetchCalled, false)
+  } finally {
+    await vite.close()
+    if (previousWindow === undefined) delete globalThis.window
+    else globalThis.window = previousWindow
+    if (previousFetch === undefined) delete globalThis.fetch
+    else globalThis.fetch = previousFetch
+  }
+})
+
+test('admin API does not resolve before deferred fetch resolves', async () => {
+  const previousWindow = globalThis.window
+  const previousFetch = globalThis.fetch
+  globalThis.window = { location: { hostname: 'localhost' } }
+  let resolveFetch
+  globalThis.fetch = () => new Promise(resolve => { resolveFetch = resolve })
+  const { createServer } = await import('vite')
+  const vite = await createServer({ appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } })
+  try {
+    const { adminApi } = await vite.ssrLoadModule('/src/api/adminApi.js')
+    let settled = false
+    const pending = adminApi.listReports({ page: 2 }, {}).then(() => { settled = true })
+    await Promise.resolve()
+    assert.equal(settled, false)
+    resolveFetch({ ok: true, status: 200, statusText: 'OK', text: async () => JSON.stringify({ code: 200, data: {} }) })
+    await pending
+    assert.equal(settled, true)
   } finally {
     await vite.close()
     if (previousWindow === undefined) delete globalThis.window

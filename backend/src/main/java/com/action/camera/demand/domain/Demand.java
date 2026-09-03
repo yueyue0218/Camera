@@ -1,5 +1,8 @@
 package com.action.camera.demand.domain;
 
+import com.action.camera.admin.domain.ModerationStatus;
+import com.action.camera.common.ErrorCode;
+import com.action.camera.common.exception.BusinessException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
@@ -29,7 +32,8 @@ import java.util.List;
 @Table(name = "demands", indexes = {
         @Index(name = "idx_demands_hall", columnList = "status,city_code,scene,expected_date"),
         @Index(name = "idx_demands_budget_cent", columnList = "budget_min_cent,budget_max_cent"),
-        @Index(name = "idx_demands_customer_status", columnList = "customer_id,status,created_at")
+        @Index(name = "idx_demands_customer_status", columnList = "customer_id,status,created_at"),
+        @Index(name = "idx_demands_moderation_public", columnList = "moderation_status,status,created_at")
 })
 public class Demand {
 
@@ -101,6 +105,19 @@ public class Demand {
     @Column(name = "hidden_at")
     private LocalDateTime hiddenAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "moderation_status", nullable = false, length = 20)
+    private ModerationStatus moderationStatus = ModerationStatus.VISIBLE;
+
+    @Column(name = "moderated_by")
+    private Long moderatedBy;
+
+    @Column(name = "moderated_at")
+    private LocalDateTime moderatedAt;
+
+    @Column(name = "moderation_reason", length = 500)
+    private String moderationReason;
+
     public Demand(Long customerId,
                   String scene,
                   List<String> styleTags,
@@ -159,6 +176,18 @@ public class Demand {
         touch();
     }
 
+    public void takeDown(Long adminId, String reason, LocalDateTime now) {
+        changeModeration(ModerationStatus.VISIBLE, ModerationStatus.HIDDEN, adminId, reason, now);
+    }
+
+    public void restore(Long adminId, String reason, LocalDateTime now) {
+        changeModeration(ModerationStatus.HIDDEN, ModerationStatus.VISIBLE, adminId, reason, now);
+    }
+
+    public boolean isModerationVisible() {
+        return ModerationStatus.VISIBLE.equals(moderationStatus);
+    }
+
     private void touch() {
         updatedAt = LocalDateTime.now();
     }
@@ -196,6 +225,37 @@ public class Demand {
         }
         if (hiddenByCustomer == null) {
             hiddenByCustomer = false;
+        }
+        if (moderationStatus == null) {
+            moderationStatus = ModerationStatus.VISIBLE;
+        }
+    }
+
+    private void changeModeration(ModerationStatus expected,
+                                  ModerationStatus target,
+                                  Long adminId,
+                                  String reason,
+                                  LocalDateTime now) {
+        ModerationStatus current = moderationStatus == null ? ModerationStatus.VISIBLE : moderationStatus;
+        if (!expected.equals(current)) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Content moderation state has already changed");
+        }
+        validateModerationInputs(adminId, reason, now);
+        moderationStatus = target;
+        moderatedBy = adminId;
+        moderatedAt = now;
+        moderationReason = reason.trim();
+    }
+
+    private void validateModerationInputs(Long adminId, String reason, LocalDateTime now) {
+        if (adminId == null || adminId <= 0 || now == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Administrator and moderation time are required");
+        }
+        if (reason == null || reason.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Moderation reason is required");
+        }
+        if (reason.trim().length() > 500) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Moderation reason is too long");
         }
     }
 }
