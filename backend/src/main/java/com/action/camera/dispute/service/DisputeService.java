@@ -1,5 +1,6 @@
 package com.action.camera.dispute.service;
 
+import com.action.camera.admin.service.AdminAuditService;
 import com.action.camera.admin.service.AdminPermissionService;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
@@ -57,6 +58,7 @@ public class DisputeService {
     private final NotificationService notificationService;
     private final ApplicationEventPublisher eventPublisher;
     private final AdminPermissionService adminPermissionService;
+    private final AdminAuditService adminAuditService;
 
     public DisputeResponse createDispute(Long orderId, Long initiatorId, DisputeCreateRequest request) {
         validateReason(request.reason());
@@ -155,6 +157,12 @@ public class DisputeService {
         dispute.setResolvedAt(now);
         dispute.setUpdatedAt(now);
         disputeRepository.save(dispute);
+        adminAuditService.record(
+                RELATED_TYPE,
+                dispute.getId(),
+                adminId,
+                "ARBITRATE",
+                truncateAuditReason(resolution, dispute.getAdminComment()));
 
         eventPublisher.publishEvent(
                 new DisputeResolvedEvent(this, disputeId, dispute.getOrderId(), resolution));
@@ -337,6 +345,11 @@ public class DisputeService {
 
     private String trimToNull(String value) {
         return (value == null || value.isBlank()) ? null : value.trim();
+    }
+
+    private String truncateAuditReason(String resolution, String comment) {
+        String reason = comment == null ? resolution : resolution + ": " + comment;
+        return reason.length() <= 500 ? reason : reason.substring(0, 500);
     }
 
     private DisputeResponse toResponse(Dispute dispute, List<DisputeReply> replies) {
