@@ -31,6 +31,10 @@ import com.action.camera.servicepackage.repository.ServicePackageInterestReposit
 import com.action.camera.servicepackage.repository.ServicePackageRepository;
 import com.action.camera.repository.UserRepository;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,6 +53,7 @@ import java.util.stream.Collectors;
 @Service
 public class ServicePackageService {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(ServicePackageService.class);
     private static final int MAX_PAGE_SIZE = 50;
     private static final int MAX_IMAGE_COUNT = 9;
     private static final String DEFAULT_RESERVE_MESSAGE = "I would like to reserve this service package.";
@@ -64,6 +69,9 @@ public class ServicePackageService {
     private final UserRepository userRepository;
     private final ProviderProfileMapper providerProfileMapper;
     private final CreditSnapshotService creditSnapshotService;
+
+    @Value("${service-package.performance-probe.enabled:false}")
+    private boolean servicePackagePerformanceProbeEnabled;
 
     public ServicePackageService(ServicePackageRepository servicePackageRepository,
                                   ServicePackageInterestRepository interestRepository,
@@ -184,7 +192,18 @@ public class ServicePackageService {
                         || !currentUser.isProvider()
                         || !Objects.equals(servicePackage.getProviderId(), currentUser.getUserId()))
                 .toList();
+        long metadataStartedAt = servicePackagePerformanceProbeEnabled ? System.nanoTime() : 0L;
         Map<Long, PhotographerInfo> photographerInfos = photographerInfos(baseCandidates);
+        if (servicePackagePerformanceProbeEnabled) {
+            double metadataTimeMs = (System.nanoTime() - metadataStartedAt) / 1_000_000.0d;
+            LOGGER.info(
+                    "event=service-package-metadata runId={} metadataTimeMs={} candidateCount={} photographerCount={}",
+                    MDC.get("servicePackagePerformanceRunId"),
+                    String.format(Locale.ROOT, "%.3f", metadataTimeMs),
+                    baseCandidates.size(),
+                    photographerInfos.size()
+            );
+        }
 
         List<ServicePackage> candidates = baseCandidates.stream()
                 .filter(servicePackage -> matchesServiceKeyword(
