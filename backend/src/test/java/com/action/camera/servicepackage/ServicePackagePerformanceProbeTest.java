@@ -28,16 +28,17 @@ import org.slf4j.MDC;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -215,9 +216,10 @@ class ServicePackagePerformanceProbeTest {
         servicePackage.setCreatedAt(LocalDateTime.of(2026, 9, 1, 10, 0));
         servicePackage.setUpdatedAt(LocalDateTime.of(2026, 9, 1, 10, 0));
 
-        when(servicePackageRepository.findByStatus(ServicePackageStatus.ONLINE))
-                .thenReturn(List.of(servicePackage));
-        when(userRepository.findById(2L)).thenReturn(Optional.empty());
+        when(servicePackageRepository.findPublicPage(
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(new PageImpl<>(List.of(servicePackage)));
+        when(userRepository.findAllById(any())).thenReturn(List.of());
     }
 
     private List<String> performanceMessages() {
