@@ -33,11 +33,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -88,6 +91,9 @@ class ServicePackageServiceTest {
                 creditSnapshotService
         );
         lenient().when(creditSnapshotService.getDisplayCreditScore(PROVIDER_ID)).thenReturn(new BigDecimal("88.50"));
+        lenient().when(creditSnapshotService.getDisplayCreditScores(any()))
+                .thenReturn(Map.of(PROVIDER_ID, new BigDecimal("88.50")));
+        lenient().when(userRepository.findAllById(any())).thenReturn(List.of(providerUser()));
     }
 
     @Test
@@ -156,10 +162,10 @@ class ServicePackageServiceTest {
         nearSeven.setTimeTags(List.of("NEAR_7_DAYS"));
         ServicePackage untagged = servicePackage(2L, ServicePackageStatus.ONLINE, true);
         untagged.setTimeTags(List.of());
-        when(servicePackageRepository.findByStatus(ServicePackageStatus.ONLINE))
-                .thenReturn(List.of(nearSeven, untagged))
-                .thenReturn(List.of(nearSeven, untagged));
-        when(userRepository.findById(PROVIDER_ID)).thenReturn(Optional.of(providerUser()));
+        when(servicePackageRepository.findPublicPage(
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(new PageImpl<>(List.of(untagged, nearSeven), PageRequest.of(0, 10), 2))
+                .thenReturn(new PageImpl<>(List.of(nearSeven), PageRequest.of(0, 10), 1));
 
         PageResult<ServicePackageCardDto> ordinary =
                 servicePackageService.listServices(1, 10, null, null, null, null, null, null, null);
@@ -184,9 +190,9 @@ class ServicePackageServiceTest {
         ServicePackage newerUpdate = servicePackage(2L, ServicePackageStatus.ONLINE, true);
         newerUpdate.setCreatedAt(LocalDateTime.of(2026, 6, 1, 12, 0));
         newerUpdate.setUpdatedAt(LocalDateTime.of(2026, 6, 3, 12, 10));
-        when(servicePackageRepository.findByStatus(ServicePackageStatus.ONLINE))
-                .thenReturn(List.of(olderUpdate, newerUpdate));
-        when(userRepository.findById(PROVIDER_ID)).thenReturn(Optional.of(providerUser()));
+        when(servicePackageRepository.findPublicPage(
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(new PageImpl<>(List.of(newerUpdate, olderUpdate), PageRequest.of(0, 10), 2));
 
         PageResult<ServicePackageCardDto> page =
                 servicePackageService.listServices(1, 10, null, null, null, null, null, null, null);
@@ -242,7 +248,6 @@ class ServicePackageServiceTest {
         ServicePackage online = servicePackage(SERVICE_ID, ServicePackageStatus.ONLINE, true);
         ServicePackage offline = servicePackage(9202L, ServicePackageStatus.OFFLINE, false);
         when(servicePackageRepository.findOwnerHistory(PROVIDER_ID)).thenReturn(List.of(online, offline));
-        when(userRepository.findById(PROVIDER_ID)).thenReturn(Optional.of(providerUser()));
 
         List<ServicePackageCardDto> history = servicePackageService.listMyServicePackageHistory(provider());
 
@@ -295,7 +300,6 @@ class ServicePackageServiceTest {
                 .thenReturn(List.of(interest(CUSTOMER_ID, SERVICE_ID), interest(CUSTOMER_ID, 9202L)));
         when(servicePackageRepository.findById(SERVICE_ID)).thenReturn(Optional.of(matching));
         when(servicePackageRepository.findById(9202L)).thenReturn(Optional.of(untagged));
-        when(userRepository.findById(PROVIDER_ID)).thenReturn(Optional.of(providerUser()));
 
         PageResult<ServicePackageCardDto> result =
                 servicePackageService.listMyInterests(customer(), 1, 10, "NEAR_3_DAYS");
@@ -331,7 +335,9 @@ class ServicePackageServiceTest {
     void hiddenServiceIsAbsentFromPublicList() {
         ServicePackage hidden = servicePackage(SERVICE_ID, ServicePackageStatus.ONLINE, true);
         hidden.takeDown(9001L, "policy", LocalDateTime.now());
-        when(servicePackageRepository.findByStatus(ServicePackageStatus.ONLINE)).thenReturn(List.of(hidden));
+        when(servicePackageRepository.findPublicPage(
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
 
         PageResult<ServicePackageCardDto> result = servicePackageService.listServices(
                 1, 10, null, null, null, null, null, null, null);
