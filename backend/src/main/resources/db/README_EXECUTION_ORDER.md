@@ -24,6 +24,7 @@
 | 8 | `migration/add_dual_identity_fields.sql` | provider_profiles 双身份字段、user_follows 三列唯一索引 |
 | 9 | `migration/alter_moment_images_image_data.sql` | moment_images 图片数据字段变更 |
 | 10 | `migration/add_user_profile_visibility.sql` | users 资料展示字段（当前 baseline 尚未包含）；MySQL 8 兼容、可重复执行，字段已存在时只输出提示 |
+| 11 | `migration/add_auth_phone_account.sql` | A5 手机号账号 nullable 存储契约；补齐 mobile_*、phone_verified_at 与哈希唯一索引；生产执行受 B 线发布 Gate 限制 |
 
 > 注：`schedules` 表当前无对应初始化脚本。代码未直接访问 schedules 表，不阻断 Railway fresh 初始化；档期模块恢复时再补充 V2_schedule.sql。
 
@@ -55,6 +56,28 @@
 | 10 | `migration/add_payment_order_unique_constraint.sql` | 先检查重复 order_id，再增加支付记录唯一约束；禁止静默删除重复资金记录 |
 | 11 | `migration/add_dispute_previous_order_status.sql` | 第一阶段新增 nullable 列并按状态日志回填；部署窗口内暂不强制 NOT NULL |
 | 12 | `migration/add_admin_governance.sql` | 新增独立内容治理字段、索引和 reports 表；执行后完成下方治理数据闸门 |
+| 13 | `migration/add_auth_phone_account.sql` | 兼容已有 P3 mobile_* 字段；仅补缺失 nullable 列和 uk_users_mobile_hash；不回填历史用户 |
+
+### A5 AUTH 发布 Gate
+
+`migration/add_auth_phone_account.sql` 当前仅允许在本地隔离库验证。Staging/Production 执行前必须同时满足：
+
+1. 获得 B 线确认“一手机号一账号”业务语义；在此之前，`UNIQUE(mobile_hash)` 只能标记为 proposed and locally validated。
+2. B 线冻结手机号规范化、哈希/HMAC 契约、首次绑定、verified 时点、CUSTOMER 授予、重新认证、Session 失效和 Logout 语义。
+3. 完成数据库备份，并执行：
+
+   ```sql
+   SELECT mobile_hash, COUNT(*)
+   FROM users
+   WHERE mobile_hash IS NOT NULL
+   GROUP BY mobile_hash
+   HAVING COUNT(*) > 1;
+   ```
+
+4. 上述查询必须无结果；如有结果，立即停止并记录 `DUPLICATE MOBILE HASH DETECTED`，不得删除、覆盖或合并用户数据。
+5. 核实所有历史用户仍可按原有 student_no/password 流程读取，且 users.id 及其外键引用数量不变。
+
+在 B 线确认前，本迁移不具备 production-ready 状态，也不得随普通自动部署执行。
 
 ---
 
@@ -95,6 +118,7 @@ push 到 `main` 会在 CI 成功后自动替换后端 JAR 并重启服务，部�
 | migration/alter_moment_images_image_data.sql | 图片字段扩展，幂等 | 路径 A & B |
 | migration/fix_disputes_refund_amount_type.sql | 旧数据类型迁移，幂等 | 路径 B |
 | migration/add_user_profile_visibility.sql | users 资料展示字段，MySQL 8 兼容且幂等 | 路径 A & B |
+| migration/add_auth_phone_account.sql | A5 手机号账号 nullable 字段与哈希唯一索引，幂等；Staging/Production 受 B 线 Gate 限制 | 路径 A & B |
 | migration/add_admin_governance.sql | 内容治理字段、索引与 reports 表，MySQL 8 兼容且幂等 | 路径 A & B |
 | migration/add_payment_order_unique_constraint.sql | 支付记录按订单唯一，一次性，执行前必须检查重复数据 | 路径 B |
 | migration/add_dispute_previous_order_status.sql | 争议前状态第一阶段 nullable 迁移，一次性 | 路径 B |
