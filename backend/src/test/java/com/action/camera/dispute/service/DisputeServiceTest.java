@@ -1,5 +1,6 @@
 package com.action.camera.dispute.service;
 
+import com.action.camera.admin.repository.AuditRecordRepository;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
@@ -60,6 +61,9 @@ class DisputeServiceTest {
 
     @Autowired
     private NotificationRepository notificationRepository;
+
+    @Autowired
+    private AuditRecordRepository auditRecordRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -239,6 +243,11 @@ class DisputeServiceTest {
         assertThat(notificationRepository.findByUserIdOrderByCreatedAtDesc(PROVIDER_ID))
                 .extracting(Notification::getMetadataJson)
                 .contains("{\"orderId\":" + DISPUTE_ORDER_ID + "}");
+        assertThat(auditRecordRepository.findTop10ByAuditTypeAndTargetIdOrderByCreatedAtDesc(
+                "DISPUTE", created.id()))
+                .extracting("adminId", "auditResult", "remark")
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(
+                        ADMIN_ID, "ARBITRATE", "FULL_REFUND: 核实属实，全额退款"));
     }
 
     @Test
@@ -373,6 +382,8 @@ class DisputeServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.FORBIDDEN);
+        assertThat(auditRecordRepository.findTop10ByAuditTypeAndTargetIdOrderByCreatedAtDesc(
+                "DISPUTE", created.id())).isEmpty();
     }
 
     // ────────────────────────────────────────────────

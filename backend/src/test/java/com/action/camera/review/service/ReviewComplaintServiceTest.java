@@ -1,5 +1,6 @@
 package com.action.camera.review.service;
 
+import com.action.camera.admin.repository.AuditRecordRepository;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
@@ -62,6 +63,9 @@ class ReviewComplaintServiceTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private AuditRecordRepository auditRecordRepository;
 
     @BeforeEach
     void setUp() {
@@ -314,6 +318,105 @@ class ReviewComplaintServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.FORBIDDEN);
+    }
+
+    @Test
+    void rejectedComplaintArbitrationWritesAuditRecord() {
+        ReviewComplaintResponse complaint = createComplaint(5);
+        UserContext.setUserId(ADMIN_ID);
+
+        complaintService.arbitrate(
+                complaint.complaintId(),
+                new ReviewComplaintArbitrateRequest("REJECTED", " insufficient evidence ")
+        );
+
+        assertThat(auditRecordRepository.findTop10ByAuditTypeAndTargetIdOrderByCreatedAtDesc(
+                "REVIEW_COMPLAINT", complaint.complaintId()))
+                .extracting("adminId", "auditResult", "remark")
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(
+                        ADMIN_ID, "ARBITRATE", "REJECTED: insufficient evidence"));
+    }
+
+    @Test
+    void hiddenComplaintArbitrationWritesAuditAndReusesReviewModeration() {
+        ReviewComplaintResponse complaint = createComplaint(4);
+        UserContext.setUserId(ADMIN_ID);
+
+        complaintService.arbitrate(
+                complaint.complaintId(),
+                new ReviewComplaintArbitrateRequest("REVIEW_HIDDEN", " confirmed abuse ")
+        );
+
+        assertThat(auditRecordRepository.findTop10ByAuditTypeAndTargetIdOrderByCreatedAtDesc(
+                "REVIEW_COMPLAINT", complaint.complaintId()))
+                .extracting("auditResult", "remark")
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(
+                        "ARBITRATE", "REVIEW_HIDDEN: confirmed abuse"));
+        assertThat(auditRecordRepository.findTop10ByAuditTypeAndTargetIdOrderByCreatedAtDesc(
+                "REVIEW", complaint.reviewId()))
+                .extracting("auditResult", "remark")
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(
+                        "HIDE", "REVIEW_COMPLAINT#" + complaint.complaintId() + ": confirmed abuse"));
+    }
+
+    @Test
+    void failedComplaintArbitrationWritesNoAuditRecord() {
+        ReviewComplaintResponse complaint = createComplaint(5);
+        UserContext.setUserId(ADMIN_ID);
+
+        assertThatThrownBy(() -> complaintService.arbitrate(
+                complaint.complaintId(),
+                new ReviewComplaintArbitrateRequest("UNSUPPORTED", "not valid")
+        )).isInstanceOf(BusinessException.class);
+
+        assertThat(auditRecordRepository.findTop10ByAuditTypeAndTargetIdOrderByCreatedAtDesc(
+                "REVIEW_COMPLAINT", complaint.complaintId())).isEmpty();
+    }
+
+    @Test
+    void concurrentOrRepeatedComplaintArbitrationCannotDuplicateAuditOrCreditEffects() {
+        ReviewComplaintResponse complaint = createComplaint(4);
+        UserContext.setUserId(ADMIN_ID);
+        complaintService.arbitrate(
+                complaint.complaintId(),
+                new ReviewComplaintArbitrateRequest("REVIEW_HIDDEN", "confirmed")
+        );
+
+        assertThatThrownBy(() -> complaintService.arbitrate(
+                complaint.complaintId(),
+                new ReviewComplaintArbitrateRequest("REVIEW_HIDDEN", "again")
+        )).isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.STATUS_CONFLICT);
+
+        assertThat(auditRecordRepository.findTop10ByAuditTypeAndTargetIdOrderByCreatedAtDesc(
+                "REVIEW_COMPLAINT", complaint.complaintId())).hasSize(1);
+        assertThat(auditRecordRepository.findTop10ByAuditTypeAndTargetIdOrderByCreatedAtDesc(
+                "REVIEW", complaint.reviewId())).hasSize(1);
+        assertThat(creditRecordRepository.findByUserIdOrderByCreatedAtDesc(PROVIDER_ID).stream()
+                .filter(record -> "REVIEW_ARBITRATION_APPROVED".equals(record.getEventType())))
+                .hasSize(1);
+    }
+
+    @Test
+    void complaintArbitrationRequiresNonBlankCommentForEveryResult() {
+        ReviewComplaintResponse rejected = createComplaint(5);
+        UserContext.setUserId(ADMIN_ID);
+        assertThatThrownBy(() -> complaintService.arbitrate(
+                rejected.complaintId(), new ReviewComplaintArbitrateRequest("REJECTED", " ")))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.VALIDATION_ERROR);
+
+        assertThatThrownBy(() -> complaintService.arbitrate(
+                rejected.complaintId(), new ReviewComplaintArbitrateRequest("REVIEW_HIDDEN", null)))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.VALIDATION_ERROR);
+    }
+
+    private ReviewComplaintResponse createComplaint(int rating) {
+        ReviewResponse review = createCustomerReview(rating);
+        UserContext.setUserId(PROVIDER_ID);
+        return complaintService.create(
+                review.reviewId(), new ReviewComplaintCreateRequest("reported review", null));
     }
 
     private ReviewResponse createCustomerReview(int rating) {

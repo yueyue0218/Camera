@@ -1,5 +1,6 @@
 package com.action.camera.servicepackage.dto;
 
+import com.action.camera.admin.dto.ModerationView;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -67,4 +68,6 @@ public class ServicePackageDetailDto {
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
+
+    private ModerationView moderation;
 }

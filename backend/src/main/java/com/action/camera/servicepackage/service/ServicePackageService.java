@@ -1,5 +1,6 @@
 package com.action.camera.servicepackage.service;
 
+import com.action.camera.admin.dto.ModerationView;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.page.PageResult;
@@ -30,6 +31,12 @@ import com.action.camera.servicepackage.repository.ServicePackageInterestReposit
 import com.action.camera.servicepackage.repository.ServicePackageRepository;
 import com.action.camera.repository.UserRepository;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +44,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.List;
@@ -48,6 +57,7 @@ import java.util.stream.Collectors;
 @Service
 public class ServicePackageService {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(ServicePackageService.class);
     private static final int MAX_PAGE_SIZE = 50;
     private static final int MAX_IMAGE_COUNT = 9;
     private static final String DEFAULT_RESERVE_MESSAGE = "I would like to reserve this service package.";
@@ -63,6 +73,9 @@ public class ServicePackageService {
     private final UserRepository userRepository;
     private final ProviderProfileMapper providerProfileMapper;
     private final CreditSnapshotService creditSnapshotService;
+
+    @Value("${service-package.performance-probe.enabled:false}")
+    private boolean servicePackagePerformanceProbeEnabled;
 
     public ServicePackageService(ServicePackageRepository servicePackageRepository,
                                   ServicePackageInterestRepository interestRepository,
@@ -162,9 +175,17 @@ public class ServicePackageService {
         String normalizedTimeTag = normalizeTimeTagFilter(timeTag);
         String normalizedSort = normalizeServiceSort(sort);
 
+        if (!"recommend".equals(normalizedSort)) {
+            return listOrdinaryServices(
+                    safePage, safeSize, normalizedCity, normalizedScene, normalizedStyle,
+                    minPriceCent, maxPriceCent, availableDate, normalizedTimeTag,
+                    keyword, normalizedSort);
+        }
+
         List<ServicePackage> packages = servicePackageRepository.findByStatus(ServicePackageStatus.ONLINE);
         List<ServicePackage> baseCandidates = packages.stream()
                 .filter(servicePackage -> servicePackage.getStatus() == ServicePackageStatus.ONLINE)
+                .filter(ServicePackage::isModerationVisible)
                 .filter(servicePackage -> !Boolean.TRUE.equals(servicePackage.getHiddenByProvider()))
                 .filter(servicePackage -> normalizedCity == null
                         || servicePackage.getCityCode().equalsIgnoreCase(normalizedCity))
@@ -182,7 +203,7 @@ public class ServicePackageService {
                         || !currentUser.isProvider()
                         || !Objects.equals(servicePackage.getProviderId(), currentUser.getUserId()))
                 .toList();
-        Map<Long, PhotographerInfo> photographerInfos = photographerInfos(baseCandidates);
+        Map<Long, PhotographerInfo> photographerInfos = photographerInfosWithProbe(baseCandidates);
 
         List<ServicePackage> candidates = baseCandidates.stream()
                 .filter(servicePackage -> matchesServiceKeyword(
@@ -225,6 +246,39 @@ public class ServicePackageService {
         return new PageResult<>(filtered.subList(fromIndex, toIndex), safePage, safeSize, filtered.size());
     }
 
+    private PageResult<ServicePackageCardDto> listOrdinaryServices(int safePage,
+                                                                   int safeSize,
+                                                                   String cityCode,
+                                                                   String scene,
+                                                                   String style,
+                                                                   Long minPriceCent,
+                                                                   Long maxPriceCent,
+                                                                   LocalDate availableDate,
+                                                                   String timeTag,
+                                                                   String keyword,
+                                                                   String sort) {
+        Page<ServicePackage> packagePage = servicePackageRepository.findPublicPage(
+                cityCode,
+                scene,
+                style,
+                minPriceCent,
+                maxPriceCent,
+                availableDate == null ? null : availableDate.toString(),
+                timeTag,
+                normalizeKeyword(keyword),
+                sort,
+                PageRequest.of(safePage - 1, safeSize)
+        );
+        Map<Long, PhotographerInfo> photographerInfos = photographerInfosWithProbe(packagePage.getContent());
+        List<ServicePackageCardDto> records = packagePage.getContent().stream()
+                .map(servicePackage -> ServicePackageMapper.toCard(
+                        servicePackage,
+                        photographerInfos.get(servicePackage.getProviderId()),
+                        null))
+                .toList();
+        return new PageResult<>(records, safePage, safeSize, packagePage.getTotalElements());
+    }
+
     @Transactional(readOnly = true)
     public ServicePackageDetailDto getServiceDetail(Long serviceId) {
         return getServiceDetail(serviceId, null);
@@ -233,11 +287,18 @@ public class ServicePackageService {
     @Transactional(readOnly = true)
     public ServicePackageDetailDto getServiceDetail(Long serviceId, CurrentUser currentUser) {
         ServicePackage servicePackage = getServicePackage(serviceId);
+        boolean privileged = canViewRestrictedServicePackage(servicePackage, currentUser);
+        if (!servicePackage.isModerationVisible() && !privileged) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "Service package not found: " + serviceId);
+        }
         if (servicePackage.getStatus() == ServicePackageStatus.OFFLINE
-                && !canViewOfflineServicePackage(servicePackage, currentUser)) {
+                && !privileged) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "Service package is offline");
         }
-        return ServicePackageMapper.toDetail(servicePackage, photographerInfo(servicePackage.getProviderId()));
+        return ServicePackageMapper.toDetail(
+                servicePackage,
+                photographerInfo(servicePackage.getProviderId()),
+                privileged ? moderationView(servicePackage) : null);
     }
 
     @Transactional
@@ -252,7 +313,8 @@ public class ServicePackageService {
         applyUpdate(servicePackage, request);
         ensureCompleteServicePackage(servicePackage);
         ServicePackage saved = servicePackageRepository.save(servicePackage);
-        return ServicePackageMapper.toDetail(saved, photographerInfo(saved.getProviderId()));
+        return ServicePackageMapper.toDetail(
+                saved, photographerInfo(saved.getProviderId()), moderationView(saved));
     }
 
     @Transactional
@@ -261,7 +323,8 @@ public class ServicePackageService {
         ServicePackage servicePackage = getOwnedServicePackage(serviceId, currentUser.getUserId());
         servicePackage.markOffline();
         ServicePackage saved = servicePackageRepository.save(servicePackage);
-        return ServicePackageMapper.toDetail(saved, photographerInfo(saved.getProviderId()));
+        return ServicePackageMapper.toDetail(
+                saved, photographerInfo(saved.getProviderId()), moderationView(saved));
     }
 
     @Transactional(readOnly = true)
@@ -272,7 +335,9 @@ public class ServicePackageService {
         return packages.stream()
                 .map(servicePackage -> ServicePackageMapper.toCard(
                         servicePackage,
-                        photographerInfos.get(servicePackage.getProviderId())))
+                        photographerInfos.get(servicePackage.getProviderId()),
+                        null,
+                        moderationView(servicePackage)))
                 .toList();
     }
 
@@ -306,7 +371,7 @@ public class ServicePackageService {
     @Transactional
     public ServicePackageInterestDto addInterest(Long serviceId, CurrentUser currentUser) {
         ensureCustomer(currentUser);
-        ServicePackage servicePackage = getOnlineServicePackage(serviceId);
+        ServicePackage servicePackage = getPublicInteractiveServicePackage(serviceId);
         if (Objects.equals(servicePackage.getProviderId(), currentUser.getUserId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Provider cannot add interest to own service package");
         }
@@ -361,6 +426,7 @@ public class ServicePackageService {
         List<ServicePackage> packages = serviceIds.stream()
                 .map(packageById::get)
                 .filter(Objects::nonNull)
+                .filter(ServicePackage::isModerationVisible)
                 .filter(servicePackage -> normalizedTimeTag == null
                         || servicePackage.getTimeTags().contains(normalizedTimeTag))
                 .toList();
@@ -380,7 +446,7 @@ public class ServicePackageService {
                                                    CurrentUser currentUser,
                                                    StartServicePackageChatRequest request) {
         ensureCustomer(currentUser);
-        ServicePackage servicePackage = getOnlineServicePackage(serviceId);
+        ServicePackage servicePackage = getPublicInteractiveServicePackage(serviceId);
         if (Objects.equals(servicePackage.getProviderId(), currentUser.getUserId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Provider cannot start chat for own service package");
         }
@@ -410,10 +476,14 @@ public class ServicePackageService {
                         "Service package not found: " + serviceId));
     }
 
-    private ServicePackage getOnlineServicePackage(Long serviceId) {
+    private ServicePackage getPublicInteractiveServicePackage(Long serviceId) {
         ServicePackage servicePackage = getServicePackage(serviceId);
-        if (servicePackage.getStatus() != ServicePackageStatus.ONLINE) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Service package is not online");
+        if (servicePackage.getStatus() != ServicePackageStatus.ONLINE
+                || !servicePackage.isModerationVisible()
+                || Boolean.TRUE.equals(servicePackage.getHiddenByProvider())
+                || !Boolean.TRUE.equals(servicePackage.getIsAvailable())) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                    "Service package is not publicly interactive");
         }
         return servicePackage;
     }
@@ -894,10 +964,17 @@ public class ServicePackageService {
         return value == null || value.isBlank();
     }
 
-    private boolean canViewOfflineServicePackage(ServicePackage servicePackage, CurrentUser currentUser) {
+    private boolean canViewRestrictedServicePackage(ServicePackage servicePackage, CurrentUser currentUser) {
         return currentUser != null
                 && currentUser.getUserId() != null
                 && (currentUser.isAdmin() || Objects.equals(servicePackage.getProviderId(), currentUser.getUserId()));
+    }
+
+    private ModerationView moderationView(ServicePackage servicePackage) {
+        return new ModerationView(
+                servicePackage.getModerationStatus(),
+                servicePackage.getModeratedAt(),
+                servicePackage.getModerationReason());
     }
 
     private List<String> normalizeTags(List<String> tags) {
@@ -1005,16 +1082,69 @@ public class ServicePackageService {
     }
 
     private Map<Long, PhotographerInfo> photographerInfos(List<ServicePackage> servicePackages) {
-        return servicePackages.stream()
+        LinkedHashSet<Long> photographerIds = servicePackages.stream()
                 .map(ServicePackage::getProviderId)
                 .filter(Objects::nonNull)
-                .distinct()
-                .map(this::photographerInfo)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (photographerIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, User> usersById = userRepository.findAllById(photographerIds).stream()
+                .collect(Collectors.toMap(User::getId, user -> user, (left, right) -> left, LinkedHashMap::new));
+        Map<Long, ProviderProfile> profilesByUserId = providerProfileMapper == null
+                ? Map.of()
+                : providerProfileMapper.selectList(
+                        new LambdaQueryWrapper<ProviderProfile>().in(ProviderProfile::getUserId, photographerIds))
+                .stream()
+                .filter(profile -> profile.getUserId() != null)
                 .collect(Collectors.toMap(
-                        PhotographerInfo::photographerId,
-                        info -> info,
-                        (left, right) -> left
-                ));
+                        ProviderProfile::getUserId,
+                        profile -> profile,
+                        (left, right) -> left,
+                        LinkedHashMap::new));
+        Map<Long, java.math.BigDecimal> creditScores = creditSnapshotService.getDisplayCreditScores(usersById.keySet());
+
+        Map<Long, PhotographerInfo> infos = new LinkedHashMap<>();
+        photographerIds.forEach(photographerId -> {
+            User user = usersById.get(photographerId);
+            if (user == null) {
+                infos.put(photographerId, new PhotographerInfo(photographerId, null, null, null, null));
+                return;
+            }
+            ProviderProfile providerProfile = profilesByUserId.get(photographerId);
+            Long avatarFileId = providerProfile != null && providerProfile.getProviderAvatarFileId() != null
+                    ? providerProfile.getProviderAvatarFileId()
+                    : user.getAvatarFileId();
+            String nickname = providerProfile != null
+                    && providerProfile.getDisplayName() != null
+                    && !providerProfile.getDisplayName().isBlank()
+                    ? providerProfile.getDisplayName()
+                    : user.getNickname();
+            infos.put(photographerId, new PhotographerInfo(
+                    photographerId,
+                    nickname,
+                    avatarFileId,
+                    null,
+                    creditScores.get(photographerId)));
+        });
+        return infos;
+    }
+
+    private Map<Long, PhotographerInfo> photographerInfosWithProbe(List<ServicePackage> servicePackages) {
+        long metadataStartedAt = servicePackagePerformanceProbeEnabled ? System.nanoTime() : 0L;
+        Map<Long, PhotographerInfo> infos = photographerInfos(servicePackages);
+        if (servicePackagePerformanceProbeEnabled) {
+            double metadataTimeMs = (System.nanoTime() - metadataStartedAt) / 1_000_000.0d;
+            LOGGER.info(
+                    "event=service-package-metadata runId={} metadataTimeMs={} candidateCount={} photographerCount={}",
+                    MDC.get("servicePackagePerformanceRunId"),
+                    String.format(Locale.ROOT, "%.3f", metadataTimeMs),
+                    servicePackages.size(),
+                    infos.size()
+            );
+        }
+        return infos;
     }
 
     private PhotographerInfo photographerInfo(Long photographerId) {

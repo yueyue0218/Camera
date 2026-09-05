@@ -1,6 +1,7 @@
 package com.action.camera.review.service;
 
 import com.action.camera.admin.service.AdminPermissionService;
+import com.action.camera.admin.service.AdminAuditService;
 import com.action.camera.application.CreditService;
 import com.action.camera.application.OrderDisplayService;
 import com.action.camera.application.UserDisplayService;
@@ -39,7 +40,6 @@ public class ReviewComplaintService {
     private static final String TYPE_COMPLAINT_CREATED = "REVIEW_COMPLAINT_CREATED";
     private static final String TYPE_COMPLAINT_RESOLVED = "REVIEW_COMPLAINT_RESOLVED";
     private static final String RELATED_REVIEW_COMPLAINT = "REVIEW_COMPLAINT";
-    private static final String CREDIT_EVENT_REVIEW_ARBITRATION_APPROVED = "REVIEW_ARBITRATION_APPROVED";
     private static final String CREDIT_EVENT_REVIEW_ARBITRATION_REJECTED = "REVIEW_ARBITRATION_REJECTED";
     private static final int MAX_EVIDENCE_FILE_COUNT = 5;
 
@@ -51,6 +51,8 @@ public class ReviewComplaintService {
     private final NotificationService notificationService;
     private final EvidenceFileQueryPort evidenceFileQueryPort;
     private final AdminPermissionService adminPermissionService;
+    private final ReviewModerationService reviewModerationService;
+    private final AdminAuditService adminAuditService;
 
     public ReviewComplaintService(ReviewComplaintRepository complaintRepository,
                                   ReviewRepository reviewRepository,
@@ -59,7 +61,9 @@ public class ReviewComplaintService {
                                   UserDisplayService userDisplayService,
                                   NotificationService notificationService,
                                   EvidenceFileQueryPort evidenceFileQueryPort,
-                                  AdminPermissionService adminPermissionService) {
+                                  AdminPermissionService adminPermissionService,
+                                  ReviewModerationService reviewModerationService,
+                                  AdminAuditService adminAuditService) {
         this.complaintRepository = complaintRepository;
         this.reviewRepository = reviewRepository;
         this.creditService = creditService;
@@ -68,6 +72,8 @@ public class ReviewComplaintService {
         this.notificationService = notificationService;
         this.evidenceFileQueryPort = evidenceFileQueryPort;
         this.adminPermissionService = adminPermissionService;
+        this.reviewModerationService = reviewModerationService;
+        this.adminAuditService = adminAuditService;
     }
 
     @Transactional
@@ -196,38 +202,30 @@ public class ReviewComplaintService {
         requireAdmin(currentUserId);
         validateArbitrateRequest(request);
 
-        ReviewComplaint complaint = complaintRepository.findById(complaintId)
+        ReviewComplaint complaint = complaintRepository.findByIdForUpdate(complaintId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Complaint not found"));
         if (!PENDING.equals(complaint.getStatus())) {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Complaint has been handled");
         }
 
-        Review review = reviewRepository.findById(complaint.getReviewId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Review not found"));
-
         LocalDateTime now = LocalDateTime.now();
         complaint.setStatus(RESOLVED);
         String result = request.result().trim();
+        String comment = request.comment().trim();
         complaint.setArbitrationResult(result);
-        complaint.setArbitrationComment(trimToNull(request.comment()));
+        complaint.setArbitrationComment(comment);
         complaint.setHandledBy(currentUserId);
         complaint.setHandledAt(now);
         complaint.setUpdatedAt(now);
 
-        if (REVIEW_HIDDEN.equals(result) && Boolean.TRUE.equals(review.getIsVisible())) {
-            review.setIsVisible(false);
-            creditService.reverseCreditAdjustment(
-                    review.getTargetUserId(),
-                    "REVIEW",
-                    review.getId(),
-                    CREDIT_EVENT_REVIEW_ARBITRATION_APPROVED,
-                    review.getOrderId(),
-                    "评价申诉通过，已撤销该评价并回滚其对信用分的影响",
-                    CREDIT_EVENT_REVIEW_ARBITRATION_APPROVED,
-                    complaint.getId(),
-                    calculateReviewScoreChange(review.getRating())
-            );
-        } else if (REJECTED.equals(result)) {
+        Review review;
+        if (REVIEW_HIDDEN.equals(result)) {
+            review = reviewModerationService.hideForGovernance(
+                    complaint.getReviewId(), currentUserId,
+                    RELATED_REVIEW_COMPLAINT, complaint.getId(), comment);
+        } else {
+            review = reviewRepository.findById(complaint.getReviewId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Review not found"));
             creditService.updateCreditScore(
                     review.getTargetUserId(),
                     0,
@@ -240,6 +238,12 @@ public class ReviewComplaintService {
         }
 
         ReviewComplaint savedComplaint = complaintRepository.save(complaint);
+        adminAuditService.record(
+                RELATED_REVIEW_COMPLAINT,
+                savedComplaint.getId(),
+                currentUserId,
+                "ARBITRATE",
+                truncateAuditReason(result + ": " + comment));
         notifyResolved(savedComplaint, review);
         return toResponse(savedComplaint);
     }
@@ -319,7 +323,10 @@ public class ReviewComplaintService {
         if (!REJECTED.equals(result) && !REVIEW_HIDDEN.equals(result)) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Unsupported arbitration result");
         }
-        if (request.comment() != null && request.comment().trim().length() > 1000) {
+        if (isBlank(request.comment())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Arbitration comment is required");
+        }
+        if (request.comment().trim().length() > 1000) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Arbitration comment is too long");
         }
     }
@@ -378,17 +385,6 @@ public class ReviewComplaintService {
                 "review-complaint:resolved:respondent:" + complaint.getId(),
                 buildComplaintMetadata(complaint)
         ));
-    }
-
-    private int calculateReviewScoreChange(Integer rating) {
-        return switch (rating) {
-            case 5 -> 0;
-            case 4 -> -1;
-            case 3 -> -2;
-            case 2 -> -3;
-            case 1 -> -4;
-            default -> throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Rating must be between 1 and 5");
-        };
     }
 
     private ReviewComplaintResponse toResponse(ReviewComplaint complaint) {
@@ -472,10 +468,7 @@ public class ReviewComplaintService {
         return value == null || value.trim().isEmpty();
     }
 
-    private String trimToNull(String value) {
-        if (isBlank(value)) {
-            return null;
-        }
-        return value.trim();
+    private String truncateAuditReason(String value) {
+        return value.length() <= 500 ? value : value.substring(0, 500);
     }
 }

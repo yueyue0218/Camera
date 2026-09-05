@@ -1,5 +1,6 @@
 package com.action.camera.servicepackage.mapper;
 
+import com.action.camera.admin.dto.ModerationView;
 import com.action.camera.servicepackage.domain.ServicePackage;
 import com.action.camera.servicepackage.dto.CreateServicePackageResult;
 import com.action.camera.servicepackage.dto.ServicePackageCardDto;
@@ -31,6 +32,13 @@ public final class ServicePackageMapper {
     public static ServicePackageCardDto toCard(ServicePackage servicePackage,
                                                PhotographerInfo photographerInfo,
                                                List<String> recommendReasons) {
+        return toCard(servicePackage, photographerInfo, recommendReasons, null);
+    }
+
+    public static ServicePackageCardDto toCard(ServicePackage servicePackage,
+                                               PhotographerInfo photographerInfo,
+                                               List<String> recommendReasons,
+                                               ModerationView moderation) {
         List<Long> portfolioIds = servicePackage.getPortfolioIds();
         Long coverPortfolioId = portfolioIds == null || portfolioIds.isEmpty() ? null : portfolioIds.get(0);
         List<String> images = servicePackage.getImages();
@@ -61,7 +69,8 @@ public final class ServicePackageMapper {
                 servicePackage.getTimeTags(),
                 servicePackage.getCreatedAt(),
                 servicePackage.getUpdatedAt(),
-                recommendReasons == null ? List.of() : recommendReasons
+                recommendReasons == null ? List.of() : recommendReasons,
+                moderation
         );
     }
 
@@ -70,6 +79,12 @@ public final class ServicePackageMapper {
     }
 
     public static ServicePackageDetailDto toDetail(ServicePackage servicePackage, PhotographerInfo photographerInfo) {
+        return toDetail(servicePackage, photographerInfo, null);
+    }
+
+    public static ServicePackageDetailDto toDetail(ServicePackage servicePackage,
+                                                   PhotographerInfo photographerInfo,
+                                                   ModerationView moderation) {
         return new ServicePackageDetailDto(
                 servicePackage.getId(),
                 servicePackage.getProviderId(),
@@ -98,7 +113,8 @@ public final class ServicePackageMapper {
                 servicePackage.getStatus().name(),
                 servicePackage.getIsAvailable(),
                 servicePackage.getCreatedAt(),
-                servicePackage.getUpdatedAt()
+                servicePackage.getUpdatedAt(),
+                moderation
         );
     }
 

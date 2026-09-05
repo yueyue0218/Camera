@@ -10,6 +10,8 @@ import com.action.camera.admin.repository.RealNameCertificationRepository;
 import com.action.camera.admin.repository.StudentCertificationRepository;
 import com.action.camera.admin.service.AdminCertificationService;
 import com.action.camera.admin.service.AdminDashboardService;
+import com.action.camera.demand.domain.Demand;
+import com.action.camera.demand.repository.DemandRepository;
 import com.action.camera.certification.dto.CertificationRequest;
 import com.action.camera.certification.dto.CertificationResponse;
 import com.action.camera.certification.service.CertificationService;
@@ -19,8 +21,16 @@ import com.action.camera.common.exception.BusinessException;
 import com.action.camera.order.entity.PaymentRecord;
 import com.action.camera.order.repository.PaymentRecordRepository;
 import com.action.camera.notification.repository.NotificationRepository;
+import com.action.camera.report.domain.Report;
+import com.action.camera.report.domain.ReportResolution;
+import com.action.camera.report.domain.ReportTargetType;
+import com.action.camera.report.repository.ReportRepository;
 import com.action.camera.review.entity.ReviewComplaint;
 import com.action.camera.review.repository.ReviewComplaintRepository;
+import com.action.camera.servicepackage.domain.ServicePackage;
+import com.action.camera.servicepackage.repository.ServicePackageRepository;
+import com.action.camera.social.domain.MomentPost;
+import com.action.camera.social.repository.MomentPostRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -65,6 +75,18 @@ class AdminServiceTest {
     private ReviewComplaintRepository reviewComplaintRepository;
 
     @Autowired
+    private ReportRepository reportRepository;
+
+    @Autowired
+    private DemandRepository demandRepository;
+
+    @Autowired
+    private ServicePackageRepository servicePackageRepository;
+
+    @Autowired
+    private MomentPostRepository momentPostRepository;
+
+    @Autowired
     private AuditRecordRepository auditRecordRepository;
 
     @Autowired
@@ -104,6 +126,44 @@ class AdminServiceTest {
         assertThat(response.todayGmvCent()).isEqualTo(13345L);
         assertThat(response.pendingAuditCount()).isEqualTo(2);
         assertThat(response.pendingArbitrationCount()).isEqualTo(2);
+    }
+
+    @Test
+    void dashboardCountsPendingReportsFromRealRows() {
+        UserContext.setUserId(ADMIN_ID);
+        saveReport(CUSTOMER_ID, ReportTargetType.DEMAND, 301L);
+        saveReport(PROVIDER_ID, ReportTargetType.SERVICE_PACKAGE, 302L);
+        saveResolvedReport(CUSTOMER_ID, ReportTargetType.MOMENT, 303L);
+
+        AdminDashboardResponse response = dashboardService.getDashboard();
+
+        assertThat(response.pendingReportCount()).isEqualTo(2L);
+    }
+
+    @Test
+    void dashboardCountsHiddenContentAcrossAllThreeTables() {
+        UserContext.setUserId(ADMIN_ID);
+        saveHiddenDemand();
+        saveHiddenServicePackage();
+        saveHiddenMoment();
+
+        AdminDashboardResponse response = dashboardService.getDashboard();
+
+        assertThat(response.removedContentCount()).isEqualTo(3L);
+    }
+
+    @Test
+    void resolvedReportsAndVisibleContentAreNotCounted() {
+        UserContext.setUserId(ADMIN_ID);
+        saveResolvedReport(CUSTOMER_ID, ReportTargetType.DEMAND, 401L);
+        saveVisibleDemand();
+        saveVisibleServicePackage();
+        saveVisibleMoment();
+
+        AdminDashboardResponse response = dashboardService.getDashboard();
+
+        assertThat(response.pendingReportCount()).isZero();
+        assertThat(response.removedContentCount()).isZero();
     }
 
     @Test
@@ -279,5 +339,67 @@ class AdminServiceTest {
         complaint.setCreatedAt(LocalDateTime.now());
         complaint.setUpdatedAt(LocalDateTime.now());
         reviewComplaintRepository.saveAndFlush(complaint);
+    }
+
+    private Report saveReport(Long reporterId, ReportTargetType targetType, Long targetId) {
+        return reportRepository.saveAndFlush(Report.create(
+                reporterId, targetType, targetId, "test report", null, LocalDateTime.now()));
+    }
+
+    private void saveResolvedReport(Long reporterId, ReportTargetType targetType, Long targetId) {
+        Report report = saveReport(reporterId, targetType, targetId);
+        report.resolve(ADMIN_ID, ReportResolution.IGNORE, "resolved", LocalDateTime.now());
+        reportRepository.saveAndFlush(report);
+    }
+
+    private void saveHiddenDemand() {
+        Demand demand = new Demand(CUSTOMER_ID, "portrait", List.of("film"), null, null,
+                "test time", List.of("day"), "Nanjing", "Xuanwu", 1000, 2000,
+                "test demand", List.of(), LocalDateTime.now(), null);
+        demand.takeDown(ADMIN_ID, "test moderation", LocalDateTime.now());
+        demandRepository.saveAndFlush(demand);
+    }
+
+    private void saveVisibleDemand() {
+        Demand demand = new Demand(CUSTOMER_ID, "portrait", List.of("film"), null, null,
+                "test time", List.of("day"), "Nanjing", "Xuanwu", 1000, 2000,
+                "test demand", List.of(), LocalDateTime.now(), null);
+        demandRepository.saveAndFlush(demand);
+    }
+
+    private void saveHiddenServicePackage() {
+        ServicePackage servicePackage = newServicePackage();
+        servicePackage.takeDown(ADMIN_ID, "test moderation", LocalDateTime.now());
+        servicePackageRepository.saveAndFlush(servicePackage);
+    }
+
+    private void saveVisibleServicePackage() {
+        servicePackageRepository.saveAndFlush(newServicePackage());
+    }
+
+    private ServicePackage newServicePackage() {
+        ServicePackage servicePackage = new ServicePackage();
+        servicePackage.setProviderId(PROVIDER_ID);
+        servicePackage.setTitle("test service");
+        servicePackage.setCityCode("Nanjing");
+        servicePackage.setScene("portrait");
+        servicePackage.setBasePriceCent(1000L);
+        servicePackage.setDurationMinutes(60);
+        servicePackage.setOriginalCount(10);
+        servicePackage.setRefinedCount(5);
+        servicePackage.setDeliveryDays(3);
+        servicePackage.setTimeDescription("test time");
+        return servicePackage;
+    }
+
+    private void saveHiddenMoment() {
+        MomentPost moment = new MomentPost(PROVIDER_ID, "PROVIDER", "test moment", "test content", List.of(), List.of());
+        moment.takeDown(ADMIN_ID, "test moderation", LocalDateTime.now());
+        momentPostRepository.saveAndFlush(moment);
+    }
+
+    private void saveVisibleMoment() {
+        momentPostRepository.saveAndFlush(
+                new MomentPost(PROVIDER_ID, "PROVIDER", "test moment", "test content", List.of(), List.of()));
     }
 }

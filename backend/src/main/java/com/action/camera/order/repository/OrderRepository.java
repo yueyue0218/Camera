@@ -1,5 +1,6 @@
 package com.action.camera.order.repository;
 
+import com.action.camera.credit.repository.UserCountAggregate;
 import com.action.camera.order.entity.Order;
 import com.action.camera.order.enums.OrderStatus;
 import jakarta.persistence.LockModeType;
@@ -34,6 +35,18 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     long countByCustomerIdAndStatus(Long customerId, OrderStatus status);
 
     long countByProviderUserIdAndStatus(Long providerUserId, OrderStatus status);
+
+    @Query("""
+            select r.targetUserId as userId, count(distinct o.id) as aggregateCount
+            from Review r
+            join Order o on o.id = r.orderId
+            where r.targetUserId in :userIds
+              and r.isVisible = true
+              and o.status = :status
+            group by r.targetUserId
+            """)
+    List<UserCountAggregate> findCompletedReviewedOrderCounts(@Param("userIds") Collection<Long> userIds,
+                                                               @Param("status") OrderStatus status);
 
     @Query("""
             select count(o)

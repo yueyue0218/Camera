@@ -12,8 +12,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-import java.util.Optional;
-
 @Component
 public class AuthInterceptor implements HandlerInterceptor {
 
@@ -33,6 +31,7 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        UserContext.clear();
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
             return true;
         }
@@ -48,11 +47,10 @@ public class AuthInterceptor implements HandlerInterceptor {
         String token = authHeader.substring(7);
         try {
             Long userId = jwtUtil.parseUserId(token);
-            UserContext.setUserId(userId);
-            UserRole role = loadAndSetRole(userId)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
+            UserRole role = loadActiveIdentity(userId);
             enforceProtectedRouteRole(request, role);
         } catch (Exception e) {
+            UserContext.clear();
             if (e instanceof BusinessException businessException) {
                 throw businessException;
             }
@@ -183,10 +181,9 @@ public class AuthInterceptor implements HandlerInterceptor {
         }
         try {
             Long userId = jwtUtil.parseUserId(authHeader.substring(7));
-            UserContext.setUserId(userId);
-            loadAndSetRole(userId)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
+            loadActiveIdentity(userId);
         } catch (Exception e) {
+            UserContext.clear();
             if (e instanceof BusinessException businessException) {
                 throw businessException;
             }
@@ -200,17 +197,19 @@ public class AuthInterceptor implements HandlerInterceptor {
         UserContext.clear();
     }
 
-    private Optional<UserRole> loadAndSetRole(Long userId) {
-        return userRepository.findById(userId)
-                .map(user -> {
-                    UserRole role = UserRole.parse(user.getCurrentRole(), UserRole.CUSTOMER);
-                    UserContext.setCurrentRole(role);
-                    UserContext.setAdmin(
-                            ADMIN_ROLE.equals(user.getCurrentRole())
-                                    || userRoleBindingRepository.existsByUserIdAndRole(userId, ADMIN_ROLE)
-                    );
-                    return role;
-                });
+    private UserRole loadActiveIdentity(Long userId) {
+        var user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
+        if (!"ACTIVE".equals(user.getStatus())) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        }
+        UserRole role = UserRole.parse(user.getCurrentRole(), UserRole.CUSTOMER);
+        boolean admin = ADMIN_ROLE.equals(user.getCurrentRole())
+                || userRoleBindingRepository.existsByUserIdAndRole(userId, ADMIN_ROLE);
+        UserContext.setUserId(userId);
+        UserContext.setCurrentRole(role);
+        UserContext.setAdmin(admin);
+        return role;
     }
 
 }

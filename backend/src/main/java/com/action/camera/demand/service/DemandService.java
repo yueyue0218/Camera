@@ -1,5 +1,6 @@
 package com.action.camera.demand.service;
 
+import com.action.camera.admin.dto.ModerationView;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.page.PageResult;
@@ -25,6 +26,8 @@ import com.action.camera.repository.UserRepository;
 import com.action.camera.servicepackage.domain.ServicePackage;
 import com.action.camera.servicepackage.domain.ServicePackageStatus;
 import com.action.camera.servicepackage.repository.ServicePackageRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,8 +35,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -160,7 +166,29 @@ public class DemandService {
         if (publicStatus == null) {
             return new PageResult<>(List.of(), safePage, safeSize, 0);
         }
-        List<Demand> candidates = demandRepository.findByStatus(publicStatus).stream()
+        boolean shouldRecommend = "recommend".equals(normalizedSort);
+        if (!shouldRecommend) {
+            Page<Demand> demandPage = demandRepository.findPublicPage(
+                    normalizedCity,
+                    normalizedScene,
+                    normalizedTag,
+                    expectedDate,
+                    normalizedTimeTag,
+                    minBudgetCent,
+                    maxBudgetCent,
+                    normalizeKeyword(keyword),
+                    PageRequest.of(safePage - 1, safeSize));
+            Map<Long, CustomerInfo> customers = loadCustomerInfo(demandPage.getContent());
+            List<DemandDto> records = demandPage.getContent().stream()
+                    .map(demand -> toDemandDto(demand, null, customers))
+                    .toList();
+            return new PageResult<>(records, safePage, safeSize, demandPage.getTotalElements());
+        }
+
+        List<Demand> publicDemands = demandRepository.findByStatus(publicStatus);
+        Map<Long, CustomerInfo> customers = loadCustomerInfo(publicDemands);
+        List<Demand> candidates = publicDemands.stream()
+                .filter(Demand::isModerationVisible)
                 .filter(demand -> !Boolean.TRUE.equals(demand.getHiddenByCustomer()))
                 .filter(demand -> normalizedCity == null || equalsIgnoreCase(demand.getCityCode(), normalizedCity))
                 .filter(demand -> normalizedScene == null || equalsIgnoreCase(demand.getScene(), normalizedScene))
@@ -168,11 +196,10 @@ public class DemandService {
                 .filter(demand -> normalizedTag == null || demand.getStyleTags().contains(normalizedTag))
                 .filter(demand -> normalizedTimeTag == null || demand.getTimeTags().contains(normalizedTimeTag))
                 .filter(demand -> matchesBudget(demand, minBudgetCent, maxBudgetCent))
-                .filter(demand -> matchesDemandKeyword(demand, keyword))
+                .filter(demand -> matchesDemandKeyword(demand, keyword, customers))
                 .collect(Collectors.toList());
         PhotographerPreference preference = demandRecommendationPreference(
                 currentUser, normalizedCity, normalizedTag, minBudgetCent, maxBudgetCent);
-        boolean shouldRecommend = "recommend".equals(normalizedSort);
         Set<Long> respondedDemandIds = respondedDemandIds(currentUser, candidates, shouldRecommend);
         Map<Long, Recommendation> recommendations = shouldRecommend
                 ? candidates.stream().collect(Collectors.toMap(Demand::getId,
@@ -189,7 +216,7 @@ public class DemandService {
             sortedDemands = diversifyDemands(sortedDemands);
         }
         List<DemandDto> filtered = sortedDemands.stream()
-                .map(demand -> toDemandDto(demand, recommendations.get(demand.getId())))
+                .map(demand -> toDemandDto(demand, recommendations.get(demand.getId()), customers))
                 .collect(Collectors.toList());
         int fromIndex = Math.min((safePage - 1) * safeSize, filtered.size());
         int toIndex = Math.min(fromIndex + safeSize, filtered.size());
@@ -239,7 +266,11 @@ public class DemandService {
     @Transactional(readOnly = true)
     public DemandDto getDemand(Long demandId, CurrentUser user) {
         Demand demand = findDemand(demandId);
-        if (user != null && (user.isAdmin() || demand.getCustomerId().equals(user.getUserId()))) {
+        boolean ownerOrAdmin = isOwner(user, demand) || isAdmin(user);
+        if (!demand.isModerationVisible() && !ownerOrAdmin) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "需求不存在");
+        }
+        if (ownerOrAdmin) {
             return toOwnerDemandDto(demand);
         }
         if (demand.getStatus() == DemandStatus.OPEN) {
@@ -251,10 +282,7 @@ public class DemandService {
     @Transactional
     public DemandResponseDto respondToDemand(Long demandId, CurrentUser user, CreateDemandResponseRequest request) {
         requireProvider(user);
-        Demand demand = findDemand(demandId);
-        if (!demand.getStatus().equals(DemandStatus.OPEN)) {
-            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "only open demands can be responded");
-        }
+        Demand demand = requirePublicInteractiveDemand(demandId);
         if (demand.getCustomerId().equals(user.getUserId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "provider cannot respond to own demand");
         }
@@ -368,7 +396,7 @@ public class DemandService {
 
     private AcceptedDemandResponseSnapshot acceptResponseAndBuildSnapshot(Long demandId, Long responseId, CurrentUser user) {
         requireCustomer(user);
-        Demand demand = findDemand(demandId);
+        Demand demand = requirePublicInteractiveDemand(demandId);
         if (!demand.getCustomerId().equals(user.getUserId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "only demand owner can accept responses");
         }
@@ -406,7 +434,12 @@ public class DemandService {
                 customerInfo(demand.getCustomerId()),
                 countResponses(demand.getId(), DemandResponseStatus.PENDING_CUSTOMER_ACCEPT),
                 countResponses(demand.getId(), DemandResponseStatus.ACCEPTED),
-                countResponses(demand.getId(), DemandResponseStatus.REJECTED)
+                countResponses(demand.getId(), DemandResponseStatus.REJECTED),
+                null,
+                new ModerationView(
+                        demand.getModerationStatus(),
+                        demand.getModeratedAt(),
+                        demand.getModerationReason())
         );
     }
 
@@ -414,12 +447,32 @@ public class DemandService {
         return DemandMapper.toDemandDto(demand, customerInfo(demand.getCustomerId()));
     }
 
-    private DemandDto toDemandDto(Demand demand, Recommendation recommendation) {
+    private DemandDto toDemandDto(Demand demand,
+                                  Recommendation recommendation,
+                                  Map<Long, CustomerInfo> customers) {
         return DemandMapper.toDemandDto(
                 demand,
-                customerInfo(demand.getCustomerId()),
+                customers.get(demand.getCustomerId()),
                 recommendation == null ? null : recommendation.limitedReasons()
         );
+    }
+
+    private Map<Long, CustomerInfo> loadCustomerInfo(Collection<Demand> demands) {
+        if (demands == null || demands.isEmpty() || userRepository == null) {
+            return Map.of();
+        }
+        Set<Long> customerIds = demands.stream()
+                .map(Demand::getCustomerId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (customerIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, CustomerInfo> customers = new LinkedHashMap<>();
+        userRepository.findAllById(customerIds).forEach(user -> customers.put(
+                user.getId(),
+                new CustomerInfo(user.getNickname(), user.getAvatarFileId())));
+        return customers;
     }
 
     private CustomerInfo customerInfo(Long customerId) {
@@ -449,6 +502,26 @@ public class DemandService {
         }
         return demandRepository.findById(demandId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "demand not found"));
+    }
+
+    private Demand requirePublicInteractiveDemand(Long demandId) {
+        Demand demand = findDemand(demandId);
+        if (demand.getStatus() != DemandStatus.OPEN
+                || !demand.isModerationVisible()
+                || Boolean.TRUE.equals(demand.getHiddenByCustomer())) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "current demand is not publicly interactive");
+        }
+        return demand;
+    }
+
+    private boolean isOwner(CurrentUser user, Demand demand) {
+        return user != null
+                && user.getUserId() != null
+                && demand.getCustomerId().equals(user.getUserId());
+    }
+
+    private boolean isAdmin(CurrentUser user) {
+        return user != null && user.isAdmin();
     }
 
     private DemandResponse findResponse(Long responseId) {
@@ -656,7 +729,9 @@ public class DemandService {
                 .thenComparing(Demand::getId, Comparator.nullsLast(Comparator.reverseOrder()));
     }
 
-    private boolean matchesDemandKeyword(Demand demand, String keyword) {
+    private boolean matchesDemandKeyword(Demand demand,
+                                         String keyword,
+                                         Map<Long, CustomerInfo> customers) {
         String normalized = normalizeKeyword(keyword);
         if (normalized == null) {
             return true;
@@ -669,7 +744,7 @@ public class DemandService {
         if (demandMatched) {
             return true;
         }
-        CustomerInfo customerInfo = customerInfo(demand.getCustomerId());
+        CustomerInfo customerInfo = customers.get(demand.getCustomerId());
         return containsKeyword(normalized, customerInfo == null ? null : customerInfo.nickname());
     }
 

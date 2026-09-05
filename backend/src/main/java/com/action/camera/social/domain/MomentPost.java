@@ -1,5 +1,8 @@
 package com.action.camera.social.domain;
 
+import com.action.camera.admin.domain.ModerationStatus;
+import com.action.camera.common.ErrorCode;
+import com.action.camera.common.exception.BusinessException;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
@@ -11,6 +14,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
@@ -35,7 +39,9 @@ import java.util.stream.Collectors;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "moment_posts")
+@Table(name = "moment_posts", indexes = {
+        @Index(name = "idx_moment_posts_moderation_public", columnList = "moderation_status,status,created_at")
+})
 public class MomentPost {
 
     @Id
@@ -87,6 +93,19 @@ public class MomentPost {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "moderation_status", nullable = false, length = 20)
+    private ModerationStatus moderationStatus = ModerationStatus.VISIBLE;
+
+    @Column(name = "moderated_by")
+    private Long moderatedBy;
+
+    @Column(name = "moderated_at")
+    private LocalDateTime moderatedAt;
+
+    @Column(name = "moderation_reason", length = 500)
+    private String moderationReason;
+
     public MomentPost(Long authorId, String authorRole, String title, String content,
                       List<String> mentions, List<String> imageDataList) {
         this.authorId = authorId;
@@ -122,6 +141,9 @@ public class MomentPost {
         if (status == null) {
             status = MomentStatus.PUBLISHED;
         }
+        if (moderationStatus == null) {
+            moderationStatus = ModerationStatus.VISIBLE;
+        }
     }
 
     @PreUpdate
@@ -129,6 +151,9 @@ public class MomentPost {
         updatedAt = LocalDateTime.now();
         if (status == null) {
             status = MomentStatus.PUBLISHED;
+        }
+        if (moderationStatus == null) {
+            moderationStatus = ModerationStatus.VISIBLE;
         }
     }
 
@@ -182,6 +207,18 @@ public class MomentPost {
         status = MomentStatus.DELETED;
         deletedAt = LocalDateTime.now();
         updatedAt = deletedAt;
+    }
+
+    public void takeDown(Long adminId, String reason, LocalDateTime now) {
+        changeModeration(ModerationStatus.VISIBLE, ModerationStatus.HIDDEN, adminId, reason, now);
+    }
+
+    public void restore(Long adminId, String reason, LocalDateTime now) {
+        changeModeration(ModerationStatus.HIDDEN, ModerationStatus.VISIBLE, adminId, reason, now);
+    }
+
+    public boolean isModerationVisible() {
+        return ModerationStatus.VISIBLE.equals(moderationStatus);
     }
 
     public void toggleLike(Long userId) {
@@ -250,5 +287,33 @@ public class MomentPost {
                         .thenComparing(MomentImage::getId, Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(MomentImage::getImageData)
                 .collect(Collectors.toUnmodifiableList());
+    }
+
+    private void changeModeration(ModerationStatus expected,
+                                  ModerationStatus target,
+                                  Long adminId,
+                                  String reason,
+                                  LocalDateTime now) {
+        ModerationStatus current = moderationStatus == null ? ModerationStatus.VISIBLE : moderationStatus;
+        if (!expected.equals(current)) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Content moderation state has already changed");
+        }
+        validateModerationInputs(adminId, reason, now);
+        moderationStatus = target;
+        moderatedBy = adminId;
+        moderatedAt = now;
+        moderationReason = reason.trim();
+    }
+
+    private void validateModerationInputs(Long adminId, String reason, LocalDateTime now) {
+        if (adminId == null || adminId <= 0 || now == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Administrator and moderation time are required");
+        }
+        if (reason == null || reason.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Moderation reason is required");
+        }
+        if (reason.trim().length() > 500) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Moderation reason is too long");
+        }
     }
 }

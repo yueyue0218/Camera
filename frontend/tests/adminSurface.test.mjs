@@ -1,0 +1,591 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import {
+  ADMIN_CAPABILITIES,
+  ADMIN_NAV_ITEMS,
+  getAdminActiveKey,
+  getLegacyAdminTarget,
+  resolveNavbarActivePath
+} from '../src/pages/admin/adminSurfaceConfig.js'
+import {
+  buildAdminDashboardStats,
+  buildModerationReasonBody,
+  buildReportResolutionBody,
+  buildUserStatusBody,
+  complaintActionCopy,
+  completeAdminMutation,
+  createLatestRequestGate,
+  openAdminDetail,
+  reportResolutionOptions,
+  resetAdminPage,
+  buildComplaintArbitrationBody,
+  buildCertificationListQueries,
+  buildCertificationReviewBody,
+  buildAdminUserFacts,
+  filterAdminMoments,
+  enrichComplaintsWithReviewContext,
+  loadComplaintSource,
+  normalizeAdminHallItems,
+  loadCertificationSource,
+  loadPendingCertificationOverview,
+  parseExactUserId,
+  refreshComplaintSurfaces,
+  shouldUseAdminDemoFixtures
+} from '../src/pages/admin/adminData.js'
+
+test('admin navigation uses the approved order and routes', () => {
+  assert.deepEqual(
+    ADMIN_NAV_ITEMS.map(({ label, path }) => [label, path]),
+    [
+      ['大厅', '/admin/hall'],
+      ['动态', '/admin/feed'],
+      ['用户', '/admin/users'],
+      ['举报', '/admin/reports'],
+      ['审核', '/admin/certifications'],
+      ['申诉', '/admin/complaints'],
+      ['概览', '/admin']
+    ]
+  )
+})
+
+test('nested admin paths select one admin navigation item', () => {
+  assert.equal(getAdminActiveKey('/admin/users/42'), 'users')
+  assert.equal(getAdminActiveKey('/admin/complaints'), 'complaints')
+  assert.equal(getAdminActiveKey('/admin'), 'dashboard')
+})
+
+test('admin route matching never maps ordinary platform paths', () => {
+  assert.equal(getAdminActiveKey('/hall'), 'dashboard')
+  assert.equal(getAdminActiveKey('/feed'), 'dashboard')
+  assert.equal(getAdminActiveKey('/users/42'), 'dashboard')
+})
+
+test('admin navbar resolves active state from location pathname', () => {
+  assert.equal(resolveNavbarActivePath({
+    adminSurface: true,
+    locationPathname: '/admin/feed',
+    activePath: '/admin'
+  }), '/admin/feed')
+})
+
+test('ordinary navbar continues to resolve active state from activePath', () => {
+  assert.equal(resolveNavbarActivePath({
+    adminSurface: false,
+    locationPathname: '/users/42',
+    activePath: '/profile'
+  }), '/profile')
+})
+
+test('legacy admin tabs map to product routes and preserve demo mode', () => {
+  assert.equal(getLegacyAdminTarget('?tab=certifications&demo=1'), '/admin/certifications?demo=1')
+  assert.equal(getLegacyAdminTarget('?tab=complaints'), '/admin/complaints')
+  assert.equal(getLegacyAdminTarget('?demo=1'), '')
+})
+
+test('all completed governance capabilities are available', () => {
+  for (const key of [
+    'takeDownHallItem', 'restoreHallItem',
+    'takeDownMoment', 'restoreMoment',
+    'listUsers', 'getUserAdminProfile', 'updateUserStatus',
+    'listReports', 'getReport', 'resolveReport'
+  ]) assert.equal(ADMIN_CAPABILITIES[key].available, true)
+})
+
+test('public hall records receive only public status', () => {
+  assert.deepEqual(
+    normalizeAdminHallItems([{ demandId: 7, title: '约拍' }], [{ serviceId: 8, title: '橱窗' }]),
+    [
+      { type: 'demand', id: 7, status: 'PUBLIC', record: { demandId: 7, title: '约拍' } },
+      { type: 'service', id: 8, status: 'PUBLIC', record: { serviceId: 8, title: '橱窗' } }
+    ]
+  )
+})
+
+test('hall filtering never invents removed or reported records', () => {
+  const items = normalizeAdminHallItems([{ demandId: 1 }], [{ serviceId: 2 }])
+  assert.deepEqual(items.filter(item => item.type === 'demand').map(item => item.id), [1])
+  assert.deepEqual(items.filter(item => item.status === 'REMOVED'), [])
+  assert.deepEqual(items.filter(item => item.status === 'REPORTED'), [])
+})
+
+test('admin hall request params stay on public read-only lists', async () => {
+  const adminData = await import('../src/pages/admin/adminData.js')
+  assert.equal(typeof adminData.buildAdminHallRequestParams, 'function')
+  assert.deepEqual(adminData.buildAdminHallRequestParams('  夜景  '), {
+    demands: { page: 1, size: 20, status: 'OPEN', keyword: '夜景' },
+    services: { page: 1, size: 20, keyword: '夜景' }
+  })
+})
+
+test('admin hall cards render admin response fields and eligible moderation action', async () => {
+  const previousWindow = globalThis.window
+  globalThis.window = { location: { hostname: 'localhost' } }
+  const { createServer } = await import('vite')
+  const vite = await createServer({ appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } })
+
+  try {
+    await assert.doesNotReject(async () => {
+      const { AdminHallCard } = await vite.ssrLoadModule('/src/pages/admin/components/AdminHallCard.jsx')
+      const [{ createElement }, { renderToStaticMarkup }, { MemoryRouter }] = await Promise.all([
+        import('react'),
+        import('react-dom/server'),
+        import('react-router-dom')
+      ])
+      const markup = renderToStaticMarkup(createElement(
+        MemoryRouter,
+        null,
+        createElement(AdminHallCard, {
+          item: {
+            type: 'DEMAND',
+            id: 7,
+            moderationStatus: 'VISIBLE',
+            publisherId: 42,
+            title: '夜景约拍',
+            description: '城墙边拍摄'
+          },
+          currentUser: { userId: 1, role: 'ADMIN' },
+          onOpen: () => {},
+          onOpenPublisher: () => {}
+        })
+      ))
+
+      assert.match(markup, /VISIBLE/)
+      assert.match(markup, />查看详情<\/button>/)
+      assert.match(markup, />查看发布者<\/button>/)
+      assert.match(markup, />下架<\/button>/)
+      assert.match(markup, /<button[^>]*disabled=""[^>]*>恢复展示<\/button>/)
+      assert.equal((markup.match(/接口待接入/g) || []).length, 0)
+      assert.doesNotMatch(markup, /<button[^>]*>(?:响应|预约|编辑|发布)[^<]*<\/button>/)
+    })
+  } finally {
+    await vite.close()
+    if (previousWindow === undefined) delete globalThis.window
+    else globalThis.window = previousWindow
+  }
+})
+
+test('moment search matches title content and hydrated author name', () => {
+  const moments = [
+    { momentId: 1, authorId: 10, title: '夜景', content: '南京城墙' },
+    { momentId: 2, authorId: 11, title: '早餐', content: '咖啡' }
+  ]
+  const profiles = { 10: { nickname: '林摄影' }, 11: { nickname: '周同学' } }
+  assert.deepEqual(filterAdminMoments(moments, profiles, '林摄影').map(item => item.momentId), [1])
+  assert.deepEqual(filterAdminMoments(moments, profiles, '咖啡').map(item => item.momentId), [2])
+})
+
+test('admin feed can narrow public moments to one author id', () => {
+  const moments = [{ momentId: 1, authorId: 10 }, { momentId: 2, authorId: 11 }]
+  assert.deepEqual(filterAdminMoments(moments, {}, '', 11).map(item => item.momentId), [2])
+})
+
+test('admin feed request params use the administrator page contract', async () => {
+  const adminData = await import('../src/pages/admin/adminData.js')
+  assert.equal(typeof adminData.buildAdminFeedRequestParams, 'function')
+  assert.deepEqual(adminData.buildAdminFeedRequestParams(), { page: 1, size: 20 })
+})
+
+test('admin moment cards keep engagement read-only and expose eligible moderation', async () => {
+  const { createServer } = await import('vite')
+  const vite = await createServer({ appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } })
+
+  try {
+    const { AdminMomentCard } = await vite.ssrLoadModule('/src/pages/admin/components/AdminMomentCard.jsx')
+    const [{ createElement }, { renderToStaticMarkup }] = await Promise.all([
+      import('react'),
+      import('react-dom/server')
+    ])
+    const markup = renderToStaticMarkup(createElement(AdminMomentCard, {
+      moment: {
+        momentId: 8,
+        authorId: 42,
+        authorRole: 'PROVIDER',
+        title: '雨夜胶片',
+        content: '记录城市里的蓝色时刻。',
+        imageDataList: ['https://example.test/rain.jpg'],
+        likeCount: 12,
+        favoriteCount: 3,
+        createdAt: '2026-08-30T12:00:00Z'
+      },
+      author: { nickname: '林摄影', avatarData: '' },
+      onOpen: () => {},
+      onOpenAuthor: () => {}
+    }))
+
+    assert.match(markup, /No\. 000008/)
+    assert.match(markup, /雨夜胶片/)
+    assert.match(markup, /12 个赞/)
+    assert.match(markup, /3 个收藏/)
+    assert.match(markup, /<img[^>]*width="640"[^>]*height="360"[^>]*loading="lazy"/)
+    assert.match(markup, />查看详情<\/button>/)
+    assert.match(markup, />查看作者<\/button>/)
+    assert.match(markup, />下架动态<\/button>/)
+    assert.match(markup, /<button[^>]*disabled=""[^>]*>恢复展示<\/button>/)
+    assert.equal((markup.match(/接口待接入/g) || []).length, 0)
+    assert.doesNotMatch(markup, /<button[^>]*>(?:点赞|收藏|关注|编辑|删除)[^<]*<\/button>/)
+  } finally {
+    await vite.close()
+  }
+})
+
+test('user lookup accepts positive integer ids only', () => {
+  assert.equal(parseExactUserId('42'), 42)
+  assert.equal(parseExactUserId('0'), null)
+  assert.equal(parseExactUserId('abc'), null)
+})
+
+test('admin user facts keep unsupported account fields unknown', () => {
+  const facts = buildAdminUserFacts({ userId: 9, currentRole: 'PROVIDER' }, { creditScore: 4.8 }, 3)
+  assert.equal(facts.find(item => item.key === 'userId').value, 9)
+  assert.equal(facts.find(item => item.key === 'contentCount').value, 3)
+  assert.equal(facts.find(item => item.key === 'accountStatus').value, null)
+  assert.equal(facts.find(item => item.key === 'reportCount').value, null)
+})
+
+test('admin user facts do not turn unavailable public content into zero', () => {
+  const facts = buildAdminUserFacts({ userId: 9 }, undefined, null)
+  assert.equal(facts.find(item => item.key === 'creditScore').value, null)
+  assert.equal(facts.find(item => item.key === 'contentCount').value, null)
+})
+
+test('admin user lookup card exposes only the real profile navigation', async () => {
+  const { createServer } = await import('vite')
+  const vite = await createServer({ appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } })
+
+  try {
+    const { AdminUserCard } = await vite.ssrLoadModule('/src/pages/admin/components/AdminUserCard.jsx')
+    const [{ createElement }, { renderToStaticMarkup }] = await Promise.all([
+      import('react'),
+      import('react-dom/server')
+    ])
+    const markup = renderToStaticMarkup(createElement(AdminUserCard, {
+      user: { userId: 9, nickname: '林摄影', currentRole: 'PROVIDER' },
+      onOpen: () => {}
+    }))
+
+    assert.match(markup, /用户 #9/)
+    assert.match(markup, /林摄影/)
+    assert.match(markup, /摄影师/)
+    assert.match(markup, />查看主页<\/button>/)
+    assert.doesNotMatch(markup, /限制账号|解除限制/)
+  } finally {
+    await vite.close()
+  }
+})
+
+test('reports surface loads real report APIs rather than pending placeholders', async () => {
+  const { readFile } = await import('node:fs/promises')
+  const source = await readFile(new URL('../src/pages/admin/AdminReportsPage.jsx', import.meta.url), 'utf8')
+  assert.match(source, /adminApi\.listReports/)
+  assert.match(source, /adminApi\.getReport/)
+  assert.match(source, /adminApi\.resolveReport/)
+  assert.doesNotMatch(source, /接口待接入/)
+})
+
+test('certification rejection trims and requires a reason', () => {
+  assert.deepEqual(buildCertificationReviewBody('APPROVED', ''), { result: 'APPROVED', reason: '' })
+  assert.deepEqual(buildCertificationReviewBody('REJECTED', '  证件模糊  '), { result: 'REJECTED', reason: '证件模糊' })
+  assert.throws(() => buildCertificationReviewBody('REJECTED', '   '), /请填写驳回原因/)
+})
+
+test('certification list queries request both types and preserve pending mappings', () => {
+  assert.deepEqual(buildCertificationListQueries('ALL', 'PENDING'), [
+    { type: 'REAL_NAME' },
+    { type: 'STUDENT' }
+  ])
+  assert.deepEqual(buildCertificationListQueries('STUDENT', 'APPROVED'), [
+    { type: 'STUDENT', status: 'APPROVED' }
+  ])
+})
+
+test('admin overview loads pending certification records from both certification types', async () => {
+  const queries = []
+  const records = await loadPendingCertificationOverview(async params => {
+    queries.push(params)
+    return params.type === 'REAL_NAME'
+      ? [{ id: 1, type: 'REAL_NAME', status: 'PENDING' }]
+      : [{ id: 2, type: 'STUDENT', status: 'PENDING_REVIEW' }]
+  })
+
+  assert.deepEqual(queries, [{ type: 'REAL_NAME' }, { type: 'STUDENT' }])
+  assert.deepEqual(records.map(item => item.type), ['REAL_NAME', 'STUDENT'])
+})
+
+test('certification fixtures require both dev mode and demo query', () => {
+  assert.equal(shouldUseAdminDemoFixtures(true, '?demo=1'), true)
+  assert.equal(shouldUseAdminDemoFixtures(false, '?demo=1'), false)
+  assert.equal(shouldUseAdminDemoFixtures(true, '?demo=0'), false)
+})
+
+test('production certification request failures never fall back to fixtures', async () => {
+  let fixtureCalls = 0
+  await assert.rejects(
+    loadCertificationSource({
+      demoMode: false,
+      loadReal: async () => { throw new Error('真实接口失败') },
+      loadDemo: async () => { fixtureCalls += 1; return [{ id: 1 }] }
+    }),
+    /真实接口失败/
+  )
+  assert.equal(fixtureCalls, 0)
+})
+
+test('take-down restore account and report bodies require trimmed explanations', () => {
+  assert.deepEqual(buildModerationReasonBody('  违规  '), { reason: '违规' })
+  assert.deepEqual(buildUserStatusBody('DISABLED', '  风险账号  '), { status: 'DISABLED', reason: '风险账号' })
+  assert.deepEqual(buildReportResolutionBody('IGNORE', '  不成立  '), { resolution: 'IGNORE', adminComment: '不成立' })
+  assert.deepEqual(buildComplaintArbitrationBody('REJECTED', '  证据不足  '), { result: 'REJECTED', comment: '证据不足' })
+  assert.throws(() => buildModerationReasonBody('   '), /请填写处理原因/)
+  assert.throws(() => buildComplaintArbitrationBody('REJECTED', '   '), /请填写处理说明/)
+})
+
+test('hiding a review requires a trimmed processing comment', () => {
+  assert.deepEqual(buildComplaintArbitrationBody('REJECTED', '维持原评价'), { result: 'REJECTED', comment: '维持原评价' })
+  assert.deepEqual(buildComplaintArbitrationBody('REVIEW_HIDDEN', '  内容违规  '), { result: 'REVIEW_HIDDEN', comment: '内容违规' })
+  assert.throws(() => buildComplaintArbitrationBody('REVIEW_HIDDEN', '  '), /请填写处理说明/)
+})
+
+test('failed review detail keeps the complaint visible without invented context', () => {
+  const complaints = [
+    { complaintId: 1, reviewId: 10 },
+    { complaintId: 2, reviewId: 11 }
+  ]
+  const enriched = enrichComplaintsWithReviewContext(complaints, {
+    10: { status: 'fulfilled', value: { reviewId: 10, rating: 4, content: '真实评价' } },
+    11: { status: 'rejected', reason: new Error('detail failed') }
+  })
+
+  assert.equal(enriched.length, 2)
+  assert.deepEqual(enriched[0].review, { reviewId: 10, rating: 4, content: '真实评价' })
+  assert.equal(enriched[1].review, null)
+  assert.equal(enriched[1].reviewContextMessage, '评价详情暂不可用')
+})
+
+test('production complaint request failures never fall back to fixtures', async () => {
+  let fixtureCalls = 0
+  await assert.rejects(
+    loadComplaintSource({
+      demoMode: false,
+      loadReal: async () => { throw new Error('真实申诉接口失败') },
+      loadDemo: async () => { fixtureCalls += 1; return [{ complaintId: 1 }] }
+    }),
+    /真实申诉接口失败/
+  )
+  assert.equal(fixtureCalls, 0)
+})
+
+test('successful complaint arbitration refreshes queue and dashboard before success', async () => {
+  const refreshed = []
+  const complaints = await refreshComplaintSurfaces({
+    loadComplaints: async () => { refreshed.push('complaints'); return [{ complaintId: 7 }] },
+    loadDashboard: async () => { refreshed.push('dashboard'); return { pendingArbitrationCount: 2 } }
+  })
+
+  assert.deepEqual(complaints, [{ complaintId: 7 }])
+  assert.deepEqual(refreshed.sort(), ['complaints', 'dashboard'])
+})
+
+test('unknown dashboard values remain unknown instead of becoming zero', () => {
+  const stats = buildAdminDashboardStats({ totalUsers: 12, pendingAuditCount: 3, pendingArbitrationCount: 2 })
+  assert.equal(stats.find(item => item.key === 'reports').value, null)
+  assert.equal(stats.find(item => item.key === 'removed').value, null)
+})
+
+test('dashboard uses real report and removed counts', () => {
+  const stats = buildAdminDashboardStats({ pendingReportCount: 4, removedContentCount: 7 })
+  assert.equal(stats.find(item => item.key === 'reports').value, 4)
+  assert.equal(stats.find(item => item.key === 'removed').value, 7)
+})
+
+test('admin-local detail opener commits the selected admin response', () => {
+  let selected = null
+  const item = { id: 7, title: '真实大厅记录' }
+  openAdminDetail(value => { selected = value }, item)()
+  assert.equal(selected, item)
+})
+
+test('content reports expose both take-down and restore resolutions', () => {
+  assert.deepEqual(reportResolutionOptions('DEMAND'), ['TAKE_DOWN', 'RESTORE', 'IGNORE'])
+  assert.deepEqual(reportResolutionOptions('SERVICE_PACKAGE'), ['TAKE_DOWN', 'RESTORE', 'IGNORE'])
+  assert.deepEqual(reportResolutionOptions('MOMENT'), ['TAKE_DOWN', 'RESTORE', 'IGNORE'])
+})
+
+test('complaint action copy keeps required comments separate from review hiding', () => {
+  assert.deepEqual(complaintActionCopy('REJECTED'), {
+    title: '维持原评价', description: '确认维持原评价；请填写处理说明，并会写入真实申诉记录。', required: true
+  })
+  assert.deepEqual(complaintActionCopy('REVIEW_HIDDEN'), {
+    title: '隐藏原评价', description: '隐藏评价会撤销其信用影响，请填写清楚的处理说明。', required: true
+  })
+})
+
+test('latest request gate rejects stale deferred list results', () => {
+  const gate = createLatestRequestGate()
+  const first = gate.begin()
+  const second = gate.begin()
+  assert.equal(gate.isCurrent(first), false)
+  assert.equal(gate.isCurrent(second), true)
+})
+
+test('changing a management filter resets pagination to the first page', () => {
+  assert.equal(resetAdminPage(), 1)
+})
+
+test('successful governance patch reports refresh failure without resubmitting', async () => {
+  let mutations = 0
+  const result = await completeAdminMutation(
+    async () => { mutations += 1; return { id: 7, moderationStatus: 'HIDDEN' } },
+    async () => { throw new Error('列表刷新失败') }
+  )
+  assert.equal(mutations, 1)
+  assert.equal(result.response.moderationStatus, 'HIDDEN')
+  assert.equal(result.refreshed, false)
+  assert.match(result.refreshError.message, /列表刷新失败/)
+})
+
+test('dashboard stats distinguish real zero from unavailable data', () => {
+  const stats = buildAdminDashboardStats({
+    totalUsers: 0,
+    todayGmvCent: 238800,
+    pendingAuditCount: 0,
+    pendingArbitrationCount: 1
+  })
+  assert.equal(stats.find(item => item.key === 'users').value, 0)
+  assert.equal(stats.find(item => item.key === 'gmv').displayValue, '¥2,388')
+  assert.equal(stats.find(item => item.key === 'reports').value, null)
+})
+
+test('shared admin controls preserve disabled moderation contracts', async () => {
+  const { createServer } = await import('vite')
+  const vite = await createServer({ appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } })
+
+  try {
+    await assert.doesNotReject(async () => {
+      const { AdminActionBar } = await vite.ssrLoadModule('/src/pages/admin/components/AdminActionBar.jsx')
+      const { AdminStatCard } = await vite.ssrLoadModule('/src/pages/admin/components/AdminStatCard.jsx')
+      const { ModerationReasonDialog } = await vite.ssrLoadModule('/src/pages/admin/components/ModerationReasonDialog.jsx')
+      const requiredModules = [
+        '/src/pages/admin/components/AdminModeBanner.jsx',
+        '/src/pages/admin/components/AdminStatusTag.jsx',
+        '/src/pages/admin/components/AdminEmptyState.jsx'
+      ]
+      await Promise.all(requiredModules.map(path => vite.ssrLoadModule(path)))
+
+      const actionBar = AdminActionBar({
+        actions: [{
+          key: 'remove',
+          label: '下架',
+          disabled: true,
+          hint: '接口待接入',
+          onClick: () => assert.fail('disabled admin action must not run')
+        }]
+      })
+      const [actionItem] = actionBar.props.children
+      const [button, hint] = actionItem.props.children
+      assert.equal(button.props.disabled, true)
+      assert.equal(button.props.onClick, undefined)
+      assert.equal(hint.props.children, '接口待接入')
+
+      const [{ createElement }, { renderToStaticMarkup }, { MemoryRouter }] = await Promise.all([
+        import('react'),
+        import('react-dom/server'),
+        import('react-router-dom')
+      ])
+      const statMarkup = renderToStaticMarkup(createElement(
+        MemoryRouter,
+        null,
+        createElement(AdminStatCard, {
+          stat: { label: '平台用户', displayValue: '0', helper: '真实值', available: true },
+          to: '/admin/users'
+        })
+      ))
+      assert.match(statMarkup, /href="\/admin\/users"/)
+
+      const dialog = ModerationReasonDialog({
+        open: true,
+        title: '确认下架',
+        description: '请填写原因',
+        value: '   ',
+        onChange: () => {},
+        onCancel: () => {},
+        onConfirm: () => {},
+        submitting: false,
+        required: true
+      })
+      assert.equal(dialog.props['data-confirm-disabled'], true)
+    })
+  } finally {
+    await vite.close()
+  }
+})
+
+test('admin API sends every completed governance request contract', async () => {
+  const previousWindow = globalThis.window
+  const previousFetch = globalThis.fetch
+  const { createServer } = await import('vite')
+  const vite = await createServer({ appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } })
+  globalThis.window = { location: { hostname: 'localhost' } }
+  const calls = []
+  globalThis.fetch = async (url, options) => {
+    calls.push([url, options])
+    return { ok: true, status: 200, statusText: 'OK', text: async () => JSON.stringify({ code: 200, data: {} }) }
+  }
+
+  try {
+    const { adminApi } = await vite.ssrLoadModule('/src/api/adminApi.js')
+    const cases = [
+      [() => adminApi.listHallItems({ page: 2, keyword: '夜景' }, {}), 'GET', '/admin/hall-items?page=2&keyword=%E5%A4%9C%E6%99%AF'],
+      [() => adminApi.takeDownHallItem('DEMAND', 7, { reason: '违规' }, {}), 'PATCH', '/admin/hall-items/DEMAND/7/take-down', { reason: '违规' }],
+      [() => adminApi.restoreHallItem('SERVICE_PACKAGE', 9, { reason: '恢复' }, {}), 'PATCH', '/admin/hall-items/SERVICE_PACKAGE/9/restore', { reason: '恢复' }],
+      [() => adminApi.listMoments({ page: 3, status: 'VISIBLE' }, {}), 'GET', '/admin/moments?page=3&status=VISIBLE'],
+      [() => adminApi.takeDownMoment(8, { reason: '违规' }, {}), 'PATCH', '/admin/moments/8/take-down', { reason: '违规' }],
+      [() => adminApi.restoreMoment(8, { reason: '恢复' }, {}), 'PATCH', '/admin/moments/8/restore', { reason: '恢复' }],
+      [() => adminApi.listUsers({ page: 2, role: 'PROVIDER' }, {}), 'GET', '/admin/users?page=2&role=PROVIDER'],
+      [() => adminApi.getUserAdminProfile(42, {}), 'GET', '/admin/users/42'],
+      [() => adminApi.updateUserStatus(42, { status: 'DISABLED', reason: '风险' }, {}), 'PATCH', '/admin/users/42/status', { status: 'DISABLED', reason: '风险' }],
+      [() => adminApi.listReports({ page: 3, status: 'PENDING' }, {}), 'GET', '/admin/reports?page=3&status=PENDING'],
+      [() => adminApi.getReport(6, {}), 'GET', '/admin/reports/6'],
+      [() => adminApi.resolveReport(6, { resolution: 'IGNORE', adminComment: '不成立' }, {}), 'PATCH', '/admin/reports/6/resolve', { resolution: 'IGNORE', adminComment: '不成立' }]
+    ]
+
+    for (const [invoke, method, path, body] of cases) {
+      await invoke()
+      const [url, options] = calls.at(-1)
+      assert.equal(url, `http://localhost:8080${path}`)
+      assert.equal(options.method || 'GET', method)
+      assert.equal(options.body, body === undefined ? undefined : JSON.stringify(body))
+    }
+  } finally {
+    await vite.close()
+    if (previousWindow === undefined) delete globalThis.window
+    else globalThis.window = previousWindow
+    if (previousFetch === undefined) delete globalThis.fetch
+    else globalThis.fetch = previousFetch
+  }
+})
+
+test('admin API does not resolve before deferred fetch resolves', async () => {
+  const previousWindow = globalThis.window
+  const previousFetch = globalThis.fetch
+  globalThis.window = { location: { hostname: 'localhost' } }
+  let resolveFetch
+  globalThis.fetch = () => new Promise(resolve => { resolveFetch = resolve })
+  const { createServer } = await import('vite')
+  const vite = await createServer({ appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } })
+  try {
+    const { adminApi } = await vite.ssrLoadModule('/src/api/adminApi.js')
+    let settled = false
+    const pending = adminApi.listReports({ page: 2 }, {}).then(() => { settled = true })
+    await Promise.resolve()
+    assert.equal(settled, false)
+    resolveFetch({ ok: true, status: 200, statusText: 'OK', text: async () => JSON.stringify({ code: 200, data: {} }) })
+    await pending
+    assert.equal(settled, true)
+  } finally {
+    await vite.close()
+    if (previousWindow === undefined) delete globalThis.window
+    else globalThis.window = previousWindow
+    if (previousFetch === undefined) delete globalThis.fetch
+    else globalThis.fetch = previousFetch
+  }
+})

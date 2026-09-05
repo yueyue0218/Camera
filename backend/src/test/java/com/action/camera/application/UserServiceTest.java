@@ -143,9 +143,19 @@ class UserServiceTest {
     @Test
     @DisplayName("login rejects disabled account")
     void login_accountDisabled() {
-        createTestUser("241880166", "test123456", "BANNED");
+        createTestUser("241880166", "test123456", "DISABLED");
 
         assertThatThrownBy(() -> userService.login("241880166", "test123456", "CUSTOMER", null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("账号已被禁用");
+    }
+
+    @Test
+    @DisplayName("admin login rejects disabled account")
+    void adminLogin_disabledAccount() {
+        createTestUser("241880174", "test123456", "DISABLED", "ADMIN");
+
+        assertThatThrownBy(() -> userService.adminLogin("241880174", "test123456"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("账号已被禁用");
     }
