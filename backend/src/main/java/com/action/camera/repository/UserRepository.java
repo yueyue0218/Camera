@@ -16,6 +16,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByStudentNo(String studentNo);
 
+    boolean existsByPhone(String phone);
+
+    Optional<User> findByPhone(String phone);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where u.phone = :phone")
+    Optional<User> findByPhoneForUpdate(@Param("phone") String phone);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where u.id = :id")
     Optional<User> findByIdForUpdate(@Param("id") Long id);

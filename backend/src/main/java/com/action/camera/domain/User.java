@@ -8,7 +8,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "users")
+@Table(name = "users",
+        uniqueConstraints = @UniqueConstraint(name = "uk_users_phone", columnNames = "phone"))
 @Getter
 @Setter
 public class User {
@@ -22,6 +23,15 @@ public class User {
 
     @Column(name = "password_hash", length = 100)
     private String passwordHash;
+
+    @Column(name = "phone", length = 20)
+    private String phone;
+
+    @Column(name = "phone_verified_at")
+    private LocalDateTime phoneVerifiedAt;
+
+    @Column(name = "last_login_at")
+    private LocalDateTime lastLoginAt;
 
     @Column(name = "nickname", nullable = false, length = 64)
     private String nickname;
