@@ -2,12 +2,10 @@ server:
   port: ${PORT:8080}
 
 spring:
-  config:
-    import: optional:application-local.yml
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/camera_app?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai}
     username: ${SPRING_DATASOURCE_USERNAME:root}
-    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:root}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:}}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jackson:
     serialization:
@@ -23,8 +21,8 @@ spring:
     host: ${SPRING_MAIL_HOST:smtp.qq.com}
     port: ${SPRING_MAIL_PORT:587}
     default-encoding: UTF-8
-    username: ${SPRING_MAIL_USERNAME:1245758621@qq.com}
-    password: ${SPRING_MAIL_PASSWORD:rdcszuvjubeejajb}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
@@ -41,7 +39,7 @@ spring:
       max-request-size: 50MB
 
 jwt:
-  secret: camera-platform-secret-key-please-change-in-production-2026
+  secret: ${JWT_SECRET:}
   expire-hours: 24
 
 file:

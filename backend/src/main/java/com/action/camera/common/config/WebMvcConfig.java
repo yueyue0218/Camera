@@ -20,7 +20,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addInterceptor(authInterceptor)
                 .addPathPatterns("/**")
                 .excludePathPatterns(
-                        "/test/**",
                         "/auth/**",
                         "/admin/login",
                         "/users/register",

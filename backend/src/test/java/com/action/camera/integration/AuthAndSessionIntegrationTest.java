@@ -13,6 +13,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 import java.util.Map;
 
@@ -31,6 +32,9 @@ class AuthAndSessionIntegrationTest {
     @Autowired
     private JwtUtil jwtUtil;
 
+    @Autowired
+    private RequestMappingHandlerMapping handlerMapping;
+
     @BeforeEach
     void seedDemoUsers() {
         jdbc.execute("DELETE FROM users WHERE id IN (1001, 2001)");
@@ -41,10 +45,10 @@ class AuthAndSessionIntegrationTest {
     }
 
     @Test
-    void healthCheck_returns200() {
-        ResponseEntity<Map> resp = rest.getForEntity("/test/success", Map.class);
-        assertThat(resp.getStatusCode().value()).isEqualTo(200);
-        assertThat(resp.getBody().get("code")).isEqualTo(200);
+    void testAndDebugEndpoints_areNotMapped() {
+        assertThat(handlerMapping.getHandlerMethods().keySet())
+                .flatExtracting(mapping -> mapping.getPatternValues())
+                .noneMatch(path -> path.startsWith("/test") || path.startsWith("/secure"));
     }
 
     @Test
