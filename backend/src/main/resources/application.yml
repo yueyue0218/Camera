@@ -52,6 +52,26 @@ mybatis-plus:
     map-underscore-to-camel-case: true
 
 camera:
+  session:
+    refresh-cookie-name: ${SESSION_REFRESH_COOKIE_NAME:camera_refresh}
+    refresh-ttl: P${SESSION_REFRESH_TTL_DAYS:30}D
+  sms:
+    provider: ${SMS_PROVIDER:}
+    endpoint: ${SMS_ENDPOINT:dysmsapi.aliyuncs.com}
+    access-key-id: ${SMS_ACCESS_KEY_ID:}
+    access-key-secret: ${SMS_ACCESS_KEY_SECRET:}
+    sign-name: ${SMS_SIGN_NAME:}
+    login-template-id: ${SMS_LOGIN_TEMPLATE_ID:}
+    code-pepper: ${SMS_CODE_PEPPER:}
+    code-ttl: ${SMS_CODE_TTL:5m}
+    resend-cooldown: ${SMS_RESEND_COOLDOWN:60s}
+    max-attempts: ${SMS_MAX_ATTEMPTS:5}
+    phone-hourly-limit: ${SMS_PHONE_HOURLY_LIMIT:5}
+    phone-daily-limit: ${SMS_PHONE_DAILY_LIMIT:20}
+    ip-hourly-limit: ${SMS_IP_HOURLY_LIMIT:20}
+    ip-daily-limit: ${SMS_IP_DAILY_LIMIT:100}
+    device-hourly-limit: ${SMS_DEVICE_HOURLY_LIMIT:10}
+    device-daily-limit: ${SMS_DEVICE_DAILY_LIMIT:50}
   order:
     adapter: local
     c-base-url: http://localhost:8080

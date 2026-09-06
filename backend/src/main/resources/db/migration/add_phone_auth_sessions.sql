@@ -78,6 +78,9 @@ CREATE TABLE IF NOT EXISTS sms_challenges (
     consumed_at     DATETIME     NULL,
     request_ip      VARCHAR(45)  NULL,
     device_id       VARCHAR(128) NULL,
+    delivery_status VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
+    provider_message_id VARCHAR(128) NULL,
+    sent_at         DATETIME     NULL,
     created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_attempt_at DATETIME     NULL,
     KEY idx_sms_phone_purpose_created (phone, purpose, created_at),
@@ -86,6 +89,54 @@ CREATE TABLE IF NOT EXISTS sms_challenges (
     KEY idx_sms_expires_at (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='Hashed SMS verification challenges and abuse-control metadata';
+
+-- B2 delivery state is also repeatable against databases initialized by the B1
+-- version of this migration. Failed provider calls remain unusable but continue
+-- to count toward abuse-control limits.
+SET @sql = (
+    SELECT IF(
+        COUNT(*) = 0,
+        'ALTER TABLE sms_challenges ADD COLUMN delivery_status VARCHAR(20) NOT NULL DEFAULT ''PENDING'' AFTER device_id',
+        'SELECT ''sms_challenges.delivery_status already exists'' AS message'
+    )
+    FROM information_schema.columns
+    WHERE table_schema = @schema_name
+      AND table_name = 'sms_challenges'
+      AND column_name = 'delivery_status'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (
+    SELECT IF(
+        COUNT(*) = 0,
+        'ALTER TABLE sms_challenges ADD COLUMN provider_message_id VARCHAR(128) NULL AFTER delivery_status',
+        'SELECT ''sms_challenges.provider_message_id already exists'' AS message'
+    )
+    FROM information_schema.columns
+    WHERE table_schema = @schema_name
+      AND table_name = 'sms_challenges'
+      AND column_name = 'provider_message_id'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (
+    SELECT IF(
+        COUNT(*) = 0,
+        'ALTER TABLE sms_challenges ADD COLUMN sent_at DATETIME NULL AFTER provider_message_id',
+        'SELECT ''sms_challenges.sent_at already exists'' AS message'
+    )
+    FROM information_schema.columns
+    WHERE table_schema = @schema_name
+      AND table_name = 'sms_challenges'
+      AND column_name = 'sent_at'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS user_sessions (
     id                 BIGINT       PRIMARY KEY AUTO_INCREMENT,

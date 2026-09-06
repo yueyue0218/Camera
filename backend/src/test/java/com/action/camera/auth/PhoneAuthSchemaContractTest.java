@@ -56,7 +56,13 @@ class PhoneAuthSchemaContractTest {
                 .contains("purpose         varchar(32)  not null")
                 .contains("code_hash       varchar(100) not null")
                 .contains("attempt_count   int          not null default 0")
-                .contains("max_attempts    int          not null default 5");
+                .contains("max_attempts    int          not null default 5")
+                .contains("delivery_status varchar(20)  not null default 'pending'")
+                .contains("provider_message_id varchar(128) null")
+                .contains("sent_at         datetime     null")
+                .contains("alter table sms_challenges add column delivery_status")
+                .contains("alter table sms_challenges add column provider_message_id")
+                .contains("alter table sms_challenges add column sent_at");
         for (String index : indexNames(table.indexes())) {
             assertThat(sql).contains(index.toLowerCase());
         }

@@ -32,6 +32,10 @@ file:
     local-path: ./target/test-uploads
 
 camera:
+  session:
+    refresh-ttl: 30d
+  sms:
+    code-pepper: unit-test-sms-code-pepper-not-for-production
   demo:
     seed-users: false
   order:

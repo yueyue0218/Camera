@@ -36,14 +36,20 @@ public class JwtUtil {
 
     /** 生成 token，把用户 id 装进去 */
     public String generateToken(Long userId) {
+        return generateToken(userId, null);
+    }
+
+    public String generateToken(Long userId, String sessionId) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + expireHours * 3600 * 1000);
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(String.valueOf(userId))
                 .issuedAt(now)
-                .expiration(expiry)
-                .signWith(key)
-                .compact();
+                .expiration(expiry);
+        if (sessionId != null && !sessionId.isBlank()) {
+            builder.claim("sid", sessionId);
+        }
+        return builder.signWith(key).compact();
     }
 
     public long getExpireSeconds() {
@@ -52,11 +58,21 @@ public class JwtUtil {
 
     /** 从 token 解析出用户 id；无效或过期会抛异常 */
     public Long parseUserId(String token) {
-        Claims claims = Jwts.parser()
+        Claims claims = parseClaims(token);
+        return claims.getSubject() == null
+                ? null
+                : Long.valueOf(claims.getSubject());
+    }
+
+    public String parseSessionId(String token) {
+        return parseClaims(token).get("sid", String.class);
+    }
+
+    private Claims parseClaims(String token) {
+        return Jwts.parser()
                 .verifyWith(key)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
-        return Long.valueOf(claims.getSubject());
     }
 }

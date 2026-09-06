@@ -77,6 +77,13 @@
             <artifactId>spring-security-crypto</artifactId>
         </dependency>
 
+        <!-- Alibaba Cloud SMS V2 SDK (domestic SMS API 2017-05-25) -->
+        <dependency>
+            <groupId>com.aliyun</groupId>
+            <artifactId>dysmsapi20170525</artifactId>
+            <version>4.6.0</version>
+        </dependency>
+
         <!-- MyBatis-Plus（与现有 JPA 共存，用于 certification 模块） -->
         <dependency>
             <groupId>com.baomidou</groupId>

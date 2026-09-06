@@ -58,6 +58,16 @@ public class SmsChallenge {
     @Column(name = "device_id", length = 128)
     private String deviceId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "delivery_status", nullable = false, length = 20)
+    private SmsDeliveryStatus deliveryStatus = SmsDeliveryStatus.PENDING;
+
+    @Column(name = "provider_message_id", length = 128)
+    private String providerMessageId;
+
+    @Column(name = "sent_at")
+    private LocalDateTime sentAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -71,6 +81,9 @@ public class SmsChallenge {
         }
         if (maxAttempts <= 0) {
             maxAttempts = 5;
+        }
+        if (deliveryStatus == null) {
+            deliveryStatus = SmsDeliveryStatus.PENDING;
         }
     }
 }

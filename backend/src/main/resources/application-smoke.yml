@@ -35,6 +35,10 @@ file:
     local-path: ./target/smoke-uploads
 
 camera:
+  session:
+    refresh-ttl: 30d
+  sms:
+    code-pepper: smoke-only-sms-code-pepper-not-for-production
   demo:
     seed-users: true
   order:

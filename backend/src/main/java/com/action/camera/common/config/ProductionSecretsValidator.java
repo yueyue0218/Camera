@@ -38,6 +38,13 @@ public class ProductionSecretsValidator implements InitializingBean {
         requireText("spring.mail.username", "SPRING_MAIL_USERNAME", missing);
         requireText("spring.mail.password", "SPRING_MAIL_PASSWORD", missing);
         requireText("jwt.secret", "JWT_SECRET", missing);
+        requireText("camera.sms.provider", "SMS_PROVIDER", missing);
+        requireText("camera.sms.endpoint", "SMS_ENDPOINT", missing);
+        requireText("camera.sms.access-key-id", "SMS_ACCESS_KEY_ID", missing);
+        requireText("camera.sms.access-key-secret", "SMS_ACCESS_KEY_SECRET", missing);
+        requireText("camera.sms.sign-name", "SMS_SIGN_NAME", missing);
+        requireText("camera.sms.login-template-id", "SMS_LOGIN_TEMPLATE_ID", missing);
+        requireText("camera.sms.code-pepper", "SMS_CODE_PEPPER", missing);
 
         if (!missing.isEmpty()) {
             throw new IllegalStateException(
@@ -47,6 +54,10 @@ public class ProductionSecretsValidator implements InitializingBean {
         String jwtSecret = environment.getProperty("jwt.secret", "").trim();
         if (jwtSecret.getBytes(StandardCharsets.UTF_8).length < MINIMUM_JWT_SECRET_LENGTH) {
             throw new IllegalStateException("JWT_SECRET must contain at least 32 bytes in production");
+        }
+
+        if (!"aliyun".equalsIgnoreCase(environment.getProperty("camera.sms.provider", ""))) {
+            throw new IllegalStateException("SMS_PROVIDER must be aliyun in production");
         }
 
         if (StringUtils.hasText(environment.getProperty("CAMERA_DEMO_BYPASS_CODE"))) {
