@@ -1,4 +1,5 @@
 import { EnvironmentConfig } from '../common/config/EnvironmentConfig';
+import { NavigationRouteParam } from '../model/NavigationModels';
 
 const ROUTE_LOGIN: string = 'Login';
 const ROUTE_HALL: string = 'Hall';
@@ -7,21 +8,23 @@ const ROUTE_PUBLISH: string = 'Publish';
 const ROUTE_MESSAGE: string = 'Message';
 const ROUTE_ORDER: string = 'Order';
 const ROUTE_PROFILE: string = 'Profile';
+const EMPTY_ROUTE_PARAM: NavigationRouteParam = {};
 
 @Entry
 @Component
 struct Index {
   @Provide('appPathStack') appPathStack: NavPathStack = new NavPathStack();
+  private lastNavigationAt: number = 0;
 
   @Builder
-  PageMap(name: string) {
+  PageMap(name: string, param: Object) {
     NavDestination() {
       if (name === ROUTE_LOGIN) {
         this.PlaceholderPage('登录', '登录入口已预留，认证协议确认后接入。');
       } else if (name === ROUTE_HALL) {
         this.PlaceholderPage('大厅', '后续接入需求和服务套餐真实列表。');
       } else if (name === ROUTE_DEMAND_DETAIL) {
-        this.PlaceholderPage('需求详情', '后续接入 demandId 参数和需求详情接口。');
+        this.DemandDetailPage(param);
       } else if (name === ROUTE_PUBLISH) {
         this.PlaceholderPage('发布需求', '后续接入发布表单和权限校验。');
       } else if (name === ROUTE_MESSAGE) {
@@ -65,8 +68,30 @@ struct Index {
     .backgroundColor('#F7F5F2')
   }
 
-  private openPage(route: string): void {
-    this.appPathStack.pushPathByName(route, null);
+  @Builder
+  DemandDetailPage(param: Object) {
+    if (param === null) {
+      this.PlaceholderPage('需求详情', '缺少 demandId，无法打开详情。');
+    } else {
+      this.PlaceholderPage('需求详情', this.demandDetailDescription(param));
+    }
+  }
+
+  private demandDetailDescription(param: Object): string {
+    const routeParam = param as NavigationRouteParam;
+    if (routeParam.demandId === undefined) {
+      return '缺少 demandId，无法打开详情。';
+    }
+    return `当前需求编号：${routeParam.demandId}`;
+  }
+
+  private openPage(route: string, param: Object = EMPTY_ROUTE_PARAM): void {
+    const currentTime = Date.now();
+    if (currentTime - this.lastNavigationAt < 350) {
+      return;
+    }
+    this.lastNavigationAt = currentTime;
+    this.appPathStack.pushPathByName(route, param);
   }
 
   build() {
@@ -127,6 +152,12 @@ struct Index {
         }
         .width('80%')
         .margin({ top: 16 })
+
+        Button('打开示例需求详情')
+          .width('80%')
+          .height(44)
+          .margin({ top: 16 })
+          .onClick(() => this.openPage(ROUTE_DEMAND_DETAIL, { demandId: 1 } as NavigationRouteParam))
       }
       .width('100%')
       .height('100%')
