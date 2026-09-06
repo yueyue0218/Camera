@@ -1,4 +1,7 @@
 import { EnvironmentConfig } from '../common/config/EnvironmentConfig';
+import { PortraButton } from '../common/components/PortraButton';
+import { PortraCard } from '../common/components/PortraCard';
+import { PortraEmptyView } from '../common/components/PortraEmptyView';
 import { NavigationRouteParam } from '../model/NavigationModels';
 
 const ROUTE_LOGIN: string = 'Login';
@@ -48,11 +51,7 @@ struct Index {
         .fontWeight(FontWeight.Bold)
         .fontColor('#252525')
 
-      Text(description)
-        .fontSize(16)
-        .fontColor('#666666')
-        .margin({ top: 16 })
-        .textAlign(TextAlign.Center)
+      PortraEmptyView({ message: description })
 
       Button('返回')
         .width('72%')
@@ -112,16 +111,19 @@ struct Index {
           .fontColor('#8A817A')
           .margin({ top: 12 })
 
-        Text('当前为导航骨架，尚未接入真实数据。')
-          .fontSize(14)
-          .fontColor('#8A817A')
+        PortraCard({
+          title: '客户端底座',
+          description: '当前为导航骨架，尚未接入真实数据。'
+        })
+          .width('80%')
           .margin({ top: 20 })
 
-        Button('进入大厅')
+        PortraButton({
+          label: '进入大厅',
+          onAction: () => this.openPage(ROUTE_HALL)
+        })
           .width('80%')
-          .height(48)
           .margin({ top: 32 })
-          .onClick(() => this.openPage(ROUTE_HALL))
 
         Row() {
           Button('登录')
