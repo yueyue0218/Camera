@@ -73,3 +73,13 @@ $env:PATH = "$env:NODE_HOME;<DevEcoStudio>/tools/hvigor/bin;<DevEcoStudio>/tools
 ```
 
 该测试使用隔离的 Asset Store 与 NetworkKit 替身，验证环境隔离、存取失败、退出、并发过期、401/403 区分和账号切换。真实设备上的 Asset Store 读写、真实登录和应用重启恢复仍在安装及 B 接口可用后验收。
+
+## D11 非视觉组件行为
+
+现有组件样式仍是临时底座，不代替正式 UI 稿。`PortraButton` 已限制快速重复触发；`PortraInput` 有禁用、焦点和错误状态；`PortraAvatar`、`PortraImage` 对空头像和加载失败提供稳定回退。字符串图片源只允许公开 HTTPS 地址，本地图片使用打包的 `Resource`；需要认证的私有文件不得把 Bearer token 拼进图片 URL，后续由独立下载层处理。
+
+```powershell
+& "$env:NODE_HOME/node.exe" --test tests/components.test.cjs
+```
+
+组件策略可以在电脑上测试；实际图片解码、键盘遮挡、放大字体和小屏布局仍需模拟器或真机验收，并等待最终 UI 稿确定视觉参数。
