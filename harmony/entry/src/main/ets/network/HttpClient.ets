@@ -1,14 +1,26 @@
 import { http } from '@kit.NetworkKit';
 import { BusinessError } from '@kit.BasicServicesKit';
+import { AuthTokenController } from '../auth/AuthTokenController';
 import { EnvironmentConfig } from '../common/config/EnvironmentConfig';
 import { ApiEnvelope } from '../model/ApiModels';
 import { AuthInterceptor } from './AuthInterceptor';
-import { ErrorMapper } from './ErrorMapper';
+import { ErrorMapper, PortraError } from './ErrorMapper';
 
-export class HttpClient {
-  private readonly authInterceptor: AuthInterceptor = new AuthInterceptor();
+export interface AuthenticationExpiredHandler {
+  onExpired(): Promise<void>;
+}
+
+export class HttpClient implements AuthTokenController {
+  private readonly authInterceptor: AuthInterceptor;
+  private readonly authenticationExpiredHandler?: AuthenticationExpiredHandler;
   private readonly requestVersions: Map<string, number> = new Map<string, number>();
   private readonly activeRequests: Map<string, http.HttpRequest> = new Map<string, http.HttpRequest>();
+
+  constructor(authInterceptor: AuthInterceptor = new AuthInterceptor(),
+    authenticationExpiredHandler?: AuthenticationExpiredHandler) {
+    this.authInterceptor = authInterceptor;
+    this.authenticationExpiredHandler = authenticationExpiredHandler;
+  }
 
   setAccessToken(token: string): void {
     this.cancelAllRequests();
@@ -102,7 +114,9 @@ export class HttpClient {
     }
 
     if (response.responseCode < 200 || response.responseCode >= 300) {
-      throw ErrorMapper.fromHttpStatus(response.responseCode);
+      const mappedError = ErrorMapper.fromHttpStatus(response.responseCode);
+      await this.handleAuthenticationExpired(mappedError);
+      throw mappedError;
     }
 
     let envelope: ApiEnvelope<T>;
@@ -121,7 +135,9 @@ export class HttpClient {
     }
 
     if (envelope.code !== 200) {
-      throw ErrorMapper.fromBusinessCode(envelope.code, envelope.message);
+      const mappedError = ErrorMapper.fromBusinessCode(envelope.code, envelope.message);
+      await this.handleAuthenticationExpired(mappedError);
+      throw mappedError;
     }
 
     if (!this.isCurrentRequest(requestKey, requestVersion)) {
@@ -164,5 +180,11 @@ export class HttpClient {
     const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
     return `${normalizedBaseUrl}${normalizedPath}`;
+  }
+
+  private async handleAuthenticationExpired(error: PortraError): Promise<void> {
+    if (this.authenticationExpiredHandler !== undefined && ErrorMapper.isAuthenticationExpired(error)) {
+      await this.authenticationExpiredHandler.onExpired();
+    }
   }
 }

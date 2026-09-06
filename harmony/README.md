@@ -7,7 +7,7 @@
 - ArkTS/ArkUI Stage 工程，目标 SDK 26.0.0。
 - App Shell 和原生 Navigation 已建立，包含 Login、Hall、DemandDetail、Publish、Message、Order、Profile 入口。
 - 网络底座已建立：`HttpClient`、`ApiService`、错误映射、Bearer Token 注入、请求取消和旧响应保护。
-- 客户端认证状态已建立状态边界；安全凭据存储等待 B 确认最终登录/Session 契约后接入。
+- 客户端认证状态与网络层已接通；访问 token 使用 HarmonyOS Asset Store 按环境保存。B 的最终登录/Session 契约仍待接入。
 - 视觉组件目前是临时基础设施，不代表舍友正在设计的最终 UI。
 
 ## 构建
@@ -52,7 +52,7 @@ $env:PATH = "$env:NODE_HOME;<DevEcoStudio>/tools/hvigor/bin;<DevEcoStudio>/tools
 
 两条公开列表使用 `getPublic`，即使本地存在 token 也不附带认证头。其他 `get` 请求可携带 Bearer；通过 HttpClient 设置或清除 token 时会取消在途请求。所有请求禁用自动重定向与 HTTP 缓存；50001 等错误不直接展示后端 SQL 文本。超时码 2300028 依据本地 SDK 声明和[华为 HTTP 文档](https://developer.huawei.com/consumer/en/doc/harmonyos-references-V13/js-apis-http-V13)。
 
-限制：当前仅校验统一响应包装，具体列表记录的字段校验和真实数据接入留待 D08。401/40101 已映射为认证错误，但尚未接通会话自动退出；D10 安全存储与会话联动仍未完成。环境缓存命名空间目前只是配置，尚未接入持久化存储，不能据此认定凭据隔离已经验收。
+限制：当前仅校验统一响应包装，具体列表记录的字段校验和真实数据接入留待 D08。401/40101 会清理会话；403 只表示权限不足。环境缓存命名空间已经用于访问 token，其他业务缓存仍未建立。
 
 ## D09 导航逻辑验证
 
@@ -63,3 +63,13 @@ $env:PATH = "$env:NODE_HOME;<DevEcoStudio>/tools/hvigor/bin;<DevEcoStudio>/tools
 ```
 
 该测试检查七个路由名称、公开/认证入口、登录前目标和详情参数。快速点击由页面入口的 350 ms 保护处理，返回由 `NavPathStack.pop()` 和系统 Navigation 栈处理；设备上的物理返回键和完整交互仍在最后的安装验收中确认。
+
+## D10 认证底座验证
+
+`AppClient` 让导航、会话和网络层共享同一个 token 状态。应用启动时从 Asset Store 恢复当前环境的访问 token；登录、退出、401/40101 会使在途旧请求失效。凭据禁止设备间同步，应用卸载后不保留，且没有保存密码或验证码。
+
+```powershell
+& "$env:NODE_HOME/node.exe" --test tests/auth.test.cjs
+```
+
+该测试使用隔离的 Asset Store 与 NetworkKit 替身，验证环境隔离、存取失败、退出、并发过期、401/403 区分和账号切换。真实设备上的 Asset Store 读写、真实登录和应用重启恢复仍在安装及 B 接口可用后验收。

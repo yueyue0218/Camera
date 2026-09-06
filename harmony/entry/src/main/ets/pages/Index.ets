@@ -1,3 +1,4 @@
+import { AppClient } from '../app/AppClient';
 import { EnvironmentConfig } from '../common/config/EnvironmentConfig';
 import { PortraButton } from '../common/components/PortraButton';
 import { PortraCard } from '../common/components/PortraCard';
@@ -11,7 +12,12 @@ const EMPTY_ROUTE_PARAM: NavigationRouteParam = {};
 @Component
 struct Index {
   @Provide('appPathStack') appPathStack: NavPathStack = new NavPathStack();
+  private readonly appClient: AppClient = AppClient.shared;
   private readonly navigationClickGuard: NavigationClickGuard = new NavigationClickGuard();
+
+  aboutToAppear(): void {
+    this.appClient.restoreSession();
+  }
 
   @Builder
   PageMap(name: string, param: Object) {
@@ -83,8 +89,7 @@ struct Index {
     if (!this.navigationClickGuard.accept(Date.now())) {
       return;
     }
-    // The real session manager will supply this value when D10 is connected.
-    const resolution = NavigationPolicy.resolve(route, param, false);
+    const resolution = NavigationPolicy.resolve(route, param, this.appClient.sessionManager.isAuthenticated());
     this.appPathStack.pushPathByName(resolution.route, resolution.param);
   }
 

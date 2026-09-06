@@ -8,13 +8,14 @@ export enum ErrorKind {
   STALE = 'stale'
 }
 
-export class PortraError {
+export class PortraError extends Error {
   readonly kind: ErrorKind;
   readonly message: string;
   readonly httpStatus: number;
   readonly businessCode: number;
 
   constructor(kind: ErrorKind, message: string, httpStatus: number = 0, businessCode: number = 0) {
+    super(message);
     this.kind = kind;
     this.message = message;
     this.httpStatus = httpStatus;
@@ -79,5 +80,9 @@ export class ErrorMapper {
 
   static isStale(error: PortraError): boolean {
     return error.kind === ErrorKind.STALE;
+  }
+
+  static isAuthenticationExpired(error: PortraError): boolean {
+    return error.httpStatus === 401 || error.businessCode === 40101;
   }
 }
