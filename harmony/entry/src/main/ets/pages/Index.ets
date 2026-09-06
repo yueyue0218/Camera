@@ -2,39 +2,33 @@ import { EnvironmentConfig } from '../common/config/EnvironmentConfig';
 import { PortraButton } from '../common/components/PortraButton';
 import { PortraCard } from '../common/components/PortraCard';
 import { PortraEmptyView } from '../common/components/PortraEmptyView';
-import { NavigationRouteParam } from '../model/NavigationModels';
+import { AppRoute, NavigationRouteParam } from '../model/NavigationModels';
+import { NavigationClickGuard, NavigationPolicy } from '../navigation/NavigationPolicy';
 
-const ROUTE_LOGIN: string = 'Login';
-const ROUTE_HALL: string = 'Hall';
-const ROUTE_DEMAND_DETAIL: string = 'DemandDetail';
-const ROUTE_PUBLISH: string = 'Publish';
-const ROUTE_MESSAGE: string = 'Message';
-const ROUTE_ORDER: string = 'Order';
-const ROUTE_PROFILE: string = 'Profile';
 const EMPTY_ROUTE_PARAM: NavigationRouteParam = {};
 
 @Entry
 @Component
 struct Index {
   @Provide('appPathStack') appPathStack: NavPathStack = new NavPathStack();
-  private lastNavigationAt: number = 0;
+  private readonly navigationClickGuard: NavigationClickGuard = new NavigationClickGuard();
 
   @Builder
   PageMap(name: string, param: Object) {
     NavDestination() {
-      if (name === ROUTE_LOGIN) {
-        this.PlaceholderPage('登录', '登录入口已预留，认证协议确认后接入。');
-      } else if (name === ROUTE_HALL) {
+      if (name === AppRoute.LOGIN) {
+        this.PlaceholderPage('登录', NavigationPolicy.loginDescription(param as NavigationRouteParam));
+      } else if (name === AppRoute.HALL) {
         this.PlaceholderPage('大厅', '后续接入需求和服务套餐真实列表。');
-      } else if (name === ROUTE_DEMAND_DETAIL) {
+      } else if (name === AppRoute.DEMAND_DETAIL) {
         this.DemandDetailPage(param);
-      } else if (name === ROUTE_PUBLISH) {
+      } else if (name === AppRoute.PUBLISH) {
         this.PlaceholderPage('发布需求', '后续接入发布表单和权限校验。');
-      } else if (name === ROUTE_MESSAGE) {
+      } else if (name === AppRoute.MESSAGE) {
         this.PlaceholderPage('消息', '后续接入现有消息接口，不在本步新增实时通信。');
-      } else if (name === ROUTE_ORDER) {
+      } else if (name === AppRoute.ORDER) {
         this.PlaceholderPage('订单', '后续接入订单状态和服务流程。');
-      } else if (name === ROUTE_PROFILE) {
+      } else if (name === AppRoute.PROFILE) {
         this.PlaceholderPage('个人中心', '后续接入个人资料和账号状态。');
       } else {
         this.PlaceholderPage('页面不存在', '未找到对应的导航目标。');
@@ -78,19 +72,20 @@ struct Index {
 
   private demandDetailDescription(param: Object): string {
     const routeParam = param as NavigationRouteParam;
-    if (routeParam.demandId === undefined) {
-      return '缺少 demandId，无法打开详情。';
+    const demandId = NavigationPolicy.validDemandId(routeParam);
+    if (demandId === undefined) {
+      return 'demandId 缺失或无效，无法打开详情。';
     }
-    return `当前需求编号：${routeParam.demandId}`;
+    return `当前需求编号：${demandId}`;
   }
 
-  private openPage(route: string, param: Object = EMPTY_ROUTE_PARAM): void {
-    const currentTime = Date.now();
-    if (currentTime - this.lastNavigationAt < 350) {
+  private openPage(route: AppRoute, param: NavigationRouteParam = EMPTY_ROUTE_PARAM): void {
+    if (!this.navigationClickGuard.accept(Date.now())) {
       return;
     }
-    this.lastNavigationAt = currentTime;
-    this.appPathStack.pushPathByName(route, param);
+    // The real session manager will supply this value when D10 is connected.
+    const resolution = NavigationPolicy.resolve(route, param, false);
+    this.appPathStack.pushPathByName(resolution.route, resolution.param);
   }
 
   build() {
@@ -120,7 +115,7 @@ struct Index {
 
         PortraButton({
           label: '进入大厅',
-          onAction: () => this.openPage(ROUTE_HALL)
+          onAction: () => this.openPage(AppRoute.HALL)
         })
           .width('80%')
           .margin({ top: 32 })
@@ -129,11 +124,11 @@ struct Index {
           Button('登录')
             .layoutWeight(1)
             .margin({ right: 8 })
-            .onClick(() => this.openPage(ROUTE_LOGIN))
+            .onClick(() => this.openPage(AppRoute.LOGIN))
           Button('个人中心')
             .layoutWeight(1)
             .margin({ left: 8 })
-            .onClick(() => this.openPage(ROUTE_PROFILE))
+            .onClick(() => this.openPage(AppRoute.PROFILE))
         }
         .width('80%')
         .margin({ top: 16 })
@@ -142,15 +137,15 @@ struct Index {
           Button('发布需求')
             .layoutWeight(1)
             .margin({ right: 8 })
-            .onClick(() => this.openPage(ROUTE_PUBLISH))
+            .onClick(() => this.openPage(AppRoute.PUBLISH))
           Button('消息')
             .layoutWeight(1)
             .margin({ left: 8, right: 8 })
-            .onClick(() => this.openPage(ROUTE_MESSAGE))
+            .onClick(() => this.openPage(AppRoute.MESSAGE))
           Button('订单')
             .layoutWeight(1)
             .margin({ left: 8 })
-            .onClick(() => this.openPage(ROUTE_ORDER))
+            .onClick(() => this.openPage(AppRoute.ORDER))
         }
         .width('80%')
         .margin({ top: 16 })
@@ -159,7 +154,7 @@ struct Index {
           .width('80%')
           .height(44)
           .margin({ top: 16 })
-          .onClick(() => this.openPage(ROUTE_DEMAND_DETAIL, { demandId: 1 } as NavigationRouteParam))
+          .onClick(() => this.openPage(AppRoute.DEMAND_DETAIL, { demandId: 1 }))
       }
       .width('100%')
       .height('100%')

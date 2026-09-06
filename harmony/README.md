@@ -53,3 +53,13 @@ $env:PATH = "$env:NODE_HOME;<DevEcoStudio>/tools/hvigor/bin;<DevEcoStudio>/tools
 两条公开列表使用 `getPublic`，即使本地存在 token 也不附带认证头。其他 `get` 请求可携带 Bearer；通过 HttpClient 设置或清除 token 时会取消在途请求。所有请求禁用自动重定向与 HTTP 缓存；50001 等错误不直接展示后端 SQL 文本。超时码 2300028 依据本地 SDK 声明和[华为 HTTP 文档](https://developer.huawei.com/consumer/en/doc/harmonyos-references-V13/js-apis-http-V13)。
 
 限制：当前仅校验统一响应包装，具体列表记录的字段校验和真实数据接入留待 D08。401/40101 已映射为认证错误，但尚未接通会话自动退出；D10 安全存储与会话联动仍未完成。环境缓存命名空间目前只是配置，尚未接入持久化存储，不能据此认定凭据隔离已经验收。
+
+## D09 导航逻辑验证
+
+七个第一阶段目标统一由 `NavigationPolicy` 管理。Login、Hall、DemandDetail 是公开入口；Publish、Message、Order、Profile 在游客状态下进入 Login，并保留原目标。DemandDetail 只接受正的安全整数 `demandId`。当前登录协议尚未接通，所以应用壳按游客状态运行。
+
+```powershell
+& "$env:NODE_HOME/node.exe" --test tests/navigation.test.cjs
+```
+
+该测试检查七个路由名称、公开/认证入口、登录前目标和详情参数。快速点击由页面入口的 350 ms 保护处理，返回由 `NavPathStack.pop()` 和系统 Navigation 栈处理；设备上的物理返回键和完整交互仍在最后的安装验收中确认。
