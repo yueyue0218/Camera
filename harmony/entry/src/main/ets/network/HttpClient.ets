@@ -36,8 +36,8 @@ export class HttpClient {
 
   private async request<T>(method: http.RequestMethod, path: string, requestKey: string): Promise<T> {
     const profile = EnvironmentConfig.current();
-    if (!profile.enabled || profile.baseUrl.length === 0) {
-      throw ErrorMapper.config('当前环境没有可用的服务端地址。');
+    if (!EnvironmentConfig.isUsable(profile)) {
+      throw ErrorMapper.config(`当前环境 ${profile.name} 没有可用的服务端地址。`);
     }
 
     const request = http.createHttp();
