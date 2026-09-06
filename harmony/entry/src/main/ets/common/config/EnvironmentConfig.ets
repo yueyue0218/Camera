@@ -74,8 +74,12 @@ export class EnvironmentConfig {
       return false;
     }
 
-    const isHttp = profile.baseUrl.startsWith('http://');
-    return !isHttp || profile.allowsPlainHttp;
+    // Restrict configuration to an origin: no embedded credentials, path or query.
+    if (!/^https?:\/\/[a-zA-Z0-9.-]+(:[0-9]{1,5})?\/?$/.test(profile.baseUrl)) {
+      return false;
+    }
+    return profile.baseUrl.startsWith('https://') ||
+      (profile.name === EnvironmentName.DEV && profile.allowsPlainHttp);
   }
 
   static displayName(): string {

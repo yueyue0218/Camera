@@ -46,7 +46,19 @@ export class ErrorMapper {
     if (code === 40301) {
       return new PortraError(ErrorKind.BUSINESS, '当前账号没有权限执行此操作。', 200, code);
     }
-    return new PortraError(ErrorKind.BUSINESS, message, 200, code);
+    if (code === 40401) {
+      return new PortraError(ErrorKind.BUSINESS, '请求的内容不存在。', 200, code);
+    }
+    // Backend error messages can contain SQL and other internal details.
+    return new PortraError(ErrorKind.BUSINESS,
+      code >= 50000 ? '服务器暂时不可用，请稍后再试。' : `请求未能完成（${code}）。`, 200, code);
+  }
+
+  static fromTransportCode(code: number): PortraError {
+    if (code === 2300028) {
+      return new PortraError(ErrorKind.TIMEOUT, '请求超时，请稍后重试。');
+    }
+    return ErrorMapper.network();
   }
 
   static network(): PortraError {

@@ -10,7 +10,7 @@ export class ApiService {
 
   listDemands(page: number = 1, size: number = 10, requestKey: string = 'demands.list'):
     Promise<PageResult<DemandSummary>> {
-    return this.client.get<PageResult<DemandSummary>>(
+    return this.client.getPublic<PageResult<DemandSummary>>(
       `/demands?page=${page}&size=${size}`,
       requestKey
     );
@@ -22,7 +22,7 @@ export class ApiService {
 
   listServicePackages(page: number = 1, size: number = 10, requestKey: string = 'servicePackages.list'):
     Promise<PageResult<ServicePackageSummary>> {
-    return this.client.get<PageResult<ServicePackageSummary>>(
+    return this.client.getPublic<PageResult<ServicePackageSummary>>(
       `/service-packages?page=${page}&size=${size}`,
       requestKey
     );

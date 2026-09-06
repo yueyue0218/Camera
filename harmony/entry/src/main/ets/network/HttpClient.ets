@@ -1,4 +1,5 @@
 import { http } from '@kit.NetworkKit';
+import { BusinessError } from '@kit.BasicServicesKit';
 import { EnvironmentConfig } from '../common/config/EnvironmentConfig';
 import { ApiEnvelope } from '../model/ApiModels';
 import { AuthInterceptor } from './AuthInterceptor';
@@ -10,15 +11,27 @@ export class HttpClient {
   private readonly activeRequests: Map<string, http.HttpRequest> = new Map<string, http.HttpRequest>();
 
   setAccessToken(token: string): void {
+    this.cancelAllRequests();
     this.authInterceptor.setAccessToken(token);
   }
 
   clearAccessToken(): void {
+    this.cancelAllRequests();
     this.authInterceptor.clearAccessToken();
   }
 
   async get<T>(path: string, requestKey: string = path): Promise<T> {
-    return this.request<T>(http.RequestMethod.GET, path, requestKey);
+    return this.request<T>(http.RequestMethod.GET, path, requestKey, true);
+  }
+
+  async getPublic<T>(path: string, requestKey: string = path): Promise<T> {
+    return this.request<T>(http.RequestMethod.GET, path, requestKey, false);
+  }
+
+  cancelAllRequests(): void {
+    this.activeRequests.forEach((_request: http.HttpRequest, key: string) => {
+      this.cancelRequest(key);
+    });
   }
 
   /**
@@ -34,15 +47,19 @@ export class HttpClient {
     }
   }
 
-  private async request<T>(method: http.RequestMethod, path: string, requestKey: string): Promise<T> {
+  private async request<T>(method: http.RequestMethod, path: string, requestKey: string,
+    authenticated: boolean): Promise<T> {
     const profile = EnvironmentConfig.current();
     if (!EnvironmentConfig.isUsable(profile)) {
       throw ErrorMapper.config(`当前环境 ${profile.name} 没有可用的服务端地址。`);
     }
 
+    if (!path.startsWith('/') || path.startsWith('//') || /[\\\s#]/.test(path)) {
+      throw ErrorMapper.config('接口必须使用以单个 / 开头的相对路径。');
+    }
     const request = http.createHttp();
     const requestVersion = this.beginRequest(requestKey, request);
-    const authorization = this.authInterceptor.authorizationHeader();
+    const authorization = authenticated ? this.authInterceptor.authorizationHeader() : '';
     const options: http.HttpRequestOptions = authorization.length === 0
       ? {
         method: method,
@@ -50,6 +67,7 @@ export class HttpClient {
         expectDataType: http.HttpDataType.STRING,
         connectTimeout: 10000,
         readTimeout: 15000,
+        maxRedirects: 0,
         usingCache: false
       }
       : {
@@ -61,19 +79,20 @@ export class HttpClient {
         expectDataType: http.HttpDataType.STRING,
         connectTimeout: 10000,
         readTimeout: 15000,
+        maxRedirects: 0,
         usingCache: false
       };
 
     let response: http.HttpResponse;
     try {
       response = await request.request(this.buildUrl(profile.baseUrl, path), options);
-    } catch {
+    } catch (error) {
       this.releaseRequest(requestKey, request);
       if (!this.isCurrentRequest(requestKey, requestVersion)) {
         throw ErrorMapper.stale();
       }
       request.destroy();
-      throw ErrorMapper.network();
+      throw ErrorMapper.fromTransportCode((error as BusinessError)?.code);
     }
     request.destroy();
     this.releaseRequest(requestKey, request);
@@ -88,7 +107,15 @@ export class HttpClient {
 
     let envelope: ApiEnvelope<T>;
     try {
+      if (typeof response.result !== 'string') {
+        throw ErrorMapper.parse();
+      }
       envelope = JSON.parse(response.result as string) as ApiEnvelope<T>;
+      if (envelope === null || typeof envelope !== 'object' || Array.isArray(envelope) ||
+        !Number.isInteger(envelope.code) || typeof envelope.message !== 'string' ||
+        (envelope.code === 200 && envelope.data === undefined)) {
+        throw ErrorMapper.parse();
+      }
     } catch {
       throw ErrorMapper.parse();
     }
