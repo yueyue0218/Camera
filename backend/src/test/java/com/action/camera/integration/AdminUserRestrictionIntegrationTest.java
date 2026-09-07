@@ -77,9 +77,7 @@ class AdminUserRestrictionIntegrationTest {
         assertThat(UserContext.getCurrentRole()).isNull();
         assertThat(UserContext.isAdmin()).isFalse();
 
-        mockMvc.perform(post("/users/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(loginBody("241882002", "CUSTOMER")))
+        mockMvc.perform(post("/users/login"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(40901));
 
