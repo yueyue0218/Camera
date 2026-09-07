@@ -24,10 +24,18 @@ const http = {
     };
   }
 };
+class TestBuildProfile {
+  static PORTRA_ENVIRONMENT = 'dev';
+  static PORTRA_BASE_URL = 'http://192.168.1.23:8080';
+}
 require.extensions['.ets'] = (module, filename) => {
   assert.ok(filename.startsWith(sourceRoot + path.sep));
   const originalRequire = module.require.bind(module);
-  module.require = name => name === '@kit.NetworkKit' ? { http } : originalRequire(name);
+  module.require = name => {
+    if (name === '@kit.NetworkKit') return { http };
+    if (name.endsWith('/BuildProfile')) return { default: TestBuildProfile };
+    return originalRequire(name);
+  };
   const output = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 }
   });
@@ -136,7 +144,7 @@ test('public lists omit Bearer, use exact backend paths, and disable redirects/c
     [() => api.listServicePackages(), '/service-packages?page=1&size=10']]) {
     const result = invoke();
     const call = calls.at(-1);
-    assert.equal(call.url, EnvironmentConfig.DEV.baseUrl + suffix);
+    assert.equal(call.url, EnvironmentConfig.current().baseUrl + suffix);
     assert.equal(call.options.header.Authorization, undefined);
     assert.equal(call.options.maxRedirects, 0);
     assert.equal(call.options.usingCache, false);
@@ -159,15 +167,34 @@ test('absolute URLs and ambiguous paths are rejected before network access', asy
   assert.equal(calls.length, before);
 });
 
+test('build products select one endpoint without a committed fallback', () => {
+  const buildProfile = fs.readFileSync(path.resolve(__dirname, '../build-profile.json5'), 'utf8');
+  const hvigorfile = fs.readFileSync(path.resolve(__dirname, '../hvigorfile.ts'), 'utf8');
+  for (const name of ['dev', 'staging', 'production']) {
+    assert.match(buildProfile, new RegExp(`"name": "${name}"`));
+  }
+  assert.doesNotMatch(buildProfile, /127\.0\.0\.1|192\.168\./);
+  assert.match(hvigorfile, /process\.env\.PORTRA_BASE_URL/);
+  assert.match(hvigorfile, /requires an HTTPS PORTRA_BASE_URL/);
+  assert.equal(EnvironmentConfig.current().name, 'dev');
+  assert.equal(EnvironmentConfig.current().baseUrl, 'http://192.168.1.23:8080');
+  assert.equal(EnvironmentConfig.profile('staging').enabled, false);
+  assert.equal(EnvironmentConfig.profile('production').enabled, false);
+  assert.equal(EnvironmentConfig.fromBuildFields('dev', '').enabled, false);
+  assert.equal(EnvironmentConfig.fromBuildFields('invalid', 'https://api.example.com').enabled, false);
+});
+
 test('environment validation rejects unapproved protocols, credentials and non-dev HTTP', () => {
   assert.equal(EnvironmentConfig.isUsable(), true);
-  assert.equal(EnvironmentConfig.isUsable(EnvironmentConfig.STAGING), false);
-  assert.equal(EnvironmentConfig.isUsable(EnvironmentConfig.PRODUCTION), false);
-  for (const baseUrl of ['ftp://host', 'host', 'HTTPS://host', 'https://user:password@host', 'https://host?x=1']) {
-    assert.equal(EnvironmentConfig.isUsable({ ...EnvironmentConfig.DEV, baseUrl }), false);
+  const dev = EnvironmentConfig.fromBuildFields('dev', 'http://192.168.1.23:8080');
+  for (const baseUrl of ['ftp://host', 'host', 'HTTPS://host', 'https://user:password@host',
+    'https://host?x=1', 'http://192.168.1.23:0', 'http://192.168.1.23:65536']) {
+    assert.equal(EnvironmentConfig.isUsable({ ...dev, baseUrl }), false);
   }
-  assert.equal(EnvironmentConfig.isUsable({ ...EnvironmentConfig.STAGING,
-    enabled: true, allowsPlainHttp: true, baseUrl: 'http://example.com' }), false);
-  assert.equal(EnvironmentConfig.isUsable({ ...EnvironmentConfig.STAGING,
-    enabled: true, baseUrl: 'https://example.com' }), true);
+  const stagingHttp = EnvironmentConfig.fromBuildFields('staging', 'http://staging.example.com');
+  const stagingHttps = EnvironmentConfig.fromBuildFields('staging', 'https://staging.example.com');
+  const productionHttps = EnvironmentConfig.fromBuildFields('production', 'https://api.example.com');
+  assert.equal(EnvironmentConfig.isUsable(stagingHttp), false);
+  assert.equal(EnvironmentConfig.isUsable(stagingHttps), true);
+  assert.equal(EnvironmentConfig.isUsable(productionHttps), true);
 });

@@ -27,7 +27,19 @@ $env:PATH = "$env:NODE_HOME;<DevEcoStudio>/tools/hvigor/bin;<DevEcoStudio>/tools
 
 ## 环境和接口状态
 
-当前 `dev` 默认地址是 `http://127.0.0.1:8080`，只适合本机开发。真机联调必须替换为电脑可达的局域网地址；`staging` 和 `production` 在地址确认前保持禁用。
+工程提供 `dev`、`staging`、`production` 三个 Build Product，运行时环境来自生成的 `BuildProfile`，不再固定返回 DEV。地址必须在构建前通过进程环境变量 `PORTRA_BASE_URL` 提供；未提供时网络保持禁用，不会回退到某个开发者的个人 IP。
+
+开发设备与电脑处于同一局域网时，先用 `ipconfig` 找到电脑可达的 IPv4 地址，再执行：
+
+```powershell
+$env:PORTRA_BASE_URL = 'http://<电脑局域网IPv4>:8080'
+& "<DevEcoStudio>/tools/hvigor/bin/hvigorw.bat" assembleHap --no-daemon `
+  -p product=dev
+```
+
+`PORTRA_BASE_URL` 只对当前终端进程有效，不会写入源码或 Git。`127.0.0.1` 在手机或模拟器里通常指设备自身，不能代替电脑地址。后端还必须监听局域网接口，Windows 防火墙也必须允许对应开发端口；这些条件由实际联调确认。Staging 和 Production 必须选择相应 Product，并先把该环境变量设置为团队确认的 HTTPS origin，再构建；Hvigor 和应用运行时都会拒绝这两个环境的 HTTP 地址。
+
+`network_config.json` 显式提供开发 HTTP 所需的系统能力；应用层的 `EnvironmentConfig` 再限制只有 DEV 可以使用 HTTP。该配置不关闭或绕过 HTTPS 证书校验。DevEco Studio 中也必须选择与目标一致的 Product；当前未提供正式地址，因此 Staging 和 Production 仍不能视为联调完成。
 
 当前已核对的公开接口是：
 

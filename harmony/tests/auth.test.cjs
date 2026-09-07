@@ -61,10 +61,18 @@ const mocks = {
   '@kit.ArkTS': { util: { TextEncoder: ArkTextEncoder, TextDecoder: ArkTextDecoder } },
   '@kit.BasicServicesKit': { BusinessError: class BusinessError extends Error {} }
 };
+class TestBuildProfile {
+  static PORTRA_ENVIRONMENT = 'dev';
+  static PORTRA_BASE_URL = 'http://192.168.1.23:8080';
+}
 require.extensions['.ets'] = (module, filename) => {
   assert.ok(filename.startsWith(sourceRoot + path.sep));
   const originalRequire = module.require.bind(module);
-  module.require = name => mocks[name] || originalRequire(name);
+  module.require = name => {
+    if (mocks[name]) return mocks[name];
+    if (name.endsWith('/BuildProfile')) return { default: TestBuildProfile };
+    return originalRequire(name);
+  };
   const output = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 }
   });

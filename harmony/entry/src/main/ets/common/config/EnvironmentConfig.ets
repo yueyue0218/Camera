@@ -1,8 +1,8 @@
+import { BuildEnvironment } from './BuildEnvironment';
+
 /**
- * Client endpoint configuration.
- *
- * Only the local development endpoint is known at this stage. Staging and
- * production remain disabled until the team provides confirmed HTTPS URLs.
+ * Product and endpoint are injected by Hvigor. No developer-specific IP or
+ * unconfirmed server address is stored in source control.
  */
 export enum EnvironmentName {
   DEV = 'dev',
@@ -22,51 +22,37 @@ export interface EnvironmentProfile {
 }
 
 export class EnvironmentConfig {
-  /**
-   * This address is valid for the development machine itself. A real device
-   * must use the computer's reachable LAN address instead of localhost.
-   */
-  static readonly DEV: EnvironmentProfile = {
-    name: EnvironmentName.DEV,
-    baseUrl: 'http://127.0.0.1:8080',
-    enabled: true,
-    allowsPlainHttp: true,
-    cacheNamespace: 'portra:dev',
-    note: '本机开发后端；真机联调时替换为电脑局域网地址'
-  };
-
-  static readonly STAGING: EnvironmentProfile = {
-    name: EnvironmentName.STAGING,
-    baseUrl: '',
-    enabled: false,
-    allowsPlainHttp: false,
-    cacheNamespace: 'portra:staging',
-    note: '等待 C 提供已验证的 Staging HTTPS 地址'
-  };
-
-  static readonly PRODUCTION: EnvironmentProfile = {
-    name: EnvironmentName.PRODUCTION,
-    baseUrl: '',
-    enabled: false,
-    allowsPlainHttp: false,
-    cacheNamespace: 'portra:production',
-    note: '第一阶段不连接生产环境'
-  };
-
   static current(): EnvironmentProfile {
-    return EnvironmentConfig.DEV;
+    return EnvironmentConfig.fromBuildFields(BuildEnvironment.environment(), BuildEnvironment.baseUrl());
   }
 
   static profile(name: EnvironmentName): EnvironmentProfile {
-    switch (name) {
-      case EnvironmentName.STAGING:
-        return EnvironmentConfig.STAGING;
-      case EnvironmentName.PRODUCTION:
-        return EnvironmentConfig.PRODUCTION;
-      case EnvironmentName.DEV:
-      default:
-        return EnvironmentConfig.DEV;
+    const current = EnvironmentConfig.current();
+    if (current.name === name) {
+      return current;
     }
+    return EnvironmentConfig.disabledProfile(name, '当前构建未选择此环境');
+  }
+
+  /** Converts generated BuildProfile fields into one validated runtime profile. */
+  static fromBuildFields(environment: string, baseUrl: string): EnvironmentProfile {
+    const name = EnvironmentConfig.parseName(environment);
+    if (name === undefined) {
+      return EnvironmentConfig.disabledProfile(EnvironmentName.DEV, '构建环境名称无效');
+    }
+    const normalizedBaseUrl = baseUrl.trim();
+    if (normalizedBaseUrl.length === 0 || normalizedBaseUrl.startsWith('@param:')) {
+      return EnvironmentConfig.disabledProfile(name, '构建时尚未提供服务端地址');
+    }
+
+    return {
+      name: name,
+      baseUrl: normalizedBaseUrl,
+      enabled: true,
+      allowsPlainHttp: name === EnvironmentName.DEV,
+      cacheNamespace: `portra:${name}`,
+      note: name === EnvironmentName.DEV ? '本地开发环境' : '团队 HTTPS 环境'
+    };
   }
 
   static isUsable(profile: EnvironmentProfile = EnvironmentConfig.current()): boolean {
@@ -74,8 +60,11 @@ export class EnvironmentConfig {
       return false;
     }
 
-    // Restrict configuration to an origin: no embedded credentials, path or query.
+    // Restrict configuration to an origin: no embedded credentials, path, query or fragment.
     if (!/^https?:\/\/[a-zA-Z0-9.-]+(:[0-9]{1,5})?\/?$/.test(profile.baseUrl)) {
+      return false;
+    }
+    if (!EnvironmentConfig.hasValidPort(profile.baseUrl)) {
       return false;
     }
     return profile.baseUrl.startsWith('https://') ||
@@ -84,5 +73,40 @@ export class EnvironmentConfig {
 
   static displayName(): string {
     return EnvironmentConfig.current().name;
+  }
+
+  private static parseName(value: string): EnvironmentName | undefined {
+    switch (value) {
+      case EnvironmentName.DEV:
+        return EnvironmentName.DEV;
+      case EnvironmentName.STAGING:
+        return EnvironmentName.STAGING;
+      case EnvironmentName.PRODUCTION:
+        return EnvironmentName.PRODUCTION;
+      default:
+        return undefined;
+    }
+  }
+
+  private static disabledProfile(name: EnvironmentName, note: string): EnvironmentProfile {
+    return {
+      name: name,
+      baseUrl: '',
+      enabled: false,
+      allowsPlainHttp: name === EnvironmentName.DEV,
+      cacheNamespace: `portra:${name}`,
+      note: note
+    };
+  }
+
+  private static hasValidPort(baseUrl: string): boolean {
+    const withoutProtocol = baseUrl.startsWith('https://') ? baseUrl.slice(8) : baseUrl.slice(7);
+    const normalized = withoutProtocol.endsWith('/') ? withoutProtocol.slice(0, -1) : withoutProtocol;
+    const separator = normalized.lastIndexOf(':');
+    if (separator < 0) {
+      return true;
+    }
+    const port = Number(normalized.slice(separator + 1));
+    return Number.isInteger(port) && port > 0 && port <= 65535;
   }
 }
