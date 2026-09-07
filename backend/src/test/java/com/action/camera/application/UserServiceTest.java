@@ -1,6 +1,8 @@
 package com.action.camera.application;
 
 import com.action.camera.common.ErrorCode;
+import com.action.camera.auth.repository.UserSessionRepository;
+import com.action.camera.auth.service.SessionAuthenticationResult;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.domain.User;
 import com.action.camera.domain.UserRoleBinding;
@@ -47,6 +49,9 @@ class UserServiceTest {
     @Autowired
     private UserRoleBindingRepository userRoleBindingRepository;
 
+    @Autowired
+    private UserSessionRepository userSessionRepository;
+
     @MockBean
     private VerificationCodeService codeService;
 
@@ -60,6 +65,7 @@ class UserServiceTest {
 
     @BeforeEach
     void setUp() {
+        userSessionRepository.deleteAll();
         userRoleBindingRepository.deleteAll();
         userRepository.deleteAll();
     }
@@ -155,7 +161,7 @@ class UserServiceTest {
     void adminLogin_disabledAccount() {
         createTestUser("241880174", "test123456", "DISABLED", "ADMIN");
 
-        assertThatThrownBy(() -> userService.adminLogin("241880174", "test123456"))
+        assertThatThrownBy(() -> userService.adminLogin("241880174", "test123456", "test-device", null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("账号已被禁用");
     }
@@ -191,7 +197,8 @@ class UserServiceTest {
     void adminLogin_success() {
         User admin = createTestUser("241880170", "test123456", "ACTIVE", "ADMIN");
 
-        LoginResponse response = userService.adminLogin("241880170", "test123456");
+        LoginResponse response = userService.adminLogin(
+                "241880170", "test123456", "test-device", "JUnit").response();
 
         assertThat(response.getToken()).isNotBlank();
         assertThat(response.getUserId()).isEqualTo(admin.getId());
@@ -204,7 +211,7 @@ class UserServiceTest {
     void adminLogin_rejectsNonAdminAccount() {
         createTestUser("241880171", "test123456", "ACTIVE", "CUSTOMER");
 
-        assertThatThrownBy(() -> userService.adminLogin("241880171", "test123456"))
+        assertThatThrownBy(() -> userService.adminLogin("241880171", "test123456", "test-device", null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("当前账号没有管理员权限");
     }
@@ -229,7 +236,9 @@ class UserServiceTest {
         User user = createTestUser("241880173", "test123456", "ACTIVE", "PROVIDER");
         grantAdminBinding(user.getId());
 
-        LoginResponse response = userService.adminLogin("241880173", "test123456");
+        SessionAuthenticationResult result = userService.adminLogin(
+                "241880173", "test123456", "test-device", "JUnit");
+        LoginResponse response = result.response();
 
         assertThat(response.getToken()).isNotBlank();
         assertThat(response.getUserId()).isEqualTo(user.getId());

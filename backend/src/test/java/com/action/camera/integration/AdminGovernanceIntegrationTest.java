@@ -1,7 +1,7 @@
 package com.action.camera.integration;
 
 import com.action.camera.admin.repository.AuditRecordRepository;
-import com.action.camera.common.JwtUtil;
+import com.action.camera.support.TestAuthTokens;
 import com.action.camera.demand.domain.Demand;
 import com.action.camera.demand.domain.DemandResponse;
 import com.action.camera.demand.repository.DemandRepository;
@@ -55,7 +55,7 @@ class AdminGovernanceIntegrationTest {
     private static final Long TARGET_ID = 92704L;
 
     @Autowired private MockMvc mockMvc;
-    @Autowired private JwtUtil jwtUtil;
+    @Autowired private TestAuthTokens jwtUtil;
     @Autowired private DemandRepository demandRepository;
     @Autowired private DemandResponseRepository demandResponseRepository;
     @Autowired private ConversationRepository conversationRepository;

@@ -1,6 +1,6 @@
 package com.action.camera.integration;
 
-import com.action.camera.common.JwtUtil;
+import com.action.camera.support.TestAuthTokens;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,7 +30,7 @@ class AuthAndSessionIntegrationTest {
     private JdbcTemplate jdbc;
 
     @Autowired
-    private JwtUtil jwtUtil;
+    private TestAuthTokens jwtUtil;
 
     @Autowired
     private RequestMappingHandlerMapping handlerMapping;

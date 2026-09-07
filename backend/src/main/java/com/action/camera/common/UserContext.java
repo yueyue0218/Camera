@@ -7,6 +7,7 @@ public class UserContext {
     private static final ThreadLocal<Long> CURRENT_USER = new ThreadLocal<>();
     private static final ThreadLocal<UserRole> CURRENT_ROLE = new ThreadLocal<>();
     private static final ThreadLocal<Boolean> CURRENT_ADMIN = new ThreadLocal<>();
+    private static final ThreadLocal<String> CURRENT_SESSION = new ThreadLocal<>();
 
     public static void setUserId(Long userId) {
         CURRENT_USER.set(userId);
@@ -32,9 +33,18 @@ public class UserContext {
         return Boolean.TRUE.equals(CURRENT_ADMIN.get());
     }
 
+    public static void setSessionId(String sessionId) {
+        CURRENT_SESSION.set(sessionId);
+    }
+
+    public static String getSessionId() {
+        return CURRENT_SESSION.get();
+    }
+
     public static void clear() {
         CURRENT_USER.remove();
         CURRENT_ROLE.remove();
         CURRENT_ADMIN.remove();
+        CURRENT_SESSION.remove();
     }
 }

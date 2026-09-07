@@ -4,6 +4,8 @@ import com.action.camera.auth.domain.UserSession;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -12,6 +14,10 @@ import java.util.Optional;
 public interface UserSessionRepository extends JpaRepository<UserSession, Long> {
 
     Optional<UserSession> findBySessionId(String sessionId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select session from UserSession session where session.sessionId = :sessionId")
+    Optional<UserSession> findBySessionIdForUpdate(@Param("sessionId") String sessionId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<UserSession> findBySessionIdAndUserId(String sessionId, Long userId);

@@ -1,7 +1,7 @@
 package com.action.camera.integration;
 
 import com.action.camera.admin.repository.AuditRecordRepository;
-import com.action.camera.common.JwtUtil;
+import com.action.camera.support.TestAuthTokens;
 import com.action.camera.demand.domain.Demand;
 import com.action.camera.demand.domain.DemandStatus;
 import com.action.camera.demand.repository.DemandRepository;
@@ -44,7 +44,7 @@ class AdminHallModerationIntegrationTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private JwtUtil jwtUtil;
+    private TestAuthTokens jwtUtil;
 
     @Autowired
     private DemandRepository demandRepository;

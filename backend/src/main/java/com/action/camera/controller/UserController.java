@@ -3,16 +3,13 @@ package com.action.camera.controller;
 import com.action.camera.application.UserService;
 import com.action.camera.common.Result;
 import com.action.camera.common.UserContext;
-import com.action.camera.dto.LoginRequest;
-import com.action.camera.dto.LoginResponse;
-import com.action.camera.dto.RegisterRequest;
+import com.action.camera.common.ErrorCode;
+import com.action.camera.common.exception.BusinessException;
 import com.action.camera.dto.SwitchRoleRequest;
 import com.action.camera.dto.SwitchRoleResponse;
 import com.action.camera.dto.UpdateProfileRequest;
 import com.action.camera.dto.UserBriefResponse;
 import com.action.camera.dto.UserProfileResponse;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,28 +30,13 @@ public class UserController {
     }
 
     @PostMapping("/register")
-    public Result<Void> register(@Valid @RequestBody RegisterRequest req) {
-        userService.register(req.getEmail(), req.getCode(), req.getPassword(), req.getNickname(), req.getRole());
-        return Result.success(null, "注册成功");
+    public Result<Void> deprecatedRegister() {
+        throw legacyAuthDisabled();
     }
 
     @PostMapping("/login")
-    public Result<LoginResponse> login(@Valid @RequestBody LoginRequest req, HttpServletRequest request) {
-        String clientIp = extractClientIp(request);
-        LoginResponse response = userService.login(req.getStudentNo(), req.getPassword(), req.getRole(), clientIp);
-        return Result.success(response);
-    }
-
-    private static String extractClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip != null && !ip.isBlank() && !"unknown".equalsIgnoreCase(ip)) {
-            return ip.split(",")[0].trim();
-        }
-        ip = request.getHeader("X-Real-IP");
-        if (ip != null && !ip.isBlank() && !"unknown".equalsIgnoreCase(ip)) {
-            return ip.trim();
-        }
-        return request.getRemoteAddr();
+    public Result<Void> deprecatedLogin() {
+        throw legacyAuthDisabled();
     }
 
     @GetMapping("/me")
@@ -80,5 +62,9 @@ public class UserController {
     public Result<SwitchRoleResponse> switchRole(@RequestBody SwitchRoleRequest req) {
         Long userId = UserContext.getUserId();
         return Result.success(userService.switchRole(userId, req.getRole()));
+    }
+
+    private BusinessException legacyAuthDisabled() {
+        return new BusinessException(ErrorCode.STATUS_CONFLICT, "该登录方式已停用，请使用手机号验证码登录");
     }
 }

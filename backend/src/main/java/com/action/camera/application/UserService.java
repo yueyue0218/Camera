@@ -4,6 +4,8 @@ import com.action.camera.common.ErrorCode;
 import com.action.camera.common.JwtUtil;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.security.UserRole;
+import com.action.camera.auth.service.AuthSessionService;
+import com.action.camera.auth.service.SessionAuthenticationResult;
 import com.action.camera.credit.service.CreditSnapshotService;
 import com.action.camera.domain.User;
 import com.action.camera.dto.LoginResponse;
@@ -30,6 +32,7 @@ public class UserService {
     private final IpLocationService ipLocationService;
     private final UserRoleBindingRepository userRoleBindingRepository;
     private final CreditSnapshotService creditSnapshotService;
+    private final AuthSessionService sessionService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public UserService(UserRepository userRepository,
@@ -38,7 +41,8 @@ public class UserService {
                        ProviderProfileMapper providerProfileMapper,
                        IpLocationService ipLocationService,
                        UserRoleBindingRepository userRoleBindingRepository,
-                       CreditSnapshotService creditSnapshotService) {
+                       CreditSnapshotService creditSnapshotService,
+                       AuthSessionService sessionService) {
         this.userRepository = userRepository;
         this.codeService = codeService;
         this.jwtUtil = jwtUtil;
@@ -46,6 +50,7 @@ public class UserService {
         this.ipLocationService = ipLocationService;
         this.userRoleBindingRepository = userRoleBindingRepository;
         this.creditSnapshotService = creditSnapshotService;
+        this.sessionService = sessionService;
     }
 
     @Transactional
@@ -123,8 +128,11 @@ public class UserService {
         );
     }
 
-    @Transactional(readOnly = true)
-    public LoginResponse adminLogin(String studentNo, String password) {
+    @Transactional
+    public SessionAuthenticationResult adminLogin(String studentNo,
+                                                  String password,
+                                                  String deviceId,
+                                                  String deviceName) {
         User user = userRepository.findByStudentNo(studentNo)
                 .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_ERROR, "学号或密码错误"));
 
@@ -140,8 +148,7 @@ public class UserService {
             throw new BusinessException(ErrorCode.FORBIDDEN, "当前账号没有管理员权限");
         }
 
-        String token = jwtUtil.generateToken(user.getId());
-        return new LoginResponse(token, user.getId(), user.getNickname(), UserRole.ADMIN.name(), true);
+        return sessionService.issue(user, UserRole.ADMIN.name(), true, deviceId, deviceName);
     }
 
     private boolean hasAdminPermission(User user) {

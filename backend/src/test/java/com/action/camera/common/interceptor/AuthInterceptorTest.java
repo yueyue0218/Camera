@@ -8,6 +8,7 @@ import com.action.camera.common.security.UserRole;
 import com.action.camera.domain.User;
 import com.action.camera.repository.UserRepository;
 import com.action.camera.repository.UserRoleBindingRepository;
+import com.action.camera.auth.repository.UserSessionRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.AfterEach;
@@ -32,6 +33,8 @@ class AuthInterceptorTest {
     @Mock
     private UserRoleBindingRepository userRoleBindingRepository;
     @Mock
+    private UserSessionRepository userSessionRepository;
+    @Mock
     private HttpServletRequest request;
     @Mock
     private HttpServletResponse response;
@@ -46,7 +49,7 @@ class AuthInterceptorTest {
         when(request.getMethod()).thenReturn("GET");
         when(request.getRequestURI()).thenReturn("/files/42/download");
 
-        AuthInterceptor interceptor = new AuthInterceptor(jwtUtil, userRepository, userRoleBindingRepository);
+        AuthInterceptor interceptor = interceptor();
 
         assertThat(interceptor.preHandle(request, response, new Object())).isTrue();
         assertThat(UserContext.getUserId()).isNull();
@@ -61,6 +64,7 @@ class AuthInterceptorTest {
         assertThat(UserContext.getUserId()).isEqualTo(41L);
         assertThat(UserContext.getCurrentRole()).isEqualTo(UserRole.CUSTOMER);
         assertThat(UserContext.isAdmin()).isFalse();
+        assertThat(UserContext.getSessionId()).isEqualTo("session-41");
     }
 
     @Test
@@ -76,6 +80,11 @@ class AuthInterceptorTest {
         when(request.getRequestURI()).thenReturn("/notifications");
         when(request.getHeader("Authorization")).thenReturn("Bearer signed-token");
         when(jwtUtil.parseUserId("signed-token")).thenReturn(43L);
+        when(jwtUtil.parseSessionId("signed-token")).thenReturn("session-43");
+        when(userSessionRepository.existsBySessionIdAndUserIdAndRevokedAtIsNullAndExpiresAtAfter(
+                org.mockito.ArgumentMatchers.eq("session-43"),
+                org.mockito.ArgumentMatchers.eq(43L),
+                org.mockito.ArgumentMatchers.any())).thenReturn(true);
         when(userRepository.findById(43L)).thenReturn(Optional.empty());
 
         assertUnauthorizedAndEmptyContext(interceptor());
@@ -87,6 +96,11 @@ class AuthInterceptorTest {
         when(request.getRequestURI()).thenReturn("/notifications");
         when(request.getHeader("Authorization")).thenReturn("Bearer demo-token-customer-44");
         when(jwtUtil.parseUserId("demo-token-customer-44")).thenReturn(44L);
+        when(jwtUtil.parseSessionId("demo-token-customer-44")).thenReturn("session-44");
+        when(userSessionRepository.existsBySessionIdAndUserIdAndRevokedAtIsNullAndExpiresAtAfter(
+                org.mockito.ArgumentMatchers.eq("session-44"),
+                org.mockito.ArgumentMatchers.eq(44L),
+                org.mockito.ArgumentMatchers.any())).thenReturn(true);
         when(userRepository.findById(44L)).thenReturn(Optional.of(user(44L, "CUSTOMER", "DISABLED")));
 
         assertUnauthorizedAndEmptyContext(interceptor());
@@ -110,8 +124,34 @@ class AuthInterceptorTest {
         assertUnauthorizedAndEmptyContext(interceptor());
     }
 
+    @Test
+    void sidlessAccessTokenIsRejected() {
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getRequestURI()).thenReturn("/notifications");
+        when(request.getHeader("Authorization")).thenReturn("Bearer signed-token");
+        when(jwtUtil.parseUserId("signed-token")).thenReturn(46L);
+        when(jwtUtil.parseSessionId("signed-token")).thenReturn(null);
+
+        assertUnauthorizedAndEmptyContext(interceptor());
+    }
+
+    @Test
+    void revokedOrExpiredServerSessionRejectsOtherwiseValidJwt() {
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getRequestURI()).thenReturn("/notifications");
+        when(request.getHeader("Authorization")).thenReturn("Bearer signed-token");
+        when(jwtUtil.parseUserId("signed-token")).thenReturn(47L);
+        when(jwtUtil.parseSessionId("signed-token")).thenReturn("session-47");
+        when(userSessionRepository.existsBySessionIdAndUserIdAndRevokedAtIsNullAndExpiresAtAfter(
+                org.mockito.ArgumentMatchers.eq("session-47"),
+                org.mockito.ArgumentMatchers.eq(47L),
+                org.mockito.ArgumentMatchers.any())).thenReturn(false);
+
+        assertUnauthorizedAndEmptyContext(interceptor());
+    }
+
     private AuthInterceptor interceptor() {
-        return new AuthInterceptor(jwtUtil, userRepository, userRoleBindingRepository);
+        return new AuthInterceptor(jwtUtil, userRepository, userRoleBindingRepository, userSessionRepository);
     }
 
     private void stubBearer(String method, String uri, Long userId, User user) {
@@ -119,6 +159,11 @@ class AuthInterceptorTest {
         when(request.getRequestURI()).thenReturn(uri);
         when(request.getHeader("Authorization")).thenReturn("Bearer signed-token");
         when(jwtUtil.parseUserId("signed-token")).thenReturn(userId);
+        when(jwtUtil.parseSessionId("signed-token")).thenReturn("session-" + userId);
+        when(userSessionRepository.existsBySessionIdAndUserIdAndRevokedAtIsNullAndExpiresAtAfter(
+                org.mockito.ArgumentMatchers.eq("session-" + userId),
+                org.mockito.ArgumentMatchers.eq(userId),
+                org.mockito.ArgumentMatchers.any())).thenReturn(true);
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     }
 

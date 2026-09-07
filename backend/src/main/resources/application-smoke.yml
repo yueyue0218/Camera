@@ -28,7 +28,7 @@ mybatis-plus:
 
 jwt:
   secret: smoke-test-secret-key-for-testing-2026-camera-platform
-  expire-hours: 24
+  access-ttl: 15m
 
 file:
   storage:

@@ -1,6 +1,6 @@
 package com.action.camera.integration;
 
-import com.action.camera.common.JwtUtil;
+import com.action.camera.support.TestAuthTokens;
 import com.action.camera.demand.repository.DemandRepository;
 import com.action.camera.servicepackage.repository.ServicePackageRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,7 +44,7 @@ class B1B2RouteAuthIntegrationTest {
     private JdbcTemplate jdbc;
 
     @Autowired
-    private JwtUtil jwtUtil;
+    private TestAuthTokens jwtUtil;
 
     @BeforeEach
     void cleanDatabase() {

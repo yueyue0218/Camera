@@ -40,7 +40,7 @@ spring:
 
 jwt:
   secret: ${JWT_SECRET:}
-  expire-hours: 24
+  access-ttl: PT${JWT_ACCESS_TTL_MINUTES:15}M
 
 file:
   storage:

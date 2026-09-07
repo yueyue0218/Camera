@@ -1,13 +1,11 @@
 package com.action.camera.integration;
 
 import com.action.camera.admin.repository.AuditRecordRepository;
-import com.action.camera.common.JwtUtil;
+import com.action.camera.support.TestAuthTokens;
 import com.action.camera.common.UserContext;
 import com.action.camera.domain.User;
 import com.action.camera.repository.UserRepository;
 import com.action.camera.repository.UserRoleBindingRepository;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,15 +34,13 @@ class AdminUserRestrictionIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
     @Autowired
-    private JwtUtil jwtUtil;
+    private TestAuthTokens jwtUtil;
     @Autowired
     private UserRepository userRepository;
     @Autowired
     private UserRoleBindingRepository userRoleBindingRepository;
     @Autowired
     private AuditRecordRepository auditRecordRepository;
-    @Autowired
-    private ObjectMapper objectMapper;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
@@ -60,7 +56,7 @@ class AdminUserRestrictionIntegrationTest {
     void disablingUserImmediatelyInvalidatesOldJwtAndRestoreAllowsNewLogin() throws Exception {
         User admin = createUser("241882001", "admin", "ADMIN", "ACTIVE");
         User target = createUser("241882002", "target", "CUSTOMER", "ACTIVE");
-        String oldToken = login("241882002", "CUSTOMER");
+        String oldToken = login("241882002");
 
         mockMvc.perform(get("/notifications").header(HttpHeaders.AUTHORIZATION, bearer(oldToken)))
                 .andExpect(status().isOk())
@@ -85,7 +81,7 @@ class AdminUserRestrictionIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody("241882002", "CUSTOMER")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(40001));
+                .andExpect(jsonPath("$.code").value(40901));
 
         mockMvc.perform(patch("/admin/users/{id}/status", target.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(jwtUtil.generateToken(admin.getId())))
@@ -94,7 +90,7 @@ class AdminUserRestrictionIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("ACTIVE"));
 
-        String newToken = login("241882002", "CUSTOMER");
+        String newToken = login("241882002");
         mockMvc.perform(get("/notifications").header(HttpHeaders.AUTHORIZATION, bearer(newToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
@@ -134,17 +130,9 @@ class AdminUserRestrictionIntegrationTest {
         assertThat(auditRecordRepository.count()).isZero();
     }
 
-    private String login(String studentNo, String role) throws Exception {
-        String body = mockMvc.perform(post("/users/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(loginBody(studentNo, role)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
-        JsonNode json = objectMapper.readTree(body);
-        return json.path("data").path("token").asText();
+    private String login(String studentNo) {
+        User user = userRepository.findByStudentNo(studentNo).orElseThrow();
+        return jwtUtil.generateToken(user.getId());
     }
 
     private User createUser(String studentNo, String nickname, String role, String userStatus) {
@@ -156,11 +144,6 @@ class AdminUserRestrictionIntegrationTest {
         user.setCurrentRole(role);
         user.setStatus(userStatus);
         return userRepository.saveAndFlush(user);
-    }
-
-    private String loginBody(String studentNo, String role) {
-        return "{\"studentNo\":\"" + studentNo + "\",\"password\":\"" + PASSWORD
-                + "\",\"role\":\"" + role + "\"}";
     }
 
     private String bearer(String token) {

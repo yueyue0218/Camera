@@ -5,6 +5,7 @@ import com.action.camera.common.JwtUtil;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.security.UserRole;
+import com.action.camera.auth.repository.UserSessionRepository;
 import com.action.camera.repository.UserRepository;
 import com.action.camera.repository.UserRoleBindingRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,13 +21,16 @@ public class AuthInterceptor implements HandlerInterceptor {
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
     private final UserRoleBindingRepository userRoleBindingRepository;
+    private final UserSessionRepository userSessionRepository;
 
     public AuthInterceptor(JwtUtil jwtUtil,
                            UserRepository userRepository,
-                           UserRoleBindingRepository userRoleBindingRepository) {
+                           UserRoleBindingRepository userRoleBindingRepository,
+                           UserSessionRepository userSessionRepository) {
         this.jwtUtil = jwtUtil;
         this.userRepository = userRepository;
         this.userRoleBindingRepository = userRoleBindingRepository;
+        this.userSessionRepository = userSessionRepository;
     }
 
     @Override
@@ -47,7 +51,8 @@ public class AuthInterceptor implements HandlerInterceptor {
         String token = authHeader.substring(7);
         try {
             Long userId = jwtUtil.parseUserId(token);
-            UserRole role = loadActiveIdentity(userId);
+            String sessionId = jwtUtil.parseSessionId(token);
+            UserRole role = loadActiveIdentity(userId, sessionId);
             enforceProtectedRouteRole(request, role);
         } catch (Exception e) {
             UserContext.clear();
@@ -180,8 +185,10 @@ public class AuthInterceptor implements HandlerInterceptor {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
         try {
-            Long userId = jwtUtil.parseUserId(authHeader.substring(7));
-            loadActiveIdentity(userId);
+            String token = authHeader.substring(7);
+            Long userId = jwtUtil.parseUserId(token);
+            String sessionId = jwtUtil.parseSessionId(token);
+            loadActiveIdentity(userId, sessionId);
         } catch (Exception e) {
             UserContext.clear();
             if (e instanceof BusinessException businessException) {
@@ -197,7 +204,12 @@ public class AuthInterceptor implements HandlerInterceptor {
         UserContext.clear();
     }
 
-    private UserRole loadActiveIdentity(Long userId) {
+    private UserRole loadActiveIdentity(Long userId, String sessionId) {
+        if (userId == null || sessionId == null || sessionId.isBlank()
+                || !userSessionRepository.existsBySessionIdAndUserIdAndRevokedAtIsNullAndExpiresAtAfter(
+                        sessionId, userId, java.time.LocalDateTime.now())) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        }
         var user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
         if (!"ACTIVE".equals(user.getStatus())) {
@@ -209,6 +221,7 @@ public class AuthInterceptor implements HandlerInterceptor {
         UserContext.setUserId(userId);
         UserContext.setCurrentRole(role);
         UserContext.setAdmin(admin);
+        UserContext.setSessionId(sessionId);
         return role;
     }
 

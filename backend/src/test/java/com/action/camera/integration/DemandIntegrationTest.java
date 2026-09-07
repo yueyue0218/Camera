@@ -1,6 +1,6 @@
 package com.action.camera.integration;
 
-import com.action.camera.common.JwtUtil;
+import com.action.camera.support.TestAuthTokens;
 import com.action.camera.notification.entity.Notification;
 import com.action.camera.notification.repository.NotificationRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,7 +29,7 @@ class DemandIntegrationTest {
     private TestRestTemplate rest;
 
     @Autowired
-    private JwtUtil jwtUtil;
+    private TestAuthTokens jwtUtil;
 
     @Autowired
     private NotificationRepository notificationRepository;

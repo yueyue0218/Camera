@@ -1,7 +1,7 @@
 package com.action.camera.integration;
 
 import com.action.camera.admin.repository.AuditRecordRepository;
-import com.action.camera.common.JwtUtil;
+import com.action.camera.support.TestAuthTokens;
 import com.action.camera.common.UserContext;
 import com.action.camera.domain.User;
 import com.action.camera.report.repository.ReportRepository;
@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ReportIntegrationTest {
 
     @Autowired MockMvc mockMvc;
-    @Autowired JwtUtil jwtUtil;
+    @Autowired TestAuthTokens jwtUtil;
     @Autowired UserRepository userRepository;
     @Autowired ReportRepository reportRepository;
     @Autowired AuditRecordRepository auditRecordRepository;

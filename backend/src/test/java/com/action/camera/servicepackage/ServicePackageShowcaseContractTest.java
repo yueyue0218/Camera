@@ -1,6 +1,6 @@
 package com.action.camera.servicepackage;
 
-import com.action.camera.common.JwtUtil;
+import com.action.camera.support.TestAuthTokens;
 import com.action.camera.message.repository.ConversationRepository;
 import com.action.camera.message.repository.MessageRepository;
 import com.action.camera.servicepackage.domain.ServicePackage;
@@ -47,7 +47,7 @@ class ServicePackageShowcaseContractTest {
     private TestRestTemplate rest;
 
     @Autowired
-    private JwtUtil jwtUtil;
+    private TestAuthTokens jwtUtil;
 
     @Autowired
     private JdbcTemplate jdbc;

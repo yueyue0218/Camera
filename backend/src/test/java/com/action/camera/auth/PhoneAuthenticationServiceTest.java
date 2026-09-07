@@ -5,10 +5,10 @@ import com.action.camera.auth.domain.SmsPurpose;
 import com.action.camera.auth.domain.UserSession;
 import com.action.camera.auth.repository.SmsChallengeRepository;
 import com.action.camera.auth.repository.UserSessionRepository;
-import com.action.camera.auth.service.PhoneAuthenticationResult;
 import com.action.camera.auth.service.PhoneAuthenticationService;
 import com.action.camera.auth.service.PhoneLoginRejectedException;
 import com.action.camera.auth.service.PhoneSmsService;
+import com.action.camera.auth.service.SessionAuthenticationResult;
 import com.action.camera.auth.service.SmsCodeInvalidException;
 import com.action.camera.auth.sms.SmsDeliveryReceipt;
 import com.action.camera.auth.sms.SmsMessage;
@@ -103,7 +103,7 @@ class PhoneAuthenticationServiceTest {
     void verifiedNewPhoneCreatesCustomerAndUsableSessionMaterialAtomically() throws Exception {
         String code = sendAndCaptureCode();
 
-        PhoneAuthenticationResult result = authenticationService.verifyAndLogin(
+        SessionAuthenticationResult result = authenticationService.verifyAndLogin(
                 PHONE, SmsPurpose.LOGIN, code, DEVICE_ID, "Chrome on Windows");
 
         User user = userRepository.findByPhone(PHONE).orElseThrow();
@@ -134,7 +134,7 @@ class PhoneAuthenticationServiceTest {
         existing = userRepository.saveAndFlush(existing);
         String code = sendAndCaptureCode();
 
-        PhoneAuthenticationResult result = authenticationService.verifyAndLogin(
+        SessionAuthenticationResult result = authenticationService.verifyAndLogin(
                 PHONE, SmsPurpose.LOGIN, code, DEVICE_ID, null);
 
         assertThat(userRepository.count()).isEqualTo(1);

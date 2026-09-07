@@ -1,6 +1,6 @@
 package com.action.camera.integration;
 
-import com.action.camera.common.JwtUtil;
+import com.action.camera.support.TestAuthTokens;
 import com.action.camera.message.entity.Conversation;
 import com.action.camera.message.entity.Quote;
 import com.action.camera.message.enums.QuoteStatus;
@@ -50,7 +50,7 @@ class OrderFlowIntegrationTest {
     private JdbcTemplate jdbc;
 
     @Autowired
-    private JwtUtil jwtUtil;
+    private TestAuthTokens jwtUtil;
 
     @Autowired
     private ConversationRepository conversationRepository;

@@ -1,10 +1,12 @@
 package com.action.camera.auth;
 
-import com.action.camera.application.VerificationCodeService;
+import com.action.camera.auth.config.SessionProperties;
 import com.action.camera.auth.domain.SmsPurpose;
-import com.action.camera.auth.service.PhoneAuthenticationResult;
+import com.action.camera.auth.service.AuthSessionService;
 import com.action.camera.auth.service.PhoneAuthenticationService;
 import com.action.camera.auth.service.PhoneSmsService;
+import com.action.camera.auth.service.RefreshCookieService;
+import com.action.camera.auth.service.SessionAuthenticationResult;
 import com.action.camera.common.exception.GlobalExceptionHandler;
 import com.action.camera.controller.AuthController;
 import com.action.camera.dto.LoginResponse;
@@ -32,14 +34,17 @@ class PhoneSmsControllerTest {
 
     private PhoneSmsService phoneSmsService;
     private PhoneAuthenticationService phoneAuthenticationService;
+    private AuthSessionService sessionService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         phoneSmsService = mock(PhoneSmsService.class);
         phoneAuthenticationService = mock(PhoneAuthenticationService.class);
+        sessionService = mock(AuthSessionService.class);
+        SessionProperties properties = new SessionProperties();
         AuthController controller = new AuthController(
-                mock(VerificationCodeService.class), phoneSmsService, phoneAuthenticationService);
+                phoneSmsService, phoneAuthenticationService, sessionService, new RefreshCookieService(properties));
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
@@ -94,7 +99,7 @@ class PhoneSmsControllerTest {
     void verifyEndpointKeepsRefreshTokenOutOfBodyAndSetsSecureCookie() throws Exception {
         when(phoneAuthenticationService.verifyAndLogin(
                 anyString(), any(SmsPurpose.class), anyString(), anyString(), any()))
-                .thenReturn(new PhoneAuthenticationResult(
+                .thenReturn(new SessionAuthenticationResult(
                         new LoginResponse("access-token", 42L, "新用户", "CUSTOMER", false),
                         "raw-refresh-token",
                         "camera_refresh",

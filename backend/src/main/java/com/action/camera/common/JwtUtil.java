@@ -1,14 +1,14 @@
 package com.action.camera.common;
 
+import com.action.camera.auth.config.JwtProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import jakarta.annotation.PostConstruct;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Date;
 
 /**
@@ -17,17 +17,14 @@ import java.util.Date;
 @Component
 public class JwtUtil {
 
-    @Value("${jwt.secret}")
-    private String secret;
+    private final JwtProperties properties;
+    private final SecretKey key;
 
-    @Value("${jwt.expire-hours}")
-    private long expireHours;
-
-    private SecretKey key;
-
-    @PostConstruct
-    public void init() {
-        byte[] secretBytes = secret == null ? new byte[0] : secret.getBytes(StandardCharsets.UTF_8);
+    public JwtUtil(JwtProperties properties) {
+        this.properties = properties;
+        byte[] secretBytes = properties.getSecret() == null
+                ? new byte[0]
+                : properties.getSecret().getBytes(StandardCharsets.UTF_8);
         if (secretBytes.length < 32) {
             throw new IllegalStateException("JWT_SECRET must contain at least 32 bytes");
         }
@@ -40,12 +37,12 @@ public class JwtUtil {
     }
 
     public String generateToken(Long userId, String sessionId) {
-        Date now = new Date();
-        Date expiry = new Date(now.getTime() + expireHours * 3600 * 1000);
+        Instant now = Instant.now();
+        Instant expiry = now.plus(properties.getAccessTtl());
         var builder = Jwts.builder()
                 .subject(String.valueOf(userId))
-                .issuedAt(now)
-                .expiration(expiry);
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(expiry));
         if (sessionId != null && !sessionId.isBlank()) {
             builder.claim("sid", sessionId);
         }
@@ -53,7 +50,7 @@ public class JwtUtil {
     }
 
     public long getExpireSeconds() {
-        return expireHours * 3600;
+        return properties.getAccessTtl().toSeconds();
     }
 
     /** 从 token 解析出用户 id；无效或过期会抛异常 */

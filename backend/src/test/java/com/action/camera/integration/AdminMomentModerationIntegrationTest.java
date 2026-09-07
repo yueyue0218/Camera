@@ -2,7 +2,7 @@ package com.action.camera.integration;
 
 import com.action.camera.admin.domain.ModerationStatus;
 import com.action.camera.admin.repository.AuditRecordRepository;
-import com.action.camera.common.JwtUtil;
+import com.action.camera.support.TestAuthTokens;
 import com.action.camera.report.repository.ReportRepository;
 import com.action.camera.social.domain.MomentPost;
 import com.action.camera.social.domain.MomentStatus;
@@ -42,7 +42,7 @@ class AdminMomentModerationIntegrationTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private JwtUtil jwtUtil;
+    private TestAuthTokens jwtUtil;
 
     @Autowired
     private MomentPostRepository momentPostRepository;

@@ -4,7 +4,7 @@ import com.action.camera.dto.LoginResponse;
 
 import java.time.Duration;
 
-public record PhoneAuthenticationResult(
+public record SessionAuthenticationResult(
         LoginResponse response,
         String refreshToken,
         String refreshCookieName,
