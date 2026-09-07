@@ -184,6 +184,32 @@ test('build products select one endpoint without a committed fallback', () => {
   assert.equal(EnvironmentConfig.fromBuildFields('invalid', 'https://api.example.com').enabled, false);
 });
 
+test('system cleartext policy is isolated by product target', () => {
+  const projectProfile = fs.readFileSync(path.resolve(__dirname, '../build-profile.json5'), 'utf8');
+  const moduleProfile = fs.readFileSync(path.resolve(__dirname, '../entry/build-profile.json5'), 'utf8');
+  const sharedPolicy = path.resolve(__dirname,
+    '../entry/src/main/resources/base/profile/network_config.json');
+  const readPolicy = environment => JSON.parse(fs.readFileSync(path.resolve(__dirname,
+    `../entry/src/${environment}/resources/base/profile/network_config.json`), 'utf8'));
+  const permitsCleartext = policy =>
+    policy['network-security-config']['base-config'].cleartextTrafficPermitted;
+
+  assert.equal(fs.existsSync(sharedPolicy), false);
+  assert.equal(permitsCleartext(readPolicy('dev')), true);
+  assert.equal(permitsCleartext(readPolicy('staging')), false);
+  assert.equal(permitsCleartext(readPolicy('production')), false);
+  for (const name of ['default', 'dev', 'staging', 'production']) {
+    assert.match(projectProfile,
+      new RegExp(`"name": "${name}"[\\s\\S]*?"applyToProducts": \\[\\s*"${name}"\\s*\\]`));
+  }
+  for (const [target, resourceEnvironment] of [
+    ['default', 'dev'], ['dev', 'dev'], ['staging', 'staging'], ['production', 'production']
+  ]) {
+    assert.match(moduleProfile,
+      new RegExp(`"name": "${target}"[\\s\\S]*?"\\./src/${resourceEnvironment}/resources"`));
+  }
+});
+
 test('environment validation rejects unapproved protocols, credentials and non-dev HTTP', () => {
   assert.equal(EnvironmentConfig.isUsable(), true);
   const dev = EnvironmentConfig.fromBuildFields('dev', 'http://192.168.1.23:8080');

@@ -96,9 +96,24 @@
         {
           "name": "default",
           "applyToProducts": [
-            "default",
-            "dev",
-            "staging",
+            "default"
+          ]
+        },
+        {
+          "name": "dev",
+          "applyToProducts": [
+            "dev"
+          ]
+        },
+        {
+          "name": "staging",
+          "applyToProducts": [
+            "staging"
+          ]
+        },
+        {
+          "name": "production",
+          "applyToProducts": [
             "production"
           ]
         }

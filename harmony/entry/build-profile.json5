@@ -24,10 +24,49 @@
   ],
   "targets": [
     {
-      "name": "default"
+      "name": "default",
+      "resource": {
+        "directories": [
+          "./src/main/resources",
+          "./src/dev/resources"
+        ]
+      }
+    },
+    {
+      "name": "dev",
+      "resource": {
+        "directories": [
+          "./src/main/resources",
+          "./src/dev/resources"
+        ]
+      }
+    },
+    {
+      "name": "staging",
+      "resource": {
+        "directories": [
+          "./src/main/resources",
+          "./src/staging/resources"
+        ]
+      }
+    },
+    {
+      "name": "production",
+      "resource": {
+        "directories": [
+          "./src/main/resources",
+          "./src/production/resources"
+        ]
+      }
     },
     {
       "name": "ohosTest",
+      "resource": {
+        "directories": [
+          "./src/main/resources",
+          "./src/dev/resources"
+        ]
+      }
     }
   ]
 }

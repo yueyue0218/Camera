@@ -39,7 +39,7 @@ $env:PORTRA_BASE_URL = 'http://<电脑局域网IPv4>:8080'
 
 `PORTRA_BASE_URL` 只对当前终端进程有效，不会写入源码或 Git。`127.0.0.1` 在手机或模拟器里通常指设备自身，不能代替电脑地址。后端还必须监听局域网接口，Windows 防火墙也必须允许对应开发端口；这些条件由实际联调确认。Staging 和 Production 必须选择相应 Product，并先把该环境变量设置为团队确认的 HTTPS origin，再构建；Hvigor 和应用运行时都会拒绝这两个环境的 HTTP 地址。
 
-`network_config.json` 显式提供开发 HTTP 所需的系统能力；应用层的 `EnvironmentConfig` 再限制只有 DEV 可以使用 HTTP。该配置不关闭或绕过 HTTPS 证书校验。DevEco Studio 中也必须选择与目标一致的 Product；当前未提供正式地址，因此 Staging 和 Production 仍不能视为联调完成。
+系统网络策略也按 Product 对应的模块 Target 隔离：`default/dev` 构建才包含允许开发 HTTP 的配置，`staging/production` 构建均显式禁止明文流量；应用层的 `EnvironmentConfig` 还会再次拒绝非 DEV 环境的 HTTP 地址。该配置不关闭或绕过 HTTPS 证书校验。DevEco Studio 中也必须选择与目标一致的 Product；当前未提供正式地址，因此 Staging 和 Production 仍不能视为联调完成。
 
 当前已核对的公开接口是：
 
