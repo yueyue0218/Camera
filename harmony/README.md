@@ -84,7 +84,7 @@ $env:PORTRA_BASE_URL = 'http://<电脑局域网IPv4>:8080'
 & "$env:NODE_HOME/node.exe" --test tests/auth.test.cjs
 ```
 
-该测试使用隔离的 Asset Store 与 NetworkKit 替身，验证环境隔离、存取失败、退出、并发过期、401/403 区分和账号切换。真实设备上的 Asset Store 读写、真实登录和应用重启恢复仍在安装及 B 接口可用后验收。
+该测试使用隔离的 Asset Store 与 NetworkKit 替身，验证环境隔离、存取失败、并发恢复去重、临时恢复失败后的重试、退出、并发过期、401/403 区分和账号切换。真实设备上的 Asset Store 读写、真实登录和应用重启恢复仍在安装及 B 接口可用后验收。
 
 ## D11 非视觉组件行为
 

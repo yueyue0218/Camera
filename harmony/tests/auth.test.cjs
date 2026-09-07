@@ -29,6 +29,7 @@ const Tag = {
 };
 const assets = new Map();
 const assetCalls = { add: [], query: [], remove: [] };
+let assetQueryError = null;
 function aliasKey(bytes) { return Buffer.from(bytes).toString('hex'); }
 const asset = {
   Tag,
@@ -41,6 +42,7 @@ const asset = {
   },
   async query(query) {
     assetCalls.query.push(query);
+    if (assetQueryError !== null) throw assetQueryError;
     const record = assets.get(aliasKey(query.get(Tag.ALIAS)));
     if (!record) throw { code: 24000002 };
     return [new Map(record)];
@@ -86,6 +88,7 @@ const { CredentialOperation, CredentialStoreError } =
 const { AssetCredentialStore } = require('../entry/src/main/ets/storage/AssetCredentialStore.ets');
 const { AuthInterceptor } = require('../entry/src/main/ets/network/AuthInterceptor.ets');
 const { HttpClient } = require('../entry/src/main/ets/network/HttpClient.ets');
+const { AppClient } = require('../entry/src/main/ets/app/AppClient.ets');
 
 class MemoryCredentialStore {
   constructor(credential = null) {
@@ -169,6 +172,27 @@ test('storage failures never create an in-memory authenticated session', async (
   assert.equal(await manager.signIn('token'), false);
   assert.equal(manager.isAuthenticated(), false);
   assert.equal(controller.token, '');
+});
+
+test('application session restore deduplicates concurrency and retries after a transient failure', async () => {
+  assets.clear();
+  assetQueryError = { code: 24000001 };
+  const first = AppClient.shared.restoreSession();
+  const concurrent = AppClient.shared.restoreSession();
+  assert.equal(first, concurrent);
+  await first;
+  assert.equal(AppClient.shared.sessionManager.getStatus(), AuthStatus.GUEST);
+  assert.equal(AppClient.shared.sessionManager.getCredentialError().operation, CredentialOperation.LOAD);
+
+  assetQueryError = null;
+  const store = new AssetCredentialStore('dev', 'portra:dev');
+  await store.save({ accessToken: 'retry-token', environment: 'dev' });
+  const retry = AppClient.shared.restoreSession();
+  assert.notEqual(retry, first);
+  await retry;
+  assert.equal(AppClient.shared.sessionManager.getStatus(), AuthStatus.AUTHENTICATED);
+  assert.equal(AppClient.shared.sessionManager.getSession().accessToken, 'retry-token');
+  await AppClient.shared.sessionManager.signOut();
 });
 
 test('sign out clears local authentication even when secure deletion fails', async () => {

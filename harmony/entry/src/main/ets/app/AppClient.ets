@@ -39,10 +39,21 @@ export class AppClient {
   }
 
   restoreSession(): Promise<void> {
-    if (this.restorePromise === undefined) {
-      const version = this.sessionManager.beginRestore();
-      this.restorePromise = this.sessionManager.restore(version);
+    if (this.restorePromise !== undefined) {
+      return this.restorePromise;
     }
-    return this.restorePromise;
+
+    const version = this.sessionManager.beginRestore();
+    const restore = this.restoreAndRelease(version);
+    this.restorePromise = restore;
+    return restore;
+  }
+
+  private async restoreAndRelease(version: number): Promise<void> {
+    try {
+      await this.sessionManager.restore(version);
+    } finally {
+      this.restorePromise = undefined;
+    }
   }
 }
