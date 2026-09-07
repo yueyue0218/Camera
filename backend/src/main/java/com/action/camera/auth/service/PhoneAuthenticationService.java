@@ -53,7 +53,8 @@ public class PhoneAuthenticationService {
             throw new PhoneLoginRejectedException();
         }
 
-        if (user == null) {
+        boolean newUser = user == null;
+        if (newUser) {
             user = new User();
             user.setPhone(phone);
             user.setNickname(DEFAULT_NICKNAME);
@@ -67,7 +68,10 @@ public class PhoneAuthenticationService {
         ensureCustomerRole(user.getId(), now);
 
         String currentRole = UserRole.parse(user.getCurrentRole(), UserRole.CUSTOMER).name();
-        return sessionService.issue(user, currentRole, false, normalizedDeviceId, normalizedDeviceName);
+        SessionAuthenticationResult result = sessionService.issue(
+                user, currentRole, false, normalizedDeviceId, normalizedDeviceName);
+        result.response().setNewUser(newUser);
+        return result;
     }
 
     private boolean isAdministrator(User user) {

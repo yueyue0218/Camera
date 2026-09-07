@@ -76,6 +76,19 @@ class AuthAndSessionIntegrationTest {
     }
 
     @Test
+    void phoneAuthCors_allowsCredentialedLocalWebRequests() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setOrigin("http://localhost:5173");
+        headers.setAccessControlRequestMethod(HttpMethod.POST);
+
+        ResponseEntity<String> resp = rest.exchange(
+                "/auth/refresh", HttpMethod.OPTIONS, new HttpEntity<>(headers), String.class);
+
+        assertThat(resp.getHeaders().getAccessControlAllowOrigin()).isEqualTo("http://localhost:5173");
+        assertThat(resp.getHeaders().getAccessControlAllowCredentials()).isTrue();
+    }
+
+    @Test
     void protectedEndpoint_withForgedXUserId_returns401() {
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-User-Id", "1001");

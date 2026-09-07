@@ -1,1 +1,1 @@
-export { LoginChoicePage, LoginInfoPage, RegisterPage } from './AuthPages.jsx'
+export { AdminLoginPage, LoginChoicePage, PhoneAuthPage } from './AuthPages.jsx'

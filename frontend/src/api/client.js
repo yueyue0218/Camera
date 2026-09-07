@@ -19,13 +19,13 @@ function notifyAuthenticationTimeout() {
   window.dispatchEvent(new CustomEvent('portra:authentication-timeout'))
 }
 
-function authenticationError(payload = null, status = 401) {
+function authenticationError(payload = null, status = 401, notify = true) {
   const error = new Error(AUTH_TIMEOUT_MESSAGE)
   error.status = status
   error.code = payload?.code || 40101
   error.payload = payload
   error.isAuthenticationTimeout = true
-  notifyAuthenticationTimeout()
+  if (notify) notifyAuthenticationTimeout()
   return error
 }
 
@@ -36,21 +36,30 @@ function isAuthenticationFailure(response, payload) {
 }
 
 export async function request(path, options = {}, currentUser) {
-  if (jwtHasExpired(currentUser?.token)) {
+  const {
+    suppressAuthTimeout = false,
+    skipTokenExpiryCheck = false,
+    ...fetchOptions
+  } = options
+  if (!skipTokenExpiryCheck && jwtHasExpired(currentUser?.token)) {
     throw authenticationError()
   }
-  const isFormDataBody = typeof FormData !== 'undefined' && options.body instanceof FormData
+  const isFormDataBody = typeof FormData !== 'undefined' && fetchOptions.body instanceof FormData
   const headers = {
     ...(!isFormDataBody ? { 'Content-Type': 'application/json' } : {}),
     ...(currentUser?.token ? {
       Authorization: `Bearer ${currentUser.token}`
     } : {}),
-    ...(options.headers || {})
+    ...(fetchOptions.headers || {})
   }
 
   let response
   try {
-    response = await fetch(`${API_BASE}${path}`, { ...options, headers })
+    response = await fetch(`${API_BASE}${path}`, {
+      credentials: 'include',
+      ...fetchOptions,
+      headers
+    })
   } catch (error) {
     const networkError = new Error(`无法连接后端服务（${API_BASE}）。请确认后端已启动，且前端地址已被后端 CORS 放行。`)
     networkError.cause = error
@@ -61,7 +70,7 @@ export async function request(path, options = {}, currentUser) {
   const hasResultEnvelope = payload && Object.prototype.hasOwnProperty.call(payload, 'code')
   if (!response.ok || (hasResultEnvelope && Number(payload.code) !== 200)) {
     if (isAuthenticationFailure(response, payload)) {
-      throw authenticationError(payload, response.status)
+      throw authenticationError(payload, response.status, !suppressAuthTimeout)
     }
     const error = new Error(payload.message || '请求失败')
     error.status = response.status

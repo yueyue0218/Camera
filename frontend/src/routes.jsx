@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './AuthContext.jsx'
-import { LoginChoicePage, LoginInfoPage, RegisterPage } from './pages/auth/index.js'
+import { AdminLoginPage, LoginChoicePage, PhoneAuthPage } from './pages/auth/index.js'
 import { DemandDetailPage, HallPage, ServicePackageDetailPage } from './pages/hall/index.js'
 import { PublishPage, PublishServicePackagePage } from './pages/demand/index.js'
 import { FeedPage, MomentDetailPage } from './pages/feed/index.js'
@@ -110,9 +110,9 @@ export function LoginRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginChoicePage />}>
-        <Route path="sign-in" element={<LoginInfoPage />} />
-        <Route path="admin" element={<LoginInfoPage />} />
-        <Route path="register" element={<RegisterPage />} />
+        <Route path="sign-in" element={<PhoneAuthPage />} />
+        <Route path="admin" element={<AdminLoginPage />} />
+        <Route path="register" element={<Navigate to="/login/sign-in" replace />} />
       </Route>
       <Route path="/login/customer" element={<Navigate to="/login/sign-in" replace />} />
       <Route path="/login/provider" element={<Navigate to="/login/sign-in" replace />} />

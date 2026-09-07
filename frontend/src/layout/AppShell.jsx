@@ -6,7 +6,7 @@ import { Navbar } from './Navbar.jsx'
 
 export default function AppShell() {
   const location = useLocation()
-  const { currentUser, isAuthenticated, logout } = useAuth()
+  const { currentUser, isAuthenticated, isRestoringSession, logout } = useAuth()
   const [authenticationTimedOut, setAuthenticationTimedOut] = useState(false)
   const isLoginRoute = location.pathname === '/login' || location.pathname.startsWith('/login/')
 
@@ -18,6 +18,14 @@ export default function AppShell() {
     window.addEventListener('portra:authentication-timeout', handleAuthenticationTimeout)
     return () => window.removeEventListener('portra:authentication-timeout', handleAuthenticationTimeout)
   }, [logout])
+
+  useEffect(() => {
+    if (isAuthenticated) setAuthenticationTimedOut(false)
+  }, [isAuthenticated])
+
+  if (isRestoringSession) {
+    return <div className="portra-route-loading" role="status" aria-live="polite">正在恢复登录状态...</div>
+  }
 
   if (isLoginRoute) {
     return <LoginRoutes />

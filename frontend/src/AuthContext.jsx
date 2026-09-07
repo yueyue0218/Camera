@@ -1,9 +1,10 @@
-import { createContext, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { USERS } from './auth/demoUsers.js'
+import { authSessionFromResponse, clearLegacyStoredAuthentication } from './auth/phoneAuth.js'
+import { authApi } from './api.js'
 
 export { USERS }
 
-const AUTH_STORAGE_KEY = 'camera-p4-auth'
 const USER_PROFILE_STORAGE_KEY = 'camera-p4-user-profiles'
 
 const AuthContext = createContext(null)
@@ -83,7 +84,6 @@ function normalizeAdminSession(session) {
 
   return {
     token: rawToken,
-    refreshToken: session.refreshToken || '',
     user: {
       ...session.user,
       userId,
@@ -126,7 +126,6 @@ function normalizeSession(session) {
   const bio = isProvider ? providerBio : customerBio
   return {
     token: rawToken,
-    refreshToken: session.refreshToken || '',
     user: {
       ...demoUser,
       ...storedProfile,
@@ -152,33 +151,38 @@ function normalizeSession(session) {
   }
 }
 
-function readStoredSession() {
-  try {
-    return normalizeSession(JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY)))
-  } catch {
-    return null
-  }
-}
-
-function persistSession(session) {
-  if (session) {
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session))
-  } else {
-    localStorage.removeItem(AUTH_STORAGE_KEY)
-  }
-}
-
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(readStoredSession)
+  const [session, setSession] = useState(null)
+  const [isRestoringSession, setIsRestoringSession] = useState(true)
+  const sessionRef = useRef(null)
+  const restoreStartedRef = useRef(false)
   const currentUser = session ? { ...session.user, token: session.token } : null
   const userKey = roleToUserKey(currentUser?.role)
 
-  function completeLogin(nextSession) {
+  useEffect(() => {
+    sessionRef.current = session
+  }, [session])
+
+  const completeLogin = useCallback((nextSession) => {
     const normalized = normalizeSession(nextSession)
     setSession(normalized)
-    persistSession(normalized)
+    sessionRef.current = normalized
     return normalized
-  }
+  }, [])
+
+  useEffect(() => {
+    if (restoreStartedRef.current) return
+    restoreStartedRef.current = true
+    clearLegacyStoredAuthentication()
+
+    authApi.refresh()
+      .then(data => completeLogin(authSessionFromResponse(data)))
+      .catch(() => {
+        setSession(null)
+        sessionRef.current = null
+      })
+      .finally(() => setIsRestoringSession(false))
+  }, [completeLogin])
 
   function updateProfile(partial) {
     if (!session) return null
@@ -196,14 +200,28 @@ export function AuthProvider({ children }) {
     saveStoredProfile(nextUser)
     const nextSession = normalizeSession({ ...session, user: nextUser })
     setSession(nextSession)
-    persistSession(nextSession)
+    sessionRef.current = nextSession
     return nextSession
   }
 
-  function logout() {
+  const logout = useCallback(async () => {
+    const activeSession = sessionRef.current
     setSession(null)
-    persistSession(null)
-  }
+    sessionRef.current = null
+    if (!activeSession?.token) return
+    try {
+      await authApi.logout({ token: activeSession.token })
+    } catch {
+      // If only the access token expired, rotate once through the HttpOnly cookie and
+      // immediately revoke that refreshed server session so a reload cannot sign back in.
+      try {
+        const refreshed = await authApi.refresh()
+        if (refreshed?.token) await authApi.logout({ token: refreshed.token })
+      } catch {
+        // Invalid or revoked server sessions remain unusable; local state is already clear.
+      }
+    }
+  }, [])
 
   function switchRole(newRole) {
     if (!session) return
@@ -213,7 +231,7 @@ export function AuthProvider({ children }) {
       user: { ...session.user, role: newRole }
     })
     setSession(nextSession)
-    persistSession(nextSession)
+    sessionRef.current = nextSession
   }
 
   const value = useMemo(() => ({
@@ -222,11 +240,12 @@ export function AuthProvider({ children }) {
     userKey,
     currentUser,
     isAuthenticated: Boolean(session),
+    isRestoringSession,
     completeLogin,
     logout,
     switchRole,
     updateProfile
-  }), [session, userKey, currentUser])
+  }), [session, userKey, currentUser, isRestoringSession, completeLogin, logout])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

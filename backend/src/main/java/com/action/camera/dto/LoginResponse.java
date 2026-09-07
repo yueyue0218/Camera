@@ -11,6 +11,7 @@ public class LoginResponse {
     private String nickname;
     private String role;
     private boolean adminCapable;
+    private boolean newUser;
 
     public LoginResponse(String token, Long userId, String nickname, String role) {
         this(token, userId, nickname, role, false);

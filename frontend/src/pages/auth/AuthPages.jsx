@@ -2,6 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import { authApi } from '../../api.js'
+import {
+  authSessionFromResponse,
+  getDeviceName,
+  getOrCreateDeviceId,
+  isSupportedPhone,
+  sanitizeVerificationCode,
+  verificationErrorMessage
+} from '../../auth/phoneAuth.js'
 import filmSpringUrl from '../../assets/film-spring.png'
 import filmLibraryUrl from '../../assets/film-library.png'
 import filmSummerUrl from '../../assets/film-summer.png'
@@ -164,34 +172,6 @@ function SuccessBanner({ text }) {
       background: 'rgba(13,47,178,.06)', border: '1px solid rgba(13,47,178,.18)',
       borderRadius: 12, color: BLUE, fontSize: 13, letterSpacing: '.04em', fontFamily: SANS
     }}>{text}</div>
-  )
-}
-
-function _RoleToggle({ value, onChange }) {
-  const options = [
-    { key: 'CUSTOMER', label: '约拍方', hint: '我想拍照' },
-    { key: 'PROVIDER', label: '摄影师', hint: '我来拍' }
-  ]
-  return (
-    <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
-      {options.map(o => (
-        <button
-          key={o.key} type="button" onClick={() => onChange(o.key)}
-          style={{
-            flex: 1, border: `1px solid ${value === o.key ? BLUE : 'rgba(17,16,21,.14)'}`,
-            borderRadius: 14, padding: '11px 10px',
-            background: value === o.key ? 'rgba(13,47,178,.06)' : WARM,
-            cursor: 'pointer', fontFamily: SANS, textAlign: 'center',
-            transition: 'border-color .18s, background .18s'
-          }}
-        >
-          <div style={{ fontSize: 13, fontWeight: 700, color: value === o.key ? BLUE : INK, marginBottom: 3 }}>
-            {o.label}
-          </div>
-          <div style={{ fontSize: 11, color: MUTED }}>{o.hint}</div>
-        </button>
-      ))}
-    </div>
   )
 }
 
@@ -597,53 +577,38 @@ function _NavBtn({ children, onClick, primary }) {
 
 /* ── Login page ────────────────────────────────────────────── */
 
-export function LoginInfoPage() {
+export function AdminLoginPage() {
   usePortraStyles()
   const navigate   = useNavigate()
   const location   = useLocation()
   const { isAuthenticated, currentUser, completeLogin } = useAuth()
-  const [email, setEmail]     = useState('')
+  const [account, setAccount] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]     = useState('')
   const [loading, setLoading] = useState(false)
   const notice = location.state?.notice || ''
   const sessionError = location.state?.error || ''
-  const isAdminEntry = location.pathname === '/login/admin'
   const hasAdminAccess = currentUser?.role === 'ADMIN' || currentUser?.adminCapable
   const authenticatedHome = currentUser?.role === 'ADMIN' ? '/admin' : '/hall'
-  const postLoginHome = isAdminEntry ? '/admin' : '/hall'
 
   useEffect(() => {
     if (!isAuthenticated) return
-    if (isAdminEntry && hasAdminAccess) {
+    if (hasAdminAccess) {
       navigate('/admin', { replace: true })
       return
     }
     navigate(authenticatedHome, { replace: true })
-  }, [authenticatedHome, hasAdminAccess, isAdminEntry, isAuthenticated, navigate])
+  }, [authenticatedHome, hasAdminAccess, isAuthenticated, navigate])
 
   async function submit() {
     setError('')
-    if (!email.trim())  { setError('请输入学校邮箱'); return }
+    if (!account.trim()) { setError('请输入管理员账号'); return }
     if (!password)      { setError('请输入密码'); return }
     setLoading(true)
     try {
-      const data = await (isAdminEntry
-        ? authApi.adminLogin({ email: email.trim(), password })
-        : authApi.login({ email: email.trim(), password }))
-      const loginUser = data?.user || data || {}
-      completeLogin({
-        token: data?.token,
-        refreshToken: data?.refreshToken,
-        user: {
-          ...loginUser,
-          userId: loginUser.userId ?? data?.userId ?? loginUser.id ?? data?.id,
-          nickname: loginUser.nickname ?? data?.nickname,
-          role: loginUser.role ?? data?.role,
-          email: email.trim()
-        }
-      })
-      navigate(postLoginHome, { replace: true })
+      const data = await authApi.adminLogin({ email: account.trim(), password })
+      completeLogin(authSessionFromResponse(data))
+      navigate('/admin', { replace: true })
     } catch (err) {
       setError(err.message || '登录失败，请重试')
     } finally {
@@ -657,30 +622,30 @@ export function LoginInfoPage() {
     <AuthCard>
       <Wordmark size={26} />
       <div style={{ fontSize: 10, letterSpacing: '.22em', color: MUTED, textTransform: 'uppercase', marginTop: 5, marginBottom: 26, fontFamily: SANS }}>
-        {isAdminEntry ? 'ADMIN ACCESS' : 'MEET RIGHT NOW'}
+        ADMIN ACCESS
       </div>
-      <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '.04em', marginBottom: 4, color: INK }}>欢迎回来</div>
-      <div style={{ fontSize: 13, color: MUTED, marginBottom: 22, lineHeight: 1.65 }}>输入邮箱和密码，进入你的 Portra</div>
+      <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '.04em', marginBottom: 4, color: INK }}>管理员登录</div>
+      <div style={{ fontSize: 13, color: MUTED, marginBottom: 22, lineHeight: 1.65 }}>使用管理员账号进入治理后台</div>
 
       <SuccessBanner text={notice} />
       <ErrorBanner text={sessionError} />
       <ErrorBanner text={error} />
 
       <div style={{ marginBottom: 14 }}>
-        <FieldLabel label="学校邮箱" htmlFor="li-email" />
+        <FieldLabel label="管理员账号" htmlFor="admin-account" />
         <FocusInput
-          id="li-email" type="email"
-          placeholder="yourname@smail.nju.edu.cn"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
+          id="admin-account" type="text"
+          placeholder="请输入管理员账号"
+          value={account}
+          onChange={e => setAccount(e.target.value)}
           onKeyDown={handleKey}
-          autoComplete="email"
+          autoComplete="username"
         />
       </div>
       <div style={{ marginBottom: 22 }}>
-        <FieldLabel label="密码" htmlFor="li-pwd" />
+        <FieldLabel label="管理员密码" htmlFor="admin-password" />
         <FocusInput
-          id="li-pwd" type="password"
+          id="admin-password" type="password"
           placeholder="请输入密码"
           value={password}
           onChange={e => setPassword(e.target.value)}
@@ -689,29 +654,28 @@ export function LoginInfoPage() {
         />
       </div>
 
-      <PrimaryBtn onClick={submit} loading={loading}>进入 Portra</PrimaryBtn>
-      {!isAdminEntry ? <SwitchLine prompt="还没有账号？" linkText="立即注册" onClick={() => navigate('/login/register')} /> : null}
-      {!isAdminEntry ? <BackLink label="返回" onClick={() => navigate('/login')} /> : null}
+      <PrimaryBtn onClick={submit} loading={loading}>进入管理后台</PrimaryBtn>
+      <BackLink label="返回手机号登录" onClick={() => navigate('/login/sign-in')} />
     </AuthCard>
   )
 }
 
 /* ── Register page (2-step) ────────────────────────────────── */
 
-export function RegisterPage() {
+export function PhoneAuthPage() {
   usePortraStyles()
   const navigate = useNavigate()
-  const { isAuthenticated, currentUser } = useAuth()
-  const [step, setStep] = useState(1)
-  const [email, setEmail]       = useState('')
-  const [code, setCode]         = useState('')
-  const [password, setPassword] = useState('')
-  const [password2, setPassword2] = useState('')
+  const location = useLocation()
+  const { isAuthenticated, currentUser, completeLogin } = useAuth()
+  const [phone, setPhone] = useState('')
+  const [code, setCode] = useState('')
   const [codeSent, setCodeSent] = useState(false)
   const [codeHint, setCodeHint] = useState('')
   const [cooldown, setCooldown] = useState(0)
-  const [error, setError]       = useState('')
-  const [loading, setLoading]   = useState(false)
+  const [agreementAccepted, setAgreementAccepted] = useState(false)
+  const [error, setError] = useState(location.state?.error || '')
+  const [sending, setSending] = useState(false)
+  const [verifying, setVerifying] = useState(false)
   const timerRef = useRef(null)
 
   useEffect(() => {
@@ -721,13 +685,16 @@ export function RegisterPage() {
 
   async function sendCode() {
     setError('')
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setError('请输入有效的学校邮箱'); return
+    if (!isSupportedPhone(phone)) {
+      setError('请输入有效的中国大陆手机号'); return
     }
-    setLoading(true)
+    if (!agreementAccepted) {
+      setError('请先阅读并同意用户协议和隐私政策'); return
+    }
+    setSending(true)
     try {
-      await authApi.sendCode(email.trim())
-      setCodeHint('验证码已发送，请查收邮箱。')
+      await authApi.sendSmsCode({ phone: phone.trim(), deviceId: getOrCreateDeviceId() })
+      setCodeHint('验证码已发送，5 分钟内有效。')
       setCodeSent(true)
       setCooldown(60)
       timerRef.current = setInterval(() => {
@@ -739,37 +706,49 @@ export function RegisterPage() {
     } catch (err) {
       setError(err.message || '发送失败，请稍后重试')
     } finally {
-      setLoading(false)
+      setSending(false)
     }
   }
 
-  function toStep2() {
+  async function verifyCode() {
     setError('')
-    if (!email.trim())  { setError('请输入学校邮箱'); return }
-    if (!codeSent)      { setError('请先点击「获取验证码」'); return }
-    if (!code.trim())   { setError('请输入验证码'); return }
-    setStep(2)
-  }
-
-  async function register() {
-    setError('')
-    if (password.length < 8)   { setError('密码至少需要 8 位字符'); return }
-    if (password !== password2) { setError('两次密码不一致'); return }
-    setLoading(true)
+    if (!isSupportedPhone(phone)) { setError('请输入有效的中国大陆手机号'); return }
+    if (!codeSent) { setError('请先获取验证码'); return }
+    if (!/^\d{6}$/.test(code)) { setError('请输入 6 位验证码'); return }
+    setVerifying(true)
     try {
-      await authApi.register({
-        nickname: email.split('@')[0] || '南大同学',
-        email: email.trim(),
-        code: code.trim(),
-        password,
-        role: 'CUSTOMER'
+      const data = await authApi.verifySmsCode({
+        phone: phone.trim(),
+        code,
+        deviceId: getOrCreateDeviceId(),
+        deviceName: getDeviceName()
       })
-      navigate('/login/sign-in', { replace: true, state: { notice: '注册成功，请登录' } })
+      completeLogin(authSessionFromResponse(data))
+      if (data.newUser) {
+        navigate('/profile', { replace: true, state: { onboarding: true } })
+        return
+      }
+      const requestedPath = location.state?.from
+      const destination = typeof requestedPath === 'string'
+        && requestedPath.startsWith('/') && !requestedPath.startsWith('//')
+        ? requestedPath
+        : '/hall'
+      navigate(destination, { replace: true })
     } catch (err) {
-      setError(err.message || '注册失败，请重试')
+      setError(verificationErrorMessage(err))
     } finally {
-      setLoading(false)
+      setVerifying(false)
     }
+  }
+
+  function changePhone(event) {
+    const nextPhone = event.target.value
+    if (nextPhone !== phone && codeSent) {
+      setCodeSent(false)
+      setCode('')
+      setCodeHint('手机号已变更，请重新获取验证码。')
+    }
+    setPhone(nextPhone)
   }
 
   return (
@@ -778,109 +757,87 @@ export function RegisterPage() {
       <div style={{ fontSize: 10, letterSpacing: '.22em', color: MUTED, textTransform: 'uppercase', marginTop: 5, marginBottom: 24, fontFamily: SANS }}>
         MEET RIGHT NOW
       </div>
-        {/* step dots */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <div style={{ width: 26, height: 4, borderRadius: 999, background: BLUE }} />
-            <div style={{ width: 26, height: 4, borderRadius: 999, background: step === 2 ? BLUE : 'rgba(17,16,21,.12)', transition: 'background .3s' }} />
-          </div>
-          <span style={{ fontSize: 11, color: MUTED, letterSpacing: '.12em', fontFamily: SANS }}>步骤 {step} / 2</span>
+      <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '.04em', marginBottom: 4, color: INK }}>手机号登录或注册</div>
+      <div style={{ fontSize: 13, color: MUTED, marginBottom: 22, lineHeight: 1.65 }}>未注册手机号验证成功后将自动创建账号</div>
+
+      <ErrorBanner text={error} />
+
+      <div style={{ marginBottom: 14 }}>
+        <FieldLabel label="手机号" htmlFor="phone-auth-phone" />
+        <FocusInput
+          id="phone-auth-phone"
+          type="tel"
+          inputMode="tel"
+          placeholder="请输入手机号"
+          value={phone}
+          onChange={changePhone}
+          autoComplete="tel"
+        />
+      </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <FieldLabel label="短信验证码" htmlFor="phone-auth-code" />
+        <div style={{ display: 'flex', gap: 10 }}>
+          <FocusInput
+            id="phone-auth-code"
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            placeholder="6 位验证码"
+            maxLength={6}
+            value={code}
+            disabled={!codeSent}
+            onChange={event => setCode(sanitizeVerificationCode(event.target.value))}
+            onKeyDown={event => event.key === 'Enter' && verifyCode()}
+            style={{ flex: 1, letterSpacing: '.24em' }}
+          />
+          <button
+            type="button"
+            onClick={sendCode}
+            disabled={cooldown > 0 || sending || verifying}
+            style={{
+              flexShrink: 0, height: 50, border: 0, borderRadius: 999,
+              background: (cooldown > 0 || sending || verifying) ? '#ddd8d0' : YELLOW,
+              color: INK, fontSize: 12, fontWeight: 700,
+              letterSpacing: '.10em', padding: '0 16px',
+              cursor: (cooldown > 0 || sending || verifying) ? 'default' : 'pointer',
+              fontFamily: SANS, whiteSpace: 'nowrap', transition: 'background .18s'
+            }}
+          >
+            {sending ? '发送中' : cooldown > 0 ? `${cooldown}s` : '获取验证码'}
+          </button>
         </div>
-
-        {step === 1 ? (
-          <>
-            <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '.04em', marginBottom: 4, color: INK }}>创建你的 Portra</div>
-            <div style={{ fontSize: 13, color: MUTED, marginBottom: 22, lineHeight: 1.65 }}>使用学校邮箱完成验证</div>
-
-            <ErrorBanner text={error} />
-
-            {/* email */}
-            <div style={{ marginBottom: 14 }}>
-              <FieldLabel label="学校邮箱" htmlFor="reg-email" />
-              <FocusInput
-                id="reg-email" type="email"
-                placeholder="yourname@smail.nju.edu.cn"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                autoComplete="email"
-              />
-            </div>
-
-            {/* code */}
-            <div style={{ marginBottom: 22 }}>
-              <FieldLabel label="邮箱验证码" htmlFor="reg-code" />
-              <div style={{ display: 'flex', gap: 10 }}>
-                <FocusInput
-                  id="reg-code" type="text"
-                  placeholder="6 位验证码" maxLength={6}
-                  value={code}
-                  onChange={e => setCode(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && toStep2()}
-                  style={{ flex: 1, letterSpacing: '.24em' }}
-                />
-                <button
-                  type="button" onClick={sendCode}
-                  disabled={cooldown > 0 || loading}
-                  style={{
-                    flexShrink: 0, height: 50, border: 0, borderRadius: 999,
-                    background: (cooldown > 0 || loading) ? '#ddd8d0' : YELLOW,
-                    color: INK, fontSize: 12, fontWeight: 700,
-                    letterSpacing: '.10em', padding: '0 16px',
-                    cursor: (cooldown > 0 || loading) ? 'default' : 'pointer',
-                    fontFamily: SANS, whiteSpace: 'nowrap', transition: 'background .18s'
-                  }}
-                >
-                  {cooldown > 0 ? `${cooldown}s` : '获取验证码'}
-                </button>
-              </div>
-              {codeHint && (
-                <div style={{
-                  marginTop: 9, padding: '9px 12px',
-                  background: 'rgba(247,206,58,.15)', border: '1px solid rgba(247,206,58,.6)',
-                  borderRadius: 10, fontSize: 12, color: '#5e4f00', lineHeight: 1.55, fontFamily: SANS
-                }}>{codeHint}</div>
-              )}
-            </div>
-
-            <PrimaryBtn onClick={toStep2}>下一步</PrimaryBtn>
-            <SwitchLine prompt="已有账号？" linkText="直接登录" onClick={() => navigate('/login/sign-in')} />
-          </>
-        ) : (
-          <>
-            <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '.04em', marginBottom: 4, color: INK }}>设置你的密码</div>
-            <div style={{ fontSize: 13, color: MUTED, marginBottom: 22, lineHeight: 1.65 }}>密码至少 8 位，注册成功后直接进入 Portra</div>
-
-            <ErrorBanner text={error} />
-
-            {/* password */}
-            <div style={{ marginBottom: 14 }}>
-              <FieldLabel label="设置密码" htmlFor="reg-pwd" />
-              <FocusInput
-                id="reg-pwd" type="password"
-                placeholder="至少 8 位字符"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                autoComplete="new-password"
-              />
-            </div>
-
-            {/* confirm password */}
-            <div style={{ marginBottom: 22 }}>
-              <FieldLabel label="确认密码" htmlFor="reg-pwd2" />
-              <FocusInput
-                id="reg-pwd2" type="password"
-                placeholder="再输一次"
-                value={password2}
-                onChange={e => setPassword2(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && register()}
-                autoComplete="new-password"
-              />
-            </div>
-
-            <PrimaryBtn onClick={register} loading={loading}>完成注册，进入 Portra</PrimaryBtn>
-            <BackLink label="返回上一步" onClick={() => { setStep(1); setError('') }} />
-          </>
+        {codeHint && (
+          <div style={{
+            marginTop: 9, padding: '9px 12px',
+            background: 'rgba(247,206,58,.15)', border: '1px solid rgba(247,206,58,.6)',
+            borderRadius: 10, fontSize: 12, color: '#5e4f00', lineHeight: 1.55, fontFamily: SANS
+          }}>{codeHint}</div>
         )}
+      </div>
+
+      <label style={{
+        display: 'flex', alignItems: 'flex-start', gap: 9, marginBottom: 20,
+        color: MUTED, fontSize: 12, lineHeight: 1.6, cursor: 'pointer'
+      }}>
+        <input
+          type="checkbox"
+          checked={agreementAccepted}
+          onChange={event => setAgreementAccepted(event.target.checked)}
+          style={{ marginTop: 3, accentColor: BLUE }}
+        />
+        <span>我已阅读并同意《用户协议》和《隐私政策》</span>
+      </label>
+
+      <PrimaryBtn
+        onClick={verifyCode}
+        loading={verifying}
+        disabled={!codeSent || code.length !== 6 || !agreementAccepted}
+      >
+        验证并进入 Portra
+      </PrimaryBtn>
+      <SwitchLine prompt="管理员账号？" linkText="管理员登录" onClick={() => navigate('/login/admin')} />
+      <BackLink label="返回" onClick={() => navigate('/login')} />
     </AuthCard>
   )
 }

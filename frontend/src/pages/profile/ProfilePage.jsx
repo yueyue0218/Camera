@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
 import {
   creditApi, demandApi, fileApi, momentApi, orderApi, userApi, conversationApi
@@ -62,8 +62,10 @@ function formatCreditScore(value) {
 
 export function ProfilePage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { currentUser, updateProfile, logout, switchRole } = useAuth()
   const isProvider = currentUser.role === 'PROVIDER'
+  const isOnboarding = location.state?.onboarding === true
 
   const [profileForm, setProfileForm] = useState({
     nickname: currentUser.nickname || currentUser.label || '',
@@ -79,7 +81,7 @@ export function ProfilePage() {
   const [avatarFile, setAvatarFile] = useState(null)
   const [activeTab, setActiveTab] = useState('photos')
   const [activeMonth, setActiveMonth] = useState(0)
-  const [editOpen, setEditOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(isOnboarding)
 
   const [moments, setMoments] = useState([])
   const [myDemands, setMyDemands] = useState([])
@@ -88,7 +90,9 @@ export function ProfilePage() {
   const [profileOrders, setProfileOrders] = useState([])
   const [creditSummary, setCreditSummary] = useState(null)
   const [portfolioItems, setPortfolioItems] = useState([])
-  const [notice, setNotice] = useState(null)
+  const [notice, setNotice] = useState(isOnboarding
+    ? { type: 'ok', text: '账号已创建，请完善昵称、头像和所在地区。' }
+    : null)
   const [myFollowers, setMyFollowers] = useState([])
   const [myFollowing, setMyFollowing] = useState([])
   const [followListOpen, setFollowListOpen] = useState(null) // null | 'following' | 'followers'
@@ -995,7 +999,12 @@ export function ProfilePage() {
               </div>
             </div>
             <div className="pp-modal-actions">
-              <button className="primary-btn" onClick={async () => { if (await saveProfile()) setEditOpen(false) }}>保存资料</button>
+              <button className="primary-btn" onClick={async () => {
+                if (await saveProfile()) {
+                  setEditOpen(false)
+                  if (isOnboarding) navigate('/profile', { replace: true })
+                }
+              }}>保存资料</button>
               <button className="secondary-btn" onClick={() => setEditOpen(false)}>取消</button>
               <button className="danger-btn" onClick={() => { logout(); navigate('/login', {replace:true}) }}>退出</button>
             </div>

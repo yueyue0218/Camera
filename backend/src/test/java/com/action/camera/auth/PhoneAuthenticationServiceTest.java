@@ -122,6 +122,7 @@ class PhoneAuthenticationServiceTest {
         assertThat(jwtUtil.parseUserId(result.response().getToken())).isEqualTo(user.getId());
         assertThat(jwtUtil.parseSessionId(result.response().getToken())).isEqualTo(session.getSessionId());
         assertThat(result.response().isAdminCapable()).isFalse();
+        assertThat(result.response().isNewUser()).isTrue();
     }
 
     @Test
@@ -143,6 +144,7 @@ class PhoneAuthenticationServiceTest {
         assertThat(reloaded.getCurrentRole()).isEqualTo("PROVIDER");
         assertThat(reloaded.getLastLoginAt()).isNotNull();
         assertThat(result.response().getRole()).isEqualTo("PROVIDER");
+        assertThat(result.response().isNewUser()).isFalse();
         assertThat(roleBindingRepository.existsByUserIdAndRole(existing.getId(), "CUSTOMER")).isTrue();
     }
 

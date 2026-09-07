@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
+    "test": "npm run test:auth && npm run test:admin",
     "test:admin": "node --test tests/adminSurface.test.mjs",
+    "test:auth": "node --test tests/authFlow.test.mjs",
     "lint": "eslint src --ext .js,.jsx",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0"

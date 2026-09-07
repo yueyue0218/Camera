@@ -1,44 +1,38 @@
 import { request } from './client.js'
+import { SMS_PURPOSE } from '../auth/phoneAuth.js'
 
 function studentNoFromEmail(email) {
   return email.trim().split('@')[0]
 }
 
 export const authApi = {
-  sendCode(email) {
-    return request('/auth/send-code', { method: 'POST', body: JSON.stringify({ email }) })
-  },
-  async register(body) {
-    const registerPaths = ['/users/register', '/auth/register']
-    const registerBody = {
-      ...body,
-      code: body.code || body.verifyCode
-    }
-    delete registerBody.verifyCode
-    let fallbackError = null
-
-    for (const path of registerPaths) {
-      try {
-        return await request(path, { method: 'POST', body: JSON.stringify(registerBody) })
-      } catch (error) {
-        fallbackError = error
-        const endpointMissing = error.status === 404
-          || (error.code === 50001 && /No static resource|No endpoint|not found/i.test(error.message || ''))
-        const backendUnavailable = error.name === 'TypeError'
-        if (!endpointMissing && !backendUnavailable) {
-          throw error
-        }
-      }
-    }
-
-    throw fallbackError || new Error('注册接口暂不可用')
-  },
-  async login({ email, password }) {
-    const studentNo = studentNoFromEmail(email)
-    return request('/users/login', {
+  sendSmsCode({ phone, deviceId }) {
+    return request('/auth/sms/send', {
       method: 'POST',
-      body: JSON.stringify({ studentNo, password, role: 'CUSTOMER' })
+      body: JSON.stringify({ phone, purpose: SMS_PURPOSE, deviceId })
     })
+  },
+  verifySmsCode({ phone, code, deviceId, deviceName }) {
+    return request('/auth/sms/verify', {
+      method: 'POST',
+      body: JSON.stringify({ phone, purpose: SMS_PURPOSE, code, deviceId, deviceName })
+    })
+  },
+  refresh() {
+    return request('/auth/refresh', {
+      method: 'POST',
+      suppressAuthTimeout: true
+    })
+  },
+  session(currentUser) {
+    return request('/auth/session', {}, currentUser)
+  },
+  logout(currentUser) {
+    return request('/auth/logout', {
+      method: 'POST',
+      suppressAuthTimeout: true,
+      skipTokenExpiryCheck: true
+    }, currentUser)
   },
   adminLogin({ email, password }) {
     return request('/admin/login', {
