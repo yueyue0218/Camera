@@ -64,8 +64,10 @@ class AdminMomentModerationServiceTest {
         reportRepository.deleteAll();
         auditRecordRepository.deleteAll();
         momentPostRepository.deleteAll();
+        jdbcTemplate.update("DELETE FROM user_role_bindings WHERE user_id IN (?, ?, ?)", ADMIN_ID, AUTHOR_ID, REPORTER_ID);
         jdbcTemplate.update("DELETE FROM users WHERE id IN (?, ?, ?)", ADMIN_ID, AUTHOR_ID, REPORTER_ID);
         insertUser(ADMIN_ID, "admin-moment", "ADMIN");
+        jdbcTemplate.update("INSERT INTO user_role_bindings (user_id, role, granted_at) VALUES (?, 'ADMIN', NOW())", ADMIN_ID);
         insertUser(AUTHOR_ID, "author-moment", "CUSTOMER");
         insertUser(REPORTER_ID, "reporter-moment", "PROVIDER");
     }

@@ -73,8 +73,10 @@ class AdminHallModerationServiceTest {
         auditRecordRepository.deleteAll();
         demandRepository.deleteAll();
         servicePackageRepository.deleteAll();
+        jdbcTemplate.update("DELETE FROM user_role_bindings WHERE user_id IN (?, ?, ?)", ADMIN_ID, CUSTOMER_ID, PROVIDER_ID);
         jdbcTemplate.update("DELETE FROM users WHERE id IN (?, ?, ?)", ADMIN_ID, CUSTOMER_ID, PROVIDER_ID);
         insertUser(ADMIN_ID, "admin-hall", "ADMIN");
+        jdbcTemplate.update("INSERT INTO user_role_bindings (user_id, role, granted_at) VALUES (?, 'ADMIN', NOW())", ADMIN_ID);
         insertUser(CUSTOMER_ID, "customer-hall", "CUSTOMER");
         insertUser(PROVIDER_ID, "provider-hall", "PROVIDER");
     }

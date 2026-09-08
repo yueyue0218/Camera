@@ -3,8 +3,6 @@ package com.action.camera.admin.service;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
-import com.action.camera.domain.User;
-import com.action.camera.repository.UserRepository;
 import com.action.camera.repository.UserRoleBindingRepository;
 import org.springframework.stereotype.Service;
 
@@ -13,12 +11,9 @@ public class AdminPermissionService {
 
     private static final String ADMIN = "ADMIN";
 
-    private final UserRepository userRepository;
     private final UserRoleBindingRepository userRoleBindingRepository;
 
-    public AdminPermissionService(UserRepository userRepository,
-                                  UserRoleBindingRepository userRoleBindingRepository) {
-        this.userRepository = userRepository;
+    public AdminPermissionService(UserRoleBindingRepository userRoleBindingRepository) {
         this.userRoleBindingRepository = userRoleBindingRepository;
     }
 
@@ -37,13 +32,11 @@ public class AdminPermissionService {
         if (userId == null) {
             return false;
         }
+        // This flag is populated by AuthInterceptor only after an ADMIN binding
+        // lookup. Reusing it within the same request avoids duplicate queries.
         if (userId.equals(UserContext.getUserId()) && UserContext.isAdmin()) {
             return true;
         }
-        return userRepository.findById(userId)
-                .map(User::getCurrentRole)
-                .map(currentRole -> ADMIN.equals(currentRole)
-                        || userRoleBindingRepository.existsByUserIdAndRole(userId, ADMIN))
-                .orElse(false);
+        return userRoleBindingRepository.existsByUserIdAndRole(userId, ADMIN);
     }
 }

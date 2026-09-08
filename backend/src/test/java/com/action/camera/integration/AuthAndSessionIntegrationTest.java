@@ -37,6 +37,7 @@ class AuthAndSessionIntegrationTest {
 
     @BeforeEach
     void seedDemoUsers() {
+        jdbc.execute("DELETE FROM user_role_bindings WHERE user_id IN (1001, 2001)");
         jdbc.execute("DELETE FROM users WHERE id IN (1001, 2001)");
         jdbc.execute("INSERT INTO users (id, nickname, current_role, status, credit_score, created_at, updated_at) " +
                 "VALUES (1001, '需求方', 'CUSTOMER', 'ACTIVE', 80.00, NOW(), NOW())");
@@ -160,6 +161,7 @@ class AuthAndSessionIntegrationTest {
 
     @Test
     void switchRole_customerToProvider_succeeds() {
+        jdbc.update("INSERT INTO user_role_bindings (user_id, role, granted_at) VALUES (1001, 'PROVIDER', NOW())");
         String body = "{\"role\":\"PROVIDER\"}";
         ResponseEntity<Map> resp = rest.exchange("/users/me/role", HttpMethod.POST,
                 bearerEntity(1001L, body), Map.class);

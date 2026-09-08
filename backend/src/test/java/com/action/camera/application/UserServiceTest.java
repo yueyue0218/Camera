@@ -10,6 +10,8 @@ import com.action.camera.dto.LoginResponse;
 import com.action.camera.dto.UpdateProfileRequest;
 import com.action.camera.dto.UserBriefResponse;
 import com.action.camera.dto.UserProfileResponse;
+import com.action.camera.provider.entity.ProviderProfile;
+import com.action.camera.provider.mapper.ProviderProfileMapper;
 import com.action.camera.repository.UserRepository;
 import com.action.camera.repository.UserRoleBindingRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,6 +50,9 @@ class UserServiceTest {
 
     @Autowired
     private UserRoleBindingRepository userRoleBindingRepository;
+
+    @Autowired
+    private ProviderProfileMapper providerProfileMapper;
 
     @Autowired
     private UserSessionRepository userSessionRepository;
@@ -180,22 +185,22 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("login cannot rewrite an existing admin account role")
-    void login_adminAccountCannotUseCommonRoleEntry() {
+    @DisplayName("stale admin view without binding grants no admin permission")
+    void login_staleAdminViewDoesNotGrantPermission() {
         User admin = createTestUser("241880169", "test123456", "ACTIVE", "ADMIN");
 
-        assertThatThrownBy(() -> userService.login("241880169", "test123456", "CUSTOMER", null))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("管理员账号需通过专用入口登录");
+        LoginResponse response = userService.login("241880169", "test123456", "CUSTOMER", null);
 
         User reloaded = userRepository.findById(admin.getId()).orElseThrow();
-        assertThat(reloaded.getCurrentRole()).isEqualTo("ADMIN");
+        assertThat(reloaded.getCurrentRole()).isEqualTo("CUSTOMER");
+        assertThat(response.isAdminCapable()).isFalse();
     }
 
     @Test
     @DisplayName("admin login returns token for active admin account")
     void adminLogin_success() {
         User admin = createTestUser("241880170", "test123456", "ACTIVE", "ADMIN");
+        grantRoleBinding(admin.getId(), "ADMIN");
 
         LoginResponse response = userService.adminLogin(
                 "241880170", "test123456", "test-device", "JUnit").response();
@@ -217,17 +222,14 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("provider account with admin binding can still use normal provider login")
-    void login_providerWithAdminBindingKeepsProviderRole() {
+    @DisplayName("provider account with admin binding must use the admin login entry")
+    void login_providerWithAdminBindingRejectsCommonEntry() {
         User user = createTestUser("241880172", "test123456", "ACTIVE", "PROVIDER");
         grantAdminBinding(user.getId());
 
-        LoginResponse response = userService.login("241880172", "test123456", "PROVIDER", null);
-
-        assertThat(response.getRole()).isEqualTo("PROVIDER");
-        assertThat(response.isAdminCapable()).isTrue();
-        User reloaded = userRepository.findById(user.getId()).orElseThrow();
-        assertThat(reloaded.getCurrentRole()).isEqualTo("PROVIDER");
+        assertThatThrownBy(() -> userService.login("241880172", "test123456", "PROVIDER", null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("管理员账号需通过专用入口登录");
     }
 
     @Test
@@ -287,6 +289,7 @@ class UserServiceTest {
     @DisplayName("provider brief returns latest avatar after profile update")
     void updateProviderAvatar_returnsLatestAvatarInBrief() {
         User user = createTestUser("241880167", "test123456", "ACTIVE");
+        grantRoleBinding(user.getId(), "PROVIDER");
         UpdateProfileRequest request = new UpdateProfileRequest();
         request.setRole("PROVIDER");
         request.setAvatarFileId(777L);
@@ -297,6 +300,34 @@ class UserServiceTest {
         UserProfileResponse profile = userService.getMyProfile(user.getId());
         assertThat(brief.getAvatarFileId()).isEqualTo(777L);
         assertThat(profile.getProviderAvatarFileId()).isEqualTo(777L);
+    }
+
+    @Test
+    @DisplayName("switching to provider requires an existing role binding and creates no profile")
+    void switchRole_providerRequiresBinding() {
+        User user = createTestUser("241880175", "test123456", "ACTIVE");
+
+        assertThatThrownBy(() -> userService.switchRole(user.getId(), "PROVIDER"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.FORBIDDEN);
+        assertThat(userRepository.findById(user.getId()).orElseThrow().getCurrentRole())
+                .isEqualTo("CUSTOMER");
+    }
+
+    @Test
+    @DisplayName("switching to a bound provider role only changes the UI view")
+    void switchRole_boundProviderSucceeds() {
+        User user = createTestUser("241880176", "test123456", "ACTIVE");
+        grantRoleBinding(user.getId(), "PROVIDER");
+
+        var response = userService.switchRole(user.getId(), "PROVIDER");
+
+        assertThat(response.getCurrentRole()).isEqualTo("PROVIDER");
+        assertThat(providerProfileMapper.selectCount(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ProviderProfile>()
+                        .eq(ProviderProfile::getUserId, user.getId())))
+                .isZero();
     }
 
     private User createTestUser(String studentNo, String password, String status) {
@@ -315,9 +346,13 @@ class UserServiceTest {
     }
 
     private void grantAdminBinding(Long userId) {
+        grantRoleBinding(userId, "ADMIN");
+    }
+
+    private void grantRoleBinding(Long userId, String role) {
         UserRoleBinding binding = new UserRoleBinding();
         binding.setUserId(userId);
-        binding.setRole("ADMIN");
+        binding.setRole(role);
         userRoleBindingRepository.save(binding);
     }
 }

@@ -18,6 +18,7 @@ import com.action.camera.photoauthorization.entity.PhotoAuthorization;
 import com.action.camera.photoauthorization.entity.PhotoAuthorizationFile;
 import com.action.camera.photoauthorization.repository.PhotoAuthorizationFileRepository;
 import com.action.camera.photoauthorization.repository.PhotoAuthorizationRepository;
+import com.action.camera.repository.UserRoleBindingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -69,6 +70,7 @@ public class FileAccessPolicy {
     private final PhotoAuthorizationRepository photoAuthorizationRepository;
     private final MessageRepository messageRepository;
     private final ConversationRepository conversationRepository;
+    private final UserRoleBindingRepository userRoleBindingRepository;
 
     public String normalizeBizType(String bizType) {
         String normalized = normalize(bizType);
@@ -96,7 +98,7 @@ public class FileAccessPolicy {
             throw new BusinessException(ErrorCode.NOT_FOUND, "File not found");
         }
         if (Objects.equals(file.getUploaderId(), currentUserId)
-                || currentRole == UserRole.ADMIN
+                || hasAdminBinding(currentUserId)
                 || isAllowedPublicFile(file)
                 || canAccessDeliveryFile(file.getId(), currentUserId)
                 || isGrantedPublicAuthorizationFile(file.getId())
@@ -107,6 +109,11 @@ public class FileAccessPolicy {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication is required for this file");
         }
         throw new BusinessException(ErrorCode.FORBIDDEN, "No permission to access this file");
+    }
+
+    private boolean hasAdminBinding(Long userId) {
+        return userId != null
+                && userRoleBindingRepository.existsByUserIdAndRole(userId, UserRole.ADMIN.name());
     }
 
     private boolean isAllowedPublicFile(FileRecord file) {

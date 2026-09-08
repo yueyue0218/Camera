@@ -32,10 +32,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("""
             select u from User u
             where u.status = 'ACTIVE'
-              and (u.currentRole = 'ADMIN' or exists (
+              and exists (
                   select binding.id from UserRoleBinding binding
                   where binding.userId = u.id and binding.role = 'ADMIN'
-              ))
+              )
             order by u.id
             """)
     List<User> findActiveAdministratorsForUpdate();

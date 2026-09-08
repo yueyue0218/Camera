@@ -42,6 +42,8 @@ class CertificationAccessTest {
         insertUser(CUSTOMER_ID, "cert-customer", "CUSTOMER");
         insertUser(PROVIDER_ID, "cert-provider", "PROVIDER");
         insertUser(ADMIN_ID,    "cert-admin",    "ADMIN");
+        jdbcTemplate.update("DELETE FROM user_role_bindings WHERE user_id = ?", ADMIN_ID);
+        jdbcTemplate.update("INSERT INTO user_role_bindings (user_id, role, granted_at) VALUES (?, 'ADMIN', NOW())", ADMIN_ID);
     }
 
     @AfterEach

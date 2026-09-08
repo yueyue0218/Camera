@@ -67,7 +67,11 @@ public class PhoneAuthenticationService {
 
         ensureCustomerRole(user.getId(), now);
 
-        String currentRole = UserRole.parse(user.getCurrentRole(), UserRole.CUSTOMER).name();
+        String currentRole = resolveBoundRole(user);
+        if (!currentRole.equals(user.getCurrentRole())) {
+            user.setCurrentRole(currentRole);
+            userRepository.saveAndFlush(user);
+        }
         SessionAuthenticationResult result = sessionService.issue(
                 user, currentRole, false, normalizedDeviceId, normalizedDeviceName);
         result.response().setNewUser(newUser);
@@ -75,8 +79,14 @@ public class PhoneAuthenticationService {
     }
 
     private boolean isAdministrator(User user) {
-        return UserRole.ADMIN.name().equals(user.getCurrentRole())
-                || roleBindingRepository.existsByUserIdAndRole(user.getId(), UserRole.ADMIN.name());
+        return roleBindingRepository.existsByUserIdAndRole(user.getId(), UserRole.ADMIN.name());
+    }
+
+    private String resolveBoundRole(User user) {
+        UserRole currentRole = UserRole.parse(user.getCurrentRole(), UserRole.CUSTOMER);
+        return roleBindingRepository.existsByUserIdAndRole(user.getId(), currentRole.name())
+                ? currentRole.name()
+                : UserRole.CUSTOMER.name();
     }
 
     private void ensureCustomerRole(Long userId, LocalDateTime grantedAt) {

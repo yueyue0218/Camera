@@ -215,14 +215,24 @@ public class AuthInterceptor implements HandlerInterceptor {
         if (!"ACTIVE".equals(user.getStatus())) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
-        UserRole role = UserRole.parse(user.getCurrentRole(), UserRole.CUSTOMER);
-        boolean admin = ADMIN_ROLE.equals(user.getCurrentRole())
-                || userRoleBindingRepository.existsByUserIdAndRole(userId, ADMIN_ROLE);
+        UserRole role = resolveBoundRole(userId, user.getCurrentRole());
+        boolean admin = userRoleBindingRepository.existsByUserIdAndRole(userId, ADMIN_ROLE);
         UserContext.setUserId(userId);
         UserContext.setCurrentRole(role);
         UserContext.setAdmin(admin);
         UserContext.setSessionId(sessionId);
         return role;
+    }
+
+    private UserRole resolveBoundRole(Long userId, String currentRole) {
+        UserRole requestedView = UserRole.parse(currentRole, UserRole.CUSTOMER);
+        if (userRoleBindingRepository.existsByUserIdAndRole(userId, requestedView.name())) {
+            return requestedView;
+        }
+        if (userRoleBindingRepository.existsByUserIdAndRole(userId, UserRole.CUSTOMER.name())) {
+            return UserRole.CUSTOMER;
+        }
+        throw new BusinessException(ErrorCode.FORBIDDEN);
     }
 
 }

@@ -58,6 +58,7 @@ class AuthInterceptorTest {
     @Test
     void activeBearerUserPopulatesContextAfterDatabaseStatusCheck() {
         stubBearer("GET", "/notifications", 41L, user(41L, "CUSTOMER", "ACTIVE"));
+        when(userRoleBindingRepository.existsByUserIdAndRole(41L, "CUSTOMER")).thenReturn(true);
         when(userRoleBindingRepository.existsByUserIdAndRole(41L, "ADMIN")).thenReturn(false);
 
         assertThat(interceptor().preHandle(request, response, new Object())).isTrue();
@@ -148,6 +149,17 @@ class AuthInterceptorTest {
                 org.mockito.ArgumentMatchers.any())).thenReturn(false);
 
         assertUnauthorizedAndEmptyContext(interceptor());
+    }
+
+    @Test
+    void currentRoleAdminWithoutBindingDoesNotGrantAdministratorAccess() {
+        stubBearer("GET", "/notifications", 48L, user(48L, "ADMIN", "ACTIVE"));
+        when(userRoleBindingRepository.existsByUserIdAndRole(48L, "ADMIN")).thenReturn(false);
+        when(userRoleBindingRepository.existsByUserIdAndRole(48L, "CUSTOMER")).thenReturn(true);
+
+        assertThat(interceptor().preHandle(request, response, new Object())).isTrue();
+        assertThat(UserContext.getCurrentRole()).isEqualTo(UserRole.CUSTOMER);
+        assertThat(UserContext.isAdmin()).isFalse();
     }
 
     private AuthInterceptor interceptor() {

@@ -37,12 +37,11 @@ public class GlobalExceptionHandler {
             MissingServletRequestParameterException.class
     })
     public Result<?> handleMissingRequestPart(Exception e) {
-        return Result.error(ErrorCode.VALIDATION_ERROR.getCode(), e.getMessage());
+        return Result.error(ErrorCode.VALIDATION_ERROR.getCode(), "请求参数不完整");
     }
 
     @ExceptionHandler(Exception.class)
     public Result<?> handleException(Exception e) {
-        return Result.error(ErrorCode.INTERNAL_ERROR.getCode(),
-                "系统内部错误: " + e.getMessage());
+        return Result.error(ErrorCode.INTERNAL_ERROR.getCode(), "服务暂时不可用");
     }
 }

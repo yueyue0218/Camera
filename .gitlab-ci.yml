@@ -6,9 +6,8 @@ variables:
   MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
   MYSQL_DATABASE: "camera_app"
   MYSQL_USER: "camera_dev"
-  MYSQL_PASSWORD: "Camera_dev_2026"
-  MYSQL_ROOT_PASSWORD: "root"
-  DB_PASSWORD: "Camera_dev_2026"
+  MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+  MYSQL_PASSWORD: ""
 
 cache:
   key: "maven-${CI_COMMIT_REF_SLUG}"
@@ -23,12 +22,12 @@ cache:
   variables:
     SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/camera_app?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false"
     SPRING_DATASOURCE_USERNAME: "camera_dev"
-    SPRING_DATASOURCE_PASSWORD: "Camera_dev_2026"
+    SPRING_DATASOURCE_PASSWORD: ""
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends default-mysql-client && rm -rf /var/lib/apt/lists/*
-    - until mysqladmin ping -h mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --silent; do sleep 2; done
-    - mysql -h mysql -uroot -p"$MYSQL_ROOT_PASSWORD" < docs/P3/04_建表SQL.sql
-    - mysql -h mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "GRANT ALL PRIVILEGES ON camera_app.* TO '$MYSQL_USER'@'%'; FLUSH PRIVILEGES;"
+    - until mysqladmin ping -h mysql -uroot --silent; do sleep 2; done
+    - mysql -h mysql -uroot < docs/P3/04_建表SQL.sql
+    - mysql -h mysql -uroot -e "GRANT ALL PRIVILEGES ON camera_app.* TO '$MYSQL_USER'@'%'; FLUSH PRIVILEGES;"
   only:
     - main
     - dev

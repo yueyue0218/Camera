@@ -326,39 +326,41 @@ REFUND_FAILED
 4. 订单取消或仲裁退款时，按取消规则和仲裁结果更新 refundStatus 与 escrowStatus。
 3. 身份认证与用户基础接口
 3.1 发送短信验证码
-POST /auth/sms
+POST /auth/sms/send
 权限：Public
 {
- "mobile": "13800000000",
- "type": "LOGIN"
+ "phone": "+8613800138000",
+ "purpose": "LOGIN",
+ "deviceId": "browser-device-id"
 }
 响应 data：null
 可能错误：40001, 40002, 50301
-3.2 登录与注册
-POST /sessions
+3.2 手机号统一注册/登录
+POST /auth/sms/verify
 权限：Public
 {
- "loginType": "MOBILE",
- "mobile": "13800000000",
- "verifyCode": "123456",
- "role": "CUSTOMER"
+ "phone": "+8613800138000",
+ "purpose": "LOGIN",
+ "code": "六位短信验证码",
+ "deviceId": "browser-device-id",
+ "deviceName": "Chrome on Windows"
 }
 响应 data：
 {
- "token": "eyJhbGciOiJIUzI1Ni...",
- "refreshToken": "refresh_token",
- "expiresIn": 7200,
- "user": {
+ "token": "短期 Access Token",
  "userId": 10086,
+ "nickname": "新用户",
  "role": "CUSTOMER",
- "isNewUser": true
- }
+ "adminCapable": false,
+ "newUser": true
 }
 可能错误：40001, 40002, 50001
-3.3 退出登录
-POST /sessions/logout
-权限：User
-响应 data：null
+长期 Refresh Token 仅通过受限路径的 HttpOnly、Secure、SameSite Cookie 下发，不出现在响应体或 Local Storage。
+3.3 会话续期、查询与退出
+POST /auth/refresh（Public，必须携带 Refresh Cookie）
+GET /auth/session（User）
+POST /auth/logout（User）
+旧 POST /sessions、POST /users/register、POST /users/login 和 POST /auth/send-code 已停用，不再签发凭据。
 
 3.4 获取当前用户资料
 GET /users/me
@@ -396,17 +398,17 @@ PUT /users/me
 }
 可能错误：40001, 40101
 3.6 切换当前角色
-POST /users/me/role-switch
+POST /users/me/role
 权限：User
 {
- "targetRole": "PROVIDER"
+ "role": "PROVIDER"
 }
 响应 data：
 {
  "currentRole": "PROVIDER"
 }
-业务规则：同一账号可在需求方和服务方视角之间切换；切换到 PROVIDER 前必须已通过服务方认证，或处于平台
-允许的试用状态。未认证用户可先调用 POST /verification/provider 提交申请。
+业务规则：`user_role_bindings` 是权限唯一事实来源；`current_role` 只保存当前 UI 视角。切换到 PROVIDER
+必须已有 PROVIDER binding，切换动作本身不会创建摄影师档案或授予权限。
 可能错误：40301
 
 3.7 服务方实名认证申请
@@ -1841,39 +1843,14 @@ POST /notifications/{notificationId}/read
 本章列出核心写接口的请求体字段、必填规则与校验约束。路径参数如 {orderId}、{serviceId}、{demandId} 均为
 必填；分页查询参数统一使用 page、size。
 12.1 登录与认证
-POST /sessions
-参数名
-类型
-必填
-说明
-校验规则
-loginType
-String
-是
-登录方式
-MOBILE / WECHAT
-mobile
-String
-条件必填
-手机号
-loginType = MOBILE 时必
-填
-verifyCode
-String
-条件必填
-短信验证码
-6 位数字
-wechatCode
-String
-条件必填
-微信授权码
-loginType = WECHAT 时必
-填
-role
-String
-否
-初始角色
-CUSTOMER / PROVIDER
+POST /auth/sms/send：phone、purpose=LOGIN、deviceId 必填；phone 必须是支持的大陆手机号格式。
+
+POST /auth/sms/verify：phone、purpose=LOGIN、code、deviceId 必填，deviceName 可选；请求不得携带角色，
+新账号由服务端固定授予 CUSTOMER binding。
+
+POST /auth/refresh：不接收响应体中的 Refresh Token，只读取 HttpOnly Cookie 并执行轮换。
+
+POST /auth/logout：撤销当前服务端会话并清除 Refresh Cookie。
 POST /verification/provider
 参数名
 类型

@@ -131,7 +131,7 @@ class AdminUserServiceTest {
     }
 
     @Test
-    void adminRoleFilterUsesCurrentRoleAndRoleBindingsAsAUnion() {
+    void adminRoleFilterUsesOnlyRoleBindings() {
         User caller = createAdminContext("241881005");
         User directAdmin = createUser("241881006", "direct-admin", "ADMIN", "ACTIVE");
         User boundAdmin = createUser("241881007", "bound-admin", "PROVIDER", "ACTIVE");
@@ -142,8 +142,8 @@ class AdminUserServiceTest {
                 null, "ADMIN", "ACTIVE", 1, 20);
 
         assertThat(admins.getRecords()).extracting(AdminUserListItemResponse::userId)
-                .containsExactlyInAnyOrder(caller.getId(), directAdmin.getId(), boundAdmin.getId())
-                .doesNotContain(ordinary.getId());
+                .containsExactlyInAnyOrder(caller.getId(), boundAdmin.getId())
+                .doesNotContain(directAdmin.getId(), ordinary.getId());
         assertThat(admins.getRecords()).allMatch(AdminUserListItemResponse::admin);
     }
 
@@ -244,6 +244,11 @@ class AdminUserServiceTest {
     @Test
     void lastActiveAdministratorCannotBeDisabled() {
         User target = createUser("241881016", "last-admin", "ADMIN", "ACTIVE");
+        grantAdmin(target);
+        UserRoleBinding callerBinding = new UserRoleBinding();
+        callerBinding.setUserId(999999L);
+        callerBinding.setRole("ADMIN");
+        userRoleBindingRepository.saveAndFlush(callerBinding);
         UserContext.setUserId(999999L);
         UserContext.setAdmin(true);
 
@@ -258,9 +263,10 @@ class AdminUserServiceTest {
     @Test
     void oneOfMultipleActiveAdministratorsCanBeDisabledSafely() {
         User target = createUser("241881017", "direct-admin", "ADMIN", "ACTIVE");
+        grantAdmin(target);
         User bindingAdmin = createUser("241881018", "binding-admin", "PROVIDER", "ACTIVE");
         grantAdmin(bindingAdmin);
-        UserContext.setUserId(999999L);
+        UserContext.setUserId(bindingAdmin.getId());
         UserContext.setAdmin(true);
 
         AdminUserDetailResponse response = adminUserService.changeStatus(
@@ -273,6 +279,7 @@ class AdminUserServiceTest {
 
     private User createAdminContext(String studentNo) {
         User admin = createUser(studentNo, "admin", "ADMIN", "ACTIVE");
+        grantAdmin(admin);
         UserContext.setUserId(admin.getId());
         UserContext.setCurrentRole(com.action.camera.common.security.UserRole.ADMIN);
         UserContext.setAdmin(true);

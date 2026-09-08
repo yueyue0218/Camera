@@ -54,6 +54,12 @@ public class AuthSessionService {
                                              boolean adminCapable,
                                              String deviceId,
                                              String deviceName) {
+        UserRole sessionRole = UserRole.parse(role, null);
+        boolean boundAdmin = hasAdminPermission(user);
+        if (!roleBindingRepository.existsByUserIdAndRole(user.getId(), sessionRole.name())
+                || adminCapable != boundAdmin) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
         LocalDateTime now = LocalDateTime.now();
         String sessionId = randomToken(32);
         String refreshToken = refreshToken(sessionId);
@@ -68,7 +74,7 @@ public class AuthSessionService {
         session.setExpiresAt(now.plus(properties.getRefreshTtl()));
         sessionRepository.saveAndFlush(session);
 
-        return result(user, role, adminCapable, session, refreshToken);
+        return result(user, sessionRole.name(), boundAdmin, session, refreshToken);
     }
 
     @Transactional(noRollbackFor = BusinessException.class)
@@ -98,9 +104,7 @@ public class AuthSessionService {
         }
 
         boolean adminCapable = hasAdminPermission(user);
-        String role = adminCapable
-                ? ADMIN_ROLE
-                : UserRole.parse(user.getCurrentRole(), UserRole.CUSTOMER).name();
+        String role = resolveBoundRole(user, adminCapable);
         String rotatedRefreshToken = refreshToken(sessionId);
         session.setRefreshTokenHash(hash(rotatedRefreshToken));
         session.setLastSeenAt(now);
@@ -126,9 +130,7 @@ public class AuthSessionService {
                 .filter(value -> ACTIVE_STATUS.equals(value.getStatus()))
                 .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
         boolean adminCapable = hasAdminPermission(user);
-        String role = adminCapable
-                ? ADMIN_ROLE
-                : UserRole.parse(user.getCurrentRole(), UserRole.CUSTOMER).name();
+        String role = resolveBoundRole(user, adminCapable);
         return new SessionResponse(
                 user.getId(), user.getNickname(), role, adminCapable,
                 session.getSessionId(), session.getDeviceId(), session.getDeviceName(),
@@ -148,8 +150,21 @@ public class AuthSessionService {
     }
 
     private boolean hasAdminPermission(User user) {
-        return ADMIN_ROLE.equals(user.getCurrentRole())
-                || roleBindingRepository.existsByUserIdAndRole(user.getId(), ADMIN_ROLE);
+        return roleBindingRepository.existsByUserIdAndRole(user.getId(), ADMIN_ROLE);
+    }
+
+    private String resolveBoundRole(User user, boolean adminCapable) {
+        if (adminCapable) {
+            return ADMIN_ROLE;
+        }
+        UserRole currentRole = UserRole.parse(user.getCurrentRole(), UserRole.CUSTOMER);
+        if (roleBindingRepository.existsByUserIdAndRole(user.getId(), currentRole.name())) {
+            return currentRole.name();
+        }
+        if (roleBindingRepository.existsByUserIdAndRole(user.getId(), UserRole.CUSTOMER.name())) {
+            return UserRole.CUSTOMER.name();
+        }
+        throw new BusinessException(ErrorCode.FORBIDDEN);
     }
 
     private void revoke(UserSession session, LocalDateTime now, String reason) {

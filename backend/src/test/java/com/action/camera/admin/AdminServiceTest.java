@@ -98,6 +98,8 @@ class AdminServiceTest {
     @BeforeEach
     void setUp() {
         insertUser(ADMIN_ID, "admin-test", "ADMIN");
+        jdbcTemplate.update("DELETE FROM user_role_bindings WHERE user_id = ?", ADMIN_ID);
+        jdbcTemplate.update("INSERT INTO user_role_bindings (user_id, role, granted_at) VALUES (?, 'ADMIN', NOW())", ADMIN_ID);
         insertUser(CUSTOMER_ID, "customer-test", "CUSTOMER");
         insertUser(PROVIDER_ID, "provider-test", "PROVIDER");
     }

@@ -15,10 +15,10 @@ import java.util.Locale;
 public class AdminUserQueryRepository {
 
     private static final String ADMIN_PREDICATE = """
-            (u.current_role = 'ADMIN' OR EXISTS (
+            EXISTS (
                 SELECT 1 FROM user_role_bindings urb
                 WHERE urb.user_id = u.id AND urb.role = 'ADMIN'
-            ))
+            )
             """;
 
     private static final String FILTER = """

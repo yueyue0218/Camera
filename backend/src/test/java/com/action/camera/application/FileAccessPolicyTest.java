@@ -18,6 +18,7 @@ import com.action.camera.photoauthorization.entity.PhotoAuthorization;
 import com.action.camera.photoauthorization.entity.PhotoAuthorizationFile;
 import com.action.camera.photoauthorization.repository.PhotoAuthorizationFileRepository;
 import com.action.camera.photoauthorization.repository.PhotoAuthorizationRepository;
+import com.action.camera.repository.UserRoleBindingRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,6 +49,7 @@ class FileAccessPolicyTest {
     @Mock private PhotoAuthorizationRepository photoAuthorizationRepository;
     @Mock private MessageRepository messageRepository;
     @Mock private ConversationRepository conversationRepository;
+    @Mock private UserRoleBindingRepository userRoleBindingRepository;
 
     private FileAccessPolicy policy;
 
@@ -60,7 +62,8 @@ class FileAccessPolicyTest {
                 photoAuthorizationFileRepository,
                 photoAuthorizationRepository,
                 messageRepository,
-                conversationRepository
+                conversationRepository,
+                userRoleBindingRepository
         );
     }
 
@@ -78,6 +81,20 @@ class FileAccessPolicyTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.FORBIDDEN);
+    }
+
+    @Test
+    void adminDownloadRequiresAdminRoleBindingRatherThanCurrentView() {
+        stubNoBusinessRelationship();
+        when(userRoleBindingRepository.existsByUserIdAndRole(OUTSIDER_ID, UserRole.ADMIN.name()))
+                .thenReturn(false, true);
+
+        assertThatThrownBy(() -> policy.assertCanDownload(privateFile("CERTIFICATION"), OUTSIDER_ID, UserRole.ADMIN))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.FORBIDDEN);
+        assertThatCode(() -> policy.assertCanDownload(privateFile("CERTIFICATION"), OUTSIDER_ID, UserRole.CUSTOMER))
+                .doesNotThrowAnyException();
     }
 
     @Test

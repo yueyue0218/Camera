@@ -78,6 +78,8 @@ class DisputeServiceTest {
         insertUser(PROVIDER_ID, "dispute-provider", "PROVIDER");
         insertUser(OUTSIDER_ID, "dispute-outsider", "CUSTOMER");
         insertUser(ADMIN_ID,    "dispute-admin",    "ADMIN");
+        jdbcTemplate.update("DELETE FROM user_role_bindings WHERE user_id = ?", ADMIN_ID);
+        jdbcTemplate.update("INSERT INTO user_role_bindings (user_id, role, granted_at) VALUES (?, 'ADMIN', NOW())", ADMIN_ID);
         insertConversation();
         insertQuote();
         insertOrder(DISPUTE_ORDER_ID,   "ORDER-DISPUTE-TEST",    "DELIVERED_PENDING_CONFIRM");

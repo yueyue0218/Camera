@@ -90,8 +90,7 @@ public class UserService {
         }
 
         UserRole requestedRole = UserRole.parse(role, null);
-        UserRole currentRole = UserRole.parse(user.getCurrentRole(), UserRole.CUSTOMER);
-        if (requestedRole == UserRole.ADMIN || currentRole == UserRole.ADMIN) {
+        if (requestedRole == UserRole.ADMIN || hasAdminPermission(user)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "管理员账号需通过专用入口登录");
         }
 
@@ -112,10 +111,6 @@ public class UserService {
 
         if (dirty) {
             userRepository.save(user);
-        }
-
-        if (requestedRole == UserRole.PROVIDER) {
-            ensureProviderProfile(user.getId());
         }
 
         String token = jwtUtil.generateToken(user.getId());
@@ -152,8 +147,7 @@ public class UserService {
     }
 
     private boolean hasAdminPermission(User user) {
-        return UserRole.ADMIN.name().equals(user.getCurrentRole())
-                || userRoleBindingRepository.existsByUserIdAndRole(user.getId(), UserRole.ADMIN.name());
+        return userRoleBindingRepository.existsByUserIdAndRole(user.getId(), UserRole.ADMIN.name());
     }
 
     private void ensureProviderProfile(Long userId) {
@@ -244,6 +238,8 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
 
+        requireRoleBinding(userId, targetRole);
+
         if (targetRole.name().equals(user.getCurrentRole())) {
             return new SwitchRoleResponse(user.getId(), user.getCurrentRole(), user.getNickname());
         }
@@ -258,6 +254,7 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
         if ("PROVIDER".equals(req.getRole())) {
+            requireRoleBinding(userId, UserRole.PROVIDER);
             ensureProviderProfile(userId);
             ProviderProfile pp = providerProfileMapper.selectOne(
                     new LambdaQueryWrapper<ProviderProfile>().eq(ProviderProfile::getUserId, userId)
@@ -306,6 +303,12 @@ public class UserService {
                 user.setLocationVisible(req.getLocationVisible());
             }
             userRepository.save(user);
+        }
+    }
+
+    private void requireRoleBinding(Long userId, UserRole role) {
+        if (!userRoleBindingRepository.existsByUserIdAndRole(userId, role.name())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "当前账号未获得该角色权限");
         }
     }
 }

@@ -162,11 +162,31 @@ class AuthSessionServiceTest {
                 .isEqualTo(ErrorCode.UNAUTHORIZED);
     }
 
+    @Test
+    void sessionIssuanceRejectsUnboundRoleAndForgedAdminCapability() {
+        User user = user("CUSTOMER", "ACTIVE");
+
+        assertThatThrownBy(() -> service.issue(user, "PROVIDER", false, "device-1", null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.FORBIDDEN);
+        assertThatThrownBy(() -> service.issue(user, "CUSTOMER", true, "device-1", null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.FORBIDDEN);
+        assertThat(sessionRepository.count()).isZero();
+    }
+
     private User user(String role, String status) {
         User user = new User();
         user.setNickname("Session User");
         user.setCurrentRole(role);
         user.setStatus(status);
-        return userRepository.saveAndFlush(user);
+        user = userRepository.saveAndFlush(user);
+        UserRoleBinding binding = new UserRoleBinding();
+        binding.setUserId(user.getId());
+        binding.setRole(role);
+        roleBindingRepository.saveAndFlush(binding);
+        return user;
     }
 }

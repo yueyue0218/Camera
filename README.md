@@ -10,7 +10,7 @@ Portra 是一个连接摄影师与有拍摄需求用户的垂直服务平台。�
 
 | 模块 | 功能描述 |
 |---|---|
-| 用户认证 | 邮箱注册（QQ SMTP 验证码）、JWT 登录、双角色身份（消费者 / 摄影师） |
+| 用户认证 | 手机号短信验证码统一注册/登录、可撤销会话、双角色视角（消费者 / 摄影师） |
 | 橱窗大厅 | 摄影师发布服务套餐（含封面、价格、风格标签），消费者浏览、收藏、发起约拍 |
 | 需求大厅 | 消费者发布拍摄需求，摄影师主动响应，消费者接受响应后建立会话 |
 | 在线报价 | 摄影师在会话中发起正式报价，消费者确认后生成订单 |
@@ -34,13 +34,13 @@ Portra 是一个连接摄影师与有拍摄需求用户的垂直服务平台。�
 | 前端 | React 18 · Vite · React Router v6 · Axios |
 | 后端 | Spring Boot 3 · MyBatis-Plus · Spring Data JPA |
 | 数据库 | MySQL 8.0 |
-| 认证 | JWT（无状态，双角色 claim） |
-| 邮件 | QQ SMTP（smtp.qq.com:587） |
-| 测试 | JUnit 5 · Spring Boot Test · H2 内存库（398 项测试，全部通过） |
+| 认证 | 短期 Access JWT + HttpOnly/Secure Refresh Cookie + 服务端可撤销会话 |
+| 短信 | 可配置短信供应商；开发环境使用独立发送实现 |
+| 测试 | JUnit 5 · Spring Boot Test · H2 内存库 |
 | 覆盖率 | JaCoCo，行覆盖率 **80.21%**（要求 ≥ 60%） |
 | CI | GitHub Actions（lint → build → test → jacoco report） |
 | CD | GitHub Actions 自动部署（push main 触发，SSH + scp 推送至阿里云） |
-| 部署 | 阿里云 ECS `http://47.250.86.6` / 本地 localhost |
+| 部署 | Nginx HTTPS 反向代理 / 本地 localhost |
 
 ---
 
@@ -74,7 +74,9 @@ cd frontend
 npm install && npm run dev
 ```
 
-浏览器打开 `http://localhost:5173`，用**学校邮箱**注册（系统内置 QQ SMTP 发送验证码）。完整演示需要两个学校邮箱账号，分别扮演客户和摄影师角色。
+浏览器打开 `http://localhost:5173`，使用手机号短信验证码完成注册或登录。新账号只获得 `CUSTOMER` 权限；切换到摄影师视角前，服务端必须已经存在 `PROVIDER` 角色绑定。
+
+普通用户认证接口为 `POST /auth/sms/send`、`POST /auth/sms/verify`、`POST /auth/refresh`、`GET /auth/session` 和 `POST /auth/logout`。旧 `/users/register`、`/users/login`、`/auth/send-code` 与 `/sessions` 不再签发普通用户凭据。
 
 完整演示流程（账号注册、双角色切换、完整订单链路）见 → [`docs/P4/DEMO_GUIDE.md`](docs/P4/DEMO_GUIDE.md)
 
@@ -84,7 +86,7 @@ npm install && npm run dev
 
 ## 线上访问
 
-**线上地址**：[http://47.250.86.6](http://47.250.86.6)（阿里云 ECS）
+生产部署必须配置域名、有效 TLS 证书并仅通过 HTTPS 提供认证和业务 API；仓库中的 Nginx 文件是需替换域名和证书路径的安全模板。
 
 > 首次部署已通过 CI/CD 自动完成。push 到 `main` 分支后，GitHub Actions 将自动运行 CI（lint → build → test → jacoco），CI 通过后触发 Deploy 工作流，将前端 dist 和后端 JAR 通过 SSH 推送至服务器并重启服务。
 

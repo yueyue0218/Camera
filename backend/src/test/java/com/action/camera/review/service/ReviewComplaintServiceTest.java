@@ -74,6 +74,8 @@ class ReviewComplaintServiceTest {
         insertUser(PROVIDER_ID, "complaint-provider", "CUSTOMER");
         insertUser(OUTSIDER_ID, "complaint-outsider", "CUSTOMER");
         insertUser(ADMIN_ID, "complaint-admin", "ADMIN");
+        jdbcTemplate.update("DELETE FROM user_role_bindings WHERE user_id = ?", ADMIN_ID);
+        jdbcTemplate.update("INSERT INTO user_role_bindings (user_id, role, granted_at) VALUES (?, 'ADMIN', NOW())", ADMIN_ID);
         insertUser(ARBITRATOR_ID, "complaint-arbitrator", "ARBITRATOR");
         insertCompletedOrder();
     }

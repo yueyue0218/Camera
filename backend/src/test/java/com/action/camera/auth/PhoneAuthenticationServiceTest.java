@@ -15,6 +15,7 @@ import com.action.camera.auth.sms.SmsMessage;
 import com.action.camera.auth.sms.SmsSender;
 import com.action.camera.common.JwtUtil;
 import com.action.camera.domain.User;
+import com.action.camera.domain.UserRoleBinding;
 import com.action.camera.repository.UserRepository;
 import com.action.camera.repository.UserRoleBindingRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -133,6 +134,7 @@ class PhoneAuthenticationServiceTest {
         existing.setCurrentRole("PROVIDER");
         existing.setStatus("ACTIVE");
         existing = userRepository.saveAndFlush(existing);
+        grantRole(existing.getId(), "PROVIDER");
         String code = sendAndCaptureCode();
 
         SessionAuthenticationResult result = authenticationService.verifyAndLogin(
@@ -146,6 +148,25 @@ class PhoneAuthenticationServiceTest {
         assertThat(result.response().getRole()).isEqualTo("PROVIDER");
         assertThat(result.response().isNewUser()).isFalse();
         assertThat(roleBindingRepository.existsByUserIdAndRole(existing.getId(), "CUSTOMER")).isTrue();
+    }
+
+    @Test
+    void staleProviderViewWithoutBindingFallsBackToCustomer() {
+        User existing = new User();
+        existing.setPhone(PHONE);
+        existing.setNickname("已有昵称");
+        existing.setCurrentRole("PROVIDER");
+        existing.setStatus("ACTIVE");
+        existing = userRepository.saveAndFlush(existing);
+        String code = sendAndCaptureCode();
+
+        SessionAuthenticationResult result = authenticationService.verifyAndLogin(
+                PHONE, SmsPurpose.LOGIN, code, DEVICE_ID, null);
+
+        assertThat(result.response().getRole()).isEqualTo("CUSTOMER");
+        assertThat(result.response().isAdminCapable()).isFalse();
+        assertThat(userRepository.findById(existing.getId()).orElseThrow().getCurrentRole())
+                .isEqualTo("CUSTOMER");
     }
 
     @Test
@@ -193,5 +214,12 @@ class PhoneAuthenticationServiceTest {
         byte[] digest = MessageDigest.getInstance("SHA-256")
                 .digest(value.getBytes(StandardCharsets.UTF_8));
         return HexFormat.of().formatHex(digest);
+    }
+
+    private void grantRole(Long userId, String role) {
+        UserRoleBinding binding = new UserRoleBinding();
+        binding.setUserId(userId);
+        binding.setRole(role);
+        roleBindingRepository.saveAndFlush(binding);
     }
 }
