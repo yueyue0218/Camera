@@ -8,8 +8,9 @@ export struct PortraErrorView {
   build() {
     Column() {
       Text('出错了')
-        .fontSize(20)
-        .fontColor(PortraTheme.danger)
+        .fontSize(PortraTheme.fontTitle)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(PortraTheme.primaryText)
       Text(this.message)
         .fontSize(14)
         .fontColor(PortraTheme.secondaryText)
@@ -20,13 +21,15 @@ export struct PortraErrorView {
         .height(40)
         .margin({ top: 16 })
         .fontColor(PortraTheme.primary)
-        .backgroundColor(PortraTheme.surface)
+        .backgroundColor(PortraTheme.primarySoft)
         .border({ width: 1, color: PortraTheme.primary })
-        .borderRadius(PortraTheme.radius)
+        .borderRadius(PortraTheme.radiusPill)
         .onClick(() => this.onRetry?.())
     }
     .width('100%')
     .padding(24)
+    .constraintSize({ minHeight: 180 })
+    .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Center)
   }
 }

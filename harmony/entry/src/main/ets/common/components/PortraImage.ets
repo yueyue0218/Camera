@@ -8,8 +8,8 @@ import { PublicImagePolicy } from './ComponentPolicy';
 @Component
 export struct PortraImage {
   @Prop source: ResourceStr = '';
-  @Prop imageWidth: number = 160;
-  @Prop imageHeight: number = 120;
+  @Prop imageWidth: Length = 160;
+  @Prop imageHeight: Length = 120;
   @Prop cornerRadius: number = PortraTheme.radius;
   @Prop fallbackText: string = '图片暂不可用';
   @Prop contentDescription: string = '图片';
