@@ -5,18 +5,19 @@ export struct PortraLoading {
   @Prop label: string = '加载中…';
 
   build() {
-    Row() {
-      Text('…')
-        .fontSize(20)
-        .fontColor(PortraTheme.primary)
+    Column({ space: PortraTheme.spacingMd }) {
+      LoadingProgress()
+        .width(28)
+        .height(28)
+        .color(PortraTheme.primary)
       Text(this.label)
         .fontSize(14)
         .fontColor(PortraTheme.secondaryText)
-        .margin({ left: 8 })
+        .textAlign(TextAlign.Center)
     }
     .justifyContent(FlexAlign.Center)
-    .alignItems(VerticalAlign.Center)
+    .alignItems(HorizontalAlign.Center)
     .width('100%')
-    .height(48)
+    .constraintSize({ minHeight: 180 })
   }
 }

@@ -6,6 +6,7 @@
 
 - ArkTS/ArkUI Stage 工程，目标 SDK 26.0.0。
 - App Shell 和原生 Navigation 已建立，包含 Login、Hall、DemandDetail、Publish、Message、Order、Profile 入口。
+- 大厅第一批原生 ArkUI 已按交互原型拆分为品牌栏、频道切换、筛选、发布 Banner、双列橱窗卡和底部导航；没有使用 WebView。
 - 网络底座已建立：`HttpClient`、`ApiService`、错误映射、Bearer Token 注入、请求取消和旧响应保护。
 - 客户端认证状态与网络层已接通；访问 token 使用 HarmonyOS Asset Store 按环境保存。B 的最终登录/Session 契约仍待接入。
 - 视觉组件目前是临时基础设施，不代表舍友正在设计的最终 UI。
@@ -47,6 +48,8 @@ $env:PORTRA_BASE_URL = 'http://<电脑局域网IPv4>:8080'
 - `GET /service-packages?page=1&size=10`
 
 本地后端目前会返回业务错误 `code=50001`，原因是数据库缺少 `moderation_status` 字段。该问题交由 A 确认迁移方案；在修复前不使用假数据完成 D08。
+
+正式大厅只调用上述真实接口，并覆盖 Loading、Empty、Error 和正常列表状态。视觉对照数据仅位于 `entry/src/ohosTest/ets/preview/HallPreview.ets`；DevEco 要求 Preview 入口位于 `src/main/ets`，因此请打开不含数据且未注册到正式页面的 `entry/src/main/ets/preview/HallPreviewEntry.ets`。该入口包含镜头与约拍的 360、390、430 vp 预览，以及 Loading、Empty、Error、长中文、无头像、无图片和长价格/预算边界预览。频道切换会把内容滚动位置复位到顶部，避免较长的镜头列表把旧滚动位置带入约拍列表。默认 HAP 仍需通过示例数据泄漏检查。当前没有连接模拟器或真机，因此系统字体放大和安全区仍需在 Preview 或设备上完成最终视觉验收。
 
 ## 提交边界
 

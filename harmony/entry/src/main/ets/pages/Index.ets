@@ -1,10 +1,9 @@
 import { AppClient } from '../app/AppClient';
-import { EnvironmentConfig } from '../common/config/EnvironmentConfig';
-import { PortraButton } from '../common/components/PortraButton';
-import { PortraCard } from '../common/components/PortraCard';
 import { PortraEmptyView } from '../common/components/PortraEmptyView';
+import { PortraAppShell } from '../features/shell/PortraAppShell';
 import { AppRoute, NavigationRouteParam } from '../model/NavigationModels';
 import { NavigationClickGuard, NavigationPolicy } from '../navigation/NavigationPolicy';
+import { PortraTheme } from '../theme/PortraTheme';
 
 const EMPTY_ROUTE_PARAM: NavigationRouteParam = {};
 
@@ -25,7 +24,7 @@ struct Index {
       if (name === AppRoute.LOGIN) {
         this.PlaceholderPage('登录', NavigationPolicy.loginDescription(param as NavigationRouteParam));
       } else if (name === AppRoute.HALL) {
-        this.PlaceholderPage('大厅', '后续接入需求和服务套餐真实列表。');
+        this.AppShell();
       } else if (name === AppRoute.DEMAND_DETAIL) {
         this.DemandDetailPage(param);
       } else if (name === AppRoute.PUBLISH) {
@@ -44,12 +43,25 @@ struct Index {
   }
 
   @Builder
+  AppShell() {
+    PortraAppShell({
+      onOpenRoute: (route: AppRoute, demandId?: number) => {
+        if (demandId === undefined) {
+          this.openPage(route);
+        } else {
+          this.openPage(route, { demandId: demandId });
+        }
+      }
+    })
+  }
+
+  @Builder
   PlaceholderPage(title: string, description: string) {
     Column() {
       Text(title)
         .fontSize(24)
         .fontWeight(FontWeight.Bold)
-        .fontColor('#252525')
+        .fontColor(PortraTheme.primaryText)
 
       PortraEmptyView({ message: description })
 
@@ -64,7 +76,7 @@ struct Index {
     .padding({ left: 24, right: 24 })
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Center)
-    .backgroundColor('#F7F5F2')
+    .backgroundColor(PortraTheme.pageBackground)
   }
 
   @Builder
@@ -95,78 +107,7 @@ struct Index {
 
   build() {
     Navigation(this.appPathStack) {
-      Column() {
-        Text('Portra')
-          .fontSize(32)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#252525')
-
-        Text('HarmonyOS 客户端底座')
-          .fontSize(18)
-          .fontColor('#6B625C')
-          .margin({ top: 8 })
-
-        Text(`当前环境：${EnvironmentConfig.displayName()}`)
-          .fontSize(14)
-          .fontColor('#8A817A')
-          .margin({ top: 12 })
-
-        PortraCard({
-          title: '客户端底座',
-          description: '当前为导航骨架，尚未接入真实数据。'
-        })
-          .width('80%')
-          .margin({ top: 20 })
-
-        PortraButton({
-          label: '进入大厅',
-          onAction: () => this.openPage(AppRoute.HALL)
-        })
-          .width('80%')
-          .margin({ top: 32 })
-
-        Row() {
-          Button('登录')
-            .layoutWeight(1)
-            .margin({ right: 8 })
-            .onClick(() => this.openPage(AppRoute.LOGIN))
-          Button('个人中心')
-            .layoutWeight(1)
-            .margin({ left: 8 })
-            .onClick(() => this.openPage(AppRoute.PROFILE))
-        }
-        .width('80%')
-        .margin({ top: 16 })
-
-        Row() {
-          Button('发布需求')
-            .layoutWeight(1)
-            .margin({ right: 8 })
-            .onClick(() => this.openPage(AppRoute.PUBLISH))
-          Button('消息')
-            .layoutWeight(1)
-            .margin({ left: 8, right: 8 })
-            .onClick(() => this.openPage(AppRoute.MESSAGE))
-          Button('订单')
-            .layoutWeight(1)
-            .margin({ left: 8 })
-            .onClick(() => this.openPage(AppRoute.ORDER))
-        }
-        .width('80%')
-        .margin({ top: 16 })
-
-        Button('打开示例需求详情')
-          .width('80%')
-          .height(44)
-          .margin({ top: 16 })
-          .onClick(() => this.openPage(AppRoute.DEMAND_DETAIL, { demandId: 1 }))
-      }
-      .width('100%')
-      .height('100%')
-      .padding({ left: 24, right: 24 })
-      .justifyContent(FlexAlign.Center)
-      .alignItems(HorizontalAlign.Center)
-      .backgroundColor('#F7F5F2')
+      this.AppShell()
     }
     .navDestination(this.PageMap)
     .hideTitleBar(true)
