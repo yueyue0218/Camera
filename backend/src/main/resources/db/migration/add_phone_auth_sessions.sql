@@ -1,46 +1,70 @@
--- Phone authentication and revocable session persistence.
--- MySQL 8.0-compatible repeatable migration used by both:
---   Path A: fresh initialization after V1_baseline.sql has created users.
---   Path B: existing database upgrade before deploying phone-auth code.
--- Existing users remain valid with phone = NULL. Adding uk_users_phone deliberately
--- fails if a partially migrated database already contains duplicate non-null phones.
+-- B AUTH persistence after migration/add_auth_phone_account.sql.
+-- MySQL 8.0-compatible and repeatable. This script never stores a plaintext phone.
 
 SET @schema_name = DATABASE();
 
-SET @sql = (
-    SELECT IF(
-        COUNT(*) = 0,
-        'ALTER TABLE users ADD COLUMN phone VARCHAR(20) NULL',
-        'SELECT ''users.phone already exists'' AS message'
-    )
+DELIMITER //
+DROP PROCEDURE IF EXISTS require_auth_phone_account//
+CREATE PROCEDURE require_auth_phone_account()
+BEGIN
+    DECLARE required_mobile_columns INT DEFAULT 0;
+    SELECT COUNT(*) INTO required_mobile_columns
     FROM information_schema.columns
-    WHERE table_schema = @schema_name
+    WHERE table_schema = DATABASE()
       AND table_name = 'users'
-      AND column_name = 'phone'
-);
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
+      AND column_name IN ('mobile_cipher', 'mobile_hash', 'mobile_masked', 'phone_verified_at');
+    IF required_mobile_columns <> 4 THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'add_auth_phone_account.sql must run first';
+    END IF;
+END//
+CALL require_auth_phone_account()//
+DROP PROCEDURE require_auth_phone_account//
+DELIMITER ;
+
+-- A pre-integration B build may have created users.phone in plaintext. An empty
+-- legacy column can be removed automatically. Real values need an application
+-- controlled decrypt/normalize/HMAC/encrypt conversion and must never be dropped.
+DELIMITER //
+DROP PROCEDURE IF EXISTS remove_empty_legacy_user_phone//
+CREATE PROCEDURE remove_empty_legacy_user_phone()
+BEGIN
+    DECLARE legacy_phone_column INT DEFAULT 0;
+    DECLARE legacy_phone_rows BIGINT DEFAULT 0;
+    DECLARE legacy_phone_index INT DEFAULT 0;
+
+    SELECT COUNT(*) INTO legacy_phone_column
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+      AND table_name = 'users'
+      AND column_name = 'phone';
+
+    IF legacy_phone_column > 0 THEN
+        SELECT COUNT(*) INTO legacy_phone_rows FROM users WHERE phone IS NOT NULL;
+        IF legacy_phone_rows > 0 THEN
+            SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'LEGACY users.phone DATA REQUIRES CONTROLLED APPLICATION CONVERSION';
+        END IF;
+
+        SELECT COUNT(*) INTO legacy_phone_index
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE()
+          AND table_name = 'users'
+          AND index_name = 'uk_users_phone';
+        IF legacy_phone_index > 0 THEN
+            ALTER TABLE users DROP INDEX uk_users_phone;
+        END IF;
+        ALTER TABLE users DROP COLUMN phone;
+    END IF;
+END//
+CALL remove_empty_legacy_user_phone()//
+DROP PROCEDURE remove_empty_legacy_user_phone//
+DELIMITER ;
 
 SET @sql = (
     SELECT IF(
         COUNT(*) = 0,
-        'ALTER TABLE users ADD COLUMN phone_verified_at DATETIME NULL',
-        'SELECT ''users.phone_verified_at already exists'' AS message'
-    )
-    FROM information_schema.columns
-    WHERE table_schema = @schema_name
-      AND table_name = 'users'
-      AND column_name = 'phone_verified_at'
-);
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-
-SET @sql = (
-    SELECT IF(
-        COUNT(*) = 0,
-        'ALTER TABLE users ADD COLUMN last_login_at DATETIME NULL',
+        'ALTER TABLE users ADD COLUMN last_login_at DATETIME(6) NULL',
         'SELECT ''users.last_login_at already exists'' AS message'
     )
     FROM information_schema.columns
@@ -52,91 +76,78 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
-SET @sql = (
-    SELECT IF(
-        COUNT(*) = 0,
-        'ALTER TABLE users ADD UNIQUE INDEX uk_users_phone (phone)',
-        'SELECT ''users.uk_users_phone already exists'' AS message'
-    )
-    FROM information_schema.statistics
-    WHERE table_schema = @schema_name
-      AND table_name = 'users'
-      AND index_name = 'uk_users_phone'
-);
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
+-- SMS challenges are short-lived. We can reshape an empty legacy table, but an
+-- operator must deliberately purge or archive populated plaintext challenges.
+DELIMITER //
+DROP PROCEDURE IF EXISTS migrate_legacy_sms_challenges//
+CREATE PROCEDURE migrate_legacy_sms_challenges()
+BEGIN
+    DECLARE sms_table_count INT DEFAULT 0;
+    DECLARE plaintext_phone_column INT DEFAULT 0;
+    DECLARE hashed_phone_column INT DEFAULT 0;
+    DECLARE challenge_rows BIGINT DEFAULT 0;
+    DECLARE legacy_index_count INT DEFAULT 0;
+
+    SELECT COUNT(*) INTO sms_table_count
+    FROM information_schema.tables
+    WHERE table_schema = DATABASE() AND table_name = 'sms_challenges';
+    IF sms_table_count > 0 THEN
+        SELECT COUNT(*) INTO plaintext_phone_column
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'sms_challenges' AND column_name = 'phone';
+        SELECT COUNT(*) INTO hashed_phone_column
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'sms_challenges' AND column_name = 'phone_hash';
+
+        IF plaintext_phone_column > 0 AND hashed_phone_column = 0 THEN
+            SELECT COUNT(*) INTO challenge_rows FROM sms_challenges;
+            IF challenge_rows > 0 THEN
+                SIGNAL SQLSTATE '45000'
+                    SET MESSAGE_TEXT = 'PLAINTEXT SMS CHALLENGES REQUIRE CONTROLLED PURGE BEFORE MIGRATION';
+            END IF;
+            SELECT COUNT(*) INTO legacy_index_count
+            FROM information_schema.statistics
+            WHERE table_schema = DATABASE()
+              AND table_name = 'sms_challenges'
+              AND index_name = 'idx_sms_phone_purpose_created';
+            IF legacy_index_count > 0 THEN
+                ALTER TABLE sms_challenges DROP INDEX idx_sms_phone_purpose_created;
+            END IF;
+            ALTER TABLE sms_challenges CHANGE COLUMN phone phone_hash CHAR(64) NOT NULL;
+            ALTER TABLE sms_challenges
+                ADD INDEX idx_sms_phone_hash_purpose_created (phone_hash, purpose, created_at);
+        ELSEIF plaintext_phone_column > 0 OR hashed_phone_column = 0 THEN
+            SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'sms_challenges HAS AN INCOMPATIBLE PHONE IDENTITY SCHEMA';
+        END IF;
+    END IF;
+END//
+CALL migrate_legacy_sms_challenges()//
+DROP PROCEDURE migrate_legacy_sms_challenges//
+DELIMITER ;
 
 CREATE TABLE IF NOT EXISTS sms_challenges (
-    id              BIGINT       PRIMARY KEY AUTO_INCREMENT,
-    phone           VARCHAR(20)  NOT NULL,
-    purpose         VARCHAR(32)  NOT NULL,
-    code_hash       VARCHAR(100) NOT NULL,
-    expires_at      DATETIME     NOT NULL,
-    attempt_count   INT          NOT NULL DEFAULT 0,
-    max_attempts    INT          NOT NULL DEFAULT 5,
-    consumed_at     DATETIME     NULL,
-    request_ip      VARCHAR(45)  NULL,
-    device_id       VARCHAR(128) NULL,
-    delivery_status VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
+    id                  BIGINT       PRIMARY KEY AUTO_INCREMENT,
+    phone_hash          CHAR(64)     NOT NULL,
+    purpose             VARCHAR(32)  NOT NULL,
+    code_hash           VARCHAR(100) NOT NULL,
+    expires_at          DATETIME(6)  NOT NULL,
+    attempt_count       INT          NOT NULL DEFAULT 0,
+    max_attempts        INT          NOT NULL DEFAULT 5,
+    consumed_at         DATETIME(6)  NULL,
+    request_ip          VARCHAR(45)  NULL,
+    device_id           VARCHAR(128) NULL,
+    delivery_status     VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
     provider_message_id VARCHAR(128) NULL,
-    sent_at         DATETIME     NULL,
-    created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    last_attempt_at DATETIME     NULL,
-    KEY idx_sms_phone_purpose_created (phone, purpose, created_at),
+    sent_at             DATETIME(6)  NULL,
+    created_at          DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    last_attempt_at     DATETIME(6)  NULL,
+    KEY idx_sms_phone_hash_purpose_created (phone_hash, purpose, created_at),
     KEY idx_sms_ip_created (request_ip, created_at),
     KEY idx_sms_device_created (device_id, created_at),
     KEY idx_sms_expires_at (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='Hashed SMS verification challenges and abuse-control metadata';
-
--- B2 delivery state is also repeatable against databases initialized by the B1
--- version of this migration. Failed provider calls remain unusable but continue
--- to count toward abuse-control limits.
-SET @sql = (
-    SELECT IF(
-        COUNT(*) = 0,
-        'ALTER TABLE sms_challenges ADD COLUMN delivery_status VARCHAR(20) NOT NULL DEFAULT ''PENDING'' AFTER device_id',
-        'SELECT ''sms_challenges.delivery_status already exists'' AS message'
-    )
-    FROM information_schema.columns
-    WHERE table_schema = @schema_name
-      AND table_name = 'sms_challenges'
-      AND column_name = 'delivery_status'
-);
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-
-SET @sql = (
-    SELECT IF(
-        COUNT(*) = 0,
-        'ALTER TABLE sms_challenges ADD COLUMN provider_message_id VARCHAR(128) NULL AFTER delivery_status',
-        'SELECT ''sms_challenges.provider_message_id already exists'' AS message'
-    )
-    FROM information_schema.columns
-    WHERE table_schema = @schema_name
-      AND table_name = 'sms_challenges'
-      AND column_name = 'provider_message_id'
-);
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-
-SET @sql = (
-    SELECT IF(
-        COUNT(*) = 0,
-        'ALTER TABLE sms_challenges ADD COLUMN sent_at DATETIME NULL AFTER provider_message_id',
-        'SELECT ''sms_challenges.sent_at already exists'' AS message'
-    )
-    FROM information_schema.columns
-    WHERE table_schema = @schema_name
-      AND table_name = 'sms_challenges'
-      AND column_name = 'sent_at'
-);
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS user_sessions (
     id                 BIGINT       PRIMARY KEY AUTO_INCREMENT,
@@ -145,10 +156,10 @@ CREATE TABLE IF NOT EXISTS user_sessions (
     refresh_token_hash CHAR(64)     NOT NULL,
     device_id          VARCHAR(128) NULL,
     device_name        VARCHAR(128) NULL,
-    created_at         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    expires_at         DATETIME     NOT NULL,
-    last_seen_at       DATETIME     NULL,
-    revoked_at         DATETIME     NULL,
+    created_at         DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    expires_at         DATETIME(6)  NOT NULL,
+    last_seen_at       DATETIME(6)  NULL,
+    revoked_at         DATETIME(6)  NULL,
     revoke_reason      VARCHAR(64)  NULL,
     UNIQUE KEY uk_user_sessions_session_id (session_id),
     UNIQUE KEY uk_user_sessions_refresh_hash (refresh_token_hash),
@@ -157,24 +168,19 @@ CREATE TABLE IF NOT EXISTS user_sessions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='Server-side state for revocable access and refresh sessions';
 
--- Post-migration verification. duplicate_phone_count must be zero; the unique
--- index above also prevents any future duplicate non-null normalized phone.
-SELECT COUNT(*) AS duplicate_phone_count
-FROM (
-    SELECT phone
-    FROM users
-    WHERE phone IS NOT NULL
-    GROUP BY phone
-    HAVING COUNT(*) > 1
-) duplicate_phones;
+SELECT column_name, column_type, is_nullable
+FROM information_schema.columns
+WHERE table_schema = @schema_name
+  AND ((table_name = 'users' AND column_name = 'last_login_at')
+    OR (table_name = 'sms_challenges' AND column_name = 'phone_hash'))
+ORDER BY table_name, ordinal_position;
 
 SELECT table_name, index_name, non_unique, seq_in_index, column_name
 FROM information_schema.statistics
 WHERE table_schema = @schema_name
-  AND table_name IN ('users', 'sms_challenges', 'user_sessions')
+  AND table_name IN ('sms_challenges', 'user_sessions')
   AND index_name IN (
-      'uk_users_phone',
-      'idx_sms_phone_purpose_created',
+      'idx_sms_phone_hash_purpose_created',
       'idx_sms_ip_created',
       'idx_sms_device_created',
       'idx_sms_expires_at',

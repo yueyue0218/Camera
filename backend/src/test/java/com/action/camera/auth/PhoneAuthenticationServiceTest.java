@@ -6,6 +6,7 @@ import com.action.camera.auth.domain.UserSession;
 import com.action.camera.auth.repository.SmsChallengeRepository;
 import com.action.camera.auth.repository.UserSessionRepository;
 import com.action.camera.auth.service.PhoneAuthenticationService;
+import com.action.camera.auth.service.PhoneIdentityCodec;
 import com.action.camera.auth.service.PhoneLoginRejectedException;
 import com.action.camera.auth.service.PhoneSmsService;
 import com.action.camera.auth.service.SessionAuthenticationResult;
@@ -61,6 +62,9 @@ class PhoneAuthenticationServiceTest {
     private PhoneSmsService phoneSmsService;
 
     @Autowired
+    private PhoneIdentityCodec phoneIdentityCodec;
+
+    @Autowired
     private PhoneAuthenticationService authenticationService;
 
     @Autowired
@@ -107,7 +111,9 @@ class PhoneAuthenticationServiceTest {
         SessionAuthenticationResult result = authenticationService.verifyAndLogin(
                 PHONE, SmsPurpose.LOGIN, code, DEVICE_ID, "Chrome on Windows");
 
-        User user = userRepository.findByPhone(PHONE).orElseThrow();
+        User user = userRepository.findByMobileHash(phoneIdentityCodec.lookupHash(PHONE)).orElseThrow();
+        assertThat(phoneIdentityCodec.decrypt(user.getMobileCipher())).isEqualTo(PHONE);
+        assertThat(user.getMobileMasked()).doesNotContain("13800138000");
         assertThat(user.getPhoneVerifiedAt()).isNotNull();
         assertThat(user.getLastLoginAt()).isNotNull();
         assertThat(user.getCurrentRole()).isEqualTo("CUSTOMER");
@@ -129,7 +135,7 @@ class PhoneAuthenticationServiceTest {
     @Test
     void verifiedExistingPhonePreservesProfileAndDoesNotDuplicateUser() {
         User existing = new User();
-        existing.setPhone(PHONE);
+        setPhoneIdentity(existing, PHONE);
         existing.setNickname("已有昵称");
         existing.setCurrentRole("PROVIDER");
         existing.setStatus("ACTIVE");
@@ -153,7 +159,7 @@ class PhoneAuthenticationServiceTest {
     @Test
     void staleProviderViewWithoutBindingFallsBackToCustomer() {
         User existing = new User();
-        existing.setPhone(PHONE);
+        setPhoneIdentity(existing, PHONE);
         existing.setNickname("已有昵称");
         existing.setCurrentRole("PROVIDER");
         existing.setStatus("ACTIVE");
@@ -172,7 +178,7 @@ class PhoneAuthenticationServiceTest {
     @Test
     void disabledUserConsumesValidCodeWithoutCreatingSession() {
         User disabled = new User();
-        disabled.setPhone(PHONE);
+        setPhoneIdentity(disabled, PHONE);
         disabled.setNickname("停用用户");
         disabled.setStatus("DISABLED");
         userRepository.saveAndFlush(disabled);
@@ -221,5 +227,12 @@ class PhoneAuthenticationServiceTest {
         binding.setUserId(userId);
         binding.setRole(role);
         roleBindingRepository.saveAndFlush(binding);
+    }
+
+    private void setPhoneIdentity(User user, String phone) {
+        PhoneIdentityCodec.PhoneIdentity identity = phoneIdentityCodec.encode(phone);
+        user.setMobileCipher(identity.cipher());
+        user.setMobileHash(identity.hash());
+        user.setMobileMasked(identity.masked());
     }
 }

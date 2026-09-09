@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users",
-        uniqueConstraints = @UniqueConstraint(name = "uk_users_phone", columnNames = "phone"))
+        uniqueConstraints = @UniqueConstraint(name = "uk_users_mobile_hash", columnNames = "mobile_hash"))
 @Getter
 @Setter
 public class User {
@@ -24,8 +24,14 @@ public class User {
     @Column(name = "password_hash", length = 100)
     private String passwordHash;
 
-    @Column(name = "phone", length = 20)
-    private String phone;
+    @Column(name = "mobile_cipher", length = 512)
+    private byte[] mobileCipher;
+
+    @Column(name = "mobile_hash", length = 64)
+    private String mobileHash;
+
+    @Column(name = "mobile_masked", length = 32)
+    private String mobileMasked;
 
     @Column(name = "phone_verified_at")
     private LocalDateTime phoneVerifiedAt;

@@ -32,6 +32,9 @@ file:
     local-path: ./target/test-uploads
 
 camera:
+  phone-identity:
+    encryption-key: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+    lookup-hmac-key: YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODk=
   session:
     refresh-ttl: 30d
   sms:

@@ -1,5 +1,7 @@
 package com.action.camera.controller;
 
+import com.action.camera.auth.dto.NativeRefreshRequest;
+import com.action.camera.auth.dto.NativeSessionResponse;
 import com.action.camera.auth.dto.SessionResponse;
 import com.action.camera.auth.dto.SendSmsCodeRequest;
 import com.action.camera.auth.dto.VerifySmsCodeRequest;
@@ -63,6 +65,15 @@ public class AuthController {
         return Result.success(result.response());
     }
 
+    /** Native clients cannot use an HttpOnly browser cookie, so their refresh
+     * credential is returned once and must be kept in the OS secure store. */
+    @PostMapping("/native/sms/verify")
+    public Result<NativeSessionResponse> verifyNativeSmsCode(@Valid @RequestBody VerifySmsCodeRequest req) {
+        SessionAuthenticationResult result = phoneAuthenticationService.verifyAndLogin(
+                req.getPhone(), req.smsPurpose(), req.getCode(), req.getDeviceId(), req.getDeviceName());
+        return Result.success(NativeSessionResponse.from(result));
+    }
+
     @PostMapping("/refresh")
     public Result<LoginResponse> refresh(HttpServletRequest request, HttpServletResponse response) {
         String refreshToken = cookieService.read(request)
@@ -70,6 +81,17 @@ public class AuthController {
         SessionAuthenticationResult result = sessionService.refresh(refreshToken);
         response.addHeader(HttpHeaders.SET_COOKIE, cookieService.create(result.refreshToken(), result.refreshTtl()));
         return Result.success(result.response());
+    }
+
+    @PostMapping("/native/refresh")
+    public Result<NativeSessionResponse> refreshNative(@Valid @RequestBody NativeRefreshRequest request) {
+        return Result.success(NativeSessionResponse.from(sessionService.refresh(request.refreshToken())));
+    }
+
+    @PostMapping("/native/logout")
+    public Result<Boolean> logoutNative() {
+        sessionService.logout(UserContext.getUserId(), UserContext.getSessionId());
+        return Result.success(true);
     }
 
     @PostMapping("/logout")

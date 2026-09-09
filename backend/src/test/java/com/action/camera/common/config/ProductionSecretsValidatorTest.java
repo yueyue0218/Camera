@@ -24,7 +24,8 @@ class ProductionSecretsValidatorTest {
                                     + "SPRING_DATASOURCE_PASSWORD/DB_PASSWORD, SPRING_MAIL_USERNAME, "
                                     + "SPRING_MAIL_PASSWORD, JWT_SECRET, SMS_PROVIDER, SMS_ENDPOINT, "
                                     + "SMS_ACCESS_KEY_ID, SMS_ACCESS_KEY_SECRET, SMS_SIGN_NAME, "
-                                    + "SMS_LOGIN_TEMPLATE_ID, SMS_CODE_PEPPER");
+                                    + "SMS_LOGIN_TEMPLATE_ID, SMS_CODE_PEPPER, PHONE_ENCRYPTION_KEY, "
+                                    + "PHONE_LOOKUP_HMAC_KEY");
                 });
     }
 
@@ -60,7 +61,9 @@ class ProductionSecretsValidatorTest {
                 .hasMessageContaining("SMS_ACCESS_KEY_SECRET")
                 .hasMessageContaining("SMS_SIGN_NAME")
                 .hasMessageContaining("SMS_LOGIN_TEMPLATE_ID")
-                .hasMessageContaining("SMS_CODE_PEPPER");
+                .hasMessageContaining("SMS_CODE_PEPPER")
+                .hasMessageContaining("PHONE_ENCRYPTION_KEY")
+                .hasMessageContaining("PHONE_LOOKUP_HMAC_KEY");
     }
 
     @Test
@@ -105,6 +108,10 @@ class ProductionSecretsValidatorTest {
                 .withProperty("camera.sms.access-key-secret", "external-ram-access-key-secret")
                 .withProperty("camera.sms.sign-name", "approved-sign-name")
                 .withProperty("camera.sms.login-template-id", "SMS_123456789")
-                .withProperty("camera.sms.code-pepper", "external-sms-code-pepper-with-sufficient-entropy");
+                .withProperty("camera.sms.code-pepper", "external-sms-code-pepper-with-sufficient-entropy")
+                .withProperty("camera.phone-identity.encryption-key",
+                        "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
+                .withProperty("camera.phone-identity.lookup-hmac-key",
+                        "YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODk=");
     }
 }

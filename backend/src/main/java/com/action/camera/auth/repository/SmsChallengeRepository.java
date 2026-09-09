@@ -12,9 +12,9 @@ import java.util.Optional;
 public interface SmsChallengeRepository extends JpaRepository<SmsChallenge, Long> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    Optional<SmsChallenge> findFirstByPhoneAndPurposeOrderByCreatedAtDesc(String phone, SmsPurpose purpose);
+    Optional<SmsChallenge> findFirstByPhoneHashAndPurposeOrderByCreatedAtDesc(String phoneHash, SmsPurpose purpose);
 
-    long countByPhoneAndCreatedAtAfter(String phone, LocalDateTime createdAfter);
+    long countByPhoneHashAndCreatedAtAfter(String phoneHash, LocalDateTime createdAfter);
 
     long countByRequestIpAndCreatedAtAfter(String requestIp, LocalDateTime createdAfter);
 

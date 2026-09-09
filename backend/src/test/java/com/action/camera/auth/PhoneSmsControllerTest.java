@@ -149,4 +149,50 @@ class PhoneSmsControllerTest {
         verify(phoneAuthenticationService, never()).verifyAndLogin(
                 anyString(), any(), anyString(), anyString(), any());
     }
+
+    @Test
+    void nativeVerifyReturnsRotatableRefreshCredentialWithoutCookie() throws Exception {
+        LoginResponse login = new LoginResponse("native-access", 84L, "鸿蒙用户", "CUSTOMER", false);
+        login.setNewUser(true);
+        when(phoneAuthenticationService.verifyAndLogin(
+                anyString(), any(SmsPurpose.class), anyString(), anyString(), any()))
+                .thenReturn(new SessionAuthenticationResult(
+                        login, "native-refresh", "camera_refresh", Duration.ofDays(30)));
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/auth/native/sms/verify")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "phone": "13800138000",
+                                  "purpose": "LOGIN",
+                                  "code": "123456",
+                                  "deviceId": "harmony-device",
+                                  "deviceName": "HarmonyOS"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accessToken").value("native-access"))
+                .andExpect(jsonPath("$.data.refreshToken").value("native-refresh"))
+                .andExpect(jsonPath("$.data.userId").value(84))
+                .andExpect(jsonPath("$.data.newUser").value(true))
+                .andExpect(header().doesNotExist("Set-Cookie"));
+    }
+
+    @Test
+    void nativeRefreshRotatesBodyCredentialWithoutCookie() throws Exception {
+        when(sessionService.refresh("old-native-refresh"))
+                .thenReturn(new SessionAuthenticationResult(
+                        new LoginResponse("new-access", 84L, "鸿蒙用户", "CUSTOMER", false),
+                        "new-native-refresh", "camera_refresh", Duration.ofDays(30)));
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/auth/native/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"old-native-refresh\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accessToken").value("new-access"))
+                .andExpect(jsonPath("$.data.refreshToken").value("new-native-refresh"))
+                .andExpect(header().doesNotExist("Set-Cookie"));
+
+        verify(sessionService).refresh("old-native-refresh");
+    }
 }

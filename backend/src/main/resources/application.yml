@@ -52,6 +52,9 @@ mybatis-plus:
     map-underscore-to-camel-case: true
 
 camera:
+  phone-identity:
+    encryption-key: ${PHONE_ENCRYPTION_KEY:}
+    lookup-hmac-key: ${PHONE_LOOKUP_HMAC_KEY:}
   session:
     refresh-cookie-name: ${SESSION_REFRESH_COOKIE_NAME:camera_refresh}
     refresh-ttl: P${SESSION_REFRESH_TTL_DAYS:30}D

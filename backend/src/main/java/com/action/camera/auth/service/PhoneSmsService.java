@@ -27,6 +27,7 @@ public class PhoneSmsService {
     private final SmsChallengeRepository challengeRepository;
     private final SmsSender smsSender;
     private final PhoneNumberNormalizer phoneNumberNormalizer;
+    private final PhoneIdentityCodec phoneIdentityCodec;
     private final SmsCodeHasher codeHasher;
     private final SmsProperties properties;
     private final Clock clock;
@@ -36,15 +37,17 @@ public class PhoneSmsService {
     public PhoneSmsService(SmsChallengeRepository challengeRepository,
                            SmsSender smsSender,
                            PhoneNumberNormalizer phoneNumberNormalizer,
+                           PhoneIdentityCodec phoneIdentityCodec,
                            SmsCodeHasher codeHasher,
                            SmsProperties properties) {
-        this(challengeRepository, smsSender, phoneNumberNormalizer, codeHasher, properties,
+        this(challengeRepository, smsSender, phoneNumberNormalizer, phoneIdentityCodec, codeHasher, properties,
                 Clock.systemDefaultZone(), new SecureRandom());
     }
 
     PhoneSmsService(SmsChallengeRepository challengeRepository,
                     SmsSender smsSender,
                     PhoneNumberNormalizer phoneNumberNormalizer,
+                    PhoneIdentityCodec phoneIdentityCodec,
                     SmsCodeHasher codeHasher,
                     SmsProperties properties,
                     Clock clock,
@@ -52,6 +55,7 @@ public class PhoneSmsService {
         this.challengeRepository = challengeRepository;
         this.smsSender = smsSender;
         this.phoneNumberNormalizer = phoneNumberNormalizer;
+        this.phoneIdentityCodec = phoneIdentityCodec;
         this.codeHasher = codeHasher;
         this.properties = properties;
         this.clock = clock;
@@ -64,22 +68,23 @@ public class PhoneSmsService {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "验证码用途不能为空");
         }
         String phone = phoneNumberNormalizer.normalize(rawPhone);
+        String phoneHash = phoneIdentityCodec.lookupHash(phone);
         String safeIp = requireContextValue(requestIp, 45, "请求来源无效");
         String safeDeviceId = requireContextValue(deviceId, 128, "设备标识不能为空");
         LocalDateTime now = LocalDateTime.now(clock);
 
         Optional<SmsChallenge> latest = challengeRepository
-                .findFirstByPhoneAndPurposeOrderByCreatedAtDesc(phone, purpose);
+                .findFirstByPhoneHashAndPurposeOrderByCreatedAtDesc(phoneHash, purpose);
         if (latest.isPresent()
                 && latest.get().getCreatedAt().isAfter(now.minus(properties.getResendCooldown()))) {
             throw rateLimited();
         }
 
-        enforceRateLimits(phone, safeIp, safeDeviceId, now);
+        enforceRateLimits(phoneHash, safeIp, safeDeviceId, now);
 
         String code = String.format("%06d", secureRandom.nextInt(1_000_000));
         SmsChallenge challenge = new SmsChallenge();
-        challenge.setPhone(phone);
+        challenge.setPhoneHash(phoneHash);
         challenge.setPurpose(purpose);
         challenge.setCodeHash(codeHasher.hash(phone, purpose, code));
         challenge.setExpiresAt(now.plus(properties.getCodeTtl()));
@@ -112,9 +117,10 @@ public class PhoneSmsService {
             throw new SmsCodeInvalidException();
         }
         String phone = phoneNumberNormalizer.normalize(rawPhone);
+        String phoneHash = phoneIdentityCodec.lookupHash(phone);
         LocalDateTime now = LocalDateTime.now(clock);
         SmsChallenge challenge = challengeRepository
-                .findFirstByPhoneAndPurposeOrderByCreatedAtDesc(phone, purpose)
+                .findFirstByPhoneHashAndPurposeOrderByCreatedAtDesc(phoneHash, purpose)
                 .orElseThrow(SmsCodeInvalidException::new);
 
         if (challenge.getConsumedAt() != null
@@ -137,12 +143,12 @@ public class PhoneSmsService {
         return phone;
     }
 
-    private void enforceRateLimits(String phone, String requestIp, String deviceId, LocalDateTime now) {
+    private void enforceRateLimits(String phoneHash, String requestIp, String deviceId, LocalDateTime now) {
         LocalDateTime hourAgo = now.minusHours(1);
         LocalDateTime dayAgo = now.minusHours(24);
-        if (challengeRepository.countByPhoneAndCreatedAtAfter(phone, hourAgo)
+        if (challengeRepository.countByPhoneHashAndCreatedAtAfter(phoneHash, hourAgo)
                 >= properties.getPhoneHourlyLimit()
-                || challengeRepository.countByPhoneAndCreatedAtAfter(phone, dayAgo)
+                || challengeRepository.countByPhoneHashAndCreatedAtAfter(phoneHash, dayAgo)
                 >= properties.getPhoneDailyLimit()
                 || challengeRepository.countByRequestIpAndCreatedAtAfter(requestIp, hourAgo)
                 >= properties.getIpHourlyLimit()

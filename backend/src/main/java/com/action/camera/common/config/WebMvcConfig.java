@@ -24,6 +24,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/auth/sms/send",
                         "/auth/sms/verify",
                         "/auth/refresh",
+                        "/auth/native/sms/verify",
+                        "/auth/native/refresh",
                         "/admin/login",
                         "/users/register",
                         "/users/login",

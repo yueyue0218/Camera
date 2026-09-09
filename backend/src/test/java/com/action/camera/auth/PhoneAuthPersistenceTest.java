@@ -5,6 +5,7 @@ import com.action.camera.auth.domain.SmsPurpose;
 import com.action.camera.auth.domain.UserSession;
 import com.action.camera.auth.repository.SmsChallengeRepository;
 import com.action.camera.auth.repository.UserSessionRepository;
+import com.action.camera.auth.service.PhoneIdentityCodec;
 import com.action.camera.domain.User;
 import com.action.camera.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -33,11 +34,14 @@ class PhoneAuthPersistenceTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private PhoneIdentityCodec phoneIdentityCodec;
+
     @Test
     void challengeCanBeLockedAndQueriedForRateLimits() {
         LocalDateTime now = LocalDateTime.of(2026, 9, 5, 18, 0);
         SmsChallenge challenge = new SmsChallenge();
-        challenge.setPhone("+8613800138000");
+        challenge.setPhoneHash(phoneIdentityCodec.lookupHash("+8613800138000"));
         challenge.setPurpose(SmsPurpose.LOGIN);
         challenge.setCodeHash("$2a$10$01234567890123456789012345678901234567890123456789012");
         challenge.setExpiresAt(now.plusMinutes(5));
@@ -46,10 +50,10 @@ class PhoneAuthPersistenceTest {
         challenge.setCreatedAt(now);
         smsChallengeRepository.saveAndFlush(challenge);
 
-        assertThat(smsChallengeRepository.findFirstByPhoneAndPurposeOrderByCreatedAtDesc(
-                challenge.getPhone(), SmsPurpose.LOGIN)).contains(challenge);
-        assertThat(smsChallengeRepository.countByPhoneAndCreatedAtAfter(
-                challenge.getPhone(), now.minusSeconds(1))).isOne();
+        assertThat(smsChallengeRepository.findFirstByPhoneHashAndPurposeOrderByCreatedAtDesc(
+                challenge.getPhoneHash(), SmsPurpose.LOGIN)).contains(challenge);
+        assertThat(smsChallengeRepository.countByPhoneHashAndCreatedAtAfter(
+                challenge.getPhoneHash(), now.minusSeconds(1))).isOne();
         assertThat(smsChallengeRepository.countByRequestIpAndCreatedAtAfter(
                 challenge.getRequestIp(), now.minusSeconds(1))).isOne();
         assertThat(smsChallengeRepository.countByDeviceIdAndCreatedAtAfter(
@@ -85,18 +89,21 @@ class PhoneAuthPersistenceTest {
         User first = user("+8613900139000", "Phone User One");
         userRepository.saveAndFlush(first);
 
-        assertThat(userRepository.existsByPhone(first.getPhone())).isTrue();
-        assertThat(userRepository.findByPhone(first.getPhone())).contains(first);
-        assertThat(userRepository.findByPhoneForUpdate(first.getPhone())).contains(first);
+        assertThat(userRepository.existsByMobileHash(first.getMobileHash())).isTrue();
+        assertThat(userRepository.findByMobileHash(first.getMobileHash())).contains(first);
+        assertThat(userRepository.findByMobileHashForUpdate(first.getMobileHash())).contains(first);
 
-        User duplicate = user(first.getPhone(), "Phone User Two");
+        User duplicate = user(phoneIdentityCodec.decrypt(first.getMobileCipher()), "Phone User Two");
         assertThatThrownBy(() -> userRepository.saveAndFlush(duplicate))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     private User user(String phone, String nickname) {
         User user = new User();
-        user.setPhone(phone);
+        PhoneIdentityCodec.PhoneIdentity identity = phoneIdentityCodec.encode(phone);
+        user.setMobileCipher(identity.cipher());
+        user.setMobileHash(identity.hash());
+        user.setMobileMasked(identity.masked());
         user.setPhoneVerifiedAt(LocalDateTime.of(2026, 9, 5, 18, 0));
         user.setNickname(nickname);
         return user;

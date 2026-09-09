@@ -1,0 +1,72 @@
+{
+  "apiType": "stageMode",
+  "buildOption": {
+    "resOptions": {
+      "copyCodeResource": {
+        "enable": false
+      }
+    }
+  },
+  "buildOptionSet": [
+    {
+      "name": "release",
+      "arkOptions": {
+        "obfuscation": {
+          "ruleOptions": {
+            "enable": false,
+            "files": [
+              "./obfuscation-rules.txt"
+            ]
+          }
+        }
+      }
+    },
+  ],
+  "targets": [
+    {
+      "name": "default",
+      "resource": {
+        "directories": [
+          "./src/main/resources",
+          "./src/dev/resources"
+        ]
+      }
+    },
+    {
+      "name": "dev",
+      "resource": {
+        "directories": [
+          "./src/main/resources",
+          "./src/dev/resources"
+        ]
+      }
+    },
+    {
+      "name": "staging",
+      "resource": {
+        "directories": [
+          "./src/main/resources",
+          "./src/staging/resources"
+        ]
+      }
+    },
+    {
+      "name": "production",
+      "resource": {
+        "directories": [
+          "./src/main/resources",
+          "./src/production/resources"
+        ]
+      }
+    },
+    {
+      "name": "ohosTest",
+      "resource": {
+        "directories": [
+          "./src/main/resources",
+          "./src/dev/resources"
+        ]
+      }
+    }
+  ]
+}

@@ -16,13 +16,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByStudentNo(String studentNo);
 
-    boolean existsByPhone(String phone);
+    boolean existsByMobileHash(String mobileHash);
 
-    Optional<User> findByPhone(String phone);
+    Optional<User> findByMobileHash(String mobileHash);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select u from User u where u.phone = :phone")
-    Optional<User> findByPhoneForUpdate(@Param("phone") String phone);
+    @Query("select u from User u where u.mobileHash = :mobileHash")
+    Optional<User> findByMobileHashForUpdate(@Param("mobileHash") String mobileHash);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where u.id = :id")

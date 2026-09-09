@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "sms_challenges", indexes = {
-        @Index(name = "idx_sms_phone_purpose_created", columnList = "phone,purpose,created_at"),
+        @Index(name = "idx_sms_phone_hash_purpose_created", columnList = "phone_hash,purpose,created_at"),
         @Index(name = "idx_sms_ip_created", columnList = "request_ip,created_at"),
         @Index(name = "idx_sms_device_created", columnList = "device_id,created_at"),
         @Index(name = "idx_sms_expires_at", columnList = "expires_at")
@@ -30,8 +30,8 @@ public class SmsChallenge {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "phone", nullable = false, length = 20)
-    private String phone;
+    @Column(name = "phone_hash", nullable = false, length = 64)
+    private String phoneHash;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "purpose", nullable = false, length = 32)

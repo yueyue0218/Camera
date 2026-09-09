@@ -20,15 +20,18 @@ public class PhoneAuthenticationService {
     private static final String DEFAULT_NICKNAME = "新用户";
 
     private final PhoneSmsService phoneSmsService;
+    private final PhoneIdentityCodec phoneIdentityCodec;
     private final UserRepository userRepository;
     private final UserRoleBindingRepository roleBindingRepository;
     private final AuthSessionService sessionService;
 
     public PhoneAuthenticationService(PhoneSmsService phoneSmsService,
+                                      PhoneIdentityCodec phoneIdentityCodec,
                                       UserRepository userRepository,
                                       UserRoleBindingRepository roleBindingRepository,
                                       AuthSessionService sessionService) {
         this.phoneSmsService = phoneSmsService;
+        this.phoneIdentityCodec = phoneIdentityCodec;
         this.userRepository = userRepository;
         this.roleBindingRepository = roleBindingRepository;
         this.sessionService = sessionService;
@@ -46,9 +49,10 @@ public class PhoneAuthenticationService {
         String normalizedDeviceId = requireDeviceId(deviceId);
         String normalizedDeviceName = normalizeDeviceName(deviceName);
         String phone = phoneSmsService.verifyCode(rawPhone, purpose, code);
+        String mobileHash = phoneIdentityCodec.lookupHash(phone);
         LocalDateTime now = LocalDateTime.now();
 
-        User user = userRepository.findByPhoneForUpdate(phone).orElse(null);
+        User user = userRepository.findByMobileHashForUpdate(mobileHash).orElse(null);
         if (user != null && (!ACTIVE_STATUS.equals(user.getStatus()) || isAdministrator(user))) {
             throw new PhoneLoginRejectedException();
         }
@@ -56,7 +60,10 @@ public class PhoneAuthenticationService {
         boolean newUser = user == null;
         if (newUser) {
             user = new User();
-            user.setPhone(phone);
+            PhoneIdentityCodec.PhoneIdentity identity = phoneIdentityCodec.encode(phone);
+            user.setMobileCipher(identity.cipher());
+            user.setMobileHash(identity.hash());
+            user.setMobileMasked(identity.masked());
             user.setNickname(DEFAULT_NICKNAME);
             user.setCurrentRole(UserRole.CUSTOMER.name());
             user.setStatus(ACTIVE_STATUS);

@@ -9,6 +9,7 @@ import org.springframework.util.StringUtils;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 
 /**
@@ -45,6 +46,8 @@ public class ProductionSecretsValidator implements InitializingBean {
         requireText("camera.sms.sign-name", "SMS_SIGN_NAME", missing);
         requireText("camera.sms.login-template-id", "SMS_LOGIN_TEMPLATE_ID", missing);
         requireText("camera.sms.code-pepper", "SMS_CODE_PEPPER", missing);
+        requireText("camera.phone-identity.encryption-key", "PHONE_ENCRYPTION_KEY", missing);
+        requireText("camera.phone-identity.lookup-hmac-key", "PHONE_LOOKUP_HMAC_KEY", missing);
 
         if (!missing.isEmpty()) {
             throw new IllegalStateException(
@@ -60,6 +63,9 @@ public class ProductionSecretsValidator implements InitializingBean {
             throw new IllegalStateException("SMS_PROVIDER must be aliyun in production");
         }
 
+        validateBase64Key("camera.phone-identity.encryption-key", "PHONE_ENCRYPTION_KEY");
+        validateBase64Key("camera.phone-identity.lookup-hmac-key", "PHONE_LOOKUP_HMAC_KEY");
+
         if (StringUtils.hasText(environment.getProperty("CAMERA_DEMO_BYPASS_CODE"))) {
             throw new IllegalStateException("CAMERA_DEMO_BYPASS_CODE must not be set in production");
         }
@@ -68,6 +74,17 @@ public class ProductionSecretsValidator implements InitializingBean {
     private void requireText(String propertyName, String environmentName, List<String> missing) {
         if (!StringUtils.hasText(environment.getProperty(propertyName))) {
             missing.add(environmentName);
+        }
+    }
+
+    private void validateBase64Key(String propertyName, String environmentName) {
+        try {
+            byte[] decoded = Base64.getDecoder().decode(environment.getRequiredProperty(propertyName).trim());
+            if (decoded.length != 32) {
+                throw new IllegalArgumentException();
+            }
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException(environmentName + " must be Base64 for exactly 32 bytes");
         }
     }
 }

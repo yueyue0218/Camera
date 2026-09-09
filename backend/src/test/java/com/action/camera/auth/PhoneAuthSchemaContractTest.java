@@ -21,22 +21,32 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PhoneAuthSchemaContractTest {
 
     private static final String MIGRATION = "db/migration/add_phone_auth_sessions.sql";
+    private static final String ACCOUNT_MIGRATION = "db/migration/add_auth_phone_account.sql";
     private static final String EXECUTION_ORDER = "db/README_EXECUTION_ORDER.md";
 
     @Test
-    void userPhoneMappingsMatchMigration() throws Exception {
-        String sql = readResource(MIGRATION).toLowerCase();
+    void encryptedUserPhoneMappingsMatchAccountMigration() throws Exception {
+        String accountSql = readResource(ACCOUNT_MIGRATION).toLowerCase();
+        String sessionSql = readResource(MIGRATION).toLowerCase();
         Table table = User.class.getAnnotation(Table.class);
 
-        assertColumn(User.class, "phone", "phone", 20, true);
+        assertColumn(User.class, "mobileCipher", "mobile_cipher", 512, true);
+        assertColumn(User.class, "mobileHash", "mobile_hash", 64, true);
+        assertColumn(User.class, "mobileMasked", "mobile_masked", 32, true);
         assertColumn(User.class, "phoneVerifiedAt", "phone_verified_at", 255, true);
         assertColumn(User.class, "lastLoginAt", "last_login_at", 255, true);
-        assertThat(uniqueNames(table.uniqueConstraints())).contains("uk_users_phone");
-        assertThat(sql)
-                .contains("alter table users add column phone varchar(20) null")
-                .contains("alter table users add column phone_verified_at datetime null")
-                .contains("alter table users add column last_login_at datetime null")
-                .contains("alter table users add unique index uk_users_phone (phone)");
+        assertThat(uniqueNames(table.uniqueConstraints())).contains("uk_users_mobile_hash");
+        assertThat(accountSql)
+                .contains("mobile_cipher")
+                .contains("mobile_hash")
+                .contains("mobile_masked")
+                .contains("phone_verified_at")
+                .contains("uk_users_mobile_hash")
+                .doesNotContain("add column phone ");
+        assertThat(sessionSql)
+                .contains("alter table users add column last_login_at datetime(6) null")
+                .contains("drop index uk_users_phone")
+                .doesNotContain("add constraint uk_users_phone", "unique (phone)");
     }
 
     @Test
@@ -46,23 +56,21 @@ class PhoneAuthSchemaContractTest {
 
         assertThat(table.name()).isEqualTo("sms_challenges");
         assertThat(indexNames(table.indexes())).containsExactlyInAnyOrder(
-                "idx_sms_phone_purpose_created",
+                "idx_sms_phone_hash_purpose_created",
                 "idx_sms_ip_created",
                 "idx_sms_device_created",
                 "idx_sms_expires_at");
         assertThat(sql)
                 .contains("create table if not exists sms_challenges")
-                .contains("phone           varchar(20)  not null")
-                .contains("purpose         varchar(32)  not null")
-                .contains("code_hash       varchar(100) not null")
-                .contains("attempt_count   int          not null default 0")
-                .contains("max_attempts    int          not null default 5")
-                .contains("delivery_status varchar(20)  not null default 'pending'")
+                .contains("phone_hash          char(64)     not null")
+                .contains("purpose             varchar(32)  not null")
+                .contains("code_hash           varchar(100) not null")
+                .contains("attempt_count       int          not null default 0")
+                .contains("max_attempts        int          not null default 5")
+                .contains("delivery_status     varchar(20)  not null default 'pending'")
                 .contains("provider_message_id varchar(128) null")
-                .contains("sent_at         datetime     null")
-                .contains("alter table sms_challenges add column delivery_status")
-                .contains("alter table sms_challenges add column provider_message_id")
-                .contains("alter table sms_challenges add column sent_at");
+                .contains("sent_at             datetime(6)  null")
+                .doesNotContain("phone           varchar(20)");
         for (String index : indexNames(table.indexes())) {
             assertThat(sql).contains(index.toLowerCase());
         }
@@ -102,6 +110,7 @@ class PhoneAuthSchemaContractTest {
         String legacy = section(readme, "## 路径 B", "## 自动部署前数据库闸门");
 
         assertThat(sql)
+                .contains("add_auth_phone_account.sql must run first")
                 .contains("information_schema.columns")
                 .contains("information_schema.statistics")
                 .contains("create table if not exists sms_challenges")

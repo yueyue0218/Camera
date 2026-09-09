@@ -5,6 +5,7 @@ import com.action.camera.auth.domain.SmsDeliveryStatus;
 import com.action.camera.auth.domain.SmsPurpose;
 import com.action.camera.auth.repository.SmsChallengeRepository;
 import com.action.camera.auth.service.PhoneSmsService;
+import com.action.camera.auth.service.PhoneIdentityCodec;
 import com.action.camera.auth.service.SmsCodeHasher;
 import com.action.camera.auth.service.SmsCodeInvalidException;
 import com.action.camera.auth.sms.SmsDeliveryException;
@@ -69,6 +70,9 @@ class PhoneSmsServiceTest {
     @Autowired
     private SmsCodeHasher codeHasher;
 
+    @Autowired
+    private PhoneIdentityCodec phoneIdentityCodec;
+
     @MockBean
     private SmsSender smsSender;
 
@@ -93,7 +97,8 @@ class PhoneSmsServiceTest {
         SmsChallenge challenge = onlyChallenge();
         assertThat(message.phone()).isEqualTo(PHONE);
         assertThat(message.code()).matches("\\d{6}");
-        assertThat(challenge.getPhone()).isEqualTo(PHONE);
+        assertThat(challenge.getPhoneHash()).isEqualTo(phoneIdentityCodec.lookupHash(PHONE));
+        assertThat(challenge.getPhoneHash()).doesNotContain(PHONE);
         assertThat(challenge.getCodeHash()).doesNotContain(message.code());
         assertThat(codeHasher.matches(PHONE, SmsPurpose.LOGIN, message.code(), challenge.getCodeHash())).isTrue();
         assertThat(challenge.getDeliveryStatus()).isEqualTo(SmsDeliveryStatus.SENT);
@@ -262,7 +267,7 @@ class PhoneSmsServiceTest {
 
     private SmsChallenge challenge(String phone, String ip, String deviceId, LocalDateTime createdAt) {
         SmsChallenge challenge = new SmsChallenge();
-        challenge.setPhone(phone);
+        challenge.setPhoneHash(phoneIdentityCodec.lookupHash(phone));
         challenge.setPurpose(SmsPurpose.LOGIN);
         challenge.setCodeHash(codeHasher.hash(phone, SmsPurpose.LOGIN, "123456"));
         challenge.setExpiresAt(createdAt.plusMinutes(5));
