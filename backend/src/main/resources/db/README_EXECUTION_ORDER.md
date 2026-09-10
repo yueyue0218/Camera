@@ -10,6 +10,8 @@
 
 ## 路径 A：全新库初始化（从零建库）
 
+`FRESH_INIT_ENTRYPOINT = backend/src/main/resources/db/V1_baseline.sql`。入口文件不是完整初始化器，必须继续按本节顺序执行全部后续脚本。
+
 > 只执行以下步骤，不执行路径 B 的任何脚本。
 
 | 步骤 | 文件 | 说明 |
@@ -26,6 +28,7 @@
 | 10 | `migration/add_user_profile_visibility.sql` | users 资料展示字段（当前 baseline 尚未包含）；MySQL 8 兼容、可重复执行，字段已存在时只输出提示 |
 | 11 | `migration/add_auth_phone_account.sql` | users 加密手机号身份字段、phone_verified_at 与哈希唯一索引；B 最终契约见 `docs/data/b-auth-final-contract.md` |
 | 12 | `migration/add_phone_auth_sessions.sql` | last_login_at、哈希化短信挑战、可撤销会话及业务索引；依赖步骤 11 |
+| 13 | `migration/add_provider_style_catalog.sql` | provider profile Mapper 所需 style_tags、provider_style_tags；兼容 P3 历史库、可重复执行 |
 
 > 注：`schedules` 表当前无对应初始化脚本。代码未直接访问 schedules 表，不阻断 Railway fresh 初始化；档期模块恢复时再补充 V2_schedule.sql。
 
@@ -59,6 +62,9 @@
 | 12 | `migration/add_admin_governance.sql` | 新增独立内容治理字段、索引和 reports 表；执行后完成下方治理数据闸门 |
 | 13 | `migration/add_auth_phone_account.sql` | 兼容已有 P3 mobile_* 字段；仅补缺失 nullable 列和 uk_users_mobile_hash；不回填历史用户 |
 | 14 | `migration/add_phone_auth_sessions.sql` | 新增 last_login_at、哈希化短信挑战表、可撤销会话表和业务索引；依赖步骤 13 |
+| 15 | `conversations_messages.sql` | 对齐 conversations 的 order_id、五列会话唯一键及消息索引；按 information_schema 判断，可重复执行 |
+| 16 | `migration/add_provider_style_catalog.sql` | 补齐 provider profile Mapper 所需标签目录与关联表；已有 P3 表时保持不变 |
+| 17 | `migration/sync_current_main_schema.sql` | 将当前代码实际使用的列定义和查询索引对齐到 Path A；收窄/NOT NULL 前先校验，发现不兼容历史数据立即停止且不回填 |
 
 ### A5 AUTH 发布 Gate
 
@@ -96,8 +102,11 @@ push 到 `main` 会在 CI 成功后自动替换后端 JAR 并重启服务，部�
 8. 执行 `SELECT order_id, COUNT(*) FROM payment_records GROUP BY order_id HAVING COUNT(*) > 1;`。如有结果，先依据权威支付记录人工处理，不得删除后直接继续。
 9. 确认无重复后执行 `add_payment_order_unique_constraint.sql`。
 10. 执行 `add_dispute_previous_order_status.sql`，检查脚本最后返回的 unresolved dispute；无法回填的历史记录保留 nullable，由新代码安全拒绝恢复。
-11. 检查所有迁移均成功且没有半迁移状态，再 push `main` 部署代码。
-12. 部署后验证重复支付、争议驳回恢复、公开作品和交付文件权限，以及手机号登录、Session 刷新和撤销流程。
+11. 执行 `conversations_messages.sql`，确认会话唯一键包含 `order_id`。
+12. 执行 `add_provider_style_catalog.sql`，确认 `style_tags` 与 `provider_style_tags` 的唯一键和外键完整。
+13. 执行 `sync_current_main_schema.sql`。如果出现 `SCHEMA SYNC BLOCKED`，停止发布并人工处理报告的超长值或 NULL；不得用脚本伪造回填。
+14. 检查所有迁移均成功且没有半迁移状态，再 push `main` 部署代码。
+15. 部署后验证重复支付、争议驳回恢复、公开作品和交付文件权限，以及手机号登录、Session 刷新和撤销流程。
 
 `previous_order_status` 的 `NOT NULL` 收紧属于第二阶段维护操作。只有在新代码已稳定运行、确认所有历史与新增 dispute 均无 null 后才可执行，不得与本次自动部署绑定。
 
@@ -110,7 +119,7 @@ push 到 `main` 会在 CI 成功后自动替换后端 JAR 并重启服务，部�
 | V1_baseline.sql | 全量建表，幂等 | 路径 A |
 | certification.sql | 认证/审核/档案建表，幂等 | 路径 A |
 | V3_b1_b2_fresh.sql | 供需模块纯建表，幂等，无存储过程 | 路径 A |
-| conversations_messages.sql | 会话消息建表+迁移，含存储过程 | 路径 A |
+| conversations_messages.sql | 会话消息建表+迁移，含存储过程 | 路径 A & B |
 | V5_d_line_fresh.sql | 评价/通知模块纯建表，幂等，无存储过程 | 路径 A |
 | moments.sql | 动态模块建表，幂等 | 路径 A |
 | b1_b2_persistence.sql | 供需模块字段回填迁移，含存储过程，一次性 | 路径 B |
@@ -124,5 +133,7 @@ push 到 `main` 会在 CI 成功后自动替换后端 JAR 并重启服务，部�
 | migration/add_auth_phone_account.sql | 加密手机号身份 nullable 字段与 HMAC hash 唯一索引，幂等；业务规则由 B 最终契约冻结 | 路径 A & B |
 | migration/add_admin_governance.sql | 内容治理字段、索引与 reports 表，MySQL 8 兼容且幂等 | 路径 A & B |
 | migration/add_phone_auth_sessions.sql | last_login_at、哈希化短信挑战、可撤销会话及认证索引，依赖手机号账号迁移 | 路径 A & B |
+| migration/add_provider_style_catalog.sql | Provider 标签目录与关联表建表，幂等 | 路径 A & B |
 | migration/add_payment_order_unique_constraint.sql | 支付记录按订单唯一，一次性，执行前必须检查重复数据 | 路径 B |
 | migration/add_dispute_previous_order_status.sql | 争议前状态第一阶段 nullable 迁移，一次性 | 路径 B |
+| migration/sync_current_main_schema.sql | 当前主线列定义与查询索引同步；预检失败即停止，不回填业务数据 | 路径 B |
