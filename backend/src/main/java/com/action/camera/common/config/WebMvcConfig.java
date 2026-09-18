@@ -1,18 +1,22 @@
 package com.action.camera.common.config;
 
 import com.action.camera.common.interceptor.AuthInterceptor;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
+@EnableConfigurationProperties(CorsProperties.class)
 public class WebMvcConfig implements WebMvcConfigurer {
 
     private final AuthInterceptor authInterceptor;
+    private final CorsProperties corsProperties;
 
-    public WebMvcConfig(AuthInterceptor authInterceptor) {
+    public WebMvcConfig(AuthInterceptor authInterceptor, CorsProperties corsProperties) {
         this.authInterceptor = authInterceptor;
+        this.corsProperties = corsProperties;
     }
 
     @Override
@@ -36,19 +40,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOriginPatterns(
-                        "http://localhost:*",
-                        "https://localhost:*",
-                        "http://127.0.0.1:*",
-                        "http://47.250.86.6",
-                        "http://47.250.86.6:*",
-                        "https://47.250.86.6",
-                        "https://47.250.86.6:*",
-                        "http://192.168.*:*",
-                        "http://10.*:*",
-                        "https://*.vercel.app",
-                        "https://*.up.railway.app"
-                )
+                .allowedOriginPatterns(corsProperties.getAllowedOriginPatterns().toArray(String[]::new))
                 .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);

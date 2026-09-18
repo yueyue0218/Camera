@@ -1,0 +1,4 @@
+camera:
+  cors:
+    allowed-origin-patterns:
+      - "${TEMP_STAGING_ALLOWED_ORIGIN:https://47.76.106.57}"
