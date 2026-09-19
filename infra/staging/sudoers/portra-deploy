@@ -1,0 +1,5 @@
+# One-time root bootstrap installs /usr/local/sbin/portra-deploy-infra as
+# root:root mode 0755 before enabling this rule.
+portra-deploy ALL=(root) NOPASSWD: /usr/local/sbin/portra-deploy-infra *
+portra-deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart portra-backend.service
+portra-deploy ALL=(root) NOPASSWD: /usr/bin/systemctl is-active portra-backend.service

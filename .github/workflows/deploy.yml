@@ -1,66 +1,385 @@
-name: Deploy to Server
+name: Deploy Portra staging
 
 on:
-  workflow_run:
-    workflows: ["Project CI"]
-    types: [completed]
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to deploy
+        required: true
+        default: main
+        type: string
+      deploy_scope:
+        description: Deployment surfaces
+        required: true
+        default: auto
+        type: choice
+        options: [auto, backend, infra, all]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portra-staging-deployment
+  cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Deploy frontend and backend
+    name: Plan and deploy staging
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    environment: staging
 
     steps:
-      - name: Download frontend artifact
-        uses: actions/download-artifact@v4
+      - name: Checkout requested ref
+        uses: actions/checkout@v6
         with:
-          name: frontend-dist
-          path: ./dist
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
 
-      - name: Download backend JAR artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: backend-jar
-          path: ./jar
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve immutable commit
+        id: revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse HEAD)"
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "TARGET_COMMIT=$sha"
 
-      - name: Upload frontend to server
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_KEY }}
-          source: "dist"
-          target: "/var/www/"
-      
+      - name: Configure verified SSH
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.STAGING_KNOWN_HOSTS }}
+          STAGING_HOST: ${{ vars.STAGING_HOST }}
+          STAGING_PORT: ${{ vars.STAGING_PORT }}
+          STAGING_USER: ${{ vars.STAGING_USER }}
+        run: |
+          set -euo pipefail
+          : "${SSH_PRIVATE_KEY:?STAGING_SSH_PRIVATE_KEY is required}"
+          : "${SSH_KNOWN_HOSTS:?STAGING_KNOWN_HOSTS is required}"
+          : "${STAGING_HOST:?STAGING_HOST is required}"
+          : "${STAGING_PORT:?STAGING_PORT is required}"
+          : "${STAGING_USER:?STAGING_USER is required}"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_portra_staging"
+          chmod 600 "$HOME/.ssh/id_portra_staging"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
 
-      - name: Upload backend JAR to server
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_KEY }}
-          source: "jar/*.jar"
-          target: "/opt/camera-app/"
-          strip_components: 1
+      - name: Determine changed deployment surfaces
+        id: plan
+        shell: bash
+        env:
+          TARGET_SHA: ${{ steps.revision.outputs.sha }}
+          REQUESTED_SCOPE: ${{ inputs.deploy_scope }}
+          STAGING_HOST: ${{ vars.STAGING_HOST }}
+          STAGING_PORT: ${{ vars.STAGING_PORT }}
+          STAGING_USER: ${{ vars.STAGING_USER }}
+        run: |
+          set -euo pipefail
+          ssh_base=(ssh -i "$HOME/.ssh/id_portra_staging" -p "$STAGING_PORT"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            "$STAGING_USER@$STAGING_HOST")
 
-      - name: Restart backend and reload Nginx
-        uses: appleboy/ssh-action@master
+          read_remote_commit() {
+            local path="$1" value=""
+            value="$("${ssh_base[@]}" "test -r '$path' && cat '$path' || true")"
+            if [[ "$value" =~ ^[0-9a-f]{40}$ ]] \
+              && git cat-file -e "$value^{commit}" 2>/dev/null \
+              && git merge-base --is-ancestor "$value" "$TARGET_SHA"; then
+              printf '%s' "$value"
+            fi
+          }
+
+          changed_since() {
+            local base="$1"
+            shift
+            [[ -z "$base" ]] || ! git diff --quiet "$base" "$TARGET_SHA" -- "$@"
+          }
+
+          app_base="$(read_remote_commit /home/portra-deploy/state/application-commit.txt)"
+          infra_base="$(read_remote_commit /home/portra-deploy/state/infra-commit.txt)"
+          bootstrap_base="$(read_remote_commit /opt/portra/deploy/bootstrap-commit.txt)"
+          deploy_backend=false
+          deploy_nginx=false
+          deploy_systemd=false
+          deploy_scripts=false
+
+          case "$REQUESTED_SCOPE" in
+            backend)
+              deploy_backend=true
+              ;;
+            infra)
+              deploy_nginx=true
+              deploy_systemd=true
+              deploy_scripts=true
+              ;;
+            all)
+              deploy_backend=true
+              deploy_nginx=true
+              deploy_systemd=true
+              deploy_scripts=true
+              ;;
+            auto)
+              changed_since "$app_base" backend && deploy_backend=true
+              changed_since "$infra_base" infra/staging/nginx && deploy_nginx=true
+              changed_since "$infra_base" infra/staging/systemd && deploy_systemd=true
+              changed_since "$infra_base" infra/staging/scripts && deploy_scripts=true
+              ;;
+            *)
+              echo "Unsupported deploy_scope: $REQUESTED_SCOPE" >&2
+              exit 2
+              ;;
+          esac
+
+          deploy_infra=false
+          if [[ "$deploy_nginx" == true || "$deploy_systemd" == true || "$deploy_scripts" == true ]]; then
+            deploy_infra=true
+          fi
+
+          bootstrap_required=false
+          if [[ "$deploy_infra" == true ]] \
+            && changed_since "$bootstrap_base" \
+              infra/staging/scripts/deploy-infra-root.sh infra/staging/sudoers; then
+            bootstrap_required=true
+          fi
+
+          {
+            echo "deploy_backend=$deploy_backend"
+            echo "deploy_infra=$deploy_infra"
+            echo "deploy_nginx=$deploy_nginx"
+            echo "deploy_systemd=$deploy_systemd"
+            echo "deploy_scripts=$deploy_scripts"
+            echo "bootstrap_required=$bootstrap_required"
+            echo "application_base=${app_base:-UNKNOWN}"
+            echo "infra_base=${infra_base:-UNKNOWN}"
+            echo "bootstrap_base=${bootstrap_base:-UNKNOWN}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "APPLICATION_BASE=${app_base:-UNKNOWN}"
+          echo "INFRA_BASE=${infra_base:-UNKNOWN}"
+          echo "BACKEND_CHANGED=$deploy_backend"
+          echo "INFRA_CHANGED=$deploy_infra"
+          echo "NGINX_CHANGED=$deploy_nginx"
+          echo "SYSTEMD_CHANGED=$deploy_systemd"
+          echo "ADMIN_BOOTSTRAP_REQUIRED=$bootstrap_required"
+
+      - name: Enforce administrator bootstrap boundary
+        if: steps.plan.outputs.bootstrap_required == 'true'
+        shell: bash
+        run: |
+          echo "ADMIN_BOOTSTRAP_REQUIRED" >&2
+          echo "The root-owned helper or sudo policy is not recorded at this target commit." >&2
+          echo "Complete infra/staging/README.md one-time bootstrap before deploying infra." >&2
+          exit 1
+
+      - name: Validate repository infrastructure
+        if: steps.plan.outputs.deploy_infra == 'true'
+        shell: bash
+        run: bash infra/staging/scripts/validate-repository-infra.sh
+
+      - name: Set up Java 17
+        if: steps.plan.outputs.deploy_backend == 'true'
+        uses: actions/setup-java@v5
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_KEY }}
-          script: |
-            set -e
-            rm -f /opt/camera-app/app.jar  
-            mv /opt/camera-app/*.jar /opt/camera-app/app.jar
-            chmod -R 755 /var/www/dist
-            systemctl restart camera-backend
-            nginx -s reload
-            sleep 5
-            systemctl is-active camera-backend
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Package backend
+        if: steps.plan.outputs.deploy_backend == 'true'
+        working-directory: backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x mvnw
+          ./mvnw -B -DskipTests clean package
+
+      - name: Select unique backend artifact
+        if: steps.plan.outputs.deploy_backend == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t jars < <(find backend/target -maxdepth 1 -type f -name '*.jar' ! -name '*.original.jar' | sort)
+          if [[ "${#jars[@]}" -ne 1 ]]; then
+            printf 'Expected exactly one deployable JAR, found %s\n' "${#jars[@]}" >&2
+            printf '%s\n' "${jars[@]}" >&2
+            exit 1
+          fi
+          install -d staging-package
+          cp -- "${jars[0]}" staging-package/portra-backend.jar
+          sha256sum staging-package/portra-backend.jar > staging-package/portra-backend.jar.sha256
+          cat staging-package/portra-backend.jar.sha256
+
+      - name: Prepare immutable payload
+        id: payload
+        shell: bash
+        env:
+          TARGET_SHA: ${{ steps.revision.outputs.sha }}
+        run: |
+          set -euo pipefail
+          payload="staging-payload/$TARGET_SHA"
+          install -d "$payload"
+          cp -R infra/staging "$payload/infra"
+          printf '%s\n' "$TARGET_SHA" > "$payload/target-commit.txt"
+          if [[ -f staging-package/portra-backend.jar ]]; then
+            cp staging-package/portra-backend.jar staging-package/portra-backend.jar.sha256 "$payload/"
+          fi
+          echo "path=$payload" >> "$GITHUB_OUTPUT"
+
+      - name: Upload payload without touching live files
+        if: steps.plan.outputs.deploy_backend == 'true' || steps.plan.outputs.deploy_infra == 'true'
+        shell: bash
+        env:
+          PAYLOAD: ${{ steps.payload.outputs.path }}
+          TARGET_SHA: ${{ steps.revision.outputs.sha }}
+          STAGING_HOST: ${{ vars.STAGING_HOST }}
+          STAGING_PORT: ${{ vars.STAGING_PORT }}
+          STAGING_USER: ${{ vars.STAGING_USER }}
+        run: |
+          set -euo pipefail
+          ssh -i "$HOME/.ssh/id_portra_staging" -p "$STAGING_PORT" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$STAGING_USER@$STAGING_HOST" \
+            "install -d -m 700 '/home/portra-deploy/incoming/$TARGET_SHA'"
+          scp -i "$HOME/.ssh/id_portra_staging" -P "$STAGING_PORT" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes -r \
+            "$PAYLOAD/." "$STAGING_USER@$STAGING_HOST:/home/portra-deploy/incoming/$TARGET_SHA/"
+
+      - name: Deploy backend release
+        if: steps.plan.outputs.deploy_backend == 'true'
+        shell: bash
+        env:
+          TARGET_SHA: ${{ steps.revision.outputs.sha }}
+          STAGING_HOST: ${{ vars.STAGING_HOST }}
+          STAGING_PORT: ${{ vars.STAGING_PORT }}
+          STAGING_USER: ${{ vars.STAGING_USER }}
+          STAGING_HEALTH_URL: ${{ vars.STAGING_HEALTH_URL }}
+          STAGING_PUBLIC_URL: ${{ vars.STAGING_PUBLIC_URL }}
+          STAGING_EXPECTED_ORIGIN: ${{ vars.STAGING_EXPECTED_ORIGIN }}
+        run: |
+          set -euo pipefail
+          : "${STAGING_HEALTH_URL:?STAGING_HEALTH_URL is required}"
+          : "${STAGING_PUBLIC_URL:?STAGING_PUBLIC_URL is required}"
+          : "${STAGING_EXPECTED_ORIGIN:?STAGING_EXPECTED_ORIGIN is required}"
+          ssh -i "$HOME/.ssh/id_portra_staging" -p "$STAGING_PORT" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$STAGING_USER@$STAGING_HOST" \
+            "bash '/home/portra-deploy/incoming/$TARGET_SHA/infra/scripts/deploy-backend.sh' \
+              '$TARGET_SHA' '/home/portra-deploy/incoming/$TARGET_SHA/portra-backend.jar' \
+              '$STAGING_HEALTH_URL' '$STAGING_PUBLIC_URL' '$STAGING_EXPECTED_ORIGIN'"
+
+      - name: Install versioned deployment scripts
+        if: steps.plan.outputs.deploy_infra == 'true'
+        shell: bash
+        env:
+          TARGET_SHA: ${{ steps.revision.outputs.sha }}
+          STAGING_HOST: ${{ vars.STAGING_HOST }}
+          STAGING_PORT: ${{ vars.STAGING_PORT }}
+          STAGING_USER: ${{ vars.STAGING_USER }}
+        run: |
+          set -euo pipefail
+          ssh -i "$HOME/.ssh/id_portra_staging" -p "$STAGING_PORT" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$STAGING_USER@$STAGING_HOST" \
+            "bash '/home/portra-deploy/incoming/$TARGET_SHA/infra/scripts/install-deployment-scripts.sh' \
+              '$TARGET_SHA' '/home/portra-deploy/incoming/$TARGET_SHA/infra/scripts'"
+
+      - name: Deploy privileged infrastructure surfaces
+        if: steps.plan.outputs.deploy_nginx == 'true' || steps.plan.outputs.deploy_systemd == 'true'
+        shell: bash
+        env:
+          TARGET_SHA: ${{ steps.revision.outputs.sha }}
+          STAGING_HOST: ${{ vars.STAGING_HOST }}
+          STAGING_PORT: ${{ vars.STAGING_PORT }}
+          STAGING_USER: ${{ vars.STAGING_USER }}
+          STAGING_HEALTH_URL: ${{ vars.STAGING_HEALTH_URL }}
+          STAGING_PUBLIC_URL: ${{ vars.STAGING_PUBLIC_URL }}
+          STAGING_EXPECTED_ORIGIN: ${{ vars.STAGING_EXPECTED_ORIGIN }}
+          DEPLOY_NGINX: ${{ steps.plan.outputs.deploy_nginx }}
+          DEPLOY_SYSTEMD: ${{ steps.plan.outputs.deploy_systemd }}
+        run: |
+          set -euo pipefail
+          local_helper_sha="$(sha256sum infra/staging/scripts/deploy-infra-root.sh | awk '{print $1}')"
+          remote_helper_sha="$(ssh -i "$HOME/.ssh/id_portra_staging" -p "$STAGING_PORT" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$STAGING_USER@$STAGING_HOST" \
+            "test -f /usr/local/sbin/portra-deploy-infra && \
+              sha256sum /usr/local/sbin/portra-deploy-infra | awk '{print \$1}'")"
+          if [[ "$local_helper_sha" != "$remote_helper_sha" ]]; then
+            echo "ADMIN_BOOTSTRAP_REQUIRED: root-owned helper checksum differs" >&2
+            exit 1
+          fi
+          surfaces=""
+          [[ "$DEPLOY_NGINX" == true ]] && surfaces="nginx"
+          [[ "$DEPLOY_SYSTEMD" == true ]] && surfaces="${surfaces:+$surfaces,}systemd"
+          ssh -i "$HOME/.ssh/id_portra_staging" -p "$STAGING_PORT" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$STAGING_USER@$STAGING_HOST" \
+            "sudo /usr/local/sbin/portra-deploy-infra \
+              '/home/portra-deploy/incoming/$TARGET_SHA/infra' '$TARGET_SHA' '$surfaces' \
+              '$STAGING_HEALTH_URL' '$STAGING_PUBLIC_URL' '$STAGING_EXPECTED_ORIGIN'"
+
+      - name: Verify staging after infrastructure deployment
+        if: steps.plan.outputs.deploy_infra == 'true'
+        shell: bash
+        env:
+          STAGING_HOST: ${{ vars.STAGING_HOST }}
+          STAGING_PORT: ${{ vars.STAGING_PORT }}
+          STAGING_USER: ${{ vars.STAGING_USER }}
+          STAGING_HEALTH_URL: ${{ vars.STAGING_HEALTH_URL }}
+          STAGING_PUBLIC_URL: ${{ vars.STAGING_PUBLIC_URL }}
+          STAGING_EXPECTED_ORIGIN: ${{ vars.STAGING_EXPECTED_ORIGIN }}
+        run: |
+          set -euo pipefail
+          ssh -i "$HOME/.ssh/id_portra_staging" -p "$STAGING_PORT" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$STAGING_USER@$STAGING_HOST" \
+            "bash /home/portra-deploy/scripts/current/health-check.sh \
+              '$STAGING_HEALTH_URL' '$STAGING_PUBLIC_URL' '$STAGING_EXPECTED_ORIGIN'"
+
+      - name: Record infrastructure provenance
+        if: steps.plan.outputs.deploy_infra == 'true'
+        shell: bash
+        env:
+          TARGET_SHA: ${{ steps.revision.outputs.sha }}
+          STAGING_HOST: ${{ vars.STAGING_HOST }}
+          STAGING_PORT: ${{ vars.STAGING_PORT }}
+          STAGING_USER: ${{ vars.STAGING_USER }}
+          DEPLOY_BACKEND: ${{ steps.plan.outputs.deploy_backend }}
+          DEPLOY_NGINX: ${{ steps.plan.outputs.deploy_nginx }}
+          DEPLOY_SYSTEMD: ${{ steps.plan.outputs.deploy_systemd }}
+        run: |
+          set -euo pipefail
+          ssh -i "$HOME/.ssh/id_portra_staging" -p "$STAGING_PORT" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$STAGING_USER@$STAGING_HOST" \
+            "bash '/home/portra-deploy/incoming/$TARGET_SHA/infra/scripts/record-infra-state.sh' \
+              '$TARGET_SHA' '$DEPLOY_BACKEND' '$DEPLOY_NGINX' '$DEPLOY_SYSTEMD'"
+
+      - name: Report deployment provenance
+        shell: bash
+        env:
+          TARGET_SHA: ${{ steps.revision.outputs.sha }}
+          STAGING_HOST: ${{ vars.STAGING_HOST }}
+          STAGING_PORT: ${{ vars.STAGING_PORT }}
+          STAGING_USER: ${{ vars.STAGING_USER }}
+          DEPLOY_BACKEND: ${{ steps.plan.outputs.deploy_backend }}
+          DEPLOY_INFRA: ${{ steps.plan.outputs.deploy_infra }}
+          DEPLOY_NGINX: ${{ steps.plan.outputs.deploy_nginx }}
+          DEPLOY_SYSTEMD: ${{ steps.plan.outputs.deploy_systemd }}
+        run: |
+          set -euo pipefail
+          echo "TARGET_COMMIT=$TARGET_SHA"
+          echo "BACKEND_CHANGED=$DEPLOY_BACKEND"
+          echo "INFRA_CHANGED=$DEPLOY_INFRA"
+          echo "NGINX_CHANGED=$DEPLOY_NGINX"
+          echo "SYSTEMD_CHANGED=$DEPLOY_SYSTEMD"
+          echo "ADMIN_BOOTSTRAP_REQUIRED=${{ steps.plan.outputs.bootstrap_required }}"
+          ssh -i "$HOME/.ssh/id_portra_staging" -p "$STAGING_PORT" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$STAGING_USER@$STAGING_HOST" \
+            "test ! -r /home/portra-deploy/state/application-commit.txt || \
+              sed 's/^/APPLICATION_COMMIT=/' /home/portra-deploy/state/application-commit.txt; \
+             test ! -r /home/portra-deploy/state/infra-commit.txt || \
+              sed 's/^/INFRA_COMMIT=/' /home/portra-deploy/state/infra-commit.txt"
