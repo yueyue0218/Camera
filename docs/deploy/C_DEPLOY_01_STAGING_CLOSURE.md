@@ -24,10 +24,13 @@ release, switches `current`, restarts `portra-backend.service`, and runs finite 
 HTTPS, CORS, credentials, and Authorization-preflight checks. Failure restores the
 previous release and re-runs acceptance.
 
-Infrastructure deployment copies repository candidates to a root-owned staging area.
-The fixed root helper validates the candidate, backs up the current Nginx/systemd
-files, installs atomically, runs `nginx -t` or `systemd-analyze verify`, reloads or
-restarts only the affected service, and rolls back on validation or health failure.
+Privileged infrastructure deployment does not trust uploaded candidates. The
+root-owned helper independently fetches the fixed GitHub repository into a root-owned
+cache, requires the requested SHA to be the exact current `main` head, exports files
+directly from Git, and checks complete approved SHA-256 values. The systemd unit must
+also match a complete semantic allowlist. It then backs up live files, installs
+atomically, validates, reloads/restarts only the affected service, and rolls back on
+validation or health failure.
 
 The workflow never runs SQL and never reads or replaces `/etc/portra/portra.env`.
 The repository contains only the non-secret template
@@ -59,6 +62,8 @@ The existing server sudo policy permits only restart/is-active for
 `portra-backend.service`. A one-time administrator bootstrap described in
 `infra/staging/README.md` is required before Nginx or systemd deployment can run.
 Do not weaken this boundary with `NOPASSWD: ALL` or generic `sudo sh/cp/systemctl`.
+Any change to root-loaded Nginx/systemd bytes requires a reviewed helper update and a
+new administrator bootstrap. Backend and non-root deployment assets remain automatic.
 
 ## Known runtime risk
 

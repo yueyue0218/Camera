@@ -98,7 +98,8 @@ jobs:
           }
 
           app_base="$(read_remote_commit /home/portra-deploy/state/application-commit.txt)"
-          infra_base="$(read_remote_commit /home/portra-deploy/state/infra-commit.txt)"
+          infra_base="$(read_remote_commit /opt/portra/deploy/infra-commit.txt)"
+          scripts_base="$(read_remote_commit /home/portra-deploy/scripts/current/deployed-commit.txt)"
           bootstrap_base="$(read_remote_commit /opt/portra/deploy/bootstrap-commit.txt)"
           deploy_backend=false
           deploy_nginx=false
@@ -124,7 +125,7 @@ jobs:
               changed_since "$app_base" backend && deploy_backend=true
               changed_since "$infra_base" infra/staging/nginx && deploy_nginx=true
               changed_since "$infra_base" infra/staging/systemd && deploy_systemd=true
-              changed_since "$infra_base" infra/staging/scripts && deploy_scripts=true
+              changed_since "$scripts_base" infra/staging/scripts && deploy_scripts=true
               ;;
             *)
               echo "Unsupported deploy_scope: $REQUESTED_SCOPE" >&2
@@ -138,7 +139,7 @@ jobs:
           fi
 
           bootstrap_required=false
-          if [[ "$deploy_infra" == true ]] \
+          if [[ "$deploy_nginx" == true || "$deploy_systemd" == true ]] \
             && changed_since "$bootstrap_base" \
               infra/staging/scripts/deploy-infra-root.sh infra/staging/sudoers; then
             bootstrap_required=true
@@ -153,11 +154,13 @@ jobs:
             echo "bootstrap_required=$bootstrap_required"
             echo "application_base=${app_base:-UNKNOWN}"
             echo "infra_base=${infra_base:-UNKNOWN}"
+            echo "scripts_base=${scripts_base:-UNKNOWN}"
             echo "bootstrap_base=${bootstrap_base:-UNKNOWN}"
           } >> "$GITHUB_OUTPUT"
 
           echo "APPLICATION_BASE=${app_base:-UNKNOWN}"
           echo "INFRA_BASE=${infra_base:-UNKNOWN}"
+          echo "SCRIPTS_BASE=${scripts_base:-UNKNOWN}"
           echo "BACKEND_CHANGED=$deploy_backend"
           echo "INFRA_CHANGED=$deploy_infra"
           echo "NGINX_CHANGED=$deploy_nginx"
@@ -293,9 +296,6 @@ jobs:
           STAGING_HOST: ${{ vars.STAGING_HOST }}
           STAGING_PORT: ${{ vars.STAGING_PORT }}
           STAGING_USER: ${{ vars.STAGING_USER }}
-          STAGING_HEALTH_URL: ${{ vars.STAGING_HEALTH_URL }}
-          STAGING_PUBLIC_URL: ${{ vars.STAGING_PUBLIC_URL }}
-          STAGING_EXPECTED_ORIGIN: ${{ vars.STAGING_EXPECTED_ORIGIN }}
           DEPLOY_NGINX: ${{ steps.plan.outputs.deploy_nginx }}
           DEPLOY_SYSTEMD: ${{ steps.plan.outputs.deploy_systemd }}
         run: |
@@ -310,15 +310,13 @@ jobs:
             echo "ADMIN_BOOTSTRAP_REQUIRED: root-owned helper checksum differs" >&2
             exit 1
           fi
-          surfaces=""
-          [[ "$DEPLOY_NGINX" == true ]] && surfaces="nginx"
-          [[ "$DEPLOY_SYSTEMD" == true ]] && surfaces="${surfaces:+$surfaces,}systemd"
+          surface="all"
+          [[ "$DEPLOY_NGINX" == true && "$DEPLOY_SYSTEMD" != true ]] && surface="nginx"
+          [[ "$DEPLOY_SYSTEMD" == true && "$DEPLOY_NGINX" != true ]] && surface="systemd"
           ssh -i "$HOME/.ssh/id_portra_staging" -p "$STAGING_PORT" \
             -o BatchMode=yes -o StrictHostKeyChecking=yes \
             "$STAGING_USER@$STAGING_HOST" \
-            "sudo /usr/local/sbin/portra-deploy-infra \
-              '/home/portra-deploy/incoming/$TARGET_SHA/infra' '$TARGET_SHA' '$surfaces' \
-              '$STAGING_HEALTH_URL' '$STAGING_PUBLIC_URL' '$STAGING_EXPECTED_ORIGIN'"
+            "sudo /usr/local/sbin/portra-deploy-infra '$TARGET_SHA' '$surface'"
 
       - name: Verify staging after infrastructure deployment
         if: steps.plan.outputs.deploy_infra == 'true'
@@ -337,25 +335,6 @@ jobs:
             "$STAGING_USER@$STAGING_HOST" \
             "bash /home/portra-deploy/scripts/current/health-check.sh \
               '$STAGING_HEALTH_URL' '$STAGING_PUBLIC_URL' '$STAGING_EXPECTED_ORIGIN'"
-
-      - name: Record infrastructure provenance
-        if: steps.plan.outputs.deploy_infra == 'true'
-        shell: bash
-        env:
-          TARGET_SHA: ${{ steps.revision.outputs.sha }}
-          STAGING_HOST: ${{ vars.STAGING_HOST }}
-          STAGING_PORT: ${{ vars.STAGING_PORT }}
-          STAGING_USER: ${{ vars.STAGING_USER }}
-          DEPLOY_BACKEND: ${{ steps.plan.outputs.deploy_backend }}
-          DEPLOY_NGINX: ${{ steps.plan.outputs.deploy_nginx }}
-          DEPLOY_SYSTEMD: ${{ steps.plan.outputs.deploy_systemd }}
-        run: |
-          set -euo pipefail
-          ssh -i "$HOME/.ssh/id_portra_staging" -p "$STAGING_PORT" \
-            -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            "$STAGING_USER@$STAGING_HOST" \
-            "bash '/home/portra-deploy/incoming/$TARGET_SHA/infra/scripts/record-infra-state.sh' \
-              '$TARGET_SHA' '$DEPLOY_BACKEND' '$DEPLOY_NGINX' '$DEPLOY_SYSTEMD'"
 
       - name: Report deployment provenance
         shell: bash
@@ -381,5 +360,7 @@ jobs:
             "$STAGING_USER@$STAGING_HOST" \
             "test ! -r /home/portra-deploy/state/application-commit.txt || \
               sed 's/^/APPLICATION_COMMIT=/' /home/portra-deploy/state/application-commit.txt; \
-             test ! -r /home/portra-deploy/state/infra-commit.txt || \
-              sed 's/^/INFRA_COMMIT=/' /home/portra-deploy/state/infra-commit.txt"
+             test ! -r /opt/portra/deploy/infra-commit.txt || \
+              sed 's/^/INFRA_COMMIT=/' /opt/portra/deploy/infra-commit.txt; \
+             test ! -r /home/portra-deploy/scripts/current/deployed-commit.txt || \
+              sed 's/^/SCRIPTS_COMMIT=/' /home/portra-deploy/scripts/current/deployed-commit.txt"

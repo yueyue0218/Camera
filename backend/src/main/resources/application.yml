@@ -44,7 +44,7 @@ jwt:
 
 file:
   storage:
-    local-path: ./uploads
+    local-path: ${FILE_STORAGE_LOCAL_PATH:./uploads}
 
 mybatis-plus:
   mapper-locations: classpath*:mapper/*.xml

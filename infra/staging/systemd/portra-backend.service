@@ -8,7 +8,7 @@ Type=simple
 User=portra
 Group=portra
 
-WorkingDirectory=/opt/portra
+WorkingDirectory=/opt/portra/app
 
 EnvironmentFile=/etc/portra/portra.env
 
