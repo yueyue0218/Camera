@@ -1,5 +1,6 @@
 package com.action.camera.servicepackage;
 
+import com.action.camera.application.FileReferenceValidator;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
@@ -77,7 +78,8 @@ class ServicePackagePerformanceProbeTest {
                 conversationService,
                 userRepository,
                 providerProfileMapper,
-                creditSnapshotService
+                creditSnapshotService,
+                mock(FileReferenceValidator.class)
         );
         serviceLogger = (Logger) LoggerFactory.getLogger(ServicePackageService.class);
         logAppender = new ListAppender<>();

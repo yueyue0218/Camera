@@ -1,5 +1,6 @@
 package com.action.camera.servicepackage;
 
+import com.action.camera.application.FileReferenceValidator;
 import com.action.camera.common.page.PageResult;
 import com.action.camera.common.security.CurrentUser;
 import com.action.camera.common.security.UserRole;
@@ -292,7 +293,13 @@ class ServicePackageA2BehaviorTest {
                                           ProviderProfileMapper profiles,
                                           CreditSnapshotService credits) {
         return new ServicePackageService(
-                repository, interests, mock(ConversationService.class), users, profiles, credits);
+                repository,
+                interests,
+                mock(ConversationService.class),
+                users,
+                profiles,
+                credits,
+                mock(FileReferenceValidator.class));
     }
 
     private ServicePackageRepository recommendationRepository(List<ServicePackage> packages) {

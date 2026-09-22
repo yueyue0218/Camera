@@ -1,4 +1,5 @@
 import { API_BASE, request } from './client.js'
+import { fetchImageObjectUrl } from './fileBinary.js'
 
 export function extractFileId(value) {
   if (value === null || value === undefined || value === '') return null
@@ -6,7 +7,7 @@ export function extractFileId(value) {
   const text = String(value).trim()
   if (!text) return null
   if (/^\d+$/.test(text)) return Number(text)
-  const match = text.match(/\/files\/(\d+)\/download(?:\b|[?#])/)
+  const match = text.match(/\/files\/(\d+)\/(?:download|thumbnail|medium|original)(?:\b|[?#])/)
   return match ? Number(match[1]) : null
 }
 
@@ -46,15 +47,12 @@ export const fileApi = {
   async downloadObjectUrl(fileId, currentUser, options = {}) {
     const normalizedFileId = extractFileId(fileId)
     if (!normalizedFileId) throw new Error(`Invalid fileId: ${fileId}`)
-    const headers = {
-      ...(currentUser?.token ? { Authorization: `Bearer ${currentUser.token}` } : {})
-    }
-    const response = await fetch(`${API_BASE}/files/${normalizedFileId}/download`, {
-      headers,
+    return fetchImageObjectUrl({
+      apiBase: API_BASE,
+      fileId: normalizedFileId,
+      variant: options.variant,
+      token: currentUser?.token,
       signal: options.signal
     })
-    if (!response.ok) throw new Error(`Image load failed for fileId ${normalizedFileId}: ${response.status}`)
-    const blob = await response.blob()
-    return URL.createObjectURL(blob)
   }
 }

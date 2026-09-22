@@ -158,7 +158,7 @@ export function FeedPage() {
         let avatarData = ''
         if (profile?.avatarFileId) {
           try {
-            avatarData = await fileApi.downloadObjectUrl(profile.avatarFileId, currentUser)
+            avatarData = await fileApi.downloadObjectUrl(profile.avatarFileId, currentUser, { variant: 'thumbnail' })
             avatarUrlsRef.current.push(avatarData)
           } catch {
             avatarData = ''
@@ -171,7 +171,7 @@ export function FeedPage() {
           let avatarData = ''
           if (brief.avatarFileId) {
             try {
-              avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser)
+              avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser, { variant: 'thumbnail' })
               avatarUrlsRef.current.push(avatarData)
             } catch {
               avatarData = ''

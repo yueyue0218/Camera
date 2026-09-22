@@ -194,12 +194,14 @@ export function DemandDetailPage() {
   const referenceUrls = useFileObjectUrls(
     demand?.referenceFileIds,
     currentUser,
-    `demand ${demandId} reference`
+    `demand ${demandId} reference`,
+    { variant: 'medium' }
   )
   const uploadedPublisherAvatar = useFileObjectUrl(
     [demand?.customerAvatarFileId, demand?.avatarFileId],
     currentUser,
-    `demand ${demandId} publisher avatar`
+    `demand ${demandId} publisher avatar`,
+    { variant: 'thumbnail' }
   )
   const fallbackPublisherAvatar = publicImageUrls(demand?.customerAvatarUrl, demand?.customerAvatar)[0] || ''
   const publisherAvatar = uploadedPublisherAvatar || fallbackPublisherAvatar
@@ -227,7 +229,7 @@ export function DemandDetailPage() {
                   let avatarData = brief?.avatarData || brief?.avatarUrl || ''
                   if (!avatarData && brief?.avatarFileId) {
                     try {
-                      avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser)
+                      avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser, { variant: 'thumbnail' })
                       if (avatarData) downloadedAvatarUrls.push(avatarData)
                     } catch { /**/ }
                   }
@@ -501,12 +503,14 @@ export function ServicePackageDetailPage() {
   const uploadedPortfolioUrls = useFileObjectUrls(
     [service?.portfolioIds, service?.images],
     currentUser,
-    `service package ${serviceId} portfolio`
+    `service package ${serviceId} portfolio`,
+    { variant: 'medium' }
   )
   const uploadedProviderAvatar = useFileObjectUrl(
     [service?.photographerAvatarFileId, service?.avatarFileId],
     currentUser,
-    `service package ${serviceId} avatar`
+    `service package ${serviceId} avatar`,
+    { variant: 'thumbnail' }
   )
   const fallbackProviderAvatar = publicImageUrls(service?.photographerAvatarUrl, service?.photographerAvatar)[0] || ''
   const providerAvatar = uploadedProviderAvatar || fallbackProviderAvatar

@@ -79,6 +79,9 @@ class ServicePackageShowcaseContractTest {
                 "VALUES (2001, 'provider', 'PROVIDER', 'ACTIVE', 80.00, NOW(), NOW())");
         jdbc.execute("INSERT INTO users (id, nickname, current_role, status, credit_score, created_at, updated_at) " +
                 "VALUES (2002, 'other provider', 'PROVIDER', 'ACTIVE', 80.00, NOW(), NOW())");
+        jdbc.execute("DELETE FROM files WHERE id IN (11, 12)");
+        seedPortfolioFile(11L);
+        seedPortfolioFile(12L);
     }
 
     @Test
@@ -394,6 +397,16 @@ class ServicePackageShowcaseContractTest {
                   "timeTags":["NEAR_7_DAYS"]
                 }
                 """.formatted(AVAILABLE_DATE);
+    }
+
+    private void seedPortfolioFile(Long fileId) {
+        jdbc.update("""
+                INSERT INTO files (
+                    id, uploader_id, file_key, original_name, mime_type, file_size,
+                    biz_type, visibility, created_at
+                )
+                VALUES (?, ?, ?, ?, 'image/jpeg', 100, 'SERVICE_PORTFOLIO', 'PUBLIC', NOW())
+                """, fileId, PROVIDER_ID, "service-showcase-" + fileId, "portfolio-" + fileId + ".jpg");
     }
 
     private List<Long> serviceIds(ResponseEntity<Map> response) {

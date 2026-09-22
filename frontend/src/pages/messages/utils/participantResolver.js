@@ -77,7 +77,7 @@ export async function loadConversationPeerProfile(peerUserId, peerRole, currentU
   const avatarFileId = profile.avatarFileId || profile.avatarId || profile.profileImageFileId
   if (avatarFileId && !profile.avatarUrl && !profile.avatarData) {
     try {
-      profile.avatarUrl = await fileApi.downloadObjectUrl(avatarFileId, currentUser)
+      profile.avatarUrl = await fileApi.downloadObjectUrl(avatarFileId, currentUser, { variant: 'thumbnail' })
       profile.avatarObjectUrl = profile.avatarUrl
     } catch {
       // Avatar image is optional; fallback initials keep the identity stable.
