@@ -22,8 +22,12 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 @Service
 public class SocialRelationService {
@@ -106,9 +110,7 @@ public class SocialRelationService {
         List<UserFollow> follows = (targetRole != null && !targetRole.isBlank())
                 ? userFollowRepository.findByFollowingUserIdAndTargetRoleOrderByCreatedAtDesc(userId, normalizeRole(targetRole))
                 : userFollowRepository.findByFollowingUserIdOrderByCreatedAtDesc(userId);
-        return follows.stream()
-                .map(follow -> toUserBrief(follow.getFollowerId(), currentUserId))
-                .toList();
+        return toUserBriefs(follows.stream().map(UserFollow::getFollowerId).toList(), currentUserId);
     }
 
     @Transactional(readOnly = true)
@@ -118,9 +120,7 @@ public class SocialRelationService {
         List<UserFollow> follows = (targetRole != null && !targetRole.isBlank())
                 ? userFollowRepository.findByFollowerIdAndTargetRoleOrderByCreatedAtDesc(userId, normalizeRole(targetRole))
                 : userFollowRepository.findByFollowerIdOrderByCreatedAtDesc(userId);
-        return follows.stream()
-                .map(follow -> toUserBrief(follow.getFollowingUserId(), currentUserId))
-                .toList();
+        return toUserBriefs(follows.stream().map(UserFollow::getFollowingUserId).toList(), currentUserId);
     }
 
     @Transactional(readOnly = true)
@@ -183,18 +183,33 @@ public class SocialRelationService {
         );
     }
 
-    private SocialUserBriefResponse toUserBrief(Long userId, Long currentUserId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
-        boolean followedByCurrentUser = userFollowRepository.existsByFollowerIdAndFollowingUserId(currentUserId, userId);
-        return new SocialUserBriefResponse(
-                user.getId(),
-                user.getNickname(),
-                user.getAvatarFileId(),
-                user.getCurrentRole(),
-                user.getBio(),
-                followedByCurrentUser
-        );
+    private List<SocialUserBriefResponse> toUserBriefs(List<Long> orderedUserIds, Long currentUserId) {
+        if (orderedUserIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> distinctUserIds = orderedUserIds.stream().distinct().toList();
+        Map<Long, User> usersById = new HashMap<>();
+        userRepository.findAllById(distinctUserIds).forEach(user -> usersById.put(user.getId(), user));
+        Set<Long> followedUserIds = new HashSet<>(
+                userFollowRepository.findFollowingUserIdsByFollowerIdAndFollowingUserIdIn(currentUserId, distinctUserIds));
+
+        return orderedUserIds.stream()
+                .map(userId -> {
+                    User user = usersById.get(userId);
+                    if (user == null) {
+                        throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
+                    }
+                    return new SocialUserBriefResponse(
+                            user.getId(),
+                            user.getNickname(),
+                            user.getAvatarFileId(),
+                            user.getCurrentRole(),
+                            user.getBio(),
+                            followedUserIds.contains(userId)
+                    );
+                })
+                .toList();
     }
 
     private void validateTargetUser(Long userId) {

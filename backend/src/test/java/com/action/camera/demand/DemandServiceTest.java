@@ -1,6 +1,8 @@
 package com.action.camera.demand;
 
 import com.action.camera.admin.domain.ModerationStatus;
+import com.action.camera.application.FileReferenceValidator;
+import com.action.camera.application.IpLocationService;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.page.PageResult;
@@ -40,6 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -62,6 +65,12 @@ class DemandServiceTest {
 
     @MockBean
     private ConversationService conversationService;
+
+    @MockBean
+    private FileReferenceValidator fileReferenceValidator;
+
+    @MockBean
+    private IpLocationService ipLocationService;
 
     @Autowired
     private DemandService demandService;
@@ -89,6 +98,52 @@ class DemandServiceTest {
         assertThat(demand.getStatus()).isEqualTo(DemandStatus.OPEN.name());
         assertThat(demand.getScene()).isEqualTo("GRADUATION");
         assertThat(demand.getCityCode()).isEqualTo("NJU");
+    }
+
+    @Test
+    void createDemandValidatesNormalizedReferenceIdsBeforeSaving() {
+        CreateDemandRequest request = demandRequest("PORTRAIT", "NJU");
+        request.setReferenceFileIds(List.of(13L, 11L, 13L));
+
+        DemandDto created = demandService.createDemand(customer, request);
+
+        verify(fileReferenceValidator)
+                .requireExisting(List.of(13L, 11L), "referenceFileIds");
+        assertThat(created.getReferenceFileIds()).containsExactly(13L, 11L);
+    }
+
+    @Test
+    void createDemandRejectsMissingReferenceBeforePersistence() {
+        CreateDemandRequest request = demandRequest("PORTRAIT", "NJU");
+        request.setReferenceFileIds(List.of(99L));
+        doThrow(new BusinessException(ErrorCode.VALIDATION_ERROR, "missing 99"))
+                .when(fileReferenceValidator)
+                .requireExisting(List.of(99L), "referenceFileIds");
+
+        assertThatThrownBy(() -> demandService.createDemand(customer, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("99");
+
+        assertThat(demandRepository.count()).isZero();
+    }
+
+    @Test
+    void updateDemandRejectsMissingReferenceBeforeReplacingExistingIds() {
+        DemandDto created = demandService.createDemand(
+                customer, demandRequest("PORTRAIT", "NJU"));
+        CreateDemandRequest update = demandRequest("PORTRAIT", "NJU");
+        update.setReferenceFileIds(List.of(88L));
+        doThrow(new BusinessException(ErrorCode.VALIDATION_ERROR, "missing 88"))
+                .when(fileReferenceValidator)
+                .requireExisting(List.of(88L), "referenceFileIds");
+
+        assertThatThrownBy(() -> demandService.updateDemand(
+                created.getDemandId(), customer, update))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("88");
+
+        assertThat(demandRepository.findById(created.getDemandId()).orElseThrow()
+                .getReferenceFileIds()).isEmpty();
     }
 
     @Test

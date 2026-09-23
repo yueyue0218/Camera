@@ -24,6 +24,15 @@ public interface UserFollowRepository extends JpaRepository<UserFollow, Long> {
     @Query("select uf.followingUserId from UserFollow uf where uf.followerId = :followerId")
     List<Long> findFollowingUserIdsByFollowerId(@Param("followerId") Long followerId);
 
+    @Query("""
+            select distinct uf.followingUserId from UserFollow uf
+            where uf.followerId = :followerId
+              and uf.followingUserId in :followingUserIds
+            """)
+    List<Long> findFollowingUserIdsByFollowerIdAndFollowingUserIdIn(
+            @Param("followerId") Long followerId,
+            @Param("followingUserIds") List<Long> followingUserIds);
+
     @Query("select uf.followerId from UserFollow uf where uf.followingUserId = :followingUserId")
     List<Long> findFollowerUserIdsByFollowingUserId(@Param("followingUserId") Long followingUserId);
 

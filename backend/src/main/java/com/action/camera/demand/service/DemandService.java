@@ -1,6 +1,7 @@
 package com.action.camera.demand.service;
 
 import com.action.camera.admin.dto.ModerationView;
+import com.action.camera.application.FileReferenceValidator;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.page.PageResult;
@@ -65,19 +66,22 @@ public class DemandService {
     private final NotificationService notificationService;
     private final UserRepository userRepository;
     private final ServicePackageRepository servicePackageRepository;
+    private final FileReferenceValidator fileReferenceValidator;
 
     public DemandService(DemandRepository demandRepository,
                          DemandResponseRepository responseRepository,
                          ConversationService conversationService,
                          NotificationService notificationService,
                          UserRepository userRepository,
-                         ServicePackageRepository servicePackageRepository) {
+                         ServicePackageRepository servicePackageRepository,
+                         FileReferenceValidator fileReferenceValidator) {
         this.demandRepository = demandRepository;
         this.responseRepository = responseRepository;
         this.conversationService = conversationService;
         this.notificationService = notificationService;
         this.userRepository = userRepository;
         this.servicePackageRepository = servicePackageRepository;
+        this.fileReferenceValidator = fileReferenceValidator;
     }
 
     @Transactional
@@ -85,6 +89,8 @@ public class DemandService {
         requireCustomer(user);
         validateDemandRequest(request);
         LocalDateTime now = LocalDateTime.now();
+        List<Long> referenceFileIds = normalizeIds(request.getReferenceFileIds());
+        fileReferenceValidator.requireExisting(referenceFileIds, "referenceFileIds");
         Demand demand = new Demand(
                 user.getUserId(),
                 trim(request.getScene()),
@@ -98,7 +104,7 @@ public class DemandService {
                 request.getBudgetMinCent(),
                 request.getBudgetMaxCent(),
                 trim(request.getDescription()),
-                normalizeIds(request.getReferenceFileIds()),
+                referenceFileIds,
                 now,
                 now.plusDays(DEFAULT_EXPIRE_DAYS)
         );
@@ -605,7 +611,9 @@ public class DemandService {
             demand.setDescription(trim(request.getDescription()));
         }
         if (request.getReferenceFileIds() != null) {
-            demand.setReferenceFileIds(normalizeIds(request.getReferenceFileIds()));
+            List<Long> referenceFileIds = normalizeIds(request.getReferenceFileIds());
+            fileReferenceValidator.requireExisting(referenceFileIds, "referenceFileIds");
+            demand.setReferenceFileIds(referenceFileIds);
         }
     }
 

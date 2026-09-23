@@ -81,7 +81,10 @@ export function ReviewAvatar({
     }
 
     setAvatarUrl('')
-    fileApi.downloadObjectUrl(avatarFileId, currentUser, { signal: controller?.signal })
+    fileApi.downloadObjectUrl(avatarFileId, currentUser, {
+      signal: controller?.signal,
+      variant: 'thumbnail'
+    })
       .then(url => {
         objectUrl = url
         if (!active) {

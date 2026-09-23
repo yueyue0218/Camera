@@ -1,6 +1,7 @@
 package com.action.camera.servicepackage;
 
 import com.action.camera.admin.domain.ModerationStatus;
+import com.action.camera.application.FileReferenceValidator;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.page.PageResult;
@@ -48,6 +49,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -78,6 +80,9 @@ class ServicePackageServiceTest {
     @Mock
     private CreditSnapshotService creditSnapshotService;
 
+    @Mock
+    private FileReferenceValidator fileReferenceValidator;
+
     private ServicePackageService servicePackageService;
 
     @BeforeEach
@@ -88,7 +93,8 @@ class ServicePackageServiceTest {
                 conversationService,
                 userRepository,
                 providerProfileMapper,
-                creditSnapshotService
+                creditSnapshotService,
+                fileReferenceValidator
         );
         lenient().when(creditSnapshotService.getDisplayCreditScore(PROVIDER_ID)).thenReturn(new BigDecimal("88.50"));
         lenient().when(creditSnapshotService.getDisplayCreditScores(any()))
@@ -118,6 +124,63 @@ class ServicePackageServiceTest {
         assertThat(saved.getPriceRange()).isEqualTo("399-599");
         assertThat(saved.getTimeDescription()).isEqualTo("七月上旬周末可约");
         assertThat(saved.getTimeTags()).containsExactly("NEAR_7_DAYS");
+    }
+
+    @Test
+    void publishValidatesNormalizedPortfolioIdsAndPreservesLegacyUrls() {
+        CreateServicePackageRequest request = createRequest();
+        request.setPortfolioIds(List.of(12L, 11L, 12L));
+        when(servicePackageRepository.save(any(ServicePackage.class))).thenAnswer(invocation -> {
+            ServicePackage servicePackage = invocation.getArgument(0);
+            servicePackage.setId(SERVICE_ID);
+            return servicePackage;
+        });
+
+        servicePackageService.createServicePackage(provider(), request);
+
+        verify(fileReferenceValidator)
+                .requireExisting(List.of(12L, 11L), "portfolioIds");
+        ArgumentCaptor<ServicePackage> captor = ArgumentCaptor.forClass(ServicePackage.class);
+        verify(servicePackageRepository).save(captor.capture());
+        assertThat(captor.getValue().getPortfolioIds()).containsExactly(12L, 11L);
+        assertThat(captor.getValue().getImages())
+                .containsExactly("https://cdn.example/cover.jpg", "https://cdn.example/detail.jpg");
+    }
+
+    @Test
+    void publishRejectsMissingPortfolioBeforePersistence() {
+        CreateServicePackageRequest request = createRequest();
+        request.setPortfolioIds(List.of(99L));
+        doThrow(new BusinessException(ErrorCode.VALIDATION_ERROR, "missing 99"))
+                .when(fileReferenceValidator)
+                .requireExisting(List.of(99L), "portfolioIds");
+
+        assertThatThrownBy(() -> servicePackageService.createServicePackage(provider(), request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("99");
+
+        verify(servicePackageRepository, never()).save(any());
+    }
+
+    @Test
+    void updateRejectsMissingPortfolioBeforeReplacingExistingIds() {
+        ServicePackage servicePackage =
+                servicePackage(SERVICE_ID, ServicePackageStatus.ONLINE, true);
+        when(servicePackageRepository.findByIdAndProviderId(SERVICE_ID, PROVIDER_ID))
+                .thenReturn(Optional.of(servicePackage));
+        UpdateServicePackageRequest update = new UpdateServicePackageRequest();
+        update.setPortfolioIds(List.of(88L));
+        doThrow(new BusinessException(ErrorCode.VALIDATION_ERROR, "missing 88"))
+                .when(fileReferenceValidator)
+                .requireExisting(List.of(88L), "portfolioIds");
+
+        assertThatThrownBy(() -> servicePackageService.updateServicePackage(
+                SERVICE_ID, provider(), update))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("88");
+
+        assertThat(servicePackage.getPortfolioIds()).containsExactly(11L, 12L);
+        verify(servicePackageRepository, never()).save(any());
     }
 
     @Test

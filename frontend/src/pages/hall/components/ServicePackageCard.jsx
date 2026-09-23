@@ -21,7 +21,8 @@ export const ServicePackageCard = memo(function ServicePackageCard({ service, cu
   const { url: uploadedCoverUrl, loading: coverDownloading, error: coverDownloadFailed } = useFileObjectUrlState(
     coverFileValue,
     currentUser,
-    `service package ${service.serviceId} cover`
+    `service package ${service.serviceId} cover`,
+    { variant: 'thumbnail' }
   )
   const fallbackCover = publicImageUrls(service.coverImage, service.images)[0] || ''
   const cover = uploadedCoverUrl || fallbackCover
@@ -29,7 +30,8 @@ export const ServicePackageCard = memo(function ServicePackageCard({ service, cu
   const uploadedAvatarUrl = useFileObjectUrl(
     avatarFileValue,
     currentUser,
-    `service package ${service.serviceId} avatar`
+    `service package ${service.serviceId} avatar`,
+    { variant: 'thumbnail' }
   )
   const fallbackAvatar = publicImageUrls(service.photographerAvatarUrl, service.photographerAvatar)[0] || ''
   const avatar = uploadedAvatarUrl || fallbackAvatar

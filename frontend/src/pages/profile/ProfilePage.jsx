@@ -13,6 +13,7 @@ import {
   saveConversationRecord, saveOrderSnapshots, saveUserProfile,
   addPortfolioItem, buildPortfolioWorks
 } from './utils/profileUtils.js'
+import { loadProfileSocialLists } from './utils/socialCardUtils.js'
 import './profile.css'
 
 const MONTH_ABBR = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
@@ -224,7 +225,7 @@ export function ProfilePage() {
       let avatarData = currentUser.avatarData || ''
       if (avatarFileId) {
         try {
-          avatarData = await fileApi.downloadObjectUrl(avatarFileId, currentUser)
+          avatarData = await fileApi.downloadObjectUrl(avatarFileId, currentUser, { variant: 'thumbnail' })
         } catch {
           // ignore avatar download fallback
           avatarData = currentUser.avatarData || ''
@@ -260,44 +261,13 @@ export function ProfilePage() {
     setPortfolioItems(readPortfolioItems(currentUser.userId))
     const rawFollowers = followersRes.status === 'fulfilled' ? followersRes.value : []
     try {
-      const enrichedFollowers = await Promise.all(rawFollowers.map(async f => {
-        const uid = f.userId ?? f.authorId
-        if (f.avatarData || f.avatarUrl) return f
-        try {
-          const brief = await userApi.brief(uid, currentUser)
-          let avatarData = brief?.avatarData || brief?.avatarUrl || ''
-          if (!avatarData && brief?.avatarFileId) {
-            try { avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser) } catch { /**/ }
-          }
-          return { ...f, nickname: f.nickname || brief?.nickname, bio: f.bio || brief?.bio || brief?.description || '', avatarData, role: f.role || brief?.currentRole || brief?.role }
-        } catch { return f }
-      }))
-      setMyFollowers(enrichedFollowers)
-    } catch { setMyFollowers(rawFollowers) }
-    try {
-      const [followingCustomer, followingProvider] = await Promise.all([
-        userApi.following(currentUser.userId, currentUser, 'CUSTOMER').catch(() => []),
-        userApi.following(currentUser.userId, currentUser, 'PROVIDER').catch(() => [])
-      ])
-      const combined = [
-        ...(followingCustomer || []).map(f => ({ ...f, role: f.role || 'CUSTOMER' })),
-        ...(followingProvider || []).map(f => ({ ...f, role: f.role || 'PROVIDER' })),
-      ]
-      // Enrich with avatar data
-      const enriched = await Promise.all(combined.map(async f => {
-        const uid = f.userId ?? f.authorId
-        if (f.avatarData || f.avatarUrl) return f
-        try {
-          const brief = await userApi.brief(uid, currentUser)
-          let avatarData = brief?.avatarData || brief?.avatarUrl || ''
-          if (!avatarData && brief?.avatarFileId) {
-            try { avatarData = await fileApi.downloadObjectUrl(brief.avatarFileId, currentUser) } catch { /**/ }
-          }
-          return { ...f, nickname: f.nickname || brief?.nickname, avatarData }
-        } catch { return f }
-      }))
-      setMyFollowing(enriched)
-    } catch { setMyFollowing([]) }
+      const socialLists = await loadProfileSocialLists({ rawFollowers, currentUser, userApi, fileApi })
+      setMyFollowers(socialLists.followers)
+      setMyFollowing(socialLists.following)
+    } catch {
+      setMyFollowers(rawFollowers)
+      setMyFollowing([])
+    }
     if (!isProvider) {
       try {
         const interestsPage = await servicePackageApi.myInterests({ page: 1, size: 50 }, currentUser).catch(() => null)

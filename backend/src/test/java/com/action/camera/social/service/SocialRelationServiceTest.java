@@ -2,6 +2,7 @@ package com.action.camera.social.service;
 
 import com.action.camera.common.security.CurrentUser;
 import com.action.camera.common.security.UserRole;
+import com.action.camera.common.exception.BusinessException;
 import com.action.camera.notification.repository.NotificationRepository;
 import com.action.camera.provider.dto.ProviderProfilePublicVO;
 import com.action.camera.social.domain.MomentStatus;
@@ -11,6 +12,10 @@ import com.action.camera.social.dto.PublicProfileResponse;
 import com.action.camera.social.dto.SocialUserBriefResponse;
 import com.action.camera.social.repository.MomentPostRepository;
 import com.action.camera.social.repository.UserFollowRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,11 +25,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@SpringBootTest
+@SpringBootTest(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @Transactional
 class SocialRelationServiceTest {
 
@@ -50,6 +57,14 @@ class SocialRelationServiceTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private EntityManager entityManager;
+
+    @Autowired
+    private EntityManagerFactory entityManagerFactory;
+
+    private Statistics statistics;
+
     @BeforeEach
     void setUp() {
         createMyBatisPlusTables();
@@ -57,6 +72,9 @@ class SocialRelationServiceTest {
         insertUser(PROVIDER_ID, "provider", "PROVIDER", "provider bio");
         insertUser(OTHER_ID, "other", "CUSTOMER", "other bio");
         insertProviderProfile(PROVIDER_ID);
+        statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        statistics.setStatisticsEnabled(true);
+        statistics.clear();
     }
 
     @AfterEach
@@ -150,6 +168,82 @@ class SocialRelationServiceTest {
         assertThat(following).allMatch(item -> item.getNickname() != null);
     }
 
+    @Test
+    void twelveUserSocialListsUseAtMostFourDataStatementsEach() {
+        LocalDateTime createdAt = LocalDateTime.of(2026, 9, 19, 10, 0);
+        for (int index = 0; index < 12; index++) {
+            long socialUserId = 931000L + index;
+            insertUser(socialUserId, "social-" + index, index % 2 == 0 ? "CUSTOMER" : "PROVIDER", null);
+            insertFollow(VIEWER_ID, socialUserId, index % 2 == 0 ? "CUSTOMER" : "PROVIDER", createdAt.plusMinutes(index));
+            insertFollow(socialUserId, PROVIDER_ID, "PROVIDER", createdAt.plusHours(1).plusMinutes(index));
+        }
+
+        entityManager.clear();
+        statistics.clear();
+        List<SocialUserBriefResponse> following = socialRelationService.listFollowing(
+                VIEWER_ID, null, new CurrentUser(VIEWER_ID, UserRole.CUSTOMER));
+        long followingSql = statistics.getPrepareStatementCount();
+
+        entityManager.clear();
+        statistics.clear();
+        List<SocialUserBriefResponse> followers = socialRelationService.listFollowers(
+                PROVIDER_ID, "PROVIDER", new CurrentUser(VIEWER_ID, UserRole.CUSTOMER));
+        long followersSql = statistics.getPrepareStatementCount();
+
+        assertThat(following).hasSize(12);
+        assertThat(followers).hasSize(12);
+        assertThat(followingSql).as("12-user following data SQL").isLessThanOrEqualTo(4);
+        assertThat(followersSql).as("12-user followers data SQL").isLessThanOrEqualTo(4);
+    }
+
+    @Test
+    void socialCardsPreserveRelationOrderRoleFilterFieldsAndFollowState() {
+        long newestCustomerId = 932001L;
+        insertUser(newestCustomerId, "newest customer", "CUSTOMER", "newest bio");
+        jdbcTemplate.update("UPDATE users SET avatar_file_id = 88001 WHERE id = ?", newestCustomerId);
+        LocalDateTime createdAt = LocalDateTime.of(2026, 9, 19, 11, 0);
+        insertFollow(VIEWER_ID, OTHER_ID, "CUSTOMER", createdAt);
+        insertFollow(VIEWER_ID, PROVIDER_ID, "PROVIDER", createdAt.plusMinutes(1));
+        insertFollow(VIEWER_ID, newestCustomerId, "CUSTOMER", createdAt.plusMinutes(2));
+        insertFollow(OTHER_ID, PROVIDER_ID, "PROVIDER", createdAt.plusMinutes(3));
+        insertFollow(OTHER_ID, newestCustomerId, "CUSTOMER", createdAt.plusMinutes(4));
+
+        List<SocialUserBriefResponse> all = socialRelationService.listFollowing(
+                VIEWER_ID, null, new CurrentUser(OTHER_ID, UserRole.CUSTOMER));
+        List<SocialUserBriefResponse> customers = socialRelationService.listFollowing(
+                VIEWER_ID, "CUSTOMER", new CurrentUser(OTHER_ID, UserRole.CUSTOMER));
+
+        assertThat(all).extracting(SocialUserBriefResponse::getUserId)
+                .containsExactly(newestCustomerId, PROVIDER_ID, OTHER_ID);
+        assertThat(all).extracting(SocialUserBriefResponse::isFollowedByCurrentUser)
+                .containsExactly(true, true, false);
+        assertThat(all.get(0).getNickname()).isEqualTo("newest customer");
+        assertThat(all.get(0).getAvatarFileId()).isEqualTo(88001L);
+        assertThat(all.get(0).getCurrentRole()).isEqualTo("CUSTOMER");
+        assertThat(all.get(0).getBio()).isEqualTo("newest bio");
+        assertThat(all.get(2).getAvatarFileId()).isNull();
+        assertThat(customers).extracting(SocialUserBriefResponse::getUserId)
+                .containsExactly(newestCustomerId, OTHER_ID);
+    }
+
+    @Test
+    void socialListsKeepEmptySingleAndOrphanSemantics() {
+        CurrentUser viewer = new CurrentUser(VIEWER_ID, UserRole.CUSTOMER);
+        assertThat(socialRelationService.listFollowing(VIEWER_ID, null, viewer)).isEmpty();
+
+        insertFollow(VIEWER_ID, OTHER_ID, "CUSTOMER", LocalDateTime.of(2026, 9, 19, 12, 0));
+        List<SocialUserBriefResponse> single = socialRelationService.listFollowing(VIEWER_ID, null, viewer);
+        assertThat(single).hasSize(1);
+        assertThat(single.get(0).getUserId()).isEqualTo(OTHER_ID);
+        assertThat(single.get(0).getAvatarFileId()).isNull();
+
+        long missingUserId = 939999L;
+        insertFollow(VIEWER_ID, missingUserId, "CUSTOMER", LocalDateTime.of(2026, 9, 19, 12, 1));
+        assertThatThrownBy(() -> socialRelationService.listFollowing(VIEWER_ID, null, viewer))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("用户不存在");
+    }
+
     private CreateMomentRequest momentRequest(String content) {
         CreateMomentRequest request = new CreateMomentRequest();
         request.setTitle("标题");
@@ -177,6 +271,13 @@ class SocialRelationServiceTest {
                         199.00, 499.00, TRUE, 4.90, 18, 'APPROVED', 28, 'Sony A7R', NOW(), NOW())
                 ON DUPLICATE KEY UPDATE display_name = VALUES(display_name)
                 """, userId);
+    }
+
+    private void insertFollow(Long followerId, Long followingUserId, String targetRole, LocalDateTime createdAt) {
+        jdbcTemplate.update("""
+                INSERT INTO user_follows (follower_id, following_user_id, target_role, created_at)
+                VALUES (?, ?, ?, ?)
+                """, followerId, followingUserId, targetRole, createdAt);
     }
 
     private void createMyBatisPlusTables() {

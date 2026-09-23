@@ -12,9 +12,10 @@ export function publicImageUrls(...values) {
     .filter(value => value && !isProtectedFileUrl(value) && !extractFileId(value))
 }
 
-export function useFileObjectUrls(values, currentUser, context = 'image') {
+export function useFileObjectUrls(values, currentUser, context = 'image', options = {}) {
   const fileIds = useMemo(() => fileIdsFromValues(values), [values])
   const fileIdsKey = fileIds.join(',')
+  const variant = options.variant
   const [urls, setUrls] = useState([])
 
   useEffect(() => {
@@ -30,7 +31,10 @@ export function useFileObjectUrls(values, currentUser, context = 'image') {
 
       const downloaded = await Promise.all(fileIds.map(async fileId => {
         try {
-          return await fileApi.downloadObjectUrl(fileId, currentUser, { signal: controller?.signal })
+          return await fileApi.downloadObjectUrl(fileId, currentUser, {
+            signal: controller?.signal,
+            variant: options.variant
+          })
         } catch (error) {
           if (error?.name === 'AbortError') return ''
           console.warn(`${context} image load failed`, { fileId, error })
@@ -53,17 +57,18 @@ export function useFileObjectUrls(values, currentUser, context = 'image') {
       controller?.abort()
       objectUrls.forEach(url => URL.revokeObjectURL(url))
     }
-  }, [currentUser?.role, currentUser?.token, currentUser?.userId, fileIdsKey, context])
+  }, [currentUser?.role, currentUser?.token, currentUser?.userId, fileIdsKey, context, variant])
 
   return urls
 }
 
-export function useFileObjectUrl(values, currentUser, context = 'image') {
-  return useFileObjectUrls(values, currentUser, context)[0] || ''
+export function useFileObjectUrl(values, currentUser, context = 'image', options = {}) {
+  return useFileObjectUrls(values, currentUser, context, options)[0] || ''
 }
 
-export function useFileObjectUrlState(value, currentUser, context = 'image') {
+export function useFileObjectUrlState(value, currentUser, context = 'image', options = {}) {
   const fileId = useMemo(() => fileIdsFromValues(value)[0] || null, [value])
+  const variant = options.variant
   const [state, setState] = useState({ url: '', loading: Boolean(fileId), error: false })
 
   useEffect(() => {
@@ -77,7 +82,10 @@ export function useFileObjectUrlState(value, currentUser, context = 'image') {
     }
 
     setState({ url: '', loading: true, error: false })
-    fileApi.downloadObjectUrl(fileId, currentUser, { signal: controller?.signal })
+    fileApi.downloadObjectUrl(fileId, currentUser, {
+      signal: controller?.signal,
+      variant: options.variant
+    })
       .then(url => {
         objectUrl = url
         if (cancelled) {
@@ -97,7 +105,7 @@ export function useFileObjectUrlState(value, currentUser, context = 'image') {
       controller?.abort()
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [currentUser?.role, currentUser?.token, currentUser?.userId, fileId, context])
+  }, [currentUser?.role, currentUser?.token, currentUser?.userId, fileId, context, variant])
 
   return state
 }
