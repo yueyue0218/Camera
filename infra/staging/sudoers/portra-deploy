@@ -1,0 +1,7 @@
+# The root-owned helper accepts exactly a 40-hex trusted-main SHA and one fixed
+# surface. It never reads configuration from portra-deploy-writable paths.
+portra-deploy ALL=(root) NOPASSWD: /usr/local/sbin/portra-deploy-infra * nginx
+portra-deploy ALL=(root) NOPASSWD: /usr/local/sbin/portra-deploy-infra * systemd
+portra-deploy ALL=(root) NOPASSWD: /usr/local/sbin/portra-deploy-infra * all
+portra-deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart portra-backend.service
+portra-deploy ALL=(root) NOPASSWD: /usr/bin/systemctl is-active portra-backend.service

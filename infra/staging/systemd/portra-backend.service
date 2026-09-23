@@ -1,0 +1,23 @@
+[Unit]
+Description=Portra Spring Boot Backend
+After=network.target mysqld.service
+Requires=mysqld.service
+
+[Service]
+Type=simple
+User=portra
+Group=portra
+
+WorkingDirectory=/opt/portra/app
+
+EnvironmentFile=/etc/portra/portra.env
+
+ExecStart=/usr/bin/java -jar /opt/portra/app/app.jar --server.address=127.0.0.1 --server.port=8080
+
+Restart=on-failure
+RestartSec=5
+
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target
