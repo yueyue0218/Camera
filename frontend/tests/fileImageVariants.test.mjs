@@ -104,3 +104,51 @@ test('default path preserves legacy download behavior', () => {
   assert.equal(fileBinaryPath('12', 'original'), '/files/12/original')
   assert.throws(() => fileBinaryPath(0), /Invalid fileId/)
 })
+
+test('default download accepts zip and pdf binary responses', async () => {
+  assert.equal(typeof fetchImageObjectUrl, 'function')
+  for (const [fileId, contentType, expectedUrl] of [
+    [21, 'application/zip', 'blob:zip'],
+    [22, 'application/pdf', 'blob:pdf']
+  ]) {
+    const url = await fetchImageObjectUrl({
+      apiBase: 'http://example.test',
+      fileId,
+      fetchImpl: async () => new Response(new Blob(['binary']), {
+        status: 200,
+        headers: { 'Content-Type': contentType }
+      }),
+      createObjectUrl: () => expectedUrl
+    })
+
+    assert.equal(url, expectedUrl)
+  }
+})
+
+test('default download rejects successful JSON and missing-file errors', async () => {
+  assert.equal(typeof fetchImageObjectUrl, 'function')
+  for (const status of [200, 404]) {
+    await assert.rejects(() => fetchImageObjectUrl({
+      apiBase: 'http://example.test',
+      fileId: 23,
+      fetchImpl: async () => new Response('{"code":40401}', {
+        status,
+        headers: { 'Content-Type': 'application/json; charset=utf-8' }
+      }),
+      createObjectUrl: () => { throw new Error('must not create object URL') }
+    }), error => error.status === status && error.contentType === 'application/json')
+  }
+})
+
+test('image representations reject non-image binary responses', async () => {
+  assert.equal(typeof fetchImageObjectUrl, 'function')
+  await assert.rejects(() => fetchImageObjectUrl({
+    apiBase: 'http://example.test',
+    fileId: 24,
+    variant: 'original',
+    fetchImpl: async () => new Response(new Blob(['zip']), {
+      status: 200,
+      headers: { 'Content-Type': 'application/zip' }
+    })
+  }), error => error.status === 200 && error.contentType === 'application/zip')
+})

@@ -5,13 +5,16 @@ import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.security.UserRole;
 import com.action.camera.domain.FileRecord;
 import com.action.camera.dto.FileUploadResponse;
+import com.action.camera.image.RasterImageInspector;
 import com.action.camera.infrastructure.storage.FileStorage;
 import com.action.camera.repository.FileRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -35,18 +38,37 @@ public class FileService {
             ".webp",
             ".gif"
     );
+    private static final Set<String> IMAGE_BIZ_TYPES = Set.of(
+            "AVATAR",
+            "DEMAND_REFERENCE",
+            "PORTFOLIO",
+            "SERVICE_PORTFOLIO",
+            "PUBLISH_IMAGE"
+    );
 
     private final FileStorage fileStorage;
     private final FileRepository fileRepository;
     private final FileAccessPolicy fileAccessPolicy;
+    private final RasterImageInspector rasterImageInspector;
 
     @Value("${camera.files.image.max-size-bytes:10485760}")
     private long maxImageSizeBytes = DEFAULT_MAX_IMAGE_SIZE_BYTES;
 
-    public FileService(FileStorage fileStorage, FileRepository fileRepository, FileAccessPolicy fileAccessPolicy) {
+    @Autowired
+    public FileService(
+            FileStorage fileStorage,
+            FileRepository fileRepository,
+            FileAccessPolicy fileAccessPolicy,
+            RasterImageInspector rasterImageInspector) {
         this.fileStorage = fileStorage;
         this.fileRepository = fileRepository;
         this.fileAccessPolicy = fileAccessPolicy;
+        this.rasterImageInspector = rasterImageInspector;
+    }
+
+    FileService(FileStorage fileStorage, FileRepository fileRepository, FileAccessPolicy fileAccessPolicy) {
+        this(fileStorage, fileRepository, fileAccessPolicy,
+                new RasterImageInspector(16_384, 16_384, 64_000_000L));
     }
 
     /**
@@ -66,6 +88,11 @@ public class FileService {
         }
         String normalizedBizType = fileAccessPolicy.normalizeBizType(bizType);
         String normalizedVisibility = fileAccessPolicy.resolveVisibility(normalizedBizType, visibility);
+        if (requiresImageValidation(file, normalizedBizType)) {
+            validateImage(file, 1);
+        } else {
+            validateRasterIfPresent(file);
+        }
 
         // 1. 物理存储，拿到 fileKey
         String fileKey = fileStorage.store(file);
@@ -165,6 +192,33 @@ public class FileService {
         if (file.getSize() > maxImageSizeBytes) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR,
                     "第 " + index + " 张图片过大，单张不能超过 " + maxImageSizeMb() + "MB");
+        }
+        try {
+            rasterImageInspector.inspect(file.getInputStream());
+        } catch (BusinessException error) {
+            throw error;
+        } catch (IOException error) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR,
+                    "第 " + index + " 张图片读取失败");
+        }
+    }
+
+    private boolean requiresImageValidation(MultipartFile file, String normalizedBizType) {
+        return IMAGE_BIZ_TYPES.contains(normalizedBizType)
+                || normalize(file.getContentType()).startsWith("image/");
+    }
+
+    private void validateRasterIfPresent(MultipartFile file) {
+        try {
+            boolean raster = rasterImageInspector.inspectIfSupported(file.getInputStream()).isPresent();
+            if (raster && file.getSize() > maxImageSizeBytes) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR,
+                        "图片过大，单张不能超过 " + maxImageSizeMb() + "MB");
+            }
+        } catch (BusinessException error) {
+            throw error;
+        } catch (IOException error) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "文件读取失败");
         }
     }
 

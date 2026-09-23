@@ -29,6 +29,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -77,7 +78,7 @@ class ImageVariantServiceTest {
 
     @Test
     void originalReturnsOriginalBytesAndMimeWithoutRendering() throws Exception {
-        byte[] original = "original".getBytes();
+        byte[] original = png(2, 2);
         when(fileStorage.load("original.png")).thenReturn(new ByteArrayResource(original));
         ImageVariantService service = new ImageVariantService(fileStorage, renderer);
 
@@ -87,6 +88,51 @@ class ImageVariantServiceTest {
         assertThat(readAll(binary.resource())).isEqualTo(original);
         verify(renderer, never()).render(any(), any());
         verify(fileStorage, never()).loadVariant(any(), any());
+    }
+
+    @Test
+    void originalUsesDetectedRasterMimeInsteadOfStoredMime() throws Exception {
+        byte[] actualPng = png(4, 3);
+        FileRecord mismatched = record();
+        mismatched.setMimeType("image/jpeg");
+        when(fileStorage.load("original.png")).thenReturn(new ByteArrayResource(actualPng));
+        ImageVariantService service = new ImageVariantService(
+                fileStorage,
+                renderer,
+                new RasterImageInspector(16_384, 16_384, 64_000_000L));
+
+        ImageBinary binary = service.load(mismatched, ImageVariant.ORIGINAL);
+
+        assertThat(binary.contentType()).isEqualTo("image/png");
+        assertThat(readAll(binary.resource())).isEqualTo(actualPng);
+    }
+
+    @Test
+    void originalRejectsSvgEvenWhenStoredMimeClaimsRasterImage() {
+        FileRecord disguisedSvg = record();
+        disguisedSvg.setMimeType("image/jpeg");
+        when(fileStorage.load("original.png"))
+                .thenReturn(new ByteArrayResource("<svg><script/></svg>".getBytes()));
+        ImageVariantService service = new ImageVariantService(
+                fileStorage,
+                renderer,
+                new RasterImageInspector(16_384, 16_384, 64_000_000L));
+
+        assertThatThrownBy(() -> service.load(disguisedSvg, ImageVariant.ORIGINAL))
+                .isInstanceOf(UnsupportedImageFileException.class);
+    }
+
+    @Test
+    void derivativeRejectsUnknownBytesAsUnsupportedMedia() {
+        when(fileStorage.load("original.png"))
+                .thenReturn(new ByteArrayResource("%PDF-not-an-image".getBytes()));
+        ImageVariantService service = new ImageVariantService(
+                fileStorage,
+                new ImageVariantRenderer(new ImageIoWebpEncoder()),
+                new RasterImageInspector(16_384, 16_384, 64_000_000L));
+
+        assertThatThrownBy(() -> service.load(record(), ImageVariant.THUMBNAIL))
+                .isInstanceOf(UnsupportedImageFileException.class);
     }
 
     @Test
@@ -203,6 +249,13 @@ class ImageVariantServiceTest {
         }
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         assertThat(ImageIO.write(image, "jpeg", output)).isTrue();
+        return output.toByteArray();
+    }
+
+    private static byte[] png(int width, int height) throws Exception {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        assertThat(ImageIO.write(image, "png", output)).isTrue();
         return output.toByteArray();
     }
 }

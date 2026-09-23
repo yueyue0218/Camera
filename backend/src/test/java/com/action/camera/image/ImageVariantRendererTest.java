@@ -80,11 +80,23 @@ class ImageVariantRendererTest {
     }
 
     @Test
-    void corruptInputIsRejectedAsImageProcessingFailure() {
+    void unknownInputIsRejectedAsUnsupportedMedia() {
         assertThatThrownBy(() -> renderer.render(
                 new ByteArrayInputStream("not-an-image".getBytes()), ImageVariant.THUMBNAIL))
+                .isInstanceOf(UnsupportedImageFileException.class);
+    }
+
+    @Test
+    void rendererAppliesConfiguredPixelLimitBeforeDecode() throws Exception {
+        ImageVariantRenderer constrained = new ImageVariantRenderer(
+                new ImageIoWebpEncoder(),
+                new RasterImageInspector(4, 4, 16));
+
+        assertThatThrownBy(() -> constrained.render(
+                new ByteArrayInputStream(png(5, 5, false)), ImageVariant.THUMBNAIL))
                 .isInstanceOfSatisfying(BusinessException.class,
-                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.INTERNAL_ERROR));
+                        error -> assertThat(error.getErrorCode())
+                                .isEqualTo(ErrorCode.VALIDATION_ERROR));
     }
 
     @Test

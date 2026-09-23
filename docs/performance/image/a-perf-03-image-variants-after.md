@@ -6,11 +6,11 @@
 
 ## Commit 与环境
 
-- 日期：2026-09-22（Asia/Shanghai）
+- 日期：2026-09-23（Asia/Shanghai）
 - 工作树：`C:\Users\LiXiaozhou\Camera-A-ProfileBaseline`
 - 分支：`codex/a-perf-03-image-variants`
 - 基线 HEAD：`e410d5e1ecdad6e0969de0d7520a782bc45a36ec`
-- 本轮状态：按指令保留为未暂存工作树；未执行 `git add`、`commit`、`push` 或 `merge`
+- 本轮交付状态以当前分支最新 commit 与 PR 记录为准；本文记录提交前本地验证证据
 - Windows 11 amd64
 - Java 17.0.12
 - Maven 3.9.15
@@ -33,12 +33,13 @@
 | 匿名/未认证访问私有文件 | File access policy 拒绝 + controller 401 映射 | 401 | `application/json` | business code `40101` |
 | 已认证但无权访问 | controller policy failure | 403 | `application/json` | business code `40301` |
 | 非图片请求 derivative | thumbnail + `application/pdf` | 415 | `application/json` | 不把 JSON 当作图片 Blob |
+| 伪装成 raster 的 SVG/未知格式 | original / derivative | 415 | `application/json` | 不信任数据库 MIME 或文件扩展名 |
 | 生成/IO 失败 | thumbnail generation failure | 500 | `application/json` | business code `50001` |
 
 对应命令：
 
 ```powershell
-.\mvnw.cmd "-Dtest=ImageVariantRendererTest,LocalImageVariantStorageTest,ImageVariantServiceTest,FileControllerTest,FileAccessPolicyTest,AuthInterceptorTest" test
+.\mvnw.cmd "-Dtest=RasterImageInspectorTest,ImageVariantRendererTest,LocalImageVariantStorageTest,ImageVariantServiceTest,FileControllerTest,FileServiceTest,FileAccessPolicyTest,AuthInterceptorTest" test
 ```
 
 观察结果：`Tests run: 44, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`，总耗时 `32.617 s`。
@@ -64,7 +65,15 @@
 - 写入使用同目录临时文件并原子发布；自动化断言目录内无残留 `.tmp`。
 - 两个并发首次请求由同一进程内 key lock 收敛为一次 renderer 调用，两个调用者只读到完整派生文件。
 - 2400×1800 JPEG 首次生成 thumbnail 后，测试把派生文件 mtime 固定为 `1700000000000` ms；第二次请求返回同一路径且 mtime 保持不变，证明命中已持久化文件而非重写。
-- `original` 直接读取原文件及原 MIME，不调用 renderer，也不查询 derivative storage。
+- `original` 直接读取原文件，不调用 renderer，也不查询 derivative storage；响应 MIME 由文件字节实际识别结果决定，不信任数据库 MIME。
+
+## 图片解码与 original 安全边界
+
+- 上传与 derivative generation 共用 `RasterImageInspector`：先用 `ImageReader` 读取宽高，再决定是否解码。
+- 默认限制为单边不超过 `16384` px、总像素不超过 `64,000,000`，分别可由 `CAMERA_FILES_IMAGE_MAX_WIDTH`、`CAMERA_FILES_IMAGE_MAX_HEIGHT`、`CAMERA_FILES_IMAGE_MAX_PIXELS` 配置。
+- derivative decode 在通过限制后使用 source subsampling，避免为缩略图先分配完整原图 raster。
+- 单文件通用上传会探测真实 raster；即使调用者把 PNG/JPEG 标成 `application/octet-stream`，仍会执行像素与图片字节上限检查。无法识别为 raster 的 PDF/ZIP 等通用附件保持兼容。
+- `/original` 只允许实际可识别的 JPEG、PNG、WebP、GIF；SVG、未知格式和伪装内容返回 HTTP 415。
 
 ## Browser 路由映射
 
@@ -72,7 +81,7 @@
 - Demand 详情 reference images 与 ServicePackage 详情 portfolio images 使用 `{ variant: 'medium' }`。
 - Delivery 与 Order 下载仍不传 variant，继续走默认 `/download`。
 - `fileApi.downloadObjectUrl` 默认仍为 `/download`；只有调用者明确提供 `options.variant` 时才选择 representation。
-- binary helper 只有在 HTTP 2xx 且 `Content-Type` 为 `image/*` 时才创建 object URL；HTTP 200 + JSON 会在 Blob 转换前拒绝。
+- binary helper 对 thumbnail/medium/original 要求 HTTP 2xx 且 `Content-Type: image/*`；legacy `/download` 允许 ZIP、PDF 等合法二进制，但 HTTP 200 + JSON 会在 Blob 转换前拒绝。
 - ServicePackage `coverImage` / `images` legacy URL fallback 顺序保持不变。
 - Moment 继续消费既有 `imageData` / `imageDataList`，本轮没有迁移 Base64 模型。
 
@@ -112,7 +121,7 @@
 最终观察结果：
 
 - Maven 退出码：`0`
-- Surefire 汇总：`Tests run: 700, Failures: 0, Errors: 0, Skipped: 2`
+- Surefire 汇总：`Tests run: 710, Failures: 0, Errors: 0, Skipped: 2`
 - Test suites：80
 - Surefire testsuite time 合计：`138.781 s`
 - 12-user Profile social SQL probe 仍输出：followers `8`、following customer `8`、following provider `8`
@@ -131,9 +140,9 @@ npm run build
 
 观察结果：
 
-- `npm test`：63/63 通过。
+- `npm test`：66/66 通过。
 - `npm run lint`：退出码 0，0 errors；存在 38 个仓库既有 unused warnings。
-- `npm run build`：Vite 成功，1213 modules transformed，`built in 10.09s`。
+- `npm run build`：Vite 成功，1213 modules transformed，`built in 14.11s`。
 - build 仍报告既有 dynamic/static import 提示及大于 500 kB chunk 的 warning；本轮未扩大范围处理 bundle split。
 
 ## Scope 与兼容性机械检查

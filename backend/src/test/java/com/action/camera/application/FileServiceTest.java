@@ -3,6 +3,7 @@ package com.action.camera.application;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.domain.FileRecord;
 import com.action.camera.dto.FileUploadResponse;
+import com.action.camera.image.RasterImageInspector;
 import com.action.camera.infrastructure.storage.FileStorage;
 import com.action.camera.repository.FileRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +16,9 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -86,7 +90,60 @@ class FileServiceTest {
     }
 
     @Test
-    void batchImageUploadStoresAllImagesWhenValid() {
+    void batchImageUploadRejectsBytesThatAreNotAnImage() {
+        MockMultipartFile disguised = image("fake.png", "image/png", "<svg><script/></svg>");
+
+        assertThatThrownBy(() -> fileService.uploadImages(
+                List.of(disguised), 1001L, "DEMAND_REFERENCE", "PUBLIC"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("图片格式");
+
+        verify(fileStorage, never()).store(any());
+        verify(fileRepository, never()).save(any());
+    }
+
+    @Test
+    void singleAvatarUploadRejectsOversizedPixelDimensionsBeforeStorage() throws Exception {
+        allowUploadPolicy("AVATAR", "PUBLIC", "PUBLIC");
+        FileService constrained = new FileService(
+                fileStorage,
+                fileRepository,
+                fileAccessPolicy,
+                new RasterImageInspector(4, 4, 16));
+        MockMultipartFile oversized = new MockMultipartFile(
+                "file", "avatar.png", "image/png", png(5, 5));
+
+        assertThatThrownBy(() -> constrained.upload(
+                oversized, 1001L, "AVATAR", "PUBLIC"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("像素");
+
+        verify(fileStorage, never()).store(any());
+        verify(fileRepository, never()).save(any());
+    }
+
+    @Test
+    void genericSingleUploadCannotHideOversizedRasterBehindOctetStream() throws Exception {
+        allowUploadPolicy("CERTIFICATION", "PRIVATE", "PRIVATE");
+        FileService constrained = new FileService(
+                fileStorage,
+                fileRepository,
+                fileAccessPolicy,
+                new RasterImageInspector(4, 4, 16));
+        MockMultipartFile disguised = new MockMultipartFile(
+                "file", "evidence.bin", "application/octet-stream", png(5, 5));
+
+        assertThatThrownBy(() -> constrained.upload(
+                disguised, 1001L, "CERTIFICATION", "PRIVATE"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("像素");
+
+        verify(fileStorage, never()).store(any());
+        verify(fileRepository, never()).save(any());
+    }
+
+    @Test
+    void batchImageUploadStoresAllImagesWhenValid() throws Exception {
         allowUploadPolicy("SERVICE_PORTFOLIO", "PUBLIC", "PUBLIC");
         AtomicLong ids = new AtomicLong(20L);
         when(fileStorage.store(any())).thenReturn("2026/06/15/a.jpg", "2026/06/15/b.webp");
@@ -97,8 +154,8 @@ class FileServiceTest {
         });
 
         List<FileUploadResponse> responses = fileService.uploadImages(List.of(
-                image("a.jpg", "image/jpeg", "a"),
-                image("b.webp", "image/webp", "b")
+                new MockMultipartFile("files", "a.png", "image/png", png(2, 2)),
+                new MockMultipartFile("files", "b.png", "image/png", png(3, 2))
         ), 1001L, "SERVICE_PORTFOLIO", "PUBLIC");
 
         assertThat(responses).extracting(FileUploadResponse::getFileId).containsExactly(21L, 22L);
@@ -128,7 +185,7 @@ class FileServiceTest {
     }
 
     @Test
-    void deliveryUploadCannotBeMarkedPublicByRequestParameter() {
+    void deliveryUploadCannotBeMarkedPublicByRequestParameter() throws Exception {
         allowUploadPolicy("DELIVERY", "PUBLIC", "PRIVATE");
         when(fileStorage.store(any())).thenReturn("2026/06/16/delivery.jpg");
         when(fileRepository.save(any(FileRecord.class))).thenAnswer(invocation -> {
@@ -138,7 +195,9 @@ class FileServiceTest {
         });
         ArgumentCaptor<FileRecord> recordCaptor = ArgumentCaptor.forClass(FileRecord.class);
 
-        fileService.upload(image("delivery.jpg", "image/jpeg", "data"), 1001L, "DELIVERY", "PUBLIC");
+        fileService.upload(new MockMultipartFile(
+                "file", "delivery.png", "image/png", png(2, 2)),
+                1001L, "DELIVERY", "PUBLIC");
 
         verify(fileRepository).save(recordCaptor.capture());
         assertThat(recordCaptor.getValue().getVisibility()).isEqualTo("PRIVATE");
@@ -151,5 +210,12 @@ class FileServiceTest {
 
     private MockMultipartFile image(String filename, String contentType, String content) {
         return new MockMultipartFile("files", filename, contentType, content.getBytes());
+    }
+
+    private byte[] png(int width, int height) throws Exception {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        assertThat(ImageIO.write(image, "png", output)).isTrue();
+        return output.toByteArray();
     }
 }

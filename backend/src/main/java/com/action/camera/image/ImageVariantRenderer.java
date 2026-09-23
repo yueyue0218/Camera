@@ -2,6 +2,7 @@ package com.action.camera.image;
 
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.imageio.IIOImage;
@@ -22,31 +23,28 @@ import java.util.Iterator;
 public class ImageVariantRenderer {
 
     private final WebpEncoder webpEncoder;
+    private final RasterImageInspector rasterImageInspector;
 
-    public ImageVariantRenderer(WebpEncoder webpEncoder) {
+    @Autowired
+    public ImageVariantRenderer(
+            WebpEncoder webpEncoder,
+            RasterImageInspector rasterImageInspector) {
         this.webpEncoder = webpEncoder;
+        this.rasterImageInspector = rasterImageInspector;
+    }
+
+    ImageVariantRenderer(WebpEncoder webpEncoder) {
+        this(webpEncoder, new RasterImageInspector(16_384, 16_384, 64_000_000L));
     }
 
     public RenderedImageVariant render(InputStream input, ImageVariant variant) {
-        BufferedImage source = readRequiredImage(input);
+        BufferedImage source = rasterImageInspector.decode(input, variant.maxLongEdge());
         BufferedImage resized = resizeWithoutUpscale(source, variant.maxLongEdge());
         try {
             byte[] webp = webpEncoder.encode(resized, variant.quality());
             return result(webp, "image/webp", "webp", resized);
         } catch (IOException | RuntimeException webpFailure) {
             return fallback(resized, variant.quality());
-        }
-    }
-
-    private BufferedImage readRequiredImage(InputStream input) {
-        try {
-            BufferedImage image = ImageIO.read(input);
-            if (image == null) {
-                throw new BusinessException(ErrorCode.INTERNAL_ERROR, "图片解码失败");
-            }
-            return image;
-        } catch (IOException error) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "图片解码失败");
         }
     }
 

@@ -28,8 +28,13 @@ export async function fetchImageObjectUrl({
     .split(';', 1)[0]
     .trim()
     .toLowerCase()
-  if (!response.ok || !contentType.startsWith('image/')) {
-    const error = new Error(`Image load failed for fileId ${fileId}: ${response.status}`)
+  const isImageRepresentation = variant !== 'download'
+  const isJson = contentType === 'application/json' || contentType.endsWith('+json')
+  const invalidContentType = !contentType
+    || isJson
+    || (isImageRepresentation && !contentType.startsWith('image/'))
+  if (!response.ok || invalidContentType) {
+    const error = new Error(`Binary load failed for fileId ${fileId}: ${response.status}`)
     error.status = response.status
     error.contentType = contentType
     throw error

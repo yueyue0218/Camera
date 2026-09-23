@@ -6,7 +6,10 @@ import com.action.camera.common.exception.BusinessException;
 import com.action.camera.domain.FileRecord;
 import com.action.camera.image.ImageBinary;
 import com.action.camera.image.ImageVariant;
+import com.action.camera.image.ImageIoWebpEncoder;
+import com.action.camera.image.ImageVariantRenderer;
 import com.action.camera.image.ImageVariantService;
+import com.action.camera.image.RasterImageInspector;
 import com.action.camera.image.UnsupportedImageFileException;
 import com.action.camera.infrastructure.storage.FileStorage;
 import org.junit.jupiter.api.BeforeEach;
@@ -124,6 +127,29 @@ class FileControllerTest {
                 .thenThrow(new UnsupportedImageFileException("该文件不是图片"));
 
         assertJsonError("/files/42/thumbnail", 415, 40001);
+    }
+
+    @Test
+    void realVariantServiceMapsUnknownImageBytesTo415Json() throws Exception {
+        FileRecord record = imageRecord();
+        when(fileService.getForDownload(eq(42L), any(), any())).thenReturn(record);
+        when(fileStorage.load("original.png"))
+                .thenReturn(new ByteArrayResource("%PDF-not-an-image".getBytes()));
+        ImageVariantService realService = new ImageVariantService(
+                fileStorage,
+                new ImageVariantRenderer(
+                        new ImageIoWebpEncoder(),
+                        new RasterImageInspector(16_384, 16_384, 64_000_000L)),
+                new RasterImageInspector(16_384, 16_384, 64_000_000L));
+        FileController controller = new FileController(fileService, fileStorage, realService);
+        MockMvc realMockMvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new FileEndpointExceptionHandler())
+                .build();
+
+        realMockMvc.perform(get("/files/42/thumbnail"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value(40001));
     }
 
     @Test
