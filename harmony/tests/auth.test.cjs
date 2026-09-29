@@ -89,6 +89,7 @@ const { AssetCredentialStore } = require('../entry/src/main/ets/storage/AssetCre
 const { AuthInterceptor } = require('../entry/src/main/ets/network/AuthInterceptor.ets');
 const { HttpClient } = require('../entry/src/main/ets/network/HttpClient.ets');
 const { AppClient } = require('../entry/src/main/ets/app/AppClient.ets');
+const { ErrorKind, PortraError } = require('../entry/src/main/ets/network/ErrorMapper.ets');
 
 class MemoryCredentialStore {
   constructor(credential = null) {
@@ -171,6 +172,23 @@ test('restore accepts only a valid credential from the current environment', asy
   assert.equal(manager.getStatus(), AuthStatus.GUEST);
   assert.equal(controller.token, '');
   assert.equal(manager.getCredentialError().operation, CredentialOperation.LOAD);
+});
+
+test('temporary refresh failure keeps the stored credential for a later retry', async () => {
+  const store = new MemoryCredentialStore({ refreshToken: 'stored-refresh', environment: 'dev' });
+  const controller = tokenController();
+  const api = nativeSessionApi();
+  api.refresh = async () => { throw new PortraError(ErrorKind.NETWORK, 'offline'); };
+  const manager = new AuthSessionManager(controller, store, EnvironmentName.DEV, api);
+  await manager.restore(manager.beginRestore());
+  assert.equal(manager.getStatus(), AuthStatus.GUEST);
+  assert.deepEqual(store.credential, { refreshToken: 'stored-refresh', environment: 'dev' });
+  assert.equal(store.clearCalls, 0);
+
+  api.refresh = nativeSessionApi().refresh;
+  await manager.restore(manager.beginRestore());
+  assert.equal(manager.getStatus(), AuthStatus.AUTHENTICATED);
+  assert.equal(store.credential.refreshToken, 'rotated-refresh');
 });
 
 test('storage failures never create an in-memory authenticated session', async () => {

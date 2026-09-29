@@ -45,9 +45,9 @@ export class NavigationPolicy {
 
   static loginDescription(param: NavigationRouteParam): string {
     if (param.returnRoute === undefined) {
-      return '登录入口已预留，认证协议确认后接入。';
+      return '';
     }
-    return `请先登录，再继续前往${NavigationPolicy.label(param.returnRoute)}。`;
+    return `登录后继续前往${NavigationPolicy.label(param.returnRoute)}`;
   }
 
   static label(route: AppRoute): string {

@@ -3,9 +3,12 @@ import { PortraEmptyView } from '../common/components/PortraEmptyView';
 import { PortraAppShell } from '../features/shell/PortraAppShell';
 import { AppRoute, NavigationRouteParam } from '../model/NavigationModels';
 import { NavigationClickGuard, NavigationPolicy } from '../navigation/NavigationPolicy';
+import { LoginPage } from './LoginPage';
+import { ProfilePage } from './ProfilePage';
 import { PortraTheme } from '../theme/PortraTheme';
 
 const EMPTY_ROUTE_PARAM: NavigationRouteParam = {};
+const PROFILE_LOGIN_PARAM: NavigationRouteParam = { returnRoute: AppRoute.PROFILE };
 
 @Entry
 @Component
@@ -13,16 +16,21 @@ struct Index {
   @Provide('appPathStack') appPathStack: NavPathStack = new NavPathStack();
   private readonly appClient: AppClient = AppClient.shared;
   private readonly navigationClickGuard: NavigationClickGuard = new NavigationClickGuard();
+  private restorePromise?: Promise<void>;
 
   aboutToAppear(): void {
-    this.appClient.restoreSession();
+    this.restorePromise = this.appClient.restoreSession();
   }
 
   @Builder
   PageMap(name: string, param: Object) {
     NavDestination() {
       if (name === AppRoute.LOGIN) {
-        this.PlaceholderPage('登录', NavigationPolicy.loginDescription(param as NavigationRouteParam));
+        LoginPage({
+          contextText: NavigationPolicy.loginDescription(param as NavigationRouteParam),
+          onBack: () => this.appPathStack.pop(),
+          onSuccess: () => this.completeLogin(param as NavigationRouteParam)
+        });
       } else if (name === AppRoute.HALL) {
         this.AppShell();
       } else if (name === AppRoute.DEMAND_DETAIL) {
@@ -34,7 +42,14 @@ struct Index {
       } else if (name === AppRoute.ORDER) {
         this.PlaceholderPage('订单', '后续接入订单状态和服务流程。');
       } else if (name === AppRoute.PROFILE) {
-        this.PlaceholderPage('个人中心', '后续接入个人资料和账号状态。');
+        ProfilePage({
+          onBack: () => this.appPathStack.pop(),
+          onSignedOut: () => this.appPathStack.pop(),
+          onRequireLogin: () => {
+            this.appPathStack.pop();
+            this.appPathStack.pushPathByName(AppRoute.LOGIN, PROFILE_LOGIN_PARAM);
+          }
+        });
       } else {
         this.PlaceholderPage('页面不存在', '未找到对应的导航目标。');
       }
@@ -97,9 +112,20 @@ struct Index {
     return `当前需求编号：${demandId}`;
   }
 
-  private openPage(route: AppRoute, param: NavigationRouteParam = EMPTY_ROUTE_PARAM): void {
+  private completeLogin(param: NavigationRouteParam): void {
+    this.appPathStack.pop();
+    const returnRoute = param.returnRoute;
+    if (returnRoute !== undefined && NavigationPolicy.requiresAuthentication(returnRoute)) {
+      this.appPathStack.pushPathByName(returnRoute, EMPTY_ROUTE_PARAM);
+    }
+  }
+
+  private async openPage(route: AppRoute, param: NavigationRouteParam = EMPTY_ROUTE_PARAM): Promise<void> {
     if (!this.navigationClickGuard.accept(Date.now())) {
       return;
+    }
+    if (this.restorePromise !== undefined) {
+      await this.restorePromise;
     }
     const resolution = NavigationPolicy.resolve(route, param, this.appClient.sessionManager.isAuthenticated());
     this.appPathStack.pushPathByName(resolution.route, resolution.param);

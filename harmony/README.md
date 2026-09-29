@@ -8,10 +8,10 @@
 - App Shell 和原生 Navigation 已建立，包含 Login、Hall、DemandDetail、Publish、Message、Order、Profile 入口。
 - 大厅第一批原生 ArkUI 已按交互原型拆分为品牌栏、频道切换、筛选、发布 Banner、双列橱窗卡和底部导航；没有使用 WebView。
 - 网络底座已建立：`HttpClient`、`ApiService`、公开列表 GET、原生会话刷新/退出 POST、错误映射、Bearer Token 注入、请求取消和旧响应保护。
-- B 的手机号与 Session 契约已冻结并合入 `main`。客户端已接入原生 Refresh/Logout 底座：Access Token 只保存在内存，Refresh Token 使用 HarmonyOS Asset Store 按环境保存；短信发送、验证码登录页面和设备联调尚未完成。
+- B 的手机号与 Session 契约已冻结并合入 `main`。客户端已接入短信发送、原生验证码登录、Refresh/Logout 和当前会话读取；Access Token 只保存在内存，Refresh Token 使用 HarmonyOS Asset Store 按环境保存。安装标识由本机随机生成并持久化，不读取硬件标识。
 - 视觉组件目前是临时基础设施，不代表舍友正在设计的最终 UI。
 
-当前只有大厅具备真实列表 UI。Login、DemandDetail、Publish、Message、Order、Profile 仍是导航目标或占位页面，不要把 Web 端已经实现的业务功能算作鸿蒙端已完成。
+当前大厅具备真实列表 UI；Login 有手机号验证码表单，Profile 有当前会话信息和退出登录入口。DemandDetail、Publish、Message、Order 仍是导航目标或占位页面，不要把 Web 端已经实现的业务功能算作鸿蒙端已完成。
 
 ## 构建
 
@@ -53,6 +53,8 @@ $env:PORTRA_BASE_URL = 'http://<电脑局域网IPv4>:8080'
 
 2026-09-29 从本地对临时 Staging 只读探测，两条接口均返回 HTTP 200、业务码 200：需求列表为 0 条，摄影橱窗列表为 1 条测试数据。此前 `moderation_status` 缺列导致的错误在这两条接口上已不再出现；这不证明全库迁移或设备联调完成。大厅代码已请求真实列表，D08 仍需在鸿蒙设备上确认加载、空状态、图片回退和错误重试。
 
+临时 Staging 的后端配置为 `temp-staging`，该运行配置当前使用 `DisabledSmsSender`，因此即使客户端登录页面已接线，也不能把收取真实短信并登录记为完成。启用团队认可的短信发送环境后再进行人工联调；不要用固定验证码或假登录绕过。
+
 正式大厅只调用上述真实接口，并覆盖 Loading、Empty、Error 和正常列表状态。视觉对照数据仅位于 `entry/src/ohosTest/ets/preview/HallPreview.ets`；DevEco 要求 Preview 入口位于 `src/main/ets`，因此请打开不含数据且未注册到正式页面的 `entry/src/main/ets/preview/HallPreviewEntry.ets`。该入口包含镜头与约拍的 360、390、430 vp 预览，以及 Loading、Empty、Error、长中文、无头像、无图片和长价格/预算边界预览。频道切换会把内容滚动位置复位到顶部，避免较长的镜头列表把旧滚动位置带入约拍列表。默认 HAP 仍需通过示例数据泄漏检查。当前没有连接模拟器或真机，因此系统字体放大和安全区仍需在 Preview 或设备上完成最终视觉验收。
 
 ## 提交边界
@@ -75,7 +77,7 @@ $env:PORTRA_BASE_URL = 'http://<电脑局域网IPv4>:8080'
 
 ## D09 导航逻辑验证
 
-七个第一阶段目标统一由 `NavigationPolicy` 管理。Login、Hall、DemandDetail 是公开入口；Publish、Message、Order、Profile 在游客状态下进入 Login，并保留原目标。DemandDetail 只接受正的安全整数 `demandId`。后端登录契约已确定，但鸿蒙登录页面尚未实现，首次安装时仍按游客状态运行。
+七个第一阶段目标统一由 `NavigationPolicy` 管理。Login、Hall、DemandDetail 是公开入口；Publish、Message、Order、Profile 在游客状态下进入 Login，并保留原目标。DemandDetail 只接受正的安全整数 `demandId`。登录成功后返回原目标；首次安装且无有效凭据时按游客状态运行。
 
 ```powershell
 & "$env:NODE_HOME/node.exe" --test tests/navigation.test.cjs
@@ -85,13 +87,13 @@ $env:PORTRA_BASE_URL = 'http://<电脑局域网IPv4>:8080'
 
 ## D10 认证底座验证
 
-`AppClient` 让导航、会话和网络层共享同一个 token 状态。应用启动时从 Asset Store 读取当前环境的 Refresh Token，通过 `POST /auth/native/refresh` 换取新的 Access Token；Access Token 只保存在内存。退出时调用 `POST /auth/native/logout` 并清理本地凭据；401/40101 会使在途旧请求失效。凭据禁止设备间同步，应用卸载后不保留，且没有保存密码或验证码。后端还提供 `POST /auth/sms/send` 和 `POST /auth/native/sms/verify`，鸿蒙端尚未接入短信登录流程。
+`AppClient` 让导航、会话和网络层共享同一个 token 状态。登录页调用 `POST /auth/sms/send` 和 `POST /auth/native/sms/verify`；应用启动时从 Asset Store 读取当前环境的 Refresh Token，通过 `POST /auth/native/refresh` 换取新的 Access Token。Access Token 只保存在内存。暂时断网不会删除已保存的凭据，真正的 401/40101 会使在途旧请求失效。个人中心通过 `GET /auth/session` 读取昵称和身份，退出时调用 `POST /auth/native/logout` 并清理本地凭据。凭据禁止设备间同步，应用卸载后不保留，且没有保存密码或验证码。
 
 ```powershell
 & "$env:NODE_HOME/node.exe" --test tests/auth.test.cjs
 ```
 
-该测试使用隔离的 Asset Store 与 NetworkKit 替身，验证环境隔离、存取失败、并发恢复去重、退出、并发过期、401/403 区分和账号切换。真实设备上的 Asset Store 读写、真实登录和应用重启恢复仍待验收。认证契约见 [`docs/data/b-auth-final-contract.md`](../docs/data/b-auth-final-contract.md)。
+该测试使用隔离的 Asset Store 与 NetworkKit 替身，验证环境隔离、存取失败、并发恢复去重、断网后凭据保留、退出、并发过期、401/403 区分和账号切换。`tests/login.test.cjs` 另检查手机号规范化和安装标识持久化；`tests/network.test.cjs` 检查原生登录请求路径与请求体。真实设备上的 Asset Store 读写、收码登录和应用重启恢复仍待验收。认证契约见 [`docs/data/b-auth-final-contract.md`](../docs/data/b-auth-final-contract.md)。
 
 ## D11 非视觉组件行为
 

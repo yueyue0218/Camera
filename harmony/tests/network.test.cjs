@@ -159,6 +159,56 @@ test('public lists omit Bearer, use exact backend paths, and disable redirects/c
   await result;
 });
 
+test('native phone login uses public SMS endpoints and authenticated session endpoints', async () => {
+  const client = new HttpClient();
+  client.setAccessToken('current-token');
+  const api = new ApiService(client);
+
+  const send = api.sendLoginCode('+8613800138000', 'device-id');
+  let call = calls.at(-1);
+  assert.equal(call.url, EnvironmentConfig.current().baseUrl + '/auth/sms/send');
+  assert.equal(call.options.header.Authorization, undefined);
+  assert.deepEqual(JSON.parse(call.options.extraData),
+    { phone: '+8613800138000', purpose: 'LOGIN', deviceId: 'device-id' });
+  complete(call);
+  await send;
+
+  const verify = api.verifyLoginCode('+8613800138000', '123456', 'device-id');
+  call = calls.at(-1);
+  assert.equal(call.url, EnvironmentConfig.current().baseUrl + '/auth/native/sms/verify');
+  assert.equal(call.options.header.Authorization, undefined);
+  assert.deepEqual(JSON.parse(call.options.extraData), {
+    phone: '+8613800138000', purpose: 'LOGIN', code: '123456',
+    deviceId: 'device-id', deviceName: 'Portra HarmonyOS'
+  });
+  const session = { accessToken: 'new-token', refreshToken: 'refresh-token', userId: 4,
+    nickname: '测试用户', role: 'CUSTOMER', adminCapable: false, newUser: false };
+  complete(call, session);
+  assert.deepEqual(await verify, session);
+
+  const current = api.currentSession();
+  call = calls.at(-1);
+  assert.equal(call.url, EnvironmentConfig.current().baseUrl + '/auth/session');
+  assert.equal(call.options.header.Authorization, 'Bearer current-token');
+  complete(call, { userId: 4, nickname: '测试用户', role: 'CUSTOMER' });
+  assert.equal((await current).nickname, '测试用户');
+
+  const logout = api.logout();
+  call = calls.at(-1);
+  assert.equal(call.url, EnvironmentConfig.current().baseUrl + '/auth/native/logout');
+  assert.equal(call.options.header.Authorization, 'Bearer current-token');
+  assert.equal(call.options.extraData, undefined);
+  complete(call, true);
+  assert.equal(await logout, true);
+});
+
+test('native login rejects incomplete token responses', async () => {
+  const api = new ApiService(new HttpClient());
+  const verify = api.verifyLoginCode('+8613800138000', '123456', 'device-id');
+  complete(calls.at(-1), { accessToken: 'token', userId: 1 });
+  await assert.rejects(verify, hasKind('parse'));
+});
+
 test('absolute URLs and ambiguous paths are rejected before network access', async () => {
   const before = calls.length;
   for (const url of ['https://example.com', '//example.com', '/bad\\path', '/bad path', '/bad#fragment']) {

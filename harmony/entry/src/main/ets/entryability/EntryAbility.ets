@@ -1,12 +1,19 @@
 import { AbilityConstant, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
+import { AppClient } from '../app/AppClient';
+import { DeviceIdentityStore } from '../storage/DeviceIdentityStore';
 
 const DOMAIN = 0x0000;
 
 export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
+    try {
+      AppClient.shared.setDeviceId(DeviceIdentityStore.getOrCreate(this.context));
+    } catch {
+      hilog.error(DOMAIN, 'testTag', '%{public}s', 'Installation identity is unavailable');
+    }
   }
 
   onDestroy(): void {

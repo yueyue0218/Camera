@@ -78,7 +78,7 @@ npm install && npm run dev
 
 普通用户认证接口为 `POST /auth/sms/send`、`POST /auth/sms/verify`、`POST /auth/refresh`、`GET /auth/session` 和 `POST /auth/logout`。旧 `/users/register`、`/users/login`、`/auth/send-code` 与 `/sessions` 不再签发普通用户凭据。
 
-鸿蒙原生客户端位于 [`harmony/`](harmony/README.md)。目前已有大厅 UI、真实公开列表请求、导航与认证安全底座；手机号登录页面及其他业务页面尚未接通，不能把 Web 功能视为已在鸿蒙完成。
+鸿蒙原生客户端位于 [`harmony/`](harmony/README.md)。目前已有大厅 UI、真实公开列表请求、手机号验证码登录页面和个人中心基础页；消息、订单、发布等业务页面仍未接通。临时 Staging 尚未启用短信发送，鸿蒙登录还没有完成真机验收，不能把 Web 功能视为已在鸿蒙完成。
 
 完整演示流程（账号注册、双角色切换、完整订单链路）见 → [`docs/P4/DEMO_GUIDE.md`](docs/P4/DEMO_GUIDE.md)
 

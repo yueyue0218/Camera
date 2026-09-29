@@ -71,6 +71,17 @@ export interface NativeRefreshRequest {
   readonly refreshToken: string;
 }
 
+export interface SendSmsCodeRequest {
+  readonly phone: string;
+  readonly purpose: string;
+  readonly deviceId: string;
+}
+
+export interface VerifyNativeSmsCodeRequest extends SendSmsCodeRequest {
+  readonly code: string;
+  readonly deviceName: string;
+}
+
 export interface NativeSessionResponse {
   readonly accessToken: string;
   readonly refreshToken: string;
@@ -79,4 +90,14 @@ export interface NativeSessionResponse {
   readonly role: string;
   readonly adminCapable: boolean;
   readonly newUser: boolean;
+}
+
+export interface SessionSummary {
+  readonly userId: number;
+  readonly nickname: string;
+  readonly role: string;
+  readonly adminCapable: boolean;
+  readonly sessionId: string;
+  readonly deviceId: string;
+  readonly deviceName: string;
 }

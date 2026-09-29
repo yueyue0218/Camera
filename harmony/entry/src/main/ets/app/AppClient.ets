@@ -26,6 +26,7 @@ export class AppClient {
   readonly sessionManager: AuthSessionManager;
   readonly apiService: ApiService;
   private restorePromise?: Promise<void>;
+  private deviceId: string = '';
 
   private constructor() {
     const environment = EnvironmentConfig.current();
@@ -47,6 +48,14 @@ export class AppClient {
     const restore = this.restoreAndRelease(version);
     this.restorePromise = restore;
     return restore;
+  }
+
+  setDeviceId(deviceId: string): void {
+    this.deviceId = deviceId;
+  }
+
+  getDeviceId(): string {
+    return this.deviceId;
   }
 
   private async restoreAndRelease(version: number): Promise<void> {

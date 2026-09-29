@@ -40,7 +40,7 @@ test('protected guest destinations redirect to login and preserve the target', (
     const result = NavigationPolicy.resolve(route, {}, false);
     assert.equal(result.route, AppRoute.LOGIN);
     assert.equal(result.param.returnRoute, route);
-    assert.match(NavigationPolicy.loginDescription(result.param), /请先登录/);
+    assert.match(NavigationPolicy.loginDescription(result.param), /登录后继续前往/);
   }
 });
 
@@ -67,7 +67,7 @@ test('route labels and direct login description are deterministic', () => {
   for (const route of NavigationPolicy.routes) {
     assert.notEqual(NavigationPolicy.label(route), '目标页面');
   }
-  assert.match(NavigationPolicy.loginDescription({}), /认证协议确认后接入/);
+  assert.equal(NavigationPolicy.loginDescription({}), '');
 });
 
 test('rapid repeated navigation is accepted only after the cooldown', () => {

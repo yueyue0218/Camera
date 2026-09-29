@@ -1,6 +1,7 @@
 import { EnvironmentConfig, EnvironmentName } from '../common/config/EnvironmentConfig';
 import { AuthInterceptor } from '../network/AuthInterceptor';
 import { CredentialOperation, CredentialStore, CredentialStoreError, StoredCredential } from '../storage/CredentialStore';
+import { ErrorKind, PortraError } from '../network/ErrorMapper';
 import { AuthTokenController } from './AuthTokenController';
 import { NativeSessionApi } from './NativeSessionApi';
 
@@ -108,8 +109,14 @@ export class AuthSessionManager {
         return;
       }
       await this.persistAndApply(refreshed.accessToken, refreshed.refreshToken, version);
-    } catch {
+    } catch (error) {
       if (version === this.restoreVersion) {
+        if (this.isTemporaryRestoreFailure(error as Object)) {
+          this.status = AuthStatus.GUEST;
+          this.session = null;
+          this.authTokenController.clearAccessToken();
+          return;
+        }
         await this.clearStoredCredential();
         this.status = AuthStatus.EXPIRED;
         this.session = null;
@@ -238,5 +245,13 @@ export class AuthSessionManager {
       return error;
     }
     return new CredentialStoreError(operation);
+  }
+
+  private isTemporaryRestoreFailure(error: Object): boolean {
+    if (!(error instanceof PortraError)) {
+      return false;
+    }
+    return error.kind === ErrorKind.NETWORK || error.kind === ErrorKind.TIMEOUT ||
+      error.kind === ErrorKind.CONFIG || (error.kind === ErrorKind.HTTP && error.httpStatus >= 500);
   }
 }
