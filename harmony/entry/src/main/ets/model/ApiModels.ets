@@ -67,6 +67,10 @@ export interface ApiEnvelope<T> {
   readonly data: T;
 }
 
+export interface NativeRefreshRequest {
+  readonly refreshToken: string;
+}
+
 export interface NativeSessionResponse {
   readonly accessToken: string;
   readonly refreshToken: string;

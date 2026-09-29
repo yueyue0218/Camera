@@ -40,7 +40,7 @@ export class HttpClient implements AuthTokenController {
     return this.request<T>(http.RequestMethod.GET, path, requestKey, false);
   }
 
-  async post<T>(path: string, body: Object, requestKey: string = path): Promise<T> {
+  async post<T>(path: string, body?: Object, requestKey: string = path): Promise<T> {
     return this.request<T>(http.RequestMethod.POST, path, requestKey, true, body);
   }
 

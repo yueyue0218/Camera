@@ -1,5 +1,5 @@
 import { NativeSessionApi } from '../auth/NativeSessionApi';
-import { PageResult, DemandSummary, NativeSessionResponse, ServicePackageSummary } from '../model/ApiModels';
+import { PageResult, DemandSummary, NativeRefreshRequest, NativeSessionResponse, ServicePackageSummary } from '../model/ApiModels';
 import { HttpClient } from './HttpClient';
 
 export class ApiService implements NativeSessionApi {
@@ -34,11 +34,12 @@ export class ApiService implements NativeSessionApi {
   }
 
   refresh(refreshToken: string): Promise<NativeSessionResponse> {
+    const request: NativeRefreshRequest = { refreshToken: refreshToken };
     return this.client.postPublic<NativeSessionResponse>(
-      '/auth/native/refresh', { refreshToken }, 'auth.refresh');
+      '/auth/native/refresh', request, 'auth.refresh');
   }
 
   logout(): Promise<boolean> {
-    return this.client.post<boolean>('/auth/native/logout', {}, 'auth.logout');
+    return this.client.post<boolean>('/auth/native/logout', undefined, 'auth.logout');
   }
 }

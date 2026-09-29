@@ -32,15 +32,16 @@ Portra 是一个连接摄影师与有拍摄需求用户的垂直服务平台。�
 | 层 | 技术选型 |
 |---|---|
 | 前端 | React 18 · Vite · React Router v6 · Axios |
+| 鸿蒙客户端 | ArkTS · ArkUI Stage · HarmonyOS SDK 26（原生工程，持续开发中） |
 | 后端 | Spring Boot 3 · MyBatis-Plus · Spring Data JPA |
 | 数据库 | MySQL 8.0 |
-| 认证 | 短期 Access JWT + HttpOnly/Secure Refresh Cookie + 服务端可撤销会话 |
+| 认证 | 短期 Access JWT + 服务端可撤销会话；Web 使用 HttpOnly/Secure Refresh Cookie，鸿蒙使用 Asset Store 保存 Refresh Token |
 | 短信 | 可配置短信供应商；开发环境使用独立发送实现 |
 | 测试 | JUnit 5 · Spring Boot Test · H2 内存库 |
 | 覆盖率 | JaCoCo，行覆盖率 **80.21%**（要求 ≥ 60%） |
-| CI | GitHub Actions（lint → build → test → jacoco report） |
-| CD | GitHub Actions 自动部署（push main 触发，SSH + scp 推送至阿里云） |
-| 部署 | Nginx HTTPS 反向代理 / 本地 localhost |
+| CI | GitHub Actions（Web lint/build、后端测试与覆盖率；暂不含鸿蒙构建） |
+| CD | GitHub Actions 手动触发临时 Staging 后端/基础设施部署 |
+| 部署 | 临时 Staging：Nginx HTTPS 反向代理；本地开发可使用 localhost |
 
 ---
 
@@ -60,10 +61,9 @@ Portra 是一个连接摄影师与有拍摄需求用户的垂直服务平台。�
 **环境要求**：Java 17、Maven 3.8+、Node 18+、MySQL 8.0
 
 ```bash
-# 1. 初始化数据库
-# 在 MySQL 中执行：
-CREATE DATABASE camera_app CHARACTER SET utf8mb4;
-# 然后导入：backend/src/main/resources/db/migration/V1__baseline.sql
+# 1. 初始化或升级数据库
+# 先阅读 backend/src/main/resources/db/README_EXECUTION_ORDER.md，
+# 按“全新库”或“旧库迁移”对应路径执行完整脚本；不要只导入 baseline。
 
 # 2. 启动后端（端口 8080）
 cd backend
@@ -78,44 +78,40 @@ npm install && npm run dev
 
 普通用户认证接口为 `POST /auth/sms/send`、`POST /auth/sms/verify`、`POST /auth/refresh`、`GET /auth/session` 和 `POST /auth/logout`。旧 `/users/register`、`/users/login`、`/auth/send-code` 与 `/sessions` 不再签发普通用户凭据。
 
+鸿蒙原生客户端位于 [`harmony/`](harmony/README.md)。目前已有大厅 UI、真实公开列表请求、导航与认证安全底座；手机号登录页面及其他业务页面尚未接通，不能把 Web 功能视为已在鸿蒙完成。
+
 完整演示流程（账号注册、双角色切换、完整订单链路）见 → [`docs/P4/DEMO_GUIDE.md`](docs/P4/DEMO_GUIDE.md)
 
 演示前建议阅读 [`docs/P4/DEMO_GUIDE.md#二十三性能与体验验收说明`](docs/P4/DEMO_GUIDE.md#二十三性能与体验验收说明)：其中说明了会话列表、聊天详情、图片消息即时预览、作品相册缩略图、Vite chunk warning 和线上演示预热建议。当前优化目标是减少白屏、闪烁和发送无反馈，不代表所有页面已完成生产级性能治理。
 
 ---
 
-## 线上访问
+## 测试环境
 
-生产部署必须配置域名、有效 TLS 证书并仅通过 HTTPS 提供认证和业务 API；仓库中的 Nginx 文件是需替换域名和证书路径的安全模板。
+当前临时 Staging 地址为 <https://47.76.106.57>。2026-09-29 从本地只读探测：网站和 `GET /demands`、`GET /service-packages` 均可通过 HTTPS 访问；两个列表接口返回业务码 200，分别为 0 条需求和 1 条测试橱窗。这只能证明当时的公开列表查询可用，不代表所有数据库迁移、短信登录或鸿蒙真机访问都已验收。`/health` 当前返回前端页面，不能作为独立健康检查接口。
 
-> 首次部署已通过 CI/CD 自动完成。push 到 `main` 分支后，GitHub Actions 将自动运行 CI（lint → build → test → jacoco），CI 通过后触发 Deploy 工作流，将前端 dist 和后端 JAR 通过 SSH 推送至服务器并重启服务。
+这是临时测试环境，不是已完成正式域名、发布和全链路验收的生产环境。
 
 ---
 
 ## CI/CD 配置说明
 
-自动部署依赖以下三个 GitHub Secrets（仓库 → Settings → Secrets → Actions）：
-
-| Secret | 说明 |
-|---|---|
-| `DEPLOY_HOST` | 服务器 IP，当前为 `47.250.86.6` |
-| `DEPLOY_USER` | SSH 登录用户名（如 `root`） |
-| `DEPLOY_KEY` | SSH 私钥（PEM 格式，对应服务器 `~/.ssh/authorized_keys`） |
-
 工作流文件：
-- `.github/workflows/ci.yml`：CI 流水线（lint + build + test + jacoco）
-- `.github/workflows/deploy.yml`：CD 部署（CI 成功后自动触发）
+- `.github/workflows/ci.yml`：`main` / `dev` 的 push 与 PR 触发 Web lint/build 和后端测试；目前不包含鸿蒙构建。
+- `.github/workflows/deploy.yml`：临时 Staging 部署由 GitHub Actions **手动触发**（`workflow_dispatch`），不是每次 push `main` 后自动部署，也不自动执行数据库迁移。
+
+Staging 的部署权限、服务器文件归属与操作说明以 [`infra/staging/README.md`](infra/staging/README.md) 为准；数据库初始化和迁移顺序以 [`backend/src/main/resources/db/README_EXECUTION_ORDER.md`](backend/src/main/resources/db/README_EXECUTION_ORDER.md) 为准。不要沿用旧服务器 IP 或旧的 root SSH 部署说明。
 
 ---
 
-## 项目质量指标
+## Phase 4 历史质量指标
 
 | 指标 | 数值 |
 |---|---|
 | 后端测试用例 | 398 项，全部通过，0 Failures / 0 Errors |
 | JaCoCo 行覆盖率 | **80.21%**（4081 / 5088 行） |
 | 订单状态机覆盖率 | **100%** |
-| CI 流水线 | GitHub Actions 全绿（lint + build + test + jacoco） |
+| CI 流水线 | Phase 4 记录见 `docs/P4/CI_RUN_RECORD.md`；不代表当前鸿蒙构建已纳入 CI |
 | Bug 修复记录 | 四线合计 140+ 条，详见 BUG_FIX_LOG.md |
 | AI 协作实验 | 代码信任度实验 + 调试对决实验，均有完整报告 |
 
