@@ -9,6 +9,8 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -16,6 +18,8 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice(assignableTypes = FileController.class)
 public class FileEndpointExceptionHandler {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(FileEndpointExceptionHandler.class);
 
     @ExceptionHandler(FileBinaryException.class)
     public ResponseEntity<Result<?>> handleFileBinary(FileBinaryException error) {
@@ -45,6 +49,15 @@ public class FileEndpointExceptionHandler {
                 HttpStatus.BAD_REQUEST,
                 ErrorCode.VALIDATION_ERROR,
                 "非法文件参数");
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Result<?>> handleUnexpectedException(Exception error) {
+        LOGGER.error("Unexpected file endpoint failure", error);
+        return response(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                ErrorCode.INTERNAL_ERROR,
+                "服务暂时不可用");
     }
 
     private ResponseEntity<Result<?>> response(

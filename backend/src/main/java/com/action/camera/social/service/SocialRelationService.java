@@ -19,6 +19,8 @@ import com.action.camera.social.dto.SocialUserBriefResponse;
 import com.action.camera.social.repository.MomentPostRepository;
 import com.action.camera.social.repository.UserFollowRepository;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +34,7 @@ import java.util.Set;
 @Service
 public class SocialRelationService {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(SocialRelationService.class);
     private static final String NOTIFICATION_TYPE_FOLLOWED = "FOLLOWED";
 
     private final UserFollowRepository userFollowRepository;
@@ -198,7 +201,8 @@ public class SocialRelationService {
                 .map(userId -> {
                     User user = usersById.get(userId);
                     if (user == null) {
-                        throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
+                        LOGGER.warn("Skipping orphan social relation for missing userId={}", userId);
+                        return null;
                     }
                     return new SocialUserBriefResponse(
                             user.getId(),
@@ -209,6 +213,7 @@ public class SocialRelationService {
                             followedUserIds.contains(userId)
                     );
                 })
+                .filter(Objects::nonNull)
                 .toList();
     }
 

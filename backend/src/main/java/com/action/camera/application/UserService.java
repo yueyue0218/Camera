@@ -22,6 +22,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 public class UserService {
 
@@ -33,6 +35,7 @@ public class UserService {
     private final UserRoleBindingRepository userRoleBindingRepository;
     private final CreditSnapshotService creditSnapshotService;
     private final AuthSessionService sessionService;
+    private final FileReferenceValidator fileReferenceValidator;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public UserService(UserRepository userRepository,
@@ -42,7 +45,8 @@ public class UserService {
                        IpLocationService ipLocationService,
                        UserRoleBindingRepository userRoleBindingRepository,
                        CreditSnapshotService creditSnapshotService,
-                       AuthSessionService sessionService) {
+                       AuthSessionService sessionService,
+                       FileReferenceValidator fileReferenceValidator) {
         this.userRepository = userRepository;
         this.codeService = codeService;
         this.jwtUtil = jwtUtil;
@@ -51,6 +55,7 @@ public class UserService {
         this.userRoleBindingRepository = userRoleBindingRepository;
         this.creditSnapshotService = creditSnapshotService;
         this.sessionService = sessionService;
+        this.fileReferenceValidator = fileReferenceValidator;
     }
 
     @Transactional
@@ -253,6 +258,9 @@ public class UserService {
     public void updateMyProfile(Long userId, UpdateProfileRequest req) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
+        if (req.getAvatarFileId() != null) {
+            fileReferenceValidator.requireExisting(List.of(req.getAvatarFileId()), "avatarFileId");
+        }
         if ("PROVIDER".equals(req.getRole())) {
             requireRoleBinding(userId, UserRole.PROVIDER);
             ensureProviderProfile(userId);

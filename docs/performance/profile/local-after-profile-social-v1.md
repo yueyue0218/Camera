@@ -84,7 +84,7 @@ Automated tests cover:
 - mixed followed/unfollowed state;
 - DTO card fields and null avatar values;
 - empty and one-user lists;
-- fail-fast `用户不存在` behavior for an orphan relation;
+- orphan relations are logged and skipped while valid cards retain relation order;
 - 36 frontend cards with zero `userApi.brief` calls;
 - successful and failed optional avatar downloads.
 
@@ -94,29 +94,25 @@ alters pagination.
 ## Verification
 
 ```text
-Backend Profile-adjacent suite:
-Tests run: 47, Failures: 0, Errors: 0, Skipped: 0
+Full backend suite:
+Tests run: 714, Failures: 0, Errors: 0, Skipped: 2
+
+JaCoCo:
+All coverage checks met
 
 Frontend suite:
-Tests: 52, Pass: 52, Fail: 0
+Tests: 66, Pass: 66, Fail: 0
 
 Frontend lint:
 0 errors, 38 existing warnings
 
 Frontend production build:
-success, 1212 modules transformed
-
-Full backend suite in this workspace:
-Tests run: 668, Failures: 0, Errors: 55, Skipped: 2
+success, 1213 modules transformed
 ```
 
-All 55 full-suite errors are environment startup errors across six test classes
-that require a local loopback connection. Four classes record
-`java.net.SocketException: Invalid argument: connect`; the other two reuse the
-same failed Spring `RANDOM_PORT` context and are skipped by the context-failure
-threshold. There are no assertion failures. The focused 47-test backend suite,
-including the real authenticated social endpoints and their SQL budgets, does
-not require a bound loopback port and passes in this environment.
+The full backend verification uses an explicit JDK Unix-domain socket temporary
+directory so the Windows loopback integration tests run instead of failing during
+environment startup.
 
 Maven continues to emit the pre-existing duplicate `jacoco-maven-plugin` warning.
 Vite continues to emit pre-existing chunk-size and mixed static/dynamic import

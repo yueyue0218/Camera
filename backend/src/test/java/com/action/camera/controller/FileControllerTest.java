@@ -163,6 +163,17 @@ class FileControllerTest {
     }
 
     @Test
+    void unexpectedDownloadFailureReturns500Json() throws Exception {
+        FileRecord record = imageRecord();
+        record.setMimeType("not a valid mime type");
+        when(fileService.getForDownload(eq(42L), any(), any())).thenReturn(record);
+        when(fileStorage.load("original.png"))
+                .thenReturn(new ByteArrayResource("original".getBytes()));
+
+        assertJsonError("/files/42/download", 500, 50001);
+    }
+
+    @Test
     void legacyDownloadRetainsAttachmentSemantics() throws Exception {
         FileRecord record = imageRecord();
         when(fileService.getForDownload(eq(42L), any(), any())).thenReturn(record);

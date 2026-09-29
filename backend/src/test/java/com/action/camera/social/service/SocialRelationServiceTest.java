@@ -29,7 +29,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @Transactional
@@ -227,7 +226,7 @@ class SocialRelationServiceTest {
     }
 
     @Test
-    void socialListsKeepEmptySingleAndOrphanSemantics() {
+    void socialListsSkipOrphansAndKeepValidCardsInRelationOrder() {
         CurrentUser viewer = new CurrentUser(VIEWER_ID, UserRole.CUSTOMER);
         assertThat(socialRelationService.listFollowing(VIEWER_ID, null, viewer)).isEmpty();
 
@@ -239,9 +238,11 @@ class SocialRelationServiceTest {
 
         long missingUserId = 939999L;
         insertFollow(VIEWER_ID, missingUserId, "CUSTOMER", LocalDateTime.of(2026, 9, 19, 12, 1));
-        assertThatThrownBy(() -> socialRelationService.listFollowing(VIEWER_ID, null, viewer))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage("用户不存在");
+        List<SocialUserBriefResponse> withOrphan = socialRelationService.listFollowing(
+                VIEWER_ID, null, viewer);
+
+        assertThat(withOrphan).extracting(SocialUserBriefResponse::getUserId)
+                .containsExactly(OTHER_ID);
     }
 
     private CreateMomentRequest momentRequest(String content) {

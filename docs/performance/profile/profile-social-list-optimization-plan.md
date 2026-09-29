@@ -4,8 +4,8 @@
 
 - Keep `SocialUserBriefResponse` unchanged: `userId`, `nickname`, `avatarFileId`,
   `currentRole`, `bio`, and `followedByCurrentUser` already cover the Profile card.
-- Preserve relation order, role filtering, duplicate behavior, null values, and the
-  existing fail-fast `用户不存在` behavior for orphan relations.
+- Preserve relation order, role filtering, duplicate behavior, and null values;
+  log and skip orphan relations so valid cards still render.
 - Treat avatar file downloads separately from API/JSON requests.
 
 ## Test-driven implementation
