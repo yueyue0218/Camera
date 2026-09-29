@@ -141,6 +141,51 @@ test('auth API sends only the phone session contract and includes cookies', asyn
   }
 })
 
+test('login endpoint 401 errors do not become authentication-timeout events', async () => {
+  const previousWindow = globalThis.window
+  const previousFetch = globalThis.fetch
+  const previousCustomEvent = globalThis.CustomEvent
+  const dispatched = []
+  const phone = ['138', '0013', '8000'].join('')
+  globalThis.window = {
+    location: { hostname: 'localhost' },
+    dispatchEvent: event => dispatched.push(event.type)
+  }
+  globalThis.CustomEvent = class CustomEvent { constructor(type) { this.type = type } }
+  globalThis.fetch = async () => ({
+    ok: false,
+    status: 401,
+    statusText: 'Unauthorized',
+    text: async () => JSON.stringify({ code: 40101, message: '登录凭据无效', data: null })
+  })
+
+  const { createServer } = await import('vite')
+  const vite = await createServer({ appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } })
+  try {
+    const { authApi } = await vite.ssrLoadModule('/src/api/authApi.js')
+
+    await assert.rejects(
+      () => authApi.verifySmsCode({
+        phone, code: '123456', deviceId: 'device-1', deviceName: 'Chrome on Win32'
+      }),
+      error => error.message === '登录凭据无效' && !error.isAuthenticationTimeout
+    )
+    await assert.rejects(
+      () => authApi.adminLogin({ email: 'admin@example.com', password: 'wrong-password' }),
+      error => error.message === '登录凭据无效' && !error.isAuthenticationTimeout
+    )
+    assert.deepEqual(dispatched, [])
+  } finally {
+    await vite.close()
+    if (previousWindow === undefined) delete globalThis.window
+    else globalThis.window = previousWindow
+    if (previousFetch === undefined) delete globalThis.fetch
+    else globalThis.fetch = previousFetch
+    if (previousCustomEvent === undefined) delete globalThis.CustomEvent
+    else globalThis.CustomEvent = previousCustomEvent
+  }
+})
+
 test('ordinary auth source has no legacy login or persisted token flow', async () => {
   const [authContext, authApi, authPages] = await Promise.all([
     readFile(new URL('../src/AuthContext.jsx', import.meta.url), 'utf8'),

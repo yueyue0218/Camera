@@ -69,8 +69,8 @@ export async function request(path, options = {}, currentUser) {
   const payload = await parsePayload(response)
   const hasResultEnvelope = payload && Object.prototype.hasOwnProperty.call(payload, 'code')
   if (!response.ok || (hasResultEnvelope && Number(payload.code) !== 200)) {
-    if (isAuthenticationFailure(response, payload)) {
-      throw authenticationError(payload, response.status, !suppressAuthTimeout)
+    if (isAuthenticationFailure(response, payload) && !suppressAuthTimeout) {
+      throw authenticationError(payload, response.status)
     }
     const error = new Error(payload.message || '请求失败')
     error.status = response.status
