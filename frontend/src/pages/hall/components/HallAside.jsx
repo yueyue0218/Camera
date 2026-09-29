@@ -48,7 +48,8 @@ export function DemandAside({ selectedDemand, error, currentUser, onRespond, onH
   const uploadedPublisherAvatar = useFileObjectUrl(
     [selectedDemand?.customerAvatarFileId, selectedDemand?.avatarFileId],
     currentUser,
-    `demand ${selectedDemand?.demandId || 'selected'} aside publisher avatar`
+    `demand ${selectedDemand?.demandId || 'selected'} aside publisher avatar`,
+    { variant: 'thumbnail' }
   )
   const fallbackPublisherAvatar = publicImageUrls(selectedDemand?.customerAvatarUrl, selectedDemand?.customerAvatar)[0] || ''
   const publisherAvatar = uploadedPublisherAvatar || fallbackPublisherAvatar
@@ -128,7 +129,8 @@ export function ShowcaseAside({ selectedService, currentUser, interests }) {
   const uploadedAvatar = useFileObjectUrl(
     [selectedService?.photographerAvatarFileId, selectedService?.avatarFileId],
     currentUser,
-    `service package ${selectedService?.serviceId || 'selected'} aside avatar`
+    `service package ${selectedService?.serviceId || 'selected'} aside avatar`,
+    { variant: 'thumbnail' }
   )
   const fallbackAvatar = publicImageUrls(selectedService?.photographerAvatarUrl, selectedService?.photographerAvatar)[0] || ''
   const avatar = uploadedAvatar || fallbackAvatar

@@ -4,6 +4,7 @@ import com.action.camera.common.ErrorCode;
 import com.action.camera.auth.repository.UserSessionRepository;
 import com.action.camera.auth.service.SessionAuthenticationResult;
 import com.action.camera.common.exception.BusinessException;
+import com.action.camera.domain.FileRecord;
 import com.action.camera.domain.User;
 import com.action.camera.domain.UserRoleBinding;
 import com.action.camera.dto.LoginResponse;
@@ -14,6 +15,7 @@ import com.action.camera.provider.entity.ProviderProfile;
 import com.action.camera.provider.mapper.ProviderProfileMapper;
 import com.action.camera.repository.UserRepository;
 import com.action.camera.repository.UserRoleBindingRepository;
+import com.action.camera.repository.FileRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -57,6 +59,9 @@ class UserServiceTest {
     @Autowired
     private UserSessionRepository userSessionRepository;
 
+    @Autowired
+    private FileRepository fileRepository;
+
     @MockBean
     private VerificationCodeService codeService;
 
@@ -73,6 +78,7 @@ class UserServiceTest {
         userSessionRepository.deleteAll();
         userRoleBindingRepository.deleteAll();
         userRepository.deleteAll();
+        fileRepository.deleteAll();
     }
 
     @Test
@@ -273,16 +279,17 @@ class UserServiceTest {
     @DisplayName("customer brief returns latest avatar after profile update")
     void updateCustomerAvatar_returnsLatestAvatarInBrief() {
         User user = createTestUser("241880166", "test123456", "ACTIVE");
+        FileRecord avatar = createAvatarFile(user.getId(), "customer-avatar.png");
         UpdateProfileRequest request = new UpdateProfileRequest();
         request.setRole("CUSTOMER");
-        request.setAvatarFileId(501L);
+        request.setAvatarFileId(avatar.getId());
 
         userService.updateMyProfile(user.getId(), request);
 
         UserBriefResponse brief = userService.getUserBrief(user.getId());
         UserProfileResponse profile = userService.getMyProfile(user.getId());
-        assertThat(brief.getAvatarFileId()).isEqualTo(501L);
-        assertThat(profile.getCustomerAvatarFileId()).isEqualTo(501L);
+        assertThat(brief.getAvatarFileId()).isEqualTo(avatar.getId());
+        assertThat(profile.getCustomerAvatarFileId()).isEqualTo(avatar.getId());
     }
 
     @Test
@@ -290,16 +297,32 @@ class UserServiceTest {
     void updateProviderAvatar_returnsLatestAvatarInBrief() {
         User user = createTestUser("241880167", "test123456", "ACTIVE");
         grantRoleBinding(user.getId(), "PROVIDER");
+        FileRecord avatar = createAvatarFile(user.getId(), "provider-avatar.png");
         UpdateProfileRequest request = new UpdateProfileRequest();
         request.setRole("PROVIDER");
-        request.setAvatarFileId(777L);
+        request.setAvatarFileId(avatar.getId());
 
         userService.updateMyProfile(user.getId(), request);
 
         UserBriefResponse brief = userService.getUserBrief(user.getId());
         UserProfileResponse profile = userService.getMyProfile(user.getId());
-        assertThat(brief.getAvatarFileId()).isEqualTo(777L);
-        assertThat(profile.getProviderAvatarFileId()).isEqualTo(777L);
+        assertThat(brief.getAvatarFileId()).isEqualTo(avatar.getId());
+        assertThat(profile.getProviderAvatarFileId()).isEqualTo(avatar.getId());
+    }
+
+    @Test
+    @DisplayName("profile update rejects a missing avatar file reference")
+    void updateProfile_rejectsMissingAvatarFile() {
+        User user = createTestUser("241880177", "test123456", "ACTIVE");
+        UpdateProfileRequest request = new UpdateProfileRequest();
+        request.setRole("CUSTOMER");
+        request.setAvatarFileId(999_999L);
+
+        assertThatThrownBy(() -> userService.updateMyProfile(user.getId(), request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.VALIDATION_ERROR);
+        assertThat(userRepository.findById(user.getId()).orElseThrow().getAvatarFileId()).isNull();
     }
 
     @Test
@@ -332,6 +355,18 @@ class UserServiceTest {
 
     private User createTestUser(String studentNo, String password, String status) {
         return createTestUser(studentNo, password, status, "CUSTOMER");
+    }
+
+    private FileRecord createAvatarFile(Long uploaderId, String fileName) {
+        FileRecord record = new FileRecord();
+        record.setUploaderId(uploaderId);
+        record.setFileKey("test/avatars/" + fileName);
+        record.setOriginalName(fileName);
+        record.setMimeType("image/png");
+        record.setFileSize(128L);
+        record.setBizType("AVATAR");
+        record.setVisibility("PUBLIC");
+        return fileRepository.save(record);
     }
 
     private User createTestUser(String studentNo, String password, String status, String currentRole) {

@@ -5,6 +5,9 @@ import com.action.camera.common.Result;
 import com.action.camera.common.UserContext;
 import com.action.camera.domain.FileRecord;
 import com.action.camera.dto.FileUploadResponse;
+import com.action.camera.image.ImageBinary;
+import com.action.camera.image.ImageVariant;
+import com.action.camera.image.ImageVariantService;
 import com.action.camera.infrastructure.storage.FileStorage;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -19,12 +22,21 @@ import java.util.List;
 @RequestMapping("/files")
 public class FileController {
 
+    private static final String PUBLIC_IMMUTABLE_CACHE =
+            "public, max-age=31536000, immutable";
+    private static final String PRIVATE_NO_STORE_CACHE = "private, no-store";
+
     private final FileService fileService;
     private final FileStorage fileStorage;
+    private final ImageVariantService imageVariantService;
 
-    public FileController(FileService fileService, FileStorage fileStorage) {
+    public FileController(
+            FileService fileService,
+            FileStorage fileStorage,
+            ImageVariantService imageVariantService) {
         this.fileService = fileService;
         this.fileStorage = fileStorage;
+        this.imageVariantService = imageVariantService;
     }
 
     /** 上传文件（需登录） */
@@ -67,7 +79,35 @@ public class FileController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"" + record.getOriginalName() + "\"")
+                .header(HttpHeaders.CACHE_CONTROL, PRIVATE_NO_STORE_CACHE)
                 .contentType(MediaType.parseMediaType(contentType))
                 .body(resource);
+    }
+
+    /** 图片 representation：复用原 FileRecord 与访问策略，响应使用 inline。 */
+    @GetMapping("/{fileId}/{variant}")
+    public ResponseEntity<Resource> image(
+            @PathVariable Long fileId,
+            @PathVariable String variant) {
+        ImageVariant parsed = ImageVariant.parse(variant);
+        FileRecord record = fileService.getForDownload(
+                fileId,
+                UserContext.getUserId(),
+                UserContext.getCurrentRole()
+        );
+        ImageBinary binary = imageVariantService.load(record, parsed);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
+                .header(HttpHeaders.CACHE_CONTROL, cacheControl(record, parsed))
+                .contentType(MediaType.parseMediaType(binary.contentType()))
+                .body(binary.resource());
+    }
+
+    private String cacheControl(FileRecord record, ImageVariant variant) {
+        if ((variant == ImageVariant.THUMBNAIL || variant == ImageVariant.MEDIUM)
+                && fileService.isPubliclyCacheable(record)) {
+            return PUBLIC_IMMUTABLE_CACHE;
+        }
+        return PRIVATE_NO_STORE_CACHE;
     }
 }

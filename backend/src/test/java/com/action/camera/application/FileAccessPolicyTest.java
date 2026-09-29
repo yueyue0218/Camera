@@ -104,6 +104,14 @@ class FileAccessPolicyTest {
     }
 
     @Test
+    void publicCacheClassificationReusesAnonymousPublicAccessRule() {
+        assertThat(policy.isPubliclyCacheable(publicFile("AVATAR"))).isTrue();
+        assertThat(policy.isPubliclyCacheable(publicFile("DELIVERY"))).isFalse();
+        assertThat(policy.isPubliclyCacheable(privateFile("AVATAR"))).isFalse();
+        assertThat(policy.isPubliclyCacheable(null)).isFalse();
+    }
+
+    @Test
     void anonymousUserCanDownloadLegacyPublicPortfolio() {
         assertThatCode(() -> policy.assertCanDownload(publicFile("PORTFOLIO"), null, null))
                 .doesNotThrowAnyException();

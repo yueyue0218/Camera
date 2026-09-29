@@ -98,7 +98,7 @@ export function PublicProfilePage() {
     if (!fileId) return
     let url = ''
     let cancelled = false
-    fileApi.downloadObjectUrl(fileId, currentUser)
+    fileApi.downloadObjectUrl(fileId, currentUser, { variant: 'thumbnail' })
       .then(u => { if (!cancelled) { url = u; setAvatarUrl(u) } })
       .catch(() => {})
     return () => { cancelled = true; if (url) URL.revokeObjectURL(url) }
