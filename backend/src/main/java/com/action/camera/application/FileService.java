@@ -165,6 +165,10 @@ public class FileService {
         return record;
     }
 
+    public boolean isPubliclyCacheable(FileRecord record) {
+        return fileAccessPolicy.isPubliclyCacheable(record);
+    }
+
     private void validateImageBatch(List<MultipartFile> files) {
         if (files == null || files.isEmpty()) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "请选择要上传的图片");

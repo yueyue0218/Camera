@@ -22,6 +22,10 @@ import java.util.List;
 @RequestMapping("/files")
 public class FileController {
 
+    private static final String PUBLIC_IMMUTABLE_CACHE =
+            "public, max-age=31536000, immutable";
+    private static final String PRIVATE_NO_STORE_CACHE = "private, no-store";
+
     private final FileService fileService;
     private final FileStorage fileStorage;
     private final ImageVariantService imageVariantService;
@@ -75,6 +79,7 @@ public class FileController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"" + record.getOriginalName() + "\"")
+                .header(HttpHeaders.CACHE_CONTROL, PRIVATE_NO_STORE_CACHE)
                 .contentType(MediaType.parseMediaType(contentType))
                 .body(resource);
     }
@@ -93,7 +98,16 @@ public class FileController {
         ImageBinary binary = imageVariantService.load(record, parsed);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
+                .header(HttpHeaders.CACHE_CONTROL, cacheControl(record, parsed))
                 .contentType(MediaType.parseMediaType(binary.contentType()))
                 .body(binary.resource());
+    }
+
+    private String cacheControl(FileRecord record, ImageVariant variant) {
+        if ((variant == ImageVariant.THUMBNAIL || variant == ImageVariant.MEDIUM)
+                && fileService.isPubliclyCacheable(record)) {
+            return PUBLIC_IMMUTABLE_CACHE;
+        }
+        return PRIVATE_NO_STORE_CACHE;
     }
 }

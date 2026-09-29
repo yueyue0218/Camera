@@ -35,6 +35,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(MockitoExtension.class)
 class FileControllerTest {
 
+    private static final String PUBLIC_IMMUTABLE_CACHE =
+            "public, max-age=31536000, immutable";
+    private static final String PRIVATE_NO_STORE_CACHE = "private, no-store";
+
     @Mock
     private FileService fileService;
     @Mock
@@ -57,6 +61,7 @@ class FileControllerTest {
     void thumbnailReturnsInlineImageWithTruthfulMime() throws Exception {
         FileRecord record = imageRecord();
         when(fileService.getForDownload(eq(42L), any(), any())).thenReturn(record);
+        when(fileService.isPubliclyCacheable(record)).thenReturn(true);
         when(imageVariantService.load(record, ImageVariant.THUMBNAIL))
                 .thenReturn(new ImageBinary(
                         new ByteArrayResource("webp".getBytes()), "image/webp"));
@@ -64,8 +69,53 @@ class FileControllerTest {
         mockMvc.perform(get("/files/42/thumbnail"))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, "inline"))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, PUBLIC_IMMUTABLE_CACHE))
                 .andExpect(content().contentType("image/webp"))
                 .andExpect(content().bytes("webp".getBytes()));
+    }
+
+    @Test
+    void publicMediumReturnsLongLivedImmutableCacheHeader() throws Exception {
+        FileRecord record = imageRecord();
+        when(fileService.getForDownload(eq(42L), any(), any())).thenReturn(record);
+        when(fileService.isPubliclyCacheable(record)).thenReturn(true);
+        when(imageVariantService.load(record, ImageVariant.MEDIUM))
+                .thenReturn(new ImageBinary(
+                        new ByteArrayResource("medium".getBytes()), "image/webp"));
+
+        mockMvc.perform(get("/files/42/medium"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, PUBLIC_IMMUTABLE_CACHE));
+    }
+
+    @Test
+    void privateThumbnailReturnsPrivateNoStoreCacheHeader() throws Exception {
+        FileRecord record = imageRecord();
+        record.setVisibility("PRIVATE");
+        when(fileService.getForDownload(eq(42L), any(), any())).thenReturn(record);
+        when(fileService.isPubliclyCacheable(record)).thenReturn(false);
+        when(imageVariantService.load(record, ImageVariant.THUMBNAIL))
+                .thenReturn(new ImageBinary(
+                        new ByteArrayResource("thumbnail".getBytes()), "image/webp"));
+
+        mockMvc.perform(get("/files/42/thumbnail"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, PRIVATE_NO_STORE_CACHE));
+    }
+
+    @Test
+    void privateMediumReturnsPrivateNoStoreCacheHeader() throws Exception {
+        FileRecord record = imageRecord();
+        record.setVisibility("PRIVATE");
+        when(fileService.getForDownload(eq(42L), any(), any())).thenReturn(record);
+        when(fileService.isPubliclyCacheable(record)).thenReturn(false);
+        when(imageVariantService.load(record, ImageVariant.MEDIUM))
+                .thenReturn(new ImageBinary(
+                        new ByteArrayResource("medium".getBytes()), "image/webp"));
+
+        mockMvc.perform(get("/files/42/medium"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, PRIVATE_NO_STORE_CACHE));
     }
 
     @Test
@@ -79,6 +129,7 @@ class FileControllerTest {
         mockMvc.perform(get("/files/42/original"))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, "inline"))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, PRIVATE_NO_STORE_CACHE))
                 .andExpect(content().contentType("image/png"))
                 .andExpect(content().bytes("original".getBytes()));
     }
@@ -185,6 +236,7 @@ class FileControllerTest {
                 .andExpect(header().string(
                         HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"original.png\""))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, PRIVATE_NO_STORE_CACHE))
                 .andExpect(content().contentType("image/png"))
                 .andExpect(content().bytes("original".getBytes()));
     }
@@ -192,6 +244,7 @@ class FileControllerTest {
     private void assertJsonError(String path, int statusCode, int businessCode) throws Exception {
         mockMvc.perform(get(path))
                 .andExpect(status().is(statusCode))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, PRIVATE_NO_STORE_CACHE))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.code").value(businessCode));
     }

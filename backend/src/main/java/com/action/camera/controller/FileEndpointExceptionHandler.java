@@ -6,6 +6,7 @@ import com.action.camera.common.exception.BusinessException;
 import com.action.camera.image.UnsupportedImageFileException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +21,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 public class FileEndpointExceptionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FileEndpointExceptionHandler.class);
+    private static final String PRIVATE_NO_STORE_CACHE = "private, no-store";
 
     @ExceptionHandler(FileBinaryException.class)
     public ResponseEntity<Result<?>> handleFileBinary(FileBinaryException error) {
@@ -63,6 +65,7 @@ public class FileEndpointExceptionHandler {
     private ResponseEntity<Result<?>> response(
             HttpStatus status, ErrorCode errorCode, String message) {
         return ResponseEntity.status(status)
+                .header(HttpHeaders.CACHE_CONTROL, PRIVATE_NO_STORE_CACHE)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Result.error(errorCode.getCode(), message));
     }
