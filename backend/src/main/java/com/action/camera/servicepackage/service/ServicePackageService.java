@@ -1,6 +1,7 @@
 package com.action.camera.servicepackage.service;
 
 import com.action.camera.admin.dto.ModerationView;
+import com.action.camera.application.FileReferenceValidator;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.page.PageResult;
@@ -73,6 +74,7 @@ public class ServicePackageService {
     private final UserRepository userRepository;
     private final ProviderProfileMapper providerProfileMapper;
     private final CreditSnapshotService creditSnapshotService;
+    private final FileReferenceValidator fileReferenceValidator;
 
     @Value("${service-package.performance-probe.enabled:false}")
     private boolean servicePackagePerformanceProbeEnabled;
@@ -82,13 +84,15 @@ public class ServicePackageService {
                                   ConversationService conversationService,
                                   UserRepository userRepository,
                                   ProviderProfileMapper providerProfileMapper,
-                                  CreditSnapshotService creditSnapshotService) {
+                                  CreditSnapshotService creditSnapshotService,
+                                  FileReferenceValidator fileReferenceValidator) {
         this.servicePackageRepository = servicePackageRepository;
         this.interestRepository = interestRepository;
         this.conversationService = conversationService;
         this.userRepository = userRepository;
         this.providerProfileMapper = providerProfileMapper;
         this.creditSnapshotService = creditSnapshotService;
+        this.fileReferenceValidator = fileReferenceValidator;
     }
 
     @Transactional
@@ -114,6 +118,7 @@ public class ServicePackageService {
         servicePackage.setAvailableDates(normalizeDates(request.getAvailableDates()));
         List<Long> portfolioIds = normalizeIds(request.getPortfolioIds());
         ensureMaxImageCount(portfolioIds);
+        fileReferenceValidator.requireExisting(portfolioIds, "portfolioIds");
         servicePackage.setPortfolioIds(portfolioIds);
         servicePackage.setDescription(trimToNull(request.getDescription()));
         servicePackage.setTimeDescription(trim(request.getTimeDescription()));
@@ -624,6 +629,7 @@ public class ServicePackageService {
         if (request.getPortfolioIds() != null) {
             List<Long> portfolioIds = normalizeIds(request.getPortfolioIds());
             ensureMaxImageCount(portfolioIds);
+            fileReferenceValidator.requireExisting(portfolioIds, "portfolioIds");
             servicePackage.setPortfolioIds(portfolioIds);
         }
         if (request.getDescription() != null) {

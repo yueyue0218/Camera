@@ -55,6 +55,15 @@ class B1B2RouteAuthIntegrationTest {
                 "VALUES (1001, 'Route auth customer', 'CUSTOMER', 'ACTIVE', 80.00, NOW(), NOW())");
         jdbc.execute("INSERT INTO users (id, nickname, current_role, status, credit_score, created_at, updated_at) " +
                 "VALUES (2001, 'Route auth provider', 'PROVIDER', 'ACTIVE', 80.00, NOW(), NOW())");
+        jdbc.execute("DELETE FROM files WHERE id = 11");
+        jdbc.update("""
+                INSERT INTO files (
+                    id, uploader_id, file_key, original_name, mime_type, file_size,
+                    biz_type, visibility, created_at
+                )
+                VALUES (11, 2001, 'route-auth-portfolio-11', 'portfolio-11.jpg',
+                        'image/jpeg', 100, 'SERVICE_PORTFOLIO', 'PUBLIC', NOW())
+                """);
     }
 
     @Test

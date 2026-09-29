@@ -25,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -72,10 +73,16 @@ class DemandConversationHandoffTest {
     @Autowired
     private DemandService demandService;
 
+    @Autowired
+    private JdbcTemplate jdbc;
+
     @BeforeEach
     void setUp() {
         responseRepository.deleteAll();
         demandRepository.deleteAll();
+        jdbc.execute("DELETE FROM files WHERE id IN (11, 12)");
+        seedFile(11L);
+        seedFile(12L);
     }
 
     @Test
@@ -268,5 +275,15 @@ class DemandConversationHandoffTest {
         request.setMessage(message);
         request.setExpectedPriceCent(39900);
         return request;
+    }
+
+    private void seedFile(Long fileId) {
+        jdbc.update("""
+                INSERT INTO files (
+                    id, uploader_id, file_key, original_name, mime_type, file_size,
+                    biz_type, visibility, created_at
+                )
+                VALUES (?, ?, ?, ?, 'image/jpeg', 100, 'DEMAND_REFERENCE', 'PUBLIC', NOW())
+                """, fileId, CUSTOMER.getUserId(), "demand-handoff-" + fileId, "reference-" + fileId + ".jpg");
     }
 }

@@ -136,7 +136,8 @@ export const DemandCard = memo(function DemandCard({
   const { url: coverUrl, loading: coverDownloading, error: coverDownloadFailed } = useFileObjectUrlState(
     coverFileValue(demand),
     currentUser,
-    `demand ${demand.demandId} reference`
+    `demand ${demand.demandId} reference`,
+    { variant: 'thumbnail' }
   )
   const fallbackCoverUrl = publicImageUrls(publicImageValues(demand))[0] || ''
   const imageUrl = coverUrl || fallbackCoverUrl

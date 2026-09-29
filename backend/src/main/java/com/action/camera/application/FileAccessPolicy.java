@@ -99,7 +99,7 @@ public class FileAccessPolicy {
         }
         if (Objects.equals(file.getUploaderId(), currentUserId)
                 || hasAdminBinding(currentUserId)
-                || isAllowedPublicFile(file)
+                || isPubliclyCacheable(file)
                 || canAccessDeliveryFile(file.getId(), currentUserId)
                 || isGrantedPublicAuthorizationFile(file.getId())
                 || canAccessConversationFile(file.getId(), currentUserId)) {
@@ -111,14 +111,15 @@ public class FileAccessPolicy {
         throw new BusinessException(ErrorCode.FORBIDDEN, "No permission to access this file");
     }
 
+    public boolean isPubliclyCacheable(FileRecord file) {
+        return file != null
+                && VISIBILITY_PUBLIC.equals(normalize(file.getVisibility()))
+                && PUBLIC_BIZ_TYPES.contains(normalize(file.getBizType()));
+    }
+
     private boolean hasAdminBinding(Long userId) {
         return userId != null
                 && userRoleBindingRepository.existsByUserIdAndRole(userId, UserRole.ADMIN.name());
-    }
-
-    private boolean isAllowedPublicFile(FileRecord file) {
-        return VISIBILITY_PUBLIC.equals(normalize(file.getVisibility()))
-                && PUBLIC_BIZ_TYPES.contains(normalize(file.getBizType()));
     }
 
     private boolean canAccessDeliveryFile(Long fileId, Long userId) {

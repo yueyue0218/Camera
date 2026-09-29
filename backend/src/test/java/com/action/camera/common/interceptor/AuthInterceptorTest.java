@@ -56,6 +56,18 @@ class AuthInterceptorTest {
     }
 
     @Test
+    void anonymousFrozenImageVariantsCanReachFileAccessPolicy() {
+        AuthInterceptor interceptor = interceptor();
+        for (String variant : java.util.List.of("thumbnail", "medium", "original")) {
+            when(request.getMethod()).thenReturn("GET");
+            when(request.getRequestURI()).thenReturn("/files/42/" + variant);
+
+            assertThat(interceptor.preHandle(request, response, new Object())).isTrue();
+            assertThat(UserContext.getUserId()).isNull();
+        }
+    }
+
+    @Test
     void activeBearerUserPopulatesContextAfterDatabaseStatusCheck() {
         stubBearer("GET", "/notifications", 41L, user(41L, "CUSTOMER", "ACTIVE"));
         when(userRoleBindingRepository.existsByUserIdAndRole(41L, "CUSTOMER")).thenReturn(true);

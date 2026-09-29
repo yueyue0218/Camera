@@ -1,5 +1,6 @@
 package com.action.camera.demand;
 
+import com.action.camera.application.FileReferenceValidator;
 import com.action.camera.common.page.PageResult;
 import com.action.camera.demand.domain.Demand;
 import com.action.camera.demand.dto.DemandDto;
@@ -121,7 +122,8 @@ class DemandA4BehaviorTest {
                 mock(ConversationService.class),
                 mock(NotificationService.class),
                 users,
-                mock(ServicePackageRepository.class));
+                mock(ServicePackageRepository.class),
+                mock(FileReferenceValidator.class));
     }
 
     private UserRepository users(Map<Long, User> values, AtomicInteger batchCalls) {
