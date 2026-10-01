@@ -299,10 +299,6 @@ function enhanceTilt(el, { maxRot = 5, maxMove = 10, perspective = 900 }) {
 /* ── Pages ─────────────────────────────────────────────────── */
 
 export function LoginChoicePage() {
-  return TEMP_STAGING_BUILD ? <TempStagingLoginPage /> : <StandardLoginChoicePage />
-}
-
-function StandardLoginChoicePage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { isAuthenticated, currentUser } = useAuth()
