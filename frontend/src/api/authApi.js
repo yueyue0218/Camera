@@ -9,12 +9,14 @@ export const authApi = {
   sendSmsCode({ phone, deviceId }) {
     return request('/auth/sms/send', {
       method: 'POST',
+      suppressAuthTimeout: true,
       body: JSON.stringify({ phone, purpose: SMS_PURPOSE, deviceId })
     })
   },
   verifySmsCode({ phone, code, deviceId, deviceName }) {
     return request('/auth/sms/verify', {
       method: 'POST',
+      suppressAuthTimeout: true,
       body: JSON.stringify({ phone, purpose: SMS_PURPOSE, code, deviceId, deviceName })
     })
   },
@@ -37,6 +39,7 @@ export const authApi = {
   adminLogin({ email, password }) {
     return request('/admin/login', {
       method: 'POST',
+      suppressAuthTimeout: true,
       body: JSON.stringify({ studentNo: studentNoFromEmail(email), password })
     })
   }

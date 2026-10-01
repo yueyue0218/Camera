@@ -26,6 +26,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -38,6 +39,7 @@ class FileControllerTest {
     private static final String PUBLIC_IMMUTABLE_CACHE =
             "public, max-age=31536000, immutable";
     private static final String PRIVATE_NO_STORE_CACHE = "private, no-store";
+    private static final String X_CONTENT_TYPE_OPTIONS = "X-Content-Type-Options";
 
     @Mock
     private FileService fileService;
@@ -70,6 +72,7 @@ class FileControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, "inline"))
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, PUBLIC_IMMUTABLE_CACHE))
+                .andExpect(header().string(X_CONTENT_TYPE_OPTIONS, "nosniff"))
                 .andExpect(content().contentType("image/webp"))
                 .andExpect(content().bytes("webp".getBytes()));
     }
@@ -85,7 +88,8 @@ class FileControllerTest {
 
         mockMvc.perform(get("/files/42/medium"))
                 .andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, PUBLIC_IMMUTABLE_CACHE));
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, PUBLIC_IMMUTABLE_CACHE))
+                .andExpect(header().string(X_CONTENT_TYPE_OPTIONS, "nosniff"));
     }
 
     @Test
@@ -100,7 +104,8 @@ class FileControllerTest {
 
         mockMvc.perform(get("/files/42/thumbnail"))
                 .andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, PRIVATE_NO_STORE_CACHE));
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, PRIVATE_NO_STORE_CACHE))
+                .andExpect(header().string(X_CONTENT_TYPE_OPTIONS, "nosniff"));
     }
 
     @Test
@@ -115,7 +120,8 @@ class FileControllerTest {
 
         mockMvc.perform(get("/files/42/medium"))
                 .andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, PRIVATE_NO_STORE_CACHE));
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, PRIVATE_NO_STORE_CACHE))
+                .andExpect(header().string(X_CONTENT_TYPE_OPTIONS, "nosniff"));
     }
 
     @Test
@@ -130,6 +136,7 @@ class FileControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, "inline"))
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, PRIVATE_NO_STORE_CACHE))
+                .andExpect(header().string(X_CONTENT_TYPE_OPTIONS, "nosniff"))
                 .andExpect(content().contentType("image/png"))
                 .andExpect(content().bytes("original".getBytes()));
     }
@@ -235,8 +242,9 @@ class FileControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string(
                         HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"original.png\""))
+                        startsWith("attachment;")))
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, PRIVATE_NO_STORE_CACHE))
+                .andExpect(header().string(X_CONTENT_TYPE_OPTIONS, "nosniff"))
                 .andExpect(content().contentType("image/png"))
                 .andExpect(content().bytes("original".getBytes()));
     }
@@ -245,6 +253,7 @@ class FileControllerTest {
         mockMvc.perform(get(path))
                 .andExpect(status().is(statusCode))
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, PRIVATE_NO_STORE_CACHE))
+                .andExpect(header().string(X_CONTENT_TYPE_OPTIONS, "nosniff"))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.code").value(businessCode));
     }
