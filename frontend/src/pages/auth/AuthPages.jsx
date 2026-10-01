@@ -32,6 +32,7 @@ const PAPER  = '#f2ede6'
 const MUTED  = '#60646c'
 const _BG    = '#e6e2e0'
 const WARM   = '#fffaf2'
+const TEMP_STAGING_BUILD = import.meta.env.MODE === 'temp-staging'
 
 const SERIF = '"Bodoni 72","Didot","Bodoni MT",Georgia,serif'
 const SANS  = '"Avenir Next","Helvetica Neue",Arial,"Noto Sans SC","PingFang SC",sans-serif'
@@ -298,6 +299,10 @@ function enhanceTilt(el, { maxRot = 5, maxMove = 10, perspective = 900 }) {
 /* ── Pages ─────────────────────────────────────────────────── */
 
 export function LoginChoicePage() {
+  return TEMP_STAGING_BUILD ? <TempStagingLoginPage /> : <StandardLoginChoicePage />
+}
+
+function StandardLoginChoicePage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { isAuthenticated, currentUser } = useAuth()
@@ -663,6 +668,99 @@ export function AdminLoginPage() {
 /* ── Register page (2-step) ────────────────────────────────── */
 
 export function PhoneAuthPage() {
+  return TEMP_STAGING_BUILD ? <TempStagingLoginPage /> : <PhoneSmsAuthPage />
+}
+
+function TempStagingLoginPage() {
+  usePortraStyles()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { isAuthenticated, currentUser, completeLogin } = useAuth()
+  const [userId, setUserId] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState(location.state?.error || '')
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (isAuthenticated) navigate(currentUser?.role === 'ADMIN' ? '/admin' : '/hall', { replace: true })
+  }, [currentUser?.role, isAuthenticated, navigate])
+
+  async function submit() {
+    setError('')
+    const numericUserId = Number(userId)
+    if (!/^[1-9][0-9]*$/.test(userId) || !Number.isSafeInteger(numericUserId)) {
+      setError('请输入负责人提供的测试用户 ID'); return
+    }
+    if (!password) {
+      setError('请输入测试账号密码'); return
+    }
+    setLoading(true)
+    try {
+      const data = await authApi.tempStagingLogin({
+        userId: numericUserId,
+        password,
+        deviceId: getOrCreateDeviceId(),
+        deviceName: getDeviceName()
+      })
+      completeLogin(authSessionFromResponse(data))
+      const requestedPath = location.state?.from
+      const destination = typeof requestedPath === 'string'
+        && requestedPath.startsWith('/') && !requestedPath.startsWith('//')
+        ? requestedPath
+        : '/hall'
+      navigate(destination, { replace: true })
+    } catch (err) {
+      setError(err.message || '测试账号登录失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <AuthCard>
+      <Wordmark size={26} />
+      <div style={{ fontSize: 10, letterSpacing: '.22em', color: ORANGE, marginTop: 5, marginBottom: 20, fontFamily: SANS }}>
+        临时测试环境 · 不发送短信或邮件
+      </div>
+      <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '.04em', marginBottom: 4, color: INK }}>
+        白名单测试账号登录
+      </div>
+      <div style={{ fontSize: 13, color: MUTED, marginBottom: 22, lineHeight: 1.65 }}>
+        仅限负责人配置的已有测试用户，不支持注册或任意手机号登录。
+      </div>
+      <ErrorBanner text={error} />
+      <div style={{ marginBottom: 14 }}>
+        <FieldLabel label="测试用户 ID" htmlFor="temp-staging-user-id" />
+        <FocusInput
+          id="temp-staging-user-id"
+          type="text"
+          inputMode="numeric"
+          autoComplete="username"
+          value={userId}
+          onChange={event => setUserId(event.target.value.replace(/\D/g, ''))}
+          placeholder="请输入测试用户 ID"
+        />
+      </div>
+      <div style={{ marginBottom: 20 }}>
+        <FieldLabel label="测试账号密码" htmlFor="temp-staging-password" />
+        <FocusInput
+          id="temp-staging-password"
+          type="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={event => setPassword(event.target.value)}
+          onKeyDown={event => event.key === 'Enter' && submit()}
+          placeholder="请输入测试账号密码"
+        />
+      </div>
+      <PrimaryBtn onClick={submit} loading={loading} disabled={!userId || !password}>
+        进入临时测试环境
+      </PrimaryBtn>
+    </AuthCard>
+  )
+}
+
+function PhoneSmsAuthPage() {
   usePortraStyles()
   const navigate = useNavigate()
   const location = useLocation()

@@ -2,6 +2,7 @@ package com.action.camera.common.config;
 
 import com.action.camera.common.interceptor.AuthInterceptor;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.env.Environment;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 
@@ -53,7 +54,8 @@ class WebMvcTempStagingCorsContractTest {
     }
 
     private CorsConfiguration configurationFor(CorsProperties properties) {
-        WebMvcConfig config = new WebMvcConfig(mock(AuthInterceptor.class), properties);
+        WebMvcConfig config = new WebMvcConfig(
+                mock(AuthInterceptor.class), properties, mock(Environment.class));
         InspectableCorsRegistry registry = new InspectableCorsRegistry();
         config.addCorsMappings(registry);
         return registry.configurations().get("/**");

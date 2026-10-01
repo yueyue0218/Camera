@@ -174,6 +174,12 @@ test('login endpoint 401 errors do not become authentication-timeout events', as
       () => authApi.adminLogin({ email: 'admin@example.com', password: 'wrong-password' }),
       error => error.message === '登录凭据无效' && !error.isAuthenticationTimeout
     )
+    await assert.rejects(
+      () => authApi.tempStagingLogin({
+        userId: 101, password: 'wrong-password', deviceId: 'device-1', deviceName: 'Chrome on Win32'
+      }),
+      error => error.message === '登录凭据无效' && !error.isAuthenticationTimeout
+    )
     assert.deepEqual(dispatched, [])
   } finally {
     await vite.close()
@@ -198,4 +204,24 @@ test('ordinary auth source has no legacy login or persisted token flow', async (
   assert.doesNotMatch(authPages, /学校邮箱|smail\.nju|设置你的密码|完成注册/)
   assert.match(authPages, /手机号登录或注册/)
   assert.match(authPages, /管理员登录/)
+})
+
+test('temp-staging build is isolated from the normal phone login build', async () => {
+  const [packageJson, authApi, client, authPages] = await Promise.all([
+    readFile(new URL('../package.json', import.meta.url), 'utf8').then(JSON.parse),
+    readFile(new URL('../src/api/authApi.js', import.meta.url), 'utf8'),
+    readFile(new URL('../src/api/client.js', import.meta.url), 'utf8'),
+    readFile(new URL('../src/pages/auth/AuthPages.jsx', import.meta.url), 'utf8')
+  ])
+
+  assert.equal(packageJson.scripts.build, 'vite build')
+  assert.equal(packageJson.scripts['build:temp-staging'], 'vite build --mode temp-staging')
+  assert.match(client, /import\.meta\.env\.MODE === ['"]temp-staging['"]/)
+  assert.match(authApi, /tempStagingLogin/)
+  assert.match(authApi, /\/auth\/temp-staging\/login/)
+  assert.match(authApi, /tempStagingLogin[\s\S]*?suppressAuthTimeout:\s*true/)
+  assert.match(authPages, /TEMP_STAGING_BUILD \? <TempStagingLoginPage \/> : <StandardLoginChoicePage \/>/)
+  assert.match(authPages, /TEMP_STAGING_BUILD \? <TempStagingLoginPage \/> : <PhoneSmsAuthPage \/>/)
+  assert.match(authPages, /白名单测试账号登录/)
+  assert.match(authPages, /手机号登录或注册/)
 })

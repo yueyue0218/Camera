@@ -1,4 +1,18 @@
+spring:
+  autoconfigure:
+    # A profile-only denying JavaMailSender bean is supplied by TempStagingMailConfig.
+    exclude: org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration
+  jpa:
+    hibernate:
+      ddl-auto: none
+
+file:
+  storage:
+    local-path: ${FILE_STORAGE_LOCAL_PATH:/opt/portra/uploads}
+
 camera:
+  order:
+    adapter: ${CAMERA_ORDER_ADAPTER:local}
   cors:
     allowed-origin-patterns:
       - "${TEMP_STAGING_ALLOWED_ORIGIN:https://47.76.106.57}"

@@ -1,4 +1,6 @@
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || `http://${window.location.hostname || 'localhost'}:8080`
+export const API_BASE = import.meta.env.MODE === 'temp-staging'
+  ? ''
+  : import.meta.env.VITE_API_BASE_URL || `http://${window.location.hostname || 'localhost'}:8080`
 export const AUTH_TIMEOUT_MESSAGE = '登录超时，请重新登录'
 
 function jwtHasExpired(token) {

@@ -20,6 +20,13 @@ export const authApi = {
       body: JSON.stringify({ phone, purpose: SMS_PURPOSE, code, deviceId, deviceName })
     })
   },
+  tempStagingLogin({ userId, password, deviceId, deviceName }) {
+    return request('/auth/temp-staging/login', {
+      method: 'POST',
+      suppressAuthTimeout: true,
+      body: JSON.stringify({ userId, password, deviceId, deviceName })
+    })
+  },
   refresh() {
     return request('/auth/refresh', {
       method: 'POST',
