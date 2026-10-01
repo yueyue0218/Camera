@@ -1,19 +1,21 @@
 name: Deploy Portra staging
 
 on:
+  workflow_call:
+    inputs:
+      deploy_scope:
+        description: Optional infrastructure scope; application surfaces always deploy together
+        required: false
+        default: auto
+        type: string
   workflow_dispatch:
     inputs:
-      ref:
-        description: Git ref to deploy
-        required: true
-        default: main
-        type: string
       deploy_scope:
-        description: Deployment surfaces
+        description: Optional infrastructure scope; application surfaces always deploy together
         required: true
         default: auto
         type: choice
-        options: [auto, backend, infra, all]
+        options: [auto, application, infra, all]
 
 permissions:
   contents: read
@@ -25,23 +27,27 @@ concurrency:
 jobs:
   deploy:
     name: Plan and deploy staging
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: staging
 
     steps:
-      - name: Checkout requested ref
+      - name: Checkout immutable main commit
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
 
       - name: Resolve immutable commit
         id: revision
         shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           sha="$(git rev-parse HEAD)"
           [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$sha" == "$EXPECTED_SHA" ]]
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           echo "TARGET_COMMIT=$sha"
 
@@ -98,17 +104,17 @@ jobs:
           }
 
           app_base="$(read_remote_commit /home/portra-deploy/state/application-commit.txt)"
+          frontend_base="$(read_remote_commit /home/portra-deploy/state/frontend-commit.txt)"
           infra_base="$(read_remote_commit /opt/portra/deploy/infra-commit.txt)"
           scripts_base="$(read_remote_commit /home/portra-deploy/scripts/current/deployed-commit.txt)"
           bootstrap_base="$(read_remote_commit /opt/portra/deploy/bootstrap-commit.txt)"
-          deploy_backend=false
+          deploy_application=true
           deploy_nginx=false
           deploy_systemd=false
           deploy_scripts=false
 
           case "$REQUESTED_SCOPE" in
-            backend)
-              deploy_backend=true
+            application)
               ;;
             infra)
               deploy_nginx=true
@@ -116,13 +122,11 @@ jobs:
               deploy_scripts=true
               ;;
             all)
-              deploy_backend=true
               deploy_nginx=true
               deploy_systemd=true
               deploy_scripts=true
               ;;
             auto)
-              changed_since "$app_base" backend && deploy_backend=true
               changed_since "$infra_base" infra/staging/nginx && deploy_nginx=true
               changed_since "$infra_base" infra/staging/systemd && deploy_systemd=true
               changed_since "$scripts_base" infra/staging/scripts && deploy_scripts=true
@@ -146,22 +150,24 @@ jobs:
           fi
 
           {
-            echo "deploy_backend=$deploy_backend"
+            echo "deploy_application=$deploy_application"
             echo "deploy_infra=$deploy_infra"
             echo "deploy_nginx=$deploy_nginx"
             echo "deploy_systemd=$deploy_systemd"
             echo "deploy_scripts=$deploy_scripts"
             echo "bootstrap_required=$bootstrap_required"
             echo "application_base=${app_base:-UNKNOWN}"
+            echo "frontend_base=${frontend_base:-UNKNOWN}"
             echo "infra_base=${infra_base:-UNKNOWN}"
             echo "scripts_base=${scripts_base:-UNKNOWN}"
             echo "bootstrap_base=${bootstrap_base:-UNKNOWN}"
           } >> "$GITHUB_OUTPUT"
 
           echo "APPLICATION_BASE=${app_base:-UNKNOWN}"
+          echo "FRONTEND_BASE=${frontend_base:-UNKNOWN}"
           echo "INFRA_BASE=${infra_base:-UNKNOWN}"
           echo "SCRIPTS_BASE=${scripts_base:-UNKNOWN}"
-          echo "BACKEND_CHANGED=$deploy_backend"
+          echo "APPLICATION_DEPLOY=$deploy_application"
           echo "INFRA_CHANGED=$deploy_infra"
           echo "NGINX_CHANGED=$deploy_nginx"
           echo "SYSTEMD_CHANGED=$deploy_systemd"
@@ -182,7 +188,6 @@ jobs:
         run: bash infra/staging/scripts/validate-repository-infra.sh
 
       - name: Set up Java 17
-        if: steps.plan.outputs.deploy_backend == 'true'
         uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -190,7 +195,6 @@ jobs:
           cache: maven
 
       - name: Package backend
-        if: steps.plan.outputs.deploy_backend == 'true'
         working-directory: backend
         shell: bash
         run: |
@@ -198,9 +202,25 @@ jobs:
           chmod +x mvnw
           ./mvnw -B -DskipTests clean package
 
-      - name: Select unique backend artifact
-        if: steps.plan.outputs.deploy_backend == 'true'
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build temp-staging frontend
+        working-directory: frontend
+        run: npm run build:temp-staging
+
+      - name: Package same-SHA application artifacts
         shell: bash
+        env:
+          TARGET_SHA: ${{ steps.revision.outputs.sha }}
         run: |
           set -euo pipefail
           mapfile -t jars < <(find backend/target -maxdepth 1 -type f -name '*.jar' ! -name '*.original.jar' | sort)
@@ -209,10 +229,21 @@ jobs:
             printf '%s\n' "${jars[@]}" >&2
             exit 1
           fi
+          [[ -f frontend/dist/index.html ]]
+          [[ -d frontend/dist/assets ]]
+          grep -R -Fq -- '/auth/temp-staging/login' frontend/dist/assets
+
+          printf '{"gitSha":"%s","environment":"temp-staging"}\n' "$TARGET_SHA" \
+            > frontend/dist/deployment.json
           install -d staging-package
-          cp -- "${jars[0]}" staging-package/portra-backend.jar
-          sha256sum staging-package/portra-backend.jar > staging-package/portra-backend.jar.sha256
-          cat staging-package/portra-backend.jar.sha256
+          backend_artifact="staging-package/portra-backend-$TARGET_SHA.jar"
+          frontend_artifact="staging-package/portra-frontend-$TARGET_SHA.tar.gz"
+          cp -- "${jars[0]}" "$backend_artifact"
+          tar -C frontend/dist -czf "$frontend_artifact" .
+          sha256sum "$backend_artifact" > "${backend_artifact}.sha256"
+          sha256sum "$frontend_artifact" > "${frontend_artifact}.sha256"
+          cat "${backend_artifact}.sha256"
+          cat "${frontend_artifact}.sha256"
 
       - name: Prepare immutable payload
         id: payload
@@ -225,13 +256,14 @@ jobs:
           install -d "$payload"
           cp -R infra/staging "$payload/infra"
           printf '%s\n' "$TARGET_SHA" > "$payload/target-commit.txt"
-          if [[ -f staging-package/portra-backend.jar ]]; then
-            cp staging-package/portra-backend.jar staging-package/portra-backend.jar.sha256 "$payload/"
-          fi
+          cp "staging-package/portra-backend-$TARGET_SHA.jar" \
+            "staging-package/portra-backend-$TARGET_SHA.jar.sha256" \
+            "staging-package/portra-frontend-$TARGET_SHA.tar.gz" \
+            "staging-package/portra-frontend-$TARGET_SHA.tar.gz.sha256" \
+            "$payload/"
           echo "path=$payload" >> "$GITHUB_OUTPUT"
 
       - name: Upload payload without touching live files
-        if: steps.plan.outputs.deploy_backend == 'true' || steps.plan.outputs.deploy_infra == 'true'
         shell: bash
         env:
           PAYLOAD: ${{ steps.payload.outputs.path }}
@@ -249,8 +281,7 @@ jobs:
             -o BatchMode=yes -o StrictHostKeyChecking=yes -r \
             "$PAYLOAD/." "$STAGING_USER@$STAGING_HOST:/home/portra-deploy/incoming/$TARGET_SHA/"
 
-      - name: Deploy backend release
-        if: steps.plan.outputs.deploy_backend == 'true'
+      - name: Deploy same-SHA backend and frontend release
         shell: bash
         env:
           TARGET_SHA: ${{ steps.revision.outputs.sha }}
@@ -268,8 +299,10 @@ jobs:
           ssh -i "$HOME/.ssh/id_portra_staging" -p "$STAGING_PORT" \
             -o BatchMode=yes -o StrictHostKeyChecking=yes \
             "$STAGING_USER@$STAGING_HOST" \
-            "bash '/home/portra-deploy/incoming/$TARGET_SHA/infra/scripts/deploy-backend.sh' \
-              '$TARGET_SHA' '/home/portra-deploy/incoming/$TARGET_SHA/portra-backend.jar' \
+            "bash '/home/portra-deploy/incoming/$TARGET_SHA/infra/scripts/deploy-application.sh' \
+              '$TARGET_SHA' \
+              '/home/portra-deploy/incoming/$TARGET_SHA/portra-backend-$TARGET_SHA.jar' \
+              '/home/portra-deploy/incoming/$TARGET_SHA/portra-frontend-$TARGET_SHA.tar.gz' \
               '$STAGING_HEALTH_URL' '$STAGING_PUBLIC_URL' '$STAGING_EXPECTED_ORIGIN'"
 
       - name: Install versioned deployment scripts
@@ -343,14 +376,14 @@ jobs:
           STAGING_HOST: ${{ vars.STAGING_HOST }}
           STAGING_PORT: ${{ vars.STAGING_PORT }}
           STAGING_USER: ${{ vars.STAGING_USER }}
-          DEPLOY_BACKEND: ${{ steps.plan.outputs.deploy_backend }}
+          DEPLOY_APPLICATION: ${{ steps.plan.outputs.deploy_application }}
           DEPLOY_INFRA: ${{ steps.plan.outputs.deploy_infra }}
           DEPLOY_NGINX: ${{ steps.plan.outputs.deploy_nginx }}
           DEPLOY_SYSTEMD: ${{ steps.plan.outputs.deploy_systemd }}
         run: |
           set -euo pipefail
           echo "TARGET_COMMIT=$TARGET_SHA"
-          echo "BACKEND_CHANGED=$DEPLOY_BACKEND"
+          echo "APPLICATION_DEPLOYED=$DEPLOY_APPLICATION"
           echo "INFRA_CHANGED=$DEPLOY_INFRA"
           echo "NGINX_CHANGED=$DEPLOY_NGINX"
           echo "SYSTEMD_CHANGED=$DEPLOY_SYSTEMD"
@@ -358,8 +391,14 @@ jobs:
           ssh -i "$HOME/.ssh/id_portra_staging" -p "$STAGING_PORT" \
             -o BatchMode=yes -o StrictHostKeyChecking=yes \
             "$STAGING_USER@$STAGING_HOST" \
-            "test ! -r /home/portra-deploy/state/application-commit.txt || \
-              sed 's/^/APPLICATION_COMMIT=/' /home/portra-deploy/state/application-commit.txt; \
+            "set -e; \
+             test \"\$(cat /home/portra-deploy/state/application-commit.txt)\" = '$TARGET_SHA'; \
+             test \"\$(cat /home/portra-deploy/state/frontend-commit.txt)\" = '$TARGET_SHA'; \
+             test \"\$(readlink -f /opt/portra/app/current)\" = '/opt/portra/app/releases/$TARGET_SHA'; \
+             grep -Fq '\"gitSha\":\"$TARGET_SHA\"' /var/www/dist/deployment.json; \
+             sed 's/^/APPLICATION_COMMIT=/' /home/portra-deploy/state/application-commit.txt; \
+             sed 's/^/FRONTEND_COMMIT=/' /home/portra-deploy/state/frontend-commit.txt; \
+             printf 'BACKEND_CURRENT=%s\n' \"\$(readlink -f /opt/portra/app/current)\"; \
              test ! -r /opt/portra/deploy/infra-commit.txt || \
               sed 's/^/INFRA_COMMIT=/' /opt/portra/deploy/infra-commit.txt; \
              test ! -r /home/portra-deploy/scripts/current/deployed-commit.txt || \
