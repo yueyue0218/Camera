@@ -2,27 +2,31 @@
 
 ## Entry point
 
-Run **Deploy Portra staging** manually with `workflow_dispatch`.
+`Project CI` is the primary entry point. A successful push to `main` calls
+**Deploy Portra staging** with the exact same `${{ github.sha }}`. Pull requests and
+failed CI runs never deploy. `workflow_dispatch` remains a main-only fallback that
+uses the same deployment job.
 
-Inputs:
+Input `deploy_scope` controls only optional infrastructure work: `auto`,
+`application`, `infra`, or `all`. Backend and frontend application surfaces always
+deploy together from the same immutable main SHA.
 
-- `ref`: `main` or an explicitly reviewed Git ref.
-- `deploy_scope`: `auto`, `backend`, `infra`, or `all`.
-
-`auto` compares the target commit with the independently recorded application and
-infra commits. Changes under `backend/**` deploy the backend. Changes under
+`auto` compares the target commit with the independently recorded infra commits.
+Every accepted main SHA builds and deploys both application surfaces. Changes under
 `infra/staging/nginx/**`, `systemd/**`, or `scripts/**` deploy only those surfaces.
-Harmony- and docs-only commits do not restart the backend or alter infrastructure.
 Changes to the privileged root helper or sudo policy stop the run until an
 administrator reviews, installs, and records that target commit.
 
 ## Deployment behavior
 
-Backend deployment builds with Java 17 and `-DskipTests`, verifies that exactly one
-deployable JAR exists, uploads to a non-live incoming directory, creates an immutable
-release, switches `current`, restarts `portra-backend.service`, and runs finite health,
-HTTPS, CORS, credentials, and Authorization-preflight checks. Failure restores the
-previous release and re-runs acceptance.
+Application deployment builds the backend with Java 17 and `-DskipTests` and builds
+the frontend with Node 20, `npm ci`, and `npm run build:temp-staging`. Both artifacts
+come from the caller's exact `github.sha`, include checksums, and upload to the same
+non-live incoming directory. The server prepares and validates both candidates before
+switching either one. It then updates the backend `current` release and atomically
+replaces `/var/www/dist`, restarts `portra-backend.service`, and runs finite health,
+HTTPS, CORS, credentials, and Authorization-preflight checks. Failure restores both
+application surfaces and re-runs acceptance.
 
 Privileged infrastructure deployment does not trust uploaded candidates. The
 root-owned helper independently fetches the fixed GitHub repository into a root-owned
