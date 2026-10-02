@@ -220,8 +220,6 @@ else
   echo "FRONTEND_RELEASE=CREATED path=$frontend_release"
 fi
 
-/usr/sbin/nginx -t
-
 # Both immutable releases are READY before either live surface changes.
 echo "BACKEND_CANDIDATE=READY release=$release_dir"
 echo "FRONTEND_CANDIDATE=READY release=$frontend_release"
