@@ -60,6 +60,10 @@ if grep -E '^[[:space:]]*mv([[:space:]]|$)' "$application_deploy" | \
   echo "Normal application deployment must never move /var/www/dist" >&2
   exit 1
 fi
+if grep -Eq 'nginx[[:space:]]+.*-t([[:space:]]|$)' "$application_deploy"; then
+  echo "Normal application deployment must not validate privileged Nginx configuration" >&2
+  exit 1
+fi
 
 for expected in \
   'readonly LIVE_ENTRY=/var/www/dist' \
