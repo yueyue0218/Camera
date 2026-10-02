@@ -124,7 +124,10 @@ if grep -Eq '(^/|(^|/)\.\.(/|$))' "$archive_listing"; then
   echo "Frontend archive contains an unsafe path" >&2
   exit 1
 fi
-install -d -m 775 "$frontend_candidate"
+# Create the empty candidate with the script umask. Final public read/execute
+# permissions are applied only after extraction and validation below.
+mkdir -- "$frontend_candidate"
+[[ -d "$frontend_candidate" && ! -L "$frontend_candidate" ]]
 tar -xzf "$source_frontend" --no-same-owner --no-same-permissions -C "$frontend_candidate"
 [[ -f "$frontend_candidate/index.html" && -d "$frontend_candidate/assets" ]]
 [[ -f "$frontend_candidate/deployment.json" ]]

@@ -30,12 +30,18 @@ grep -Fq 'ExecStart=/usr/bin/java -jar /opt/portra/app/app.jar' \
 
 deploy_workflow="$repo_root/.github/workflows/deploy.yml"
 ci_workflow="$repo_root/.github/workflows/ci.yml"
+application_deploy="$infra_root/scripts/deploy-application.sh"
 grep -Fq 'ref: ${{ github.sha }}' "$deploy_workflow"
 grep -Fq 'npm run build:temp-staging' "$deploy_workflow"
 grep -Fq 'deploy-application.sh' "$deploy_workflow"
 grep -Fq 'portra-frontend-$TARGET_SHA.tar.gz' "$deploy_workflow"
 grep -Fq 'uses: ./.github/workflows/deploy.yml' "$ci_workflow"
 grep -Fq "github.event_name == 'push' && github.ref == 'refs/heads/main'" "$ci_workflow"
+grep -Fq 'mkdir -- "$frontend_candidate"' "$application_deploy"
+if grep -Fq 'install -d -m 775 "$frontend_candidate"' "$application_deploy"; then
+  echo "Frontend candidate must not use install for initialization" >&2
+  exit 1
+fi
 
 helper="$infra_root/scripts/deploy-infra-root.sh"
 grep -Fq 'trusted_repository_url=https://github.com/yueyue0218/Camera.git' "$helper"
