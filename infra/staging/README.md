@@ -17,13 +17,14 @@ Server files are deployment results; they are not a second source of truth.
 | Process environment values | not stored | `/etc/portra/portra.env` | SECRET_SERVER_ONLY |
 | TLS certificate | not stored | `/etc/letsencrypt/live/47.76.106.57/fullchain.pem` | GENERATED |
 | TLS private key | not stored | `/etc/letsencrypt/live/47.76.106.57/privkey.pem` | SECRET_SERVER_ONLY |
-| Frontend assets | same-SHA temp-staging build artifact | `/var/www/dist` | GENERATED |
+| Frontend releases | same-SHA temp-staging build artifact | `/var/www/portra/releases/<sha>/` | GENERATED |
+| Frontend live entry | administrator-created fixed symlink | `/var/www/dist -> /var/www/portra/current` | SERVER_BOOTSTRAP |
 
 The vendor-owned `/etc/nginx/nginx.conf` remains server package configuration. Portra
 owns only the two included files above. Database migrations are deliberately absent
 from this deployment system.
 
-## One-time administrator bootstrap
+## One-time infrastructure administrator bootstrap
 
 The normal deploy account must not receive `NOPASSWD: ALL`. Do not install helper or
 sudoers files copied from `/home/portra-deploy` or the obsolete
@@ -69,6 +70,56 @@ install -d -o portra-deploy -g portra-deploy -m 0700 \
   /home/portra-deploy/scripts
 ```
 
+## One-time frontend release-root bootstrap
+
+Before the first deployment containing the versioned frontend-release change, an
+administrator must migrate the legacy `/var/www/dist/` directory. Run the reviewed
+`infra/staging/scripts/bootstrap-frontend-release-root.sh` from the exact pull-request
+head after its CI passes and before merging that pull request. The script accepts no
+arguments and requires UID 0. It is not called by GitHub Actions and installs no
+sudoers rule or persistent privileged helper.
+
+```bash
+PR_HEAD_SHA=<reviewed-full-40-character-pr-head-sha>
+BOOTSTRAP_DIR="$(mktemp -d /root/portra-frontend-bootstrap.XXXXXX)"
+git clone --bare https://github.com/yueyue0218/Camera.git "$BOOTSTRAP_DIR/repository.git"
+git --git-dir="$BOOTSTRAP_DIR/repository.git" cat-file -e "$PR_HEAD_SHA^{commit}"
+git --git-dir="$BOOTSTRAP_DIR/repository.git" show \
+  "$PR_HEAD_SHA:infra/staging/scripts/bootstrap-frontend-release-root.sh" \
+  > "$BOOTSTRAP_DIR/bootstrap-frontend-release-root.sh"
+bash -n "$BOOTSTRAP_DIR/bootstrap-frontend-release-root.sh"
+chmod 0700 "$BOOTSTRAP_DIR/bootstrap-frontend-release-root.sh"
+"$BOOTSTRAP_DIR/bootstrap-frontend-release-root.sh"
+```
+
+The idempotent migration preserves the live bytes in both an immutable
+`bootstrap-<timestamp>` release and
+`/home/portra-deploy/backups/frontend/<timestamp>-before-release-root-migration/`.
+It creates this layout without changing `/var/www` ownership:
+
+```text
+/var/www/dist -> /var/www/portra/current
+/var/www/portra/current -> releases/bootstrap-<timestamp>
+/var/www/portra/releases/bootstrap-<timestamp>/
+```
+
+After migration, verify:
+
+```bash
+test "$(readlink /var/www/dist)" = /var/www/portra/current
+test -f /var/www/dist/index.html
+CURRENT_RELEASE="$(readlink -f /var/www/portra/current)"
+case "$CURRENT_RELEASE" in /var/www/portra/releases/*) ;; *) exit 1 ;; esac
+stat -c '%U:%G %a %n' /var/www /var/www/portra /var/www/portra/releases
+/usr/sbin/nginx -t
+```
+
+Normal deployments run as `portra-deploy`, create immutable
+`/var/www/portra/releases/<sha>/` directories, and atomically replace only the
+`/var/www/portra/current` symlink. The account can modify `/var/www/portra` but cannot
+modify `/var/www` or replace `/var/www/dist`. Nginx continues to use
+`root /var/www/dist;`; no Nginx configuration change or reload is required.
+
 ## Root trust boundary
 
 The root-owned helper never reads Nginx or systemd content from a deploy-user-writable
@@ -106,17 +157,23 @@ cat /opt/portra/deploy/bootstrap-commit.txt
 - Human-readable current: `/home/portra-deploy/current/deployed-commit.txt`
 - Backend commit: `/home/portra-deploy/state/application-commit.txt`
 - Frontend commit: `/home/portra-deploy/state/frontend-commit.txt`
+- Frontend releases: `/var/www/portra/releases/<sha>/`
+- Frontend current: `/var/www/portra/current -> releases/<release>`
+- Fixed Nginx entry: `/var/www/dist -> /var/www/portra/current`
 - Frontend artifact metadata: `/var/www/dist/deployment.json`
 - Frontend backups: `/home/portra-deploy/backups/frontend/<timestamp>-before-<sha>/`
 - Root-owned Infra commit: `/opt/portra/deploy/infra-commit.txt`
 - Non-root deployment scripts commit: `/home/portra-deploy/scripts/current/deployed-commit.txt`
 - Infra backups: `/opt/portra/backups/infra/<timestamp>-<sha>/`
 
-`deploy-application.sh` prepares and validates both application candidates before
-switching either live surface. If switching, restart, or acceptance fails, it restores
-both the prior backend `current` target and the prior frontend directory, restarts the
-backend, and re-runs acceptance. Do not invoke the legacy backend-only rollback helper
-for unified releases because doing so would violate the same-SHA contract.
+`deploy-application.sh` validates the release-root bootstrap and prepares both
+immutable application releases before switching either live surface. It never writes
+directly under `/var/www` and never replaces `/var/www/dist`. If switching, restart,
+or acceptance fails, it atomically returns frontend `current` to the previous release,
+restores the prior backend `current` target, restarts the backend, and re-runs
+acceptance. The previous immutable frontend release and the normal pre-switch backup
+are retained. Do not invoke the legacy backend-only rollback helper for unified
+releases because doing so would violate the same-SHA contract.
 
 The sudo rule permits only the fixed root-owned helper with a SHA argument and one of
 the fixed surfaces `nginx`, `systemd`, or `all`. The helper itself enforces exact
