@@ -26,22 +26,46 @@ done
 app_root=/opt/portra/app
 release_root="$app_root/releases"
 release_dir="$release_root/$sha"
-frontend_live=/var/www/dist
-frontend_candidate="/var/www/dist.new-$sha"
+FRONTEND_ROOT=/var/www/portra
+FRONTEND_RELEASE_ROOT=/var/www/portra/releases
+FRONTEND_CURRENT=/var/www/portra/current
+FRONTEND_LIVE_ENTRY=/var/www/dist
+frontend_release="$FRONTEND_RELEASE_ROOT/$sha"
 backup_root=/home/portra-deploy/backups/frontend
 state_root=/home/portra-deploy/state
 health_script="$incoming_root/infra/scripts/health-check.sh"
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 frontend_backup="$backup_root/$timestamp-before-$sha"
-frontend_old="/var/www/dist.rollback-$sha-$$"
-frontend_failed="/var/www/dist.failed-$sha-$$"
 application_state="$state_root/application-commit.txt"
 frontend_state="$state_root/frontend-commit.txt"
 release_state="$state_root/release-state.env"
 
+frontend_candidate=""
+frontend_switch_temp=""
+archive_listing=""
+
+cleanup_attempt_files() {
+  if [[ -n "$archive_listing" ]]; then
+    rm -f -- "$archive_listing"
+  fi
+  if [[ -n "$frontend_switch_temp" && -L "$frontend_switch_temp" ]]; then
+    rm -f -- "$frontend_switch_temp"
+  fi
+  if [[ -n "$frontend_candidate" && -d "$frontend_candidate" && ! -L "$frontend_candidate" ]]; then
+    [[ "$frontend_candidate" == "$FRONTEND_RELEASE_ROOT/.candidate-$sha-"* ]] &&
+      rm -rf --one-file-system -- "$frontend_candidate"
+  fi
+}
+trap cleanup_attempt_files EXIT
+
 install -d -m 700 "$state_root"
 exec 9>"$state_root/application-deploy.lock"
 flock -n 9 || { echo "Another Portra application deployment is running" >&2; exit 1; }
+
+fail() {
+  echo "$*" >&2
+  exit 1
+}
 
 verify_checksum() {
   local artifact="$1" checksum_file="${1}.sha256" expected actual
@@ -61,9 +85,71 @@ atomic_link() {
   mv -Tf -- "$temp_link" "$link_path"
 }
 
+resolve_frontend_current() {
+  local resolved release_root_resolved
+  [[ -L "$FRONTEND_CURRENT" ]] || fail "$FRONTEND_CURRENT must be a symlink"
+  resolved="$(readlink -f -- "$FRONTEND_CURRENT")" ||
+    fail "$FRONTEND_CURRENT does not resolve to an existing release"
+  release_root_resolved="$(readlink -f -- "$FRONTEND_RELEASE_ROOT")" ||
+    fail "$FRONTEND_RELEASE_ROOT cannot be resolved"
+  [[ "$resolved" == "$release_root_resolved/"* ]] ||
+    fail "$FRONTEND_CURRENT must resolve strictly inside $FRONTEND_RELEASE_ROOT"
+  [[ -d "$resolved" && ! -L "$resolved" && -f "$resolved/index.html" ]] ||
+    fail "Current frontend release is invalid: $resolved"
+  printf '%s\n' "$resolved"
+}
+
+verify_frontend_release() {
+  local path="$1"
+  [[ -d "$path" && ! -L "$path" ]] || fail "Frontend release must be a real directory: $path"
+  [[ -f "$path/index.html" && -d "$path/assets" ]] ||
+    fail "Frontend release is missing index.html or assets: $path"
+  [[ -f "$path/deployment.json" && ! -L "$path/deployment.json" ]] ||
+    fail "Frontend release is missing deployment.json: $path"
+  grep -Fq "\"gitSha\":\"$sha\"" "$path/deployment.json" ||
+    fail "Frontend deployment marker SHA does not match $sha"
+  grep -Fq '"environment":"temp-staging"' "$path/deployment.json" ||
+    fail "Frontend deployment marker environment is not temp-staging"
+  grep -R -Fq -- '/auth/temp-staging/login' "$path/assets" ||
+    fail "Frontend release does not contain the temp-staging login endpoint"
+}
+
+atomic_frontend_switch() {
+  local target="$1"
+  frontend_switch_temp="$FRONTEND_ROOT/.current.next-$sha-$$"
+  if [[ -e "$frontend_switch_temp" || -L "$frontend_switch_temp" ]]; then
+    echo "Temporary frontend switch path already exists" >&2
+    return 1
+  fi
+  ln -s -- "$target" "$frontend_switch_temp"
+  mv -Tf -- "$frontend_switch_temp" "$FRONTEND_CURRENT"
+  frontend_switch_temp=""
+}
+
 verify_checksum "$source_jar"
 verify_checksum "$source_frontend"
 [[ -x "$health_script" || -f "$health_script" ]]
+
+# Fail before preparing or switching either live surface if the one-time
+# administrator bootstrap has not established the fixed frontend layout.
+[[ -L "$FRONTEND_LIVE_ENTRY" ]] ||
+  fail "Frontend release-root bootstrap required: $FRONTEND_LIVE_ENTRY is not a symlink"
+[[ "$(readlink -- "$FRONTEND_LIVE_ENTRY")" == "$FRONTEND_CURRENT" ]] ||
+  fail "Frontend release-root bootstrap required: $FRONTEND_LIVE_ENTRY must point exactly to $FRONTEND_CURRENT"
+[[ -d "$FRONTEND_ROOT" && ! -L "$FRONTEND_ROOT" ]] ||
+  fail "Frontend release-root bootstrap required: invalid $FRONTEND_ROOT"
+[[ -d "$FRONTEND_RELEASE_ROOT" && ! -L "$FRONTEND_RELEASE_ROOT" ]] ||
+  fail "Frontend release-root bootstrap required: invalid $FRONTEND_RELEASE_ROOT"
+[[ -w "$FRONTEND_ROOT" && -x "$FRONTEND_ROOT" ]] ||
+  fail "Deploy user cannot write $FRONTEND_ROOT"
+[[ -w "$FRONTEND_RELEASE_ROOT" && -x "$FRONTEND_RELEASE_ROOT" ]] ||
+  fail "Deploy user cannot write $FRONTEND_RELEASE_ROOT"
+previous_frontend="$(resolve_frontend_current)"
+frontend_release_root_real="$(readlink -f -- "$FRONTEND_RELEASE_ROOT")"
+previous_frontend_suffix="${previous_frontend#"$frontend_release_root_real/"}"
+[[ "$previous_frontend_suffix" != "$previous_frontend" && -n "$previous_frontend_suffix" ]] ||
+  fail "Cannot derive the previous frontend release target"
+previous_frontend_link_target="releases/$previous_frontend_suffix"
 
 # Prepare and validate the immutable backend release without touching current.
 install -d -m 2750 "$release_root"
@@ -111,41 +197,39 @@ if [[ -e "$app_root/app.jar" && ! -L "$app_root/app.jar" ]]; then
   exit 1
 fi
 
-# Prepare and validate the frontend candidate beside the live directory.
-[[ "$frontend_candidate" == "/var/www/dist.new-$sha" ]]
-if [[ -e "$frontend_candidate" || -L "$frontend_candidate" ]]; then
-  [[ ! -L "$frontend_candidate" ]]
-  rm -rf --one-file-system -- "$frontend_candidate"
+# Prepare and validate an immutable frontend release inside the deploy-owned root.
+if [[ -e "$frontend_release" || -L "$frontend_release" ]]; then
+  verify_frontend_release "$frontend_release"
+  echo "FRONTEND_RELEASE=REUSED path=$frontend_release"
+else
+  archive_listing="$(mktemp)"
+  tar -tzf "$source_frontend" > "$archive_listing"
+  if grep -Eq '(^/|(^|/)\.\.(/|$))' "$archive_listing"; then
+    echo "Frontend archive contains an unsafe path" >&2
+    exit 1
+  fi
+  frontend_candidate="$(mktemp -d "$FRONTEND_RELEASE_ROOT/.candidate-$sha-XXXXXX")"
+  [[ -d "$frontend_candidate" && ! -L "$frontend_candidate" ]]
+  tar -xzf "$source_frontend" --no-same-owner --no-same-permissions -C "$frontend_candidate"
+  verify_frontend_release "$frontend_candidate"
+  find "$frontend_candidate" -type d -exec chmod 0775 {} +
+  find "$frontend_candidate" -type f -exec chmod 0664 {} +
+  mv -T -- "$frontend_candidate" "$frontend_release"
+  frontend_candidate=""
+  verify_frontend_release "$frontend_release"
+  echo "FRONTEND_RELEASE=CREATED path=$frontend_release"
 fi
-archive_listing="$(mktemp)"
-trap 'rm -f "$archive_listing"' EXIT
-tar -tzf "$source_frontend" > "$archive_listing"
-if grep -Eq '(^/|(^|/)\.\.(/|$))' "$archive_listing"; then
-  echo "Frontend archive contains an unsafe path" >&2
-  exit 1
-fi
-# Create the empty candidate with the script umask. Final public read/execute
-# permissions are applied only after extraction and validation below.
-mkdir -- "$frontend_candidate"
-[[ -d "$frontend_candidate" && ! -L "$frontend_candidate" ]]
-tar -xzf "$source_frontend" --no-same-owner --no-same-permissions -C "$frontend_candidate"
-[[ -f "$frontend_candidate/index.html" && -d "$frontend_candidate/assets" ]]
-[[ -f "$frontend_candidate/deployment.json" ]]
-grep -Fq "\"gitSha\":\"$sha\"" "$frontend_candidate/deployment.json"
-grep -Fq '"environment":"temp-staging"' "$frontend_candidate/deployment.json"
-grep -R -Fq -- '/auth/temp-staging/login' "$frontend_candidate/assets"
-chown -R portra-deploy:portra-deploy "$frontend_candidate"
-find "$frontend_candidate" -type d -exec chmod 0775 {} +
-find "$frontend_candidate" -type f -exec chmod 0664 {} +
-[[ -d "$frontend_live" && ! -L "$frontend_live" ]]
+
 /usr/sbin/nginx -t
 
-# Both candidates are READY before either live surface changes.
+# Both immutable releases are READY before either live surface changes.
 echo "BACKEND_CANDIDATE=READY release=$release_dir"
-echo "FRONTEND_CANDIDATE=READY path=$frontend_candidate"
+echo "FRONTEND_CANDIDATE=READY release=$frontend_release"
 
-install -d -m 775 "$backup_root" "$frontend_backup"
-cp -a -- "$frontend_live" "$frontend_backup/dist"
+[[ ! -e "$frontend_backup" && ! -L "$frontend_backup" ]] ||
+  fail "Frontend backup path already exists: $frontend_backup"
+install -d -m 775 "$backup_root" "$frontend_backup" "$frontend_backup/dist"
+cp -a -- "$previous_frontend/." "$frontend_backup/dist/"
 
 previous_application_state="$(cat "$application_state" 2>/dev/null || true)"
 previous_frontend_state="$(cat "$frontend_state" 2>/dev/null || true)"
@@ -153,7 +237,6 @@ previous_release_state="$(cat "$release_state" 2>/dev/null || true)"
 
 backend_switched=false
 backend_links_touched=false
-frontend_old_moved=false
 frontend_switched=false
 
 apply_release() {
@@ -168,17 +251,15 @@ apply_release() {
     ln -s "$app_root/current/portra-backend.jar" "$app_root/app.jar" || return 1
   fi
 
-  [[ ! -e "$frontend_old" && ! -L "$frontend_old" ]] || return 1
-  mv -T -- "$frontend_live" "$frontend_old" || return 1
-  frontend_old_moved=true
-  mv -T -- "$frontend_candidate" "$frontend_live" || return 1
+  atomic_frontend_switch "releases/$sha" || return 1
   frontend_switched=true
 
   sudo /usr/bin/systemctl restart portra-backend.service || return 1
   sudo /usr/bin/systemctl is-active portra-backend.service || return 1
   bash "$health_script" "$health_url" "$public_url" "$expected_origin" || return 1
   [[ "$(readlink -f "$app_root/current")" == "$release_dir" ]] || return 1
-  grep -Fq "\"gitSha\":\"$sha\"" "$frontend_live/deployment.json" || return 1
+  [[ "$(readlink -f "$FRONTEND_CURRENT")" == "$frontend_release" ]] || return 1
+  grep -Fq "\"gitSha\":\"$sha\"" "$FRONTEND_LIVE_ENTRY/deployment.json" || return 1
 
   printf '%s\n' "$sha" > "$application_state" || return 1
   printf '%s\n' "$sha" > "$frontend_state" || return 1
@@ -202,12 +283,7 @@ rollback_release() {
   echo "Application acceptance failed; restoring backend and frontend" >&2
 
   if [[ "$frontend_switched" == true ]]; then
-    mv -T -- "$frontend_live" "$frontend_failed" || rollback_failed=true
-    mv -T -- "$frontend_old" "$frontend_live" || rollback_failed=true
-    frontend_old_moved=false
-  elif [[ "$frontend_old_moved" == true && ! -e "$frontend_live" ]]; then
-    mv -T -- "$frontend_old" "$frontend_live" || rollback_failed=true
-    frontend_old_moved=false
+    atomic_frontend_switch "$previous_frontend_link_target" || rollback_failed=true
   fi
 
   if [[ "$backend_switched" == true ]]; then
@@ -235,21 +311,12 @@ rollback_release() {
   sudo /usr/bin/systemctl restart portra-backend.service || rollback_failed=true
   sudo /usr/bin/systemctl is-active portra-backend.service || rollback_failed=true
   bash "$health_script" "$health_url" "$public_url" "$expected_origin" || rollback_failed=true
-
-  if [[ -d "$frontend_failed" && ! -L "$frontend_failed" ]]; then
-    rm -rf --one-file-system -- "$frontend_failed"
-  fi
   [[ "$rollback_failed" == false ]]
 }
 
 if ! apply_release; then
   rollback_release || echo "ROLLBACK=FAILED" >&2
   exit 1
-fi
-
-if [[ -d "$frontend_old" && ! -L "$frontend_old" ]]; then
-  rm -rf --one-file-system -- "$frontend_old" || \
-    echo "Warning: retained old frontend at $frontend_old" >&2
 fi
 
 echo "DEPLOYED_COMMIT=$sha"

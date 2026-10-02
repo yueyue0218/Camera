@@ -24,9 +24,12 @@ the frontend with Node 20, `npm ci`, and `npm run build:temp-staging`. Both arti
 come from the caller's exact `github.sha`, include checksums, and upload to the same
 non-live incoming directory. The server prepares and validates both candidates before
 switching either one. It then updates the backend `current` release and atomically
-replaces `/var/www/dist`, restarts `portra-backend.service`, and runs finite health,
-HTTPS, CORS, credentials, and Authorization-preflight checks. Failure restores both
-application surfaces and re-runs acceptance.
+switches `/var/www/portra/current` to the prepared immutable frontend release,
+restarts `portra-backend.service`, and runs finite health, HTTPS, CORS, credentials,
+and Authorization-preflight checks. The fixed administrator-created entry
+`/var/www/dist -> /var/www/portra/current` is never replaced by a normal deployment.
+Failure atomically returns frontend `current` to its previous release, restores the
+previous backend release, and re-runs acceptance.
 
 Privileged infrastructure deployment does not trust uploaded candidates. The
 root-owned helper independently fetches the fixed GitHub repository into a root-owned
@@ -60,7 +63,32 @@ Variables:
 For the current staging host the three URL variables are expected to describe
 `https://47.76.106.57`; no secret value belongs in these variables.
 
-## Current bootstrap boundary
+## Frontend release-root bootstrap
+
+Before this release architecture is merged, an administrator runs the reviewed
+`infra/staging/scripts/bootstrap-frontend-release-root.sh` from the exact CI-passing
+pull-request head. This one-time, idempotent migration converts the existing live
+directory into:
+
+```text
+/var/www/dist -> /var/www/portra/current
+/var/www/portra/current -> releases/bootstrap-<timestamp>
+/var/www/portra/releases/bootstrap-<timestamp>/
+```
+
+It copies the legacy live frontend into both the bootstrap release and the existing
+backup area before replacing the live entry. If the new entry cannot be created or
+validated, it restores the original `/var/www/dist` directory. The migration does not
+change `/var/www` ownership, reload Nginx, add sudo permissions, or modify Nginx
+configuration. Nginx continues to use `root /var/www/dist;`.
+
+After bootstrap, normal GitHub Actions deployments run as `portra-deploy`. They can
+write `/var/www/portra`, prepare `/var/www/portra/releases/<sha>`, and atomically
+replace `/var/www/portra/current`; they cannot write `/var/www` or replace
+`/var/www/dist`. Existing valid same-SHA releases are reused, inconsistent releases
+fail closed, and no automatic release pruning occurs.
+
+## Privileged infrastructure bootstrap boundary
 
 The existing server sudo policy permits only restart/is-active for
 `portra-backend.service`. A one-time administrator bootstrap described in
