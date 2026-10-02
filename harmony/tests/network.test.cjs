@@ -209,6 +209,46 @@ test('native login rejects incomplete token responses', async () => {
   await assert.rejects(verify, hasKind('parse'));
 });
 
+test('business read-only pages use the existing API paths and authentication boundary', async () => {
+  const client = new HttpClient();
+  client.setAccessToken('current-token');
+  const api = new ApiService(client);
+
+  const detail = api.getDemand(12);
+  let call = calls.at(-1);
+  assert.equal(call.url, EnvironmentConfig.current().baseUrl + '/demands/12');
+  assert.equal(call.options.header.Authorization, undefined);
+  complete(call, { demandId: 12, scene: '校园摄影' });
+  assert.equal((await detail).demandId, 12);
+
+  const conversations = api.listConversations();
+  call = calls.at(-1);
+  assert.equal(call.url, EnvironmentConfig.current().baseUrl + '/conversations');
+  assert.equal(call.options.header.Authorization, 'Bearer current-token');
+  complete(call, []);
+  assert.deepEqual(await conversations, []);
+
+  const orders = api.listOrders();
+  call = calls.at(-1);
+  assert.equal(call.url, EnvironmentConfig.current().baseUrl + '/orders');
+  assert.equal(call.options.header.Authorization, 'Bearer current-token');
+  complete(call, []);
+  assert.deepEqual(await orders, []);
+
+  const count = calls.length;
+  await assert.rejects(api.getDemand(0), hasKind('parse'));
+  assert.equal(calls.length, count);
+});
+
+test('demand detail rejects missing or mismatched records', async () => {
+  const api = new ApiService(new HttpClient());
+  for (const data of [null, { demandId: 99 }]) {
+    const request = api.getDemand(12);
+    complete(calls.at(-1), data);
+    await assert.rejects(request, hasKind('parse'));
+  }
+});
+
 test('absolute URLs and ambiguous paths are rejected before network access', async () => {
   const before = calls.length;
   for (const url of ['https://example.com', '//example.com', '/bad\\path', '/bad path', '/bad#fragment']) {

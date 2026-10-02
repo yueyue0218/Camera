@@ -4,7 +4,11 @@ import { PortraAppShell } from '../features/shell/PortraAppShell';
 import { AppRoute, NavigationRouteParam } from '../model/NavigationModels';
 import { NavigationClickGuard, NavigationPolicy } from '../navigation/NavigationPolicy';
 import { LoginPage } from './LoginPage';
+import { DemandDetailPage } from './DemandDetailPage';
+import { MessagePage } from './MessagePage';
+import { OrderPage } from './OrderPage';
 import { ProfilePage } from './ProfilePage';
+import { PublishPage } from './PublishPage';
 import { PortraTheme } from '../theme/PortraTheme';
 
 const EMPTY_ROUTE_PARAM: NavigationRouteParam = {};
@@ -34,13 +38,13 @@ struct Index {
       } else if (name === AppRoute.HALL) {
         this.AppShell();
       } else if (name === AppRoute.DEMAND_DETAIL) {
-        this.DemandDetailPage(param);
+        this.DemandDetailDestination(param);
       } else if (name === AppRoute.PUBLISH) {
-        this.PlaceholderPage('发布需求', '后续接入发布表单和权限校验。');
+        PublishPage({ onBack: () => this.appPathStack.pop() });
       } else if (name === AppRoute.MESSAGE) {
-        this.PlaceholderPage('消息', '后续接入现有消息接口，不在本步新增实时通信。');
+        MessagePage({ onBack: () => this.appPathStack.pop() });
       } else if (name === AppRoute.ORDER) {
-        this.PlaceholderPage('订单', '后续接入订单状态和服务流程。');
+        OrderPage({ onBack: () => this.appPathStack.pop() });
       } else if (name === AppRoute.PROFILE) {
         ProfilePage({
           onBack: () => this.appPathStack.pop(),
@@ -48,7 +52,10 @@ struct Index {
           onRequireLogin: () => {
             this.appPathStack.pop();
             this.appPathStack.pushPathByName(AppRoute.LOGIN, PROFILE_LOGIN_PARAM);
-          }
+          },
+          onOpenOrders: () => this.openPage(AppRoute.ORDER),
+          onOpenMessages: () => this.openPage(AppRoute.MESSAGE),
+          onOpenPublish: () => this.openPage(AppRoute.PUBLISH)
         });
       } else {
         this.PlaceholderPage('页面不存在', '未找到对应的导航目标。');
@@ -95,21 +102,16 @@ struct Index {
   }
 
   @Builder
-  DemandDetailPage(param: Object) {
-    if (param === null) {
-      this.PlaceholderPage('需求详情', '缺少 demandId，无法打开详情。');
+  DemandDetailDestination(param: Object) {
+    if (this.validDemandId(param) === 0) {
+      this.PlaceholderPage('需求详情', '无效的需求编号');
     } else {
-      this.PlaceholderPage('需求详情', this.demandDetailDescription(param));
+      DemandDetailPage({ demandId: this.validDemandId(param), onBack: () => this.appPathStack.pop() });
     }
   }
 
-  private demandDetailDescription(param: Object): string {
-    const routeParam = param as NavigationRouteParam;
-    const demandId = NavigationPolicy.validDemandId(routeParam);
-    if (demandId === undefined) {
-      return 'demandId 缺失或无效，无法打开详情。';
-    }
-    return `当前需求编号：${demandId}`;
+  private validDemandId(param: Object): number {
+    return NavigationPolicy.validDemandId(param as NavigationRouteParam) ?? 0;
   }
 
   private completeLogin(param: NavigationRouteParam): void {

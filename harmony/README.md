@@ -11,7 +11,7 @@
 - B 的手机号与 Session 契约已冻结并合入 `main`。客户端已接入短信发送、原生验证码登录、Refresh/Logout 和当前会话读取；Access Token 只保存在内存，Refresh Token 使用 HarmonyOS Asset Store 按环境保存。安装标识由本机随机生成并持久化，不读取硬件标识。
 - 视觉组件目前是临时基础设施，不代表舍友正在设计的最终 UI。
 
-当前大厅具备真实列表 UI；Login 有手机号验证码表单，Profile 有当前会话信息和退出登录入口。DemandDetail、Publish、Message、Order 仍是导航目标或占位页面，不要把 Web 端已经实现的业务功能算作鸿蒙端已完成。
+大厅具备真实列表 UI；Login 有手机号验证码表单，Profile 展示真实会话信息并支持退出。DemandDetail 已接公开详情接口；Message 和 Order 已接受保护的只读列表接口；Publish 已有原生表单布局，但尚未接入发布和图片上传。消息详情、通知、订单支付/交付/评价仍未接入，不要把 Web 端已有业务算作鸿蒙端已完成。
 
 ## 构建
 
@@ -50,6 +50,9 @@ $env:PORTRA_BASE_URL = 'http://<电脑局域网IPv4>:8080'
 
 - `GET /demands?page=1&size=10`
 - `GET /service-packages?page=1&size=10`
+- `GET /demands/{demandId}`
+- `GET /conversations`（需要登录）
+- `GET /orders`（需要登录）
 
 2026-09-29 从本地对临时 Staging 只读探测，两条接口均返回 HTTP 200、业务码 200：需求列表为 0 条，摄影橱窗列表为 1 条测试数据。此前 `moderation_status` 缺列导致的错误在这两条接口上已不再出现；这不证明全库迁移或设备联调完成。大厅代码已请求真实列表，D08 仍需在鸿蒙设备上确认加载、空状态、图片回退和错误重试。
 

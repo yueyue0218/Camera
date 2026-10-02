@@ -1,6 +1,6 @@
 import { NativeSessionApi } from '../auth/NativeSessionApi';
-import { DemandSummary, NativeRefreshRequest, NativeSessionResponse, PageResult, SendSmsCodeRequest,
-  ServicePackageSummary, SessionSummary, VerifyNativeSmsCodeRequest } from '../model/ApiModels';
+import { ConversationSummary, DemandSummary, NativeRefreshRequest, NativeSessionResponse, OrderSummary,
+  PageResult, SendSmsCodeRequest, ServicePackageSummary, SessionSummary, VerifyNativeSmsCodeRequest } from '../model/ApiModels';
 import { ErrorMapper } from './ErrorMapper';
 import { HttpClient } from './HttpClient';
 
@@ -21,6 +21,21 @@ export class ApiService implements NativeSessionApi {
 
   cancelDemands(requestKey: string = 'demands.list'): void {
     this.client.cancelRequest(requestKey);
+  }
+
+  async getDemand(demandId: number): Promise<DemandSummary> {
+    if (!Number.isSafeInteger(demandId) || demandId <= 0) {
+      throw ErrorMapper.parse();
+    }
+    const result = await this.client.getPublic<DemandSummary>(`/demands/${demandId}`, 'demands.detail');
+    if (result === null || result.demandId !== demandId) {
+      throw ErrorMapper.parse();
+    }
+    return result;
+  }
+
+  cancelDemandDetail(): void {
+    this.client.cancelRequest('demands.detail');
   }
 
   listServicePackages(page: number = 1, size: number = 10, requestKey: string = 'servicePackages.list'):
@@ -68,6 +83,22 @@ export class ApiService implements NativeSessionApi {
 
   cancelCurrentSession(): void {
     this.client.cancelRequest('auth.session');
+  }
+
+  listConversations(): Promise<ConversationSummary[]> {
+    return this.client.get<ConversationSummary[]>('/conversations', 'conversations.list');
+  }
+
+  cancelConversations(): void {
+    this.client.cancelRequest('conversations.list');
+  }
+
+  listOrders(): Promise<OrderSummary[]> {
+    return this.client.get<OrderSummary[]>('/orders', 'orders.list');
+  }
+
+  cancelOrders(): void {
+    this.client.cancelRequest('orders.list');
   }
 
   async refresh(refreshToken: string): Promise<NativeSessionResponse> {

@@ -19,6 +19,7 @@ export interface DemandSummary {
   readonly scene?: string;
   readonly styleTags?: string[];
   readonly expectedDate?: string;
+  readonly timeSlot?: string;
   readonly timeDescription?: string;
   readonly cityCode?: string;
   readonly location?: string;
@@ -100,4 +101,23 @@ export interface SessionSummary {
   readonly sessionId: string;
   readonly deviceId: string;
   readonly deviceName: string;
+}
+
+export interface ConversationSummary {
+  readonly conversationId: number;
+  readonly otherUserId: number;
+  readonly orderId?: number;
+  readonly lastMessageTime?: string;
+  readonly createdAt?: string;
+}
+
+export interface OrderSummary {
+  readonly orderId: number;
+  readonly orderNo?: string;
+  readonly customerNickname?: string;
+  readonly providerNickname?: string;
+  readonly status?: string;
+  readonly amountCent?: number;
+  readonly createdAt?: string;
+  readonly demandId?: number;
 }

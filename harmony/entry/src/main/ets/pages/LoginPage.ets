@@ -139,45 +139,65 @@ export struct LoginPage {
 
   build() {
     Scroll() {
-      Column({ space: 16 }) {
-        Button('返回')
-          .fontSize(14)
+      Column({ space: 0 }) {
+        Button('‹')
+          .width(40)
+          .height(40)
+          .fontSize(27)
           .fontColor(PortraTheme.primaryText)
           .backgroundColor(Color.Transparent)
           .enabled(!this.signingIn)
           .alignSelf(ItemAlign.Start)
+          .accessibilityText('返回')
           .onClick(() => this.onBack?.())
 
-        Text('手机号登录')
+        Text('PORTRA')
+          .fontSize(16)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(PortraTheme.primary)
+          .margin({ top: 44 })
+        Row()
+          .width(36)
+          .height(4)
+          .backgroundColor(PortraTheme.accent)
+          .margin({ top: 9, bottom: 24 })
+
+        Text('欢迎来到 Portra')
           .width('100%')
-          .fontSize(24)
+          .fontSize(27)
           .fontWeight(FontWeight.Bold)
           .fontColor(PortraTheme.primaryText)
-          .margin({ top: 28 })
+        Text('用手机号，继续你的约拍旅程')
+          .width('100%')
+          .fontSize(14)
+          .fontColor(PortraTheme.secondaryText)
+          .margin({ top: 9 })
 
         if (this.contextText.length > 0) {
           Text(this.contextText)
             .width('100%')
-            .fontSize(14)
-            .fontColor(PortraTheme.secondaryText)
+            .fontSize(12)
+            .fontColor(PortraTheme.primary)
+            .margin({ top: 15 })
         }
 
         Text('手机号')
           .width('100%')
-          .fontSize(14)
+          .fontSize(13)
+          .fontWeight(FontWeight.Medium)
           .fontColor(PortraTheme.primaryText)
-          .margin({ top: 16 })
+          .margin({ top: 48, bottom: 9 })
 
-        TextInput({ text: this.phone, placeholder: '请输入手机号' })
+        TextInput({ text: this.phone, placeholder: '请输入中国大陆手机号' })
           .width('100%')
-          .height(48)
+          .height(54)
           .type(InputType.PhoneNumber)
           .maxLength(32)
           .enabled(!this.sendingCode && !this.signingIn)
           .backgroundColor(PortraTheme.surface)
           .border({ width: 1, color: PortraTheme.border })
-          .borderRadius(PortraTheme.radius)
-          .padding({ left: 14, right: 14 })
+          .borderRadius(8)
+          .padding({ left: 16, right: 16 })
           .onChange((value: string) => {
             this.phone = value;
             this.code = '';
@@ -187,32 +207,34 @@ export struct LoginPage {
 
         Text('验证码')
           .width('100%')
-          .fontSize(14)
+          .fontSize(13)
+          .fontWeight(FontWeight.Medium)
           .fontColor(PortraTheme.primaryText)
+          .margin({ top: 22, bottom: 9 })
 
-        Row({ space: 10 }) {
+        Row({ space: 8 }) {
           TextInput({ text: this.code, placeholder: '6 位验证码' })
             .layoutWeight(1)
-            .height(48)
+            .height(54)
             .type(InputType.Number)
             .maxLength(6)
             .enabled(!this.signingIn)
             .backgroundColor(PortraTheme.surface)
             .border({ width: 1, color: PortraTheme.border })
-            .borderRadius(PortraTheme.radius)
-            .padding({ left: 14, right: 14 })
+            .borderRadius(8)
+            .padding({ left: 16, right: 12 })
             .onChange((value: string) => {
               this.code = PhoneLoginPolicy.sanitizeCode(value);
               this.errorMessage = '';
             })
 
           Button(this.cooldownSeconds > 0 ? `${this.cooldownSeconds}s 后重试` : '获取验证码')
-            .width(116)
-            .height(48)
-            .fontSize(13)
+            .width(110)
+            .height(54)
+            .fontSize(12)
             .fontColor(PortraTheme.primary)
             .backgroundColor(PortraTheme.primarySoft)
-            .borderRadius(PortraTheme.radius)
+            .borderRadius(8)
             .enabled(!this.sendingCode && !this.signingIn && this.cooldownSeconds === 0)
             .onClick(() => this.sendCode())
         }
@@ -223,20 +245,29 @@ export struct LoginPage {
             .width('100%')
             .fontSize(13)
             .fontColor(PortraTheme.danger)
+            .margin({ top: 14 })
         }
         if (this.notice.length > 0) {
           Text(this.notice)
             .width('100%')
             .fontSize(13)
             .fontColor(PortraTheme.primary)
+            .margin({ top: 14 })
         }
 
-        PortraButton({ label: '登录', loading: this.signingIn, disabled: this.sendingCode,
+        PortraButton({ label: '登录 / 注册', loading: this.signingIn, disabled: this.sendingCode,
           onAction: () => this.signIn() })
+          .margin({ top: 28 })
+        Text('未注册手机号验证成功后将自动创建账号')
+          .width('100%')
+          .fontSize(12)
+          .fontColor(PortraTheme.secondaryText)
+          .textAlign(TextAlign.Center)
           .margin({ top: 16 })
       }
       .width('100%')
-      .padding({ left: 24, right: 24, top: 28, bottom: 40 })
+      .alignItems(HorizontalAlign.Start)
+      .padding({ left: 24, right: 24, top: 20, bottom: 48 })
     }
     .width('100%')
     .height('100%')
