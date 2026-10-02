@@ -17,7 +17,7 @@ Server files are deployment results; they are not a second source of truth.
 | Process environment values | not stored | `/etc/portra/portra.env` | SECRET_SERVER_ONLY |
 | TLS certificate | not stored | `/etc/letsencrypt/live/47.76.106.57/fullchain.pem` | GENERATED |
 | TLS private key | not stored | `/etc/letsencrypt/live/47.76.106.57/privkey.pem` | SECRET_SERVER_ONLY |
-| Frontend assets | built artifact | `/var/www/dist` | GENERATED |
+| Frontend assets | same-SHA temp-staging build artifact | `/var/www/dist` | GENERATED |
 
 The vendor-owned `/etc/nginx/nginx.conf` remains server package configuration. Portra
 owns only the two included files above. Database migrations are deliberately absent
@@ -105,18 +105,18 @@ cat /opt/portra/deploy/bootstrap-commit.txt
 - Backend current/previous: `/opt/portra/app/current`, `/opt/portra/app/previous`
 - Human-readable current: `/home/portra-deploy/current/deployed-commit.txt`
 - Backend commit: `/home/portra-deploy/state/application-commit.txt`
+- Frontend commit: `/home/portra-deploy/state/frontend-commit.txt`
+- Frontend artifact metadata: `/var/www/dist/deployment.json`
+- Frontend backups: `/home/portra-deploy/backups/frontend/<timestamp>-before-<sha>/`
 - Root-owned Infra commit: `/opt/portra/deploy/infra-commit.txt`
 - Non-root deployment scripts commit: `/home/portra-deploy/scripts/current/deployed-commit.txt`
 - Infra backups: `/opt/portra/backups/infra/<timestamp>-<sha>/`
 
-Manual backend rollback after the workflow has established the release layout:
-
-```bash
-bash /home/portra-deploy/scripts/current/rollback-backend.sh \
-  'https://47.76.106.57/service-packages?page=1&size=1' \
-  'https://47.76.106.57/' \
-  'https://47.76.106.57'
-```
+`deploy-application.sh` prepares and validates both application candidates before
+switching either live surface. If switching, restart, or acceptance fails, it restores
+both the prior backend `current` target and the prior frontend directory, restarts the
+backend, and re-runs acceptance. Do not invoke the legacy backend-only rollback helper
+for unified releases because doing so would violate the same-SHA contract.
 
 The sudo rule permits only the fixed root-owned helper with a SHA argument and one of
 the fixed surfaces `nginx`, `systemd`, or `all`. The helper itself enforces exact

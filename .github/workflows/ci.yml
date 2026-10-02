@@ -104,3 +104,12 @@ jobs:
           path: backend/target/*.jar
           if-no-files-found: error
           retention-days: 30
+
+  deploy-staging:
+    name: Deploy successful main SHA to staging
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [frontend, backend]
+    uses: ./.github/workflows/deploy.yml
+    with:
+      deploy_scope: auto
+    secrets: inherit

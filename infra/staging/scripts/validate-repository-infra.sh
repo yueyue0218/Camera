@@ -10,6 +10,7 @@ required=(
   "$infra_root/systemd/portra-backend.service"
   "$infra_root/sudoers/portra-deploy"
   "$infra_root/scripts/health-check.sh"
+  "$infra_root/scripts/deploy-application.sh"
   "$infra_root/scripts/deploy-backend.sh"
   "$infra_root/scripts/rollback-backend.sh"
   "$infra_root/scripts/deploy-infra-root.sh"
@@ -26,6 +27,21 @@ grep -Fq 'proxy_pass http://127.0.0.1:8080;' "$infra_root/nginx/portra.conf"
 grep -Fq 'EnvironmentFile=/etc/portra/portra.env' "$infra_root/systemd/portra-backend.service"
 grep -Fq 'ExecStart=/usr/bin/java -jar /opt/portra/app/app.jar' \
   "$infra_root/systemd/portra-backend.service"
+
+deploy_workflow="$repo_root/.github/workflows/deploy.yml"
+ci_workflow="$repo_root/.github/workflows/ci.yml"
+application_deploy="$infra_root/scripts/deploy-application.sh"
+grep -Fq 'ref: ${{ github.sha }}' "$deploy_workflow"
+grep -Fq 'npm run build:temp-staging' "$deploy_workflow"
+grep -Fq 'deploy-application.sh' "$deploy_workflow"
+grep -Fq 'portra-frontend-$TARGET_SHA.tar.gz' "$deploy_workflow"
+grep -Fq 'uses: ./.github/workflows/deploy.yml' "$ci_workflow"
+grep -Fq "github.event_name == 'push' && github.ref == 'refs/heads/main'" "$ci_workflow"
+grep -Fq 'mkdir -- "$frontend_candidate"' "$application_deploy"
+if grep -Fq 'install -d -m 775 "$frontend_candidate"' "$application_deploy"; then
+  echo "Frontend candidate must not use install for initialization" >&2
+  exit 1
+fi
 
 helper="$infra_root/scripts/deploy-infra-root.sh"
 grep -Fq 'trusted_repository_url=https://github.com/yueyue0218/Camera.git' "$helper"

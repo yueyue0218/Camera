@@ -13,6 +13,7 @@
     "test:image-usage": "node --test tests/imageVariantUsage.test.mjs",
     "lint": "eslint src --ext .js,.jsx",
     "build": "vite build",
+    "build:temp-staging": "vite build --mode temp-staging",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {

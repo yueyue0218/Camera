@@ -68,6 +68,25 @@ class AuthInterceptorTest {
     }
 
     @Test
+    void malformedFilePathsReachControllerValidationBeforeAuthentication() {
+        AuthInterceptor interceptor = interceptor();
+        for (String path : java.util.List.of("/files/abc/thumbnail", "/files/1/huge")) {
+            when(request.getMethod()).thenReturn("GET");
+            when(request.getRequestURI()).thenReturn(path);
+
+            assertThat(interceptor.preHandle(request, response, new Object())).isTrue();
+            assertThat(UserContext.getUserId()).isNull();
+        }
+    }
+
+    @Test
+    void fileMutationRoutesStillRequireAuthentication() {
+        when(request.getMethod()).thenReturn("POST");
+
+        assertUnauthorizedAndEmptyContext(interceptor());
+    }
+
+    @Test
     void activeBearerUserPopulatesContextAfterDatabaseStatusCheck() {
         stubBearer("GET", "/notifications", 41L, user(41L, "CUSTOMER", "ACTIVE"));
         when(userRoleBindingRepository.existsByUserIdAndRole(41L, "CUSTOMER")).thenReturn(true);

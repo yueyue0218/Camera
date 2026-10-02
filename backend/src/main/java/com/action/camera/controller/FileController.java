@@ -10,12 +10,14 @@ import com.action.camera.image.ImageVariant;
 import com.action.camera.image.ImageVariantService;
 import com.action.camera.infrastructure.storage.FileStorage;
 import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @RestController
@@ -25,6 +27,8 @@ public class FileController {
     private static final String PUBLIC_IMMUTABLE_CACHE =
             "public, max-age=31536000, immutable";
     private static final String PRIVATE_NO_STORE_CACHE = "private, no-store";
+    private static final String X_CONTENT_TYPE_OPTIONS = "X-Content-Type-Options";
+    private static final String NOSNIFF = "nosniff";
 
     private final FileService fileService;
     private final FileStorage fileStorage;
@@ -77,9 +81,12 @@ public class FileController {
                 ? record.getMimeType() : "application/octet-stream";
 
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" + record.getOriginalName() + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(record.getOriginalName(), StandardCharsets.UTF_8)
+                        .build()
+                        .toString())
                 .header(HttpHeaders.CACHE_CONTROL, PRIVATE_NO_STORE_CACHE)
+                .header(X_CONTENT_TYPE_OPTIONS, NOSNIFF)
                 .contentType(MediaType.parseMediaType(contentType))
                 .body(resource);
     }
@@ -99,6 +106,7 @@ public class FileController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
                 .header(HttpHeaders.CACHE_CONTROL, cacheControl(record, parsed))
+                .header(X_CONTENT_TYPE_OPTIONS, NOSNIFF)
                 .contentType(MediaType.parseMediaType(binary.contentType()))
                 .body(binary.resource());
     }

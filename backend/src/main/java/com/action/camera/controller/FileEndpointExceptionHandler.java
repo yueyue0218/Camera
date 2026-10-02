@@ -22,6 +22,7 @@ public class FileEndpointExceptionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FileEndpointExceptionHandler.class);
     private static final String PRIVATE_NO_STORE_CACHE = "private, no-store";
+    private static final String X_CONTENT_TYPE_OPTIONS = "X-Content-Type-Options";
 
     @ExceptionHandler(FileBinaryException.class)
     public ResponseEntity<Result<?>> handleFileBinary(FileBinaryException error) {
@@ -66,6 +67,7 @@ public class FileEndpointExceptionHandler {
             HttpStatus status, ErrorCode errorCode, String message) {
         return ResponseEntity.status(status)
                 .header(HttpHeaders.CACHE_CONTROL, PRIVATE_NO_STORE_CACHE)
+                .header(X_CONTENT_TYPE_OPTIONS, "nosniff")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Result.error(errorCode.getCode(), message));
     }
