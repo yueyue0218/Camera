@@ -31,6 +31,8 @@ import static org.mockito.Mockito.mock;
 
 class DemandA4BehaviorTest {
 
+    private final LocalDate fixtureBaseDate = LocalDate.now();
+
     @Test
     void latestUsesDatabasePageAndTotalThenLoadsCustomersInOneBatch() {
         Demand selected = demand(12L, 202L, "NJ", "fresh");
@@ -157,11 +159,12 @@ class DemandA4BehaviorTest {
     }
 
     private Demand demand(Long id, Long customerId, String city, String style) {
+        LocalDateTime createdAt = fixtureBaseDate.minusDays(1).atTime(10, 0);
         Demand demand = new Demand(
                 customerId,
                 "PORTRAIT",
                 List.of(style),
-                LocalDate.of(2026, 10, 1),
+                fixtureBaseDate.plusDays(7),
                 "AFTERNOON",
                 "Weekend availability",
                 List.of("WEEKEND"),
@@ -171,8 +174,8 @@ class DemandA4BehaviorTest {
                 50_000,
                 "Complete stable demand",
                 List.of(1L),
-                LocalDateTime.of(2026, 9, 1, 10, 0),
-                LocalDateTime.of(2026, 10, 1, 10, 0));
+                createdAt,
+                createdAt.plusDays(30));
         demand.setId(id);
         return demand;
     }
