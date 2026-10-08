@@ -110,7 +110,7 @@ class DemandConversationHandoffTest {
         assertThat(response.getStatus()).isEqualTo(DemandResponseStatus.PENDING_CUSTOMER_ACCEPT.name());
         assertThat(demandRepository.findById(demand.getDemandId()).orElseThrow().getResponseCount())
                 .isEqualTo(1);
-        verify(conversationService, never()).createConversationWithInitialMessage(any());
+        verify(conversationService, never()).createAcceptedResponseConversation(any());
     }
 
     @Test
@@ -126,7 +126,7 @@ class DemandConversationHandoffTest {
                 OTHER_PROVIDER,
                 responseRequest("Available with studio lights.")
         );
-        when(conversationService.createConversationWithInitialMessage(any(CreateConversationCommand.class)))
+        when(conversationService.createAcceptedResponseConversation(any(CreateConversationCommand.class)))
                 .thenReturn(new CreateConversationResult(9001L));
 
         AcceptDemandResponseResult result = demandService.acceptResponse(
@@ -147,7 +147,7 @@ class DemandConversationHandoffTest {
 
         ArgumentCaptor<CreateConversationCommand> commandCaptor =
                 ArgumentCaptor.forClass(CreateConversationCommand.class);
-        verify(conversationService, times(1)).createConversationWithInitialMessage(commandCaptor.capture());
+        verify(conversationService, times(1)).createAcceptedResponseConversation(commandCaptor.capture());
         CreateConversationCommand command = commandCaptor.getValue();
         assertThat(command.getCustomerId()).isEqualTo(CUSTOMER.getUserId());
         assertThat(command.getProviderId()).isEqualTo(PROVIDER.getUserId());
@@ -176,7 +176,7 @@ class DemandConversationHandoffTest {
                 .isEqualTo(DemandStatus.OPEN);
         assertThat(responseRepository.findById(response.getResponseId()).orElseThrow().getStatus())
                 .isEqualTo(DemandResponseStatus.PENDING_CUSTOMER_ACCEPT);
-        verify(conversationService, never()).createConversationWithInitialMessage(any());
+        verify(conversationService, never()).createAcceptedResponseConversation(any());
     }
 
     @Test
@@ -192,7 +192,7 @@ class DemandConversationHandoffTest {
                 OTHER_PROVIDER,
                 responseRequest("Second response.")
         );
-        when(conversationService.createConversationWithInitialMessage(any(CreateConversationCommand.class)))
+        when(conversationService.createAcceptedResponseConversation(any(CreateConversationCommand.class)))
                 .thenReturn(new CreateConversationResult(9001L));
         demandService.acceptResponse(demand.getDemandId(), first.getResponseId(), CUSTOMER);
 
@@ -209,7 +209,7 @@ class DemandConversationHandoffTest {
         assertThat(responseRepository.findById(second.getResponseId()).orElseThrow().getStatus())
                 .isEqualTo(DemandResponseStatus.ACCEPTED);
         assertThat(secondResult.getSourceId()).isEqualTo(second.getResponseId());
-        verify(conversationService, times(2)).createConversationWithInitialMessage(any());
+        verify(conversationService, times(2)).createAcceptedResponseConversation(any());
     }
 
     @Test
@@ -249,7 +249,7 @@ class DemandConversationHandoffTest {
             assertThat(status).isNotEqualTo(200);
         }
         assertThat(responseRepository.findByDemandId(demand.getDemandId())).isEmpty();
-        verify(conversationService, never()).createConversationWithInitialMessage(any());
+        verify(conversationService, never()).createAcceptedResponseConversation(any());
     }
 
     private CreateDemandRequest demandRequest() {

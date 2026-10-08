@@ -288,7 +288,7 @@ public class DemandService {
     @Transactional
     public DemandResponseDto respondToDemand(Long demandId, CurrentUser user, CreateDemandResponseRequest request) {
         requireProvider(user);
-        Demand demand = requirePublicInteractiveDemand(demandId);
+        Demand demand = requirePublicInteractiveDemandForUpdate(demandId);
         if (demand.getCustomerId().equals(user.getUserId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "provider cannot respond to own demand");
         }
@@ -346,7 +346,7 @@ public class DemandService {
     @Transactional
     public AcceptDemandResponseResult acceptResponse(Long demandId, Long responseId, CurrentUser user) {
         AcceptedDemandResponseSnapshot snapshot = acceptResponseAndBuildSnapshot(demandId, responseId, user);
-        CreateConversationResult conversation = conversationService.createConversationWithInitialMessage(
+        CreateConversationResult conversation = conversationService.createAcceptedResponseConversation(
                 new CreateConversationCommand(
                         snapshot.getCustomerId(),
                         snapshot.getProviderId(),
@@ -364,7 +364,11 @@ public class DemandService {
     @Transactional
     public DemandResponseDto rejectResponse(Long demandId, Long responseId, CurrentUser user) {
         requireCustomer(user);
-        Demand demand = findOwnedDemand(demandId, user);
+        Demand demand = demandRepository.findByIdForUpdate(demandId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "demand not found"));
+        if (!demand.getCustomerId().equals(user.getUserId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "only demand owner can reject responses");
+        }
         DemandResponse response = findResponse(responseId);
         if (!response.getDemandId().equals(demandId)) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "response does not belong to this demand");
@@ -402,7 +406,7 @@ public class DemandService {
 
     private AcceptedDemandResponseSnapshot acceptResponseAndBuildSnapshot(Long demandId, Long responseId, CurrentUser user) {
         requireCustomer(user);
-        Demand demand = requirePublicInteractiveDemand(demandId);
+        Demand demand = requirePublicInteractiveDemandForUpdate(demandId);
         if (!demand.getCustomerId().equals(user.getUserId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "only demand owner can accept responses");
         }
@@ -510,8 +514,12 @@ public class DemandService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "demand not found"));
     }
 
-    private Demand requirePublicInteractiveDemand(Long demandId) {
-        Demand demand = findDemand(demandId);
+    private Demand requirePublicInteractiveDemandForUpdate(Long demandId) {
+        if (demandId == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "demandId must not be null");
+        }
+        Demand demand = demandRepository.findByIdForUpdate(demandId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "demand not found"));
         if (demand.getStatus() != DemandStatus.OPEN
                 || !demand.isModerationVisible()
                 || Boolean.TRUE.equals(demand.getHiddenByCustomer())) {

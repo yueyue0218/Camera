@@ -86,7 +86,7 @@ class DemandServiceTest {
     void setUp() {
         responseRepository.deleteAll();
         demandRepository.deleteAll();
-        when(conversationService.createConversationWithInitialMessage(any(CreateConversationCommand.class)))
+        when(conversationService.createAcceptedResponseConversation(any(CreateConversationCommand.class)))
                 .thenReturn(new CreateConversationResult(91001L));
     }
 
@@ -909,7 +909,7 @@ class DemandServiceTest {
 
         ArgumentCaptor<CreateConversationCommand> commandCaptor =
                 ArgumentCaptor.forClass(CreateConversationCommand.class);
-        verify(conversationService).createConversationWithInitialMessage(commandCaptor.capture());
+        verify(conversationService).createAcceptedResponseConversation(commandCaptor.capture());
         CreateConversationCommand command = commandCaptor.getValue();
         assertThat(command.getCustomerId()).isEqualTo(customer.getUserId());
         assertThat(command.getProviderId()).isEqualTo(provider.getUserId());
@@ -977,7 +977,7 @@ class DemandServiceTest {
         assertThat(rejected.getStatus()).isEqualTo(DemandResponseStatus.REJECTED.name());
         assertThat(responseRepository.findById(response.getResponseId()).orElseThrow().getStatus())
                 .isEqualTo(DemandResponseStatus.REJECTED);
-        verify(conversationService, never()).createConversationWithInitialMessage(any());
+        verify(conversationService, never()).createAcceptedResponseConversation(any());
     }
 
     @Test

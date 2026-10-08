@@ -103,6 +103,17 @@ public class ConversationService {
         return findExistingConversationAfterUniqueConflict(command, sourceType);
     }
 
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public CreateConversationResult createAcceptedResponseConversation(CreateConversationCommand command) {
+        String sourceType = validateCreateCommand(command);
+        if (!SOURCE_TYPE_DEMAND_RESPONSE.equals(sourceType)) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "accepted response conversation requires DEMAND_RESPONSE");
+        }
+        return findExistingConversation(command, sourceType)
+                .map(existing -> new CreateConversationResult(existing.getId()))
+                .orElseGet(() -> createConversationAndInitialMessage(command, sourceType));
+    }
+
     @Transactional(readOnly = true)
     public List<Conversation> listMyConversations(Long operatorId) {
         if (operatorId == null) {
