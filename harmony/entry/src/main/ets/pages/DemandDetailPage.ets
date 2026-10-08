@@ -4,7 +4,7 @@ import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraLoading } from '../common/components/PortraLoading';
 import { PortraPageHeading } from '../common/components/PortraPageHeading';
 import { HallTextFormatter } from '../features/hall/HallUiModels';
-import { DemandSummary } from '../model/ApiModels';
+import { DemandResponseSummary, DemandSummary } from '../model/ApiModels';
 import { PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
 
@@ -14,9 +14,19 @@ export struct DemandDetailPage {
   @State private loading: boolean = true;
   @State private demand: DemandSummary | null = null;
   @State private errorMessage: string = '';
+  @State private actionError: string = '';
+  @State private actionNotice: string = '';
+  @State private actionBusy: boolean = false;
+  @State private userId: number = 0;
+  @State private role: string = '';
+  @State private responses: DemandResponseSummary[] = [];
+  @State private responseMessage: string = '';
+  @State private responsePrice: string = '';
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
   onBack?: () => void;
+  onRequireLogin?: () => void;
+  onOpenConversation?: (conversationId: number) => void;
 
   aboutToAppear(): void {
     this.load();
@@ -25,6 +35,7 @@ export struct DemandDetailPage {
   aboutToDisappear(): void {
     this.requestVersion++;
     this.appClient.apiService.cancelDemandDetail();
+    this.appClient.apiService.cancelDemandActions(this.demandId);
   }
 
   private async load(): Promise<void> {
@@ -35,6 +46,25 @@ export struct DemandDetailPage {
       const result = await this.appClient.apiService.getDemand(this.demandId);
       if (version === this.requestVersion) {
         this.demand = result;
+        if (this.appClient.sessionManager.isAuthenticated()) {
+          try {
+            const session = await this.appClient.apiService.currentSession();
+            if (version === this.requestVersion) {
+              this.userId = session.userId;
+              this.role = session.role;
+              if (session.userId === result.customerId) {
+                const responses = await this.appClient.apiService.listDemandResponses(this.demandId);
+                if (version === this.requestVersion) {
+                  this.responses = Array.isArray(responses) ? responses : [];
+                }
+              }
+            }
+          } catch {
+            if (version === this.requestVersion) {
+              this.actionError = '响应信息暂不可用，请重试';
+            }
+          }
+        }
       }
     } catch (error) {
       if (version === this.requestVersion) {
@@ -45,6 +75,100 @@ export struct DemandDetailPage {
         this.loading = false;
       }
     }
+  }
+
+  private async respond(): Promise<void> {
+    if (this.actionBusy || !this.responseMessage.trim()) {
+      this.actionError = '请先填写响应内容';
+      return;
+    }
+    let priceCent: number | undefined = undefined;
+    if (this.responsePrice.trim()) {
+      const amount = Number(this.responsePrice.trim());
+      priceCent = Math.round(amount * 100);
+      if (!Number.isFinite(amount) || amount < 0 || !Number.isSafeInteger(priceCent) ||
+        priceCent > 2147483647) {
+        this.actionError = '请检查预期价格';
+        return;
+      }
+    }
+    this.actionBusy = true;
+    this.actionError = '';
+    try {
+      await this.appClient.apiService.respondToDemand(this.demandId, this.responseMessage.trim(), priceCent);
+      this.actionNotice = '已发送响应，等待客户接受';
+      this.responseMessage = '';
+    } catch (error) {
+      this.actionError = (error as PortraError).message || '响应失败';
+    } finally {
+      this.actionBusy = false;
+    }
+  }
+
+  private async accept(responseId: number): Promise<void> {
+    if (this.actionBusy) {
+      return;
+    }
+    this.actionBusy = true;
+    this.actionError = '';
+    try {
+      const result = await this.appClient.apiService.acceptDemandResponse(this.demandId, responseId);
+      this.responses = this.responses.map((item: DemandResponseSummary) => item.responseId === responseId ?
+        { responseId: item.responseId, demandId: item.demandId, providerId: item.providerId,
+          message: item.message, expectedPriceCent: item.expectedPriceCent, status: 'ACCEPTED' } : item);
+      this.onOpenConversation?.(result.conversationId);
+    } catch (error) {
+      this.actionError = (error as PortraError).message || '接受失败';
+    } finally {
+      this.actionBusy = false;
+    }
+  }
+
+  @Builder
+  private ResponseActions() {
+    Column({ space: 12 }) {
+      Text('约拍响应').fontSize(17).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
+      if (this.actionError.length > 0) {
+        Text(this.actionError).fontSize(12).fontColor(PortraTheme.danger)
+      }
+      if (this.actionNotice.length > 0) {
+        Text(this.actionNotice).fontSize(12).fontColor(PortraTheme.primary)
+      }
+      if (!this.appClient.sessionManager.isAuthenticated()) {
+        Button('登录后响应').onClick(() => this.onRequireLogin?.())
+      } else if (this.userId === this.demand?.customerId) {
+        if (this.responses.length === 0) {
+          Text('暂无响应').fontSize(13).fontColor(PortraTheme.secondaryText)
+        }
+        ForEach(this.responses, (item: DemandResponseSummary) => {
+          Column({ space: 8 }) {
+            Text(`摄影师 #${item.providerId}`).fontSize(14).fontWeight(FontWeight.Bold)
+            Text(item.message).fontSize(13).fontColor(PortraTheme.secondaryText)
+            Text(item.status === 'ACCEPTED' ? '已接受' : item.status === 'REJECTED' ? '已拒绝' : '等待选择')
+              .fontSize(12).fontColor(PortraTheme.primary)
+            if (item.status === 'PENDING_CUSTOMER_ACCEPT') {
+              Button(this.actionBusy ? '处理中' : '接受并开启会话')
+                .enabled(!this.actionBusy)
+                .onClick(() => this.accept(item.responseId))
+            }
+          }
+          .width('100%').alignItems(HorizontalAlign.Start)
+          .padding(12).backgroundColor(PortraTheme.surface).borderRadius(8)
+        }, (item: DemandResponseSummary) => item.responseId.toString())
+      } else if (this.role === 'PROVIDER' && this.demand?.status === 'OPEN') {
+        TextArea({ text: this.responseMessage, placeholder: '介绍你的拍摄方案与可约时间' })
+          .height(92).backgroundColor(PortraTheme.surface).borderRadius(8)
+          .onChange((value: string) => this.responseMessage = value)
+        TextInput({ text: this.responsePrice, placeholder: '预期价格（元，可选）' })
+          .type(InputType.Number).height(46).backgroundColor(PortraTheme.surface).borderRadius(8)
+          .onChange((value: string) => this.responsePrice = value)
+        Button(this.actionBusy ? '发送中' : '发送响应')
+          .enabled(!this.actionBusy && this.actionNotice.length === 0)
+          .onClick(() => this.respond())
+      }
+    }
+    .width('100%').alignItems(HorizontalAlign.Start)
+    .padding({ top: 12, bottom: 24 })
   }
 
   @Builder
@@ -160,6 +284,7 @@ export struct DemandDetailPage {
               .textAlign(TextAlign.Center)
               .backgroundColor(PortraTheme.pageBackgroundDeep)
               .borderRadius(8)
+            this.ResponseActions()
           }
           .width('100%')
           .padding({ left: 20, right: 20, top: 18, bottom: 28 })

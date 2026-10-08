@@ -7,7 +7,7 @@ import { PortraTheme } from '../../theme/PortraTheme';
 @Component
 export struct PortraAppShell {
   @State private selectedTab: number = 0;
-  onOpenRoute?: (route: AppRoute, demandId?: number) => void;
+  onOpenRoute?: (route: AppRoute, id?: number) => void;
 
   private showPending(message: string): void {
     try {
@@ -36,7 +36,7 @@ export struct PortraAppShell {
           onSearch: () => this.showPending('搜索功能将在后续业务接入'),
           onNotice: () => this.showPending('通知中心将在后续业务接入'),
           onPublish: () => this.onOpenRoute?.(AppRoute.PUBLISH),
-          onOpenService: () => this.showPending('摄影橱窗详情将在后续接入'),
+          onOpenService: (serviceId: number) => this.onOpenRoute?.(AppRoute.SERVICE_DETAIL, serviceId),
           onOpenDemand: (demandId: number) => this.onOpenRoute?.(AppRoute.DEMAND_DETAIL, demandId)
         })
           .layoutWeight(1)

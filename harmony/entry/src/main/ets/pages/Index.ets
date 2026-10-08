@@ -5,6 +5,8 @@ import { AppRoute, NavigationRouteParam } from '../model/NavigationModels';
 import { NavigationClickGuard, NavigationPolicy } from '../navigation/NavigationPolicy';
 import { LoginPage } from './LoginPage';
 import { DemandDetailPage } from './DemandDetailPage';
+import { ServiceDetailPage } from './ServiceDetailPage';
+import { ConversationDetailPage } from './ConversationDetailPage';
 import { MessagePage } from './MessagePage';
 import { OrderPage } from './OrderPage';
 import { ProfilePage } from './ProfilePage';
@@ -39,10 +41,24 @@ struct Index {
         this.AppShell();
       } else if (name === AppRoute.DEMAND_DETAIL) {
         this.DemandDetailDestination(param);
+      } else if (name === AppRoute.SERVICE_DETAIL) {
+        this.ServiceDetailDestination(param);
+      } else if (name === AppRoute.CONVERSATION_DETAIL) {
+        this.ConversationDetailDestination(param);
       } else if (name === AppRoute.PUBLISH) {
-        PublishPage({ onBack: () => this.appPathStack.pop() });
+        PublishPage({
+          onBack: () => this.appPathStack.pop(),
+          onPublished: (demandId: number) => {
+            this.appPathStack.pop();
+            this.pushRoute(AppRoute.DEMAND_DETAIL, { demandId: demandId });
+          }
+        });
       } else if (name === AppRoute.MESSAGE) {
-        MessagePage({ onBack: () => this.appPathStack.pop() });
+        MessagePage({
+          onBack: () => this.appPathStack.pop(),
+          onOpenConversation: (conversationId: number) =>
+            this.openPage(AppRoute.CONVERSATION_DETAIL, { conversationId: conversationId })
+        });
       } else if (name === AppRoute.ORDER) {
         OrderPage({ onBack: () => this.appPathStack.pop() });
       } else if (name === AppRoute.PROFILE) {
@@ -67,11 +83,13 @@ struct Index {
   @Builder
   AppShell() {
     PortraAppShell({
-      onOpenRoute: (route: AppRoute, demandId?: number) => {
-        if (demandId === undefined) {
+      onOpenRoute: (route: AppRoute, id?: number) => {
+        if (id === undefined) {
           this.openPage(route);
+        } else if (route === AppRoute.SERVICE_DETAIL) {
+          this.openPage(route, { serviceId: id });
         } else {
-          this.openPage(route, { demandId: demandId });
+          this.openPage(route, { demandId: id });
         }
       }
     })
@@ -106,7 +124,40 @@ struct Index {
     if (this.validDemandId(param) === 0) {
       this.PlaceholderPage('需求详情', '无效的需求编号');
     } else {
-      DemandDetailPage({ demandId: this.validDemandId(param), onBack: () => this.appPathStack.pop() });
+      DemandDetailPage({
+        demandId: this.validDemandId(param),
+        onBack: () => this.appPathStack.pop(),
+        onRequireLogin: () => this.openLoginFor(AppRoute.DEMAND_DETAIL,
+          { demandId: this.validDemandId(param) }),
+        onOpenConversation: (conversationId: number) =>
+          this.pushRoute(AppRoute.CONVERSATION_DETAIL, { conversationId: conversationId })
+      });
+    }
+  }
+
+  @Builder
+  ServiceDetailDestination(param: Object) {
+    if (this.validServiceId(param) === 0) {
+      this.PlaceholderPage('摄影橱窗', '无效的橱窗编号');
+    } else {
+      ServiceDetailPage({
+        serviceId: this.validServiceId(param),
+        onBack: () => this.appPathStack.pop(),
+        onRequireLogin: () => this.openLoginFor(AppRoute.SERVICE_DETAIL,
+          { serviceId: this.validServiceId(param) }),
+        onOpenConversation: (conversationId: number) =>
+          this.pushRoute(AppRoute.CONVERSATION_DETAIL, { conversationId: conversationId })
+      });
+    }
+  }
+
+  @Builder
+  ConversationDetailDestination(param: Object) {
+    if (this.validConversationId(param) === 0) {
+      this.PlaceholderPage('约拍会话', '无效的会话编号');
+    } else {
+      ConversationDetailPage({ conversationId: this.validConversationId(param),
+        onBack: () => this.appPathStack.pop() });
     }
   }
 
@@ -114,11 +165,38 @@ struct Index {
     return NavigationPolicy.validDemandId(param as NavigationRouteParam) ?? 0;
   }
 
+  private validServiceId(param: Object): number {
+    return NavigationPolicy.validServiceId(param as NavigationRouteParam) ?? 0;
+  }
+
+  private validConversationId(param: Object): number {
+    return NavigationPolicy.validConversationId(param as NavigationRouteParam) ?? 0;
+  }
+
+  private pushRoute(route: AppRoute, param: NavigationRouteParam): void {
+    this.appPathStack.pushPathByName(route, param);
+  }
+
+  private openLoginFor(route: AppRoute, param: NavigationRouteParam): void {
+    const loginParam: NavigationRouteParam = {
+      returnRoute: route, demandId: param.demandId, serviceId: param.serviceId
+    };
+    this.pushRoute(AppRoute.LOGIN, loginParam);
+  }
+
   private completeLogin(param: NavigationRouteParam): void {
     this.appPathStack.pop();
     const returnRoute = param.returnRoute;
-    if (returnRoute !== undefined && NavigationPolicy.requiresAuthentication(returnRoute)) {
-      this.appPathStack.pushPathByName(returnRoute, EMPTY_ROUTE_PARAM);
+    if (returnRoute === AppRoute.DEMAND_DETAIL || returnRoute === AppRoute.SERVICE_DETAIL) {
+      return;
+    }
+    if (returnRoute !== undefined && returnRoute !== AppRoute.LOGIN) {
+      const returnParam: NavigationRouteParam = {
+        demandId: param.demandId,
+        serviceId: param.serviceId,
+        conversationId: param.conversationId
+      };
+      this.pushRoute(returnRoute, returnParam);
     }
   }
 

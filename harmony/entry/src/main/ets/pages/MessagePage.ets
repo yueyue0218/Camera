@@ -17,6 +17,7 @@ export struct MessagePage {
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
   onBack?: () => void;
+  onOpenConversation?: (conversationId: number) => void;
 
   aboutToAppear(): void {
     this.load();
@@ -128,13 +129,10 @@ export struct MessagePage {
               .height(78)
               .padding({ left: 20, right: 20 })
               .backgroundColor(PortraTheme.surface)
+              .onClick(() => this.onOpenConversation?.(item.conversationId))
               Divider().color(PortraTheme.border).padding({ left: 80 })
             }, (item: ConversationSummary) => item.conversationId.toString())
 
-            Text('暂无法查看会话内容')
-              .fontSize(11)
-              .fontColor(PortraTheme.mutedText)
-              .margin({ top: 16 })
           }
           .width('100%')
         }

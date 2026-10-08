@@ -1,4 +1,7 @@
+import { AppClient } from '../app/AppClient';
 import { PortraPageHeading } from '../common/components/PortraPageHeading';
+import { CreateDemandPayload } from '../model/ApiModels';
+import { PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
 
 @Component
@@ -10,7 +13,56 @@ export struct PublishPage {
   @State private minBudget: string = '';
   @State private maxBudget: string = '';
   @State private time: string = '';
+  @State private submitting: boolean = false;
+  @State private errorMessage: string = '';
+  private readonly appClient: AppClient = AppClient.shared;
   onBack?: () => void;
+  onPublished?: (demandId: number) => void;
+
+  private parseBudget(value: string): number | undefined {
+    if (value.trim().length === 0) {
+      return undefined;
+    }
+    const amount = Number(value.trim());
+    const cents = Math.round(amount * 100);
+    return Number.isFinite(amount) && amount >= 0 && Number.isSafeInteger(cents) &&
+      cents <= 2147483647 ? cents : undefined;
+  }
+
+  private async publish(): Promise<void> {
+    if (this.submitting) {
+      return;
+    }
+    const min = this.parseBudget(this.minBudget);
+    const max = this.parseBudget(this.maxBudget);
+    if (!this.title.trim() || !this.city.trim() || !this.place.trim() || !this.time.trim()) {
+      this.errorMessage = '请填写标题、城市、地点和时间';
+      return;
+    }
+    if ((this.minBudget.trim() && min === undefined) || (this.maxBudget.trim() && max === undefined) ||
+      (min !== undefined && max !== undefined && min > max)) {
+      this.errorMessage = '请检查预算金额';
+      return;
+    }
+    const payload: CreateDemandPayload = {
+      scene: this.title.trim(), cityCode: this.city.trim(), location: this.place.trim(),
+      timeDescription: this.time.trim(), description: this.description.trim(),
+      budgetMinCent: min, budgetMaxCent: max
+    };
+    this.submitting = true;
+    this.errorMessage = '';
+    try {
+      const demand = await this.appClient.apiService.createDemand(payload);
+      if (!Number.isSafeInteger(demand.demandId) || demand.demandId <= 0) {
+        throw new Error('发布结果缺少需求编号');
+      }
+      this.onPublished?.(demand.demandId);
+    } catch (error) {
+      this.errorMessage = (error as PortraError).message || '发布失败，请重试';
+    } finally {
+      this.submitting = false;
+    }
+  }
 
   @Builder
   private SectionTitle(number: string, title: string) {
@@ -56,7 +108,7 @@ export struct PublishPage {
 
           this.SectionTitle('01', '基础信息')
           Column({ space: 9 }) {
-            this.FieldLabel('需求标题')
+            this.FieldLabel('拍摄主题')
             TextInput({ text: this.title, placeholder: '例如：想拍一组毕业照' })
               .height(48)
               .backgroundColor(PortraTheme.surface)
@@ -162,17 +214,18 @@ export struct PublishPage {
       .scrollBar(BarState.Off)
 
       Column({ space: 6 }) {
-        Button('发布需求')
+        if (this.errorMessage.length > 0) {
+          Text(this.errorMessage).fontSize(12).fontColor(PortraTheme.danger).width('100%')
+        }
+        Button(this.submitting ? '发布中…' : '发布需求')
           .width('100%')
           .height(48)
           .fontSize(15)
           .fontColor(PortraTheme.white)
-          .backgroundColor(PortraTheme.mutedText)
-          .enabled(false)
+          .backgroundColor(PortraTheme.primary)
+          .enabled(!this.submitting)
           .borderRadius(8)
-        Text('暂不能发布，请稍后再试')
-          .fontSize(11)
-          .fontColor(PortraTheme.secondaryText)
+          .onClick(() => this.publish())
       }
       .width('100%')
       .padding({ left: 20, right: 20, top: 12, bottom: 20 })
