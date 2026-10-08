@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS orders (
     cancel_time             DATETIME      NULL,
     created_at              DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at              DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_orders_quote_id (quote_id),
     KEY idx_orders_customer_status (customer_id, status),
     KEY idx_orders_provider_status (provider_user_id, status),
     KEY idx_orders_status_created (status, created_at)

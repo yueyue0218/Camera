@@ -404,7 +404,7 @@ class ConversationQuoteControllerTest {
     void customerCanConfirmQuoteEndpoint() {
         UserContext.setUserId(CUSTOMER_ID);
         Quote quote = pendingQuote();
-        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdForUpdate(QUOTE_ID)).thenReturn(Optional.of(quote));
         when(quoteRepository.save(any(Quote.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderService.createOrderFromConfirmedQuote(any(Quote.class))).thenReturn(order());
 
@@ -421,7 +421,7 @@ class ConversationQuoteControllerTest {
     @Test
     void providerCannotConfirmOwnQuoteEndpoint() {
         UserContext.setUserId(PROVIDER_USER_ID);
-        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(pendingQuote()));
+        when(quoteRepository.findByIdForUpdate(QUOTE_ID)).thenReturn(Optional.of(pendingQuote()));
 
         assertThrows(BusinessException.class,
                 () -> quoteController.confirmQuote(QUOTE_ID, new ConfirmQuoteRequest()));
@@ -433,7 +433,7 @@ class ConversationQuoteControllerTest {
     void customerCanRejectQuoteEndpoint() {
         UserContext.setUserId(CUSTOMER_ID);
         Quote quote = pendingQuote();
-        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdForUpdate(QUOTE_ID)).thenReturn(Optional.of(quote));
         when(quoteRepository.save(any(Quote.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Result<RejectQuoteResponse> result = quoteController.rejectQuote(QUOTE_ID, null);
@@ -447,7 +447,7 @@ class ConversationQuoteControllerTest {
         UserContext.setUserId(CUSTOMER_ID);
         Quote quote = pendingQuote();
         quote.setStatus(QuoteStatus.REJECTED);
-        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdForUpdate(QUOTE_ID)).thenReturn(Optional.of(quote));
 
         assertThrows(BusinessException.class,
                 () -> quoteController.confirmQuote(QUOTE_ID, null));

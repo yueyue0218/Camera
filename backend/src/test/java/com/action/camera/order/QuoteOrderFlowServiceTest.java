@@ -105,7 +105,7 @@ class QuoteOrderFlowServiceTest {
     @Test
     void customerCanConfirmPendingQuoteAndGenerateOrder() {
         Quote quote = pendingQuote();
-        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdForUpdate(QUOTE_ID)).thenReturn(Optional.of(quote));
         when(quoteRepository.save(any(Quote.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderRepository.findByQuoteId(QUOTE_ID)).thenReturn(Optional.empty());
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
@@ -143,7 +143,7 @@ class QuoteOrderFlowServiceTest {
         quote.setSourceId(SERVICE_PACKAGE_ID);
         when(conversationRepository.findById(quote.getConversationId()))
                 .thenReturn(Optional.of(servicePackageConversation()));
-        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdForUpdate(QUOTE_ID)).thenReturn(Optional.of(quote));
         when(quoteRepository.save(any(Quote.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderRepository.findByQuoteId(QUOTE_ID)).thenReturn(Optional.empty());
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
@@ -192,7 +192,7 @@ class QuoteOrderFlowServiceTest {
     @Test
     void providerCannotConfirmOwnQuote() {
         Quote quote = pendingQuote();
-        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdForUpdate(QUOTE_ID)).thenReturn(Optional.of(quote));
 
         assertThrows(BusinessException.class,
                 () -> quoteService.confirmQuote(QUOTE_ID, PROVIDER_USER_ID, "服务方不能确认"));
@@ -206,7 +206,7 @@ class QuoteOrderFlowServiceTest {
         Quote quote = pendingQuote();
         AtomicReference<Order> storedOrder = new AtomicReference<>();
 
-        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdForUpdate(QUOTE_ID)).thenReturn(Optional.of(quote));
         when(quoteRepository.save(any(Quote.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderRepository.findByQuoteId(QUOTE_ID)).thenAnswer(invocation -> Optional.ofNullable(storedOrder.get()));
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
@@ -227,7 +227,7 @@ class QuoteOrderFlowServiceTest {
     @Test
     void rejectedQuoteCannotBeConfirmedAgain() {
         Quote quote = pendingQuote();
-        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdForUpdate(QUOTE_ID)).thenReturn(Optional.of(quote));
         when(quoteRepository.save(any(Quote.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         quoteService.rejectQuote(QUOTE_ID, CUSTOMER_ID, "不接受该报价");
@@ -242,7 +242,7 @@ class QuoteOrderFlowServiceTest {
     void expiredQuoteCannotBeConfirmedAndDoesNotCreateOrder() {
         Quote quote = pendingQuote();
         quote.setExpireTime(LocalDateTime.now().minusMinutes(1));
-        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdForUpdate(QUOTE_ID)).thenReturn(Optional.of(quote));
         when(quoteRepository.save(any(Quote.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         assertThrows(BusinessException.class,
@@ -255,7 +255,7 @@ class QuoteOrderFlowServiceTest {
     @Test
     void confirmingQuoteWithProviderTimeConflictDoesNotCreateOrder() {
         Quote quote = pendingQuote();
-        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdForUpdate(QUOTE_ID)).thenReturn(Optional.of(quote));
         when(quoteRepository.save(any(Quote.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderRepository.findByQuoteId(QUOTE_ID)).thenReturn(Optional.empty());
         when(orderRepository.existsProviderTimeConflict(anyLong(), any(), any(), anyCollection()))
@@ -274,7 +274,7 @@ class QuoteOrderFlowServiceTest {
         command.setAmountCent(AMOUNT_CENT + 1000);
         command.setLocation("南京大学仙林校区");
         command.setServiceContent("更新后的毕业照方案");
-        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdForUpdate(QUOTE_ID)).thenReturn(Optional.of(quote));
         when(quoteRepository.save(any(Quote.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Quote updatedQuote = quoteService.updatePendingQuote(QUOTE_ID, command, PROVIDER_USER_ID);
@@ -291,7 +291,7 @@ class QuoteOrderFlowServiceTest {
     void confirmedQuoteCannotBeEdited() {
         Quote quote = pendingQuote();
         quote.setStatus(QuoteStatus.CONFIRMED);
-        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdForUpdate(QUOTE_ID)).thenReturn(Optional.of(quote));
 
         assertThrows(BusinessException.class,
                 () -> quoteService.updatePendingQuote(QUOTE_ID, quoteCommand(), PROVIDER_USER_ID));
@@ -302,7 +302,7 @@ class QuoteOrderFlowServiceTest {
     @Test
     void pendingQuoteEditFailsWhenProviderTimeConflicts() {
         Quote quote = pendingQuote();
-        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdForUpdate(QUOTE_ID)).thenReturn(Optional.of(quote));
         when(orderRepository.existsProviderTimeConflict(anyLong(), any(), any(), anyCollection()))
                 .thenReturn(true);
 
@@ -316,7 +316,7 @@ class QuoteOrderFlowServiceTest {
     void rejectedQuoteCannotBeEdited() {
         Quote quote = pendingQuote();
         quote.setStatus(QuoteStatus.REJECTED);
-        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdForUpdate(QUOTE_ID)).thenReturn(Optional.of(quote));
 
         assertThrows(BusinessException.class,
                 () -> quoteService.updatePendingQuote(QUOTE_ID, quoteCommand(), PROVIDER_USER_ID));
