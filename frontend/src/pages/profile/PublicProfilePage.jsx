@@ -13,6 +13,7 @@ import {
 } from './utils/profileUtils.js'
 import { ReviewArchiveCard } from '../../components/reviews/ReviewArchiveCard.jsx'
 import { buildOrderNavigationTarget } from '../../utils/orderNavigation.js'
+import { ReportAction } from '../../components/reports/ReportAction.jsx'
 import './profile.css'
 
 function formatCreditScore(value) {
@@ -255,9 +256,12 @@ export function PublicProfilePage() {
         </div>
       )}
 
-      <div className="pp-crumb">
+      <div className="pp-crumb pp-crumb-report">
         <span><strong>PROFILE</strong> / {nickname} / 个人摄影档案</span>
-        <span>{isProvider ? `FRAME ${pp?.completedOrders ?? 0} · ${pp?.cityCode || 'Portra'}` : `CREDIT ${displayCreditScore} · Portra`}</span>
+        <span>
+          {isProvider ? `FRAME ${pp?.completedOrders ?? 0} · ${pp?.cityCode || 'Portra'}` : `CREDIT ${displayCreditScore} · Portra`}
+        </span>
+        {Number(publicProfile?.userId) === profileUserId && <ReportAction key={publicProfile?.userId} targetType="USER" targetId={publicProfile?.userId} ownerId={publicProfile?.userId} currentUser={currentUser} sx={{ position: 'absolute', top: 0, right: 0 }} />}
       </div>
 
       {/* ── HERO ── */}
