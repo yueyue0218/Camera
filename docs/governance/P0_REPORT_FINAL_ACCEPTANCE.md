@@ -294,3 +294,14 @@ try {
 仓库现有CI以Linux/Java17运行IntegrationTest及默认客户端clean verify，前端执行lint与build。合并以最新PR提交的现有CI通过为条件，不跳过检查、不改共享CI；main合并后现有流程会自动部署staging，用户已获告知。此前simple客户端命令与Windows Pipe的已知失败保留，第8节原强制验收结论不改为PASS。本轮不启动P0-E。
 
 集成结果与远端PR/CI链接随实际执行更新；不得把计划执行记录为已通过。
+
+### 最新main集成后的实际验证
+
+- 举报功能提交：1d7ea3e；上游同步提交：65b164e，自动合并无冲突。相对origin/main仍仅上述16文件。
+- 前端：npm test共90项通过、0失败/跳过；npm run lint退出0、0错误/38既有警告；npm run build退出0，保留大chunk警告。日志：frontend/report-closure-merge-{test,lint,build}.log。
+- 后端：采用上述仅进程级Windows Pipe隔离，默认客户端mvn verify退出0；756总数/754通过/0失败/0错误/2原A2跳过，JaCoCo检查通过。上游新增5项测试解释751→756变化。日志：backend/target-closure-merge-verify.log。
+- MySQL：与最新main集成后再次执行ReportMySqlClosureIT与ReportMySqlIsolationGuardTest；真实MySQL29/29，隔离保护3/3，32总数/0失败/0错误/0跳过，BUILD SUCCESS。日志：backend/target-closure-merge-mysql.log。专属3307已正常关闭。
+- 独立HTTP：沿用第5节真实前端+Tomcat/H2 D1～D4通过证据，本次没有把MySQL/MockMvc测试描述成新的独立HTTP测试。
+- 原始Camera目录只读复核：main仍414339e，原3处修改与6个未跟踪项完整保留。没有重置、stash或切换该目录。
+
+上述为本地实际结果。远端PR检查与合并结果由对应PR和Actions记录提供；本地通过不能代替远端检查。原simple命令失败仍属于已知运行条件，不因用户授权合并而被删除或改写。
