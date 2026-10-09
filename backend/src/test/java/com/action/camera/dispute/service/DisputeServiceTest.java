@@ -43,6 +43,7 @@ class DisputeServiceTest {
 
     private static final Long CONV_ID             = 9301L;
     private static final Long QUOTE_ID            = 7301L;
+    private static final Long COMPLETED_QUOTE_ID  = 7302L;
 
     @Autowired
     private DisputeService disputeService;
@@ -81,7 +82,8 @@ class DisputeServiceTest {
         jdbcTemplate.update("DELETE FROM user_role_bindings WHERE user_id = ?", ADMIN_ID);
         jdbcTemplate.update("INSERT INTO user_role_bindings (user_id, role, granted_at) VALUES (?, 'ADMIN', NOW())", ADMIN_ID);
         insertConversation();
-        insertQuote();
+        insertQuote(QUOTE_ID, "QUOTE-DISPUTE-TEST");
+        insertQuote(COMPLETED_QUOTE_ID, "QUOTE-COMPLETED-TEST");
         insertOrder(DISPUTE_ORDER_ID,   "ORDER-DISPUTE-TEST",    "DELIVERED_PENDING_CONFIRM");
         insertOrder(COMPLETED_ORDER_ID, "ORDER-COMPLETED-TEST",  "COMPLETED");
         insertPaymentRecord(DISPUTE_ORDER_ID);
@@ -427,7 +429,7 @@ class DisputeServiceTest {
                 """, CONV_ID, CUSTOMER_ID, PROVIDER_ID);
     }
 
-    private void insertQuote() {
+    private void insertQuote(Long quoteId, String quoteNo) {
         jdbcTemplate.update("""
                 INSERT INTO quotes (
                     id, quote_no, conversation_id, provider_user_id, customer_id, source_type,
@@ -436,13 +438,13 @@ class DisputeServiceTest {
                     status, expire_time, created_at, updated_at
                 )
                 VALUES (
-                    ?, 'QUOTE-DISPUTE-TEST', ?, ?, ?, 'DIRECT',
+                    ?, ?, ?, ?, ?, 'DIRECT',
                     NOW(), DATEADD('HOUR', 1, NOW()), 'test-location', 0, 1,
                     DATEADD('DAY', 1, NOW()), 'PERSONAL_ONLY', JSON_OBJECT(), 100.00,
                     'CONFIRMED', DATEADD('DAY', 1, NOW()), NOW(), NOW()
                 )
                 ON DUPLICATE KEY UPDATE conversation_id = VALUES(conversation_id)
-                """, QUOTE_ID, CONV_ID, PROVIDER_ID, CUSTOMER_ID);
+                """, quoteId, quoteNo, CONV_ID, PROVIDER_ID, CUSTOMER_ID);
     }
 
     private void insertOrder(Long orderId, String orderNo, String status) {
@@ -462,7 +464,9 @@ class DisputeServiceTest {
                     NOW(), NOW()
                 )
                 ON DUPLICATE KEY UPDATE status = VALUES(status)
-                """, orderId, orderNo, QUOTE_ID, CONV_ID, CUSTOMER_ID, PROVIDER_ID, status);
+                """, orderId, orderNo,
+                orderId.equals(COMPLETED_ORDER_ID) ? COMPLETED_QUOTE_ID : QUOTE_ID,
+                CONV_ID, CUSTOMER_ID, PROVIDER_ID, status);
     }
 
     private void insertPaymentRecord(Long orderId) {

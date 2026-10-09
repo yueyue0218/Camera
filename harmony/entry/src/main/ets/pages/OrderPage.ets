@@ -54,7 +54,7 @@ export struct OrderPage {
 
   private statusText(status: string | undefined): string {
     switch (status) {
-      case 'PENDING_PAYMENT': return '待支付';
+      case 'PENDING_PAYMENT': return '约定已确认';
       case 'PAID_PENDING_SHOOT': return '待拍摄';
       case 'SHOOTING': return '拍摄中';
       case 'PENDING_DELIVERY': return '待交付';

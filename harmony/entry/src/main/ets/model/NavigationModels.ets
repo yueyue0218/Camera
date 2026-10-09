@@ -2,6 +2,8 @@ export enum AppRoute {
   LOGIN = 'Login',
   HALL = 'Hall',
   DEMAND_DETAIL = 'DemandDetail',
+  SERVICE_DETAIL = 'ServiceDetail',
+  CONVERSATION_DETAIL = 'ConversationDetail',
   PUBLISH = 'Publish',
   MESSAGE = 'Message',
   ORDER = 'Order',
@@ -14,6 +16,8 @@ export interface DemandDetailRouteParam {
 
 export interface NavigationRouteParam {
   readonly demandId?: number;
+  readonly serviceId?: number;
+  readonly conversationId?: number;
   /** Protected destination requested before authentication. */
   readonly returnRoute?: AppRoute;
 }

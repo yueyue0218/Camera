@@ -147,7 +147,7 @@ public class QuoteService {
         if (quoteId == null) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "quoteId must not be null");
         }
-        return quoteRepository.findById(quoteId)
+        return quoteRepository.findByIdForUpdate(quoteId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Quote not found: " + quoteId));
     }
 

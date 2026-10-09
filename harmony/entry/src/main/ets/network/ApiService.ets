@@ -1,6 +1,10 @@
 import { NativeSessionApi } from '../auth/NativeSessionApi';
-import { ConversationSummary, DemandSummary, NativeRefreshRequest, NativeSessionResponse, OrderSummary,
-  PageResult, SendSmsCodeRequest, ServicePackageSummary, SessionSummary, VerifyNativeSmsCodeRequest } from '../model/ApiModels';
+import { AcceptedDemandResponse, ConfirmQuoteResult, ConversationSummary, CreateDemandPayload,
+  CreateDemandResponsePayload, CreateQuotePayload,
+  DemandResponseSummary, DemandSummary, MessageSummary, NativeRefreshRequest, NativeSessionResponse,
+  OrderSummary, PageResult, QuoteSummary, SendSmsCodeRequest, ServicePackageDetail, ServicePackageSummary,
+  SendTextMessagePayload, SessionSummary, StartServiceChatPayload, StartServiceChatResult,
+  VerifyNativeSmsCodeRequest } from '../model/ApiModels';
 import { ErrorMapper } from './ErrorMapper';
 import { HttpClient } from './HttpClient';
 
@@ -38,6 +42,31 @@ export class ApiService implements NativeSessionApi {
     this.client.cancelRequest('demands.detail');
   }
 
+  createDemand(payload: CreateDemandPayload): Promise<DemandSummary> {
+    return this.client.post<DemandSummary>('/demands', payload, 'demands.create');
+  }
+
+  respondToDemand(demandId: number, message: string, expectedPriceCent?: number): Promise<DemandResponseSummary> {
+    const payload: CreateDemandResponsePayload = { message: message, expectedPriceCent: expectedPriceCent };
+    return this.client.post<DemandResponseSummary>(`/demands/${demandId}/responses`,
+      payload, `demands.${demandId}.respond`);
+  }
+
+  listDemandResponses(demandId: number): Promise<DemandResponseSummary[]> {
+    return this.client.get<DemandResponseSummary[]>(`/demands/${demandId}/responses`, `demands.${demandId}.responses`);
+  }
+
+  acceptDemandResponse(demandId: number, responseId: number): Promise<AcceptedDemandResponse> {
+    return this.client.post<AcceptedDemandResponse>(`/demands/${demandId}/responses/${responseId}/accept`,
+      undefined, `demands.${demandId}.accept`);
+  }
+
+  cancelDemandActions(demandId: number): void {
+    this.client.cancelRequest(`demands.${demandId}.responses`);
+    this.client.cancelRequest(`demands.${demandId}.respond`);
+    this.client.cancelRequest(`demands.${demandId}.accept`);
+  }
+
   listServicePackages(page: number = 1, size: number = 10, requestKey: string = 'servicePackages.list'):
     Promise<PageResult<ServicePackageSummary>> {
     return this.client.getPublic<PageResult<ServicePackageSummary>>(
@@ -48,6 +77,21 @@ export class ApiService implements NativeSessionApi {
 
   cancelServicePackages(requestKey: string = 'servicePackages.list'): void {
     this.client.cancelRequest(requestKey);
+  }
+
+  getServicePackage(serviceId: number): Promise<ServicePackageDetail> {
+    return this.client.getPublic<ServicePackageDetail>(`/service-packages/${serviceId}`, 'servicePackages.detail');
+  }
+
+  startServiceChat(serviceId: number): Promise<StartServiceChatResult> {
+    const payload: StartServiceChatPayload = {};
+    return this.client.post<StartServiceChatResult>(`/service-packages/${serviceId}/start-chat`,
+      payload, `servicePackages.${serviceId}.chat`);
+  }
+
+  cancelServiceDetail(serviceId: number): void {
+    this.client.cancelRequest('servicePackages.detail');
+    this.client.cancelRequest(`servicePackages.${serviceId}.chat`);
   }
 
   sendLoginCode(phone: string, deviceId: string): Promise<void> {
@@ -85,12 +129,42 @@ export class ApiService implements NativeSessionApi {
     this.client.cancelRequest('auth.session');
   }
 
-  listConversations(): Promise<ConversationSummary[]> {
-    return this.client.get<ConversationSummary[]>('/conversations', 'conversations.list');
+  listConversations(requestKey: string = 'conversations.list'): Promise<ConversationSummary[]> {
+    return this.client.get<ConversationSummary[]>('/conversations', requestKey);
   }
 
-  cancelConversations(): void {
-    this.client.cancelRequest('conversations.list');
+  cancelConversations(requestKey: string = 'conversations.list'): void {
+    this.client.cancelRequest(requestKey);
+  }
+
+  listMessages(conversationId: number): Promise<MessageSummary[]> {
+    return this.client.get<MessageSummary[]>(`/conversations/${conversationId}/messages`,
+      `conversations.${conversationId}.messages`);
+  }
+
+  sendMessage(conversationId: number, content: string): Promise<MessageSummary> {
+    const payload: SendTextMessagePayload = { messageType: 'TEXT', content: content };
+    return this.client.post<MessageSummary>(`/conversations/${conversationId}/messages`,
+      payload, `conversations.${conversationId}.send`);
+  }
+
+  listQuotes(conversationId: number): Promise<QuoteSummary[]> {
+    return this.client.get<QuoteSummary[]>(`/conversations/${conversationId}/quotations`,
+      `conversations.${conversationId}.quotes`);
+  }
+
+  createQuote(payload: CreateQuotePayload): Promise<QuoteSummary> {
+    return this.client.post<QuoteSummary>('/quotations', payload, `conversations.${payload.conversationId}.createQuote`);
+  }
+
+  confirmQuote(quoteId: number): Promise<ConfirmQuoteResult> {
+    return this.client.post<ConfirmQuoteResult>(`/quotations/${quoteId}/confirm`,
+      undefined, `quotations.${quoteId}.confirm`);
+  }
+
+  cancelConversationDetail(conversationId: number): void {
+    this.client.cancelRequest(`conversations.${conversationId}.messages`);
+    this.client.cancelRequest(`conversations.${conversationId}.quotes`);
   }
 
   listOrders(): Promise<OrderSummary[]> {

@@ -5,13 +5,15 @@
 ## 当前范围
 
 - ArkTS/ArkUI Stage 工程，目标 SDK 26.0.0。
-- App Shell 和原生 Navigation 已建立，包含 Login、Hall、DemandDetail、Publish、Message、Order、Profile 入口。
+- App Shell 和原生 Navigation 已建立，包含登录、大厅、需求与橱窗详情、发布、会话列表与详情、订单、个人中心入口。
 - 大厅第一批原生 ArkUI 已按交互原型拆分为品牌栏、频道切换、筛选、发布 Banner、双列橱窗卡和底部导航；没有使用 WebView。
-- 网络底座已建立：`HttpClient`、`ApiService`、公开列表 GET、原生会话刷新/退出 POST、错误映射、Bearer Token 注入、请求取消和旧响应保护。
+- 网络底座已建立：`HttpClient`、`ApiService`、公开读取、约拍写请求、原生会话刷新/退出、错误映射、Bearer Token 注入、请求取消和旧响应保护。
 - B 的手机号与 Session 契约已冻结并合入 `main`。客户端已接入短信发送、原生验证码登录、Refresh/Logout 和当前会话读取；Access Token 只保存在内存，Refresh Token 使用 HarmonyOS Asset Store 按环境保存。安装标识由本机随机生成并持久化，不读取硬件标识。
 - 视觉组件目前是临时基础设施，不代表舍友正在设计的最终 UI。
 
-大厅具备真实列表 UI；Login 有手机号验证码表单，Profile 展示真实会话信息并支持退出。DemandDetail 已接公开详情接口；Message 和 Order 已接受保护的只读列表接口；Publish 已有原生表单布局，但尚未接入发布和图片上传。消息详情、通知、订单支付/交付/评价仍未接入，不要把 Web 端已有业务算作鸿蒙端已完成。
+大厅具备真实列表 UI；Login 有手机号验证码表单，Profile 展示真实会话信息并支持退出。需求发布、摄影师响应、客户接受、会话文字消息、摄影师报价和客户确认报价已接现有后端；橱窗详情与客户咨询也已接线。订单页仍是只读列表，通知、图片上传、图片消息展示、交付和评价等未纳入本次闭环。鸿蒙端没有新增支付入口；后端旧订单模型仍保留 `PENDING_PAYMENT` 与模拟支付代码，不能据此宣称支付业务已完成或已移除。
+
+本轮的最小闭环需要两个不同角色账号人工验证：客户登录并发布需求，摄影师登录后在需求详情发送响应，客户接受并进入会话，摄影师在会话中发送文字及拍摄约定，客户确认后两端都能看到“双方约定已确认”。再次确认同一报价应返回同一订单。未在真机/模拟器和可收短信的环境完成这项人工验收前，只能称为“代码接线和构建通过”，不能称为“上线闭环已验证”。
 
 ## 构建
 
@@ -80,13 +82,13 @@ $env:PORTRA_BASE_URL = 'http://<电脑局域网IPv4>:8080'
 
 ## D09 导航逻辑验证
 
-七个第一阶段目标统一由 `NavigationPolicy` 管理。Login、Hall、DemandDetail 是公开入口；Publish、Message、Order、Profile 在游客状态下进入 Login，并保留原目标。DemandDetail 只接受正的安全整数 `demandId`。登录成功后返回原目标；首次安装且无有效凭据时按游客状态运行。
+导航目标统一由 `NavigationPolicy` 管理。Login、Hall、DemandDetail、ServiceDetail 是公开入口；Publish、Message、ConversationDetail、Order、Profile 在游客状态下进入 Login，并保留原目标。详情页只接受正的安全整数 ID。登录成功后返回原目标；首次安装且无有效凭据时按游客状态运行。
 
 ```powershell
 & "$env:NODE_HOME/node.exe" --test tests/navigation.test.cjs
 ```
 
-该测试检查七个路由名称、公开/认证入口、登录前目标和详情参数。快速点击由页面入口的 350 ms 保护处理，返回由 `NavPathStack.pop()` 和系统 Navigation 栈处理；设备上的物理返回键和完整交互仍在最后的安装验收中确认。
+该测试检查路由名称、公开/认证入口、登录前目标和详情参数。快速点击由页面入口的 350 ms 保护处理，返回由 `NavPathStack.pop()` 和系统 Navigation 栈处理；设备上的物理返回键和完整交互仍在最后的安装验收中确认。
 
 ## D10 认证底座验证
 

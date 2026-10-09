@@ -19,16 +19,17 @@ const { AppRoute } = require('../entry/src/main/ets/model/NavigationModels.ets')
 const { NavigationClickGuard, NavigationPolicy } =
   require('../entry/src/main/ets/navigation/NavigationPolicy.ets');
 
-test('all seven planned destinations have one stable route name', () => {
+test('all planned destinations have one stable route name', () => {
   assert.deepEqual(NavigationPolicy.routes, [
-    AppRoute.LOGIN, AppRoute.HALL, AppRoute.DEMAND_DETAIL, AppRoute.PUBLISH,
+    AppRoute.LOGIN, AppRoute.HALL, AppRoute.DEMAND_DETAIL, AppRoute.SERVICE_DETAIL,
+    AppRoute.CONVERSATION_DETAIL, AppRoute.PUBLISH,
     AppRoute.MESSAGE, AppRoute.ORDER, AppRoute.PROFILE
   ]);
-  assert.equal(new Set(NavigationPolicy.routes).size, 7);
+  assert.equal(new Set(NavigationPolicy.routes).size, 9);
 });
 
-test('hall, demand detail and login remain public', () => {
-  for (const route of [AppRoute.LOGIN, AppRoute.HALL, AppRoute.DEMAND_DETAIL]) {
+test('hall, public details and login remain public', () => {
+  for (const route of [AppRoute.LOGIN, AppRoute.HALL, AppRoute.DEMAND_DETAIL, AppRoute.SERVICE_DETAIL]) {
     const result = NavigationPolicy.resolve(route, {}, false);
     assert.equal(result.route, route);
     assert.equal(NavigationPolicy.requiresAuthentication(route), false);
@@ -36,7 +37,8 @@ test('hall, demand detail and login remain public', () => {
 });
 
 test('protected guest destinations redirect to login and preserve the target', () => {
-  for (const route of [AppRoute.PUBLISH, AppRoute.MESSAGE, AppRoute.ORDER, AppRoute.PROFILE]) {
+  for (const route of [AppRoute.PUBLISH, AppRoute.MESSAGE, AppRoute.CONVERSATION_DETAIL,
+    AppRoute.ORDER, AppRoute.PROFILE]) {
     const result = NavigationPolicy.resolve(route, {}, false);
     assert.equal(result.route, AppRoute.LOGIN);
     assert.equal(result.param.returnRoute, route);
@@ -45,7 +47,8 @@ test('protected guest destinations redirect to login and preserve the target', (
 });
 
 test('authenticated sessions can enter protected destinations', () => {
-  for (const route of [AppRoute.PUBLISH, AppRoute.MESSAGE, AppRoute.ORDER, AppRoute.PROFILE]) {
+  for (const route of [AppRoute.PUBLISH, AppRoute.MESSAGE, AppRoute.CONVERSATION_DETAIL,
+    AppRoute.ORDER, AppRoute.PROFILE]) {
     const result = NavigationPolicy.resolve(route, {}, true);
     assert.equal(result.route, route);
     assert.equal(result.param.returnRoute, undefined);
@@ -61,6 +64,13 @@ test('demand detail accepts only positive safe integer IDs', () => {
     assert.equal(NavigationPolicy.validDemandId({ demandId }), undefined);
   }
   assert.equal(NavigationPolicy.validDemandId({}), undefined);
+});
+
+test('service and conversation details reject invalid IDs and preserve conversation target through login', () => {
+  assert.equal(NavigationPolicy.validServiceId({ serviceId: 13 }), 13);
+  assert.equal(NavigationPolicy.validConversationId({ conversationId: -1 }), undefined);
+  const result = NavigationPolicy.resolve(AppRoute.CONVERSATION_DETAIL, { conversationId: 42 }, false);
+  assert.equal(result.param.conversationId, 42);
 });
 
 test('route labels and direct login description are deterministic', () => {

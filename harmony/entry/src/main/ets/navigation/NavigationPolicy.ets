@@ -11,6 +11,8 @@ export class NavigationPolicy {
     AppRoute.LOGIN,
     AppRoute.HALL,
     AppRoute.DEMAND_DETAIL,
+    AppRoute.SERVICE_DETAIL,
+    AppRoute.CONVERSATION_DETAIL,
     AppRoute.PUBLISH,
     AppRoute.MESSAGE,
     AppRoute.ORDER,
@@ -18,7 +20,7 @@ export class NavigationPolicy {
   ];
 
   static requiresAuthentication(route: AppRoute): boolean {
-    return route === AppRoute.PUBLISH || route === AppRoute.MESSAGE ||
+    return route === AppRoute.PUBLISH || route === AppRoute.CONVERSATION_DETAIL || route === AppRoute.MESSAGE ||
       route === AppRoute.ORDER || route === AppRoute.PROFILE;
   }
 
@@ -28,7 +30,8 @@ export class NavigationPolicy {
       return {
         route: AppRoute.LOGIN,
         param: {
-          returnRoute: route
+          returnRoute: route,
+          conversationId: param.conversationId
         }
       };
     }
@@ -50,6 +53,18 @@ export class NavigationPolicy {
     return `登录后继续前往${NavigationPolicy.label(param.returnRoute)}`;
   }
 
+  static validServiceId(param: NavigationRouteParam): number | undefined {
+    return NavigationPolicy.positiveId(param.serviceId);
+  }
+
+  static validConversationId(param: NavigationRouteParam): number | undefined {
+    return NavigationPolicy.positiveId(param.conversationId);
+  }
+
+  private static positiveId(id: number | undefined): number | undefined {
+    return typeof id === 'number' && Number.isSafeInteger(id) && id > 0 ? id : undefined;
+  }
+
   static label(route: AppRoute): string {
     switch (route) {
       case AppRoute.LOGIN:
@@ -58,6 +73,10 @@ export class NavigationPolicy {
         return '大厅';
       case AppRoute.DEMAND_DETAIL:
         return '需求详情';
+      case AppRoute.SERVICE_DETAIL:
+        return '摄影橱窗';
+      case AppRoute.CONVERSATION_DETAIL:
+        return '会话';
       case AppRoute.PUBLISH:
         return '发布需求';
       case AppRoute.MESSAGE:

@@ -68,6 +68,101 @@ export interface ApiEnvelope<T> {
   readonly data: T;
 }
 
+export interface ServicePackageDetail extends ServicePackageSummary {
+  readonly description?: string;
+  readonly serviceArea?: string;
+  readonly timeDescription?: string;
+  readonly durationMinutes?: number;
+  readonly originalCount?: number;
+  readonly refinedCount?: number;
+  readonly deliveryDays?: number;
+}
+
+export interface CreateDemandPayload {
+  readonly scene: string;
+  readonly cityCode: string;
+  readonly location: string;
+  readonly timeDescription: string;
+  readonly description: string;
+  readonly budgetMinCent?: number;
+  readonly budgetMaxCent?: number;
+}
+
+export interface DemandResponseSummary {
+  readonly responseId: number;
+  readonly demandId: number;
+  readonly providerId: number;
+  readonly message: string;
+  readonly expectedPriceCent?: number;
+  readonly status: string;
+}
+
+export interface CreateDemandResponsePayload {
+  readonly message: string;
+  readonly expectedPriceCent?: number;
+}
+
+export interface AcceptedDemandResponse {
+  readonly responseId: number;
+  readonly conversationId: number;
+  readonly responseStatus: string;
+}
+
+export interface MessageSummary {
+  readonly messageId: number;
+  readonly conversationId: number;
+  readonly senderId: number;
+  readonly messageType: string;
+  readonly content?: string;
+  readonly fileName?: string;
+  readonly createdAt?: string;
+}
+
+export interface SendTextMessagePayload {
+  readonly messageType: string;
+  readonly content: string;
+}
+
+export interface StartServiceChatPayload {
+  readonly initialMessage?: string;
+}
+
+export interface QuoteSummary {
+  readonly quotationId: number;
+  readonly conversationId: number;
+  readonly customerId: number;
+  readonly providerUserId: number;
+  readonly amountCent: number;
+  readonly shootStartTime: string;
+  readonly shootEndTime: string;
+  readonly deliveryDeadline: string;
+  readonly location: string;
+  readonly serviceContent: string;
+  readonly status: string;
+}
+
+export interface CreateQuotePayload {
+  readonly conversationId: number;
+  readonly amountCent: number;
+  readonly shootStartTime: string;
+  readonly shootEndTime: string;
+  readonly deliveryDeadline: string;
+  readonly location: string;
+  readonly serviceContent: string;
+}
+
+export interface ConfirmQuoteResult {
+  readonly quotationId: number;
+  readonly quotationStatus: string;
+  readonly orderId: number;
+  readonly orderStatus: string;
+}
+
+export interface StartServiceChatResult {
+  readonly serviceId: number;
+  readonly conversationId: number;
+}
+
 export interface NativeRefreshRequest {
   readonly refreshToken: string;
 }
@@ -106,6 +201,10 @@ export interface SessionSummary {
 export interface ConversationSummary {
   readonly conversationId: number;
   readonly otherUserId: number;
+  readonly participantAId?: number;
+  readonly participantBId?: number;
+  readonly sourceType?: string;
+  readonly sourceId?: number;
   readonly orderId?: number;
   readonly lastMessageTime?: string;
   readonly createdAt?: string;

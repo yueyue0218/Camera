@@ -249,6 +249,44 @@ test('demand detail rejects missing or mismatched records', async () => {
   }
 });
 
+test('appointment flow uses authenticated demand, conversation and quote endpoints', async () => {
+  const client = new HttpClient();
+  client.setAccessToken('appointment-token');
+  const api = new ApiService(client);
+  const checks = [
+    [() => api.createDemand({ scene: '人像', cityCode: 'NJ', location: '公园', timeDescription: '周末',
+      description: '' }), '/demands', 'POST'],
+    [() => api.respondToDemand(7, '可以拍摄', 30000), '/demands/7/responses', 'POST'],
+    [() => api.listDemandResponses(7), '/demands/7/responses', 'GET'],
+    [() => api.acceptDemandResponse(7, 9), '/demands/7/responses/9/accept', 'POST'],
+    [() => api.listMessages(14), '/conversations/14/messages', 'GET'],
+    [() => api.sendMessage(14, '你好'), '/conversations/14/messages', 'POST'],
+    [() => api.listQuotes(14), '/conversations/14/quotations', 'GET'],
+    [() => api.createQuote({ conversationId: 14, amountCent: 30000,
+      shootStartTime: '2026-10-12T14:00:00', shootEndTime: '2026-10-12T16:00:00',
+      deliveryDeadline: '2026-10-19T18:00:00', location: '公园', serviceContent: '人像' }),
+      '/quotations', 'POST'],
+    [() => api.confirmQuote(19), '/quotations/19/confirm', 'POST'],
+    [() => api.startServiceChat(21), '/service-packages/21/start-chat', 'POST']
+  ];
+  for (const [invoke, route, method] of checks) {
+    const promise = invoke();
+    const call = calls.at(-1);
+    assert.equal(call.url, EnvironmentConfig.current().baseUrl + route);
+    assert.equal(call.options.method, method);
+    assert.equal(call.options.header.Authorization, 'Bearer appointment-token');
+    complete(call, {});
+    await promise;
+  }
+
+  const service = api.getServicePackage(21);
+  const call = calls.at(-1);
+  assert.equal(call.url, EnvironmentConfig.current().baseUrl + '/service-packages/21');
+  assert.equal(call.options.header.Authorization, undefined);
+  complete(call, { serviceId: 21, title: '自然人像' });
+  assert.equal((await service).serviceId, 21);
+});
+
 test('absolute URLs and ambiguous paths are rejected before network access', async () => {
   const before = calls.length;
   for (const url of ['https://example.com', '//example.com', '/bad\\path', '/bad path', '/bad#fragment']) {
