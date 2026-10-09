@@ -10,6 +10,7 @@ import { EmptyState, ErrorState, LoadingState } from './components/HallState.jsx
 import { cityName, firstText, formatCreditScoreValue, gradientFor, hasCreditScoreValue, latestTimeText, money, moneyRange, readableDate, serviceProviderUserId, splitTags, timeTagLabel } from './components/hallUtils.js'
 import { publicImageUrls, useFileObjectUrl, useFileObjectUrls } from './utils/fileObjectUrls.js'
 import { submitDemandResponse } from './utils/respondDemand.js'
+import { ReportAction } from '../../components/reports/ReportAction.jsx'
 import '../portraHall.css'
 
 function createStatus() {
@@ -361,6 +362,7 @@ export function DemandDetailPage() {
         <article className="panel-card">
           <div className="detail-heading">
             <h1 className="detail-title">{title}</h1>
+            {Number(demand.demandId) === Number(demandId) && <ReportAction key={demand.demandId} targetType="DEMAND" targetId={demand.demandId} ownerId={demand.customerId} currentUser={currentUser} sx={{ position: 'absolute', top: 0, right: 0, zIndex: 4 }} />}
             {isDemandOwner && (
               <div className="detail-top-actions" aria-label="需求管理">
                 <button className="detail-mini-action" type="button" onClick={() => navigate(`/demands/${demand.demandId}/edit`)}>编辑</button>
@@ -695,6 +697,7 @@ export function ServicePackageDetailPage() {
         <article className="panel-card">
           <div className="detail-heading">
             <h1 className="detail-title">{service.title || '暂无标题'}</h1>
+            {Number(service.serviceId) === Number(serviceId) && <ReportAction key={service.serviceId} targetType="SERVICE_PACKAGE" targetId={service.serviceId} ownerId={service.providerId} currentUser={currentUser} sx={{ position: 'absolute', top: 0, right: 0, zIndex: 4 }} />}
             {isServiceOwner && (
               <div className="detail-top-actions" aria-label="橱窗管理">
                 <button className="detail-mini-action" type="button" onClick={() => navigate(`/service-packages/${service.serviceId}/edit`)}>编辑</button>
