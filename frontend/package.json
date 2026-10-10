@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "test": "npm run test:auth && npm run test:admin && npm run test:profile-social && npm run test:image-variants && npm run test:image-usage && npm run test:reports",
+    "test": "npm run test:auth && npm run test:admin && npm run test:profile-social && npm run test:image-variants && npm run test:image-usage && npm run test:reports && npm run test:routing",
     "test:admin": "node --test tests/adminSurface.test.mjs",
     "test:auth": "node --test tests/authFlow.test.mjs",
     "test:profile-social": "node --test tests/profileSocialLists.test.mjs",
@@ -15,7 +15,8 @@
     "build": "vite build",
     "build:temp-staging": "vite build --mode temp-staging",
     "preview": "vite preview --host 0.0.0.0",
-    "test:reports": "node --test tests/reportEntry.test.mjs"
+    "test:reports": "node --test tests/reportEntry.test.mjs",
+    "test:routing": "node --test tests/stagingRouting.test.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
