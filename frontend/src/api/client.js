@@ -55,9 +55,14 @@ export async function request(path, options = {}, currentUser) {
     ...(fetchOptions.headers || {})
   }
 
+  // Separate staging admin/report APIs from SPA routes without moving auth cookies.
+  const requestPath = import.meta.env.MODE === 'temp-staging' && /^\/(admin|reports)(\/|$)/.test(path)
+    ? `/api/web${path}`
+    : path
+
   let response
   try {
-    response = await fetch(`${API_BASE}${path}`, {
+    response = await fetch(`${API_BASE}${requestPath}`, {
       credentials: 'include',
       ...fetchOptions,
       headers
