@@ -7,6 +7,8 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
@@ -49,6 +51,69 @@ public interface MomentPostRepository extends JpaRepository<MomentPost, Long> {
 
     List<MomentPost> findByAuthorIdAndAuthorRoleAndStatusAndModerationStatusOrderByCreatedAtDesc(
             Long authorId, String authorRole, MomentStatus status, ModerationStatus moderationStatus);
+
+    Page<MomentPost> findByAuthorIdAndAuthorRoleAndStatusAndModerationStatusOrderByCreatedAtDescIdDesc(
+            Long authorId, String authorRole, MomentStatus status, ModerationStatus moderationStatus, Pageable pageable);
+
+    @Query(value = """
+            select m from MomentPost m join m.likedUserIds likedUserId
+            where likedUserId = :userId
+              and m.status = :status
+              and m.moderationStatus = :moderationStatus
+            order by m.createdAt desc, m.id desc
+            """,
+            countQuery = """
+            select count(m) from MomentPost m join m.likedUserIds likedUserId
+            where likedUserId = :userId
+              and m.status = :status
+              and m.moderationStatus = :moderationStatus
+            """)
+    Page<MomentPost> findLikedByUser(@Param("userId") Long userId,
+                                     @Param("status") MomentStatus status,
+                                     @Param("moderationStatus") ModerationStatus moderationStatus,
+                                     Pageable pageable);
+
+    @Query(value = """
+            select m from MomentPost m join m.favoritedUserIds favoritedUserId
+            where favoritedUserId = :userId
+              and m.status = :status
+              and m.moderationStatus = :moderationStatus
+            order by m.createdAt desc, m.id desc
+            """,
+            countQuery = """
+            select count(m) from MomentPost m join m.favoritedUserIds favoritedUserId
+            where favoritedUserId = :userId
+              and m.status = :status
+              and m.moderationStatus = :moderationStatus
+            """)
+    Page<MomentPost> findFavoritedByUser(@Param("userId") Long userId,
+                                         @Param("status") MomentStatus status,
+                                         @Param("moderationStatus") ModerationStatus moderationStatus,
+                                         Pageable pageable);
+
+    @Query("""
+            select count(m) from MomentPost m join m.likedUserIds likedUserId
+            where m.authorId = :authorId
+              and m.authorRole = :authorRole
+              and m.status = :status
+              and m.moderationStatus = :moderationStatus
+            """)
+    long countLikesReceived(@Param("authorId") Long authorId,
+                            @Param("authorRole") String authorRole,
+                            @Param("status") MomentStatus status,
+                            @Param("moderationStatus") ModerationStatus moderationStatus);
+
+    @Query("""
+            select count(m) from MomentPost m join m.favoritedUserIds favoritedUserId
+            where m.authorId = :authorId
+              and m.authorRole = :authorRole
+              and m.status = :status
+              and m.moderationStatus = :moderationStatus
+            """)
+    long countFavoritesReceived(@Param("authorId") Long authorId,
+                                @Param("authorRole") String authorRole,
+                                @Param("status") MomentStatus status,
+                                @Param("moderationStatus") ModerationStatus moderationStatus);
 
     long countByAuthorIdAndAuthorRoleAndStatus(Long authorId, String authorRole, MomentStatus status);
 

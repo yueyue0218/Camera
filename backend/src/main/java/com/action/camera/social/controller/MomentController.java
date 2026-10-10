@@ -4,10 +4,12 @@ import com.action.camera.common.Result;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.UserContext;
 import com.action.camera.common.exception.BusinessException;
+import com.action.camera.common.page.PageResult;
 import com.action.camera.common.security.CurrentUser;
 import com.action.camera.common.security.UserRole;
 import com.action.camera.social.dto.CreateMomentRequest;
 import com.action.camera.social.dto.MomentDto;
+import com.action.camera.social.dto.ProfileMomentPageResponse;
 import com.action.camera.social.service.MomentService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,6 +41,25 @@ public class MomentController {
                                                HttpServletRequest request) {
         CurrentUser currentUser = currentUser();
         return Result.success(momentService.listMoments(currentUser, scope, authorId, authorRole));
+    }
+
+    @GetMapping("/profile")
+    public Result<ProfileMomentPageResponse> listProfileMoments(
+            @RequestParam Long authorId,
+            @RequestParam String authorRole,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "12") int size) {
+        return Result.success(momentService.listProfileMoments(
+                currentUser(), authorId, authorRole, page, size));
+    }
+
+    @GetMapping("/me/interactions")
+    public Result<PageResult<MomentDto>> listMyInteractedMoments(
+            @RequestParam String interaction,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "4") int size) {
+        return Result.success(momentService.listMyInteractedMoments(
+                currentUser(), interaction, page, size));
     }
 
     @PostMapping

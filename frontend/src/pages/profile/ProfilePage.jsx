@@ -17,6 +17,7 @@ import { loadProfileSocialLists } from './utils/socialCardUtils.js'
 import './profile.css'
 
 const MONTH_ABBR = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
+const PROFILE_MOMENT_PAGE_SIZE = 12
 
 function calcAge(birthday) {
   if (!birthday) return null
@@ -85,6 +86,10 @@ export function ProfilePage() {
   const [editOpen, setEditOpen] = useState(isOnboarding)
 
   const [moments, setMoments] = useState([])
+  const [likedMoments, setLikedMoments] = useState([])
+  const [favoriteMoments, setFavoriteMoments] = useState([])
+  const [momentPage, setMomentPage] = useState({ page: 1, total: 0, loadingMore: false })
+  const [receivedInteractionCount, setReceivedInteractionCount] = useState(0)
   const [myDemands, setMyDemands] = useState([])
   const [myInterests, setMyInterests] = useState([])
   const [myShowcases, setMyShowcases] = useState([])
@@ -101,6 +106,8 @@ export function ProfilePage() {
   const dashboardRowRef = useRef(null)
   const frameNavRef = useRef(null)
   const archiveSectionRef = useRef(null)
+  const profileLoadSeqRef = useRef(0)
+  const momentLoadMoreSeqRef = useRef(0)
 
   // Sync body class for CSS role switching
   useEffect(() => {
@@ -164,7 +171,24 @@ export function ProfilePage() {
     return () => cleanup.forEach(fn => fn())
   }, [activeTab, moments, profileOrders])
 
-  useEffect(() => { loadProfileData() }, [currentUser.userId, currentUser.role])
+  useEffect(() => {
+    const requestId = ++profileLoadSeqRef.current
+    momentLoadMoreSeqRef.current += 1
+    setMoments([])
+    setLikedMoments([])
+    setFavoriteMoments([])
+    setMomentPage({ page: 1, total: 0, loadingMore: false })
+    setReceivedInteractionCount(0)
+    setMyDemands([])
+    setMyInterests([])
+    setMyShowcases([])
+    setProfileOrders([])
+    loadProfileData(requestId)
+    return () => {
+      if (profileLoadSeqRef.current === requestId) profileLoadSeqRef.current += 1
+      momentLoadMoreSeqRef.current += 1
+    }
+  }, [currentUser.userId, currentUser.role])
 
   useEffect(() => {
     const IP_CACHE_KEY = `camera-ip-${currentUser.userId}`
@@ -203,14 +227,23 @@ export function ProfilePage() {
     detectIpLocation()
   }, [currentUser.userId])
 
-  async function loadProfileData() {
-    const [myProfileRes, momRes, credRes, ordRes, followersRes] = await Promise.allSettled([
+  async function loadProfileData(requestId) {
+    const isCurrentRequest = () => profileLoadSeqRef.current === requestId
+    const [myProfileRes, momRes, likedRes, favoriteRes, credRes, ordRes, followersRes] = await Promise.allSettled([
       userApi.me(currentUser),
-      momentApi.list({}, currentUser),
+      momentApi.profilePage({
+        authorId: currentUser.userId,
+        authorRole: currentUser.role,
+        page: 1,
+        size: PROFILE_MOMENT_PAGE_SIZE
+      }, currentUser),
+      momentApi.myInteractions({ interaction: 'LIKED', page: 1, size: 4 }, currentUser),
+      momentApi.myInteractions({ interaction: 'FAVORITED', page: 1, size: 4 }, currentUser),
       creditApi.summary(currentUser.userId, currentUser),
       orderApi.list({ role: isProvider ? 'provider' : 'customer' }, currentUser),
       userApi.followers(currentUser.userId, currentUser)
     ])
+    if (!isCurrentRequest()) return
     if (myProfileRes.status === 'fulfilled' && myProfileRes.value) {
       const role = myProfileRes.value.currentRole || myProfileRes.value.role || currentUser.role
       const nickname = myProfileRes.value.nickname || currentUser.nickname
@@ -231,6 +264,7 @@ export function ProfilePage() {
           avatarData = currentUser.avatarData || ''
         }
       }
+      if (!isCurrentRequest()) return
       updateProfile({
         userId: myProfileRes.value.userId || myProfileRes.value.id || currentUser.userId,
         id: myProfileRes.value.userId || myProfileRes.value.id || currentUser.userId,
@@ -253,7 +287,21 @@ export function ProfilePage() {
         locationVisible: myProfileRes.value.locationVisible ?? currentUser.locationVisible ?? false,
       })
     }
-    setMoments(momRes.status === 'fulfilled' ? momRes.value : [])
+    const profileMomentPage = momRes.status === 'fulfilled' ? momRes.value : null
+    setMoments(Array.isArray(profileMomentPage?.records) ? profileMomentPage.records : [])
+    setMomentPage({
+      page: Number(profileMomentPage?.page) || 1,
+      total: Number(profileMomentPage?.total) || 0,
+      loadingMore: false
+    })
+    setReceivedInteractionCount(
+      (Number(profileMomentPage?.totalLikeCount) || 0)
+      + (Number(profileMomentPage?.totalFavoriteCount) || 0)
+    )
+    setLikedMoments(likedRes.status === 'fulfilled' && Array.isArray(likedRes.value?.records)
+      ? likedRes.value.records : [])
+    setFavoriteMoments(favoriteRes.status === 'fulfilled' && Array.isArray(favoriteRes.value?.records)
+      ? favoriteRes.value.records : [])
     setCreditSummary(credRes.status === 'fulfilled' ? credRes.value : null)
     const orders = ordRes.status === 'fulfilled' ? ordRes.value : getOrderSnapshotsForUser(currentUser.userId)
     setProfileOrders(orders)
@@ -262,27 +310,73 @@ export function ProfilePage() {
     const rawFollowers = followersRes.status === 'fulfilled' ? followersRes.value : []
     try {
       const socialLists = await loadProfileSocialLists({ rawFollowers, currentUser, userApi, fileApi })
+      if (!isCurrentRequest()) return
       setMyFollowers(socialLists.followers)
       setMyFollowing(socialLists.following)
     } catch {
+      if (!isCurrentRequest()) return
       setMyFollowers(rawFollowers)
       setMyFollowing([])
     }
     if (!isProvider) {
       try {
         const interestsPage = await servicePackageApi.myInterests({ page: 1, size: 50 }, currentUser).catch(() => null)
+        if (!isCurrentRequest()) return
         setMyInterests(interestsPage?.records || interestsPage?.content || (Array.isArray(interestsPage) ? interestsPage : []))
-      } catch { setMyInterests([]) }
+      } catch {
+        if (!isCurrentRequest()) return
+        setMyInterests([])
+      }
       try {
         const demandsRes = await demandApi.myDemands(currentUser).catch(() => null)
+        if (!isCurrentRequest()) return
         setMyDemands(Array.isArray(demandsRes) ? demandsRes : (demandsRes?.records || demandsRes?.content || []))
-      } catch { setMyDemands([]) }
+      } catch {
+        if (!isCurrentRequest()) return
+        setMyDemands([])
+      }
     } else {
       try {
         const showcasesRes = await servicePackageApi.myHistory(currentUser).catch(() => null)
+        if (!isCurrentRequest()) return
         const all = Array.isArray(showcasesRes) ? showcasesRes : (showcasesRes?.records || showcasesRes?.content || [])
         setMyShowcases(all.filter(s => s.status === 'ONLINE'))
-      } catch { setMyShowcases([]) }
+      } catch {
+        if (!isCurrentRequest()) return
+        setMyShowcases([])
+      }
+    }
+  }
+
+  async function loadMoreProfileMoments() {
+    if (momentPage.loadingMore || moments.length >= momentPage.total) return
+    const requestId = ++momentLoadMoreSeqRef.current
+    setMomentPage(current => ({ ...current, loadingMore: true }))
+    try {
+      const next = await momentApi.profilePage({
+        authorId: currentUser.userId,
+        authorRole: currentUser.role,
+        page: momentPage.page + 1,
+        size: PROFILE_MOMENT_PAGE_SIZE
+      }, currentUser)
+      if (momentLoadMoreSeqRef.current !== requestId) return
+      const additions = Array.isArray(next?.records) ? next.records : []
+      setMoments(current => {
+        const seen = new Set(current.map(moment => Number(moment.momentId)))
+        return [...current, ...additions.filter(moment => !seen.has(Number(moment.momentId)))]
+      })
+      setMomentPage({
+        page: Number(next?.page) || momentPage.page + 1,
+        total: Number(next?.total) || 0,
+        loadingMore: false
+      })
+      setReceivedInteractionCount(
+        (Number(next?.totalLikeCount) || 0) + (Number(next?.totalFavoriteCount) || 0)
+      )
+    } catch (error) {
+      if (momentLoadMoreSeqRef.current !== requestId) return
+      setMomentPage(current => ({ ...current, loadingMore: false }))
+      setNotice({ type: 'err', text: error?.message || '更多动态加载失败，请稍后重试' })
     }
   }
 
@@ -369,12 +463,7 @@ export function ProfilePage() {
     () => moments.filter(m => Number(m.authorId) === currentUser.userId && m.authorRole === currentUser.role),
     [moments, currentUser.userId, currentUser.role]
   )
-  const favoriteMoments = useMemo(() => moments.filter(m => m.favoritedByCurrentUser), [moments])
-  const likedMoments = useMemo(() => moments.filter(m => m.likedByCurrentUser), [moments])
-  const totalLikesAndFavorites = useMemo(
-    () => myMoments.reduce((sum, m) => sum + (m.likeCount || 0) + (m.favoriteCount || 0), 0),
-    [myMoments]
-  )
+  const totalLikesAndFavorites = receivedInteractionCount
   const follows = myFollowing.map(f => ({ ...f, authorId: f.userId ?? f.authorId })).filter(f => Number(f.authorId) !== currentUser.userId)
   const savedPhotos = readSavedPhotos()
   const TERMINAL_STATUSES = ['COMPLETED','REVIEWED','CANCELLED','REFUNDED','APPEALING']
@@ -839,6 +928,13 @@ export function ProfilePage() {
             </div>
           )}
           </div>
+          {moments.length < momentPage.total && (
+            <div style={{display:'flex',justifyContent:'center',marginTop:22}}>
+              <button className="secondary-btn" type="button" onClick={loadMoreProfileMoments} disabled={momentPage.loadingMore}>
+                {momentPage.loadingMore ? '正在加载更多动态…' : `加载更多动态（${moments.length}/${momentPage.total}）`}
+              </button>
+            </div>
+          )}
         </section>
       </section>
 
