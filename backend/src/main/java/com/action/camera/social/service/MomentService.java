@@ -4,6 +4,7 @@ import com.action.camera.admin.domain.ModerationStatus;
 import com.action.camera.admin.dto.ModerationView;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
+import com.action.camera.common.page.PageResult;
 import com.action.camera.common.security.CurrentUser;
 import com.action.camera.notification.dto.NotificationCreateRequest;
 import com.action.camera.notification.service.NotificationService;
@@ -11,8 +12,11 @@ import com.action.camera.social.domain.MomentPost;
 import com.action.camera.social.domain.MomentStatus;
 import com.action.camera.social.dto.CreateMomentRequest;
 import com.action.camera.social.dto.MomentDto;
+import com.action.camera.social.dto.ProfileMomentPageResponse;
 import com.action.camera.social.repository.MomentPostRepository;
 import com.action.camera.social.repository.UserFollowRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -82,6 +86,67 @@ public class MomentService {
         return moments.stream()
                 .map(moment -> toListDto(moment, user))
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public ProfileMomentPageResponse listProfileMoments(CurrentUser user,
+                                                        Long authorId,
+                                                        String authorRole,
+                                                        int page,
+                                                        int size) {
+        if (authorId == null || authorId <= 0) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "authorId must be positive");
+        }
+        if (authorRole == null || authorRole.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "authorRole must not be blank");
+        }
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.max(1, Math.min(size, 50));
+        String normalizedRole = authorRole.trim().toUpperCase();
+        if (!"CUSTOMER".equals(normalizedRole) && !"PROVIDER".equals(normalizedRole)) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "unsupported authorRole");
+        }
+        Page<MomentPost> momentPage = momentPostRepository
+                .findByAuthorIdAndAuthorRoleAndStatusAndModerationStatusOrderByCreatedAtDescIdDesc(
+                        authorId,
+                        normalizedRole,
+                        MomentStatus.PUBLISHED,
+                        ModerationStatus.VISIBLE,
+                        PageRequest.of(safePage - 1, safeSize));
+        List<MomentDto> records = momentPage.getContent().stream()
+                .map(moment -> toListDto(moment, user))
+                .toList();
+        return new ProfileMomentPageResponse(
+                records,
+                safePage,
+                safeSize,
+                momentPage.getTotalElements(),
+                momentPostRepository.countLikesReceived(
+                        authorId, normalizedRole, MomentStatus.PUBLISHED, ModerationStatus.VISIBLE),
+                momentPostRepository.countFavoritesReceived(
+                        authorId, normalizedRole, MomentStatus.PUBLISHED, ModerationStatus.VISIBLE));
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<MomentDto> listMyInteractedMoments(CurrentUser user,
+                                                         String interaction,
+                                                         int page,
+                                                         int size) {
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.max(1, Math.min(size, 50));
+        PageRequest pageable = PageRequest.of(safePage - 1, safeSize);
+        Page<MomentPost> momentPage = switch (interaction == null ? "" : interaction.trim().toUpperCase()) {
+            case "LIKED" -> momentPostRepository.findLikedByUser(
+                    user.getUserId(), MomentStatus.PUBLISHED, ModerationStatus.VISIBLE, pageable);
+            case "FAVORITED" -> momentPostRepository.findFavoritedByUser(
+                    user.getUserId(), MomentStatus.PUBLISHED, ModerationStatus.VISIBLE, pageable);
+            default -> throw new BusinessException(ErrorCode.VALIDATION_ERROR, "unsupported interaction");
+        };
+        return new PageResult<>(
+                momentPage.getContent().stream().map(moment -> toListDto(moment, user)).toList(),
+                safePage,
+                safeSize,
+                momentPage.getTotalElements());
     }
 
     @Transactional

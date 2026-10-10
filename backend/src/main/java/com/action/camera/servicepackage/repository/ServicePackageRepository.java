@@ -18,6 +18,9 @@ public interface ServicePackageRepository extends JpaRepository<ServicePackage, 
 
     List<ServicePackage> findByStatus(ServicePackageStatus status);
 
+    List<ServicePackage> findByProviderIdAndStatusAndHiddenByProviderFalse(
+            Long providerId, ServicePackageStatus status);
+
     @Query(value = """
             select sp.*
             from service_packages sp
