@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Answers;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -90,10 +91,20 @@ class DemandA4BehaviorTest {
         }
         DemandRepository repository = mock(DemandRepository.class, invocation -> {
             if (invocation.getMethod().getName().equals("findByStatus")) {
-                return demands;
+                throw new AssertionError("recommend 应使用数据库筛选后的 unpaged 查询");
             }
             if (invocation.getMethod().getName().equals("findPublicPage")) {
-                throw new AssertionError("recommend 必须保留完整候选集语义");
+                assertThat(invocation.getArgument(0, String.class)).isNull();
+                assertThat(invocation.getArgument(1, String.class)).isNull();
+                assertThat(invocation.getArgument(2, String.class)).isNull();
+                assertThat(invocation.getArgument(3, LocalDate.class)).isNull();
+                assertThat(invocation.getArgument(4, String.class)).isNull();
+                assertThat(invocation.getArgument(5, Long.class)).isNull();
+                assertThat(invocation.getArgument(6, Long.class)).isNull();
+                assertThat(invocation.getArgument(7, String.class)).isNull();
+                Pageable pageable = invocation.getArgument(8, Pageable.class);
+                assertThat(pageable.isUnpaged()).isTrue();
+                return new PageImpl<>(demands, pageable, demands.size());
             }
             return Answers.RETURNS_DEFAULTS.answer(invocation);
         });

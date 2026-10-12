@@ -493,8 +493,8 @@ export function ServicePackageDetailPage() {
   const { currentUser } = useAuth()
   const [service, setService] = useState(null)
   const [providerCreditScore, setProviderCreditScore] = useState(null)
-  const [interested, setInterested] = useState(false)
-  const [followingProvider, setFollowingProvider] = useState(false)
+  const [interested, setInterested] = useState(null)
+  const [followingProvider, setFollowingProvider] = useState(null)
   const [status, setStatus] = useState(createStatus)
   const [inlineNotice, setInlineNotice] = useState(null)
   const [galleryStart, setGalleryStart] = useState(0)
@@ -551,23 +551,20 @@ export function ServicePackageDetailPage() {
   useEffect(() => {
     let ignored = false
     async function loadService() {
+      setService(null)
+      setInterested(null)
+      setFollowingProvider(null)
+      setProviderCreditScore(null)
       setStatus({ loading: true, error: '' })
       try {
-        const [detail, interestPage, providerFollowing] = await Promise.all([
-          servicePackageApi.detail(serviceId, currentUser),
-          currentUser.role === 'CUSTOMER'
-            ? servicePackageApi.myInterests({ page: 1, size: 100 }, currentUser).catch(() => null)
-            : Promise.resolve(null),
-          userApi.following(currentUser.userId, currentUser, 'PROVIDER').catch(() => [])
-        ])
-        if (!ignored) {
-          const enriched = await enrichServiceProvider(detail, currentUser)
-          setService(enriched)
-          setInterested(Boolean(interestPage?.records?.some(item => Number(item.serviceId) === Number(serviceId))))
-          const pid = enriched.photographerId || enriched.providerId
-          setFollowingProvider(Array.isArray(providerFollowing) && providerFollowing.some(f => Number(f.userId ?? f.authorId) === Number(pid)))
-          setStatus({ loading: false, error: '' })
-        }
+        const detail = await servicePackageApi.detail(serviceId, currentUser)
+        if (ignored) return
+        setService(detail)
+        setProviderCreditScore(detail.creditScore ?? null)
+        setStatus({ loading: false, error: '' })
+        enrichServiceProvider(detail, currentUser).then(enriched => {
+          if (!ignored) setService(enriched)
+        })
       } catch (error) {
         if (!ignored) {
           setService(null)
@@ -581,19 +578,58 @@ export function ServicePackageDetailPage() {
 
   useEffect(() => {
     let ignored = false
+    if (!service) return () => { ignored = true }
+
+    if (currentUser.role === 'CUSTOMER') {
+      setInterested(null)
+      servicePackageApi.myInterests({ page: 1, size: 100 }, currentUser)
+        .then(page => {
+          if (!ignored) {
+            setInterested(Boolean(page?.records?.some(item => Number(item.serviceId) === Number(serviceId))))
+          }
+        })
+        .catch(() => {
+          if (!ignored) setInterested(null)
+        })
+    } else {
+      setInterested(false)
+    }
+
+    const pid = providerProfileId
+    if (!pid) {
+      setFollowingProvider(false)
+      return () => { ignored = true }
+    }
+    setFollowingProvider(null)
+    userApi.following(currentUser.userId, currentUser, 'PROVIDER')
+      .then(providerFollowing => {
+        if (!ignored) {
+          setFollowingProvider(Array.isArray(providerFollowing)
+            && providerFollowing.some(f => Number(f.userId ?? f.authorId) === Number(pid)))
+        }
+      })
+      .catch(() => {
+        if (!ignored) setFollowingProvider(null)
+      })
+    return () => { ignored = true }
+  }, [currentUser, providerProfileId, service?.serviceId, serviceId])
+
+  useEffect(() => {
+    let ignored = false
     if (!providerProfileId) {
       setProviderCreditScore(null)
       return () => { ignored = true }
     }
+    setProviderCreditScore(service?.creditScore ?? null)
     creditApi.summary(providerProfileId, currentUser)
       .then(summary => {
         if (!ignored) setProviderCreditScore(summary?.creditScore ?? null)
       })
       .catch(() => {
-        if (!ignored) setProviderCreditScore(null)
+        if (!ignored) setProviderCreditScore(service?.creditScore ?? null)
       })
     return () => { ignored = true }
-  }, [currentUser, providerProfileId])
+  }, [currentUser, providerProfileId, service?.creditScore])
 
   if (status.loading) return <DetailShell backLabel="← 返回橱窗大厅"><LoadingState text="正在加载真实橱窗详情" /></DetailShell>
   if (status.error) return <DetailShell backLabel="← 返回橱窗大厅"><ErrorState message={status.error} /></DetailShell>
@@ -649,6 +685,7 @@ export function ServicePackageDetailPage() {
   }
 
   async function toggleInterest() {
+    if (interested === null) return
     try {
       if (interested) {
         await servicePackageApi.cancelInterest(service.serviceId, currentUser)
@@ -665,7 +702,7 @@ export function ServicePackageDetailPage() {
   }
 
   async function toggleFollowProvider() {
-    if (!providerProfileId) return
+    if (!providerProfileId || followingProvider === null) return
     try {
       if (followingProvider) {
         await userApi.unfollow(providerProfileId, currentUser, 'PROVIDER')
@@ -785,7 +822,9 @@ export function ServicePackageDetailPage() {
                 <div className="photographer-card-credit">{hasCreditScore ? `信用评分：${credit}` : '暂无信用评分'}</div>
               </div>
             </button>
-            <button className="secondary-btn" style={{ width: '100%' }} type="button" onClick={toggleFollowProvider}>{followingProvider ? '已关注' : '关注摄影师'}</button>
+            <button className="secondary-btn" style={{ width: '100%' }} type="button" onClick={toggleFollowProvider} disabled={followingProvider === null}>
+              {followingProvider === null ? '关注状态加载中…' : followingProvider ? '已关注' : '关注摄影师'}
+            </button>
           </div>
           {isCustomerViewer && (
             <div className="aside-card">
@@ -798,7 +837,9 @@ export function ServicePackageDetailPage() {
                 </div>
               )}
               <div className="detail-op-actions side-actions">
-                <button className="secondary-btn owner-only" type="button" onClick={toggleInterest}>{interested ? '取消意向' : '加入意向'}</button>
+                <button className="secondary-btn owner-only" type="button" onClick={toggleInterest} disabled={interested === null}>
+                  {interested === null ? '意向状态加载中…' : interested ? '取消意向' : '加入意向'}
+                </button>
                 <button className="primary-btn owner-only" type="button" onClick={() => startChat()}>现在预定</button>
               </div>
             </div>

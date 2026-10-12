@@ -29,6 +29,7 @@ import com.action.camera.servicepackage.domain.ServicePackageStatus;
 import com.action.camera.servicepackage.repository.ServicePackageRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -191,7 +192,16 @@ public class DemandService {
             return new PageResult<>(records, safePage, safeSize, demandPage.getTotalElements());
         }
 
-        List<Demand> publicDemands = demandRepository.findByStatus(publicStatus);
+        List<Demand> publicDemands = demandRepository.findPublicPage(
+                normalizedCity,
+                normalizedScene,
+                normalizedTag,
+                expectedDate,
+                normalizedTimeTag,
+                minBudgetCent,
+                maxBudgetCent,
+                null,
+                Pageable.unpaged()).getContent();
         Map<Long, CustomerInfo> customers = loadCustomerInfo(publicDemands);
         List<Demand> candidates = publicDemands.stream()
                 .filter(Demand::isModerationVisible)
@@ -771,10 +781,8 @@ public class DemandService {
                                                                   Integer maxBudgetCent) {
         List<ServicePackage> providerPackages = currentUser == null || !currentUser.isProvider()
                 ? List.of()
-                : servicePackageRepository.findByStatus(ServicePackageStatus.ONLINE).stream()
-                .filter(servicePackage -> Objects.equals(servicePackage.getProviderId(), currentUser.getUserId()))
-                .filter(servicePackage -> !Boolean.TRUE.equals(servicePackage.getHiddenByProvider()))
-                .toList();
+                : servicePackageRepository.findByProviderIdAndStatusAndHiddenByProviderFalse(
+                        currentUser.getUserId(), ServicePackageStatus.ONLINE);
         String preferredCity = providerPackages.stream()
                 .map(ServicePackage::getCityCode)
                 .filter(value -> !isBlank(value))

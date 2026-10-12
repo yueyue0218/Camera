@@ -17,7 +17,6 @@ import { submitDemandResponse } from './utils/respondDemand.js'
 import '../portraHall.css'
 
 const PAGE_SIZE = 20
-const FEED_CURSOR_STORAGE_KEY = 'portra-hall-feed-cursors'
 const HALL_RETURN_STATE_STORAGE_KEY = 'portra-hall-return-state'
 
 const initialFilters = {
@@ -93,37 +92,56 @@ function pageInfoFromResult(page, fallbackPage, fallbackSize) {
   }
 }
 
-function readFeedCursors() {
-  if (typeof window === 'undefined') return {}
-  try {
-    return JSON.parse(window.sessionStorage.getItem(FEED_CURSOR_STORAGE_KEY) || '{}')
-  } catch {
-    return {}
+function panelCacheKey(filters = initialFilters) {
+  return JSON.stringify({
+    keyword: filters.keyword || '',
+    cityCode: filters.cityCode || '',
+    type: filters.type || '',
+    minBudgetYuan: filters.minBudgetYuan || '',
+    maxBudgetYuan: filters.maxBudgetYuan || '',
+    timeTag: filters.timeTag || ''
+  })
+}
+
+function listRequestKey(panel, viewerKey, filters, page) {
+  return JSON.stringify({
+    panel,
+    viewerKey,
+    filters: panelCacheKey(filters),
+    sort: filters?.sort || 'recommend',
+    feedSeed: filters?.feedSeed || '',
+    page
+  })
+}
+
+function interestCacheKey(viewerKey, filters = initialFilters) {
+  return JSON.stringify({
+    viewerKey,
+    filters: panelCacheKey(filters),
+    sort: filters?.sort || 'recommend'
+  })
+}
+
+function idlePageState(pageState) {
+  return {
+    ...createInitialPageState(),
+    ...(pageState || {}),
+    loading: false,
+    loadingMore: false,
+    refreshing: false,
+    error: '',
+    errorMode: ''
   }
 }
 
-function rememberFeedCursor(panel, pageInfo) {
-  if (typeof window === 'undefined' || !pageInfo) return
-  try {
-    const current = readFeedCursors()
-    window.sessionStorage.setItem(FEED_CURSOR_STORAGE_KEY, JSON.stringify({
-      ...current,
-      [panel]: {
-        page: pageInfo.page,
-        hasNext: pageInfo.hasNext,
-        total: pageInfo.total
-      }
-    }))
-  } catch {
-    // Browsers can disable sessionStorage; the feed still works without persistence.
-  }
-}
-
-function storedNextFeedPage(panel) {
-  const cursor = readFeedCursors()[panel]
-  const page = Number(cursor?.page)
-  if (!Number.isFinite(page) || page < 1) return 1
-  return cursor?.hasNext ? page + 1 : 1
+function hallSnapshotContextKey(state) {
+  return JSON.stringify({
+    viewerKey: state?.viewerKey || '',
+    search: state?.search || '',
+    activePanel: state?.activePanel || '',
+    filters: panelCacheKey(state?.filters || initialFilters),
+    sort: state?.sort || 'recommend'
+  })
 }
 
 function saveHallReturnState(state) {
@@ -131,6 +149,7 @@ function saveHallReturnState(state) {
   try {
     window.sessionStorage.setItem(HALL_RETURN_STATE_STORAGE_KEY, JSON.stringify({
       ...state,
+      contextKey: hallSnapshotContextKey(state),
       savedAt: Date.now()
     }))
   } catch {
@@ -145,7 +164,9 @@ function consumeHallReturnState(search) {
     if (!raw) return null
     window.sessionStorage.removeItem(HALL_RETURN_STATE_STORAGE_KEY)
     const state = JSON.parse(raw)
-    if (state?.search !== search) return null
+    if (state?.activePanel !== panelFromSearch(search)) return null
+    if (state?.sort !== 'recommend') return null
+    if (state?.contextKey !== hallSnapshotContextKey(state)) return null
     if (Date.now() - Number(state.savedAt || 0) > 10 * 60 * 1000) return null
     return state
   } catch {
@@ -241,6 +262,7 @@ async function enrichServiceProviders(records, currentUser) {
 
 export function HallPage() {
   const { currentUser } = useAuth()
+  const viewerKey = `${currentUser.userId}:${currentUser.role}`
   const navigate = useNavigate()
   const location = useLocation()
   const [activePanel, setActivePanel] = useState(() => panelFromSearch(location.search))
@@ -264,12 +286,14 @@ export function HallPage() {
   const interestRequestSeq = useRef(0)
   const responsesRequestSeq = useRef(0)
   const isMountedRef = useRef(false)
-  const demandAppendInFlight = useRef(false)
-  const serviceAppendInFlight = useRef(false)
+  const inFlightRequestsRef = useRef(new Map())
+  const interestLoadedKeyRef = useRef('')
   const demandSentinelRef = useRef(null)
   const serviceSentinelRef = useRef(null)
   const suppressAutoLoadUntil = useRef(0)
   const initialLoadSearchRef = useRef(null)
+  const loadedPanelKeysRef = useRef({ demands: '', showcases: '' })
+  const restoredReturnStateRef = useRef(null)
 
   const interestedIds = useMemo(() => new Set(interests.map(item => item.serviceId)), [interests])
 
@@ -281,12 +305,31 @@ export function HallPage() {
       serviceRequestSeq.current += 1
       interestRequestSeq.current += 1
       responsesRequestSeq.current += 1
+      inFlightRequestsRef.current.clear()
     }
   }, [])
 
   useEffect(() => {
     initialLoadSearchRef.current = location.search
-    const returnState = consumeHallReturnState(location.search)
+    loadedPanelKeysRef.current = { demands: '', showcases: '' }
+    demandRequestSeq.current += 1
+    serviceRequestSeq.current += 1
+    interestRequestSeq.current += 1
+    responsesRequestSeq.current += 1
+    inFlightRequestsRef.current.clear()
+    interestLoadedKeyRef.current = ''
+    setDemands([])
+    setServices([])
+    setInterests([])
+    setRespondedDemandIds(new Set())
+    setDemandPagination(createInitialPageState())
+    setServicePagination(createInitialPageState())
+    const savedReturnState = consumeHallReturnState(location.search)
+    if (savedReturnState) restoredReturnStateRef.current = savedReturnState
+    if (restoredReturnStateRef.current?.viewerKey !== viewerKey) {
+      restoredReturnStateRef.current = null
+    }
+    const returnState = restoredReturnStateRef.current
     if (returnState) {
       setActivePanel(returnState.activePanel || panelFromSearch(location.search))
       setFeedSeeds(returnState.feedSeeds || {
@@ -296,28 +339,45 @@ export function HallPage() {
       setFilters(returnState.filters || initialFilters)
       setDemands(Array.isArray(returnState.demands) ? returnState.demands : [])
       setServices(Array.isArray(returnState.services) ? returnState.services : [])
-      setDemandPagination(returnState.demandPagination || createInitialPageState())
-      setServicePagination(returnState.servicePagination || createInitialPageState())
+      setDemandPagination(idlePageState(returnState.demandPagination))
+      setServicePagination(idlePageState(returnState.servicePagination))
+      const restoredPanel = returnState.activePanel || panelFromSearch(location.search)
+      loadedPanelKeysRef.current = returnState.loadedPanelKeys || {
+        demands: restoredPanel === 'demands' || returnState.demands?.length
+          ? panelCacheKey(returnState.filters || initialFilters) : '',
+        showcases: restoredPanel === 'showcases' || returnState.services?.length
+          ? panelCacheKey(returnState.filters || initialFilters) : ''
+      }
       window.requestAnimationFrame(() => {
         window.scrollTo({ top: Number(returnState.scrollY) || 0, left: 0, behavior: 'auto' })
       })
-      loadInterests(returnState.filters || initialFilters)
-      loadMyResponses()
+      if ((returnState.activePanel || panelFromSearch(location.search)) === 'showcases') {
+        loadInterests(returnState.filters || initialFilters, { force: true })
+      } else {
+        loadMyResponses()
+      }
       return
     }
     const currentPanel = panelFromSearch(location.search)
-    loadDemands({
-      page: currentPanel === 'demands' ? storedNextFeedPage('demands') : 1,
-      mode: 'replace',
-      rememberCursor: currentPanel === 'demands'
-    })
-    loadServices({
-      page: currentPanel === 'showcases' ? storedNextFeedPage('showcases') : 1,
-      mode: 'replace',
-      rememberCursor: currentPanel === 'showcases'
-    })
-    loadInterests()
-    loadMyResponses()
+    const params = new URLSearchParams(location.search)
+    const published = params.get('published')
+    const promoteId = params.get('id') || ''
+    if (currentPanel === 'demands') {
+      loadDemands({
+        page: 1,
+        mode: 'replace',
+        promoteId: published === 'demand' ? promoteId : ''
+      })
+      loadMyResponses()
+    } else {
+      loadServices({
+        page: 1,
+        mode: 'replace',
+        promoteId: published === 'showcase' ? promoteId : ''
+      })
+      loadInterests(initialFilters, { force: Boolean(published) })
+    }
+    if (published) showPublishedNotice(published, promoteId)
   }, [currentUser.userId, currentUser.role])
 
   useEffect(() => {
@@ -327,12 +387,28 @@ export function HallPage() {
   }, [currentUser.role])
 
   useEffect(() => {
+    if (initialLoadSearchRef.current === location.search) {
+      initialLoadSearchRef.current = null
+      return
+    }
     setActivePanel(panelFromSearch(location.search))
     const params = new URLSearchParams(location.search)
     const published = params.get('published')
     const id = params.get('id')
     if (published === 'demand') {
       loadDemands({ page: 1, mode: 'replace', promoteId: id })
+      loadMyResponses()
+      showPublishedNotice(published, id)
+    }
+    if (published === 'showcase') {
+      loadServices({ page: 1, mode: 'replace', promoteId: id })
+      loadInterests(initialFilters, { force: true })
+      showPublishedNotice(published, id)
+    }
+  }, [location.search, navigate])
+
+  function showPublishedNotice(published, id) {
+    if (published === 'demand') {
       setNotice({
         type: 'success',
         text: '需求已发布',
@@ -341,8 +417,6 @@ export function HallPage() {
       })
     }
     if (published === 'showcase') {
-      loadServices({ page: 1, mode: 'replace', promoteId: id })
-      loadInterests()
       setNotice({
         type: 'success',
         text: '橱窗已发布',
@@ -350,13 +424,28 @@ export function HallPage() {
         onAction: id ? () => navigate(`/service-packages/${id}`) : undefined
       })
     }
-  }, [location.search, navigate])
+  }
 
   useEffect(() => {
     if (!notice) return undefined
     const timer = window.setTimeout(() => setNotice(null), 3200)
     return () => window.clearTimeout(timer)
   }, [notice])
+
+  function feedFiltersFor(panel, nextFilters = filters) {
+    const feedSeed = panel === 'demands' ? feedSeeds.demands : feedSeeds.showcases
+    return {
+      ...nextFilters,
+      sort: 'recommend',
+      feedSeed: nextFilters?.feedSeed || feedSeed
+    }
+  }
+
+  function isListRequestInFlight(panel, nextFilters, page) {
+    const requestFilters = feedFiltersFor(panel, nextFilters)
+    const key = `list:${listRequestKey(panel, viewerKey, requestFilters, page)}`
+    return inFlightRequestsRef.current.has(key)
+  }
 
   useEffect(() => {
     const target = activePanel === 'demands' ? demandSentinelRef.current : serviceSentinelRef.current
@@ -371,7 +460,7 @@ export function HallPage() {
           demandPagination.loadingMore ||
           demandPagination.refreshing ||
           !demandPagination.hasNext ||
-          demandAppendInFlight.current
+          isListRequestInFlight('demands', filters, demandPagination.page + 1)
         ) return
         loadMoreDemands()
         return
@@ -381,7 +470,7 @@ export function HallPage() {
         servicePagination.loadingMore ||
         servicePagination.refreshing ||
         !servicePagination.hasNext ||
-        serviceAppendInFlight.current
+        isListRequestInFlight('showcases', filters, servicePagination.page + 1)
       ) return
       loadMoreServices()
     }, { rootMargin: '360px 0px 480px' })
@@ -501,13 +590,17 @@ export function HallPage() {
     return [promoted, ...records.filter(record => Number(record.serviceId) !== id)].slice(0, size)
   }
 
-  async function loadDemands({ nextFilters = filters, page = 1, mode = 'replace', cacheBust = '', promoteId = '', rememberCursor = true } = {}) {
+  async function loadDemands({ nextFilters = filters, page = 1, mode = 'replace', cacheBust = '', promoteId = '' } = {}) {
     const size = demandPagination.size || PAGE_SIZE
+    const requestFilters = feedFiltersFor('demands', nextFilters)
+    const requestKey = `list:${listRequestKey('demands', viewerKey, requestFilters, page)}`
+    const pendingRequest = inFlightRequestsRef.current.get(requestKey)
+    if (pendingRequest) return pendingRequest
     const requestId = ++demandRequestSeq.current
-    if (mode !== 'append') demandAppendInFlight.current = false
     updateDemandLoading(mode, true)
-    try {
-      const result = await demandApi.list(demandParams(nextFilters, page, size, cacheBust), currentUser)
+    const request = (async () => {
+      try {
+      const result = await demandApi.list(demandParams(requestFilters, page, size, cacheBust), currentUser)
       const rawRecords = result?.records || []
       const enrichedRecords = await enrichDemandPublishers(rawRecords, currentUser)
       const visibleRecords = promoteId && mode !== 'append'
@@ -515,7 +608,7 @@ export function HallPage() {
         : enrichedRecords
       const pageInfo = pageInfoFromResult(result, page, size)
       if (!isMountedRef.current || requestId !== demandRequestSeq.current) return null
-      if (rememberCursor) rememberFeedCursor('demands', pageInfo)
+      loadedPanelKeysRef.current.demands = panelCacheKey(requestFilters)
       setDemands(current => mode === 'append'
         ? appendUniqueById(current, visibleRecords, 'demandId')
         : visibleRecords)
@@ -544,16 +637,27 @@ export function HallPage() {
         setNotice({ type: 'error', text: message })
       }
       return null
-    }
+      }
+    })().finally(() => {
+      if (inFlightRequestsRef.current.get(requestKey) === request) {
+        inFlightRequestsRef.current.delete(requestKey)
+      }
+    })
+    inFlightRequestsRef.current.set(requestKey, request)
+    return request
   }
 
-  async function loadServices({ nextFilters = filters, page = 1, mode = 'replace', cacheBust = '', promoteId = '', rememberCursor = true } = {}) {
+  async function loadServices({ nextFilters = filters, page = 1, mode = 'replace', cacheBust = '', promoteId = '' } = {}) {
     const size = servicePagination.size || PAGE_SIZE
+    const requestFilters = feedFiltersFor('showcases', nextFilters)
+    const requestKey = `list:${listRequestKey('showcases', viewerKey, requestFilters, page)}`
+    const pendingRequest = inFlightRequestsRef.current.get(requestKey)
+    if (pendingRequest) return pendingRequest
     const requestId = ++serviceRequestSeq.current
-    if (mode !== 'append') serviceAppendInFlight.current = false
     updateServiceLoading(mode, true)
-    try {
-      const result = await servicePackageApi.list(serviceParams(nextFilters, page, size, cacheBust), currentUser)
+    const request = (async () => {
+      try {
+      const result = await servicePackageApi.list(serviceParams(requestFilters, page, size, cacheBust), currentUser)
       const rawRecords = result?.records || []
       const enrichedRecords = await enrichServiceProviders(rawRecords, currentUser)
       const visibleRecords = promoteId && mode !== 'append'
@@ -561,7 +665,7 @@ export function HallPage() {
         : enrichedRecords
       const pageInfo = pageInfoFromResult(result, page, size)
       if (!isMountedRef.current || requestId !== serviceRequestSeq.current) return null
-      if (rememberCursor) rememberFeedCursor('showcases', pageInfo)
+      loadedPanelKeysRef.current.showcases = panelCacheKey(requestFilters)
       setServices(current => mode === 'append'
         ? appendUniqueById(current, visibleRecords, 'serviceId')
         : visibleRecords)
@@ -590,22 +694,49 @@ export function HallPage() {
         setNotice({ type: 'error', text: message })
       }
       return null
-    }
+      }
+    })().finally(() => {
+      if (inFlightRequestsRef.current.get(requestKey) === request) {
+        inFlightRequestsRef.current.delete(requestKey)
+      }
+    })
+    inFlightRequestsRef.current.set(requestKey, request)
+    return request
   }
 
-  async function loadInterests(nextFilters = filters) {
-    const requestId = ++interestRequestSeq.current
+  async function loadInterests(nextFilters = filters, { force = false } = {}) {
     if (currentUser.role !== 'CUSTOMER') {
+      interestLoadedKeyRef.current = ''
       if (isMountedRef.current) setInterests([])
-      return
+      return null
     }
-    try {
-      const page = await servicePackageApi.myInterests({ page: 1, size: 50, timeTag: nextFilters.timeTag }, currentUser)
-      if (!isMountedRef.current || requestId !== interestRequestSeq.current) return
-      setInterests(page?.records || [])
-    } catch {
-      if (isMountedRef.current && requestId === interestRequestSeq.current) setInterests([])
-    }
+    const cacheKey = interestCacheKey(viewerKey, nextFilters)
+    if (!force && interestLoadedKeyRef.current === cacheKey) return interests
+    const requestKey = `interests:${cacheKey}`
+    const pendingRequest = inFlightRequestsRef.current.get(requestKey)
+    if (pendingRequest) return pendingRequest
+    const requestId = ++interestRequestSeq.current
+    const request = (async () => {
+      try {
+        const page = await servicePackageApi.myInterests({ page: 1, size: 50, timeTag: nextFilters.timeTag }, currentUser)
+        if (!isMountedRef.current || requestId !== interestRequestSeq.current) return null
+        setInterests(page?.records || [])
+        interestLoadedKeyRef.current = cacheKey
+        return page
+      } catch {
+        if (isMountedRef.current && requestId === interestRequestSeq.current) {
+          interestLoadedKeyRef.current = ''
+          setInterests([])
+        }
+        return null
+      }
+    })().finally(() => {
+      if (inFlightRequestsRef.current.get(requestKey) === request) {
+        inFlightRequestsRef.current.delete(requestKey)
+      }
+    })
+    inFlightRequestsRef.current.set(requestKey, request)
+    return request
   }
 
   async function loadMyResponses() {
@@ -651,7 +782,7 @@ export function HallPage() {
     }
     setFeedSeeds(current => ({ ...current, showcases: feedSeed }))
     loadServices({ nextFilters: requestFilters, page: 1, mode: 'replace' })
-    loadInterests(requestFilters)
+    loadInterests(requestFilters, { force: true })
   }
 
   function handlePublishClick() {
@@ -665,13 +796,16 @@ export function HallPage() {
   function rememberHallBeforeDetail() {
     saveHallReturnState({
       search: location.search,
+      viewerKey,
       activePanel,
       filters,
+      sort: 'recommend',
       feedSeeds,
       demands,
       services,
-      demandPagination,
-      servicePagination,
+      demandPagination: idlePageState(demandPagination),
+      servicePagination: idlePageState(servicePagination),
+      loadedPanelKeys: loadedPanelKeysRef.current,
       scrollY: window.scrollY
     })
   }
@@ -689,19 +823,22 @@ export function HallPage() {
   function changePanel(nextPanel) {
     const feedSeed = createFeedSeed()
     const requestFilters = { ...initialFilters, feedSeed }
-    const nextPage = storedNextFeedPage(nextPanel)
     setActivePanel(nextPanel)
     setFilters(initialFilters)
     setSelectedDemand(null)
     setSelectedService(null)
     navigate(`/hall?tab=${nextPanel === 'demands' ? 'demand' : 'showcase'}`, { replace: true })
+    const cacheKey = panelCacheKey(initialFilters)
     if (nextPanel === 'demands') {
+      loadMyResponses()
+      if (loadedPanelKeysRef.current.demands === cacheKey) return
       setFeedSeeds(current => ({ ...current, demands: feedSeed }))
-      loadDemands({ nextFilters: requestFilters, page: nextPage, mode: 'replace' })
+      loadDemands({ nextFilters: requestFilters, page: 1, mode: 'replace' })
     } else {
-      setFeedSeeds(current => ({ ...current, showcases: feedSeed }))
-      loadServices({ nextFilters: requestFilters, page: nextPage, mode: 'replace' })
       loadInterests(requestFilters)
+      if (loadedPanelKeysRef.current.showcases === cacheKey) return
+      setFeedSeeds(current => ({ ...current, showcases: feedSeed }))
+      loadServices({ nextFilters: requestFilters, page: 1, mode: 'replace' })
     }
   }
 
@@ -717,15 +854,13 @@ export function HallPage() {
     const refreshFilters = { ...filters, sort: 'recommend', feedSeed }
     if (activePanel === 'demands') {
       setFeedSeeds(current => ({ ...current, demands: feedSeed }))
-      const nextPage = demandPagination.hasNext ? demandPagination.page + 1 : 1
-      const listPromise = loadDemands({ nextFilters: refreshFilters, page: nextPage, mode: 'refresh', cacheBust })
+      const listPromise = loadDemands({ nextFilters: refreshFilters, page: 1, mode: 'refresh', cacheBust })
       loadMyResponses()
       return listPromise
     }
     setFeedSeeds(current => ({ ...current, showcases: feedSeed }))
-    const nextPage = servicePagination.hasNext ? servicePagination.page + 1 : 1
-    const listPromise = loadServices({ nextFilters: refreshFilters, page: nextPage, mode: 'refresh', cacheBust })
-    loadInterests(refreshFilters)
+    const listPromise = loadServices({ nextFilters: refreshFilters, page: 1, mode: 'refresh', cacheBust })
+    loadInterests(refreshFilters, { force: true })
     return listPromise
   }
 
@@ -741,17 +876,15 @@ export function HallPage() {
   }
 
   function loadMoreDemands() {
-    if (!demandPagination.hasNext || demandPagination.loadingMore || demandAppendInFlight.current) return
-    demandAppendInFlight.current = true
-    loadDemands({ page: demandPagination.page + 1, mode: 'append' })
-      .finally(() => { demandAppendInFlight.current = false })
+    const nextPage = demandPagination.page + 1
+    if (!demandPagination.hasNext || demandPagination.loadingMore || isListRequestInFlight('demands', filters, nextPage)) return
+    loadDemands({ page: nextPage, mode: 'append' })
   }
 
   function loadMoreServices() {
-    if (!servicePagination.hasNext || servicePagination.loadingMore || serviceAppendInFlight.current) return
-    serviceAppendInFlight.current = true
-    loadServices({ page: servicePagination.page + 1, mode: 'append' })
-      .finally(() => { serviceAppendInFlight.current = false })
+    const nextPage = servicePagination.page + 1
+    if (!servicePagination.hasNext || servicePagination.loadingMore || isListRequestInFlight('showcases', filters, nextPage)) return
+    loadServices({ page: nextPage, mode: 'append' })
   }
 
   async function reloadDemandsAfterRemoval() {
@@ -838,7 +971,7 @@ export function HallPage() {
     try {
       await servicePackageApi.offline(service.serviceId, currentUser)
       await reloadServicesAfterRemoval()
-      await loadInterests()
+      await loadInterests(filters, { force: true })
       setSelectedService(null)
       window.alert('橱窗已下架')
     } catch (error) {

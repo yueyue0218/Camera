@@ -25,6 +25,7 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -66,22 +67,26 @@ public class MomentPost {
 
     @OneToMany(mappedBy = "moment", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC, id ASC")
+    @BatchSize(size = 50)
     private List<MomentImage> images = new ArrayList<>();
 
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "moment_mentions", joinColumns = @JoinColumn(name = "moment_id"))
     @Column(name = "mention", length = 100)
     @OrderColumn(name = "sort_order")
+    @BatchSize(size = 50)
     private List<String> mentions = new ArrayList<>();
 
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "moment_likes", joinColumns = @JoinColumn(name = "moment_id"))
     @Column(name = "user_id", nullable = false)
+    @BatchSize(size = 50)
     private Set<Long> likedUserIds = new LinkedHashSet<>();
 
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "moment_favorites", joinColumns = @JoinColumn(name = "moment_id"))
     @Column(name = "user_id", nullable = false)
+    @BatchSize(size = 50)
     private Set<Long> favoritedUserIds = new LinkedHashSet<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)

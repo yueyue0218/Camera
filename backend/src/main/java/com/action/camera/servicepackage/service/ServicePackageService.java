@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -187,7 +188,17 @@ public class ServicePackageService {
                     keyword, normalizedSort);
         }
 
-        List<ServicePackage> packages = servicePackageRepository.findByStatus(ServicePackageStatus.ONLINE);
+        List<ServicePackage> packages = servicePackageRepository.findPublicPage(
+                normalizedCity,
+                normalizedScene,
+                normalizedStyle,
+                minPriceCent,
+                maxPriceCent,
+                availableDate == null ? null : availableDate.toString(),
+                normalizedTimeTag,
+                null,
+                "latest",
+                Pageable.unpaged()).getContent();
         List<ServicePackage> baseCandidates = packages.stream()
                 .filter(servicePackage -> servicePackage.getStatus() == ServicePackageStatus.ONLINE)
                 .filter(ServicePackage::isModerationVisible)

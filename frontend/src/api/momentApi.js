@@ -12,6 +12,12 @@ export const momentApi = {
   list(params = {}, currentUser) {
     return request(`/moments${buildQuery(params)}`, {}, currentUser)
   },
+  profilePage(params, currentUser) {
+    return request(`/moments/profile${buildQuery(params)}`, {}, currentUser)
+  },
+  myInteractions(params, currentUser) {
+    return request(`/moments/me/interactions${buildQuery(params)}`, {}, currentUser)
+  },
   create(body, currentUser) {
     return request('/moments', { method: 'POST', body: JSON.stringify(body) }, currentUser)
   },

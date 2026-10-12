@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Answers;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -305,7 +306,21 @@ class ServicePackageA2BehaviorTest {
     private ServicePackageRepository recommendationRepository(List<ServicePackage> packages) {
         return mock(ServicePackageRepository.class, invocation -> {
             if (invocation.getMethod().getName().equals("findByStatus")) {
-                return packages;
+                throw new AssertionError("recommend 应使用数据库筛选后的 unpaged 查询");
+            }
+            if (invocation.getMethod().getName().equals("findPublicPage")) {
+                assertThat(invocation.getArgument(0, String.class)).isNull();
+                assertThat(invocation.getArgument(1, String.class)).isNull();
+                assertThat(invocation.getArgument(2, String.class)).isNull();
+                assertThat(invocation.getArgument(3, Long.class)).isNull();
+                assertThat(invocation.getArgument(4, Long.class)).isNull();
+                assertThat(invocation.getArgument(5, String.class)).isNull();
+                assertThat(invocation.getArgument(6, String.class)).isNull();
+                assertThat(invocation.getArgument(7, String.class)).isNull();
+                assertThat(invocation.getArgument(8, String.class)).isEqualTo("latest");
+                Pageable pageable = invocation.getArgument(9, Pageable.class);
+                assertThat(pageable.isUnpaged()).isTrue();
+                return new PageImpl<>(packages, pageable, packages.size());
             }
             return Answers.RETURNS_DEFAULTS.answer(invocation);
         });
