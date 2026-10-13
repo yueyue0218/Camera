@@ -12,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -113,4 +114,17 @@ public interface DemandRepository extends JpaRepository<Demand, Long> {
             """)
     List<Demand> findOwnerHistory(@Param("customerId") Long customerId,
                                   @Param("statuses") Collection<DemandStatus> statuses);
+
+    @Query("""
+            select d from Demand d
+            where d.customerId = :customerId
+              and d.status = com.action.camera.demand.domain.DemandStatus.OPEN
+              and d.moderationStatus = com.action.camera.admin.domain.ModerationStatus.VISIBLE
+              and d.hiddenByCustomer = false
+              and (d.expireTime is null or d.expireTime > :now)
+            order by d.updatedAt desc, d.id desc
+            """)
+    List<Demand> findActiveRecommendationSignals(@Param("customerId") Long customerId,
+                                                  @Param("now") LocalDateTime now,
+                                                  Pageable pageable);
 }

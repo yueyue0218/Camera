@@ -7,12 +7,17 @@ import com.action.camera.common.exception.BusinessException;
 import com.action.camera.common.page.PageResult;
 import com.action.camera.common.security.CurrentUser;
 import com.action.camera.credit.service.CreditSnapshotService;
+import com.action.camera.demand.domain.Demand;
+import com.action.camera.demand.domain.DemandStatus;
+import com.action.camera.demand.repository.DemandRepository;
 import com.action.camera.domain.User;
 import com.action.camera.message.model.CreateConversationCommand;
 import com.action.camera.message.model.CreateConversationResult;
 import com.action.camera.message.service.ConversationService;
 import com.action.camera.provider.entity.ProviderProfile;
 import com.action.camera.provider.mapper.ProviderProfileMapper;
+import com.action.camera.recommendation.RecommendationMatcher;
+import com.action.camera.recommendation.RecommendationMatcher.WeightedBudget;
 import com.action.camera.servicepackage.domain.ServicePackage;
 import com.action.camera.servicepackage.domain.ServicePackageInterest;
 import com.action.camera.servicepackage.domain.ServicePackageStatus;
@@ -62,6 +67,10 @@ public class ServicePackageService {
     private static final Logger LOGGER = LoggerFactory.getLogger(ServicePackageService.class);
     private static final int MAX_PAGE_SIZE = 50;
     private static final int MAX_IMAGE_COUNT = 9;
+    private static final int MAX_CUSTOMER_DEMAND_SIGNALS = 12;
+    private static final int MAX_CUSTOMER_INTEREST_SIGNALS = 20;
+    private static final int CUSTOMER_INTEREST_LOOKBACK_DAYS = 180;
+    private static final int CUSTOMER_PROFILE_FULL_CONFIDENCE_WEIGHT = 60;
     private static final String DEFAULT_RESERVE_MESSAGE = "I would like to reserve this service package.";
     private static final Set<String> SUPPORTED_TIME_TAGS = Set.of(
             "NEAR_3_DAYS",
@@ -71,6 +80,7 @@ public class ServicePackageService {
 
     private final ServicePackageRepository servicePackageRepository;
     private final ServicePackageInterestRepository interestRepository;
+    private final DemandRepository demandRepository;
     private final ConversationService conversationService;
     private final UserRepository userRepository;
     private final ProviderProfileMapper providerProfileMapper;
@@ -82,6 +92,7 @@ public class ServicePackageService {
 
     public ServicePackageService(ServicePackageRepository servicePackageRepository,
                                   ServicePackageInterestRepository interestRepository,
+                                  DemandRepository demandRepository,
                                   ConversationService conversationService,
                                   UserRepository userRepository,
                                   ProviderProfileMapper providerProfileMapper,
@@ -89,6 +100,7 @@ public class ServicePackageService {
                                   FileReferenceValidator fileReferenceValidator) {
         this.servicePackageRepository = servicePackageRepository;
         this.interestRepository = interestRepository;
+        this.demandRepository = demandRepository;
         this.conversationService = conversationService;
         this.userRepository = userRepository;
         this.providerProfileMapper = providerProfileMapper;
@@ -201,6 +213,7 @@ public class ServicePackageService {
                 Pageable.unpaged()).getContent();
         List<ServicePackage> baseCandidates = packages.stream()
                 .filter(servicePackage -> servicePackage.getStatus() == ServicePackageStatus.ONLINE)
+                .filter(servicePackage -> Boolean.TRUE.equals(servicePackage.getIsAvailable()))
                 .filter(ServicePackage::isModerationVisible)
                 .filter(servicePackage -> !Boolean.TRUE.equals(servicePackage.getHiddenByProvider()))
                 .filter(servicePackage -> normalizedCity == null
@@ -228,7 +241,8 @@ public class ServicePackageService {
                         keyword))
                 .toList();
         CustomerPreference preference = serviceRecommendationPreference(
-                currentUser, normalizedCity, normalizedStyle, minPriceCent, maxPriceCent, normalizedTimeTag);
+                currentUser, normalizedCity, normalizedScene, normalizedStyle,
+                minPriceCent, maxPriceCent, normalizedTimeTag);
         Map<Long, Recommendation> recommendations = "recommend".equals(normalizedSort)
                 ? candidates.stream().collect(Collectors.toMap(ServicePackage::getId,
                 servicePackage -> scoreServiceRecommendation(
@@ -736,40 +750,99 @@ public class ServicePackageService {
 
     private CustomerPreference serviceRecommendationPreference(CurrentUser currentUser,
                                                                String cityCode,
+                                                               String scene,
                                                                String style,
                                                                Long minPriceCent,
                                                                Long maxPriceCent,
                                                                String timeTag) {
-        String preferredCity = cityCode;
-        if (isBlank(preferredCity) && currentUser != null && currentUser.getUserId() != null) {
-            preferredCity = userRepository.findById(currentUser.getUserId())
-                    .map(User::getCityCode)
-                    .filter(value -> !isBlank(value))
-                    .orElse(null);
+        Map<String, Integer> cityWeights = new LinkedHashMap<>();
+        Map<String, Integer> sceneWeights = new LinkedHashMap<>();
+        Map<String, Integer> styleWeights = new LinkedHashMap<>();
+        Map<String, Integer> timeTagWeights = new LinkedHashMap<>();
+        Map<LocalDate, Integer> desiredDateWeights = new LinkedHashMap<>();
+        List<WeightedBudget> budgets = new ArrayList<>();
+        Set<Long> interestedIds = new LinkedHashSet<>();
+        Set<String> directCityCodes = new LinkedHashSet<>();
+
+        RecommendationMatcher.addTextSignal(cityWeights, cityCode, 100);
+        if (!isBlank(cityCode)) {
+            directCityCodes.add(cityCode.trim().toLowerCase(Locale.ROOT));
         }
-        Set<Long> interestedIds = currentUser == null || !currentUser.isCustomer()
-                ? Set.of()
-                : interestRepository.findByUserIdOrderByCreatedAtDesc(currentUser.getUserId()).stream()
-                .map(ServicePackageInterest::getServicePackageId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-        Set<String> preferredStyles = isBlank(style)
-                ? Set.of()
-                : Set.of(style.trim().toLowerCase(Locale.ROOT));
-        boolean hasProfile = !isBlank(preferredCity)
-                || !preferredStyles.isEmpty()
-                || minPriceCent != null
-                || maxPriceCent != null
-                || timeTag != null
-                || !interestedIds.isEmpty();
-        return new CustomerPreference(
-                preferredCity,
-                preferredStyles,
-                minPriceCent,
-                maxPriceCent,
-                timeTag,
-                interestedIds,
-                hasProfile);
+        RecommendationMatcher.addTextSignal(sceneWeights, scene, 100);
+        RecommendationMatcher.addTextSignal(styleWeights, style, 100);
+        RecommendationMatcher.addTextSignal(timeTagWeights, timeTag, 100);
+        if (minPriceCent != null || maxPriceCent != null) {
+            budgets.add(new WeightedBudget(minPriceCent, maxPriceCent, 100));
+        }
+
+        if (currentUser != null && currentUser.isCustomer() && currentUser.getUserId() != null) {
+            Long customerId = currentUser.getUserId();
+            userRepository.findById(customerId)
+                    .map(User::getCityCode)
+                    .ifPresent(value -> {
+                        RecommendationMatcher.addTextSignal(
+                                cityWeights, value, CUSTOMER_PROFILE_FULL_CONFIDENCE_WEIGHT);
+                        if (!isBlank(value)) {
+                            directCityCodes.add(value.trim().toLowerCase(Locale.ROOT));
+                        }
+                    });
+
+            LocalDateTime now = LocalDateTime.now();
+            List<Demand> demands = safeList(demandRepository.findActiveRecommendationSignals(
+                    customerId, now, PageRequest.of(0, MAX_CUSTOMER_DEMAND_SIGNALS)));
+            for (int index = 0; index < demands.size(); index++) {
+                Demand demand = demands.get(index);
+                if (!isValidCustomerSignal(demand, now)) {
+                    continue;
+                }
+                int weight = Math.max(20, 60 - index * 4);
+                RecommendationMatcher.addTextSignal(cityWeights, demand.getCityCode(), weight);
+                RecommendationMatcher.addTextSignal(sceneWeights, demand.getScene(), weight);
+                RecommendationMatcher.addTextSignals(styleWeights, demand.getStyleTags(), weight);
+                RecommendationMatcher.addTextSignals(timeTagWeights, demand.getTimeTags(), weight);
+                if (demand.getExpectedDate() != null) {
+                    desiredDateWeights.merge(demand.getExpectedDate(), weight, Integer::sum);
+                }
+                if (demand.getBudgetMinCent() != null || demand.getBudgetMaxCent() != null) {
+                    budgets.add(new WeightedBudget(
+                            demand.getBudgetMinCent() == null ? null : demand.getBudgetMinCent().longValue(),
+                            demand.getBudgetMaxCent() == null ? null : demand.getBudgetMaxCent().longValue(),
+                            weight));
+                }
+            }
+
+            List<ServicePackageInterest> interests = safeList(
+                    interestRepository.findByUserIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                            customerId,
+                            now.minusDays(CUSTOMER_INTEREST_LOOKBACK_DAYS),
+                            PageRequest.of(0, MAX_CUSTOMER_INTEREST_SIGNALS)));
+            interests.stream()
+                    .map(ServicePackageInterest::getServicePackageId)
+                    .filter(Objects::nonNull)
+                    .forEach(interestedIds::add);
+            Map<Long, ServicePackage> interestedPackages = interestedIds.isEmpty()
+                    ? Map.of()
+                    : safeList(servicePackageRepository.findAllById(interestedIds)).stream()
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toMap(ServicePackage::getId, value -> value, (left, right) -> left));
+            for (int index = 0; index < interests.size(); index++) {
+                ServicePackage interestedPackage = interestedPackages.get(interests.get(index).getServicePackageId());
+                if (!isPublicRecommendationPackage(interestedPackage)) {
+                    continue;
+                }
+                int weight = Math.max(4, 10 - index / 2);
+                RecommendationMatcher.addTextSignal(cityWeights, interestedPackage.getCityCode(), weight);
+                RecommendationMatcher.addTextSignal(sceneWeights, interestedPackage.getScene(), weight);
+                RecommendationMatcher.addTextSignals(styleWeights, interestedPackage.getStyleTags(), weight);
+                RecommendationMatcher.addTextSignals(timeTagWeights, interestedPackage.getTimeTags(), weight);
+                if (interestedPackage.getBasePriceCent() != null) {
+                    budgets.add(new WeightedBudget(
+                            interestedPackage.getBasePriceCent(), interestedPackage.getBasePriceCent(), weight));
+                }
+            }
+        }
+        return new CustomerPreference(cityWeights, sceneWeights, styleWeights, budgets,
+                timeTagWeights, desiredDateWeights, interestedIds, directCityCodes);
     }
 
     private Recommendation scoreServiceRecommendation(ServicePackage servicePackage,
@@ -777,55 +850,114 @@ public class ServicePackageService {
                                                       CustomerPreference preference,
                                                       String feedSeed) {
         int score = 0;
-        List<String> reasons = new ArrayList<>();
-        if (!isBlank(preference.cityCode()) && equalsIgnoreCase(servicePackage.getCityCode(), preference.cityCode())) {
-            score += 30;
-            addReason(reasons, "同城匹配");
+        List<ReasonContribution> reasonContributions = new ArrayList<>();
+        int cityScore = RecommendationMatcher.textScore(
+                servicePackage.getCityCode(), preference.cityWeights(), 30,
+                CUSTOMER_PROFILE_FULL_CONFIDENCE_WEIGHT);
+        if (cityScore > 0) {
+            score += cityScore;
+            String normalizedCandidateCity = servicePackage.getCityCode() == null
+                    ? null
+                    : servicePackage.getCityCode().trim().toLowerCase(Locale.ROOT);
+            reasonContributions.add(new ReasonContribution(
+                    cityScore, 2,
+                    preference.directCityCodes().contains(normalizedCandidateCity)
+                            ? "同城匹配"
+                            : "城市偏好匹配"));
         }
-        if (!preference.styleTags().isEmpty() && overlaps(servicePackage.getStyleTags(), preference.styleTags())) {
-            score += 25;
-            addReason(reasons, "风格匹配");
+        int sceneScore = RecommendationMatcher.textScore(
+                servicePackage.getScene(), preference.sceneWeights(), 18,
+                CUSTOMER_PROFILE_FULL_CONFIDENCE_WEIGHT);
+        if (sceneScore > 0) {
+            score += sceneScore;
+            reasonContributions.add(new ReasonContribution(sceneScore, 5, "场景匹配"));
         }
-        if (priceMatches(servicePackage.getBasePriceCent(), preference.minPriceCent(), preference.maxPriceCent())) {
-            score += 20;
-            addReason(reasons, "价格合适");
-        } else if (preference.minPriceCent() == null
-                && preference.maxPriceCent() == null
-                && isReasonableDefaultPrice(servicePackage.getBasePriceCent())) {
+        int styleScore = RecommendationMatcher.tagScore(
+                servicePackage.getStyleTags(), preference.styleWeights(), 25,
+                CUSTOMER_PROFILE_FULL_CONFIDENCE_WEIGHT);
+        if (styleScore > 0) {
+            score += styleScore;
+            reasonContributions.add(new ReasonContribution(
+                    styleScore, 3, styleScore >= 17 ? "风格高度匹配" : "风格匹配"));
+        }
+        int priceScore = RecommendationMatcher.weightedPriceScore(
+                servicePackage.getBasePriceCent(), preference.budgets(), 20,
+                CUSTOMER_PROFILE_FULL_CONFIDENCE_WEIGHT);
+        if (priceScore > 0) {
+            score += priceScore;
+            reasonContributions.add(new ReasonContribution(priceScore, 4, "价格合适"));
+        } else if (preference.budgets().isEmpty() && isReasonableDefaultPrice(servicePackage.getBasePriceCent())) {
             score += 4;
-            addReason(reasons, "价格合适");
+            reasonContributions.add(new ReasonContribution(4, 4, "价格合适"));
         }
-        if (preference.timeTag() != null && servicePackage.getTimeTags().contains(preference.timeTag())) {
-            score += 15;
-            addReason(reasons, "近期可约");
-        } else if (hasNearAvailableDate(servicePackage)) {
-            score += 8;
-            addReason(reasons, "近期可约");
+        int timeScore = Math.max(
+                RecommendationMatcher.tagScore(
+                        servicePackage.getTimeTags(), preference.timeTagWeights(), 15,
+                        CUSTOMER_PROFILE_FULL_CONFIDENCE_WEIGHT),
+                RecommendationMatcher.dateScore(
+                        servicePackage.getAvailableDates(), preference.desiredDateWeights(), 15,
+                        CUSTOMER_PROFILE_FULL_CONFIDENCE_WEIGHT));
+        if (timeScore > 0) {
+            score += timeScore;
+            reasonContributions.add(new ReasonContribution(timeScore, 1, "近期可约"));
+        } else if (preference.timeTagWeights().isEmpty()
+                && preference.desiredDateWeights().isEmpty()
+                && hasNearAvailableDate(servicePackage)) {
+            score += 4;
+            reasonContributions.add(new ReasonContribution(4, 1, "近期可约"));
         }
-        score += creditScore(photographerInfo, reasons);
+        int creditScore = creditScore(photographerInfo);
+        score += creditScore;
+        if (creditScore > 0) {
+            reasonContributions.add(new ReasonContribution(creditScore, 0, "信用较高"));
+        }
         if (hasWorkCompleteness(servicePackage)) {
             score += 5;
-            addReason(reasons, "作品完整");
+            reasonContributions.add(new ReasonContribution(5, 6, "作品完整"));
         }
         score += freshnessScore(servicePackage.getUpdatedAt());
         if (preference.interestedServiceIds().contains(servicePackage.getId())) {
-            score += 8;
+            score += 4;
         }
         score += feedSeedScore(feedSeed, servicePackage.getId());
+        List<String> reasons = reasonContributions.stream()
+                .sorted(Comparator.comparingInt(ReasonContribution::score).reversed()
+                        .thenComparingInt(ReasonContribution::priority))
+                .map(ReasonContribution::reason)
+                .distinct()
+                .limit(3)
+                .toList();
         return new Recommendation(score, reasons);
     }
 
-    private int creditScore(PhotographerInfo photographerInfo, List<String> reasons) {
+    private boolean isValidCustomerSignal(Demand demand, LocalDateTime now) {
+        return demand != null
+                && demand.getStatus() == DemandStatus.OPEN
+                && demand.isModerationVisible()
+                && !Boolean.TRUE.equals(demand.getHiddenByCustomer())
+                && (demand.getExpireTime() == null || demand.getExpireTime().isAfter(now));
+    }
+
+    private boolean isPublicRecommendationPackage(ServicePackage servicePackage) {
+        return servicePackage != null
+                && servicePackage.getStatus() == ServicePackageStatus.ONLINE
+                && servicePackage.isModerationVisible()
+                && !Boolean.TRUE.equals(servicePackage.getHiddenByProvider());
+    }
+
+    private <T> List<T> safeList(List<T> values) {
+        return values == null ? List.of() : values;
+    }
+
+    private int creditScore(PhotographerInfo photographerInfo) {
         if (photographerInfo == null || photographerInfo.creditScore() == null) {
             return 0;
         }
         double value = photographerInfo.creditScore().doubleValue();
         if (value >= 85) {
-            addReason(reasons, "信用较高");
             return 10;
         }
         if (value >= 75) {
-            addReason(reasons, "信用较高");
             return 6;
         }
         return 0;
@@ -932,16 +1064,6 @@ public class ServicePackageService {
                 .anyMatch(normalizedRight::contains);
     }
 
-    private boolean overlaps(List<String> values, Set<String> targets) {
-        if (values == null || values.isEmpty() || targets == null || targets.isEmpty()) {
-            return false;
-        }
-        return values.stream()
-                .filter(Objects::nonNull)
-                .map(value -> value.trim().toLowerCase(Locale.ROOT))
-                .anyMatch(targets::contains);
-    }
-
     private String normalizeKeyword(String keyword) {
         if (isBlank(keyword)) {
             return null;
@@ -965,12 +1087,6 @@ public class ServicePackageService {
         return values.stream()
                 .filter(Objects::nonNull)
                 .anyMatch(value -> value.toLowerCase(Locale.ROOT).contains(keyword));
-    }
-
-    private void addReason(List<String> reasons, String reason) {
-        if (reasons.size() < 3 && !reasons.contains(reason)) {
-            reasons.add(reason);
-        }
     }
 
     private boolean equalsIgnoreCase(String left, String right) {
@@ -1202,13 +1318,17 @@ public class ServicePackageService {
         return value.trim();
     }
 
-    private record CustomerPreference(String cityCode,
-                                      Set<String> styleTags,
-                                      Long minPriceCent,
-                                      Long maxPriceCent,
-                                      String timeTag,
+    private record CustomerPreference(Map<String, Integer> cityWeights,
+                                      Map<String, Integer> sceneWeights,
+                                      Map<String, Integer> styleWeights,
+                                      List<WeightedBudget> budgets,
+                                      Map<String, Integer> timeTagWeights,
+                                      Map<LocalDate, Integer> desiredDateWeights,
                                       Set<Long> interestedServiceIds,
-                                      boolean hasProfile) {
+                                      Set<String> directCityCodes) {
+    }
+
+    private record ReasonContribution(int score, int priority, String reason) {
     }
 
     private record Recommendation(int score, List<String> reasons) {
