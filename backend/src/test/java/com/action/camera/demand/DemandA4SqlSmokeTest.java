@@ -88,7 +88,7 @@ class DemandA4SqlSmokeTest {
                     "Stable HTTP smoke demand " + index,
                     List.of(1L),
                     baseTime.plusMinutes(index),
-                    baseTime.plusDays(30));
+                    LocalDateTime.now().plusDays(30));
             demandRepository.saveAndFlush(demand);
         }
         statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();

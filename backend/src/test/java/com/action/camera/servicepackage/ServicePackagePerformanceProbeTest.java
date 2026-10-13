@@ -5,6 +5,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.action.camera.credit.service.CreditSnapshotService;
+import com.action.camera.demand.repository.DemandRepository;
 import com.action.camera.message.service.ConversationService;
 import com.action.camera.provider.mapper.ProviderProfileMapper;
 import com.action.camera.repository.UserRepository;
@@ -53,6 +54,9 @@ class ServicePackagePerformanceProbeTest {
     private ServicePackageInterestRepository interestRepository;
 
     @Mock
+    private DemandRepository demandRepository;
+
+    @Mock
     private ConversationService conversationService;
 
     @Mock
@@ -75,6 +79,7 @@ class ServicePackagePerformanceProbeTest {
         service = new ServicePackageService(
                 servicePackageRepository,
                 interestRepository,
+                demandRepository,
                 conversationService,
                 userRepository,
                 providerProfileMapper,

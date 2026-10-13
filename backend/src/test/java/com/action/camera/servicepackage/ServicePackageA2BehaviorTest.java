@@ -5,6 +5,7 @@ import com.action.camera.common.page.PageResult;
 import com.action.camera.common.security.CurrentUser;
 import com.action.camera.common.security.UserRole;
 import com.action.camera.credit.service.CreditSnapshotService;
+import com.action.camera.demand.repository.DemandRepository;
 import com.action.camera.domain.User;
 import com.action.camera.message.service.ConversationService;
 import com.action.camera.provider.entity.ProviderProfile;
@@ -119,10 +120,12 @@ class ServicePackageA2BehaviorTest {
                 204L, new BigDecimal("60.0")
         );
         ServicePackageInterestRepository interests = mock(ServicePackageInterestRepository.class, invocation -> {
-            if (invocation.getMethod().getName().equals("findByUserIdOrderByCreatedAtDesc")) {
+            if (invocation.getMethod().getName().equals(
+                    "findByUserIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc")) {
                 var interest = new com.action.camera.servicepackage.domain.ServicePackageInterest();
                 interest.setUserId(900L);
                 interest.setServicePackageId(103L);
+                interest.setCreatedAt(LocalDateTime.now());
                 return List.of(interest);
             }
             return Answers.RETURNS_DEFAULTS.answer(invocation);
@@ -296,6 +299,7 @@ class ServicePackageA2BehaviorTest {
         return new ServicePackageService(
                 repository,
                 interests,
+                mock(DemandRepository.class),
                 mock(ConversationService.class),
                 users,
                 profiles,
@@ -321,6 +325,10 @@ class ServicePackageA2BehaviorTest {
                 Pageable pageable = invocation.getArgument(9, Pageable.class);
                 assertThat(pageable.isUnpaged()).isTrue();
                 return new PageImpl<>(packages, pageable, packages.size());
+            }
+            if (invocation.getMethod().getName().equals("findAllById")) {
+                Collection<?> ids = iterable(invocation.getArgument(0));
+                return packages.stream().filter(value -> ids.contains(value.getId())).toList();
             }
             return Answers.RETURNS_DEFAULTS.answer(invocation);
         });

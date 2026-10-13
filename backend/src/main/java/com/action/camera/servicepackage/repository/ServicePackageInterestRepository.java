@@ -2,7 +2,9 @@ package com.action.camera.servicepackage.repository;
 
 import com.action.camera.servicepackage.domain.ServicePackageInterest;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,4 +17,7 @@ public interface ServicePackageInterestRepository extends JpaRepository<ServiceP
     void deleteByUserIdAndServicePackageId(Long userId, Long servicePackageId);
 
     List<ServicePackageInterest> findByUserIdOrderByCreatedAtDesc(Long userId);
+
+    List<ServicePackageInterest> findByUserIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+            Long userId, LocalDateTime createdAt, Pageable pageable);
 }

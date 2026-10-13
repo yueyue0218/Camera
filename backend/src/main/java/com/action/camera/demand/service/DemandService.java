@@ -23,6 +23,7 @@ import com.action.camera.message.model.CreateConversationResult;
 import com.action.camera.message.service.ConversationService;
 import com.action.camera.notification.dto.NotificationCreateRequest;
 import com.action.camera.notification.service.NotificationService;
+import com.action.camera.recommendation.RecommendationMatcher;
 import com.action.camera.repository.UserRepository;
 import com.action.camera.servicepackage.domain.ServicePackage;
 import com.action.camera.servicepackage.domain.ServicePackageStatus;
@@ -54,6 +55,7 @@ public class DemandService {
 
     private static final int DEFAULT_EXPIRE_DAYS = 30;
     private static final int MAX_IMAGE_COUNT = 9;
+    private static final int MAX_PROVIDER_CAPABILITIES = 30;
     private static final String DEFAULT_ACCEPT_INITIAL_MESSAGE = "已接受约拍响应，会话已开启。";
     private static final Set<String> SUPPORTED_TIME_TAGS = Set.of(
             "NEAR_3_DAYS",
@@ -204,8 +206,11 @@ public class DemandService {
                 Pageable.unpaged()).getContent();
         Map<Long, CustomerInfo> customers = loadCustomerInfo(publicDemands);
         List<Demand> candidates = publicDemands.stream()
+                .filter(demand -> demand.getStatus() == DemandStatus.OPEN)
                 .filter(Demand::isModerationVisible)
                 .filter(demand -> !Boolean.TRUE.equals(demand.getHiddenByCustomer()))
+                .filter(demand -> demand.getExpireTime() == null
+                        || demand.getExpireTime().isAfter(LocalDateTime.now()))
                 .filter(demand -> normalizedCity == null || equalsIgnoreCase(demand.getCityCode(), normalizedCity))
                 .filter(demand -> normalizedScene == null || equalsIgnoreCase(demand.getScene(), normalizedScene))
                 .filter(demand -> expectedDate == null || expectedDate.equals(demand.getExpectedDate()))
@@ -213,13 +218,17 @@ public class DemandService {
                 .filter(demand -> normalizedTimeTag == null || demand.getTimeTags().contains(normalizedTimeTag))
                 .filter(demand -> matchesBudget(demand, minBudgetCent, maxBudgetCent))
                 .filter(demand -> matchesDemandKeyword(demand, keyword, customers))
+                .filter(demand -> currentUser == null
+                        || !currentUser.isProvider()
+                        || !Objects.equals(demand.getCustomerId(), currentUser.getUserId()))
                 .collect(Collectors.toList());
         PhotographerPreference preference = demandRecommendationPreference(
-                currentUser, normalizedCity, normalizedTag, minBudgetCent, maxBudgetCent);
+                currentUser, normalizedCity, normalizedScene, normalizedTag,
+                minBudgetCent, maxBudgetCent, normalizedTimeTag);
         Set<Long> respondedDemandIds = respondedDemandIds(currentUser, candidates, shouldRecommend);
         Map<Long, Recommendation> recommendations = shouldRecommend
                 ? candidates.stream().collect(Collectors.toMap(Demand::getId,
-                        demand -> scoreDemandRecommendation(demand, preference, normalizedTimeTag, respondedDemandIds, feedSeed)))
+                        demand -> scoreDemandRecommendation(demand, preference, respondedDemandIds, feedSeed)))
                 : Map.of();
         Comparator<Demand> comparator = recommendations.isEmpty()
                 ? latestDemandComparator()
@@ -776,72 +785,44 @@ public class DemandService {
 
     private PhotographerPreference demandRecommendationPreference(CurrentUser currentUser,
                                                                   String cityCode,
+                                                                  String scene,
                                                                   String styleTag,
                                                                   Integer minBudgetCent,
-                                                                  Integer maxBudgetCent) {
+                                                                  Integer maxBudgetCent,
+                                                                  String timeTag) {
         List<ServicePackage> providerPackages = currentUser == null || !currentUser.isProvider()
                 ? List.of()
-                : servicePackageRepository.findByProviderIdAndStatusAndHiddenByProviderFalse(
-                        currentUser.getUserId(), ServicePackageStatus.ONLINE);
-        String preferredCity = providerPackages.stream()
-                .map(ServicePackage::getCityCode)
-                .filter(value -> !isBlank(value))
-                .findFirst()
-                .orElse(cityCode);
-        Set<String> preferredStyles = providerPackages.stream()
-                .flatMap(servicePackage -> servicePackage.getStyleTags().stream())
-                .filter(value -> !isBlank(value))
-                .map(value -> value.trim().toLowerCase(Locale.ROOT))
-                .collect(Collectors.toSet());
-        if (preferredStyles.isEmpty() && !isBlank(styleTag)) {
-            preferredStyles = Set.of(styleTag.trim().toLowerCase(Locale.ROOT));
+                : safeList(servicePackageRepository
+                .findByProviderIdAndStatusAndHiddenByProviderFalseOrderByUpdatedAtDescIdDesc(
+                        currentUser.getUserId(),
+                        ServicePackageStatus.ONLINE,
+                        PageRequest.of(0, MAX_PROVIDER_CAPABILITIES)));
+        List<ProviderCapability> capabilities = providerPackages.stream()
+                .filter(this::isRecommendationCapability)
+                .map(this::toProviderCapability)
+                .toList();
+        if (capabilities.isEmpty()
+                && (!isBlank(cityCode) || !isBlank(scene) || !isBlank(styleTag)
+                || minBudgetCent != null || maxBudgetCent != null || !isBlank(timeTag))) {
+            capabilities = List.of(ProviderCapability.explicit(
+                    cityCode, scene, styleTag, minBudgetCent, maxBudgetCent, timeTag));
         }
-        Integer preferredMin = providerPackages.stream()
-                .map(ServicePackage::getBasePriceCent)
-                .filter(Objects::nonNull)
-                .map(Long::intValue)
-                .min(Integer::compareTo)
-                .orElse(minBudgetCent);
-        Integer preferredMax = providerPackages.stream()
-                .map(ServicePackage::getBasePriceCent)
-                .filter(Objects::nonNull)
-                .map(Long::intValue)
-                .max(Integer::compareTo)
-                .orElse(maxBudgetCent);
-        boolean hasProfile = !isBlank(preferredCity)
-                || !preferredStyles.isEmpty()
-                || preferredMin != null
-                || preferredMax != null;
-        return new PhotographerPreference(preferredCity, preferredStyles, preferredMin, preferredMax, hasProfile);
+        return new PhotographerPreference(capabilities);
     }
 
     private Recommendation scoreDemandRecommendation(Demand demand,
                                                      PhotographerPreference preference,
-                                                     String timeTag,
                                                      Set<Long> respondedDemandIds,
                                                      String feedSeed) {
         int score = 0;
         List<String> reasons = new ArrayList<>();
-        if (!isBlank(preference.cityCode()) && equalsIgnoreCase(demand.getCityCode(), preference.cityCode())) {
-            score += 30;
-            addReason(reasons, "同城匹配");
-        }
-        if (!preference.styleTags().isEmpty() && overlaps(demand.getStyleTags(), preference.styleTags())) {
-            score += 25;
-            addReason(reasons, "风格匹配");
-        }
-        if (budgetOverlaps(demand.getBudgetMinCent(), demand.getBudgetMaxCent(),
-                preference.minPriceCent(), preference.maxPriceCent())) {
-            score += 15;
-            addReason(reasons, "预算合适");
-        }
-        if (timeTag != null && demand.getTimeTags().contains(timeTag)) {
-            score += 15;
-            addReason(reasons, "近期需求");
-        } else if (isWithinDays(demand.getExpectedDate(), 30)) {
-            score += 10;
-            addReason(reasons, "近期需求");
-        }
+        CapabilityMatch bestMatch = preference.capabilities().stream()
+                .map(capability -> scoreCapability(demand, capability))
+                .max(Comparator.comparingInt(CapabilityMatch::score))
+                .orElse(CapabilityMatch.empty());
+        score += bestMatch.score();
+        bestMatch.reasons().forEach(reason -> addReason(reasons, reason));
+        score += freshnessScore(demand.getUpdatedAt(), reasons, "近期需求");
         if (demand.getResponseCount() <= 2) {
             score += 10;
             addReason(reasons, "响应较少");
@@ -849,7 +830,6 @@ public class DemandService {
             score += 5;
             addReason(reasons, "响应较少");
         }
-        score += freshnessScore(demand.getUpdatedAt(), reasons, "近期需求");
         if (!isBlank(demand.getLocation())
                 && !isBlank(demand.getDescription())
                 && (demand.getBudgetMinCent() != null || demand.getBudgetMaxCent() != null)
@@ -863,6 +843,77 @@ public class DemandService {
         }
         score += feedSeedScore(feedSeed, demand.getId());
         return new Recommendation(score, reasons);
+    }
+
+    private ProviderCapability toProviderCapability(ServicePackage servicePackage) {
+        Map<String, Integer> styles = new LinkedHashMap<>();
+        Map<String, Integer> timeTags = new LinkedHashMap<>();
+        RecommendationMatcher.addTextSignals(styles, servicePackage.getStyleTags(), 1);
+        RecommendationMatcher.addTextSignals(timeTags, servicePackage.getTimeTags(), 1);
+        return new ProviderCapability(
+                servicePackage.getId(),
+                servicePackage.getCityCode(),
+                servicePackage.getScene(),
+                styles,
+                servicePackage.getBasePriceCent(),
+                servicePackage.getBasePriceCent(),
+                safeList(servicePackage.getAvailableDates()),
+                timeTags);
+    }
+
+    private boolean isRecommendationCapability(ServicePackage servicePackage) {
+        return servicePackage != null
+                && servicePackage.getStatus() == ServicePackageStatus.ONLINE
+                && servicePackage.isModerationVisible()
+                && !Boolean.TRUE.equals(servicePackage.getHiddenByProvider())
+                && Boolean.TRUE.equals(servicePackage.getIsAvailable());
+    }
+
+    private CapabilityMatch scoreCapability(Demand demand, ProviderCapability capability) {
+        int score = 0;
+        List<String> reasons = new ArrayList<>();
+        if (equalsIgnoreCase(demand.getCityCode(), capability.cityCode())) {
+            score += 30;
+            reasons.add("同城匹配");
+        }
+        if (equalsIgnoreCase(demand.getScene(), capability.scene())) {
+            score += 20;
+            reasons.add("摄影师擅长该场景");
+        }
+        int styleScore = RecommendationMatcher.tagScore(demand.getStyleTags(), capability.styleWeights(), 25);
+        if (styleScore > 0) {
+            score += styleScore;
+            reasons.add(styleScore >= 17 ? "风格高度匹配" : "风格匹配");
+        }
+        int budgetScore = bestCapabilityBudgetScore(demand, capability);
+        if (budgetScore > 0) {
+            score += budgetScore;
+            reasons.add("预算适配");
+        }
+        int timeScore = 0;
+        if (demand.getExpectedDate() != null
+                && capability.availableDates().contains(demand.getExpectedDate())) {
+            timeScore = 15;
+        }
+        timeScore = Math.max(timeScore,
+                RecommendationMatcher.tagScore(demand.getTimeTags(), capability.timeTagWeights(), 15));
+        if (timeScore > 0) {
+            score += timeScore;
+            reasons.add("拍摄时间匹配");
+        }
+        return new CapabilityMatch(score, reasons);
+    }
+
+    private int bestCapabilityBudgetScore(Demand demand, ProviderCapability capability) {
+        int minimumScore = RecommendationMatcher.priceToBudgetScore(
+                capability.minPriceCent(), demand.getBudgetMinCent(), demand.getBudgetMaxCent(), 20);
+        int maximumScore = RecommendationMatcher.priceToBudgetScore(
+                capability.maxPriceCent(), demand.getBudgetMinCent(), demand.getBudgetMaxCent(), 20);
+        return Math.max(minimumScore, maximumScore);
+    }
+
+    private <T> List<T> safeList(List<T> values) {
+        return values == null ? List.of() : values;
     }
 
     private Set<Long> respondedDemandIds(CurrentUser currentUser, List<Demand> candidates, boolean shouldRecommend) {
@@ -952,38 +1003,6 @@ public class DemandService {
                 .anyMatch(normalizedRight::contains);
     }
 
-    private boolean isWithinDays(LocalDate date, int days) {
-        if (date == null) {
-            return false;
-        }
-        LocalDate today = LocalDate.now();
-        return !date.isBefore(today) && !date.isAfter(today.plusDays(days));
-    }
-
-    private boolean budgetOverlaps(Integer leftMin, Integer leftMax, Integer rightMin, Integer rightMax) {
-        if (rightMin == null && rightMax == null) {
-            return false;
-        }
-        if (leftMin == null && leftMax == null) {
-            return false;
-        }
-        int normalizedLeftMin = leftMin == null ? leftMax : leftMin;
-        int normalizedLeftMax = leftMax == null ? leftMin : leftMax;
-        int normalizedRightMin = rightMin == null ? rightMax : rightMin;
-        int normalizedRightMax = rightMax == null ? rightMin : rightMax;
-        return normalizedLeftMax >= normalizedRightMin && normalizedLeftMin <= normalizedRightMax;
-    }
-
-    private boolean overlaps(List<String> values, Set<String> targets) {
-        if (values == null || values.isEmpty() || targets == null || targets.isEmpty()) {
-            return false;
-        }
-        return values.stream()
-                .filter(Objects::nonNull)
-                .map(value -> value.trim().toLowerCase(Locale.ROOT))
-                .anyMatch(targets::contains);
-    }
-
     private void addReason(List<String> reasons, String reason) {
         if (reasons.size() < 3 && !reasons.contains(reason)) {
             reasons.add(reason);
@@ -1034,11 +1053,43 @@ public class DemandService {
         return value == null || value.isBlank();
     }
 
-    private record PhotographerPreference(String cityCode,
-                                          Set<String> styleTags,
-                                          Integer minPriceCent,
-                                          Integer maxPriceCent,
-                                          boolean hasProfile) {
+    private record PhotographerPreference(List<ProviderCapability> capabilities) {
+    }
+
+    private record ProviderCapability(Long servicePackageId,
+                                      String cityCode,
+                                      String scene,
+                                      Map<String, Integer> styleWeights,
+                                      Long minPriceCent,
+                                      Long maxPriceCent,
+                                      List<LocalDate> availableDates,
+                                      Map<String, Integer> timeTagWeights) {
+        private static ProviderCapability explicit(String cityCode,
+                                                   String scene,
+                                                   String styleTag,
+                                                   Integer minPriceCent,
+                                                   Integer maxPriceCent,
+                                                   String timeTag) {
+            Map<String, Integer> styles = new LinkedHashMap<>();
+            Map<String, Integer> times = new LinkedHashMap<>();
+            RecommendationMatcher.addTextSignal(styles, styleTag, 1);
+            RecommendationMatcher.addTextSignal(times, timeTag, 1);
+            return new ProviderCapability(
+                    null,
+                    cityCode,
+                    scene,
+                    styles,
+                    minPriceCent == null ? null : minPriceCent.longValue(),
+                    maxPriceCent == null ? null : maxPriceCent.longValue(),
+                    List.of(),
+                    times);
+        }
+    }
+
+    private record CapabilityMatch(int score, List<String> reasons) {
+        private static CapabilityMatch empty() {
+            return new CapabilityMatch(0, List.of());
+        }
     }
 
     private record Recommendation(int score, List<String> reasons) {

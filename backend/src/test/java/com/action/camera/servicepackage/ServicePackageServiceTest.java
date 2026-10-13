@@ -8,6 +8,7 @@ import com.action.camera.common.page.PageResult;
 import com.action.camera.common.security.CurrentUser;
 import com.action.camera.common.security.UserRole;
 import com.action.camera.credit.service.CreditSnapshotService;
+import com.action.camera.demand.repository.DemandRepository;
 import com.action.camera.domain.User;
 import com.action.camera.message.model.CreateConversationCommand;
 import com.action.camera.message.model.CreateConversationResult;
@@ -69,6 +70,9 @@ class ServicePackageServiceTest {
     private ServicePackageInterestRepository interestRepository;
 
     @Mock
+    private DemandRepository demandRepository;
+
+    @Mock
     private ConversationService conversationService;
 
     @Mock
@@ -90,6 +94,7 @@ class ServicePackageServiceTest {
         servicePackageService = new ServicePackageService(
                 servicePackageRepository,
                 interestRepository,
+                demandRepository,
                 conversationService,
                 userRepository,
                 providerProfileMapper,
