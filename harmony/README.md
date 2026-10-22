@@ -28,7 +28,7 @@ $env:PATH = "$env:NODE_HOME;<DevEcoStudio>/tools/hvigor/bin;<DevEcoStudio>/tools
 <DevEcoStudio>/tools/hvigor/bin/hvigorw.bat assembleHap --no-daemon
 ```
 
-当前构建可以生成未签名 HAP；华为账号、AGC、最终 bundleName 和调试签名仍未确认，因此暂不能宣称已安装运行。
+AGC 已注册 Portra HarmonyOS 应用，正式 bundleName 为 `com.portra.app`。当前构建仍只能生成未签名 HAP；调试签名和设备安装尚未完成，因此暂不能宣称已安装运行。
 
 ## 环境和接口状态
 

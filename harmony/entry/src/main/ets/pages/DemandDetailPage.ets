@@ -4,6 +4,8 @@ import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraLoading } from '../common/components/PortraLoading';
 import { PortraPageHeading } from '../common/components/PortraPageHeading';
 import { HallTextFormatter } from '../features/hall/HallUiModels';
+import { FollowAction } from '../features/user/FollowAction';
+import { ReportPanel } from '../features/user/ReportPanel';
 import { DemandResponseSummary, DemandSummary } from '../model/ApiModels';
 import { PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
@@ -20,6 +22,7 @@ export struct DemandDetailPage {
   @State private userId: number = 0;
   @State private role: string = '';
   @State private responses: DemandResponseSummary[] = [];
+  @State private ownResponse: DemandResponseSummary | null = null;
   @State private responseMessage: string = '';
   @State private responsePrice: string = '';
   private readonly appClient: AppClient = AppClient.shared;
@@ -42,6 +45,12 @@ export struct DemandDetailPage {
     const version = ++this.requestVersion;
     this.loading = true;
     this.errorMessage = '';
+    this.actionError = '';
+    this.actionNotice = '';
+    this.userId = 0;
+    this.role = '';
+    this.responses = [];
+    this.ownResponse = null;
     try {
       const result = await this.appClient.apiService.getDemand(this.demandId);
       if (version === this.requestVersion) {
@@ -56,6 +65,12 @@ export struct DemandDetailPage {
                 const responses = await this.appClient.apiService.listDemandResponses(this.demandId);
                 if (version === this.requestVersion) {
                   this.responses = Array.isArray(responses) ? responses : [];
+                }
+              } else if (this.role.trim().toUpperCase() === 'PROVIDER') {
+                const responses = await this.appClient.apiService.listMyDemandResponses();
+                if (version === this.requestVersion && Array.isArray(responses)) {
+                  this.ownResponse = responses.find((item: DemandResponseSummary) =>
+                    item.demandId === this.demandId) ?? null;
                 }
               }
             }
@@ -95,8 +110,15 @@ export struct DemandDetailPage {
     this.actionBusy = true;
     this.actionError = '';
     try {
-      await this.appClient.apiService.respondToDemand(this.demandId, this.responseMessage.trim(), priceCent);
-      this.actionNotice = '已发送响应，等待客户接受';
+      const response = await this.appClient.apiService.respondToDemand(
+        this.demandId, this.responseMessage.trim(), priceCent);
+      if (response === null || response.demandId !== this.demandId || !Number.isSafeInteger(response.responseId) ||
+        response.responseId <= 0) {
+        throw new Error('响应结果缺少有效编号');
+      }
+      this.ownResponse = response;
+      this.actionNotice = response.status === 'PENDING_CUSTOMER_ACCEPT' ?
+        '已发送响应，等待客户接受' : `响应状态：${response.status}`;
       this.responseMessage = '';
     } catch (error) {
       this.actionError = (error as PortraError).message || '响应失败';
@@ -113,9 +135,16 @@ export struct DemandDetailPage {
     this.actionError = '';
     try {
       const result = await this.appClient.apiService.acceptDemandResponse(this.demandId, responseId);
+      if (result === null || result.responseId !== responseId || result.demandId !== this.demandId ||
+        result.responseStatus !== 'ACCEPTED' || !Number.isSafeInteger(result.conversationId) ||
+        result.conversationId <= 0) {
+        throw new Error('接受结果缺少有效会话');
+      }
       this.responses = this.responses.map((item: DemandResponseSummary) => item.responseId === responseId ?
         { responseId: item.responseId, demandId: item.demandId, providerId: item.providerId,
-          message: item.message, expectedPriceCent: item.expectedPriceCent, status: 'ACCEPTED' } : item);
+          providerProfileId: item.providerProfileId, message: item.message,
+          expectedPriceCent: item.expectedPriceCent, status: result.responseStatus,
+          rejectReason: item.rejectReason, responseTime: item.responseTime } : item);
       this.onOpenConversation?.(result.conversationId);
     } catch (error) {
       this.actionError = (error as PortraError).message || '接受失败';
@@ -155,7 +184,16 @@ export struct DemandDetailPage {
           .width('100%').alignItems(HorizontalAlign.Start)
           .padding(12).backgroundColor(PortraTheme.surface).borderRadius(8)
         }, (item: DemandResponseSummary) => item.responseId.toString())
-      } else if (this.role === 'PROVIDER' && this.demand?.status === 'OPEN') {
+      } else if (this.role.trim().toUpperCase() === 'PROVIDER' && this.ownResponse !== null) {
+        Text(this.ownResponse.status === 'PENDING_CUSTOMER_ACCEPT' ? '已响应，等待单主选择' :
+          this.ownResponse.status === 'ACCEPTED' ? '你的响应已被接受' : '本次响应已结束')
+          .fontSize(13).fontColor(PortraTheme.primary)
+        Text(this.ownResponse.message).fontSize(13).fontColor(PortraTheme.secondaryText)
+        if (this.ownResponse.expectedPriceCent !== undefined) {
+          Text(`预期价格 ¥${(this.ownResponse.expectedPriceCent / 100).toFixed(2)}`)
+            .fontSize(12).fontColor(PortraTheme.secondaryText)
+        }
+      } else if (this.role.trim().toUpperCase() === 'PROVIDER' && this.demand?.status === 'OPEN') {
         TextArea({ text: this.responseMessage, placeholder: '介绍你的拍摄方案与可约时间' })
           .height(92).backgroundColor(PortraTheme.surface).borderRadius(8)
           .onChange((value: string) => this.responseMessage = value)
@@ -165,6 +203,8 @@ export struct DemandDetailPage {
         Button(this.actionBusy ? '发送中' : '发送响应')
           .enabled(!this.actionBusy && this.actionNotice.length === 0)
           .onClick(() => this.respond())
+      } else if (this.role.trim().toUpperCase() === 'PROVIDER') {
+        Text('当前需求已关闭，不能继续响应').fontSize(13).fontColor(PortraTheme.secondaryText)
       }
     }
     .width('100%').alignItems(HorizontalAlign.Start)
@@ -221,6 +261,15 @@ export struct DemandDetailPage {
                 .fontColor(PortraTheme.secondaryText)
             }
             .width('100%')
+
+            if (this.userId > 0 && this.demand.customerId !== undefined &&
+              this.userId !== this.demand.customerId) {
+              FollowAction({
+                targetUserId: this.demand.customerId,
+                targetRole: 'CUSTOMER',
+                currentUserId: this.userId
+              })
+            }
 
             Column() {
               Row() {
@@ -285,6 +334,13 @@ export struct DemandDetailPage {
               .backgroundColor(PortraTheme.pageBackgroundDeep)
               .borderRadius(8)
             this.ResponseActions()
+            ReportPanel({
+              targetType: 'DEMAND',
+              targetId: this.demandId,
+              ownerId: this.demand.customerId ?? 0,
+              currentUserId: this.userId,
+              onRequireLogin: this.onRequireLogin
+            })
           }
           .width('100%')
           .padding({ left: 20, right: 20, top: 18, bottom: 28 })

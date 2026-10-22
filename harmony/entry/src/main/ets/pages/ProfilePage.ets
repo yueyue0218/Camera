@@ -4,7 +4,9 @@ import { PortraButton } from '../common/components/PortraButton';
 import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraLoading } from '../common/components/PortraLoading';
 import { PortraPageHeading } from '../common/components/PortraPageHeading';
-import { SessionSummary } from '../model/ApiModels';
+import { MomentCard } from '../features/moments/MomentCard';
+import { MomentFeedFormatter } from '../features/moments/MomentFeedModels';
+import { MomentSummary, SocialUserBrief, UserProfileSummary } from '../model/ApiModels';
 import { PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
 
@@ -12,12 +14,24 @@ import { PortraTheme } from '../theme/PortraTheme';
 export struct ProfilePage {
   @State private loading: boolean = true;
   @State private signingOut: boolean = false;
+  @State private switchingRole: boolean = false;
   @State private nickname: string = '';
   @State private role: string = '';
   @State private userId: number = 0;
   @State private errorMessage: string = '';
   @State private requiresLogin: boolean = false;
   @State private signOutCleanupFailed: boolean = false;
+  @State private profile: UserProfileSummary | null = null;
+  @State private moments: MomentSummary[] = [];
+  @State private favorites: MomentSummary[] = [];
+  @State private followers: SocialUserBrief[] = [];
+  @State private following: SocialUserBrief[] = [];
+  @State private momentPage: number = 1;
+  @State private momentTotal: number = 0;
+  @State private favoritePage: number = 1;
+  @State private favoriteTotal: number = 0;
+  @State private loadingMoreMoments: boolean = false;
+  @State private loadingMoreFavorites: boolean = false;
   private readonly appClient: AppClient = AppClient.shared;
   private loadVersion: number = 0;
   onBack?: () => void;
@@ -34,6 +48,7 @@ export struct ProfilePage {
   aboutToDisappear(): void {
     this.loadVersion++;
     this.appClient.apiService.cancelCurrentSession();
+    this.appClient.apiService.cancelUserSystemRequests(this.userId);
   }
 
   private async load(): Promise<void> {
@@ -42,14 +57,70 @@ export struct ProfilePage {
     this.errorMessage = '';
     this.requiresLogin = false;
     this.signOutCleanupFailed = false;
+    this.nickname = '';
+    this.role = '';
+    this.userId = 0;
+    this.profile = null;
+    this.moments = [];
+    this.favorites = [];
+    this.followers = [];
+    this.following = [];
+    this.momentPage = 1;
+    this.momentTotal = 0;
+    this.favoritePage = 1;
+    this.favoriteTotal = 0;
     try {
-      const session: SessionSummary = await this.appClient.apiService.currentSession();
+      const profile: UserProfileSummary = await this.appClient.apiService.getMyProfile();
       if (version !== this.loadVersion) {
         return;
       }
-      this.nickname = session.nickname.trim().length > 0 ? session.nickname : 'Portra 用户';
-      this.role = session.role;
-      this.userId = session.userId;
+      if (profile === null || !Number.isSafeInteger(profile.id) || profile.id <= 0 ||
+        (profile.currentRole !== 'CUSTOMER' && profile.currentRole !== 'PROVIDER')) {
+        throw new Error('个人资料格式异常');
+      }
+      this.profile = profile;
+      this.role = profile.currentRole;
+      this.userId = profile.id;
+      this.nickname = this.profileNickname(profile);
+
+      const momentPage = await this.appClient.apiService.listProfileMoments(profile.id, profile.currentRole, 1, 4);
+      if (version !== this.loadVersion) {
+        return;
+      }
+      if (!Array.isArray(momentPage.records) || !Number.isSafeInteger(momentPage.total) || momentPage.total < 0 ||
+        momentPage.records.some((item: MomentSummary) => !MomentFeedFormatter.isValid(item))) {
+        throw new Error('用户动态格式异常');
+      }
+      this.moments = MomentFeedFormatter.deduplicate(momentPage.records);
+      this.momentTotal = momentPage.total;
+
+      const favoritePage = await this.appClient.apiService.listFavoriteMoments(1, 4);
+      if (version !== this.loadVersion) {
+        return;
+      }
+      if (!Array.isArray(favoritePage.records) || !Number.isSafeInteger(favoritePage.total) || favoritePage.total < 0 ||
+        favoritePage.records.some((item: MomentSummary) => !MomentFeedFormatter.isValid(item))) {
+        throw new Error('收藏列表格式异常');
+      }
+      this.favorites = MomentFeedFormatter.deduplicate(favoritePage.records);
+      this.favoriteTotal = favoritePage.total;
+
+      const followers = await this.appClient.apiService.listFollowers(profile.id, profile.currentRole);
+      if (version !== this.loadVersion) {
+        return;
+      }
+      this.followers = this.validSocialUsers(followers);
+
+      const customerFollowing = await this.appClient.apiService.listFollowing(profile.id, 'CUSTOMER');
+      if (version !== this.loadVersion) {
+        return;
+      }
+      const providerFollowing = await this.appClient.apiService.listFollowing(profile.id, 'PROVIDER');
+      if (version !== this.loadVersion) {
+        return;
+      }
+      this.following = this.mergeSocialUsers(
+        this.validSocialUsers(customerFollowing), this.validSocialUsers(providerFollowing));
     } catch (error) {
       if (version === this.loadVersion) {
         const mapped = error as PortraError;
@@ -60,6 +131,107 @@ export struct ProfilePage {
       if (version === this.loadVersion) {
         this.loading = false;
       }
+    }
+  }
+
+  private profileNickname(profile: UserProfileSummary): string {
+    const roleName = profile.currentRole === 'PROVIDER' ? profile.providerNickname : profile.customerNickname;
+    const value = roleName?.trim() || profile.nickname?.trim() || '';
+    return value.length > 0 ? value : 'Portra 用户';
+  }
+
+  private profileBio(): string {
+    if (this.profile === null) {
+      return '';
+    }
+    const roleBio = this.role === 'PROVIDER' ? this.profile.providerBio : this.profile.customerBio;
+    return roleBio?.trim() || this.profile.bio?.trim() || '';
+  }
+
+  private mergeSocialUsers(first: SocialUserBrief[], second: SocialUserBrief[]): SocialUserBrief[] {
+    const result: SocialUserBrief[] = [];
+    first.concat(second).forEach((item: SocialUserBrief) => {
+      if (item !== null && Number.isSafeInteger(item.userId) && item.userId > 0 &&
+        !result.some((current: SocialUserBrief) => current.userId === item.userId &&
+          current.currentRole === item.currentRole)) {
+        result.push(item);
+      }
+    });
+    return result;
+  }
+
+  private validSocialUsers(source: SocialUserBrief[]): SocialUserBrief[] {
+    if (!Array.isArray(source)) {
+      return [];
+    }
+    return source.filter((item: SocialUserBrief) => item !== null && Number.isSafeInteger(item.userId) &&
+      item.userId > 0 && (item.currentRole === 'CUSTOMER' || item.currentRole === 'PROVIDER'));
+  }
+
+  private async loadMoreMoments(): Promise<void> {
+    if (this.loadingMoreMoments || this.userId <= 0 || this.moments.length >= this.momentTotal) {
+      return;
+    }
+    this.loadingMoreMoments = true;
+    this.errorMessage = '';
+    const nextPage = this.momentPage + 1;
+    try {
+      const result = await this.appClient.apiService.listProfileMoments(this.userId, this.role, nextPage, 4);
+      if (!Array.isArray(result.records) ||
+        result.records.some((item: MomentSummary) => !MomentFeedFormatter.isValid(item))) {
+        throw new Error('用户动态格式异常');
+      }
+      this.moments = MomentFeedFormatter.deduplicate(this.moments.concat(result.records));
+      this.momentPage = nextPage;
+      this.momentTotal = result.total;
+    } catch (error) {
+      this.errorMessage = (error as PortraError).message || '更多动态加载失败';
+    } finally {
+      this.loadingMoreMoments = false;
+    }
+  }
+
+  private async loadMoreFavorites(): Promise<void> {
+    if (this.loadingMoreFavorites || this.favorites.length >= this.favoriteTotal) {
+      return;
+    }
+    this.loadingMoreFavorites = true;
+    this.errorMessage = '';
+    const nextPage = this.favoritePage + 1;
+    try {
+      const result = await this.appClient.apiService.listFavoriteMoments(nextPage, 4);
+      if (!Array.isArray(result.records) ||
+        result.records.some((item: MomentSummary) => !MomentFeedFormatter.isValid(item))) {
+        throw new Error('收藏列表格式异常');
+      }
+      this.favorites = MomentFeedFormatter.deduplicate(this.favorites.concat(result.records));
+      this.favoritePage = nextPage;
+      this.favoriteTotal = result.total;
+    } catch (error) {
+      this.errorMessage = (error as PortraError).message || '更多收藏加载失败';
+    } finally {
+      this.loadingMoreFavorites = false;
+    }
+  }
+
+  private async switchRole(): Promise<void> {
+    if (this.switchingRole || (this.role !== 'CUSTOMER' && this.role !== 'PROVIDER')) {
+      return;
+    }
+    const targetRole = this.role === 'PROVIDER' ? 'CUSTOMER' : 'PROVIDER';
+    this.switchingRole = true;
+    this.errorMessage = '';
+    try {
+      const result = await this.appClient.apiService.switchRole(targetRole);
+      if (result === null || result.id !== this.userId || result.currentRole !== targetRole) {
+        throw new Error('角色切换结果异常');
+      }
+      this.appClient.sessionManager.notifyIdentityChanged();
+      await this.load();
+    } catch (error) {
+      this.errorMessage = (error as PortraError).message || '角色切换失败';
+    } finally {
+      this.switchingRole = false;
     }
   }
 
@@ -78,6 +250,11 @@ export struct ProfilePage {
       return;
     }
     this.signingOut = true;
+    this.profile = null;
+    this.moments = [];
+    this.favorites = [];
+    this.followers = [];
+    this.following = [];
     const cleared = await this.appClient.sessionManager.signOut();
     if (cleared) {
       this.onSignedOut?.();
@@ -111,6 +288,72 @@ export struct ProfilePage {
     .padding({ left: 18, right: 18 })
     .backgroundColor(PortraTheme.surface)
     .onClick(() => onAction())
+  }
+
+  @Builder
+  private SocialPreview(title: string, items: SocialUserBrief[]) {
+    Column({ space: 10 }) {
+      Text(`${title} · ${items.length}`)
+        .width('100%')
+        .fontSize(17)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(PortraTheme.primaryText)
+      if (items.length === 0) {
+        Text('暂无记录')
+          .width('100%')
+          .fontSize(13)
+          .fontColor(PortraTheme.secondaryText)
+          .padding({ top: 8, bottom: 8 })
+      } else {
+        ForEach(items.slice(0, 6), (item: SocialUserBrief) => {
+          Row({ space: 10 }) {
+            PortraAvatar({ displayName: item.nickname ?? '', avatarSize: 36 })
+            Column({ space: 3 }) {
+              Text(item.nickname?.trim() || `用户 #${item.userId}`)
+                .fontSize(14)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(PortraTheme.primaryText)
+              Text(item.currentRole === 'PROVIDER' ? '摄影师' : '约拍用户')
+                .fontSize(11)
+                .fontColor(PortraTheme.secondaryText)
+            }
+            .layoutWeight(1)
+            .alignItems(HorizontalAlign.Start)
+          }
+          .width('100%')
+        }, (item: SocialUserBrief) => `${item.userId}-${item.currentRole}`)
+      }
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+    .padding(16)
+    .backgroundColor(PortraTheme.surface)
+    .borderRadius(8)
+    .border({ width: 1, color: PortraTheme.border })
+  }
+
+  @Builder
+  private MomentPreview(title: string, items: MomentSummary[]) {
+    Column({ space: 12 }) {
+      Text(title)
+        .width('100%')
+        .fontSize(17)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(PortraTheme.primaryText)
+      if (items.length === 0) {
+        Text('暂无内容')
+          .width('100%')
+          .fontSize(13)
+          .fontColor(PortraTheme.secondaryText)
+          .padding({ top: 8, bottom: 8 })
+      } else {
+        ForEach(items, (item: MomentSummary) => {
+          MomentCard({ item: item })
+        }, (item: MomentSummary) => item.momentId.toString())
+      }
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
   }
 
   build() {
@@ -161,6 +404,13 @@ export struct ProfilePage {
                   Text(`用户编号 ${this.userId}`)
                     .fontSize(12)
                     .fontColor(PortraTheme.secondaryText)
+                  if (this.profileBio().length > 0) {
+                    Text(this.profileBio())
+                      .fontSize(12)
+                      .fontColor(PortraTheme.secondaryText)
+                      .maxLines(3)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  }
                 }
                 .layoutWeight(1)
                 .alignItems(HorizontalAlign.Start)
@@ -176,11 +426,34 @@ export struct ProfilePage {
                   .backgroundColor(PortraTheme.primarySoft)
                   .borderRadius(6)
                 Blank()
-                Text('PORTRA MEMBER')
-                  .fontSize(10)
-                  .fontColor(PortraTheme.mutedText)
+                Button(this.switchingRole ? '切换中' :
+                  this.role === 'PROVIDER' ? '切换到约拍用户' : '切换到摄影师')
+                  .height(34)
+                  .fontSize(11)
+                  .fontColor(PortraTheme.primary)
+                  .backgroundColor(PortraTheme.primarySoft)
+                  .enabled(!this.switchingRole)
+                  .onClick(() => this.switchRole())
               }
               .width('100%')
+              if (this.profile !== null) {
+                Column({ space: 5 }) {
+                  if (this.profile.locationVisible !== false && this.profile.locationDisplay?.trim()) {
+                    Text(`地点  ${this.profile.locationDisplay}`)
+                      .fontSize(12).fontColor(PortraTheme.secondaryText)
+                  }
+                  if (this.profile.genderVisible !== false && this.profile.gender?.trim()) {
+                    Text(`性别  ${this.profile.gender}`)
+                      .fontSize(12).fontColor(PortraTheme.secondaryText)
+                  }
+                  if (this.profile.school?.trim()) {
+                    Text(`学校  ${this.profile.school}`)
+                      .fontSize(12).fontColor(PortraTheme.secondaryText)
+                  }
+                }
+                .width('100%')
+                .alignItems(HorizontalAlign.Start)
+              }
             }
             .width('100%')
             .padding(18)
@@ -200,8 +473,10 @@ export struct ProfilePage {
               this.MenuRow('我的订单', '查看合作进度', () => this.onOpenOrders?.())
               Divider().color(PortraTheme.border).padding({ left: 18, right: 18 })
               this.MenuRow('消息', '与约拍对象保持联系', () => this.onOpenMessages?.())
-              Divider().color(PortraTheme.border).padding({ left: 18, right: 18 })
-              this.MenuRow('发布需求', '记录新的拍摄想法', () => this.onOpenPublish?.())
+              if (this.role === 'CUSTOMER') {
+                Divider().color(PortraTheme.border).padding({ left: 18, right: 18 })
+                this.MenuRow('发布需求', '记录新的拍摄想法', () => this.onOpenPublish?.())
+              }
             }
             .width('100%')
             .backgroundColor(PortraTheme.surface)
@@ -214,6 +489,23 @@ export struct ProfilePage {
                 .width('100%')
                 .fontSize(13)
                 .fontColor(PortraTheme.danger)
+            }
+
+            this.SocialPreview('我的关注', this.following)
+            this.SocialPreview('关注我的人', this.followers)
+            this.MomentPreview('当前身份动态', this.moments)
+            if (this.moments.length < this.momentTotal) {
+              Button(this.loadingMoreMoments ? '加载中' : '加载更多动态')
+                .width('100%').height(42).enabled(!this.loadingMoreMoments)
+                .backgroundColor(PortraTheme.primarySoft).fontColor(PortraTheme.primary)
+                .onClick(() => this.loadMoreMoments())
+            }
+            this.MomentPreview('我的动态收藏', this.favorites)
+            if (this.favorites.length < this.favoriteTotal) {
+              Button(this.loadingMoreFavorites ? '加载中' : '加载更多收藏')
+                .width('100%').height(42).enabled(!this.loadingMoreFavorites)
+                .backgroundColor(PortraTheme.primarySoft).fontColor(PortraTheme.primary)
+                .onClick(() => this.loadMoreFavorites())
             }
 
             Button(this.signingOut ? '退出中…' : '退出登录')

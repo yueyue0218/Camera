@@ -1,8 +1,11 @@
 import { NativeSessionApi } from '../auth/NativeSessionApi';
 import { AcceptedDemandResponse, ConfirmQuoteResult, ConversationSummary, CreateDemandPayload,
-  CreateDemandResponsePayload, CreateQuotePayload,
-  DemandResponseSummary, DemandSummary, MessageSummary, NativeRefreshRequest, NativeSessionResponse,
-  OrderSummary, PageResult, QuoteSummary, SendSmsCodeRequest, ServicePackageDetail, ServicePackageSummary,
+  CreateDemandResponsePayload, CreateQuotePayload, CreateReportPayload, CreateServicePackagePayload,
+  CreateServicePackageResult,
+  DemandListQuery, DemandResponseSummary, DemandSummary, MessageSummary, NativeRefreshRequest, NativeSessionResponse,
+  FollowState, MomentSummary, OrderSummary, PageResult, ProfileMomentPage, PublicUserProfile, QuoteSummary,
+  ReportSummary, SendSmsCodeRequest, ServicePackageDetail, ServicePackageInterest, ServicePackageListQuery,
+  ServicePackageSummary, SocialUserBrief, SwitchRolePayload, SwitchRoleResult, UserProfileSummary,
   SendTextMessagePayload, SessionSummary, StartServiceChatPayload, StartServiceChatResult,
   VerifyNativeSmsCodeRequest } from '../model/ApiModels';
 import { ErrorMapper } from './ErrorMapper';
@@ -21,6 +24,23 @@ export class ApiService implements NativeSessionApi {
       `/demands?page=${page}&size=${size}`,
       requestKey
     );
+  }
+
+  listDemandsByQuery(query: DemandListQuery, requestKey: string = 'demands.list'):
+    Promise<PageResult<DemandSummary>> {
+    const params: string[] = [`page=${this.safePage(query.page)}`, `size=${this.safeSize(query.size)}`];
+    this.appendText(params, 'cityCode', query.cityCode);
+    this.appendText(params, 'scene', query.scene);
+    this.appendText(params, 'status', query.status);
+    this.appendDate(params, 'expectedDate', query.expectedDate);
+    this.appendText(params, 'styleTag', query.styleTag);
+    this.appendNonNegative(params, 'minBudgetCent', query.minBudgetCent);
+    this.appendNonNegative(params, 'maxBudgetCent', query.maxBudgetCent);
+    this.appendText(params, 'timeTag', query.timeTag);
+    this.appendText(params, 'keyword', query.keyword);
+    this.appendSort(params, query.sort, ['latest', 'recommend']);
+    this.appendText(params, 'feedSeed', query.feedSeed);
+    return this.client.getPublic<PageResult<DemandSummary>>(`/demands?${params.join('&')}`, requestKey);
   }
 
   cancelDemands(requestKey: string = 'demands.list'): void {
@@ -56,6 +76,10 @@ export class ApiService implements NativeSessionApi {
     return this.client.get<DemandResponseSummary[]>(`/demands/${demandId}/responses`, `demands.${demandId}.responses`);
   }
 
+  listMyDemandResponses(): Promise<DemandResponseSummary[]> {
+    return this.client.get<DemandResponseSummary[]>('/demands/responses/me', 'demands.responses.me');
+  }
+
   acceptDemandResponse(demandId: number, responseId: number): Promise<AcceptedDemandResponse> {
     return this.client.post<AcceptedDemandResponse>(`/demands/${demandId}/responses/${responseId}/accept`,
       undefined, `demands.${demandId}.accept`);
@@ -65,6 +89,7 @@ export class ApiService implements NativeSessionApi {
     this.client.cancelRequest(`demands.${demandId}.responses`);
     this.client.cancelRequest(`demands.${demandId}.respond`);
     this.client.cancelRequest(`demands.${demandId}.accept`);
+    this.client.cancelRequest('demands.responses.me');
   }
 
   listServicePackages(page: number = 1, size: number = 10, requestKey: string = 'servicePackages.list'):
@@ -73,6 +98,23 @@ export class ApiService implements NativeSessionApi {
       `/service-packages?page=${page}&size=${size}`,
       requestKey
     );
+  }
+
+  listServicePackagesByQuery(query: ServicePackageListQuery,
+    requestKey: string = 'servicePackages.list'): Promise<PageResult<ServicePackageSummary>> {
+    const params: string[] = [`page=${this.safePage(query.page)}`, `size=${this.safeSize(query.size)}`];
+    this.appendText(params, 'cityCode', query.cityCode);
+    this.appendText(params, 'scene', query.scene);
+    this.appendText(params, 'style', query.style);
+    this.appendNonNegative(params, 'minPriceCent', query.minPriceCent);
+    this.appendNonNegative(params, 'maxPriceCent', query.maxPriceCent);
+    this.appendDate(params, 'availableDate', query.availableDate);
+    this.appendText(params, 'timeTag', query.timeTag);
+    this.appendText(params, 'keyword', query.keyword);
+    this.appendSort(params, query.sort, ['latest', 'recommend', 'price_asc', 'price_desc', 'created_asc']);
+    this.appendText(params, 'feedSeed', query.feedSeed);
+    return this.client.getPublic<PageResult<ServicePackageSummary>>(
+      `/service-packages?${params.join('&')}`, requestKey);
   }
 
   cancelServicePackages(requestKey: string = 'servicePackages.list'): void {
@@ -89,9 +131,144 @@ export class ApiService implements NativeSessionApi {
       payload, `servicePackages.${serviceId}.chat`);
   }
 
+  createServicePackage(payload: CreateServicePackagePayload): Promise<CreateServicePackageResult> {
+    return this.client.post<CreateServicePackageResult>('/service-packages', payload, 'servicePackages.create');
+  }
+
+  listServicePackageInterests(page: number = 1, size: number = 100):
+    Promise<PageResult<ServicePackageSummary>> {
+    return this.client.get<PageResult<ServicePackageSummary>>(
+      `/me/service-package-interests?page=${this.safePage(page)}&size=${this.safeSize(size)}`,
+      'servicePackages.interests');
+  }
+
+  addServicePackageInterest(serviceId: number): Promise<ServicePackageInterest> {
+    return this.client.post<ServicePackageInterest>(`/service-packages/${serviceId}/interest`, undefined,
+      `servicePackages.${serviceId}.interest`);
+  }
+
+  cancelServicePackageInterest(serviceId: number): Promise<void> {
+    return this.client.delete<void>(`/service-packages/${serviceId}/interest`,
+      `servicePackages.${serviceId}.interest`);
+  }
+
   cancelServiceDetail(serviceId: number): void {
     this.client.cancelRequest('servicePackages.detail');
     this.client.cancelRequest(`servicePackages.${serviceId}.chat`);
+    this.client.cancelRequest(`servicePackages.${serviceId}.interest`);
+    this.client.cancelRequest('servicePackages.interests');
+  }
+
+  listMoments(scope: string = 'latest', requestKey: string = 'moments.list'): Promise<MomentSummary[]> {
+    const normalizedScope = scope.trim().toLowerCase();
+    if (normalizedScope !== 'latest' && normalizedScope !== 'hot' && normalizedScope !== 'following') {
+      return Promise.reject(ErrorMapper.parse());
+    }
+    return this.client.get<MomentSummary[]>(`/moments?scope=${normalizedScope}`, requestKey);
+  }
+
+  cancelMoments(requestKey: string = 'moments.list'): void {
+    this.client.cancelRequest(requestKey);
+  }
+
+  listProfileMoments(authorId: number, authorRole: string, page: number = 1, size: number = 12):
+    Promise<ProfileMomentPage> {
+    const role = this.requireIdentityRole(authorRole);
+    if (!Number.isSafeInteger(authorId) || authorId <= 0) {
+      return Promise.reject(ErrorMapper.parse());
+    }
+    return this.client.get<ProfileMomentPage>(
+      `/moments/profile?authorId=${authorId}&authorRole=${role}&page=${this.safePage(page)}&size=${this.safeSize(size)}`,
+      `moments.profile.${authorId}.${role}`);
+  }
+
+  listFavoriteMoments(page: number = 1, size: number = 12): Promise<PageResult<MomentSummary>> {
+    return this.client.get<PageResult<MomentSummary>>(
+      `/moments/me/interactions?interaction=FAVORITED&page=${this.safePage(page)}&size=${this.safeSize(size)}`,
+      'moments.favorites');
+  }
+
+  favoriteMoment(momentId: number): Promise<MomentSummary> {
+    if (!Number.isSafeInteger(momentId) || momentId <= 0) {
+      return Promise.reject(ErrorMapper.parse());
+    }
+    return this.client.put<MomentSummary>(`/moments/${momentId}/favorite`, undefined, `moments.${momentId}.favorite`);
+  }
+
+  unfavoriteMoment(momentId: number): Promise<MomentSummary> {
+    if (!Number.isSafeInteger(momentId) || momentId <= 0) {
+      return Promise.reject(ErrorMapper.parse());
+    }
+    return this.client.delete<MomentSummary>(`/moments/${momentId}/favorite`, `moments.${momentId}.favorite`);
+  }
+
+  getMyProfile(): Promise<UserProfileSummary> {
+    return this.client.get<UserProfileSummary>('/users/me', 'users.me');
+  }
+
+  switchRole(role: string): Promise<SwitchRoleResult> {
+    const normalizedRole = this.requireIdentityRole(role);
+    const payload: SwitchRolePayload = { role: normalizedRole };
+    return this.client.post<SwitchRoleResult>('/users/me/role', payload, 'users.me.role');
+  }
+
+  getPublicProfile(userId: number, role: string): Promise<PublicUserProfile> {
+    const normalizedRole = this.requireIdentityRole(role);
+    if (!Number.isSafeInteger(userId) || userId <= 0) {
+      return Promise.reject(ErrorMapper.parse());
+    }
+    return this.client.get<PublicUserProfile>(
+      `/users/${userId}/public-profile?role=${normalizedRole}`, `users.${userId}.${normalizedRole}.profile`);
+  }
+
+  listFollowers(userId: number, role: string): Promise<SocialUserBrief[]> {
+    return this.listSocialUsers(userId, role, 'followers');
+  }
+
+  listFollowing(userId: number, role: string): Promise<SocialUserBrief[]> {
+    return this.listSocialUsers(userId, role, 'following');
+  }
+
+  followUser(userId: number, role: string): Promise<FollowState> {
+    const normalizedRole = this.requireIdentityRole(role);
+    if (!Number.isSafeInteger(userId) || userId <= 0) {
+      return Promise.reject(ErrorMapper.parse());
+    }
+    return this.client.put<FollowState>(`/users/${userId}/follow?targetRole=${normalizedRole}`, undefined,
+      `users.${userId}.${normalizedRole}.follow`);
+  }
+
+  unfollowUser(userId: number, role: string): Promise<FollowState> {
+    const normalizedRole = this.requireIdentityRole(role);
+    if (!Number.isSafeInteger(userId) || userId <= 0) {
+      return Promise.reject(ErrorMapper.parse());
+    }
+    return this.client.delete<FollowState>(`/users/${userId}/follow?targetRole=${normalizedRole}`,
+      `users.${userId}.${normalizedRole}.follow`);
+  }
+
+  cancelUserSystemRequests(userId?: number): void {
+    this.client.cancelRequest('users.me');
+    this.client.cancelRequest('users.me.role');
+    this.client.cancelRequest('moments.favorites');
+    if (userId !== undefined && Number.isSafeInteger(userId) && userId > 0) {
+      ['CUSTOMER', 'PROVIDER'].forEach((identityRole: string) => {
+        this.cancelSocialUserRequests(userId, identityRole);
+        this.client.cancelRequest(`moments.profile.${userId}.${identityRole}`);
+      });
+    }
+  }
+
+  cancelSocialUserRequests(userId: number, role: string): void {
+    const normalizedRole = role.trim().toUpperCase();
+    if (!Number.isSafeInteger(userId) || userId <= 0 ||
+      (normalizedRole !== 'CUSTOMER' && normalizedRole !== 'PROVIDER')) {
+      return;
+    }
+    this.client.cancelRequest(`users.${userId}.${normalizedRole}.profile`);
+    this.client.cancelRequest(`users.${userId}.${normalizedRole}.followers`);
+    this.client.cancelRequest(`users.${userId}.${normalizedRole}.following`);
+    this.client.cancelRequest(`users.${userId}.${normalizedRole}.follow`);
   }
 
   sendLoginCode(phone: string, deviceId: string): Promise<void> {
@@ -137,6 +314,17 @@ export class ApiService implements NativeSessionApi {
     this.client.cancelRequest(requestKey);
   }
 
+  hideConversation(conversationId: number): Promise<void> {
+    if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
+      return Promise.reject(ErrorMapper.parse());
+    }
+    return this.client.delete<void>(`/conversations/${conversationId}`, `conversations.${conversationId}.hide`);
+  }
+
+  cancelHideConversation(conversationId: number): void {
+    this.client.cancelRequest(`conversations.${conversationId}.hide`);
+  }
+
   listMessages(conversationId: number): Promise<MessageSummary[]> {
     return this.client.get<MessageSummary[]>(`/conversations/${conversationId}/messages`,
       `conversations.${conversationId}.messages`);
@@ -165,6 +353,8 @@ export class ApiService implements NativeSessionApi {
   cancelConversationDetail(conversationId: number): void {
     this.client.cancelRequest(`conversations.${conversationId}.messages`);
     this.client.cancelRequest(`conversations.${conversationId}.quotes`);
+    this.client.cancelRequest(`conversations.${conversationId}.send`);
+    this.client.cancelRequest(`conversations.${conversationId}.createQuote`);
   }
 
   listOrders(): Promise<OrderSummary[]> {
@@ -173,6 +363,19 @@ export class ApiService implements NativeSessionApi {
 
   cancelOrders(): void {
     this.client.cancelRequest('orders.list');
+  }
+
+  createReport(payload: CreateReportPayload): Promise<ReportSummary> {
+    return this.client.post<ReportSummary>('/reports', payload, 'reports.create');
+  }
+
+  listMyReports(): Promise<ReportSummary[]> {
+    return this.client.get<ReportSummary[]>('/reports/my', 'reports.my');
+  }
+
+  cancelReports(): void {
+    this.client.cancelRequest('reports.create');
+    this.client.cancelRequest('reports.my');
   }
 
   async refresh(refreshToken: string): Promise<NativeSessionResponse> {
@@ -194,5 +397,58 @@ export class ApiService implements NativeSessionApi {
       throw ErrorMapper.parse();
     }
     return response;
+  }
+
+  private safePage(value: number): number {
+    return Number.isSafeInteger(value) && value > 0 ? value : 1;
+  }
+
+  private safeSize(value: number): number {
+    return Number.isSafeInteger(value) && value > 0 ? Math.min(value, 100) : 10;
+  }
+
+  private requireIdentityRole(role: string): string {
+    const normalizedRole = role.trim().toUpperCase();
+    if (normalizedRole !== 'CUSTOMER' && normalizedRole !== 'PROVIDER') {
+      throw ErrorMapper.parse();
+    }
+    return normalizedRole;
+  }
+
+  private listSocialUsers(userId: number, role: string, relation: string): Promise<SocialUserBrief[]> {
+    const normalizedRole = this.requireIdentityRole(role);
+    if (!Number.isSafeInteger(userId) || userId <= 0 ||
+      (relation !== 'followers' && relation !== 'following')) {
+      return Promise.reject(ErrorMapper.parse());
+    }
+    return this.client.get<SocialUserBrief[]>(`/users/${userId}/${relation}?role=${normalizedRole}`,
+      `users.${userId}.${normalizedRole}.${relation}`);
+  }
+
+  private appendText(params: string[], name: string, value: string | undefined): void {
+    const normalized = value?.trim() ?? '';
+    if (normalized.length > 0) {
+      params.push(`${name}=${encodeURIComponent(normalized)}`);
+    }
+  }
+
+  private appendDate(params: string[], name: string, value: string | undefined): void {
+    const normalized = value?.trim() ?? '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+      params.push(`${name}=${normalized}`);
+    }
+  }
+
+  private appendNonNegative(params: string[], name: string, value: number | undefined): void {
+    if (value !== undefined && Number.isSafeInteger(value) && value >= 0) {
+      params.push(`${name}=${value}`);
+    }
+  }
+
+  private appendSort(params: string[], value: string | undefined, allowed: string[]): void {
+    const normalized = value?.trim().toLowerCase() ?? '';
+    if (allowed.includes(normalized)) {
+      params.push(`sort=${normalized}`);
+    }
   }
 }

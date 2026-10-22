@@ -65,14 +65,31 @@ export struct PortraFilterChip {
 
 @Component
 export struct HallFilters {
+  @Prop channel: HallChannel = HallChannel.SHOWCASES;
+  @Prop serviceSort: string = 'recommend';
+  @Prop demandSort: string = 'latest';
+  onServiceSortChange?: (sort: string) => void;
+  onDemandSortChange?: (sort: string) => void;
+
+  private currentSort(): string {
+    return this.channel === HallChannel.SHOWCASES ? this.serviceSort : this.demandSort;
+  }
+
+  private selectSort(sort: string): void {
+    if (this.channel === HallChannel.SHOWCASES) {
+      this.onServiceSortChange?.(sort);
+    } else {
+      this.onDemandSortChange?.(sort);
+    }
+  }
+
   build() {
     Scroll() {
       Row({ space: PortraTheme.spacingSm }) {
-        PortraFilterChip({ label: '全部地区' })
-        PortraFilterChip({ label: '时间' })
-        PortraFilterChip({ label: '风格' })
-        PortraFilterChip({ label: '预算' })
-        PortraFilterChip({ label: '更多筛选' })
+        PortraFilterChip({ label: '推荐', active: this.currentSort() === 'recommend',
+          onSelect: () => this.selectSort('recommend') })
+        PortraFilterChip({ label: '最新', active: this.currentSort() === 'latest',
+          onSelect: () => this.selectSort('latest') })
       }
       .padding({ right: PortraTheme.spacingLg })
     }

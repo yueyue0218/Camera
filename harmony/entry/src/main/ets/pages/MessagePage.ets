@@ -14,6 +14,7 @@ export struct MessagePage {
   @State private loading: boolean = true;
   @State private errorMessage: string = '';
   @State private conversations: ConversationSummary[] = [];
+  @State private hidingConversationId: number = 0;
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
   onBack?: () => void;
@@ -26,21 +27,23 @@ export struct MessagePage {
   aboutToDisappear(): void {
     this.requestVersion++;
     this.appClient.apiService.cancelConversations();
+    if (this.hidingConversationId > 0) {
+      this.appClient.apiService.cancelHideConversation(this.hidingConversationId);
+    }
   }
 
   private async load(): Promise<void> {
     const version = ++this.requestVersion;
     this.loading = true;
     this.errorMessage = '';
+    this.conversations = [];
     try {
       const result = await this.appClient.apiService.listConversations();
       if (version === this.requestVersion) {
         if (!Array.isArray(result)) {
           this.errorMessage = '会话数据格式异常';
         } else {
-          this.conversations = result.filter((item: ConversationSummary) =>
-            item !== null && Number.isSafeInteger(item.conversationId) && item.conversationId > 0 &&
-            Number.isSafeInteger(item.otherUserId) && item.otherUserId > 0);
+          this.conversations = this.normalizeConversations(result);
         }
       }
     } catch (error) {
@@ -51,6 +54,52 @@ export struct MessagePage {
       if (version === this.requestVersion) {
         this.loading = false;
       }
+    }
+  }
+
+  private normalizeConversations(source: ConversationSummary[]): ConversationSummary[] {
+    const result: ConversationSummary[] = [];
+    source.forEach((item: ConversationSummary) => {
+      if (item !== null && Number.isSafeInteger(item.conversationId) && item.conversationId > 0 &&
+        Number.isSafeInteger(item.otherUserId) && item.otherUserId > 0 &&
+        !result.some((current: ConversationSummary) => current.conversationId === item.conversationId)) {
+        result.push(item);
+      }
+    });
+    return result.sort((left: ConversationSummary, right: ConversationSummary) =>
+      this.conversationTime(right) - this.conversationTime(left));
+  }
+
+  private conversationTime(item: ConversationSummary): number {
+    const text = item.lastMessageTime ?? item.createdAt ?? '';
+    const value = Date.parse(text);
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  private conversationSubtitle(item: ConversationSummary): string {
+    if (item.orderId !== undefined) {
+      return `订单 #${item.orderId} · 对方 #${item.otherUserId}`;
+    }
+    if (item.sourceType?.trim()) {
+      return `${item.sourceType} #${item.sourceId ?? '-'} · 对方 #${item.otherUserId}`;
+    }
+    return `对方用户 #${item.otherUserId}`;
+  }
+
+  private async hideConversation(conversationId: number): Promise<void> {
+    if (this.hidingConversationId !== 0) {
+      return;
+    }
+    this.hidingConversationId = conversationId;
+    this.errorMessage = '';
+    try {
+      await this.appClient.apiService.hideConversation(conversationId);
+      this.conversations = this.conversations.filter((item: ConversationSummary) =>
+        item.conversationId !== conversationId);
+    } catch (error) {
+      this.errorMessage = (error as PortraError).message || '隐藏会话失败';
+    } finally {
+      this.hidingConversationId = 0;
     }
   }
 
@@ -112,8 +161,7 @@ export struct MessagePage {
                     .fontSize(15)
                     .fontWeight(FontWeight.Bold)
                     .fontColor(PortraTheme.primaryText)
-                  Text(item.orderId ? `订单 #${item.orderId} · 对方 #${item.otherUserId}` :
-                    `对方用户 #${item.otherUserId}`)
+                  Text(this.conversationSubtitle(item))
                     .fontSize(12)
                     .fontColor(PortraTheme.secondaryText)
                     .maxLines(1)
@@ -121,15 +169,31 @@ export struct MessagePage {
                 }
                 .layoutWeight(1)
                 .alignItems(HorizontalAlign.Start)
-                Text(typeof item.lastMessageTime === 'string' ? item.lastMessageTime.slice(0, 10) : '')
-                  .fontSize(11)
-                  .fontColor(PortraTheme.mutedText)
+                Column({ space: 4 }) {
+                  Text(typeof item.lastMessageTime === 'string' ? item.lastMessageTime.slice(0, 10) : '')
+                    .fontSize(11)
+                    .fontColor(PortraTheme.mutedText)
+                  Row({ space: 6 }) {
+                    Button('进入')
+                      .height(30)
+                      .fontSize(11)
+                      .backgroundColor(PortraTheme.primarySoft)
+                      .fontColor(PortraTheme.primary)
+                      .onClick(() => this.onOpenConversation?.(item.conversationId))
+                    Button(this.hidingConversationId === item.conversationId ? '隐藏中' : '隐藏')
+                      .height(30)
+                      .fontSize(11)
+                      .backgroundColor(PortraTheme.surface)
+                      .fontColor(PortraTheme.secondaryText)
+                      .enabled(this.hidingConversationId === 0)
+                      .onClick(() => this.hideConversation(item.conversationId))
+                  }
+                }
               }
               .width('100%')
-              .height(78)
+              .height(86)
               .padding({ left: 20, right: 20 })
               .backgroundColor(PortraTheme.surface)
-              .onClick(() => this.onOpenConversation?.(item.conversationId))
               Divider().color(PortraTheme.border).padding({ left: 80 })
             }, (item: ConversationSummary) => item.conversationId.toString())
 

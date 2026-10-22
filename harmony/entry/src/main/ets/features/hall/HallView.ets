@@ -17,6 +17,12 @@ export struct HallView {
   @Prop serviceError: string = '';
   @Prop demandError: string = '';
   @Prop initialChannel: HallChannel = HallChannel.SHOWCASES;
+  @Prop serviceSort: string = 'recommend';
+  @Prop demandSort: string = 'latest';
+  @Prop serviceHasMore: boolean = false;
+  @Prop demandHasMore: boolean = false;
+  @Prop serviceLoadingMore: boolean = false;
+  @Prop demandLoadingMore: boolean = false;
   @State private channel: HallChannel = HallChannel.SHOWCASES;
   private readonly contentScroller: Scroller = new Scroller();
   onSearch?: () => void;
@@ -25,6 +31,10 @@ export struct HallView {
   onRetry?: () => void;
   onOpenService?: (serviceId: number) => void;
   onOpenDemand?: (demandId: number) => void;
+  onServiceSortChange?: (sort: string) => void;
+  onDemandSortChange?: (sort: string) => void;
+  onLoadMoreServices?: () => void;
+  onLoadMoreDemands?: () => void;
 
   aboutToAppear(): void {
     this.channel = this.initialChannel;
@@ -90,6 +100,11 @@ export struct HallView {
       PortraEmptyView({ message: '暂时没有可展示的摄影橱窗' })
     } else {
       this.ShowcaseRows()
+      if (this.serviceHasMore) {
+        Button(this.serviceLoadingMore ? '加载中…' : '加载更多橱窗')
+          .enabled(!this.serviceLoadingMore)
+          .onClick(() => this.onLoadMoreServices?.())
+      }
     }
   }
 
@@ -106,6 +121,11 @@ export struct HallView {
         ForEach(this.demandItems, (item: DemandSummary) => {
           DemandCard({ item: item, onOpen: this.onOpenDemand })
         }, (item: DemandSummary) => item.demandId.toString())
+        if (this.demandHasMore) {
+          Button(this.demandLoadingMore ? '加载中…' : '加载更多需求')
+            .enabled(!this.demandLoadingMore)
+            .onClick(() => this.onLoadMoreDemands?.())
+        }
       }
       .width('100%')
     }
@@ -120,7 +140,13 @@ export struct HallView {
           channel: this.channel,
           onChange: (channel: HallChannel) => this.selectChannel(channel)
         })
-        HallFilters()
+        HallFilters({
+          channel: this.channel,
+          serviceSort: this.serviceSort,
+          demandSort: this.demandSort,
+          onServiceSortChange: this.onServiceSortChange,
+          onDemandSortChange: this.onDemandSortChange
+        })
       }
       .width('100%')
       .padding({ left: PortraTheme.spacingLg, right: PortraTheme.spacingLg, bottom: 5 })
