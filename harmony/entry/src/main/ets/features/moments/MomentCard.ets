@@ -8,7 +8,10 @@ import { MomentFeedFormatter } from './MomentFeedModels';
 export struct MomentCard {
   @Prop item: MomentSummary;
   @Prop favoriteBusy: boolean = false;
+  @Prop interactionsDisabled: boolean = false;
+  @Prop reportAllowed: boolean = false;
   onToggleFavorite?: (item: MomentSummary) => void;
+  onRequestReport?: (item: MomentSummary) => void;
 
   private imageSource(): string {
     const images = MomentFeedFormatter.images(this.item);
@@ -70,7 +73,7 @@ export struct MomentCard {
             allowInlineData: true
           })
           if (this.imageCount() > 1) {
-            Text(`共 ${this.imageCount()} 张`)
+            Text(`预览 ${this.imageCount()} 张`)
               .fontSize(PortraTheme.fontCaption)
               .fontColor(PortraTheme.white)
               .padding({ left: 9, right: 9, top: 5, bottom: 5 })
@@ -92,36 +95,59 @@ export struct MomentCard {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
 
-      Row({ space: PortraTheme.spacingXl }) {
+      Row({ space: PortraTheme.spacingSm }) {
         Text(`喜欢 ${this.item.likeCount}`)
           .fontSize(PortraTheme.fontBodySmall)
           .fontColor(this.item.likedByCurrentUser ? PortraTheme.danger : PortraTheme.secondaryText)
+          .layoutWeight(1)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .accessibilityText(`喜欢 ${this.item.likeCount}`)
         if (this.onToggleFavorite !== undefined) {
           Button(this.favoriteBusy ? '处理中' :
             `${this.item.favoritedByCurrentUser ? '已收藏' : '收藏'} ${this.item.favoriteCount}`)
-            .height(32)
+            .constraintSize({ minHeight: 36 })
+            .layoutWeight(1)
             .fontSize(PortraTheme.fontBodySmall)
             .fontColor(this.item.favoritedByCurrentUser ? PortraTheme.primary : PortraTheme.secondaryText)
             .backgroundColor(this.item.favoritedByCurrentUser ? PortraTheme.primarySoft : Color.Transparent)
             .borderRadius(PortraTheme.radiusPill)
-            .enabled(!this.favoriteBusy)
+            .enabled(!this.favoriteBusy && !this.interactionsDisabled)
+            .accessibilityText(`${this.item.favoritedByCurrentUser ? '取消收藏' : '收藏'}动态 ${this.item.momentId}，${this.item.favoriteCount} 次收藏${this.favoriteBusy ? '，处理中' : ''}`)
             .onClick(() => this.onToggleFavorite?.(this.item))
         } else {
           Text(`收藏 ${this.item.favoriteCount}`)
+            .layoutWeight(1)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
             .fontSize(PortraTheme.fontBodySmall)
             .fontColor(this.item.favoritedByCurrentUser ? PortraTheme.primary : PortraTheme.secondaryText)
         }
-        Blank()
+      }
+      .width('100%')
+      .padding({ top: PortraTheme.spacingSm })
+      .border({ width: { top: 1 }, color: PortraTheme.border })
+
+      Row({ space: PortraTheme.spacingSm }) {
         Text(this.item.authorRole === 'PROVIDER' ? '摄影师动态' : '约拍记录')
           .fontSize(PortraTheme.fontCaption)
           .fontColor(PortraTheme.secondaryText)
           .padding({ left: 8, right: 8, top: 4, bottom: 4 })
           .backgroundColor(PortraTheme.primarySoft)
           .borderRadius(PortraTheme.radiusPill)
+        Blank()
+        if (this.reportAllowed && this.onRequestReport !== undefined) {
+          Button('举报')
+            .constraintSize({ minHeight: 36 })
+            .fontSize(PortraTheme.fontBodySmall)
+            .fontColor(PortraTheme.secondaryText)
+            .backgroundColor(Color.Transparent)
+            .enabled(!this.interactionsDisabled)
+            .accessibilityText(`举报动态 ${this.item.momentId}`)
+            .onClick(() => this.onRequestReport?.(this.item))
+        }
       }
       .width('100%')
-      .padding({ top: PortraTheme.spacingSm })
-      .border({ width: { top: 1 }, color: PortraTheme.border })
     }
     .width('100%')
     .padding(PortraTheme.spacingLg)

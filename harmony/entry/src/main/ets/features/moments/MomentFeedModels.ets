@@ -75,35 +75,67 @@ export class MomentFeedFormatter {
   }
 }
 
-/** Short-lived, session-scoped memory cache for tab re-entry. */
+class MomentFeedCacheEntry {
+  records: MomentSummary[];
+  loadedAtMs: number;
+  sessionVersion: number;
+
+  constructor(items: MomentSummary[], nowMs: number, sessionVersion: number) {
+    this.records = items.slice();
+    this.loadedAtMs = nowMs;
+    this.sessionVersion = sessionVersion;
+  }
+}
+
+/** Short-lived snapshots, isolated by scope and authentication session. */
 export class MomentFeedCache {
   static readonly shared: MomentFeedCache = new MomentFeedCache();
   private readonly ttlMs: number;
-  private records: MomentSummary[] = [];
-  private loadedAtMs: number = -1;
-  private sessionVersion: number = -1;
+  private entries: Map<string, MomentFeedCacheEntry> = new Map<string, MomentFeedCacheEntry>();
+  private pendingFavorites: Map<number, Promise<void>> = new Map<number, Promise<void>>();
 
   constructor(ttlMs: number = 60000) {
     this.ttlMs = ttlMs;
   }
 
-  read(nowMs: number, sessionVersion: number): MomentSummary[] | undefined {
-    if (!Number.isFinite(nowMs) || nowMs < 0 || sessionVersion !== this.sessionVersion ||
-      this.loadedAtMs < 0 || nowMs - this.loadedAtMs > this.ttlMs) {
+  read(nowMs: number, sessionVersion: number, scope: string = 'latest'): MomentSummary[] | undefined {
+    const entry = this.entries.get(scope);
+    if (this.hasPendingFavorite(sessionVersion) || entry === undefined || !Number.isFinite(nowMs) || nowMs < entry.loadedAtMs ||
+      sessionVersion !== entry.sessionVersion || nowMs - entry.loadedAtMs > this.ttlMs) {
       return undefined;
     }
-    return this.records.slice();
+    return entry.records.slice();
   }
 
-  write(items: MomentSummary[], nowMs: number, sessionVersion: number): void {
-    this.records = items.slice();
-    this.loadedAtMs = nowMs;
-    this.sessionVersion = sessionVersion;
+  write(items: MomentSummary[], nowMs: number, sessionVersion: number, scope: string = 'latest'): void {
+    this.entries.set(scope, new MomentFeedCacheEntry(items, nowMs, sessionVersion));
+  }
+
+  hasPendingFavorite(sessionVersion: number): boolean {
+    return this.pendingFavorites.has(sessionVersion);
+  }
+
+  waitForFavorite(sessionVersion: number): Promise<void> {
+    return this.pendingFavorites.get(sessionVersion) ?? Promise.resolve();
+  }
+
+  /** A destroyed view must not discard a write that is still running on the server. */
+  trackFavorite(request: Promise<MomentSummary>, sessionVersion: number): void {
+    const pending = request.then(() => this.finishFavorite(sessionVersion),
+      () => this.finishFavorite(sessionVersion));
+    this.pendingFavorites.set(sessionVersion, pending);
+  }
+
+  private finishFavorite(sessionVersion: number): void {
+    this.entries.forEach((entry: MomentFeedCacheEntry, scope: string) => {
+      if (entry.sessionVersion === sessionVersion) {
+        this.entries.delete(scope);
+      }
+    });
+    this.pendingFavorites.delete(sessionVersion);
   }
 
   clear(): void {
-    this.records = [];
-    this.loadedAtMs = -1;
-    this.sessionVersion = -1;
+    this.entries.clear();
   }
 }

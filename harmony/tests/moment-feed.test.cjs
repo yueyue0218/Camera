@@ -68,13 +68,26 @@ test('feed cache is short-lived and isolated by authentication session version',
   assert.equal(cache.read(200, 3), undefined);
 });
 
+test('feed cache never returns a different scope and invalidates all scopes after interaction', () => {
+  const cache = new MomentFeedCache(1000);
+  cache.write([moment({ momentId: 1 })], 100, 3, 'latest');
+  cache.write([moment({ momentId: 2 })], 100, 3, 'hot');
+  assert.deepEqual(cache.read(500, 3, 'latest').map(item => item.momentId), [1]);
+  assert.deepEqual(cache.read(500, 3, 'hot').map(item => item.momentId), [2]);
+  assert.equal(cache.read(500, 3, 'following'), undefined);
+  assert.equal(cache.read(99, 3, 'latest'), undefined);
+  assert.equal(cache.read(500, 4, 'hot'), undefined);
+  cache.clear();
+  assert.equal(cache.read(500, 3, 'hot'), undefined);
+});
+
 test('runtime shell renders the real feed page without placeholder actions', () => {
   const shell = fs.readFileSync(path.resolve(sourceRoot, 'features/shell/PortraAppShell.ets'), 'utf8');
   const page = fs.readFileSync(path.resolve(sourceRoot, 'pages/MomentFeedPage.ets'), 'utf8');
   const card = fs.readFileSync(path.resolve(sourceRoot, 'features/moments/MomentCard.ets'), 'utf8');
   assert.match(shell, /MomentFeedPage/);
   assert.doesNotMatch(shell, /动态业务不在本轮实现范围内/);
-  assert.match(page, /listMoments\('latest'\)/);
+  assert.match(page, /listMoments\(scope\)/);
   assert.match(page, /requestInFlight/);
   assert.match(page, /MomentFeedCache/);
   assert.match(card, /allowInlineData: true/);
