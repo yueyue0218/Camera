@@ -39,11 +39,12 @@ C 页面在根 Column 的 onAppear 注册局部原生事件，不只依赖组件
 
 | 候选 | 发现来源 | 本次连通性/版本 | 团队用于本轮测试的确认 |
 | --- | --- | --- | --- |
-| https://47.76.106.57 | GitHub 仓库变量 STAGING_PUBLIC_URL / STAGING_HEALTH_URL / STAGING_EXPECTED_ORIGIN；harmony/README.md；docs/deploy/C_DEPLOY_01_STAGING_CLOSURE.md | TLS 校验成功；GET / 为 HTML 200；GET /service-packages?page=1&size=1 为 HTTP200/业务200；deployment.json 返回前端 gitSha d36689b78922cfa3f4da9b6cf25053ace5667641、environment=temp-staging | 用户在续推后明确回复“允许，授权”，已确认本轮专用测试数据写入及DevEco控制；未取得合法登录会话前仍未做外部写入 |
+| https://47.76.106.57 | GitHub 仓库变量 STAGING_PUBLIC_URL / STAGING_HEALTH_URL / STAGING_EXPECTED_ORIGIN；harmony/README.md；docs/deploy/C_DEPLOY_01_STAGING_CLOSURE.md | TLS 校验成功；GET / 为 HTML 200；GET /service-packages?page=1&size=1 为 HTTP200/业务200；deployment.json 返回前端 gitSha d36689b78922cfa3f4da9b6cf25053ace5667641、environment=temp-staging | 用户明确授权本轮专用测试数据写入及DevEco控制，随后亲自完成普通账号登录；已通过正常Web发布流程创建专用五图动态，见后文 |
 | 同源 Web 后台 | frontend/src/routes.jsx：/login/admin、/admin/feed、/admin/reports；frontend/src/api/client.js 的 temp-staging 管理/举报走 /api/web | /admin/reports 返回 HTML200；无认证 /api/web/admin/reports、/api/web/reports/my、/auth/session 为业务40101；没有合法管理员访问，不能称管理可用 | 尚待合法访问方式，不创建/提权管理员 |
 | PR25 Vercel Preview | PR 的部署机器人评论 | 根地址302，未绕过保护或尝试认证；不能证明后端同源或管理员登录可用 | 未作为测试环境采用 |
 | http://47.250.86.6 | 历史 docs/P4/DEMO_GUIDE.md、application.yml CORS 候选 | 有限8秒探测超时（curl28）；历史配置不算可用测试环境 | 无本轮确认，未写入 |
 | http://127.0.0.1:18087 | 本轮自行启动的专属进程，smoke + H2内存 portra_c_20261025，仅绑定127.0.0.1 | 普通账号/动态/举报相关真实HTTP验收通过；验收后正常退出账号并停止专属进程，内存数据已释放 | 用户明确授权隔离本地评估/普通账号测试，仅记本地结果 |
+| http://127.0.0.1:18088 / Web http://127.0.0.1:15173 | 用户随后明确要求提供测试管理员；本轮专属smoke/H2 portra_c_admin_20261025及现有Web源码的本地Vite进程 | 正常管理员密码登录、Web查同一reportId、下架/独立恢复与普通用户重新HTTP读取通过；两个服务均实查只绑定127.0.0.1 | 仅此新建空内存库初始化测试管理员；未创建或提权staging账号，结果不算鸿蒙设备/外部闭环 |
 
 公开 deployment.json 是**前端部署标识**，不能推断当前后端必为同 SHA。GitHub deploy.yml 最近显示成功的运行 38253959362 对应 d662b21（2026-10-12）；它与当前公开前端标识不同，分别记录，不伪称本轮后端版本已确认。version.json / release.json 返回 HTML SPA 回退，不是版本 JSON。
 
@@ -52,7 +53,7 @@ C 页面在根 Column 的 onAppear 注册局部原生事件，不只依赖组件
 - 已安装 DevEco Studio / SDK 26.0.0、Node/Hvigor/ohpm；HAP 可编译。
 - hdc list targets -v：`[Empty]`，无已连接真机/模拟器。
 - Emulator.exe -list：`[Empty]`，退出0；Device Manager 配置的镜像目录不存在，deployed 仅版本文件，无已部署机器。程序自带 emulator.json 是设备模板，不能当作已安装镜像。
-- 已尝试通过 Computer Use 启动/控制 DevEco 核查 Device Manager，工具返回“Computer Use app approval timed out”；没有绕过应用控制授权。未因此更改系统设置、下载镜像或声称模拟器运行。
+- 早期Computer Use控制曾超时，之后已成功打开设备管理器；用户亲自接受软件许可，配置实查为agree。官方26手机镜像下载因IDE Java HTTP回环异常未开始；进程级参数重启随后遇到.port套接字/目录锁异常，未删除共享锁或更改全局VM配置，详见补充记录。
 - Java17、Maven3.9.16、H2依赖和 MySQL8 程序可用。没有使用现有 MySQL 或其账号，采用独立 H2 内存；关闭 camera.demo.seed-users，未自动创建演示或管理员账号。
 - 初始本地启动因 Windows Java NIO Unix 域回环失败；对照已有 JBR25 同样失败。simple HTTP factory 仅移除了首个触发点，Tomcat NIO 仍失败。最小 Selector 程序证明进程级 `jdk.net.unixdomain.tmpdir` 指向本次不存在的临时父目录可触发 JDK 原生 TCP 回退，最终 Java17 启动成功。此属性只作用本次进程，未修改系统或共享配置；未关闭 TLS/鉴权。
 
@@ -105,6 +106,35 @@ C 页面在根 Column 的 onAppear 注册局部原生事件，不只依赖组件
 - 普通/管理员登录页已保留供合法登录接手；没有现成会话，尚缺负责人预置的普通测试账号访问方式及合法管理员登录。浏览器密码无需发送至聊天。账号获取不能由本轮写入授权自动替代。
 - 授权后 `hdc list targets -v`仍为Empty，无已运行模拟器/设备；许可处理后才能继续镜像准备，设备三路径和X01–X07状态不作虚假提升。
 
+### 普通账号接手、模拟器与本地测试管理员补充（2026-10-25）
+
+以上是接手前的历史记录；当前普通Web账号登录和软件许可已不再列为待用户授权事项。
+
+- 用户完成staging普通账号登录后，页面显示“测试用户3”。通过原发布对话框填写专用标题`C验收20261025-98c3e60-01（仅测试）`，上传5张本轮生成的标记测试PNG，点击发布后显示“发布成功”。界面编号`No. 000002`，时间`2026/10/25 18:39:54`；原动态`No. 000001 / 嘿嘿`未操作。详情抽屉实际显示`1 / 5`，下一张后`2 / 5`。这是Web侧测试对象准备，不是鸿蒙详情或举报证据；界面编号按当前源码DTO对象ID生成，未将列表位置推断为新reportId。
+- 普通会话访问`/admin/reports`及`/login/admin`均返回大厅。已走正常退出后重新打开管理员表单。用户表示没有现成管理员登录方式并要求提供测试管理员；没有尝试猜测staging凭据、重置密码、从浏览器取token或将普通用户提权。
+- DevEco软件许可第二次处理后实查`HarmonyOS_Software_Service_Agreement:agree`，进入“我的设备”并选择官方`Huawei_Phone / HarmonyOS 7.0.0(26.0.0)`，确认下载。实际无下载进度/无镜像：IDE日志`HttpUtil.<clinit>`报`Unable to establish loopback connection`，后续`ChooseDeviceImageStep`失败。按本机最小JDK实验，将回退属性放入本次scratch VM options，由官方启动器的`DEVECOSTUDIO_VM_OPTIONS`仅进程加载；未修改用户/安装目录VM配置。正常退出IDE后重启又因系统目录`.port`无法访问、AF_UNIX bind/connect报错而失败，官方应用入口重试也未出现可用窗口；未删除共享锁或伪造SDK许可。镜像、实例、签名与设备仍未就绪，IDE重启问题真实记录，不能称模拟器已启动。
+- 独立只读核查原生认证：`pages/LoginPage.ets`与`network/ApiService.ets`仅走`/auth/sms/send`、`/auth/native/sms/verify`，需要`NativeSessionResponse`的access/refresh；仓库`TempStagingWebConfig.java`明确拒绝短信入口，`TempStagingAuthController.java`返回Web LoginResponse并设置HttpOnly refresh cookie。公开前端为temp-staging，后端实际SHA仍未知，因此这是代码/环境不匹配证据，不能推定线上后端全部版本。普通Web登录不等于原生可登录；已加入维护者交接，不给C新增登录、WebView或token注入。
+
+#### 本地管理员与Web闭环（单独证据）
+
+用户要求测试管理员后，复用现有`StagingRoutingHttpCheck`的隔离夹具方式，在scratch运行器中固定smoke、loopback、专用H2内存、禁用demo种子；启动后再次断言profile/数据库且用户表为空，再通过既有实体及BCrypt初始化一个测试管理员（adminId=1）。随机凭据只保留本机scratch文件，无token预置，不提交Git、不输出密码。没有改后端/Web源码或共享配置。浏览器原`/login/admin`用户名/密码认证成功进入管理概览。
+
+复用既有C本地HTTP脚本，scratch副本只替换专用loopback端口与H2日志标记：普通账号仍走真实随机挑战与原native验证，authorId=2、reporterId=3，创建momentId=1（5图）、reportId=1/PENDING；三个scope、点赞/收藏幂等和普通管理拒绝再次通过。不是从鸿蒙UI发出。
+
+| 顺序 / 实际入口 | 结果 |
+| --- | --- |
+| Web `/admin/reports`、查看举报 | 显示同一`reportId=1`、`MOMENT #1 / PENDING`及专用测试说明 |
+| Web“下架内容”，填写原因提交一次 | 提示举报处理成功，动态管理显示`No.000001 HIDDEN` |
+| 普通用户新登录后GET Feed、GET `/moments/1`、GET `/reports/my` | Feed不包含1；详情业务40401；同一举报RESOLVED/TAKE_DOWN |
+| Web `/admin/feed`“恢复展示”，填写独立恢复原因 | 提示成功，动态显示VISIBLE；使用独立restore流程，未第二次resolve已处理举报 |
+| 普通用户正常间隔后重新登录并再次GET | Feed包含1；详情业务200且完整5图；举报仍RESOLVED/TAKE_DOWN |
+
+恢复后第一次重新发送短信因原间隔限制返回40001，脚本退出1；未改限流、固定OTP或跳过验证，正常间隔后再次运行通过（退出0）。本次测试未承诺推送，也未用作者删除/新建替代下架恢复。
+
+实际命令/退出码：`mvn -o dependency:build-classpath '-Dmdep.outputFile=target/c-local-audit/classpath.txt' '-DincludeScope=runtime'`退出0（初次未引用的PowerShell参数解析失败退出1后已纠正）；`javac ... PortraCLocalFixture.java`退出0；`java [进程JDK参数] -cp [既有target/classes及依赖] PortraCLocalFixture [本机凭据输出]`启动成功；`node [scratch]/harmony-c-local-admin-http-check.cjs`退出0；`node [scratch]/harmony-c-local-visibility-check.cjs hidden`退出0；同命令`restored`首次1、间隔后0。scratch运行器/凭据/日志/截图不提交，未修改常规回归集合；本次没有重跑未改变的102项和HAP，沿用前述实际代码验证结果。
+
+本机截图：`harmony-c-staging-five-images.png`、`harmony-c-local-web-hidden.png`、`harmony-c-local-web-restored.png`，以及JSON可见性证据，均在本轮scratch中。供接手的本地Web后台已保留登录页签；后端监听18088实际PID18532，Web监听15173/PID5744，仅loopback，内存数据随专属后端停止释放。后续停止前必须重新核对PID、端口与专属运行器身份，不能按旧PID盲停。此本地测试管理员不能登录staging。
+
 ## 公共依赖与真实跨端剩余项
 
 | 项目 | 最新状态 / 负责人 |
@@ -113,17 +143,17 @@ C 页面在根 Column 的 onAppear 注册局部原生事件，不只依赖组件
 | C-SHARED-03/04 | B/公共维护者尚未授权/提供修复；7项严格用例失败。shared-change-requests含精确兼容签名、插入位置与跨实例取消验收 |
 | C-SHARED-01/02 | 公共ApiService点赞/详情方法仍缺；本地后端真实接口已测，不等于鸿蒙已接。未新增假按钮或完整相册 |
 | C-SHARED-05/06 | B公开主页入口/真实作者资料与收藏页设备联动待对齐；原只读卡片兼容保留 |
-| 签名/设备 | 无签名配置、无实例/镜像、无连接设备；DevEco现已成功控制并打开设备管理器，首次软件协议/隐私选择待用户处理；staging HAP已构建，未安装 |
-| staging普通测试身份 | 环境写入已获授权；实际页面仅支持负责人预置的白名单账号，不发送短信/不开放注册，尚缺合法普通测试账号访问方式；未尝试绕过 |
-| Web管理员 | 无合法访问方式，未创建管理员、重置密码、注入token或处理真实内容 |
+| 签名/设备 | 软件许可已接受；无签名配置、无镜像/实例/连接设备。官方下载被IDE HTTP回环异常阻断；进程参数重启又遇.port目录锁故障，未改共享锁/全局配置。staging HAP已构建、未安装 |
+| staging普通测试身份 | Web普通测试账号已合法登录并创建专用对象；原生短信登录与temp-staging代码契约不匹配，需维护者提供现有原生可用测试环境/认证方案，不能拿Web cookie替代 |
+| Web管理员 | staging仍无现成合法管理员访问；用户随后授权的测试管理员仅创建在全新本地H2内存库，正常密码登录和本地Web闭环通过，未提权staging或重置既有密码 |
 
 | X编号 | 状态 / 证据 |
 | --- | --- |
 | X01 鸿蒙举报 | 未验证：本地HTTP已生成真实测试reportId=1，但不是鸿蒙UI，不能替代X01 |
-| X02 Web查同一举报 | 未验证：无合法管理员访问，本地记录已随内存库停止释放 |
-| X03 Web下架 | 未验证：无管理员且未操作外部测试/正式对象 |
+| X02 Web查同一举报 | 外部鸿蒙闭环未验证；新增本地HTTP提交reportId1→本地Web查同一记录通过，不能代替鸿蒙提交 |
+| X03 Web下架 | 本地Web对专用测试对象下架、普通HTTP确认不可见通过；外部/鸿蒙未验证 |
 | X04 鸿蒙主动刷新/详情 | 逻辑部分通过；设备未验证，鸿蒙详情公共能力仍缺 |
-| X05 Web合法恢复 | 未验证；未重复resolve或用作者删除替代管理 |
+| X05 Web合法恢复 | 本地Web独立restore后普通HTTP确认可见通过；未重复resolve，外部/鸿蒙未验证 |
 | X06 IGNORE | 未验证；不推断内容可见性 |
 | X07 普通用户管理拒绝 | **隔离本地真实HTTP通过（40301）**；外部环境与设备未验证 |
 

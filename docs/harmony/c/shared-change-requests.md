@@ -90,3 +90,11 @@ C 接入位置：MomentFeedPage 的收藏同级动作/局部详情弹层；Momen
 C 已通过局部 SDK 事件订阅提供接线，公共文件无需为本方案改动。相关实现：MomentFeedLifecycle、MomentFeedPage.observeLifecycle/isRouteVisible/handleVisibility/suspendFeed。来源为本机 SDK26 UIObserver/NavDestinationInfo/NavigationInfo、ApplicationContext/ApplicationStateChangeCallback 声明；方法签名与 ArkTS 编译已验证，不等同事件实际投递已验证。
 
 团队需在实际 Navigation 根内容及 HALL destination 各执行：动态→我的→切身份→返回；动态→我的→退出→返回；动态→后台→前台，以及个人页遮盖时后台恢复后再返回。记录旧状态清除、新 scope 请求、身份及请求次数，并交错旧列表/收藏响应；注销监听不能影响另一个 Feed。HALL destination 可通过现有登录返回路径进入，不要求新建调试路由或修改公共入口。
+
+### 原生测试认证环境交接（不新增C登录任务）
+
+本轮用户已在`https://47.76.106.57`完成合法Web白名单登录并创建专用五图动态；仍不能用于原生登录验收。精确只读来源：`harmony/entry/src/main/ets/pages/LoginPage.ets`的sendCode/signIn、`network/ApiService.ets`的sendLoginCode/verifyLoginCode只支持原生短信，`backend/src/main/java/com/action/camera/tempstaging/TempStagingWebConfig.java`拒绝`/auth/sms/send`、`/auth/native/sms/verify`，`TempStagingAuthController.java`只提供Web LoginResponse与refresh cookie，原生契约则是`auth/dto/NativeSessionResponse.java`。当前前端公开temp-staging标识；后端部署SHA未确认，线上行为须由负责人核对，不能假定为相同版本。
+
+请认证/后端维护者明确**已有、合法且允许原生普通账号登录**的测试环境及实际部署SHA；优先提供原生短信可用环境和正常验证码接手流程。若团队另有现成原生测试登录能力，请给出真实入口、返回契约、受限环境与维护者提交/PR，由公共维护者决定适配位置，不要求C实现白名单登录或修改上述公共文件。兼容要求：沿用AuthSessionManager安全保存与原生refresh/logout，不导出Web token/cookie，不绕过验证码、增设假成功或向C授权管理员权限。
+
+验收：普通作者/举报者各自通过正常原生登录进入，切CUSTOMER/PROVIDER及退出能真实失效会话，refresh/logout有效；完成root/HALL三路径和同reportId跨端链路。用户后来要求的测试管理员已只在专用本地H2空库初始化，并正常Web登录完成本地HTTP＋Web下架/恢复；不构成staging管理员访问或鸿蒙设备证据。C不新增鸿蒙登录、管理员页面或管理接口。
