@@ -60,3 +60,15 @@ Tech Stack：ArkTS / ArkUI Stage / Node test / DevEco SDK 26.0.0。
 - [x] 设备、真实后端及 X01–X07 分别记录证据或阻塞原因。
 - [x] 检查 diff 范围与敏感信息，完成独立审查与跨实例收藏修复；无 Critical/Minor，导航生命周期 Important 登记 C-SHARED-07。
 - 交付方式：提交并尝试创建阶段性草稿 PR；不合并。远端结果以实际 Git/PR 操作为准，不能标完整 C 完成。
+
+## 续推计划（2026-10-25）
+
+续推起点 `5e0402af15d92de80cca1f8beb739831deef16d8`；fetch 后集成分支与公共路径均未更新，PR #25 OPEN/Draft，无维护者授权评论。专属工作区干净；祖先 `.codex/AGENTS.md` 存在但为 0 字节，仓库作用域内无其他 AGENTS.md。
+
+采用 C 局部原生事件订阅，不改 Index/Shell/认证/EntryAbility：UIObserver `navDestinationSwitch` 驱动重新查询自身 Navigation/NavDestination 信息，`navDestinationUpdate` 补充窗口显露/隐藏的目标状态，ApplicationContext `applicationStateChange` 驱动前后台状态。根内容按所属 stack.size() 判断，HALL destination 按自身 index/state/id 判断，不按页面名误认另一个 HALL 实例。当前应用为 Stack 模式。SDK 26 声明已核对，事件只注册本实例回调且精确注销，不使用轮询。
+
+- [x] Task 4 / 生命周期：先增加真实事件适配器与页面处理的失败用例，再实现 C 专用订阅；隐藏时清列表/身份/举报并失效请求，显露时按当前 scope 重读；重复通知不重复请求，隐藏期间前台恢复不误加载。独立审查发现foreground先于shown的遗漏，已新增失败用例并修复；23项C页面行为通过。设备投递未验证。
+- [x] Task 5 / 公共交接：只读复现 B 表单与固定网络 key 的目标变化/离页/账号及跨实例问题；提供精确文件/签名/插入位置/兼容与7项严格失败用例。不复制生产表单或越界修改。
+- [x] Task 6 / 验证材料：完整102项=95通过+7已知公共依赖TODO；严格举报模式2通过7失败exit1；最终HAP exit0。自动核查GitHub变量/部署、镜像/设备，并完成隔离本地普通账号真实HTTP检查；三份文档按证据更新。提交/草稿PR状态以实际远端操作为准。
+
+三条真实验收路径（切身份返回、退出返回、后台恢复）均需真实 Navigation/设备证据；Node 注入事件只证明适配器及处理逻辑。按用户后续要求已先自行核查：GitHub staging变量与公开deployment.json、只读连通性、Web路由、远端公共修复、SDK/空模拟器列表/无连接设备；未对历史外部环境写入。明确隔离本地smoke/H2后完成普通账号、动态、举报和权限拒绝，未创建管理员。环境来源/授权区别、启动故障及限制均见交付文档，后续仅需无法自行取得的测试环境选择、合法管理员访问及设备/IDE控制授权。

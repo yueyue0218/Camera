@@ -87,7 +87,7 @@ test('runtime shell renders the real feed page without placeholder actions', () 
   const card = fs.readFileSync(path.resolve(sourceRoot, 'features/moments/MomentCard.ets'), 'utf8');
   assert.match(shell, /MomentFeedPage/);
   assert.doesNotMatch(shell, /动态业务不在本轮实现范围内/);
-  assert.match(page, /listMoments\(scope\)/);
+  assert.match(page, /listMoments\(scope, this.listRequestKey\)/);
   assert.match(page, /requestInFlight/);
   assert.match(page, /MomentFeedCache/);
   assert.match(card, /allowInlineData: true/);

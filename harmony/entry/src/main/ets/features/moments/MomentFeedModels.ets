@@ -1,5 +1,12 @@
 import { MomentSummary } from '../../model/ApiModels';
 
+let nextFeedInstanceId: number = 0;
+
+export function createMomentFeedRequestKey(): string {
+  nextFeedInstanceId++;
+  return `moments.c.feed.${nextFeedInstanceId}`;
+}
+
 export class MomentFeedFormatter {
   static title(item: MomentSummary): string {
     return MomentFeedFormatter.nonEmpty(item.title, '未填写标题');

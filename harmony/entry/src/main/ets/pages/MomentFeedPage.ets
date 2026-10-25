@@ -1,9 +1,11 @@
+import { uiObserver } from '@kit.ArkUI';
 import { AppClient } from '../app/AppClient';
 import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraEmptyView } from '../common/components/PortraEmptyView';
 import { PortraLoading } from '../common/components/PortraLoading';
 import { MomentCard } from '../features/moments/MomentCard';
-import { MomentFeedCache, MomentFeedFormatter } from '../features/moments/MomentFeedModels';
+import { createMomentFeedRequestKey, MomentFeedCache, MomentFeedFormatter } from '../features/moments/MomentFeedModels';
+import { MomentFeedLifecycle } from '../features/moments/MomentFeedLifecycle';
 import { ReportPanel } from '../features/user/ReportPanel';
 import { MomentSummary } from '../model/ApiModels';
 import { ErrorMapper, PortraError } from '../network/ErrorMapper';
@@ -23,12 +25,15 @@ export struct MomentFeedPage {
   @State private selectedReportId: number = 0;
   @State private reportIdentityLoading: boolean = false;
   @State private reportIdentityError: string = '';
+  @State private lifecycleUnavailable: boolean = false;
   private readonly appClient: AppClient = AppClient.shared;
   private readonly cache: MomentFeedCache = MomentFeedCache.shared;
   private requestVersion: number = 0;
   private viewVersion: number = 0;
   private sessionVersion: number = -1;
   private active: boolean = false;
+  private readonly listRequestKey: string = createMomentFeedRequestKey();
+  private lifecycle?: MomentFeedLifecycle;
   onRequireLogin?: () => void;
 
   aboutToAppear(): void {
@@ -50,18 +55,86 @@ export struct MomentFeedPage {
   }
 
   aboutToDisappear(): void {
+    this.lifecycle?.stop();
+    this.lifecycle = undefined;
+    this.suspendFeed(false);
+  }
+
+  private observeLifecycle(): void {
+    if (this.lifecycle !== undefined) {
+      return;
+    }
+    try {
+      this.lifecycleUnavailable = false;
+      this.lifecycle = new MomentFeedLifecycle(this.getUIContext(),
+        (update?: uiObserver.NavDestinationInfo) => this.isRouteVisible(update),
+        (visible: boolean) => this.handleVisibility(visible), () => this.handleLifecycleUnavailable());
+      this.lifecycle.start();
+    } catch {
+      this.handleLifecycleUnavailable();
+    }
+  }
+
+  private isRouteVisible(update?: uiObserver.NavDestinationInfo): boolean {
+    const navigation = this.queryNavigationInfo();
+    if (navigation === undefined) {
+      throw new Error('Navigation context unavailable');
+    }
+    let destination = this.queryNavDestinationInfo();
+    if (destination === undefined) {
+      return navigation.pathStack.size() === 0;
+    }
+    if (update !== undefined && update.navDestinationId === destination.navDestinationId) {
+      destination = update;
+    }
+    return destination.index === navigation.pathStack.size() - 1 &&
+      destination.state !== uiObserver.NavDestinationState.ON_HIDDEN &&
+      destination.state !== uiObserver.NavDestinationState.ON_WILL_HIDE &&
+      destination.state !== uiObserver.NavDestinationState.ON_DISAPPEAR &&
+      destination.state !== uiObserver.NavDestinationState.ON_WILL_DISAPPEAR;
+  }
+
+  private handleVisibility(visible: boolean): void {
+    if (!visible) {
+      if (this.active) {
+        this.suspendFeed();
+      }
+      return;
+    }
+    if (this.active) {
+      return;
+    }
+    this.active = true;
+    this.loading = true;
+    this.synchronizeSession();
+    this.load(true);
+  }
+
+  private handleLifecycleUnavailable(): void {
+    this.lifecycle?.stop();
+    this.lifecycle = undefined;
+    this.suspendFeed();
+    this.lifecycleUnavailable = true;
+    this.errorMessage = '页面状态监听不可用，请重试。';
+  }
+
+  private suspendFeed(clearCache: boolean = true): void {
     this.active = false;
     this.viewVersion++;
     this.requestVersion++;
     this.requestInFlight = false;
-    if (this.favoriteBusyId !== 0) {
+    if (clearCache || this.favoriteBusyId !== 0) {
       this.cache.clear();
     }
     this.favoriteBusyId = 0;
     this.selectedReportId = 0;
     this.currentUserId = 0;
     this.reportIdentityLoading = false;
-    this.appClient.apiService.cancelMoments();
+    this.reportIdentityError = '';
+    this.items = [];
+    this.loading = false;
+    this.errorMessage = '';
+    this.appClient.apiService.cancelMoments(this.listRequestKey);
   }
 
   private synchronizeSession(): void {
@@ -103,12 +176,15 @@ export struct MomentFeedPage {
   }
 
   private selectScope(scope: string): void {
+    if (!this.active) {
+      return;
+    }
     this.synchronizeSession();
     if (scope === this.scope || !['latest', 'hot', 'following'].includes(scope) || this.favoriteBusyId !== 0) {
       return;
     }
     this.requestVersion++;
-    this.appClient.apiService.cancelMoments();
+    this.appClient.apiService.cancelMoments(this.listRequestKey);
     this.requestInFlight = false;
     this.scope = scope;
     this.selectedReportId = 0;
@@ -155,7 +231,7 @@ export struct MomentFeedPage {
           return;
         }
       }
-      const result = await this.appClient.apiService.listMoments(scope);
+      const result = await this.appClient.apiService.listMoments(scope, this.listRequestKey);
       if (!this.isCurrent(viewVersion, sessionVersion) || version !== this.requestVersion) {
         return;
       }
@@ -241,7 +317,9 @@ export struct MomentFeedPage {
   }
 
   private handleErrorAction(): void {
-    if (this.authenticationRequired) {
+    if (this.lifecycleUnavailable) {
+      this.observeLifecycle();
+    } else if (this.authenticationRequired) {
       this.onRequireLogin?.();
     } else {
       this.load(true);
@@ -453,5 +531,6 @@ export struct MomentFeedPage {
     .width('100%')
     .height('100%')
     .backgroundColor(PortraTheme.pageBackground)
+    .onAppear(() => this.observeLifecycle())
   }
 }
