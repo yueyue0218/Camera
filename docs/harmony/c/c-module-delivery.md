@@ -51,8 +51,8 @@ C 页面在根 Column 的 onAppear 注册局部原生事件，不只依赖组件
 ### 本机 SDK、模拟器、设备、运行条件
 
 - 已安装 DevEco Studio / SDK 26.0.0、Node/Hvigor/ohpm；HAP 可编译。
-- hdc list targets -v：`[Empty]`，无已连接真机/模拟器。
-- Emulator.exe -list：`[Empty]`，退出0；Device Manager 配置的镜像目录不存在，deployed 仅版本文件，无已部署机器。程序自带 emulator.json 是设备模板，不能当作已安装镜像。
+- 初次核查hdc list targets -v为`[Empty]`，当时无已连接真机/模拟器；后续Connected实证见恢复补充。
+- 初次Emulator.exe -list为`[Empty]`，退出0；当时镜像目录不存在、deployed仅版本文件。后续已实际安装镜像和新建专属实例，不再以模板冒充已部署机器。
 - 早期Computer Use控制曾超时，之后已成功打开设备管理器；用户亲自接受软件许可，配置实查为agree。官方26手机镜像下载因IDE Java HTTP回环异常未开始；进程级参数重启随后遇到.port套接字/目录锁异常，未删除共享锁或更改全局VM配置，详见补充记录。
 - Java17、Maven3.9.16、H2依赖和 MySQL8 程序可用。没有使用现有 MySQL 或其账号，采用独立 H2 内存；关闭 camera.demo.seed-users，未自动创建演示或管理员账号。
 - 初始本地启动因 Windows Java NIO Unix 域回环失败；对照已有 JBR25 同样失败。simple HTTP factory 仅移除了首个触发点，Tomcat NIO 仍失败。最小 Selector 程序证明进程级 `jdk.net.unixdomain.tmpdir` 指向本次不存在的临时父目录可触发 JDK 原生 TCP 回退，最终 Java17 启动成功。此属性只作用本次进程，未修改系统或共享配置；未关闭 TLS/鉴权。
@@ -93,7 +93,7 @@ C 页面在根 Column 的 onAppear 注册局部原生事件，不只依赖组件
 | 设备 | hdc list targets -v；Emulator.exe -list | 0，均Empty；真实设备三路径未验证 |
 | 差异 | git diff --check | 0；只提交C源/测试/3份文档，产物/日志/个人路径不提交 |
 
-原dev HAP保持网络禁用；用户确认staging授权后，已另构建实际指向该HTTPS origin的staging HAP，见下方补充记录。本地后端验收后已停止，没有把localhost包当作真机可达联调包。
+最初dev构建时网络禁用；用户确认staging授权后另构建该HTTPS origin的staging HAP，后续设备验收又单独重建本地dev包，均见补充记录。最初18087本地后端已停止；没有把未配置转发的localhost编译包当作真机可达联调包。
 
 ### 用户授权后的 staging / Device Manager 进展
 
@@ -135,15 +135,38 @@ C 页面在根 Column 的 onAppear 注册局部原生事件，不只依赖组件
 
 本机截图：`harmony-c-staging-five-images.png`、`harmony-c-local-web-hidden.png`、`harmony-c-local-web-restored.png`，以及JSON可见性证据，均在本轮scratch中。供接手的本地Web后台已保留登录页签；后端监听18088实际PID18532，Web监听15173/PID5744，仅loopback，内存数据随专属后端停止释放。后续停止前必须重新核对PID、端口与专属运行器身份，不能按旧PID盲停。此本地测试管理员不能登录staging。
 
+## DevEco恢复与首轮真实模拟器运行补充（2026-10-25）
+
+前述“无镜像/无连接设备”和IDE启动阻塞现已解除，以下为后续实际结果，不覆盖之前的失败记录。
+
+1. 无DevEco进程时，原用户缓存`.port`为零字节ReparsePoint，`fsutil reparsepoint query`及单文件`Move-Item`备份均报系统无法访问；未删除/改动该文件。最小Java对照：同一JBR25默认临时目录`Selector.open()`失败；进程设置`jdk.net.unixdomain.tmpdir`为工作区已有临时目录后成功。工作区显式UNIX bind及清理均成功。这不支持“JDK本身完全不可用”的判断。
+2. 通过官方`devecostudio.bat`与仅进程`DEVECOSTUDIO_VM_OPTIONS`，将`idea.config.path`、`idea.system.path`、`idea.log.path`及JDK临时目录放入工作区独立目录。C工程正常打开；正常退出后的第二次启动也成功，旧用户配置/缓存、安装目录VM选项、系统环境变量与网络安全设置均未修改。个人启动器和说明保存在本机scratch，不提交Git。
+3. 官方SDK Setup实际下载约1.95GB手机镜像并显示install task finished；来源为华为`update.dbankcdn.com`的`system-image-phone_all-x86.zip`。`Emulator.exe -imageList -deviceType phone -downloaded true`确认HarmonyOS7.0.0/API26、SoftWareVersion7.0.0.107。通过设备管理器新建专属`Portra_C_API26`，4GB RAM/6GB ROM，未覆盖已有设备。
+4. `Emulator.exe -start Portra_C_API26 -bootMode coldboot`报告`Windows Hypervisor Platform accelerator is operational`；启动命令保持运行不是失败退出。`hdc list targets -v`确认`127.0.0.1:5555 TCP Connected`；设备`param get const.ohos.apiversion`为26，软件版本`emulator 7.0.0.107(SP8DEVC00E999R4P11)`。本机虚拟化固件已启用、HypervisorPresent=true，未更改Hyper-V/BIOS或安全选项。
+5. `hdc -t 127.0.0.1:5555 install [entry-staging-unsigned.hap]`实际成功，退出0；`shell aa start -b com.portra.app -a EntryAbility`成功、退出0；进程5595曾实查运行。非阻塞`hilog -x -P 5595 -L E`当时为空；初次将两个互斥日志模式组合报-31，已纠正，不算有效日志检查。**模拟器接受unsigned包不代表签名问题在真机或发布环境已解决。**
+6. 已通过真实模拟器点击大厅→动态，看到C游客提示“登录后可查看真实动态Feed / 去登录”，再点击进入原生登录页。并非Node手调生命周期。此时尚无登录状态，不能据此宣称旧账号列表/举报清理、切身份、退出及前台恢复三路径通过。
+
+### 独立本地设备包与测试库
+
+因为staging原生认证仍有前述缺口，按既有本地验收授权另构建dev：`PORTRA_BASE_URL=http://127.0.0.1:18088`、`hvigorw.bat assembleHap --no-daemon -p product=dev`，退出0，33 tasks（23执行/10 up-to-date），1min12.095s；生成BuildProfile实查dev和该origin。包SHA256为`ADA8B08A27758BE60729F3C14E6F1EEEBA72A23B39C3914E5C710CF155A14857`。`hdc install -r [entry-dev-unsigned.hap]`和`aa start`均成功，退出0，未重编/覆盖原staging产物或修改源码。
+
+原18088专属H2/Web库保持运行和已完成验收。另在127.0.0.1:18089启动`smoke`、H2内存`portra_c_device_20261025`、demo种子关闭，加载**仓库现有**`backend/src/test/resources/schema-h2.sql`（`spring.sql.init.mode=always`、`schema-locations=file:...`），补齐MyBatis表，不改后端源码/原库；进程PID15512。复用原C opt-in HTTP脚本的scratch副本（仅替换loopback端口、专属库日志标记），退出0，正常验证码创建authorId1/reporterId2、momentId1（Feed3/详情5）、HTTP reportId1/PENDING，互动幂等与普通管理拒绝通过。这是设备测试数据准备，reportId1尚非鸿蒙提交。
+
+端口转发为**设备18088→本机18089**：`hdc -t 127.0.0.1:5555 rport tcp:18088 tcp:18089`，返回OK；`fport ls`确认仅本轮映射。曾先建立设备18088→本机18088；带引号任务串移除未匹配，改用`fport rm tcp:18088 tcp:18088`成功后才建立新映射；未移除其他任务、开放主机公网接口或修改防火墙。
+
+模拟器应用控制首次等待超时，之后用户已允许并成功读取实际页面；小艺输入法首次隐私提示交用户亲自处理，未代选。随后窗口最小化与工具“检测到手动操作，需先读状态”保护发生冲突，工具拒绝恢复/读取，已请用户仅还原窗口，不重复请求已有授权。登录后的设备验收仍在继续，不能提前标通过。
+
+路由复核另发现：当前`AppRoute.HALL`仅有路由声明/标签及PageMap分支，未找到正常UI push或LOGIN returnRoute=HALL；之前交接称登录返回可进入HALL不准确，已在shared-change-requests纠正，并精确交公共导航维护者提供真实入口。C没有新造测试导航，也不把根内容设备结果套用到HALL。
+
 ## 公共依赖与真实跨端剩余项
 
 | 项目 | 最新状态 / 负责人 |
 | --- | --- |
-| C-SHARED-07 | C原生事件接线/逻辑/编译已完成；root与HALL的“切身份返回”“退出返回”“后台恢复”仍需设备实测，不能用Node事件替身替代 |
+| C-SHARED-07 | C原生事件接线/逻辑/编译已完成；官方API26模拟器已运行并打开真实C游客页，但root/HALL三条完整路径尚未验证。另核查HALL当前没有正常UI进入调用，已纠正先前登录返回的无证据描述并交公共导航维护者 |
 | C-SHARED-03/04 | B/公共维护者尚未授权/提供修复；7项严格用例失败。shared-change-requests含精确兼容签名、插入位置与跨实例取消验收 |
 | C-SHARED-01/02 | 公共ApiService点赞/详情方法仍缺；本地后端真实接口已测，不等于鸿蒙已接。未新增假按钮或完整相册 |
 | C-SHARED-05/06 | B公开主页入口/真实作者资料与收藏页设备联动待对齐；原只读卡片兼容保留 |
-| 签名/设备 | 软件许可已接受；无签名配置、无镜像/实例/连接设备。官方下载被IDE HTTP回环异常阻断；进程参数重启又遇.port目录锁故障，未改共享锁/全局配置。staging HAP已构建、未安装 |
+| 签名/设备 | 已以工作区独立配置/缓存/临时目录解决本次IDE启动和下载故障，官方26镜像安装、Portra_C_API26启动、hdc Connected、staging与本地dev unsigned包安装/启动均有实证。此模拟器接受unsigned包不证明真机/发布签名就绪；三路径仍需实际会话和导航验收 |
 | staging普通测试身份 | Web普通测试账号已合法登录并创建专用对象；原生短信登录与temp-staging代码契约不匹配，需维护者提供现有原生可用测试环境/认证方案，不能拿Web cookie替代 |
 | Web管理员 | staging仍无现成合法管理员访问；用户随后授权的测试管理员仅创建在全新本地H2内存库，正常密码登录和本地Web闭环通过，未提权staging或重置既有密码 |
 

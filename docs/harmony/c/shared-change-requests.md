@@ -11,7 +11,7 @@
 | C-SHARED-04 / P1 | ApiService.createReport/listMyReports/cancelReports 固定 reports.create/reports.my；ReportPanel.aboutToDisappear 调 cancelReports。A 详情页、C Feed 可在导航栈同时存在，离开任一实例会取消另一个的提交；HttpClient 同 key 替换也会使旧请求失效。公共维护者 + B | createReport/listMyReports 增加可选 requestKey（保留现有默认参数兼容），取消方法接收同一 key；ReportPanel 为每个实例/对象持有唯一 key，只取消自己；取消不代表服务端未写入，需核实记录 | 关闭 Feed 举报不应取消 A/B 举报；导航覆盖下层页面与快速换目标回归。**待整合**：基于现有调用链与 HttpClient 同 key 策略确认，C 未改底座 |
 | C-SHARED-05 / P2 | MomentSummary 无真实作者昵称/头像；公开用户资料 API 已有，公共主页导航入口未给 C；B/协调人 | 复用 B 的真实资料/公开主页回调契约，明确 role、userId 和会话失效；不新增假资料或第二套主页 | MomentCard 当前显示真实角色 + ID、确定性 Avatar 回退。**待对齐**：不阻塞只读卡片 |
 | C-SHARED-06 / P2 | B ProfilePage 当前 listFavoriteMoments 在进入/切换时真实读取，C MomentCard 也被其只读复用；尚无设备联验。B | 维持真实重新读取；若引入个人缓存，由 B 定义失效契约。C 收藏成功清空所有 C scope 缓存后只写当前 scope；失败/在途离页清空 C 缓存 | 保留 item 参数；新增属性有默认值、回调可选，ProfilePage 无需改动。**代码兼容/逻辑回归已验证，设备联动未验证** |
-| C-SHARED-07 / P1 | 原 Index/Shell 无显露或恢复信号，fetch 后仍无维护者更新。C 已新增 features/moments/MomentFeedLifecycle.ets，局部订阅原生 Navigation 切换、目标shown/hidden与ApplicationContext前后台；不修改公共入口 | 页面重新查询自身 Navigation/NavDestination，根路径按空栈、HALL 按自身 index/state/id 判定；navDestinationUpdate 补充foreground早于shown的时序；隐藏/退后台清 C 状态并失效响应，显露后当前 scope/真实身份重新读取，重复信号去重；精确注销实例回调，列表 requestKey 也按实例隔离 | **C 原生接线/逻辑及 HAP 已验证，真实导航/设备仍未验证**。不再等待公共入口提供信号才能接线，但三条实测路径仍阻塞于设备/环境，不能标完整完成 |
+| C-SHARED-07 / P1 | 原 Index/Shell 无显露或恢复信号，fetch 后仍无维护者更新。C 已新增 features/moments/MomentFeedLifecycle.ets，局部订阅原生 Navigation 切换、目标shown/hidden与ApplicationContext前后台；不修改公共入口 | 页面重新查询自身 Navigation/NavDestination，根路径按空栈、HALL 按自身 index/state/id 判定；navDestinationUpdate 补充foreground早于shown的时序；隐藏/退后台清 C 状态并失效响应，显露后当前 scope/真实身份重新读取，重复信号去重；精确注销实例回调，列表 requestKey 也按实例隔离 | **C 接线/逻辑/HAP通过，官方模拟器已运行真实C游客页；三条完整会话路径仍未验证**。设备准备已解除；HALL正常UI入口及双身份测试账号缺口见后文，不能标完整完成 |
 
 ## A / B 举报接入交接
 
@@ -89,7 +89,11 @@ C 接入位置：MomentFeedPage 的收藏同级动作/局部详情弹层；Momen
 
 C 已通过局部 SDK 事件订阅提供接线，公共文件无需为本方案改动。相关实现：MomentFeedLifecycle、MomentFeedPage.observeLifecycle/isRouteVisible/handleVisibility/suspendFeed。来源为本机 SDK26 UIObserver/NavDestinationInfo/NavigationInfo、ApplicationContext/ApplicationStateChangeCallback 声明；方法签名与 ArkTS 编译已验证，不等同事件实际投递已验证。
 
-团队需在实际 Navigation 根内容及 HALL destination 各执行：动态→我的→切身份→返回；动态→我的→退出→返回；动态→后台→前台，以及个人页遮盖时后台恢复后再返回。记录旧状态清除、新 scope 请求、身份及请求次数，并交错旧列表/收藏响应；注销监听不能影响另一个 Feed。HALL destination 可通过现有登录返回路径进入，不要求新建调试路由或修改公共入口。
+团队需在实际 Navigation 根内容及 HALL destination 各执行：动态→我的→切身份→返回；动态→我的→退出→返回；动态→后台→前台，以及个人页遮盖时后台恢复后再返回。记录旧状态清除、新 scope 请求、身份及请求次数，并交错旧列表/收藏响应；注销监听不能影响另一个 Feed。
+
+**设备准备后的路由复核纠正**：之前写“HALL destination 可通过现有登录返回路径进入”没有实际调用证据，现已撤回。全量检索当前ets中的`AppRoute.HALL`仅见PageMap分支、NavigationPolicy路由列表/标签；没有找到正常UI向HALL发起push或LOGIN携带returnRoute=HALL。C动态的登录回调传LOGIN且空参数，成功时只是pop回根内容，不会构造HALL。不能把这个根路径设备结果算作HALL验收。
+
+公共导航维护者目标文件：`harmony/entry/src/main/ets/pages/Index.ets`的AppShell/openPage/completeLogin、`features/shell/PortraAppShell.ets`现有onOpenRoute入口。请明确已有正常UI进入HALL的真实步骤；如确实缺失，由维护者提供正常业务入口或说明该destination是否保留，C不新建调试路由或修改公共导航。建议保留`onOpenRoute?: (route: AppRoute, id?: number) => void`兼容签名，明确哪条现有动作携带`NavigationRouteParam { returnRoute: AppRoute.HALL }`；不得为了测试暗中替换其他业务返回目标。维护者提供入口后，按上面三路径分别记录root/HALL真实NavDestination状态与旧结果失效证据。
 
 ### 原生测试认证环境交接（不新增C登录任务）
 
@@ -98,3 +102,5 @@ C 已通过局部 SDK 事件订阅提供接线，公共文件无需为本方案�
 请认证/后端维护者明确**已有、合法且允许原生普通账号登录**的测试环境及实际部署SHA；优先提供原生短信可用环境和正常验证码接手流程。若团队另有现成原生测试登录能力，请给出真实入口、返回契约、受限环境与维护者提交/PR，由公共维护者决定适配位置，不要求C实现白名单登录或修改上述公共文件。兼容要求：沿用AuthSessionManager安全保存与原生refresh/logout，不导出Web token/cookie，不绕过验证码、增设假成功或向C授权管理员权限。
 
 验收：普通作者/举报者各自通过正常原生登录进入，切CUSTOMER/PROVIDER及退出能真实失效会话，refresh/logout有效；完成root/HALL三路径和同reportId跨端链路。用户后来要求的测试管理员已只在专用本地H2空库初始化，并正常Web登录完成本地HTTP＋Web下架/恢复；不构成staging管理员访问或鸿蒙设备证据。C不新增鸿蒙登录、管理员页面或管理接口。
+
+本机模拟器现已安装官方7.0.0.107/API26镜像并由hdc确认Connected；现有staging unsigned HAP和独立本地dev HAP均实际安装、启动成功，不能继续把“无SDK/镜像/设备”列为当前原因。本地原生测试采用标准`backend/src/test/resources/schema-h2.sql`补齐MyBatis表，独立smoke/H2服务与原Web验收库分离。正常短信注册的PhoneAuthenticationService只ensureCustomerRole，UserService.switchRole要求既有目标角色绑定；尚缺正常可登录的双身份普通测试账号。请认证/用户体系维护者给出已有账号或合法普通角色开通流程；C不改角色校验或给测试账号提权来冒充该路径通过。
