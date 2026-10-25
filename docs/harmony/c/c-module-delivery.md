@@ -39,7 +39,7 @@ C 页面在根 Column 的 onAppear 注册局部原生事件，不只依赖组件
 
 | 候选 | 发现来源 | 本次连通性/版本 | 团队用于本轮测试的确认 |
 | --- | --- | --- | --- |
-| https://47.76.106.57 | GitHub 仓库变量 STAGING_PUBLIC_URL / STAGING_HEALTH_URL / STAGING_EXPECTED_ORIGIN；harmony/README.md；docs/deploy/C_DEPLOY_01_STAGING_CLOSURE.md | TLS 校验成功；GET / 为 HTML 200；GET /service-packages?page=1&size=1 为 HTTP200/业务200；deployment.json 返回前端 gitSha d36689b78922cfa3f4da9b6cf25053ace5667641、environment=temp-staging | 历史配置明确标为 staging；本轮是否可创建测试内容及账号尚无新的团队确认，未做外部写入 |
+| https://47.76.106.57 | GitHub 仓库变量 STAGING_PUBLIC_URL / STAGING_HEALTH_URL / STAGING_EXPECTED_ORIGIN；harmony/README.md；docs/deploy/C_DEPLOY_01_STAGING_CLOSURE.md | TLS 校验成功；GET / 为 HTML 200；GET /service-packages?page=1&size=1 为 HTTP200/业务200；deployment.json 返回前端 gitSha d36689b78922cfa3f4da9b6cf25053ace5667641、environment=temp-staging | 用户在续推后明确回复“允许，授权”，已确认本轮专用测试数据写入及DevEco控制；未取得合法登录会话前仍未做外部写入 |
 | 同源 Web 后台 | frontend/src/routes.jsx：/login/admin、/admin/feed、/admin/reports；frontend/src/api/client.js 的 temp-staging 管理/举报走 /api/web | /admin/reports 返回 HTML200；无认证 /api/web/admin/reports、/api/web/reports/my、/auth/session 为业务40101；没有合法管理员访问，不能称管理可用 | 尚待合法访问方式，不创建/提权管理员 |
 | PR25 Vercel Preview | PR 的部署机器人评论 | 根地址302，未绕过保护或尝试认证；不能证明后端同源或管理员登录可用 | 未作为测试环境采用 |
 | http://47.250.86.6 | 历史 docs/P4/DEMO_GUIDE.md、application.yml CORS 候选 | 有限8秒探测超时（curl28）；历史配置不算可用测试环境 | 无本轮确认，未写入 |
@@ -92,7 +92,18 @@ C 页面在根 Column 的 onAppear 注册局部原生事件，不只依赖组件
 | 设备 | hdc list targets -v；Emulator.exe -list | 0，均Empty；真实设备三路径未验证 |
 | 差异 | git diff --check | 0；只提交C源/测试/3份文档，产物/日志/个人路径不提交 |
 
-当前HAP没有配置可用于设备的origin：外部staging只做了只读探测，本地后端验收后已停止。没有把localhost包当作真机可达联调包。
+原dev HAP保持网络禁用；用户确认staging授权后，已另构建实际指向该HTTPS origin的staging HAP，见下方补充记录。本地后端验收后已停止，没有把localhost包当作真机可达联调包。
+
+### 用户授权后的 staging / Device Manager 进展
+
+- 用户已明确允许本轮使用上述staging测试环境及DevEco控制。重新fetch无公共修复更新，远端C为98c3e60；公开deployment.json仍为前端d36689b、temp-staging。
+- 当前终端设置 `PORTRA_BASE_URL=https://47.76.106.57` 后执行 `hvigorw.bat assembleHap --no-daemon -p product=staging`：**退出0，33 tasks全部执行，32.916秒**。生成BuildProfile实查环境staging与该HTTPS origin一致，未改共享配置、SDK或TLS。
+- 生成 `harmony/entry/build/staging/outputs/staging/entry-staging-unsigned.hap`（1,282,569字节）；SHA256 `4BF253A8626C54C1BADB701D787040C78A89F4A18DDA11E7A56DC3E8227F1740`。仍未签名，未安装；产物不提交Git。
+- DevEco控制本次成功，已打开C专属harmony工程并进入Tools→设备管理器。首次使用弹出《HarmonyOS软件许可及服务协议》及可选“用户体验改进计划与隐私”；尚未由用户完成审阅与选择，未代为接受或更改隐私选项。当前停留在具体协议对话框，不再把应用控制授权列为缺失。
+- IDE出现过内部HTTP服务/项目同步异常提示，CLI HAP独立构建通过；不以CLI成功冒充IDE同步或设备安装成功，未改全局VM/系统配置。
+- staging实际页面已用浏览器核实：`/login/sign-in`明确为“临时测试环境·不发送短信或邮件”“白名单测试账号登录”“不支持注册或任意手机号登录”；`/login/admin`为现有管理员账号/密码入口。未猜账号、走临时旁路、绕过验证码或注入token。
+- 普通/管理员登录页已保留供合法登录接手；没有现成会话，尚缺负责人预置的普通测试账号访问方式及合法管理员登录。浏览器密码无需发送至聊天。账号获取不能由本轮写入授权自动替代。
+- 授权后 `hdc list targets -v`仍为Empty，无已运行模拟器/设备；许可处理后才能继续镜像准备，设备三路径和X01–X07状态不作虚假提升。
 
 ## 公共依赖与真实跨端剩余项
 
@@ -102,8 +113,8 @@ C 页面在根 Column 的 onAppear 注册局部原生事件，不只依赖组件
 | C-SHARED-03/04 | B/公共维护者尚未授权/提供修复；7项严格用例失败。shared-change-requests含精确兼容签名、插入位置与跨实例取消验收 |
 | C-SHARED-01/02 | 公共ApiService点赞/详情方法仍缺；本地后端真实接口已测，不等于鸿蒙已接。未新增假按钮或完整相册 |
 | C-SHARED-05/06 | B公开主页入口/真实作者资料与收藏页设备联动待对齐；原只读卡片兼容保留 |
-| 签名/设备 | 无签名配置、无实例/镜像、无连接设备，IDE应用控制授权超时；未安装运行 |
-| 真实运营商SMS与测试环境选择 | 仍需明确本轮可写测试环境及测试号码/合法验证码获取方式；未尝试绕过临时staging登录 |
+| 签名/设备 | 无签名配置、无实例/镜像、无连接设备；DevEco现已成功控制并打开设备管理器，首次软件协议/隐私选择待用户处理；staging HAP已构建，未安装 |
+| staging普通测试身份 | 环境写入已获授权；实际页面仅支持负责人预置的白名单账号，不发送短信/不开放注册，尚缺合法普通测试账号访问方式；未尝试绕过 |
 | Web管理员 | 无合法访问方式，未创建管理员、重置密码、注入token或处理真实内容 |
 
 | X编号 | 状态 / 证据 |
