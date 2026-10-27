@@ -104,3 +104,9 @@ HALL路由交接已纠错：当前只有声明/PageMap分支，没有发现正�
 新隔离H2库 `portra_c_admin_20261027` 中，鸿蒙正常登录的普通账号3提交一次reportId1/MOMENT1，Web核对同ID和唯一测试标记后下架；鸿蒙有效会话重进确认不可见；Web独立恢复后鸿蒙刷新确认可见。原举报只读核对仍RESOLVED，没有二次resolve。此闭环为本地验收，不是staging验收，也不同于旧库同号HTTP记录。Windows浏览器URL识别故障通过内置浏览器明确URL及正常表单登录解决，未降低安全检查。
 
 当前全套105项98通过/7共享TODO，严格举报2通过/7失败；完整命令、构建、证据及剩余依赖见 [delivery](c-module-delivery.md) 和 [证据目录](evidence/20261027/README.md)。PR25保持Draft，完整C模块仍未验收完成。
+
+### 后续定位、授权修复与设备验收C-AUTH-01
+
+持久会话问题进一步复现为正常登录后39秒、不覆盖安装仅冷启动仍guest。API26只查安全存储属性：公共查询省略REQUIRE_ATTR_ENCRYPTED为NOT_FOUND，同别名设true得到已有记录1；save已true，load/clear漏传。后端真实refresh对照通过，未导出设备SECRET。新增C契约原实现严格2失败、内存两行候选2通过；随后用户明确确认公共认证维护者授权，只应用这两行，无其他公共源码改动。
+
+已授权修复实际在API26恢复原有凭据，无需新短信；force-stop/start、同一产物覆盖安装后Feed及收藏恢复。正常退出后加密记录为NOT_FOUND，冷启动为游客。临时C诊断已移除，无诊断最终包重新正常登录后再次通过冷启动/覆盖恢复及退出冷启动游客；共10次实际UI断言通过。认证相关12/12，全套107项100过/7既有举报TODO，退出均0；最终assembleHap退出0、15.412秒，SHA256 `318E4AF5BC3F8D1C8877398F928F9BFC7B9EA134303687DE5D58A9C7BC94675B`。详见[授权修复](proposals/README.md)与[真实证据](evidence/20261027-auth/README.md)。实体签名升级及外部环境仍未验收，完整C仍不宣称完成。

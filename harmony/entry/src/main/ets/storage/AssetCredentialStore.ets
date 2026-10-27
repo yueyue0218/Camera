@@ -23,6 +23,7 @@ export class AssetCredentialStore implements CredentialStore {
   async load(): Promise<StoredCredential | null> {
     const query: asset.AssetMap = new Map<asset.Tag, asset.Value>();
     query.set(asset.Tag.ALIAS, this.alias);
+    query.set(asset.Tag.REQUIRE_ATTR_ENCRYPTED, true);
     query.set(asset.Tag.RETURN_TYPE, asset.ReturnType.ALL);
     query.set(asset.Tag.RETURN_LIMIT, 1);
 
@@ -81,6 +82,7 @@ export class AssetCredentialStore implements CredentialStore {
   async clear(): Promise<void> {
     const query: asset.AssetMap = new Map<asset.Tag, asset.Value>();
     query.set(asset.Tag.ALIAS, this.alias);
+    query.set(asset.Tag.REQUIRE_ATTR_ENCRYPTED, true);
     try {
       await asset.remove(query);
     } catch (error) {
