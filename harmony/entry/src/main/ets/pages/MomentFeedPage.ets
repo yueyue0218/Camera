@@ -309,7 +309,7 @@ export struct MomentFeedPage {
       return;
     }
     const current = this.items.find((value: MomentSummary) => value.momentId === item.momentId);
-    if (!this.active || this.requestInFlight || this.currentUserId <= 0 || current === undefined ||
+    if (!this.active || this.requestInFlight || this.favoriteBusyId !== 0 || this.currentUserId <= 0 || current === undefined ||
       current.authorId === this.currentUserId) {
       return;
     }
@@ -328,7 +328,8 @@ export struct MomentFeedPage {
 
   private async toggleFavorite(item: MomentSummary): Promise<void> {
     this.synchronizeSession();
-    if (!this.active || this.favoriteBusyId !== 0 || this.requestInFlight || this.favoriteUncertain ||
+    if (!this.active || this.selectedReportId === item.momentId || this.favoriteBusyId !== 0 ||
+      this.requestInFlight || this.favoriteUncertain ||
       this.cache.hasPendingFavorite(this.sessionVersion)) {
       return;
     }
@@ -476,12 +477,14 @@ export struct MomentFeedPage {
               .backgroundColor('#FFF0EC')
               .borderRadius(PortraTheme.radius)
             }
+            // Same-ID server replacements must not retain a previous DTO/closure.
             ForEach(this.items, (item: MomentSummary) => {
               Column({ space: PortraTheme.spacingSm }) {
               MomentCard({
                 item: item,
                 favoriteBusy: this.favoriteBusyId === item.momentId,
-                interactionsDisabled: this.favoriteBusyId !== 0 || this.requestInFlight || this.favoriteUncertain,
+                interactionsDisabled: this.selectedReportId === item.momentId || this.favoriteBusyId !== 0 ||
+                  this.requestInFlight || this.favoriteUncertain,
                 onToggleFavorite: (target: MomentSummary) => this.toggleFavorite(target),
                 reportAllowed: this.currentUserId > 0 && item.authorId !== this.currentUserId,
                 onRequestReport: (target: MomentSummary) => this.openReport(target)
@@ -512,7 +515,7 @@ export struct MomentFeedPage {
               }
               }
               .width('100%')
-            }, (item: MomentSummary) => item.momentId.toString())
+            }, (item: MomentSummary) => `${this.viewVersion}:${JSON.stringify(item)}`)
           }
           .width('100%')
           .padding({

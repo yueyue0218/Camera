@@ -118,6 +118,22 @@ function setup() {
 }
 async function tick() { await new Promise(resolve => setImmediate(resolve)); }
 
+test('same-ID server replacements and a new view cannot reuse an old rendered feed row', () => {
+  const { page } = setup();
+  const source = fs.readFileSync(path.join(sourceRoot, 'pages/MomentFeedPage.ets'), 'utf8');
+  const expression = source.match(/\}, \(item: MomentSummary\) => (.+)\)/)[1];
+  // Exercise the production key generator under ArkUI's documented same-key reuse
+  // rule. This does not replace the device rendering regression.
+  const key = Function('item', `return (${expression});`).bind(page);
+  const first = moment();
+  const original = key(first);
+  assert.equal(key({ ...first }), original, 'unchanged records keep their row');
+  assert.notEqual(key({ ...first, title: '后台更新后的标题' }), original, 'server replacement must repaint');
+  assert.notEqual(key({ ...first, favoritedByCurrentUser: true, favoriteCount: 3 }), original);
+  page.viewVersion++;
+  assert.notEqual(key(first), original, 'an account/view transition must discard old row closures');
+});
+
 test('rapid scope switches use real scopes and only the last response reaches the feed', async () => {
   const { page, lists } = setup();
   page.selectScope('hot');
@@ -267,6 +283,44 @@ test('report identity from an old session or disappeared page never enables a re
     assert.equal(state.page.currentUserId, 0);
     assert.equal(state.page.selectedReportId, 0);
   }
+});
+
+test('a report draft blocks favorite changes to its own row until it closes', async () => {
+  const { page, lists, sessions, favorites } = setup();
+  lists[0].resolve([moment(), moment({ momentId: 8 })]);
+  sessions[0].resolve({ userId: 21 }); await tick();
+  page.openReport(page.items[0]);
+  const before = JSON.stringify(page.items[0]);
+  const blocked = page.toggleFavorite(page.items[0]);
+  const attemptedWrites = favorites.length;
+  if (attemptedWrites > 0) {
+    favorites[0].resolve(moment({ favoritedByCurrentUser: true, favoriteCount: 3 }));
+  }
+  await blocked;
+  assert.equal(attemptedWrites, 0, 'do not rebuild a row containing an active report');
+  const other = page.toggleFavorite(page.items[1]);
+  favorites[0].resolve(moment({ momentId: 8, favoritedByCurrentUser: true, favoriteCount: 3 }));
+  await other;
+  assert.equal(page.selectedReportId, 7);
+  assert.equal(JSON.stringify(page.items[0]), before, 'another row must leave the report row intact');
+  page.selectedReportId = 0;
+  const afterClose = page.toggleFavorite(page.items[0]);
+  assert.equal(favorites.length, 2, 'closing the report restores the real favorite action');
+  favorites[1].resolve(moment({ favoritedByCurrentUser: true, favoriteCount: 3 }));
+  await afterClose;
+});
+
+test('a queued report cannot open while a favorite result could replace the row', async () => {
+  const { page, lists, sessions, favorites } = setup();
+  lists[0].resolve([moment()]); sessions[0].resolve({ userId: 21 }); await tick();
+  const pending = page.toggleFavorite(page.items[0]);
+  page.openReport(page.items[0]);
+  const selectedWhilePending = page.selectedReportId;
+  favorites[0].resolve(moment({ favoritedByCurrentUser: true, favoriteCount: 3 }));
+  await pending;
+  assert.equal(selectedWhilePending, 0, 'also guard queued callbacks before the UI disables the button');
+  page.openReport(page.items[0]);
+  assert.equal(page.selectedReportId, 7);
 });
 
 test('report identity failure is visible and retry reads the real session again', async () => {

@@ -1,0 +1,11 @@
+{
+  "source": "HarmonyOS uitest dumpLayout",
+  "packageSha256": "BDF408F49EBA0C853ABBAA7B25359CC376B8C1F5AC572AC831DB0A449AE8C743",
+  "text": "收藏 0",
+  "type": "Button",
+  "enabled": "false",
+  "clickable": "false",
+  "visible": "true",
+  "draft": "C-DRAFT-GUARD-20261027",
+  "nativeEvidence": "final-draft-protected.png"
+}

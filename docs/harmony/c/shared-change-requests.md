@@ -1,17 +1,17 @@
 # C 公共依赖与交接
 
-核查基线：`b258ec8114ac1ff8f360099155f5d284f1247c41`。日期：2026-10-25。
+核查基线：`b258ec8114ac1ff8f360099155f5d284f1247c41`。更新：2026-10-27。
 以下均为交接需求，未替维护者实现；没有擅自修改公共或 B 文件。
 
 | ID / 优先级 | 当前缺口、目标文件 / 维护者 | 建议契约 / 生命周期 | 调用方、验收 / 状态 |
 | --- | --- | --- | --- |
 | C-SHARED-01 / P1 | network/ApiService.ets 缺少点赞方法；后端 MomentController 已有 PUT/DELETE。公共网络维护者/协调人 | `likeMoment(momentId: number): Promise<MomentSummary>`、`unlikeMoment(...)`；PUT/DELETE `/moments/{id}/like`，正安全整数校验，沿用认证和统一错误；按对象/实例隔离 key 并提供取消；禁止 toggle 自动重放 | MomentFeedPage；以返回 ID/布尔值/计数为准，离页/身份变化丢弃结果。**阻塞**：尚无维护者提交，页面维持真实点赞计数只读 |
 | C-SHARED-02 / P1 | network/ApiService.ets 缺少详情，后端 GET `/moments/{id}` 已有；公共网络维护者/协调人 | `getMoment(momentId: number, requestKey?: string): Promise<MomentSummary>`，匹配 ID 校验；`cancelMomentDetail(requestKey?: string)`；隔离在途实例与旧结果 | C 详情/完整多图预览；每次重进重新校验可见性，不能把 Feed 三张预览当完整图片。**阻塞**：尚无适配，未创建假详情入口 |
-| C-SHARED-03 / P1 | features/user/ReportPanel.ets 属 B，未移交；只校验 status 非空，缺目标/会话/离页版本保护；取消后仍可能处理旧提交。B/协调人 | 状态仅接受 PENDING/RESOLVED；提交前捕获 targetType/targetId/sessionVersion/generation，响应/异常/finally 均检查；目标变化重置 submitted/error 与输入策略；超时/取消提示结果待确认并用现有 listMyReports 核实，不能盲重发。确认后由 B 修复或明确移交 | C 目前仅复用；选中对象切换时销毁旧实例，展示动态 ID/标题；同页最多一个表单。真实提交闭环仍**阻塞**于表单生命周期和设备/后端验证，不宣称组件已全面完善 |
+| C-SHARED-03 / P1 | features/user/ReportPanel.ets 属 B，未移交；只校验 status 非空，缺目标/会话/离页版本保护；取消后仍可能处理旧提交。B/协调人 | 状态仅接受 PENDING/RESOLVED；提交前捕获 targetType/targetId/sessionVersion/generation，响应/异常/finally 均检查；目标变化重置 submitted/error 与输入策略；超时/取消提示结果待确认并用现有 listMyReports 核实，不能盲重发。确认后由 B 修复或明确移交 | C 仅复用；同页最多一个表单，举报期间同条收藏互斥。普通提交的本地原生＋Web闭环已通过；共享可靠性仍有7项严格失败，不宣称组件已全面完善 |
 | C-SHARED-04 / P1 | ApiService.createReport/listMyReports/cancelReports 固定 reports.create/reports.my；ReportPanel.aboutToDisappear 调 cancelReports。A 详情页、C Feed 可在导航栈同时存在，离开任一实例会取消另一个的提交；HttpClient 同 key 替换也会使旧请求失效。公共维护者 + B | createReport/listMyReports 增加可选 requestKey（保留现有默认参数兼容），取消方法接收同一 key；ReportPanel 为每个实例/对象持有唯一 key，只取消自己；取消不代表服务端未写入，需核实记录 | 关闭 Feed 举报不应取消 A/B 举报；导航覆盖下层页面与快速换目标回归。**待整合**：基于现有调用链与 HttpClient 同 key 策略确认，C 未改底座 |
 | C-SHARED-05 / P2 | MomentSummary 无真实作者昵称/头像；公开用户资料 API 已有，公共主页导航入口未给 C；B/协调人 | 复用 B 的真实资料/公开主页回调契约，明确 role、userId 和会话失效；不新增假资料或第二套主页 | MomentCard 当前显示真实角色 + ID、确定性 Avatar 回退。**待对齐**：不阻塞只读卡片 |
-| C-SHARED-06 / P2 | B ProfilePage 当前 listFavoriteMoments 在进入/切换时真实读取，C MomentCard 也被其只读复用；尚无设备联验。B | 维持真实重新读取；若引入个人缓存，由 B 定义失效契约。C 收藏成功清空所有 C scope 缓存后只写当前 scope；失败/在途离页清空 C 缓存 | 保留 item 参数；新增属性有默认值、回调可选，ProfilePage 无需改动。**代码兼容/逻辑回归已验证，设备联动未验证** |
-| C-SHARED-07 / P1 | 原 Index/Shell 无显露或恢复信号，fetch 后仍无维护者更新。C 已新增 features/moments/MomentFeedLifecycle.ets，局部订阅原生 Navigation 切换、目标shown/hidden与ApplicationContext前后台；不修改公共入口 | 页面重新查询自身 Navigation/NavDestination，根路径按空栈、HALL 按自身 index/state/id 判定；navDestinationUpdate 补充foreground早于shown的时序；隐藏/退后台清 C 状态并失效响应，显露后当前 scope/真实身份重新读取，重复信号去重；精确注销实例回调，列表 requestKey 也按实例隔离 | **C 接线/逻辑/HAP通过，官方模拟器已运行真实C游客页；三条完整会话路径仍未验证**。设备准备已解除；HALL正常UI入口及双身份测试账号缺口见后文，不能标完整完成 |
+| C-SHARED-06 / P2 | B ProfilePage 当前 listFavoriteMoments 在进入/切换时真实读取，C MomentCard 被其只读复用；本地官方模拟器已联验。B | 维持真实重新读取；若引入个人缓存，由 B 定义失效契约。C 收藏成功清空所有 C scope 缓存后只写当前 scope；失败/在途离页清空 C 缓存 | 保留 item 参数；新增属性有默认值、回调可选，ProfilePage 无需改动。**代码兼容、逻辑及本地C/B收藏联动已验证；staging/真机未验** |
+| C-SHARED-07 / P1 | 原 Index/Shell 无显露或恢复信号，fetch 后仍无维护者更新。C 已新增 features/moments/MomentFeedLifecycle.ets，局部订阅原生 Navigation 切换、目标shown/hidden与ApplicationContext前后台；不修改公共入口 | 页面重新查询自身 Navigation/NavDestination，根路径按空栈、HALL 按自身 index/state/id 判定；navDestinationUpdate 补充foreground早于shown的时序；隐藏/退后台清 C 状态并失效响应，显露后当前 scope/真实身份重新读取，重复信号去重；精确注销实例回调，列表 requestKey 也按实例隔离 | **root个人页返回、退出返回及有效会话前台恢复已在官方模拟器验证；HALL/成功切身份未验**。正常HALL入口及双身份测试流程仍需维护者提供，不能标完整完成 |
 
 ## A / B 举报接入交接
 
@@ -104,3 +104,13 @@ C 已通过局部 SDK 事件订阅提供接线，公共文件无需为本方案�
 验收：普通作者/举报者各自通过正常原生登录进入，切CUSTOMER/PROVIDER及退出能真实失效会话，refresh/logout有效；完成root/HALL三路径和同reportId跨端链路。用户后来要求的测试管理员已只在专用本地H2空库初始化，并正常Web登录完成本地HTTP＋Web下架/恢复；不构成staging管理员访问或鸿蒙设备证据。C不新增鸿蒙登录、管理员页面或管理接口。
 
 本机模拟器现已安装官方7.0.0.107/API26镜像并由hdc确认Connected；现有staging unsigned HAP和独立本地dev HAP均实际安装、启动成功，不能继续把“无SDK/镜像/设备”列为当前原因。本地原生测试采用标准`backend/src/test/resources/schema-h2.sql`补齐MyBatis表，独立smoke/H2服务与原Web验收库分离。正常短信注册的PhoneAuthenticationService只ensureCustomerRole，UserService.switchRole要求既有目标角色绑定；尚缺正常可登录的双身份普通测试账号。请认证/用户体系维护者给出已有账号或合法普通角色开通流程；C不改角色校验或给测试账号提权来冒充该路径通过。
+
+### 2026-10-27最新接入事实
+
+HTTPS获取远端成功，integration仍为`b258ec8`，所列公共修复/授权仍无。C局部修复了同ID DTO行复用，并对同条举报/收藏加互斥；root前台恢复、个人页返回、退出返回及C/B收藏联动已有官方模拟器真实证据。成功切身份实际被403拒绝，HALL仍无正常UI入口，这两项继续按上述目标文件/步骤交接。
+
+新增**本地原生＋Web**闭环：新H2库`portra_c_admin_20261027`，原生reportId1/MOMENT1→Web查同一记录→Web下架→鸿蒙有效会话重进不可见→Web独立restore→鸿蒙刷新可见；原举报仍RESOLVED。证据与明确范围见 [delivery](c-module-delivery.md)。这解除本地闭环缺证，不解除共享举报可靠性或staging认证/管理员依赖。
+
+当前共享举报严格9项仍2过/7失败，默认全套105项98过/7 TODO；仍需B按C-SHARED-03、公共维护者按04修复，公共层提供01/02后C才接真实点赞/详情。没有绕过认证另写网络或复制表单；普通提交成功不能代替切对象、旧会话、异常/finally及跨实例取消回归。
+
+补充认证/签名核查：最终unsigned dev包覆盖安装后进入游客提示，重新正常登录可用，跨覆盖安装的持久会话恢复未通过。请维护者只读核对`EntryAbility`/`AppClient.restoreSession`、`AuthSessionManager.restore`、`storage/AssetCredentialStore`以及覆盖安装签名/应用数据语义，记录真实错误而不导出令牌；由对应维护者修复，保持现有refresh/logout和安全存储兼容。验收需区分同进程后台恢复、冷启动和同签名覆盖安装；C不修改认证或用测试令牌替代该路径。
