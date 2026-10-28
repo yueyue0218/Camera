@@ -4,6 +4,9 @@ import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraEmptyView } from '../common/components/PortraEmptyView';
 import { PortraLoading } from '../common/components/PortraLoading';
 import { MomentCard } from '../features/moments/MomentCard';
+import { MomentDetailPanel } from '../features/moments/MomentDetailPanel';
+import { MomentInteractions, MomentInteractionSnapshot } from '../features/moments/MomentInteractions';
+import { MomentApiBinding, MomentSessionBinding } from '../features/moments/MomentInteractionBindings';
 import { createMomentFeedRequestKey, MomentFeedCache, MomentFeedFormatter } from '../features/moments/MomentFeedModels';
 import { MomentFeedLifecycle } from '../features/moments/MomentFeedLifecycle';
 import { ReportPanel } from '../features/user/ReportPanel';
@@ -26,6 +29,9 @@ export struct MomentFeedPage {
   @State private reportIdentityLoading: boolean = false;
   @State private reportIdentityError: string = '';
   @State private lifecycleUnavailable: boolean = false;
+  @State private interaction: MomentInteractionSnapshot = new MomentInteractionSnapshot();
+  @State private detailOpen: boolean = false;
+  private interactions?: MomentInteractions;
   private readonly appClient: AppClient = AppClient.shared;
   private readonly cache: MomentFeedCache = MomentFeedCache.shared;
   private requestVersion: number = 0;
@@ -39,6 +45,7 @@ export struct MomentFeedPage {
   aboutToAppear(): void {
     this.active = true;
     this.synchronizeSession();
+    this.ensureInteractions().resume();
     if (!this.appClient.sessionManager.isAuthenticated()) {
       this.showAuthenticationRequired();
       return;
@@ -107,6 +114,7 @@ export struct MomentFeedPage {
     this.active = true;
     this.loading = true;
     this.synchronizeSession();
+    this.ensureInteractions().resume();
     this.load(true);
   }
 
@@ -120,6 +128,7 @@ export struct MomentFeedPage {
 
   private suspendFeed(clearCache: boolean = true): void {
     this.active = false;
+    this.interactions?.suspend();
     this.viewVersion++;
     this.requestVersion++;
     this.requestInFlight = false;
@@ -155,6 +164,10 @@ export struct MomentFeedPage {
       this.reportIdentityError = '';
       this.items = [];
       this.errorMessage = '';
+      this.interactions?.suspend();
+      if (this.active) {
+        this.interactions?.resume();
+      }
     }
   }
 
@@ -180,7 +193,8 @@ export struct MomentFeedPage {
       return;
     }
     this.synchronizeSession();
-    if (scope === this.scope || !['latest', 'hot', 'following'].includes(scope) || this.favoriteBusyId !== 0) {
+    if (scope === this.scope || !['latest', 'hot', 'following'].includes(scope) || this.favoriteBusyId !== 0 ||
+      this.interaction.likeBusyId !== 0) {
       return;
     }
     this.requestVersion++;
@@ -195,7 +209,7 @@ export struct MomentFeedPage {
 
   private async load(force: boolean): Promise<void> {
     this.synchronizeSession();
-    if (!this.active || this.requestInFlight || this.favoriteBusyId !== 0) {
+    if (!this.active || this.requestInFlight || this.favoriteBusyId !== 0 || this.interaction.likeBusyId !== 0) {
       return;
     }
     if (!this.appClient.sessionManager.isAuthenticated()) {
@@ -231,11 +245,40 @@ export struct MomentFeedPage {
           return;
         }
       }
-      const result = await this.appClient.apiService.listMoments(scope, this.listRequestKey);
+      let revision = this.cache.getWriteRevision(sessionVersion);
+      let result: MomentSummary[] | undefined = undefined;
+      let failure: PortraError | undefined = undefined;
+      try {
+        result = await this.appClient.apiService.listMoments(scope, this.listRequestKey);
+      } catch (error) {
+        failure = error as PortraError;
+      }
       if (!this.isCurrent(viewVersion, sessionVersion) || version !== this.requestVersion) {
         return;
       }
-      if (!Array.isArray(result) || result.some((item: MomentSummary) => !MomentFeedFormatter.isValid(item))) {
+      if (revision !== this.cache.getWriteRevision(sessionVersion)) {
+        await this.cache.waitForFavorite(sessionVersion);
+        if (!this.isCurrent(viewVersion, sessionVersion) || version !== this.requestVersion) {
+          return;
+        }
+        revision = this.cache.getWriteRevision(sessionVersion);
+        failure = undefined;
+        try {
+          result = await this.appClient.apiService.listMoments(scope, this.listRequestKey);
+        } catch (error) {
+          failure = error as PortraError;
+        }
+        if (!this.isCurrent(viewVersion, sessionVersion) || version !== this.requestVersion) {
+          return;
+        }
+        if (revision !== this.cache.getWriteRevision(sessionVersion)) {
+          throw ErrorMapper.stale();
+        }
+      }
+      if (failure !== undefined) {
+        throw failure;
+      }
+      if (result === undefined || !Array.isArray(result) || result.some((item: MomentSummary) => !MomentFeedFormatter.isValid(item))) {
         throw ErrorMapper.parse();
       }
       const nextItems = MomentFeedFormatter.deduplicate(result);
@@ -262,6 +305,7 @@ export struct MomentFeedPage {
   }
 
   private showAuthenticationRequired(): void {
+    this.interactions?.suspend();
     this.loading = false;
     this.authenticationRequired = true;
     this.errorMessage = '登录后可查看真实动态 Feed。';
@@ -309,7 +353,8 @@ export struct MomentFeedPage {
       return;
     }
     const current = this.items.find((value: MomentSummary) => value.momentId === item.momentId);
-    if (!this.active || this.requestInFlight || this.favoriteBusyId !== 0 || this.currentUserId <= 0 || current === undefined ||
+    if (!this.active || this.requestInFlight || this.favoriteBusyId !== 0 || this.interaction.likeBusyId !== 0 ||
+      this.detailOpen || this.currentUserId <= 0 || current === undefined ||
       current.authorId === this.currentUserId) {
       return;
     }
@@ -329,7 +374,7 @@ export struct MomentFeedPage {
   private async toggleFavorite(item: MomentSummary): Promise<void> {
     this.synchronizeSession();
     if (!this.active || this.selectedReportId === item.momentId || this.favoriteBusyId !== 0 ||
-      this.requestInFlight || this.favoriteUncertain ||
+      this.requestInFlight || this.favoriteUncertain || this.interaction.likeBusyId !== 0 || this.detailOpen ||
       this.cache.hasPendingFavorite(this.sessionVersion)) {
       return;
     }
@@ -383,6 +428,66 @@ export struct MomentFeedPage {
     }
   }
 
+  private ensureInteractions(): MomentInteractions {
+    if (this.interactions === undefined) {
+      this.interactions = new MomentInteractions(new MomentApiBinding(this.appClient.apiService),
+        new MomentSessionBinding(this.appClient.sessionManager), this.cache,
+        (state: MomentInteractionSnapshot) => {
+          this.interaction = state;
+          this.detailOpen = state.targetId > 0 && this.active;
+          if (state.unavailableMomentId > 0) {
+            this.items = this.items.filter((item: MomentSummary) => item.momentId !== state.unavailableMomentId);
+          }
+          if (state.authenticationRequired && this.active) {
+            this.showAuthenticationRequired();
+          }
+        }, (result: MomentSummary) => {
+          if (!this.active) {
+            return;
+          }
+          this.items = this.items.map((item: MomentSummary) => item.momentId === result.momentId ? result : item);
+          this.cache.clear();
+          if (!this.cache.hasPendingFavorite(this.sessionVersion)) {
+            this.cache.write(this.items, Date.now(), this.sessionVersion, this.scope);
+          }
+        });
+    }
+    return this.interactions;
+  }
+
+  private async openDetail(item: MomentSummary): Promise<void> {
+    await this.readDetail(item.momentId, true);
+  }
+
+  private async verifyLikeResult(): Promise<void> {
+    await this.readDetail(this.interaction.uncertainMomentId, false);
+  }
+
+  private async readDetail(momentId: number, requireListed: boolean): Promise<void> {
+    this.synchronizeSession();
+    if (!this.active || this.requestInFlight || this.favoriteBusyId !== 0 ||
+      this.interaction.likeBusyId !== 0 || this.selectedReportId === momentId ||
+      (requireListed && !this.items.some((current: MomentSummary) => current.momentId === momentId))) {
+      return;
+    }
+    await this.ensureInteractions().open(momentId);
+  }
+
+  private closeDetail(): void {
+    this.interactions?.close();
+  }
+
+  private async toggleLike(item: MomentSummary): Promise<void> {
+    this.synchronizeSession();
+    const current = this.detailOpen && this.interaction.item?.momentId === item.momentId ? this.interaction.item :
+      this.items.find((record: MomentSummary) => record.momentId === item.momentId);
+    if (!this.active || this.requestInFlight || this.favoriteBusyId !== 0 ||
+      this.selectedReportId === item.momentId || current === undefined) {
+      return;
+    }
+    await this.ensureInteractions().toggleLike(current);
+  }
+
   build() {
     Column() {
       Row() {
@@ -403,7 +508,7 @@ export struct MomentFeedPage {
           .fontColor(PortraTheme.primary)
           .backgroundColor(PortraTheme.primarySoft)
           .borderRadius(PortraTheme.radiusPill)
-          .enabled(!this.requestInFlight && this.favoriteBusyId === 0)
+          .enabled(!this.requestInFlight && this.favoriteBusyId === 0 && this.interaction.likeBusyId === 0)
           .accessibilityText('刷新当前动态频道')
           .onClick(() => this.load(true))
       }
@@ -412,6 +517,20 @@ export struct MomentFeedPage {
       .padding({ left: PortraTheme.spacingXl, right: PortraTheme.spacingXl })
       .backgroundColor(PortraTheme.pageBackground)
       .border({ width: { bottom: 1 }, color: PortraTheme.border })
+
+      if (this.interaction.message.length > 0 && !this.detailOpen) {
+        Row({ space: PortraTheme.spacingSm }) {
+          Text(this.interaction.message)
+            .layoutWeight(1)
+            .fontSize(PortraTheme.fontBodySmall)
+            .fontColor(PortraTheme.danger)
+          Button('核实结果')
+            .enabled(this.interaction.likeBusyId === 0 && this.selectedReportId !== this.interaction.uncertainMomentId)
+            .onClick(() => this.verifyLikeResult())
+        }
+        .width('100%')
+        .padding(PortraTheme.spacingMd)
+      }
 
       Row({ space: PortraTheme.spacingSm }) {
         ForEach(['latest', 'hot', 'following'], (scope: string) => {
@@ -422,7 +541,7 @@ export struct MomentFeedPage {
             .fontColor(this.scope === scope ? PortraTheme.primary : PortraTheme.secondaryText)
             .backgroundColor(this.scope === scope ? PortraTheme.primarySoft : PortraTheme.surface)
             .borderRadius(PortraTheme.radiusPill)
-            .enabled(this.favoriteBusyId === 0)
+            .enabled(this.favoriteBusyId === 0 && this.interaction.likeBusyId === 0)
             .accessibilityText(`${scope === 'latest' ? '最新' : scope === 'hot' ? '热门' : '关注'}动态${this.scope === scope ? '，已选择' : ''}`)
             .onClick(() => this.selectScope(scope))
         })
@@ -482,9 +601,14 @@ export struct MomentFeedPage {
               Column({ space: PortraTheme.spacingSm }) {
               MomentCard({
                 item: item,
+                likeBusy: this.interaction.likeBusyId === item.momentId,
+                likeUncertain: this.interactions?.isLikeUncertain(item.momentId) ?? false,
                 favoriteBusy: this.favoriteBusyId === item.momentId,
                 interactionsDisabled: this.selectedReportId === item.momentId || this.favoriteBusyId !== 0 ||
+                  this.interaction.likeBusyId !== 0 ||
                   this.requestInFlight || this.favoriteUncertain,
+                onToggleLike: (target: MomentSummary) => this.toggleLike(target),
+                onOpenDetail: (target: MomentSummary) => this.openDetail(target),
                 onToggleFavorite: (target: MomentSummary) => this.toggleFavorite(target),
                 reportAllowed: this.currentUserId > 0 && item.authorId !== this.currentUserId,
                 onRequestReport: (target: MomentSummary) => this.openReport(target)
@@ -535,5 +659,21 @@ export struct MomentFeedPage {
     .height('100%')
     .backgroundColor(PortraTheme.pageBackground)
     .onAppear(() => this.observeLifecycle())
+    .bindSheet(this.detailOpen, this.detailBuilder(), {
+      height: SheetSize.LARGE,
+      showClose: false,
+      onWillDismiss: (action: DismissSheetAction) => {
+        this.closeDetail();
+        action.dismiss();
+      }
+    })
+  }
+
+  @Builder
+  private detailBuilder() {
+    MomentDetailPanel({ state: this.interaction, onClose: () => this.closeDetail(),
+      onRetry: () => this.readDetail(this.interaction.targetId, false),
+      onRequireLogin: () => { this.closeDetail(); this.onRequireLogin?.(); },
+      onToggleLike: (item: MomentSummary) => this.toggleLike(item) })
   }
 }

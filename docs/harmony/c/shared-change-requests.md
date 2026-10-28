@@ -1,12 +1,12 @@
 # C 公共依赖与交接
 
-核查基线：`b258ec8114ac1ff8f360099155f5d284f1247c41`。更新：2026-10-27。
-以下均为交接需求，未替维护者实现；没有擅自修改公共或 B 文件。
+核查基线：`b258ec8114ac1ff8f360099155f5d284f1247c41`。更新：2026-10-28。
+以下按项标记真实状态。C-AUTH-01及C-SHARED-01/02已获用户明确确认的对应维护者授权并实现；其余公共/B文件仍只读，未扩大授权。
 
 | ID / 优先级 | 当前缺口、目标文件 / 维护者 | 建议契约 / 生命周期 | 调用方、验收 / 状态 |
 | --- | --- | --- | --- |
-| C-SHARED-01 / P1 | network/ApiService.ets 缺少点赞方法；后端 MomentController 已有 PUT/DELETE。公共网络维护者/协调人 | `likeMoment(momentId: number): Promise<MomentSummary>`、`unlikeMoment(...)`；PUT/DELETE `/moments/{id}/like`，正安全整数校验，沿用认证和统一错误；按对象/实例隔离 key 并提供取消；禁止 toggle 自动重放 | MomentFeedPage；以返回 ID/布尔值/计数为准，离页/身份变化丢弃结果。**阻塞**：尚无维护者提交，页面维持真实点赞计数只读 |
-| C-SHARED-02 / P1 | network/ApiService.ets 缺少详情，后端 GET `/moments/{id}` 已有；公共网络维护者/协调人 | `getMoment(momentId: number, requestKey?: string): Promise<MomentSummary>`，匹配 ID 校验；`cancelMomentDetail(requestKey?: string)`；隔离在途实例与旧结果 | C 详情/完整多图预览；每次重进重新校验可见性，不能把 Feed 三张预览当完整图片。**阻塞**：尚无适配，未创建假详情入口 |
+| C-SHARED-01 / P1 | network/ApiService.ets；已获公共网络维护者授权，新增真实likeMoment/unlikeMoment/cancelMomentLike | PUT/DELETE `/moments/{id}/like`，沿用认证及错误映射，正安全ID/返回对象状态计数校验，兼容默认key，可按实例取消 | **已实现并本地原生验收**：Feed点赞0→1、详情取消1→0，服务器另一普通会话核对；旧响应与结果不明保护已回归。staging/真机未验 |
+| C-SHARED-02 / P1 | network/ApiService.ets；已获授权新增getMoment/cancelMomentDetail，C内详情弹层接入 | 真实GET `/moments/{id}`，每次重进重新读取；详情完整图片权威，Feed仍仅3张预览，关闭/会话/后台失效 | **已实现并本地原生验收**：1/5→5/5，关闭重入及系统Back；Web下架详情404清旧卡片，独立恢复后重读可见。staging/真机未验 |
 | C-SHARED-03 / P1 | features/user/ReportPanel.ets 属 B，未移交；只校验 status 非空，缺目标/会话/离页版本保护；取消后仍可能处理旧提交。B/协调人 | 状态仅接受 PENDING/RESOLVED；提交前捕获 targetType/targetId/sessionVersion/generation，响应/异常/finally 均检查；目标变化重置 submitted/error 与输入策略；超时/取消提示结果待确认并用现有 listMyReports 核实，不能盲重发。确认后由 B 修复或明确移交 | C 仅复用；同页最多一个表单，举报期间同条收藏互斥。普通提交的本地原生＋Web闭环已通过；共享可靠性仍有7项严格失败，不宣称组件已全面完善 |
 | C-SHARED-04 / P1 | ApiService.createReport/listMyReports/cancelReports 固定 reports.create/reports.my；ReportPanel.aboutToDisappear 调 cancelReports。A 详情页、C Feed 可在导航栈同时存在，离开任一实例会取消另一个的提交；HttpClient 同 key 替换也会使旧请求失效。公共维护者 + B | createReport/listMyReports 增加可选 requestKey（保留现有默认参数兼容），取消方法接收同一 key；ReportPanel 为每个实例/对象持有唯一 key，只取消自己；取消不代表服务端未写入，需核实记录 | 关闭 Feed 举报不应取消 A/B 举报；导航覆盖下层页面与快速换目标回归。**待整合**：基于现有调用链与 HttpClient 同 key 策略确认，C 未改底座 |
 | C-SHARED-05 / P2 | MomentSummary 无真实作者昵称/头像；公开用户资料 API 已有，公共主页导航入口未给 C；B/协调人 | 复用 B 的真实资料/公开主页回调契约，明确 role、userId 和会话失效；不新增假资料或第二套主页 | MomentCard 当前显示真实角色 + ID、确定性 Avatar 回退。**待对齐**：不阻塞只读卡片 |
@@ -120,3 +120,10 @@ HTTPS获取远端成功，integration仍为`b258ec8`，所列举报/点赞/详�
 精确目标：load和clear的ALIAS查询各增加一行true，保持现有签名/环境别名/加密强度/A/B/C调用兼容。**用户已明确确认获公共认证维护者授权，两行补丁已应用；其他公共文件仍未授权。** [补丁与实际源码回归](proposals/README.md)、[真实设备证据](evidence/20261027-auth/README.md)。原实现严格2失败、内存候选2通过、适用性检查0；应用后两项无条件通过，认证12/12，全套107项100过/7既有举报TODO，退出均0。原公共auth.test.cjs的alias-only替身未覆盖分区语义，新C契约补足边界而未修改原公共测试。
 
 授权后API26设备已验证真实恢复已有凭据、冷启动及同一unsigned产物覆盖安装；正常退出后加密属性记录NOT_FOUND，重启为游客。临时C诊断已撤回，无诊断最终包再次正常短信登录、冷启动恢复、覆盖恢复及退出冷启动游客均通过。不同环境不互删由真实源码契约覆盖。实体设备、同签名版本升级、锁屏及长时间过期恢复仍未实测；无现存证据要求扩大双分区读写。不得把false解释为SECRET明文或降低加密。
+
+
+### 2026-10-28：C-SHARED-01/02获授权并接入
+
+用户明确回复“已获公共网络维护者授权，应用补丁并接入验收”。唯一新增公共改动为ApiService.ets的47行适配，精确补丁保留在proposals/moment-api-like-detail.patch；不修改HttpClient/认证/DTO/公共导航/B表单。上文01/02“仍缺”的描述为授权前核查历史，当前以本段及表格为准。维护者独立PR/SHA仍无，此能力随现有C PR25提交。
+
+新增真实源码契约与C状态回归，全套134项127通过/7举报TODO，严格举报仍2通过/7失败；最终assembleHap退出0。真实本地API26已验证点赞/取消、完整五图、关闭重入/系统返回、Web下架后404及恢复重读、同进程后台清详情和同条举报草稿互斥。完整证据见[evidence](evidence/20261028-like-detail/README.md)。未解除03/04/05、成功切身份、HALL和团队环境/真机依赖。

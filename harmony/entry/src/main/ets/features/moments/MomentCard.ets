@@ -10,7 +10,11 @@ export struct MomentCard {
   @Prop favoriteBusy: boolean = false;
   @Prop interactionsDisabled: boolean = false;
   @Prop reportAllowed: boolean = false;
+  @Prop likeBusy: boolean = false;
+  @Prop likeUncertain: boolean = false;
   onToggleFavorite?: (item: MomentSummary) => void;
+  onToggleLike?: (item: MomentSummary) => void;
+  onOpenDetail?: (item: MomentSummary) => void;
   onRequestReport?: (item: MomentSummary) => void;
 
   private imageSource(): string {
@@ -96,13 +100,26 @@ export struct MomentCard {
       }
 
       Row({ space: PortraTheme.spacingSm }) {
-        Text(`喜欢 ${this.item.likeCount}`)
+        if (this.onToggleLike !== undefined) {
+          Button(this.likeBusy ? '处理中' :
+            `${this.item.likedByCurrentUser ? '已赞' : '点赞'} ${this.item.likeCount}`)
+            .constraintSize({ minHeight: 36 })
+            .layoutWeight(1)
+            .fontSize(PortraTheme.fontBodySmall)
+            .fontColor(this.item.likedByCurrentUser ? PortraTheme.danger : PortraTheme.secondaryText)
+            .backgroundColor(this.item.likedByCurrentUser ? PortraTheme.primarySoft : Color.Transparent)
+            .enabled(!this.likeBusy && !this.likeUncertain && !this.interactionsDisabled)
+            .accessibilityText(`${this.item.likedByCurrentUser ? '取消点赞' : '点赞'}动态 ${this.item.momentId}，${this.item.likeCount} 次点赞`)
+            .onClick(() => this.onToggleLike?.(this.item))
+        } else {
+          Text(`喜欢 ${this.item.likeCount}`)
           .fontSize(PortraTheme.fontBodySmall)
           .fontColor(this.item.likedByCurrentUser ? PortraTheme.danger : PortraTheme.secondaryText)
           .layoutWeight(1)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .accessibilityText(`喜欢 ${this.item.likeCount}`)
+        }
         if (this.onToggleFavorite !== undefined) {
           Button(this.favoriteBusy ? '处理中' :
             `${this.item.favoritedByCurrentUser ? '已收藏' : '收藏'} ${this.item.favoriteCount}`)
@@ -136,6 +153,16 @@ export struct MomentCard {
           .backgroundColor(PortraTheme.primarySoft)
           .borderRadius(PortraTheme.radiusPill)
         Blank()
+        if (this.onOpenDetail !== undefined) {
+          Button(this.likeUncertain ? '核实点赞' : '查看详情')
+            .constraintSize({ minHeight: 36 })
+            .fontSize(PortraTheme.fontBodySmall)
+            .fontColor(PortraTheme.primary)
+            .backgroundColor(Color.Transparent)
+            .enabled(!this.interactionsDisabled && !this.likeBusy)
+            .accessibilityText(`查看动态 ${this.item.momentId} 的完整详情`)
+            .onClick(() => this.onOpenDetail?.(this.item))
+        }
         if (this.reportAllowed && this.onRequestReport !== undefined) {
           Button('举报')
             .constraintSize({ minHeight: 36 })
