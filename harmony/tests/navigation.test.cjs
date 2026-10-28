@@ -23,9 +23,10 @@ test('all planned destinations have one stable route name', () => {
   assert.deepEqual(NavigationPolicy.routes, [
     AppRoute.LOGIN, AppRoute.HALL, AppRoute.DEMAND_DETAIL, AppRoute.SERVICE_DETAIL,
     AppRoute.CONVERSATION_DETAIL, AppRoute.PUBLISH,
-    AppRoute.MESSAGE, AppRoute.ORDER, AppRoute.PROFILE, AppRoute.PUBLIC_PROFILE
+    AppRoute.MESSAGE, AppRoute.ORDER, AppRoute.PROFILE, AppRoute.PUBLIC_PROFILE,
+    AppRoute.NOTIFICATIONS, AppRoute.CREDIT, AppRoute.MOMENT_DETAIL
   ]);
-  assert.equal(new Set(NavigationPolicy.routes).size, 10);
+  assert.equal(new Set(NavigationPolicy.routes).size, 13);
 });
 
 test('hall, public details and login remain public', () => {

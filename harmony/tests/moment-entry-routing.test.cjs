@@ -42,3 +42,4 @@ test('other login returns retain prior behavior and author identity parameters',
   demand.page.completeLogin({ returnRoute: AppRoute.DEMAND_DETAIL, demandId: 7 });
   assert.deepEqual(demand.stack, [AppRoute.DEMAND_DETAIL]);
 });
+test('notification moment login return preserves the exact real moment ID',()=>{const f=completion([AppRoute.LOGIN]);f.page.completeLogin({returnRoute:AppRoute.MOMENT_DETAIL,momentId:27});assert.equal(f.pushes[0].param.momentId,27);});

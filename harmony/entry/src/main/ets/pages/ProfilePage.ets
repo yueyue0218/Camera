@@ -37,6 +37,7 @@ export struct ProfilePage {
   onBack?: () => void;
   onSignedOut?: () => void;
   onRequireLogin?: () => void;
+  onOpenCredit?: () => void;
   onOpenOrders?: () => void;
   onOpenMessages?: () => void;
   onOpenPublish?: () => void;
@@ -473,6 +474,8 @@ export struct ProfilePage {
               this.MenuRow('我的订单', '查看合作进度', () => this.onOpenOrders?.())
               Divider().color(PortraTheme.border).padding({ left: 18, right: 18 })
               this.MenuRow('消息', '与约拍对象保持联系', () => this.onOpenMessages?.())
+                Divider().color(PortraTheme.border).padding({ left: 18, right: 18 })
+                this.MenuRow('信用分', '查看合作表现与分数变化', () => this.onOpenCredit?.())
               if (this.role === 'CUSTOMER') {
                 Divider().color(PortraTheme.border).padding({ left: 18, right: 18 })
                 this.MenuRow('发布需求', '记录新的拍摄想法', () => this.onOpenPublish?.())

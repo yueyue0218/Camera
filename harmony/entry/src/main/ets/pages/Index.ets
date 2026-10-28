@@ -1,3 +1,6 @@
+import { NotificationPage } from './NotificationPage';
+import { CreditPage } from './CreditPage';
+import { NotificationMomentPage } from './NotificationMomentPage';
 import { AppClient } from '../app/AppClient';
 import { PortraEmptyView } from '../common/components/PortraEmptyView';
 import { PortraAppShell } from '../features/shell/PortraAppShell';
@@ -54,8 +57,24 @@ struct Index {
             this.pushRoute(AppRoute.DEMAND_DETAIL, { demandId: demandId });
           }
         });
+      } else if (name === AppRoute.NOTIFICATIONS) {
+        NotificationPage({ onBack: () => this.appPathStack.pop(),
+          onRequireLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.NOTIFICATIONS }),
+          onOpenMoment: (id: number) => this.openPage(AppRoute.MOMENT_DETAIL, { momentId: id }),
+          onOpenCredit: () => this.openPage(AppRoute.CREDIT), onOpenOrders: () => this.openPage(AppRoute.ORDER) });
+      } else if (name === AppRoute.CREDIT) {
+        CreditPage({ onBack: () => this.appPathStack.pop(),
+          onRequireLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.CREDIT }) });
+      } else if (name === AppRoute.MOMENT_DETAIL) {
+        NotificationMomentPage({ momentId: (param as NavigationRouteParam).momentId ?? 0,
+          onBack: () => this.appPathStack.pop(),
+          onRequireLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.MOMENT_DETAIL,
+            momentId: (param as NavigationRouteParam).momentId }) });
       } else if (name === AppRoute.MESSAGE) {
         MessagePage({
+          onOpenMoment: (id: number) => this.openPage(AppRoute.MOMENT_DETAIL, { momentId: id }),
+          onOpenCredit: () => this.openPage(AppRoute.CREDIT), onOpenOrders: () => this.openPage(AppRoute.ORDER),
+          onRequireLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.MESSAGE }),
           onBack: () => this.appPathStack.pop(),
           onOpenConversation: (conversationId: number) =>
             this.openPage(AppRoute.CONVERSATION_DETAIL, { conversationId: conversationId })
@@ -72,6 +91,7 @@ struct Index {
             this.appPathStack.pop();
             this.appPathStack.pushPathByName(AppRoute.LOGIN, PROFILE_LOGIN_PARAM);
           },
+          onOpenCredit: () => this.openPage(AppRoute.CREDIT),
           onOpenOrders: () => this.openPage(AppRoute.ORDER),
           onOpenMessages: () => this.openPage(AppRoute.MESSAGE),
           onOpenPublish: () => this.openPage(AppRoute.PUBLISH)
@@ -207,7 +227,7 @@ struct Index {
 
   private openLoginFor(route: AppRoute, param: NavigationRouteParam): void {
     const loginParam: NavigationRouteParam = {
-      returnRoute: route, demandId: param.demandId, serviceId: param.serviceId,
+      returnRoute: route, momentId: param.momentId, demandId: param.demandId, serviceId: param.serviceId,
       userId: param.userId, userRole: param.userRole, initialTab: param.initialTab
     };
     this.pushRoute(AppRoute.LOGIN, loginParam);
@@ -225,6 +245,7 @@ struct Index {
     }
     if (returnRoute !== undefined && returnRoute !== AppRoute.LOGIN) {
       const returnParam: NavigationRouteParam = {
+        momentId: param.momentId,
         demandId: param.demandId,
         serviceId: param.serviceId,
         conversationId: param.conversationId,

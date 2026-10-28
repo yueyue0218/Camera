@@ -1,3 +1,4 @@
+import { NotificationSummary, CreditSummary, CreditRecordSummary } from '../model/ApiModels';
 import { NativeSessionApi } from '../auth/NativeSessionApi';
 import { AcceptedDemandResponse, ConfirmQuoteResult, ConversationSummary, CreateDemandPayload,
   CreateDemandResponsePayload, CreateQuotePayload, CreateReportPayload, CreateServicePackagePayload,
@@ -345,8 +346,8 @@ export class ApiService implements NativeSessionApi {
     this.client.cancelRequest('auth.sms.verify');
   }
 
-  async currentSession(): Promise<SessionSummary> {
-    const response = await this.client.get<SessionSummary>('/auth/session', 'auth.session');
+  async currentSession(requestKey: string = 'auth.session'): Promise<SessionSummary> {
+    const response = await this.client.get<SessionSummary>('/auth/session', requestKey);
     if (response === null || !Number.isSafeInteger(response.userId) || response.userId <= 0 ||
       typeof response.nickname !== 'string' || typeof response.role !== 'string') {
       throw ErrorMapper.parse();
@@ -354,8 +355,40 @@ export class ApiService implements NativeSessionApi {
     return response;
   }
 
-  cancelCurrentSession(): void {
-    this.client.cancelRequest('auth.session');
+  cancelCurrentSession(requestKey: string = 'auth.session'): void {
+    this.client.cancelRequest(requestKey);
+  }
+
+  listNotifications(page: number = 0, size: number = 20, requestKey: string = 'notifications.list'):
+    Promise<PageResult<NotificationSummary>> {
+    if (!Number.isSafeInteger(page) || page < 0 || !Number.isSafeInteger(size) || size < 1 || size > 100) {
+      return Promise.reject(ErrorMapper.parse());
+    }
+    return this.client.get<PageResult<NotificationSummary>>('/notifications?page=' + page + '&size=' + size, requestKey);
+  }
+  unreadNotificationCount(requestKey: string = 'notifications.unread'): Promise<number> {
+    return this.client.get<number>('/notifications/unread-count', requestKey);
+  }
+  markNotificationRead(id: number, requestKey: string = 'notifications.read'): Promise<NotificationSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.patch<NotificationSummary>('/notifications/' + id + '/read', undefined, requestKey);
+  }
+  markAllNotificationsRead(requestKey: string = 'notifications.readAll'): Promise<NotificationSummary[]> {
+    return this.client.patch<NotificationSummary[]>('/notifications/read-all', undefined, requestKey);
+  }
+  cancelNotificationRequests(requestKeys: string[]): void {
+    requestKeys.forEach((key: string) => this.client.cancelRequest(key));
+  }
+  getCreditSummary(id: number, requestKey: string = 'credit.summary'): Promise<CreditSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.get<CreditSummary>('/users/' + id + '/credit', requestKey);
+  }
+  listCreditRecords(id: number, requestKey: string = 'credit.records'): Promise<CreditRecordSummary[]> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.get<CreditRecordSummary[]>('/users/' + id + '/credit-records', requestKey);
+  }
+  cancelCreditRequests(requestKeys: string[]): void {
+    requestKeys.forEach((key: string) => this.client.cancelRequest(key));
   }
 
   listConversations(requestKey: string = 'conversations.list'): Promise<ConversationSummary[]> {

@@ -17,12 +17,12 @@ export class NavigationPolicy {
     AppRoute.MESSAGE,
     AppRoute.ORDER,
     AppRoute.PROFILE,
-    AppRoute.PUBLIC_PROFILE
+    AppRoute.PUBLIC_PROFILE, AppRoute.NOTIFICATIONS, AppRoute.CREDIT, AppRoute.MOMENT_DETAIL
   ];
 
   static requiresAuthentication(route: AppRoute): boolean {
     return route === AppRoute.PUBLISH || route === AppRoute.CONVERSATION_DETAIL || route === AppRoute.MESSAGE ||
-      route === AppRoute.ORDER || route === AppRoute.PROFILE || route === AppRoute.PUBLIC_PROFILE;
+      route === AppRoute.ORDER || route === AppRoute.PROFILE || route === AppRoute.PUBLIC_PROFILE || route === AppRoute.NOTIFICATIONS || route === AppRoute.CREDIT || route === AppRoute.MOMENT_DETAIL;
   }
 
   static resolve(route: AppRoute, param: NavigationRouteParam = EMPTY_PARAM,
@@ -32,7 +32,7 @@ export class NavigationPolicy {
         route: AppRoute.LOGIN,
         param: {
           returnRoute: route,
-          conversationId: param.conversationId,
+          conversationId: param.conversationId, momentId: param.momentId,
           userId: param.userId, userRole: param.userRole, initialTab: param.initialTab
         }
       };
@@ -81,6 +81,9 @@ export class NavigationPolicy {
 
   static label(route: AppRoute): string {
     switch (route) {
+      case AppRoute.NOTIFICATIONS: return '通知';
+      case AppRoute.CREDIT: return '信用分';
+      case AppRoute.MOMENT_DETAIL: return '动态详情';
       case AppRoute.LOGIN:
         return '登录';
       case AppRoute.HALL:

@@ -424,3 +424,52 @@ export interface OrderSummary {
   readonly createdAt?: string;
   readonly demandId?: number;
 }
+
+export interface NotificationSummary {
+  readonly notificationId: number;
+  readonly recipientUserId: number;
+  readonly actorUserId?: number | null;
+  readonly title: string;
+  readonly content: string;
+  readonly type: string;
+  readonly eventType?: string;
+  readonly relatedType?: string;
+  readonly relatedId?: number | null;
+  readonly targetType?: string;
+  readonly targetId?: number | null;
+  readonly sourceType?: string;
+  readonly sourceId?: number | null;
+  readonly metadataJson?: string | null;
+  readonly navigationPath?: string | null;
+  readonly isRead: boolean;
+  readonly createdAt?: string;
+}
+export interface CreditSummary {
+  readonly userId: number;
+  readonly creditScore?: number | null;
+  readonly creditLevel?: string;
+  readonly recordCount?: number;
+  readonly lastUpdatedAt?: string | null;
+  readonly effectiveOrderCount?: number;
+  readonly completedOrderCount?: number;
+  readonly goodReviewRate?: number | null;
+  readonly defaultRate?: number | null;
+  readonly riskRecordCount?: number;
+  readonly receivedReviewCount?: number;
+  readonly averageRating?: number | null;
+}
+export interface CreditRecordSummary {
+  readonly recordId: number;
+  readonly userId: number;
+  readonly relatedOrderId?: number | null;
+  readonly eventType?: string;
+  readonly scoreChange?: number | null;
+  readonly beforeScore?: number | null;
+  readonly scoreAfter?: number | null;
+  readonly afterScore?: number | null;
+  readonly appliedScoreChange?: number | null;
+  readonly sourceType?: string | null;
+  readonly sourceId?: number | null;
+  readonly reason?: string;
+  readonly createdAt?: string;
+}

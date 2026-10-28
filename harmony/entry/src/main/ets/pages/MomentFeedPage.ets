@@ -505,14 +505,13 @@ export struct MomentFeedPage {
   build() {
     Column() {
       Row() {
-        Column({ space: 3 }) {
-          Text('动态')
-            .fontSize(PortraTheme.fontHero)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(PortraTheme.primaryText)
-          Text('MOMENTS')
-            .fontSize(PortraTheme.fontCaption)
-            .fontColor(PortraTheme.secondaryText)
+        Column({ space: 7 }) {
+          Row({ space: 8 }) {
+            Divider().width(26).height(2).color(PortraTheme.primary)
+            Text('MOMENTS').fontSize(10).letterSpacing(3).fontColor(PortraTheme.primary)
+          }
+          Text('动态').fontSize(28).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
+          Text('分享此刻，遇见同好。').fontSize(12).fontColor(PortraTheme.secondaryText)
         }
         .alignItems(HorizontalAlign.Start)
         Blank()
@@ -527,8 +526,8 @@ export struct MomentFeedPage {
           .onClick(() => this.load(true))
       }
       .width('100%')
-      .constraintSize({ minHeight: 82 })
-      .padding({ left: PortraTheme.spacingXl, right: PortraTheme.spacingXl })
+      .constraintSize({ minHeight: 120 })
+      .padding({ left: PortraTheme.spacingXl, right: PortraTheme.spacingXl, top: 16, bottom: 18 })
       .backgroundColor(PortraTheme.pageBackground)
       .border({ width: { bottom: 1 }, color: PortraTheme.border })
 

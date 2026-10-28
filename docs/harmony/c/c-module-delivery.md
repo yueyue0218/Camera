@@ -1,5 +1,21 @@
 # C 模块交付与真实验收记录
 
+<!-- WEB-UI-MIGRATION-20261028 -->
+更新：2026-10-28，新增用户明确要求的Web风格原生通知/信用迁移。**已接入真实通知，替换占位；本人信用与动态风格迁移已安装并完成隔离本地验收。** 公共、B、D维护者9文件本轮已明确获授权，原公共边界不再作为这部分阻塞；其余边界保留。
+
+基线c37eb7a，分支feature/harmony-c-ui-polish，唯一base integration/harmony-v1，[PR25](https://github.com/yueyue0218/Camera/pull/25)继续Draft。保留先前Feed/筛选/缓存/收藏并发、点赞/全图详情、举报可靠性和root/HALL生命周期成果。主工作区三份frontend未提交修改未覆盖。
+
+新增C文件：features/notifications/NotificationController.ets、ActivityApiBindings.ets；features/credit/CreditController.ets；pages/NotificationPage.ets、CreditPage.ets、NotificationMomentPage.ets。C MomentFeedPage仅调整Web风格标题/留白。获授权公共文件：HttpClient、ApiModels、ApiService、NavigationModels、NavigationPolicy、Index、PortraAppShell；D MessagePage替换通知标签占位并去双标题；B ProfilePage增加可选信用入口，旧调用兼容。新增notification-credit-api/behavior、notification-moment-binding三测试，更新moment-entry-routing/navigation两测试。
+
+通知真实GET零基分页/count、PATCH单条/全部已读，明确已加载/总数；按实例key隔离，旧响应/异常/finally及tap前账号变化防护，写入不明要求GET核实。信用真实GET概览和本人records：可空分数不造80，缺失比率不造0%，后台/导航隐藏清旧视图；正常恢复按当前会话读取。作者/用户体系、认证/安全存储/TLS、共享主题、Web/后端源码和共享配置无新增修改。
+
+实际[最终三页、行为和环境证据](evidence/20261028-web-ui/README.md)：本机H2 portra_c_final_20261028，127.0.0.1:18090，官方API26模拟器，实际反向转发。普通用户2正常点赞/关注生成actor1的通知2、3；原生2→1→0已读，真实动态3详情、前台恢复；信用真实80/待积累/空记录、评分说明、普通角色成功切换后重读。独立普通只读会话核对后台0未读、两记录已读、信用80/记录0、他人私有records40301；没有直写通知或补示例信用记录。配图仅复用仓库现有Web素材到此本地测试动态，无正式内容操作。
+
+正式命令：harmony目录DEVECO_SDK_HOME设置现有SDK，PowerShell展开tests/*.test.cjs后node --test：**exit0，185/185，0fail/skip/TODO**；独立相关36/36。PORTRA_BASE_URL=http://127.0.0.1:18090，hvigorw.bat assembleHap --no-daemon -p product=dev：**exit0，18.149秒，33tasks（17执行16up-to-date）**；hdc install -r、aa start均0。最终unsigned SHA256 **5B111863BB9ED0A573F97C245C33E3AD716C2B3B26596828E50F9E10EA7EE318**，仅当前进程配置地址。候选/正式首次失败、IME/目录锁/工具点击误滚动与纠正详见证据，不冒充通过。
+
+维护者补丁随本PR交付：[已授权最终差异及精确签名](proposals/web-ui-migration/README.md)。当前为通知分类/正文/已读及本人信用原生迁移，不包含Web全部业务、通知聚合折叠、系统推送或实时全局角标。仅刷新/重进/前台恢复读取。本轮以模拟器为准；团队外部原生短信环境/后端部署SHA及合法Web管理、发布签名升级仍未验证，不能据本地H2/unsigned声称完整C发布验收完成。
+
+## 此前阶段记录（保留原时点，以顶部本轮状态为准）
 <!-- FINAL-20261028 -->
 更新：2026-10-28。**C 剩余授权实现和隔离本地验收已补齐；外部团队环境、实体设备及签名验收尚未完成，PR #25 保持 Draft，不自动合并。** 以下为最新结论；历史“未授权”“7 TODO”“无 HALL 入口”“缺普通双角色账号”已由本轮授权、实现与本地夹具验证更新，不能继续列为代码阻塞。
 

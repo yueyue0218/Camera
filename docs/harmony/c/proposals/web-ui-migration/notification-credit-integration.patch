@@ -1,0 +1,1031 @@
+diff --git a/harmony/entry/src/main/ets/network/HttpClient.ets b/harmony/entry/src/main/ets/network/HttpClient.ets
+index a35daa6..fe479e3 100644
+--- a/harmony/entry/src/main/ets/network/HttpClient.ets
++++ b/harmony/entry/src/main/ets/network/HttpClient.ets
+@@ -58,0 +59,4 @@ export class HttpClient implements AuthTokenController {
++  async patch<T>(path: string, body?: Object, requestKey: string = path): Promise<T> {
++    return this.request<T>(http.RequestMethod.PATCH, path, requestKey, true, body);
++  }
++
+diff --git a/harmony/entry/src/main/ets/model/ApiModels.ets b/harmony/entry/src/main/ets/model/ApiModels.ets
+index 5545a8c..e38a3a8 100644
+--- a/harmony/entry/src/main/ets/model/ApiModels.ets
++++ b/harmony/entry/src/main/ets/model/ApiModels.ets
+@@ -426,0 +427,49 @@ export interface OrderSummary {
++
++export interface NotificationSummary {
++  readonly notificationId: number;
++  readonly recipientUserId: number;
++  readonly actorUserId?: number | null;
++  readonly title: string;
++  readonly content: string;
++  readonly type: string;
++  readonly eventType?: string;
++  readonly relatedType?: string;
++  readonly relatedId?: number | null;
++  readonly targetType?: string;
++  readonly targetId?: number | null;
++  readonly sourceType?: string;
++  readonly sourceId?: number | null;
++  readonly metadataJson?: string | null;
++  readonly navigationPath?: string | null;
++  readonly isRead: boolean;
++  readonly createdAt?: string;
++}
++export interface CreditSummary {
++  readonly userId: number;
++  readonly creditScore?: number | null;
++  readonly creditLevel?: string;
++  readonly recordCount?: number;
++  readonly lastUpdatedAt?: string | null;
++  readonly effectiveOrderCount?: number;
++  readonly completedOrderCount?: number;
++  readonly goodReviewRate?: number | null;
++  readonly defaultRate?: number | null;
++  readonly riskRecordCount?: number;
++  readonly receivedReviewCount?: number;
++  readonly averageRating?: number | null;
++}
++export interface CreditRecordSummary {
++  readonly recordId: number;
++  readonly userId: number;
++  readonly relatedOrderId?: number | null;
++  readonly eventType?: string;
++  readonly scoreChange?: number | null;
++  readonly beforeScore?: number | null;
++  readonly scoreAfter?: number | null;
++  readonly afterScore?: number | null;
++  readonly appliedScoreChange?: number | null;
++  readonly sourceType?: string | null;
++  readonly sourceId?: number | null;
++  readonly reason?: string;
++  readonly createdAt?: string;
++}
+diff --git a/harmony/entry/src/main/ets/network/ApiService.ets b/harmony/entry/src/main/ets/network/ApiService.ets
+index d9739eb..0088675 100644
+--- a/harmony/entry/src/main/ets/network/ApiService.ets
++++ b/harmony/entry/src/main/ets/network/ApiService.ets
+@@ -0,0 +1 @@
++import { NotificationSummary, CreditSummary, CreditRecordSummary } from '../model/ApiModels';
+@@ -348,2 +349,2 @@ export class ApiService implements NativeSessionApi {
+-  async currentSession(): Promise<SessionSummary> {
+-    const response = await this.client.get<SessionSummary>('/auth/session', 'auth.session');
++  async currentSession(requestKey: string = 'auth.session'): Promise<SessionSummary> {
++    const response = await this.client.get<SessionSummary>('/auth/session', requestKey);
+@@ -357,2 +358,34 @@ export class ApiService implements NativeSessionApi {
+-  cancelCurrentSession(): void {
+-    this.client.cancelRequest('auth.session');
++  cancelCurrentSession(requestKey: string = 'auth.session'): void {
++    this.client.cancelRequest(requestKey);
++  }
++
++  listNotifications(page: number = 0, size: number = 20, requestKey: string = 'notifications.list'):
++    Promise<PageResult<NotificationSummary>> {
++    if (!Number.isSafeInteger(page) || page < 0 || !Number.isSafeInteger(size) || size < 1 || size > 100) {
++      return Promise.reject(ErrorMapper.parse());
++    }
++    return this.client.get<PageResult<NotificationSummary>>('/notifications?page=' + page + '&size=' + size, requestKey);
++  }
++  unreadNotificationCount(requestKey: string = 'notifications.unread'): Promise<number> {
++    return this.client.get<number>('/notifications/unread-count', requestKey);
++  }
++  markNotificationRead(id: number, requestKey: string = 'notifications.read'): Promise<NotificationSummary> {
++    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
++    return this.client.patch<NotificationSummary>('/notifications/' + id + '/read', undefined, requestKey);
++  }
++  markAllNotificationsRead(requestKey: string = 'notifications.readAll'): Promise<NotificationSummary[]> {
++    return this.client.patch<NotificationSummary[]>('/notifications/read-all', undefined, requestKey);
++  }
++  cancelNotificationRequests(requestKeys: string[]): void {
++    requestKeys.forEach((key: string) => this.client.cancelRequest(key));
++  }
++  getCreditSummary(id: number, requestKey: string = 'credit.summary'): Promise<CreditSummary> {
++    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
++    return this.client.get<CreditSummary>('/users/' + id + '/credit', requestKey);
++  }
++  listCreditRecords(id: number, requestKey: string = 'credit.records'): Promise<CreditRecordSummary[]> {
++    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
++    return this.client.get<CreditRecordSummary[]>('/users/' + id + '/credit-records', requestKey);
++  }
++  cancelCreditRequests(requestKeys: string[]): void {
++    requestKeys.forEach((key: string) => this.client.cancelRequest(key));
+diff --git a/harmony/entry/src/main/ets/model/NavigationModels.ets b/harmony/entry/src/main/ets/model/NavigationModels.ets
+index 379d421..4edd7aa 100644
+--- a/harmony/entry/src/main/ets/model/NavigationModels.ets
++++ b/harmony/entry/src/main/ets/model/NavigationModels.ets
+@@ -11 +11,4 @@ export enum AppRoute {
+-  PUBLIC_PROFILE = 'PublicProfile'
++  PUBLIC_PROFILE = 'PublicProfile',
++  NOTIFICATIONS = 'Notifications',
++  CREDIT = 'Credit',
++  MOMENT_DETAIL = 'MomentDetail'
+@@ -18,0 +22 @@ export interface NavigationRouteParam {
++  readonly momentId?: number;
+diff --git a/harmony/entry/src/main/ets/navigation/NavigationPolicy.ets b/harmony/entry/src/main/ets/navigation/NavigationPolicy.ets
+index d4d65a1..9a7903c 100644
+--- a/harmony/entry/src/main/ets/navigation/NavigationPolicy.ets
++++ b/harmony/entry/src/main/ets/navigation/NavigationPolicy.ets
+@@ -20 +20 @@ export class NavigationPolicy {
+-    AppRoute.PUBLIC_PROFILE
++    AppRoute.PUBLIC_PROFILE, AppRoute.NOTIFICATIONS, AppRoute.CREDIT, AppRoute.MOMENT_DETAIL
+@@ -25 +25 @@ export class NavigationPolicy {
+-      route === AppRoute.ORDER || route === AppRoute.PROFILE || route === AppRoute.PUBLIC_PROFILE;
++      route === AppRoute.ORDER || route === AppRoute.PROFILE || route === AppRoute.PUBLIC_PROFILE || route === AppRoute.NOTIFICATIONS || route === AppRoute.CREDIT || route === AppRoute.MOMENT_DETAIL;
+@@ -35 +35 @@ export class NavigationPolicy {
+-          conversationId: param.conversationId,
++          conversationId: param.conversationId, momentId: param.momentId,
+@@ -83,0 +84,3 @@ export class NavigationPolicy {
++      case AppRoute.NOTIFICATIONS: return '通知';
++      case AppRoute.CREDIT: return '信用分';
++      case AppRoute.MOMENT_DETAIL: return '动态详情';
+diff --git a/harmony/entry/src/main/ets/pages/Index.ets b/harmony/entry/src/main/ets/pages/Index.ets
+index 9ec0952..c29d04c 100644
+--- a/harmony/entry/src/main/ets/pages/Index.ets
++++ b/harmony/entry/src/main/ets/pages/Index.ets
+@@ -0,0 +1,3 @@
++import { NotificationPage } from './NotificationPage';
++import { CreditPage } from './CreditPage';
++import { NotificationMomentPage } from './NotificationMomentPage';
+@@ -56,0 +60,13 @@ struct Index {
++      } else if (name === AppRoute.NOTIFICATIONS) {
++        NotificationPage({ onBack: () => this.appPathStack.pop(),
++          onRequireLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.NOTIFICATIONS }),
++          onOpenMoment: (id: number) => this.openPage(AppRoute.MOMENT_DETAIL, { momentId: id }),
++          onOpenCredit: () => this.openPage(AppRoute.CREDIT), onOpenOrders: () => this.openPage(AppRoute.ORDER) });
++      } else if (name === AppRoute.CREDIT) {
++        CreditPage({ onBack: () => this.appPathStack.pop(),
++          onRequireLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.CREDIT }) });
++      } else if (name === AppRoute.MOMENT_DETAIL) {
++        NotificationMomentPage({ momentId: (param as NavigationRouteParam).momentId ?? 0,
++          onBack: () => this.appPathStack.pop(),
++          onRequireLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.MOMENT_DETAIL,
++            momentId: (param as NavigationRouteParam).momentId }) });
+@@ -58,0 +75,3 @@ struct Index {
++          onOpenMoment: (id: number) => this.openPage(AppRoute.MOMENT_DETAIL, { momentId: id }),
++          onOpenCredit: () => this.openPage(AppRoute.CREDIT), onOpenOrders: () => this.openPage(AppRoute.ORDER),
++          onRequireLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.MESSAGE }),
+@@ -74,0 +94 @@ struct Index {
++          onOpenCredit: () => this.openPage(AppRoute.CREDIT),
+@@ -210 +230 @@ struct Index {
+-      returnRoute: route, demandId: param.demandId, serviceId: param.serviceId,
++      returnRoute: route, momentId: param.momentId, demandId: param.demandId, serviceId: param.serviceId,
+@@ -227,0 +248 @@ struct Index {
++        momentId: param.momentId,
+diff --git a/harmony/entry/src/main/ets/features/shell/PortraAppShell.ets b/harmony/entry/src/main/ets/features/shell/PortraAppShell.ets
+index 81a26e1..2685b77 100644
+--- a/harmony/entry/src/main/ets/features/shell/PortraAppShell.ets
++++ b/harmony/entry/src/main/ets/features/shell/PortraAppShell.ets
+@@ -44 +44 @@ export struct PortraAppShell {
+-          onNotice: () => this.showPending('通知中心将在后续业务接入'),
++          onNotice: () => this.onOpenRoute?.(AppRoute.NOTIFICATIONS),
+diff --git a/harmony/entry/src/main/ets/pages/MessagePage.ets b/harmony/entry/src/main/ets/pages/MessagePage.ets
+index c6f388b..d07c15a 100644
+--- a/harmony/entry/src/main/ets/pages/MessagePage.ets
++++ b/harmony/entry/src/main/ets/pages/MessagePage.ets
+@@ -0,0 +1 @@
++import { NotificationPage } from './NotificationPage';
+@@ -20,0 +22,4 @@ export struct MessagePage {
++  onOpenMoment?: (id: number) => void;
++  onOpenCredit?: () => void;
++  onOpenOrders?: () => void;
++  onRequireLogin?: () => void;
+@@ -124,0 +130 @@ export struct MessagePage {
++      if (this.selectedTab === 0) {
+@@ -133,0 +140 @@ export struct MessagePage {
++      }
+@@ -136 +143,3 @@ export struct MessagePage {
+-        PortraEmptyView({ message: '通知列表尚未接入' })
++        NotificationPage({ onBack: () => this.selectedTab = 0, onOpenMoment: this.onOpenMoment,
++          onOpenCredit: this.onOpenCredit, onOpenOrders: this.onOpenOrders, onRequireLogin: this.onRequireLogin })
++          .layoutWeight(1)
+diff --git a/harmony/entry/src/main/ets/pages/ProfilePage.ets b/harmony/entry/src/main/ets/pages/ProfilePage.ets
+index 2fa0920..6a029ce 100644
+--- a/harmony/entry/src/main/ets/pages/ProfilePage.ets
++++ b/harmony/entry/src/main/ets/pages/ProfilePage.ets
+@@ -39,0 +40 @@ export struct ProfilePage {
++  onOpenCredit?: () => void;
+@@ -475,0 +477,2 @@ export struct ProfilePage {
++                Divider().color(PortraTheme.border).padding({ left: 18, right: 18 })
++                this.MenuRow('信用分', '查看合作表现与分数变化', () => this.onOpenCredit?.())
+diff --git a/harmony/entry/src/main/ets/features/notifications/NotificationController.ets b/harmony/entry/src/main/ets/features/notifications/NotificationController.ets
+new file mode 100644
+index 0000000..9f1a0df
+--- /dev/null
++++ b/harmony/entry/src/main/ets/features/notifications/NotificationController.ets
+@@ -0,0 +1,183 @@
++import { NotificationSummary, PageResult, SessionSummary } from '../../model/ApiModels';
++
++export interface NotificationApi {
++  currentSession(requestKey?: string): Promise<SessionSummary>;
++  cancelCurrentSession(requestKey?: string): void;
++  listNotifications(page: number, size: number, key: string): Promise<PageResult<NotificationSummary>>;
++  unreadNotificationCount(key: string): Promise<number>;
++  markNotificationRead(id: number, key: string): Promise<NotificationSummary>;
++  markAllNotificationsRead(key: string): Promise<NotificationSummary[]>;
++  cancelNotificationRequests(keys: string[]): void;
++}
++export interface NotificationSession { getSessionVersion(): number; isAuthenticated(): boolean; }
++let nextNotificationInstance: number = 0;
++export class NotificationSnapshot {
++  items: NotificationSummary[] = [];
++  loading: boolean = false;
++  loadingMore: boolean = false;
++  busy: boolean = false;
++  uncertain: boolean = false;
++  loginRequired: boolean = false;
++  error: string = '';
++  unread: number = 0;
++  total: number = 0;
++  page: number = 0;
++}
++export class NotificationFormat {
++  static category(item: NotificationSummary): string {
++    const types = `${item.type} ${item.eventType ?? ''} ${item.relatedType ?? ''} ${item.targetType ?? ''}`.toUpperCase();
++    if (types.includes('REVIEW_COMPLAINT') || types.includes('DISPUTE')) { return 'appeal'; }
++    if (types.includes('ORDER_') || types.includes('DEMAND_RESPONSE_') || types.includes('CONVERSATION_STARTED') ||
++      types.includes('DELIVERY_UPLOADED')) { return 'order'; }
++    if (types.includes('REVIEW_')) { return 'review'; }
++    if (types.includes('MOMENT') || types.includes('FOLLOWED')) { return 'dynamic'; }
++    return 'other';
++  }
++  static label(item: NotificationSummary): string {
++    const category = NotificationFormat.category(item);
++    return category === 'appeal' ? '申诉' : category === 'order' ? '订单' : category === 'review' ? '评价' :
++      category === 'dynamic' ? '动态' : item.type.includes('CREDIT') ? '信用' : '通知';
++  }
++  static time(value?: string): string { return value ? value.replace('T', ' ').slice(0, 16) : '时间未知'; }
++}
++
++/** C view logic only: all transport/authentication remains in the existing shared client. */
++export class NotificationController {
++  private state: NotificationSnapshot = new NotificationSnapshot();
++  private active: boolean = false;
++  private generation: number = 0;
++  private readVersion: number = 0;
++  private actorId: number = 0;
++  private accountVersion: number = -1;
++  private readonly key: string = `notifications.c.${++nextNotificationInstance}`;
++  private readonly api: NotificationApi;
++  private readonly session: NotificationSession;
++  private readonly changed: (state: NotificationSnapshot) => void;
++  constructor(api: NotificationApi, session: NotificationSession, changed: (state: NotificationSnapshot) => void) {
++    this.api = api; this.session = session; this.changed = changed;
++  }
++
++  resume(): void {
++    if (this.accountVersion !== this.session.getSessionVersion()) {
++      this.generation++; this.readVersion++; this.actorId = 0; this.state = new NotificationSnapshot();
++      this.accountVersion = this.session.getSessionVersion();
++    }
++    this.active = true; this.state.loginRequired = !this.session.isAuthenticated(); this.publish();
++  }
++  private identityCurrent(): boolean {
++    if (this.accountVersion !== this.session.getSessionVersion()) { this.suspend(); this.resume(); return false; }
++    return true;
++  }
++  suspend(): void {
++    this.active = false; this.generation++; this.readVersion++; this.actorId = 0;
++    this.api.cancelNotificationRequests([`${this.key}.list`, `${this.key}.count`, `${this.key}.write`]);
++    this.api.cancelCurrentSession(`${this.key}.session`);
++    this.state = new NotificationSnapshot(); this.publish();
++  }
++  private current(epoch: number, version: number): boolean {
++    if (epoch !== this.generation) { return false; }
++    if (version !== this.session.getSessionVersion()) {
++      this.suspend(); this.resume(); return false;
++    }
++    return this.active && epoch === this.generation;
++  }
++  private publish(): void {
++    const next = new NotificationSnapshot();
++    next.items = this.state.items.slice(); next.loading = this.state.loading; next.loadingMore = this.state.loadingMore;
++    next.busy = this.state.busy; next.uncertain = this.state.uncertain; next.loginRequired = this.state.loginRequired;
++    next.error = this.state.error; next.unread = this.state.unread; next.total = this.state.total; next.page = this.state.page;
++    this.changed(next);
++  }
++  private valid(item: NotificationSummary): boolean {
++    return item !== null && item !== undefined && Number.isSafeInteger(item.notificationId) && item.notificationId > 0 &&
++      item.recipientUserId === this.actorId && typeof item.isRead === 'boolean' && typeof item.type === 'string' &&
++      typeof item.title === 'string' && typeof item.content === 'string';
++  }
++  async load(): Promise<void> {
++    if (!this.active || !this.identityCurrent() || this.state.busy) { return; }
++    if (!this.session.isAuthenticated()) { this.suspend(); this.resume(); return; }
++    const epoch = this.generation; const version = this.session.getSessionVersion(); const read = ++this.readVersion;
++    this.state.loading = true; this.state.loadingMore = false; this.state.error = ''; this.state.items = [];
++    this.publish();
++    try {
++      const identity = await this.api.currentSession(`${this.key}.session`);
++      if (!this.current(epoch, version) || read !== this.readVersion) { return; }
++      if (!Number.isSafeInteger(identity.userId) || identity.userId <= 0) { throw new Error('身份数据异常'); }
++      this.actorId = identity.userId;
++      const values = await Promise.all([this.api.listNotifications(0, 20, `${this.key}.list`),
++        this.api.unreadNotificationCount(`${this.key}.count`)]);
++      if (!this.current(epoch, version) || read !== this.readVersion) { return; }
++      const page = values[0] as PageResult<NotificationSummary>; const count = values[1] as number;
++      if (!Array.isArray(page.records) || page.records.some((item: NotificationSummary) => !this.valid(item)) ||
++        !Number.isSafeInteger(page.total) || page.total < 0 || page.page !== 0 ||
++        !Number.isSafeInteger(count) || count < 0) { throw new Error('通知数据异常'); }
++      this.state.items = this.deduplicate(page.records); this.state.total = page.total; this.state.page = 0;
++      this.state.unread = count; this.state.uncertain = false;
++    } catch (_) {
++      if (this.current(epoch, version) && read === this.readVersion) { this.state.error = '通知暂时加载失败，请稍后再试。'; }
++    } finally {
++      if (this.current(epoch, version) && read === this.readVersion) { this.state.loading = false; this.publish(); }
++    }
++  }
++  private deduplicate(items: NotificationSummary[]): NotificationSummary[] {
++    const result: NotificationSummary[] = [];
++    items.forEach((item: NotificationSummary) => {
++      if (!result.some((entry: NotificationSummary) => entry.notificationId === item.notificationId)) { result.push(item); }
++    });
++    return result;
++  }
++  async loadMore(): Promise<void> {
++    if (!this.active || !this.identityCurrent() || this.state.loading || this.state.loadingMore || this.state.busy ||
++      this.state.items.length >= this.state.total) { return; }
++    const epoch = this.generation; const version = this.session.getSessionVersion(); const read = ++this.readVersion;
++    const next = this.state.page + 1; this.state.loadingMore = true; this.publish();
++    try {
++      const page = await this.api.listNotifications(next, 20, `${this.key}.list`);
++      if (!this.current(epoch, version) || read !== this.readVersion) { return; }
++      if (!Array.isArray(page.records) || page.records.some((item: NotificationSummary) => !this.valid(item)) ||
++        page.page !== next || !Number.isSafeInteger(page.total) || page.total < 0) { throw new Error('通知数据异常'); }
++      this.state.items = this.deduplicate(this.state.items.concat(page.records)); this.state.page = next; this.state.total = page.total;
++    } catch (_) {
++      if (this.current(epoch, version) && read === this.readVersion) { this.state.error = '更多通知加载失败，请重试。'; }
++    } finally {
++      if (this.current(epoch, version) && read === this.readVersion) { this.state.loadingMore = false; this.publish(); }
++    }
++  }
++  canOpen(id: number): boolean {
++    if (!this.active || !this.identityCurrent() || !this.session.isAuthenticated() || this.state.loading || this.state.busy) { return false; }
++    return this.state.items.some((item: NotificationSummary) => item.notificationId === id && item.isRead && this.valid(item));
++  }
++  async markRead(id: number): Promise<void> { await this.mutate(id); }
++  async markAllRead(): Promise<void> { await this.mutate(0); }
++  private async mutate(id: number): Promise<void> {
++    if (!this.active || !this.identityCurrent() || !this.session.isAuthenticated() || this.state.busy || this.state.loading ||
++      this.state.loadingMore || this.state.uncertain) { return; }
++    const item = this.state.items.find((entry: NotificationSummary) => entry.notificationId === id);
++    if (id !== 0 && (item === undefined || item.isRead)) { return; }
++    if (id === 0 && this.state.unread === 0) { return; }
++    const epoch = this.generation; const version = this.session.getSessionVersion(); this.readVersion++;
++    this.state.busy = true; this.state.error = ''; this.publish();
++    let refresh = false;
++    try {
++      if (id === 0) {
++        const result = await this.api.markAllNotificationsRead(`${this.key}.write`);
++        if (!this.current(epoch, version)) { return; }
++        if (!Array.isArray(result) || result.some((entry: NotificationSummary) => !this.valid(entry) || !entry.isRead)) {
++          throw new Error('已读数据异常');
++        }
++      } else {
++        const result = await this.api.markNotificationRead(id, `${this.key}.write`);
++        if (!this.current(epoch, version)) { return; }
++        if (!this.valid(result) || result.notificationId !== id || !result.isRead) { throw new Error('已读数据异常'); }
++      }
++      refresh = true;
++    } catch (_) {
++      if (this.current(epoch, version)) {
++        this.state.uncertain = true; this.state.error = '已读结果未确认，请刷新核实后再操作。';
++      }
++    } finally {
++      if (this.current(epoch, version)) { this.state.busy = false; this.publish(); }
++    }
++    if (refresh && this.current(epoch, version)) { await this.load(); }
++  }
++}
+diff --git a/harmony/entry/src/main/ets/features/notifications/ActivityApiBindings.ets b/harmony/entry/src/main/ets/features/notifications/ActivityApiBindings.ets
+new file mode 100644
+index 0000000..80f60c2
+--- /dev/null
++++ b/harmony/entry/src/main/ets/features/notifications/ActivityApiBindings.ets
+@@ -0,0 +1,35 @@
++import { ApiService } from '../../network/ApiService';
++import { AuthSessionManager } from '../../auth/AuthSessionManager';
++import { NotificationSummary, PageResult, SessionSummary, CreditSummary, CreditRecordSummary } from '../../model/ApiModels';
++import { NotificationApi, NotificationSession } from './NotificationController';
++import { CreditApi } from '../credit/CreditController';
++
++/** ArkTS nominal adapters only. All calls still execute the one shared ApiService/HttpClient. */
++export class ActivitySessionBinding implements NotificationSession {
++  private readonly session: AuthSessionManager;
++  constructor(session: AuthSessionManager) { this.session = session; }
++  getSessionVersion(): number { return this.session.getSessionVersion(); }
++  isAuthenticated(): boolean { return this.session.isAuthenticated(); }
++}
++export class NotificationApiBinding implements NotificationApi {
++  private readonly api: ApiService;
++  constructor(api: ApiService) { this.api = api; }
++  currentSession(key?: string): Promise<SessionSummary> { return this.api.currentSession(key); }
++  cancelCurrentSession(key?: string): void { this.api.cancelCurrentSession(key); }
++  listNotifications(page: number, size: number, key: string): Promise<PageResult<NotificationSummary>> {
++    return this.api.listNotifications(page, size, key);
++  }
++  unreadNotificationCount(key: string): Promise<number> { return this.api.unreadNotificationCount(key); }
++  markNotificationRead(id: number, key: string): Promise<NotificationSummary> { return this.api.markNotificationRead(id, key); }
++  markAllNotificationsRead(key: string): Promise<NotificationSummary[]> { return this.api.markAllNotificationsRead(key); }
++  cancelNotificationRequests(keys: string[]): void { this.api.cancelNotificationRequests(keys); }
++}
++export class CreditApiBinding implements CreditApi {
++  private readonly api: ApiService;
++  constructor(api: ApiService) { this.api = api; }
++  currentSession(key?: string): Promise<SessionSummary> { return this.api.currentSession(key); }
++  cancelCurrentSession(key?: string): void { this.api.cancelCurrentSession(key); }
++  getCreditSummary(id: number, key: string): Promise<CreditSummary> { return this.api.getCreditSummary(id, key); }
++  listCreditRecords(id: number, key: string): Promise<CreditRecordSummary[]> { return this.api.listCreditRecords(id, key); }
++  cancelCreditRequests(keys: string[]): void { this.api.cancelCreditRequests(keys); }
++}
+diff --git a/harmony/entry/src/main/ets/features/credit/CreditController.ets b/harmony/entry/src/main/ets/features/credit/CreditController.ets
+new file mode 100644
+index 0000000..91f10f2
+--- /dev/null
++++ b/harmony/entry/src/main/ets/features/credit/CreditController.ets
+@@ -0,0 +1,104 @@
++import { CreditRecordSummary, CreditSummary, SessionSummary } from '../../model/ApiModels';
++import { NotificationSession } from '../notifications/NotificationController';
++export interface CreditApi {
++  currentSession(key?: string): Promise<SessionSummary>;
++  cancelCurrentSession(key?: string): void;
++  getCreditSummary(id: number, key: string): Promise<CreditSummary>;
++  listCreditRecords(id: number, key: string): Promise<CreditRecordSummary[]>;
++  cancelCreditRequests(keys: string[]): void;
++}
++export class CreditSnapshot {
++  summary?: CreditSummary;
++  records: CreditRecordSummary[] = [];
++  loading: boolean = false;
++  error: string = '';
++  recordsError: string = '';
++  loginRequired: boolean = false;
++  userId: number = 0;
++}
++export class CreditFormat {
++  static score(value?: number | null): string { return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(1) : '暂无'; }
++  static metric(value?: number | null): string { return typeof value === 'number' && Number.isFinite(value) ? `${value}` : '--'; }
++  static percent(value?: number | null): string { return typeof value === 'number' && Number.isFinite(value) ? `${value.toFixed(1)}%` : '--'; }
++  static level(item?: CreditSummary): string {
++    if (item?.creditLevel?.trim()) { return item.creditLevel.trim(); }
++    return '待积累';
++  }
++  static delta(item: CreditRecordSummary): number {
++    if (typeof item.appliedScoreChange === 'number') { return item.appliedScoreChange; }
++    const after = item.afterScore ?? item.scoreAfter;
++    if (typeof item.beforeScore === 'number' && typeof after === 'number') { return after - item.beforeScore; }
++    return item.scoreChange ?? 0;
++  }
++}
++let nextCreditInstance: number = 0;
++export class CreditController {
++  private state: CreditSnapshot = new CreditSnapshot();
++  private active: boolean = false;
++  private generation: number = 0;
++  private readonly key: string = `credit.c.${++nextCreditInstance}`;
++  private readonly api: CreditApi;
++  private readonly session: NotificationSession;
++  private readonly changed: (state: CreditSnapshot) => void;
++  constructor(api: CreditApi, session: NotificationSession, changed: (state: CreditSnapshot) => void) {
++    this.api = api; this.session = session; this.changed = changed;
++  }
++  resume(): void { this.active = true; this.state.loginRequired = !this.session.isAuthenticated(); this.publish(); }
++  suspend(): void {
++    this.active = false; this.generation++;
++    this.api.cancelCreditRequests([`${this.key}.summary`, `${this.key}.records`]);
++    this.api.cancelCurrentSession(`${this.key}.session`);
++    this.state = new CreditSnapshot(); this.publish();
++  }
++  private publish(): void {
++    const next = new CreditSnapshot(); next.summary = this.state.summary; next.records = this.state.records.slice();
++    next.loading = this.state.loading; next.error = this.state.error; next.recordsError = this.state.recordsError;
++    next.loginRequired = this.state.loginRequired; next.userId = this.state.userId; this.changed(next);
++  }
++  private current(epoch: number, version: number): boolean {
++    if (epoch !== this.generation) { return false; }
++    if (version !== this.session.getSessionVersion()) { this.suspend(); this.resume(); return false; }
++    return this.active && epoch === this.generation;
++  }
++  async load(): Promise<void> {
++    if (!this.active || this.state.loading) { return; }
++    if (!this.session.isAuthenticated()) { this.suspend(); this.resume(); return; }
++    const epoch = ++this.generation; const version = this.session.getSessionVersion();
++    this.state = new CreditSnapshot(); this.state.loading = true; this.publish();
++    try {
++      const identity = await this.api.currentSession(`${this.key}.session`);
++      if (!this.current(epoch, version)) { return; }
++      if (!Number.isSafeInteger(identity.userId) || identity.userId <= 0) { throw new Error('身份数据异常'); }
++      this.state.userId = identity.userId;
++      await Promise.all([this.readSummary(epoch, version, identity.userId), this.readRecords(epoch, version, identity.userId)]);
++    } catch (_) {
++      if (this.current(epoch, version)) { this.state.error = '信用页暂时打不开，请稍后再试。'; }
++    } finally {
++      if (this.current(epoch, version)) { this.state.loading = false; this.publish(); }
++    }
++  }
++  private async readSummary(epoch: number, version: number, id: number): Promise<void> {
++    try {
++      const item = await this.api.getCreditSummary(id, `${this.key}.summary`);
++      if (!this.current(epoch, version)) { return; }
++      if (item === null || item.userId !== id || (item.creditScore !== null && item.creditScore !== undefined &&
++        (typeof item.creditScore !== 'number' || !Number.isFinite(item.creditScore)))) {
++        throw new Error('信用数据异常');
++      }
++      this.state.summary = item;
++    } catch (_) {
++      if (this.current(epoch, version)) { this.state.error = '暂时看不到信用分，请稍后重试。'; }
++    }
++  }
++  private async readRecords(epoch: number, version: number, id: number): Promise<void> {
++    try {
++      const items = await this.api.listCreditRecords(id, `${this.key}.records`);
++      if (!this.current(epoch, version)) { return; }
++      if (!Array.isArray(items) || items.some((item: CreditRecordSummary) => item.userId !== id ||
++        !Number.isSafeInteger(item.recordId) || item.recordId <= 0)) { throw new Error('信用记录异常'); }
++      this.state.records = items;
++    } catch (_) {
++      if (this.current(epoch, version)) { this.state.recordsError = '分数变化记录暂时加载失败，请重试。'; }
++    }
++  }
++}
+diff --git a/harmony/entry/src/main/ets/pages/NotificationPage.ets b/harmony/entry/src/main/ets/pages/NotificationPage.ets
+new file mode 100644
+index 0000000..6eb5a71
+--- /dev/null
++++ b/harmony/entry/src/main/ets/pages/NotificationPage.ets
+@@ -0,0 +1,158 @@
++import { uiObserver } from '@kit.ArkUI';
++import { AppClient } from '../app/AppClient';
++import { NotificationSummary } from '../model/ApiModels';
++import { NotificationController, NotificationFormat, NotificationSnapshot } from '../features/notifications/NotificationController';
++import { MomentFeedLifecycle } from '../features/moments/MomentFeedLifecycle';
++import { PortraTheme } from '../theme/PortraTheme';
++import { NotificationApiBinding, ActivitySessionBinding } from '../features/notifications/ActivityApiBindings';
++
++@Component
++export struct NotificationPage {
++  @State private snapshot: NotificationSnapshot = new NotificationSnapshot();
++  @State private filter: string = 'all';
++  @State private expandedId: number = 0;
++  private controller?: NotificationController;
++  private lifecycle?: MomentFeedLifecycle;
++  private visible: boolean = false;
++  onBack?: () => void;
++  onRequireLogin?: () => void;
++  onOpenMoment?: (id: number) => void;
++  onOpenCredit?: () => void;
++  onOpenOrders?: () => void;
++
++  aboutToAppear(): void {
++    this.controller = new NotificationController(new NotificationApiBinding(AppClient.shared.apiService), new ActivitySessionBinding(AppClient.shared.sessionManager),
++      (state: NotificationSnapshot) => this.snapshot = state);
++  }
++  aboutToDisappear(): void { this.lifecycle?.stop(); this.lifecycle = undefined; this.controller?.suspend(); }
++  private observe(): void {
++    if (this.lifecycle !== undefined) { return; }
++    try {
++      this.lifecycle = new MomentFeedLifecycle(this.getUIContext(), (update?: uiObserver.NavDestinationInfo) => {
++        const navigation = this.queryNavigationInfo(); let destination = this.queryNavDestinationInfo();
++        if (navigation === undefined || destination === undefined) { throw new Error('Navigation unavailable'); }
++        if (update?.navDestinationId === destination.navDestinationId) { destination = update; }
++        return destination.index === navigation.pathStack.size() - 1 &&
++          destination.state !== uiObserver.NavDestinationState.ON_HIDDEN && destination.state !== uiObserver.NavDestinationState.ON_WILL_HIDE &&
++          destination.state !== uiObserver.NavDestinationState.ON_DISAPPEAR && destination.state !== uiObserver.NavDestinationState.ON_WILL_DISAPPEAR;
++      }, (visible: boolean) => {
++        if (this.visible === visible) { return; } this.visible = visible; this.expandedId = 0;
++        if (visible) { this.controller?.resume(); this.controller?.load(); } else { this.controller?.suspend(); }
++      }, () => { this.controller?.suspend(); this.snapshot.error = '页面状态监听不可用，请返回后重试。'; });
++      this.lifecycle.start();
++    } catch { this.snapshot.error = '页面状态监听不可用，请返回后重试。'; }
++  }
++  private label(filter: string): string {
++    return filter === 'all' ? '全部' : filter === 'unread' ? '未读' : filter === 'order' ? '订单' :
++      filter === 'appeal' ? '申诉' : filter === 'review' ? '评价' : '动态';
++  }
++  private count(filter: string): number {
++    return this.snapshot.items.filter((item: NotificationSummary) => filter === 'all' ||
++      (filter === 'unread' ? !item.isRead : NotificationFormat.category(item) === filter)).length;
++  }
++  private items(): NotificationSummary[] {
++    return this.snapshot.items.filter((item: NotificationSummary) => this.filter === 'all' ||
++      (this.filter === 'unread' ? !item.isRead : NotificationFormat.category(item) === this.filter));
++  }
++  private open(item: NotificationSummary): void {
++    this.expandedId = this.expandedId === item.notificationId ? 0 : item.notificationId;
++    if (!item.isRead) { this.controller?.markRead(item.notificationId); }
++  }
++  private related(item: NotificationSummary): void {
++    if (!this.controller?.canOpen(item.notificationId)) { return; }
++    // Only implemented native destinations; never execute a server-provided URL.
++    if (item.type.includes('MOMENT') && Number.isSafeInteger(item.relatedId) && (item.relatedId ?? 0) > 0) {
++      this.onOpenMoment?.(item.relatedId as number);
++    } else if (item.type.includes('CREDIT')) { this.onOpenCredit?.(); }
++    else if (NotificationFormat.category(item) === 'order' || NotificationFormat.category(item) === 'appeal' ||
++      NotificationFormat.category(item) === 'review') { this.onOpenOrders?.(); }
++  }
++  private canOpen(item: NotificationSummary): boolean {
++    return (item.type.includes('MOMENT') && Number.isSafeInteger(item.relatedId) && (item.relatedId ?? 0) > 0) ||
++      item.type.includes('CREDIT') || ['order', 'appeal', 'review'].includes(NotificationFormat.category(item));
++  }
++  @Builder
++  private Notice(item: NotificationSummary) {
++    Column({ space: 10 }) {
++      Row({ space: 8 }) {
++        Circle().width(7).height(7).fill(item.isRead ? PortraTheme.border : PortraTheme.primary)
++        Text(item.title).fontSize(16).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText).layoutWeight(1)
++        Text(item.isRead ? '已读' : '点击即读').fontSize(10).fontColor(PortraTheme.secondaryText)
++      }.width('100%')
++      Text(item.content).width('100%').fontSize(14).lineHeight(23).fontColor(PortraTheme.primaryText)
++        .maxLines(this.expandedId === item.notificationId ? 30 : 3).textOverflow({ overflow: TextOverflow.Ellipsis })
++      Text(`${NotificationFormat.label(item)} · ${NotificationFormat.time(item.createdAt)}`)
++        .width('100%').fontSize(11).fontColor(PortraTheme.secondaryText)
++      if (this.expandedId === item.notificationId && this.canOpen(item)) {
++        Button('查看相关内容').fontSize(12).height(34).fontColor(PortraTheme.primary).backgroundColor(PortraTheme.primarySoft)
++          .enabled(!this.snapshot.busy && !this.snapshot.loading).onClick(() => this.related(item))
++      }
++    }.width('100%').alignItems(HorizontalAlign.Start).padding(18)
++      .backgroundColor(item.isRead ? PortraTheme.surface : '#F0F4FF').borderRadius(18)
++      .border({ width: { left: 4 }, color: item.isRead ? PortraTheme.border : PortraTheme.primary })
++      .onClick(() => this.open(item))
++  }
++  build() {
++    Column() {
++      Row({ space: 12 }) {
++        Button('‹').width(30).height(40).padding(0).fontSize(30).backgroundColor(Color.Transparent).fontColor(PortraTheme.primaryText)
++          .onClick(() => this.onBack?.())
++        Column({ space: 5 }) {
++          Text('消息中心').fontSize(11).fontColor(PortraTheme.primary).letterSpacing(3)
++          Text('通知').fontSize(30).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
++          Text(this.snapshot.unread > 0 ? `${this.snapshot.unread} 条未读通知` : '当前没有未读通知')
++            .fontSize(12).fontColor(PortraTheme.secondaryText)
++        }.alignItems(HorizontalAlign.Start).layoutWeight(1)
++        Button('全部已读').fontSize(11).height(36).fontColor(PortraTheme.primary).backgroundColor(PortraTheme.primarySoft)
++          .enabled(this.snapshot.unread > 0 && !this.snapshot.busy && !this.snapshot.loading && !this.snapshot.uncertain)
++          .onClick(() => this.controller?.markAllRead())
++      }.width('100%').padding({ left: 14, right: 20, top: 18, bottom: 22 })
++      Scroll() {
++        Row({ space: 8 }) {
++          ForEach(['all', 'unread', 'order', 'appeal', 'review', 'dynamic'], (filter: string) => {
++            Button(`${this.label(filter)} ${this.count(filter)}`).height(38).fontSize(12)
++              .fontWeight(this.filter === filter ? FontWeight.Bold : FontWeight.Regular)
++              .fontColor(this.filter === filter ? PortraTheme.primary : PortraTheme.secondaryText)
++              .backgroundColor(this.filter === filter ? PortraTheme.primarySoft : PortraTheme.surface)
++              .onClick(() => { this.filter = filter; this.expandedId = 0; })
++          })
++        }.padding(10)
++      }.scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off).width('100%').backgroundColor('#F8F3EB')
++      Scroll() {
++        Column({ space: 14 }) {
++          if (this.snapshot.error.length > 0) {
++            Text(this.snapshot.error).width('100%').fontSize(13).fontColor(PortraTheme.danger).padding(16)
++              .backgroundColor(PortraTheme.surface).borderRadius(14)
++          }
++          if (this.snapshot.loginRequired) {
++            Text('登录后查看属于你的通知').fontColor(PortraTheme.secondaryText).margin({ top: 40 })
++            Button('去登录').onClick(() => this.onRequireLogin?.())
++          } else if (this.snapshot.loading) {
++            LoadingProgress().width(32).height(32).color(PortraTheme.primary).margin({ top: 45 })
++            Text('正在加载通知…').fontSize(13).fontColor(PortraTheme.secondaryText)
++          } else {
++            Row() {
++              Text(`已加载 ${this.snapshot.items.length} / ${this.snapshot.total} 条`).fontSize(11).fontColor(PortraTheme.secondaryText)
++              Blank()
++              Button(this.snapshot.busy ? '处理中' : this.snapshot.uncertain ? '刷新核实' : '刷新')
++                .fontSize(11).height(32).fontColor(PortraTheme.primary).backgroundColor(Color.Transparent)
++                .enabled(!this.snapshot.busy).onClick(() => this.controller?.load())
++            }.width('100%')
++            if (this.items().length === 0) {
++              Text(this.filter === 'all' ? '暂无通知' : `暂无${this.label(this.filter)}通知`)
++                .fontSize(18).fontWeight(FontWeight.Medium).fontColor(PortraTheme.primaryText).margin({ top: 50, bottom: 12 })
++              Text('新消息到来后，会在这里与你见面。').fontSize(12).fontColor(PortraTheme.secondaryText)
++            }
++            ForEach(this.items(), (item: NotificationSummary) => { this.Notice(item) },
++              (item: NotificationSummary) => `${item.notificationId}:${item.isRead}:${this.expandedId === item.notificationId}`)
++            if (this.snapshot.items.length < this.snapshot.total) {
++              Button(this.snapshot.loadingMore ? '加载中' : '加载更多').fontSize(13).height(40)
++                .backgroundColor(PortraTheme.primarySoft).fontColor(PortraTheme.primary)
++                .enabled(!this.snapshot.loadingMore && !this.snapshot.busy).onClick(() => this.controller?.loadMore())
++            }
++          }
++        }.width('100%').padding(20)
++      }.layoutWeight(1).width('100%').scrollBar(BarState.Off).align(Alignment.TopStart)
++    }.width('100%').height('100%').backgroundColor(PortraTheme.pageBackground).onAppear(() => this.observe())
++  }
++}
+diff --git a/harmony/entry/src/main/ets/pages/CreditPage.ets b/harmony/entry/src/main/ets/pages/CreditPage.ets
+new file mode 100644
+index 0000000..c2d1a55
+--- /dev/null
++++ b/harmony/entry/src/main/ets/pages/CreditPage.ets
+@@ -0,0 +1,148 @@
++import { uiObserver } from '@kit.ArkUI';
++import { AppClient } from '../app/AppClient';
++import { CreditRecordSummary } from '../model/ApiModels';
++import { CreditController, CreditFormat, CreditSnapshot } from '../features/credit/CreditController';
++import { NotificationFormat } from '../features/notifications/NotificationController';
++import { MomentFeedLifecycle } from '../features/moments/MomentFeedLifecycle';
++import { PortraTheme } from '../theme/PortraTheme';
++import { CreditApiBinding, ActivitySessionBinding } from '../features/notifications/ActivityApiBindings';
++
++@Component
++export struct CreditPage {
++  @State private snapshot: CreditSnapshot = new CreditSnapshot();
++  @State private rulesOpen: boolean = false;
++  private controller?: CreditController;
++  private lifecycle?: MomentFeedLifecycle;
++  private visible: boolean = false;
++  onBack?: () => void;
++  onRequireLogin?: () => void;
++  aboutToAppear(): void {
++    this.controller = new CreditController(new CreditApiBinding(AppClient.shared.apiService), new ActivitySessionBinding(AppClient.shared.sessionManager),
++      (state: CreditSnapshot) => this.snapshot = state);
++  }
++  aboutToDisappear(): void { this.lifecycle?.stop(); this.lifecycle = undefined; this.controller?.suspend(); }
++  private observe(): void {
++    if (this.lifecycle !== undefined) { return; }
++    try {
++      this.lifecycle = new MomentFeedLifecycle(this.getUIContext(), (update?: uiObserver.NavDestinationInfo) => {
++        const navigation = this.queryNavigationInfo(); let destination = this.queryNavDestinationInfo();
++        if (navigation === undefined || destination === undefined) { throw new Error('Navigation unavailable'); }
++        if (update?.navDestinationId === destination.navDestinationId) { destination = update; }
++        return destination.index === navigation.pathStack.size() - 1 &&
++          destination.state !== uiObserver.NavDestinationState.ON_HIDDEN && destination.state !== uiObserver.NavDestinationState.ON_WILL_HIDE &&
++          destination.state !== uiObserver.NavDestinationState.ON_DISAPPEAR && destination.state !== uiObserver.NavDestinationState.ON_WILL_DISAPPEAR;
++      }, (visible: boolean) => {
++        if (this.visible === visible) { return; } this.visible = visible; this.rulesOpen = false;
++        if (visible) { this.controller?.resume(); this.controller?.load(); } else { this.controller?.suspend(); }
++      }, () => { this.controller?.suspend(); this.snapshot.error = '页面状态监听不可用，请返回后重试。'; });
++      this.lifecycle.start();
++    } catch { this.snapshot.error = '页面状态监听不可用，请返回后重试。'; }
++  }
++  @Builder
++  private Metric(value: string, label: string) {
++    Column({ space: 8 }) {
++      Text(value).fontSize(23).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
++      Text(label).fontSize(11).fontColor(PortraTheme.secondaryText)
++    }.width('47%').padding({ top: 18, bottom: 18 }).backgroundColor(PortraTheme.surface).borderRadius(16)
++  }
++  @Builder
++  private Record(item: CreditRecordSummary) {
++    Row({ space: 12 }) {
++      Column({ space: 6 }) {
++        Text(item.reason || '分数变化').fontSize(14).fontWeight(FontWeight.Medium).fontColor(PortraTheme.primaryText)
++        Text(NotificationFormat.time(item.createdAt)).fontSize(11).fontColor(PortraTheme.secondaryText)
++        if (item.relatedOrderId !== null && item.relatedOrderId !== undefined) {
++          Text(`关联订单 #${item.relatedOrderId}`).fontSize(11).fontColor(PortraTheme.secondaryText)
++        }
++      }.alignItems(HorizontalAlign.Start).layoutWeight(1)
++      Text(`${CreditFormat.delta(item) > 0 ? '+' : ''}${CreditFormat.delta(item)}`)
++        .fontSize(23).fontWeight(FontWeight.Bold).fontColor(CreditFormat.delta(item) < 0 ? PortraTheme.danger : PortraTheme.primary)
++    }.width('100%').padding(18).backgroundColor(PortraTheme.surface).borderRadius(16)
++  }
++  build() {
++    Column() {
++      Row({ space: 10 }) {
++        Button('‹').width(32).height(40).padding(0).fontSize(30).fontColor(PortraTheme.primaryText).backgroundColor(Color.Transparent)
++          .onClick(() => this.onBack?.())
++        Text('信用分').fontSize(15).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primary).layoutWeight(1)
++        Button('刷新').fontSize(12).height(34).fontColor(PortraTheme.primary).backgroundColor(PortraTheme.surface)
++          .enabled(!this.snapshot.loading).onClick(() => this.controller?.load())
++      }.width('100%').padding({ left: 12, right: 20, top: 12, bottom: 14 })
++      Scroll() {
++        Column({ space: 18 }) {
++          if (this.snapshot.error.length > 0) {
++            Text(this.snapshot.error).width('100%').padding(16).fontSize(13).fontColor(PortraTheme.danger)
++              .backgroundColor(PortraTheme.surface).borderRadius(14)
++          }
++          if (this.snapshot.loginRequired) {
++            Text('登录后查看你的信用记录').fontColor(PortraTheme.secondaryText).margin({ top: 40 })
++            Button('去登录').onClick(() => this.onRequireLogin?.())
++          } else if (this.snapshot.loading) {
++            LoadingProgress().width(36).height(36).color(PortraTheme.primary).margin({ top: 50 })
++            Text('正在整理信用分…').fontSize(13).fontColor(PortraTheme.secondaryText)
++          } else {
++            Column({ space: 18 }) {
++              Text('CREDIT').fontSize(43).fontFamily('serif').fontColor('#181735B9').width('100%').textAlign(TextAlign.End)
++              Stack({ alignContent: Alignment.Center }) {
++                Circle().width(158).height(158).fill(Color.Transparent).stroke('#661735B9').strokeWidth(1).strokeDashArray([3, 4])
++                Circle().width(138).height(138).fill(Color.Transparent).stroke('#331735B9').strokeWidth(1)
++                Circle().width(120).height(120).fill(Color.Transparent).stroke('#221735B9').strokeWidth(1)
++                Column({ space: 4 }) {
++                  Text(CreditFormat.score(this.snapshot.summary?.creditScore)).fontFamily('serif').fontSize(40)
++                    .fontWeight(FontWeight.Bold).fontColor(PortraTheme.primary)
++                  Text('信用评分').fontSize(10).letterSpacing(3).fontColor(PortraTheme.primary)
++                }
++              }.width('100%').height(170)
++              Row({ space: 10 }) {
++                Text(CreditFormat.level(this.snapshot.summary)).fontSize(27).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
++                if (this.snapshot.userId > 0) {
++                  Text(`用户 ${this.snapshot.userId}`).fontSize(11).fontColor(PortraTheme.primaryText)
++                    .padding({ left: 12, right: 12, top: 7, bottom: 7 }).backgroundColor(PortraTheme.accent).borderRadius(30)
++                }
++              }.width('100%')
++              Text(`最近更新：${NotificationFormat.time(this.snapshot.summary?.lastUpdatedAt ?? undefined)}`)
++                .width('100%').fontSize(11).fontColor(PortraTheme.secondaryText)
++              Text('信用分会参考完成合作后的评价、是否按约以及争议处理情况，近期表现越稳定，分数通常也越稳。')
++                .width('100%').fontSize(13).lineHeight(23).fontColor(PortraTheme.secondaryText)
++              Button(this.rulesOpen ? '收起说明' : '评分说明').fontSize(12).height(34).fontColor(PortraTheme.primary)
++                .backgroundColor(PortraTheme.primarySoft).onClick(() => this.rulesOpen = !this.rulesOpen)
++              if (this.rulesOpen) {
++                Text('信用分由平台根据合作履约、评价及争议处理结果计算。合作或评价不足时显示“新用户 / 待积累”；具体分数及变更以平台实际记录为准。')
++                  .width('100%').fontSize(13).lineHeight(23).fontColor(PortraTheme.secondaryText)
++              }
++            }.width('100%').padding(22).alignItems(HorizontalAlign.Start).backgroundColor(PortraTheme.surface).borderRadius(24)
++              .border({ width: { left: 4 }, color: PortraTheme.primary })
++            Column({ space: 12 }) {
++              Row() {
++                this.Metric(CreditFormat.metric(this.snapshot.summary?.effectiveOrderCount), '计分合作')
++                Blank()
++                this.Metric(CreditFormat.percent(this.snapshot.summary?.goodReviewRate), '好评率')
++              }.width('100%')
++              Row() {
++                this.Metric(CreditFormat.percent(this.snapshot.summary?.defaultRate), '未按约占比')
++                Blank()
++                this.Metric(CreditFormat.metric(this.snapshot.summary?.riskRecordCount), '争议记录')
++              }.width('100%')
++            }.width('100%').padding(14).backgroundColor(PortraTheme.pageBackgroundDeep).borderRadius(22)
++            Row() {
++              Text('分数变化').fontSize(20).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
++              Blank()
++              Text(`${this.snapshot.records.length} 条`).fontSize(12).fontColor(PortraTheme.secondaryText)
++            }.width('100%')
++            Text('按时间查看每一次分数变化，以及背后的原因。').width('100%').fontSize(12).fontColor(PortraTheme.secondaryText)
++            if (this.snapshot.recordsError.length > 0) {
++              Text(this.snapshot.recordsError).fontSize(13).fontColor(PortraTheme.danger)
++            } else if (this.snapshot.records.length === 0) {
++              Column({ space: 12 }) {
++                Text('还没有分数变化').fontSize(16).fontWeight(FontWeight.Medium).fontColor(PortraTheme.primaryText)
++                Text('完成合作或收到评价后，这里会出现变化说明。').fontSize(12).fontColor(PortraTheme.secondaryText)
++              }.width('100%').padding(28).backgroundColor(PortraTheme.surface).borderRadius(18)
++            }
++            ForEach(this.snapshot.records, (item: CreditRecordSummary) => { this.Record(item) },
++              (item: CreditRecordSummary) => `${item.recordId}`)
++          }
++        }.width('100%').padding({ left: 20, right: 20, top: 6, bottom: 30 })
++      }.width('100%').layoutWeight(1).scrollBar(BarState.Off)
++    }.width('100%').height('100%').backgroundColor(PortraTheme.pageBackground).onAppear(() => this.observe())
++  }
++}
+diff --git a/harmony/entry/src/main/ets/pages/NotificationMomentPage.ets b/harmony/entry/src/main/ets/pages/NotificationMomentPage.ets
+new file mode 100644
+index 0000000..59716ed
+--- /dev/null
++++ b/harmony/entry/src/main/ets/pages/NotificationMomentPage.ets
+@@ -0,0 +1,55 @@
++import { uiObserver } from '@kit.ArkUI';
++import { AppClient } from '../app/AppClient';
++import { MomentDetailPanel } from '../features/moments/MomentDetailPanel';
++import { MomentInteractions, MomentInteractionSnapshot } from '../features/moments/MomentInteractions';
++import { MomentFeedCache } from '../features/moments/MomentFeedModels';
++import { MomentFeedLifecycle } from '../features/moments/MomentFeedLifecycle';
++import { PortraTheme } from '../theme/PortraTheme';
++import { MomentApiBinding, MomentSessionBinding } from '../features/moments/MomentInteractionBindings';
++
++@Component
++export struct NotificationMomentPage {
++  @Prop momentId: number = 0;
++  @State private state: MomentInteractionSnapshot = new MomentInteractionSnapshot();
++  private interactions?: MomentInteractions;
++  private lifecycle?: MomentFeedLifecycle;
++  private visible: boolean = false;
++  onBack?: () => void;
++  onRequireLogin?: () => void;
++  aboutToAppear(): void {
++    this.interactions = new MomentInteractions(new MomentApiBinding(AppClient.shared.apiService), new MomentSessionBinding(AppClient.shared.sessionManager),
++      MomentFeedCache.shared, (state: MomentInteractionSnapshot) => this.state = state, () => {});
++  }
++  aboutToDisappear(): void { this.lifecycle?.stop(); this.lifecycle = undefined; this.interactions?.suspend(); }
++  private read(): void {
++    if (!Number.isSafeInteger(this.momentId) || this.momentId <= 0) {
++      this.state.message = '动态编号无效，请返回通知列表。'; return;
++    }
++    this.interactions?.open(this.momentId);
++  }
++  private observe(): void {
++    if (this.lifecycle !== undefined) { return; }
++    try {
++      this.lifecycle = new MomentFeedLifecycle(this.getUIContext(), (update?: uiObserver.NavDestinationInfo) => {
++        const navigation = this.queryNavigationInfo(); let destination = this.queryNavDestinationInfo();
++        if (navigation === undefined || destination === undefined) { throw new Error('Navigation unavailable'); }
++        if (update?.navDestinationId === destination.navDestinationId) { destination = update; }
++        return destination.index === navigation.pathStack.size() - 1 &&
++          destination.state !== uiObserver.NavDestinationState.ON_HIDDEN && destination.state !== uiObserver.NavDestinationState.ON_WILL_HIDE &&
++          destination.state !== uiObserver.NavDestinationState.ON_DISAPPEAR && destination.state !== uiObserver.NavDestinationState.ON_WILL_DISAPPEAR;
++      }, (visible: boolean) => {
++        if (this.visible === visible) { return; } this.visible = visible;
++        if (visible) { this.interactions?.resume(); this.read(); } else { this.interactions?.suspend(); }
++      }, () => { this.interactions?.suspend(); this.state.message = '页面状态监听不可用，请返回重试。'; });
++      this.lifecycle.start();
++    } catch { this.state.message = '页面状态监听不可用，请返回重试。'; }
++  }
++  build() {
++    Column() {
++      MomentDetailPanel({ state: this.state, onClose: this.onBack, onRetry: () => this.read(),
++        onRequireLogin: this.onRequireLogin, onToggleLike: () => {
++          if (this.state.item !== undefined) { this.interactions?.toggleLike(this.state.item); }
++        } })
++    }.width('100%').height('100%').backgroundColor(PortraTheme.pageBackground).onAppear(() => this.observe())
++  }
++}
+diff --git a/harmony/tests/notification-credit-behavior.test.cjs b/harmony/tests/notification-credit-behavior.test.cjs
+new file mode 100644
+index 0000000..030c06c
+--- /dev/null
++++ b/harmony/tests/notification-credit-behavior.test.cjs
+@@ -0,0 +1,37 @@
++const assert=require('node:assert/strict');
++const {test}=require('node:test');
++const fs=require('node:fs'),path=require('node:path');
++const ts=require(path.join(process.env.DEVECO_SDK_HOME,'default/openharmony/ets/build-tools/ets-loader/node_modules/typescript'));
++const root=path.resolve(__dirname,'../entry/src/main/ets');
++require.extensions['.ets']=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,f);
++const {NotificationController,NotificationFormat}=require(path.join(root,'features/notifications/NotificationController.ets'));
++const {CreditController,CreditFormat}=require(path.join(root,'features/credit/CreditController.ets'));
++const tick=()=>new Promise(r=>setImmediate(r));
++function deferred(){let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject};}
++const notice=(id=1,read=false,actor=7)=>({notificationId:id,recipientUserId:actor,title:'动态有新互动',content:'收到点赞',type:'MOMENT_LIKED',relatedType:'MOMENT',relatedId:2,isRead:read,createdAt:'2026-10-28T19:00:00'});
++function fixture(){let version=1,auth=true;const list=[],count=[],writes=[],cancel=[];
++ const session={getSessionVersion:()=>version,isAuthenticated:()=>auth};
++ const api={currentSession:async()=>({userId:7,role:'CUSTOMER'}),listNotifications(page,size,key){const d=deferred();list.push({page,size,key,...d});return d.promise},unreadNotificationCount(key){const d=deferred();count.push({key,...d});return d.promise},markNotificationRead(id,key){const d=deferred();writes.push({id,key,...d});return d.promise},markAllNotificationsRead(key){const d=deferred();writes.push({all:true,key,...d});return d.promise},cancelNotificationRequests(keys){cancel.push(keys)},cancelCurrentSession(key){cancel.push([key])}};
++ let state;const controller=new NotificationController(api,session,s=>state=s);controller.resume();
++ return {api,session,controller,list,count,writes,cancel,get state(){return state},change(){version++},logout(){auth=false;version++}};
++}
++async function loaded(f,records=[notice()],total=records.length){const p=f.controller.load();await tick();f.list.at(-1).resolve({records,page:0,size:20,total});f.count.at(-1).resolve(records.filter(x=>!x.isRead).length);await p;}
++test('notifications use zero-based real pages and server unread count',async()=>{const f=fixture();await loaded(f);assert.equal(f.list[0].page,0);assert.equal(f.state.items.length,1);assert.equal(f.state.unread,1);assert.equal(f.state.loading,false);});
++test('next page deduplicates and preserves total without inventing categories',async()=>{const f=fixture();await loaded(f,[notice()],3);const p=f.controller.loadMore();f.list.at(-1).resolve({records:[notice(),notice(2)],page:1,size:20,total:3});await p;assert.deepEqual(f.state.items.map(x=>x.notificationId),[1,2]);assert.equal(f.state.total,3);});
++test('old account success, catch and finally cannot repaint current notices',async()=>{for(const failure of [false,true]){const f=fixture();const p=f.controller.load();await tick();f.change();f.controller.suspend();f.controller.resume();if(failure)f.list[0].reject(new Error('old'));else f.list[0].resolve({records:[notice()],page:0,size:20,total:1});f.count[0].resolve(1);await p;assert.equal(f.state.items.length,0);assert.equal(f.state.loading,false);}});
++test('different recipient fails closed',async()=>{const f=fixture();await loaded(f,[notice(1,false,99)]);assert.equal(f.state.items.length,0);assert.ok(f.state.error.length>0);});
++test('mark read is serialized, server-authoritative and refreshes after real response',async()=>{const f=fixture();await loaded(f);const p=f.controller.markRead(1);f.controller.markRead(1);assert.equal(f.writes.length,1);assert.equal(f.state.items[0].isRead,false);f.writes[0].resolve(notice(1,true));await tick();f.list.at(-1).resolve({records:[notice(1,true)],page:0,size:20,total:1});f.count.at(-1).resolve(0);await p;assert.equal(f.state.items[0].isRead,true);assert.equal(f.state.unread,0);});
++test('unknown read failure requires GET verification before another mutation',async()=>{const f=fixture();await loaded(f);const p=f.controller.markRead(1);f.writes[0].reject(new Error('timeout'));await p;assert.equal(f.state.uncertain,true);await f.controller.markAllRead();assert.equal(f.writes.length,1);await loaded(f,[notice(1,true)]);assert.equal(f.state.uncertain,false);});
++test('suspending one notification instance cancels only its own request keys',async()=>{const a=fixture(),b=fixture();const p=a.controller.load(),q=b.controller.load();await tick();assert.notEqual(a.list[0].key,b.list[0].key);a.controller.suspend();assert.ok(a.cancel.flat().every(k=>!k.includes(b.list[0].key)));a.list[0].resolve({records:[],page:0,size:20,total:0});a.count[0].resolve(0);b.list[0].resolve({records:[notice()],page:0,size:20,total:1});b.count[0].resolve(1);await Promise.all([p,q]);assert.equal(b.state.items.length,1);});
++test('guest does not request private notification data',async()=>{const f=fixture();f.logout();await f.controller.load();assert.equal(f.list.length,0);assert.equal(f.state.loginRequired,true);});
++test('old finally cannot clear a successfully loaded newer account view',async()=>{const f=fixture();const old=f.controller.load();await tick();f.change();f.controller.suspend();f.controller.resume();await loaded(f,[notice(2)]);f.list[0].resolve({records:[notice()],page:0,size:20,total:1});f.count[0].resolve(1);await old;assert.equal(f.state.items[0]?.notificationId,2);});
++test('identity changing before tap cannot send an old notification read under new identity',async()=>{const f=fixture();await loaded(f);f.change();await f.controller.markRead(1);assert.equal(f.writes.length,0);assert.equal(f.state.items.length,0);});
++test('related content requires current visible identity and confirmed read state',async()=>{const f=fixture();await loaded(f);assert.equal(f.controller.canOpen(1),false);await loaded(f,[notice(1,true)]);assert.equal(f.controller.canOpen(1),true);f.change();assert.equal(f.controller.canOpen(1),false);assert.equal(f.state.items.length,0);f.controller.suspend();assert.equal(f.controller.canOpen(1),false);});
++test('notification filter mirrors web categories with appeal before review',()=>{assert.equal(NotificationFormat.category(notice()),'dynamic');assert.equal(NotificationFormat.category({...notice(),type:'REVIEW_COMPLAINT_RESOLVED'}),'appeal');assert.equal(NotificationFormat.category({...notice(),type:'ORDER_STATUS_CHANGED'}),'order');});
++test('credit formats absent values without inventing score and preserves zero',()=>{assert.equal(CreditFormat.score(undefined),'暂无');assert.equal(CreditFormat.score(null),'暂无');assert.equal(CreditFormat.score(0),'0.0');assert.equal(CreditFormat.percent(0),'0.0%');assert.equal(CreditFormat.metric(undefined),'--');assert.equal(CreditFormat.level({creditScore:80,creditLevel:'待积累'}),'待积累');});
++test('credit does not claim nominal delta when server says applied zero',()=>{assert.equal(CreditFormat.delta({scoreChange:5,appliedScoreChange:0}),0);assert.equal(CreditFormat.delta({beforeScore:80,afterScore:78,scoreChange:5}),-2);});
++test('credit reads only own private records and ignores hidden old results',async()=>{let version=1,state;const summaries=[],records=[],keys=[];
++ const api={currentSession:async()=>({userId:7,role:'CUSTOMER'}),getCreditSummary(id,key){const d=deferred();summaries.push({id,key,...d});return d.promise},listCreditRecords(id,key){const d=deferred();records.push({id,key,...d});return d.promise},cancelCreditRequests(k){keys.push(k)},cancelCurrentSession(){}};
++ const c=new CreditController(api,{getSessionVersion:()=>version,isAuthenticated:()=>true},s=>state=s);c.resume();const p=c.load();await tick();assert.equal(records[0].id,7);c.suspend();version++;c.resume();summaries[0].resolve({userId:7,creditScore:99});records[0].resolve([]);await p;assert.equal(state.summary,undefined);assert.equal(state.loading,false);assert.ok(keys.length>0);
++});
++test('null credit score keeps real summary metrics and does not invent an error',async()=>{let state;const c=new CreditController({currentSession:async()=>({userId:7}),cancelCurrentSession(){},getCreditSummary:async()=>({userId:7,creditScore:null,creditLevel:'待积累',effectiveOrderCount:0}),listCreditRecords:async()=>[],cancelCreditRequests(){}},{getSessionVersion:()=>1,isAuthenticated:()=>true},s=>state=s);c.resume();await c.load();assert.equal(state.error,'');assert.equal(state.summary.effectiveOrderCount,0);assert.equal(CreditFormat.score(state.summary.creditScore),'暂无');});
+diff --git a/harmony/tests/notification-credit-api.test.cjs b/harmony/tests/notification-credit-api.test.cjs
+new file mode 100644
+index 0000000..7d74092
+--- /dev/null
++++ b/harmony/tests/notification-credit-api.test.cjs
+@@ -0,0 +1,15 @@
++const assert=require('node:assert/strict'),{test}=require('node:test'),fs=require('node:fs'),path=require('node:path');
++const ts=require(path.join(process.env.DEVECO_SDK_HOME,'default/openharmony/ets/build-tools/ets-loader/node_modules/typescript'));
++const root=process.env.PORTRA_API_TEST_SOURCE||path.resolve(__dirname,'../entry/src/main/ets');
++const calls=[];
++const http={RequestMethod:{GET:'GET',POST:'POST',PUT:'PUT',DELETE:'DELETE',PATCH:'PATCH'},HttpDataType:{STRING:1},createHttp(){const c={};calls.push(c);return {request(url,options){Object.assign(c,{url,options});return new Promise((resolve,reject)=>Object.assign(c,{resolve,reject}))},destroy(){c.destroyed=true}}}};
++require.extensions['.ets']=(m,f)=>{const original=m.require.bind(m);m.require=n=>n==='@kit.NetworkKit'?{http}:n.endsWith('/BuildProfile')?{default:{PORTRA_ENVIRONMENT:'staging',PORTRA_BASE_URL:'https://test.invalid'}}:original(n);m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,f)};
++const {HttpClient}=require(path.join(root,'network/HttpClient.ets'));
++const {ApiService}=require(path.join(root,'network/ApiService.ets'));
++const client=new HttpClient();client.setAccessToken('test-token-not-a-real-credential');const api=new ApiService(client);
++const respond=(data)=>calls.at(-1).resolve({responseCode:200,result:JSON.stringify({code:200,message:'success',data})});
++test('notification paging is zero-based and uses existing authenticated GET',async()=>{const p=api.listNotifications(0,20,'a.list');assert.equal(calls.at(-1).url,'https://test.invalid/notifications?page=0&size=20');assert.equal(calls.at(-1).options.header.Authorization,'Bearer test-token-not-a-real-credential');respond({records:[],page:0,size:20,total:0});assert.deepEqual((await p).records,[]);await assert.rejects(api.listNotifications(-1,20,'bad'));});
++test('single and all read use real PATCH, no POST emulation',async()=>{const p=api.markNotificationRead(7,'a.write');assert.equal(calls.at(-1).options.method,'PATCH');assert.ok(calls.at(-1).url.endsWith('/notifications/7/read'));respond({notificationId:7,isRead:true});assert.equal((await p).isRead,true);const q=api.markAllNotificationsRead('a.all');assert.equal(calls.at(-1).options.method,'PATCH');assert.ok(calls.at(-1).url.endsWith('/notifications/read-all'));respond([]);await q;});
++test('cancelling notification instance A leaves B request alive',async()=>{const a=api.listNotifications(0,20,'isolate.a');const b=api.listNotifications(0,20,'isolate.b');const aCall=calls.at(-2),bCall=calls.at(-1);api.cancelNotificationRequests(['isolate.a']);aCall.resolve({responseCode:200,result:JSON.stringify({code:200,data:{records:[]}})});await assert.rejects(a);assert.notEqual(bCall.destroyed,true);respond({records:[],page:0,size:20,total:0});await b;});
++test('credit uses real summary and private records paths and rejects unsafe IDs',async()=>{const p=api.getCreditSummary(7,'credit.a');assert.ok(calls.at(-1).url.endsWith('/users/7/credit'));respond({userId:7,creditScore:80});assert.equal((await p).userId,7);const q=api.listCreditRecords(7,'credit.b');assert.ok(calls.at(-1).url.endsWith('/users/7/credit-records'));respond([]);await q;await assert.rejects(api.getCreditSummary(0));await assert.rejects(api.listCreditRecords(Number.NaN));});
++test('session request keys are optional and cancellation is exact',async()=>{const a=api.currentSession('identity.a'),b=api.currentSession('identity.b');const first=calls.at(-2);api.cancelCurrentSession('identity.a');first.resolve({responseCode:200,result:JSON.stringify({code:200,data:{userId:7,nickname:'测试',role:'CUSTOMER'}})});await assert.rejects(a);respond({userId:7,nickname:'测试',role:'CUSTOMER'});assert.equal((await b).userId,7);const legacy=api.currentSession();respond({userId:7,nickname:'测试',role:'CUSTOMER'});await legacy;});
+diff --git a/harmony/tests/notification-moment-binding.test.cjs b/harmony/tests/notification-moment-binding.test.cjs
+new file mode 100644
+index 0000000..c8c12c2
+--- /dev/null
++++ b/harmony/tests/notification-moment-binding.test.cjs
+@@ -0,0 +1,16 @@
++const assert=require('node:assert/strict'),{test}=require('node:test'),fs=require('node:fs'),path=require('node:path'),Module=require('node:module');
++const ts=require(path.join(process.env.DEVECO_SDK_HOME,'default/openharmony/ets/build-tools/ets-loader/node_modules/typescript'));
++const root=path.resolve(__dirname,'../entry/src/main/ets');
++require.extensions['.ets']=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,f);
++const {MomentFeedCache}=require(path.join(root,'features/moments/MomentFeedModels.ets'));
++test('notification detail joins the existing cross-page interaction barrier',()=>{
++ const file=path.join(root,'pages/NotificationMomentPage.ets'),source=fs.readFileSync(file,'utf8');
++ const plain=(source.slice(0,source.indexOf('  private observe()'))+'\n}').replace(/^@Component\s*$/m,'').replace('export struct ','export class ').replace(/@(State|Prop)\s+/g,'');
++ const seen=[],loaded=new Module(file,module);loaded.filename=file;loaded.paths=module.paths;const original=loaded.require.bind(loaded);
++ class Binding {constructor(){}}
++ class Interactions {constructor(api,session,cache){seen.push(cache)}}
++ loaded.require=name=>name==='@kit.ArkUI'?{uiObserver:{}}:name==='../app/AppClient'?{AppClient:{shared:{apiService:{},sessionManager:{}}}}:name.endsWith('/MomentInteractions')?{MomentInteractions:Interactions,MomentInteractionSnapshot:class{}}:name.endsWith('/MomentInteractionBindings')?{MomentApiBinding:Binding,MomentSessionBinding:Binding}:name.endsWith('/MomentDetailPanel')||name.endsWith('/MomentFeedLifecycle')?{}:original(name);
++ loaded._compile(ts.transpileModule(plain,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,file);
++ new loaded.exports.NotificationMomentPage().aboutToAppear();new loaded.exports.NotificationMomentPage().aboutToAppear();
++ assert.equal(seen[0],MomentFeedCache.shared);assert.equal(seen[1],MomentFeedCache.shared);
++});
+diff --git a/harmony/tests/moment-entry-routing.test.cjs b/harmony/tests/moment-entry-routing.test.cjs
+index 82bf582..c0cd202 100644
+--- a/harmony/tests/moment-entry-routing.test.cjs
++++ b/harmony/tests/moment-entry-routing.test.cjs
+@@ -44,0 +45 @@ test('other login returns retain prior behavior and author identity parameters',
++test('notification moment login return preserves the exact real moment ID',()=>{const f=completion([AppRoute.LOGIN]);f.page.completeLogin({returnRoute:AppRoute.MOMENT_DETAIL,momentId:27});assert.equal(f.pushes[0].param.momentId,27);});
+diff --git a/harmony/tests/navigation.test.cjs b/harmony/tests/navigation.test.cjs
+index 971890f..99ff167 100644
+--- a/harmony/tests/navigation.test.cjs
++++ b/harmony/tests/navigation.test.cjs
+@@ -26 +26,2 @@ test('all planned destinations have one stable route name', () => {
+-    AppRoute.MESSAGE, AppRoute.ORDER, AppRoute.PROFILE, AppRoute.PUBLIC_PROFILE
++    AppRoute.MESSAGE, AppRoute.ORDER, AppRoute.PROFILE, AppRoute.PUBLIC_PROFILE,
++    AppRoute.NOTIFICATIONS, AppRoute.CREDIT, AppRoute.MOMENT_DETAIL
+@@ -28 +29 @@ test('all planned destinations have one stable route name', () => {
+-  assert.equal(new Set(NavigationPolicy.routes).size, 10);
++  assert.equal(new Set(NavigationPolicy.routes).size, 13);

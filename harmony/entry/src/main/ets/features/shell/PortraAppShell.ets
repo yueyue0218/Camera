@@ -41,7 +41,7 @@ export struct PortraAppShell {
       if (this.selectedTab === 0) {
         HallPage({
           onSearch: () => this.showPending('搜索功能将在后续业务接入'),
-          onNotice: () => this.showPending('通知中心将在后续业务接入'),
+          onNotice: () => this.onOpenRoute?.(AppRoute.NOTIFICATIONS),
           onPublish: () => this.onOpenRoute?.(AppRoute.PUBLISH),
           onOpenService: (serviceId: number) => this.onOpenRoute?.(AppRoute.SERVICE_DETAIL, serviceId),
           onOpenDemand: (demandId: number) => this.onOpenRoute?.(AppRoute.DEMAND_DETAIL, demandId)
