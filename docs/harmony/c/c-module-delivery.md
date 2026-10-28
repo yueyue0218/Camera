@@ -1,3 +1,70 @@
+# C 模块交付与真实验收记录
+
+<!-- FINAL-20261028 -->
+更新：2026-10-28。**C 剩余授权实现和隔离本地验收已补齐；外部团队环境、实体设备及签名验收尚未完成，PR #25 保持 Draft，不自动合并。** 以下为最新结论；历史“未授权”“7 TODO”“无 HALL 入口”“缺普通双角色账号”已由本轮授权、实现与本地夹具验证更新，不能继续列为代码阻塞。
+
+### 实际基线、授权及文件边界
+
+工作区为既有 C 独立 worktree，分支 feature/harmony-c-ui-polish，起点 60b6b02ff81997e07c22738247375c89b99f484f；fetch 后 integration/harmony-v1 仍 b258ec8114ac1ff8f360099155f5d284f1247c41。唯一 PR base 不变：[Draft PR #25](https://github.com/yueyue0218/Camera/pull/25)。未发现另外可复用的公共修复 PR；公共依赖随本 PR 的已授权补丁交付，不虚构维护者提交。
+
+用户明确确认 B 和公共维护者授权整包应用（举报组件/网络实例隔离、B 只读公开主页、作者导航、动态正常登录返回 HALL 的动态标签），并另行允许**全新隔离 H2 普通 CUSTOMER/PROVIDER 双角色夹具**。此前认证两行与点赞/详情授权继续有效。未创建新的管理员、改既有账号、修改角色校验、公共 DTO、认证/HttpClient、A/D 页面、Web/后端源码或共享配置。首发继续使用现有 Web 后台。原主工作区 frontend 三份未提交修改完整保留，main 未修改。
+
+| 本轮修改文件（相对仓库） | 实际行为 |
+| --- | --- |
+| harmony/entry/src/main/ets/features/user/ReportPanel.ets | 共用一套表单；对象/会话/actor/实例版本同时守卫 success、catch、finally；换对象清表单，身份变化冻结旧草稿，重新进入才恢复操作 |
+| harmony/entry/src/main/ets/features/user/ReportSubmissionStore.ets（新增） | 仅内存 pending/unknown/confirmed；同账号同目标的未知结果跨组件及角色版本保留，其他账号隔离；不自动重发，不把历史同原因记录认作本次成功 |
+| harmony/entry/src/main/ets/network/ApiService.ets | 举报创建/查询/取消及公开资料/动态查询新增可选 requestKey；默认参数兼容 A/B/C，关闭实例只取消自己的 key；沿用唯一认证 HttpClient |
+| harmony/entry/src/main/ets/pages/PublicProfilePage.ets（新增） | B 只读公开主页，真实昵称/简介/计数和最多首批12条当前角色动态；请求/取消按实例隔离；复用已有用户体系，无编辑或管理能力 |
+| harmony/entry/src/main/ets/model/NavigationModels.ets、navigation/NavigationPolicy.ets | PUBLIC_PROFILE 及真实 userId/userRole 参数；保护需登录接口，保留正常登录返回参数；无管理员入口 |
+| harmony/entry/src/main/ets/pages/Index.ets、features/shell/PortraAppShell.ets | 作者入口接共享 B 页面；动态去登录成功进入既有 HALL(tab1)，已有栈顶 HALL 时复用，避免重复叠栈；其余目标不变 |
+| harmony/entry/src/main/ets/features/moments/MomentCard.ets、MomentDetailPanel.ets、pages/MomentFeedPage.ets | 可选作者回调和真实 DTO 身份保护；旧 B 卡片调用/default 属性兼容；保留 Feed/筛选/缓存/收藏并发、点赞及完整详情；临时原生审计日志已移除 |
+| harmony/tests/moment-report-contract.test.cjs、moment-public-profile.test.cjs（新增）、moment-entry-routing.test.cjs（新增）、moment-feed-behavior.test.cjs、navigation.test.cjs | 真实源行为回归，旧要求不弱化；未知结果跨角色4项及重复 HALL 3项均先失败再修复通过 |
+| docs/harmony/c/ 三份交付文档、proposals/remaining-owner-bundle/、evidence/20261028-final/ | 授权后最终补丁/逐文件摘要、真实设备路径及跨端证据，历史失败保留 |
+
+### 关键依赖与真实结果
+
+| 依赖 | 最新事实 |
+| --- | --- |
+| C-SHARED-07 生命周期 | root(stack0) 和正常业务 HALL(stack1) **各自**实际执行动态→我的→成功切角色→返回、动态→我的→退出→返回、真实系统 Home→恢复；旧举报草稿/列表清除、正确重新读取/游客提示。原生 UIObserver/Application 事件日志及截图齐全，不以 Node 手调代替 |
+| C-SHARED-03/04 举报 | 已授权应用共享修复；严格24/24。设备正常提交一次 report2，真实 Web 查到同一记录并处理；另一新库实际 DB 写入 report1 后延迟18s，客户端15s超时，关闭重开/同账号切角色后仍禁重发，正常查询显示真实 #1。普通只读观察器确认全库只有1条举报 |
+| C-SHARED-01/02 点赞/详情 | 前提交 60b6b02 已完成真实 PUT/DELETE 服务器状态/计数、GET 全5图对比 Feed3图；保留 [上一轮真实证据](evidence/20261028-like-detail/README.md)，无假总数或预览扩充 |
+| C-SHARED-05 作者 | 从真实动态角色+ID进入共享 B 公开主页，正常接口得到真实昵称及近期动态；返回位置沿用 Navigation；不另建用户体系 |
+| 本地跨端闭环 | 保留原库 portra_c_admin_20261027，新增专用 moment2，原生举报 **reportId2**→现有 Web 同ID PENDING→下架→原生刷新缺失该对象→Web 独立合法恢复→原生刷新可见。只读核对原 report2=RESOLVED；未再次 resolve 原 report1 或 report2 |
+
+[本轮设备、跨端及环境证据](evidence/20261028-final/README.md)。root/HALL 原生事件观测使用只增加 C 安全日志的临时包；日志只含 route/visible/stack/logicalVersion/requestKey。已精确恢复正式 C 源，最终包无该日志；最终包另外实际通过正常登录、超时核实和成功切角色再核实。Node 仅证明处理逻辑与跨实例隔离，不计为设备事件证据。
+
+### 实际命令、退出码及产物
+
+以下在 harmony 目录运行，NODE_HOME/DEVECO_SDK_HOME 使用本机已有 DevEco 工具，地址仅当前进程配置，无共享配置变动。
+
+| 命令 | 退出码与结果 |
+| --- | --- |
+| git fetch origin --prune（HTTPS rewrite）；gh pr view 25 | 0；integration 基线、Draft/base/head 已核对 |
+| $testFiles=Get-ChildItem ./tests -Filter '*.test.cjs' …；node --test $testFiles | **0；162/162，0 fail、0 skipped、0 TODO** |
+| PORTRA_REQUIRE_SHARED_REPORTS=1；node --test tests/moment-report-contract.test.cjs | **0；24/24，0 TODO**；覆盖切对象/关表单/账号变化、旧异常/finally、真实 HttpClient 实例 key、未知结果与核实 |
+| 独立审查运行 report/public-profile/entry-routing/navigation/user-system 对应五文件 | 0；46/46，无剩余 P1/P2 |
+| PORTRA_BASE_URL=http://127.0.0.1:18090；hvigorw.bat assembleHap --no-daemon -p product=dev | **0；16.896秒，33 tasks：17 executed/16 up-to-date**；最终正式包 |
+| hdc install -r entry-dev-unsigned.hap；aa start | 0/0；官方 API26 模拟器安装/启动成功；unsigned 不等于实体签名包 |
+| 正常短信只读观察器 GET /reports/my | 0；原库 report2=RESOLVED，新库 report1=PENDING 且 totalReports=1；未代替原生写入 |
+
+最终 dev HAP SHA256：F1F1447BAF3CA072EC675E0E9200CC95832DB753958503A3670499D91AA9E5FF。BuildProfile origin=127.0.0.1:18090，hdc 反向转发已实际配置，非仅编译的不可达 localhost 包。签名仍未配置，包/原始日志/验证码/凭据不提交。
+
+本轮失败也保留：临时观察构建曾因 ResourceStr 不能直接赋 string 而 exit1，修正临时类型后观察包 exit0；第一次正式回归前恢复路径多写一层 harmony，临时日志未移除导致模块未找到，纠正路径后162全过。采集工具把输出数组当单字符串产生一次错误断言，实际 UI 重新断言通过；输入法尚未挂载、Profile滚动边界及启动过渡采集各有中止，均未重复举报/自动重发，未算通过。
+
+### 地址来源与剩余验收边界
+
+| 地址/设备 | 发现来源 / 本轮可连通 | 团队确认用于测试 |
+| --- | --- | --- |
+| https://47.76.106.57；/login/admin、/admin/reports、/admin/feed | GitHub staging变量、仓库文档/现有Web路由；本轮TLS正常、根页200 | 用户此前授权专用测试内容，但当前原生短信/管理员合法访问及后端部署SHA仍未获团队确认，不将本地结果写为staging通过 |
+| http://127.0.0.1:18088；Web http://127.0.0.1:15173 | 既有本机隔离服务配置，H2 portra_c_admin_20261027；真实原生及Web闭环可达 | 本地隔离验收已获授权；不是团队部署环境 |
+| http://127.0.0.1:18090 | 本轮新隔离 fixture/smoke/H2 portra_c_final_20261028，普通双角色1；正常随机短信，真实请求/事务；仅回环绑定 | 用户明确允许此本地夹具；无 ADMIN，无既有账号变更，响应延迟仅专用测试进程 |
+| Portra_C_API26；127.0.0.1:5555 | 官方 SDK26、HarmonyOS7.0.0.107，hdc Connected；本轮实际运行 | 已授权控制；没有连接实体设备，签名未配置 |
+
+剩余必须单列：团队原生短信可用环境/部署SHA及现有合法 Web 管理访问；在该环境复测同 reportId 闭环；实体设备、合法签名和升级安装、运营商短信/实际网络。未知举报防重目前仅进程内存，杀进程/重装不承诺 exactly-once；后端未提供请求幂等键，不能声称进程重启后仍能识别所有未决写入。没有未经实现的实时推送，内容可见性以刷新/重进真实请求为准。上述外部/发布验收未完成前，不称完整 C 模块已完成。
+
+<!-- HISTORICAL-RECORDS -->
+## 历史阶段记录（以下状态和计数保留原时点，以本页顶部最新结论为准）
+
 # C 模块阶段性交付与续推记录
 
 更新：2026-10-28（北京时间）。在原阶段交付上继续；最新点赞/详情、测试构建及设备证据见末尾2026-10-28记录。**完整C仍未验收完成，PR25保持Draft，不自动合并。**

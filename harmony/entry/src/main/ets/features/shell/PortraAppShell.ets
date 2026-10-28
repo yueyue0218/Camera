@@ -6,6 +6,13 @@ import { PortraTheme } from '../../theme/PortraTheme';
 
 @Component
 export struct PortraAppShell {
+  @Prop initialTab: number = 0;
+  onOpenAuthor?: (userId: number, role: string) => void;
+  onRequireMomentLogin?: () => void;
+
+  aboutToAppear(): void {
+    this.selectedTab = this.initialTab === 1 ? 1 : 0;
+  }
   @State private selectedTab: number = 0;
   onOpenRoute?: (route: AppRoute, id?: number) => void;
 
@@ -41,7 +48,8 @@ export struct PortraAppShell {
         })
           .layoutWeight(1)
       } else {
-        MomentFeedPage({ onRequireLogin: () => this.onOpenRoute?.(AppRoute.LOGIN) })
+        MomentFeedPage({ onRequireLogin: () => this.onRequireMomentLogin !== undefined ?
+          this.onRequireMomentLogin() : this.onOpenRoute?.(AppRoute.LOGIN), onOpenAuthor: this.onOpenAuthor })
           .layoutWeight(1)
       }
 

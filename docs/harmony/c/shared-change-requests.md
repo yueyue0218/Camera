@@ -1,3 +1,24 @@
+# C 公共依赖交付状态
+
+<!-- FINAL-20261028 -->
+更新：2026-10-28，**本轮共享授权包已实际应用，不再等待代码授权或候选接入**。用户明确确认 B/公共维护者整包授权及新隔离普通双角色 H2 夹具授权；原认证两行和点赞/详情授权继续有效。integration 最新仍 b258ec8，没有另外已更新的公共修复 PR，补丁随 [Draft PR #25](https://github.com/yueyue0218/Camera/pull/25) 交付。
+
+| 编号 | 最新状态 / 精确实现 |
+| --- | --- |
+| C-SHARED-01/02 | 已接入真实 ApiService.likeMoment/unlikeMoment/getMoment 及对应实例取消；60b6b02 已有本地设备点赞/全5图详情证据 |
+| C-SHARED-03 | B ReportPanel + ReportSubmissionStore 已授权应用；提交时捕获对象/actor/逻辑会话/实例generation，response/catch/finally均隔离；目标/身份变化清草稿。unknown 同账号同目标跨角色版本仍禁重复，其他账号不泄露 |
+| C-SHARED-04 | ApiService.createReport(payload,key?)、listMyReports(key?)、cancelReports(createKey?,myKey?)，缺省行为保持兼容；每实例精确key。真实 HttpClient回归和设备超时/核实已验证 |
+| C-SHARED-05 | B PublicProfilePage 复用既有 getPublicProfile(id,role,key?)、listProfileMoments(id,role,page,size,key?)、cancelPublicProfile(profileKey,momentsKey)，C仅可选作者回调；公共 PUBLIC_PROFILE 路由/参数已授权接线 |
+| C-SHARED-07 | C局部真实 UIObserver/Application 信号覆盖root与HALL；Index/Shell动态正常登录→现有Hall(tab1)已授权，重登复用栈顶Hall。两条实际路径的成功切角色/退出/前台恢复均已实测 |
+| C-AUTH-01 | 既有5625ce0已修load/clear加密属性，冷启动/覆盖恢复和退出清理证据保留 |
+
+最终全套162/162、严格举报24/24，均0 TODO；assembleHap exit0。最终逐文件补丁/兼容说明见[授权包](proposals/remaining-owner-bundle/README.md)，[本轮设备、跨端及环境证据](evidence/20261028-final/README.md)，完整命令及限制见[delivery](c-module-delivery.md)。A/B/C旧方法和B卡片默认调用保留，未新增第二套表单/请求/用户体系。
+
+**仍需外部交接的只有真实部署与发布验收条件**：可用原生短信测试环境及后端部署SHA、现有合法管理员入口；实体设备授权/签名条件。候选来源 https://47.76.106.57 来自GitHub staging变量及仓库配置，TLS可连通，但“可连通”不等于“已确认允许原生测试”。本地18088/15173和18090为用户授权隔离环境，结果单独记录。当前不申请提权、重置密码或共享配置变更；没有新的缺失方法需要C旁路实现。后端未提供举报幂等请求ID，进程重启后的未知写入去重不作承诺，可作为后续公共能力而不是虚构已支持。
+
+<!-- HISTORICAL-RECORDS -->
+## 历史阶段记录（以下状态和计数保留原时点，以本页顶部最新结论为准）
+
 # C 公共依赖与交接
 
 核查基线：`b258ec8114ac1ff8f360099155f5d284f1247c41`。更新：2026-10-28。

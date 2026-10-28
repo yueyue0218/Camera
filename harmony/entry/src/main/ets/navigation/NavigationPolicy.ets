@@ -16,12 +16,13 @@ export class NavigationPolicy {
     AppRoute.PUBLISH,
     AppRoute.MESSAGE,
     AppRoute.ORDER,
-    AppRoute.PROFILE
+    AppRoute.PROFILE,
+    AppRoute.PUBLIC_PROFILE
   ];
 
   static requiresAuthentication(route: AppRoute): boolean {
     return route === AppRoute.PUBLISH || route === AppRoute.CONVERSATION_DETAIL || route === AppRoute.MESSAGE ||
-      route === AppRoute.ORDER || route === AppRoute.PROFILE;
+      route === AppRoute.ORDER || route === AppRoute.PROFILE || route === AppRoute.PUBLIC_PROFILE;
   }
 
   static resolve(route: AppRoute, param: NavigationRouteParam = EMPTY_PARAM,
@@ -31,11 +32,21 @@ export class NavigationPolicy {
         route: AppRoute.LOGIN,
         param: {
           returnRoute: route,
-          conversationId: param.conversationId
+          conversationId: param.conversationId,
+          userId: param.userId, userRole: param.userRole, initialTab: param.initialTab
         }
       };
     }
     return { route: route, param: param };
+  }
+
+  static validPublicUserId(param: NavigationRouteParam): number | undefined {
+    return NavigationPolicy.positiveId(param.userId);
+  }
+
+  static validPublicUserRole(param: NavigationRouteParam): string | undefined {
+    const role = param.userRole?.trim().toUpperCase();
+    return role === 'CUSTOMER' || role === 'PROVIDER' ? role : undefined;
   }
 
   static validDemandId(param: NavigationRouteParam): number | undefined {
@@ -47,6 +58,9 @@ export class NavigationPolicy {
   }
 
   static loginDescription(param: NavigationRouteParam): string {
+    if (param.returnRoute === AppRoute.HALL && param.initialTab === 1) {
+      return '登录后继续查看动态';
+    }
     if (param.returnRoute === undefined) {
       return '';
     }
@@ -83,6 +97,8 @@ export class NavigationPolicy {
         return '消息';
       case AppRoute.ORDER:
         return '订单';
+      case AppRoute.PUBLIC_PROFILE:
+        return '用户主页';
       case AppRoute.PROFILE:
         return '个人中心';
       default:

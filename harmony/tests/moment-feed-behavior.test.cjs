@@ -123,6 +123,24 @@ function setup() {
 }
 async function tick() { await new Promise(resolve => setImmediate(resolve)); }
 
+test('author callback uses the current real author and is blocked by a same-object report draft', async () => {
+  const f = setup(); f.lists[0].resolve([moment()]); await tick();
+  const calls = []; f.page.onOpenAuthor = (id, role) => calls.push({ id, role });
+  f.page.selectedReportId = 7; f.page.openAuthor(f.page.items[0]); assert.deepEqual(calls, []);
+  f.page.selectedReportId = 0; f.page.openAuthor(moment({ authorId: 999 }));
+  assert.deepEqual(calls, [{ id: 12, role: 'PROVIDER' }], 'never trust stale row author data');
+  f.events.background(); f.page.handleVisibility(false); f.page.openAuthor(moment());
+  assert.equal(calls.length, 1);
+});
+
+test('author navigation closes detail and accepts only real supported roles', async () => {
+  const f = setup(); f.lists[0].resolve([moment()]); await tick();
+  const calls = []; f.page.onOpenAuthor = (id, role) => calls.push({ id, role });
+  const read = f.page.openDetail(f.page.items[0]); f.details[0].resolve(moment()); await read;
+  f.page.openAuthor(moment()); assert.equal(f.page.detailOpen, false); assert.equal(calls.length, 1);
+  f.page.items = [moment({ authorRole: 'ADMIN' })]; f.page.openAuthor(f.page.items[0]); assert.equal(calls.length, 1);
+});
+
 test('Feed opens real detail, keeps three previews and updates server like state', async () => {
   const f = setup(); f.lists[0].resolve([moment()]); await tick();
   const read = f.page.openDetail(f.page.items[0]); assert.equal(f.details.length, 1);

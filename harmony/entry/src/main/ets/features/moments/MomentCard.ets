@@ -15,6 +15,7 @@ export struct MomentCard {
   onToggleFavorite?: (item: MomentSummary) => void;
   onToggleLike?: (item: MomentSummary) => void;
   onOpenDetail?: (item: MomentSummary) => void;
+  onOpenAuthor?: (item: MomentSummary) => void;
   onRequestReport?: (item: MomentSummary) => void;
 
   private imageSource(): string {
@@ -31,12 +32,23 @@ export struct MomentCard {
       Row({ space: PortraTheme.spacingMd }) {
         PortraAvatar({ displayName: MomentFeedFormatter.author(this.item), avatarSize: 40 })
         Column({ space: 3 }) {
+          if (this.onOpenAuthor !== undefined) {
+            Button(MomentFeedFormatter.author(this.item))
+              .fontSize(PortraTheme.fontBody)
+              .fontColor(PortraTheme.primary)
+              .backgroundColor(Color.Transparent)
+              .padding(0)
+              .enabled(!this.interactionsDisabled && !this.likeBusy && !this.favoriteBusy)
+              .accessibilityText(`查看${MomentFeedFormatter.author(this.item)}的用户主页`)
+              .onClick(() => this.onOpenAuthor?.(this.item))
+          } else {
           Text(MomentFeedFormatter.author(this.item))
             .fontSize(PortraTheme.fontBody)
             .fontWeight(FontWeight.Medium)
             .fontColor(PortraTheme.primaryText)
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
           Text(MomentFeedFormatter.time(this.item.createdAt))
             .fontSize(PortraTheme.fontCaption)
             .fontColor(PortraTheme.mutedText)

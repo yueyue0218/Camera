@@ -15,6 +15,7 @@ export struct MomentDetailPanel {
   onRetry?: () => void;
   onRequireLogin?: () => void;
   onToggleLike?: (item: MomentSummary) => void;
+  onOpenAuthor?: (item: MomentSummary) => void;
 
   aboutToAppear(): void {
     this.onStateChanged();
@@ -37,6 +38,12 @@ export struct MomentDetailPanel {
   private toggleLike(): void {
     if (this.state.item !== undefined) {
       this.onToggleLike?.(this.state.item);
+    }
+  }
+
+  private openAuthor(): void {
+    if (this.state.item !== undefined) {
+      this.onOpenAuthor?.(this.state.item);
     }
   }
 
@@ -84,6 +91,13 @@ export struct MomentDetailPanel {
                 .width('100%')
                 .fontSize(PortraTheme.fontBody)
                 .fontColor(PortraTheme.primaryText)
+              if (this.onOpenAuthor !== undefined) {
+                Button('查看作者主页')
+                  .enabled(this.state.likeBusyId === 0)
+                  .fontColor(PortraTheme.primary)
+                  .backgroundColor(PortraTheme.primarySoft)
+                  .onClick(() => this.openAuthor())
+              }
               if (this.state.images.length > 0) {
                 Stack() {
                   if (!this.imageFailed && InlineImagePolicy.accepts(this.state.images[this.imageIndex])) {

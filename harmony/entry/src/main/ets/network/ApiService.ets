@@ -218,7 +218,7 @@ export class ApiService implements NativeSessionApi {
   }
 
 
-  listProfileMoments(authorId: number, authorRole: string, page: number = 1, size: number = 12):
+  listProfileMoments(authorId: number, authorRole: string, page: number = 1, size: number = 12, requestKey?: string):
     Promise<ProfileMomentPage> {
     const role = this.requireIdentityRole(authorRole);
     if (!Number.isSafeInteger(authorId) || authorId <= 0) {
@@ -226,7 +226,7 @@ export class ApiService implements NativeSessionApi {
     }
     return this.client.get<ProfileMomentPage>(
       `/moments/profile?authorId=${authorId}&authorRole=${role}&page=${this.safePage(page)}&size=${this.safeSize(size)}`,
-      `moments.profile.${authorId}.${role}`);
+      requestKey ?? `moments.profile.${authorId}.${role}`);
   }
 
   listFavoriteMoments(page: number = 1, size: number = 12): Promise<PageResult<MomentSummary>> {
@@ -259,13 +259,18 @@ export class ApiService implements NativeSessionApi {
     return this.client.post<SwitchRoleResult>('/users/me/role', payload, 'users.me.role');
   }
 
-  getPublicProfile(userId: number, role: string): Promise<PublicUserProfile> {
+  getPublicProfile(userId: number, role: string, requestKey?: string): Promise<PublicUserProfile> {
     const normalizedRole = this.requireIdentityRole(role);
     if (!Number.isSafeInteger(userId) || userId <= 0) {
       return Promise.reject(ErrorMapper.parse());
     }
     return this.client.get<PublicUserProfile>(
-      `/users/${userId}/public-profile?role=${normalizedRole}`, `users.${userId}.${normalizedRole}.profile`);
+      `/users/${userId}/public-profile?role=${normalizedRole}`, requestKey ?? `users.${userId}.${normalizedRole}.profile`);
+  }
+
+  cancelPublicProfile(profileRequestKey: string, momentsRequestKey: string): void {
+    this.client.cancelRequest(profileRequestKey);
+    this.client.cancelRequest(momentsRequestKey);
   }
 
   listFollowers(userId: number, role: string): Promise<SocialUserBrief[]> {
@@ -412,17 +417,17 @@ export class ApiService implements NativeSessionApi {
     this.client.cancelRequest('orders.list');
   }
 
-  createReport(payload: CreateReportPayload): Promise<ReportSummary> {
-    return this.client.post<ReportSummary>('/reports', payload, 'reports.create');
+  createReport(payload: CreateReportPayload, requestKey: string = 'reports.create'): Promise<ReportSummary> {
+    return this.client.post<ReportSummary>('/reports', payload, requestKey);
   }
 
-  listMyReports(): Promise<ReportSummary[]> {
-    return this.client.get<ReportSummary[]>('/reports/my', 'reports.my');
+  listMyReports(requestKey: string = 'reports.my'): Promise<ReportSummary[]> {
+    return this.client.get<ReportSummary[]>('/reports/my', requestKey);
   }
 
-  cancelReports(): void {
-    this.client.cancelRequest('reports.create');
-    this.client.cancelRequest('reports.my');
+  cancelReports(createRequestKey: string = 'reports.create', myRequestKey: string = 'reports.my'): void {
+    this.client.cancelRequest(createRequestKey);
+    this.client.cancelRequest(myRequestKey);
   }
 
   async refresh(refreshToken: string): Promise<NativeSessionResponse> {

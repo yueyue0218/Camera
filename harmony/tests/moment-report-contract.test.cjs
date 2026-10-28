@@ -44,26 +44,23 @@ const { HttpClient } = require('../entry/src/main/ets/network/HttpClient.ets');
 const { ApiService } = require('../entry/src/main/ets/network/ApiService.ets');
 const { ErrorMapper } = require('../entry/src/main/ets/network/ErrorMapper.ets');
 
-// Owner handoff requirements are executable TODOs while the shared files remain
-// unchanged. Strict mode deliberately exits nonzero until the owner fixes them.
-// This does not replace device checks of ArkUI @Watch or lifecycle delivery.
-const strict = process.env.PORTRA_REQUIRE_SHARED_REPORTS === '1';
-const pending = id => ({ todo: strict ? false : `${id}: owner implementation not provided` });
 function report(overrides = {}) {
   return { reportId: 32, reporterId: 21, targetType: 'MOMENT', targetId: 7,
     reason: '测试原因', status: 'PENDING', createdAt: '2026-10-25T12:00:00', ...overrides };
 }
-function panelFixture() {
+function panelFixture(reset = true) {
+  if (reset) require('../entry/src/main/ets/features/user/ReportSubmissionStore.ets').ReportSubmissionStore.shared.entries.clear();
   let version = 3;
-  const requests = [];
+  const requests = [], queries = [], cancellations = [];
   const api = {
     createReport(payload, key) {
       const call = { payload, key };
       requests.push(call);
       return new Promise((resolve, reject) => Object.assign(call, { resolve, reject }));
     },
-    cancelReports() {},
-    listMyReports() { return Promise.resolve([]); }
+    cancelReports(create, mine) { cancellations.push({ create, mine }); },
+    listMyReports(key) { const call = { key }; queries.push(call);
+      return new Promise((resolve, reject) => Object.assign(call, { resolve, reject })); }
   };
   const app = { apiService: api,
     sessionManager: { isAuthenticated: () => true, getSessionVersion: () => version } };
@@ -71,7 +68,7 @@ function panelFixture() {
   const source = fs.readFileSync(filename, 'utf8');
   const plain = (source.slice(0, source.indexOf('  build() {')) + '\n}')
     .replace(/^@Component\s*$/m, '').replace('export struct ', 'export class ')
-    .replace(/@(State|Prop)\s+/g, '');
+    .replace(/@Watch\('[^']+'\)\s*/g, '').replace(/@(State|Prop)\s+/g, '');
   const compiled = ts.transpileModule(plain, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 }
   });
@@ -83,7 +80,7 @@ function panelFixture() {
   loaded._compile(compiled.outputText, filename);
   const panel = new loaded.exports.ReportPanel();
   Object.assign(panel, { targetType: 'MOMENT', targetId: 7, ownerId: 12, currentUserId: 21, reason: '测试原因' });
-  return { panel, requests, changeSession() { version++; } };
+  return { panel, requests, queries, cancellations, changeSession() { version++; } };
 }
 function complete(call, data) {
   call.resolve({ responseCode: 200, result: JSON.stringify({ code: 200, message: 'success', data }) });
@@ -120,7 +117,7 @@ test('report refuses an invalid server ID and preserves the input', async () => 
   assert.ok(panel.errorMessage.length > 0);
 });
 
-test('report response for a previous target cannot mark the new target submitted', pending('C-SHARED-03'), async () => {
+test('report response for a previous target cannot mark the new target submitted', async () => {
   const { panel, requests } = panelFixture();
   const operation = panel.submit();
   panel.targetId = 8;
@@ -128,7 +125,7 @@ test('report response for a previous target cannot mark the new target submitted
   assert.equal(panel.submitted, false);
 });
 
-test('closed report ignores late errors', pending('C-SHARED-03'), async () => {
+test('closed report ignores late errors', async () => {
   const { panel, requests } = panelFixture();
   const operation = panel.submit();
   panel.aboutToDisappear();
@@ -136,7 +133,7 @@ test('closed report ignores late errors', pending('C-SHARED-03'), async () => {
   assert.equal(panel.errorMessage, '');
 });
 
-test('old account report success cannot update a new session', pending('C-SHARED-03'), async () => {
+test('old account report success cannot update a new session', async () => {
   const { panel, requests, changeSession } = panelFixture();
   const operation = panel.submit();
   changeSession();
@@ -144,14 +141,14 @@ test('old account report success cannot update a new session', pending('C-SHARED
   assert.equal(panel.submitted, false);
 });
 
-test('report success only accepts the real PENDING or RESOLVED state', pending('C-SHARED-03'), async () => {
+test('report success only accepts the real PENDING or RESOLVED state', async () => {
   const { panel, requests } = panelFixture();
   const operation = panel.submit();
   requests[0].resolve(report({ status: 'UNKNOWN' })); await operation;
   assert.equal(panel.submitted, false);
 });
 
-test('an ambiguous report timeout does not blindly submit again', pending('C-SHARED-03'), async () => {
+test('an ambiguous report timeout does not blindly submit again', async () => {
   const { panel, requests } = panelFixture();
   const operation = panel.submit();
   requests[0].reject(ErrorMapper.fromTransportCode(2300028)); await operation;
@@ -162,7 +159,7 @@ test('an ambiguous report timeout does not blindly submit again', pending('C-SHA
   assert.equal(requests.length, 1);
 });
 
-test('two report instance request keys do not supersede one another', pending('C-SHARED-04'), async () => {
+test('two report instance request keys do not supersede one another', async () => {
   const api = apiFixture();
   const first = api.createReport({ targetType: 'MOMENT', targetId: 7, reason: '甲' }, 'reports.c.one');
   const a = calls.at(-1);
@@ -173,7 +170,7 @@ test('two report instance request keys do not supersede one another', pending('C
   assert.deepEqual((await outcomes).map(value => value.status), ['fulfilled', 'fulfilled']);
 });
 
-test('cancelling one report instance leaves the other instance live', pending('C-SHARED-04'), async () => {
+test('cancelling one report instance leaves the other instance live', async () => {
   const api = apiFixture();
   const first = api.createReport({ targetType: 'MOMENT', targetId: 7, reason: '甲' }, 'reports.c.one');
   const a = calls.at(-1);
@@ -183,4 +180,139 @@ test('cancelling one report instance leaves the other instance live', pending('C
   api.cancelReports('reports.c.one', 'reports.c.one.my');
   complete(a, report()); complete(b, report({ targetId: 8, reportId: 33 }));
   assert.deepEqual((await outcomes).map(value => value.status), ['rejected', 'fulfilled']);
+});
+
+test('target watch resets form and old finally cannot release the next submission', async () => {
+  const f = panelFixture(); const first = f.panel.submit();
+  f.panel.targetId = 8; f.panel.onTargetChanged();
+  assert.equal(f.panel.reason, ''); assert.equal(f.panel.description, '');
+  assert.equal(f.panel.submitted, false); assert.equal(f.panel.busy, false);
+  f.panel.reason = '新对象原因'; const second = f.panel.submit();
+  f.requests[0].resolve(report()); await first;
+  assert.equal(f.panel.busy, true); assert.equal(f.panel.submitted, false);
+  f.requests[1].resolve(report({ targetId: 8, reportId: 33 })); await second;
+  assert.equal(f.panel.submitted, true); assert.equal(f.panel.busy, false);
+});
+
+test('a different reporter or malformed state cannot confirm submission', async () => {
+  for (const data of [report({ reporterId: 99 }), report({ status: null }), report({ status: 'pending' })]) {
+    const f = panelFixture(); const operation = f.panel.submit();
+    f.requests[0].resolve(data); await operation;
+    assert.equal(f.panel.submitted, false); assert.equal(f.panel.unconfirmed, true);
+  }
+});
+
+test('closing during submission keeps ambiguity across a new component and never replays', async () => {
+  const f = panelFixture(); const operation = f.panel.submit(); f.panel.aboutToDisappear();
+  const reopened = panelFixture(false); await reopened.panel.submit();
+  assert.equal(reopened.requests.length, 0); assert.equal(reopened.panel.unconfirmed, true);
+  f.requests[0].reject(ErrorMapper.stale()); await operation;
+  assert.equal(f.panel.errorMessage, '');
+});
+
+test('known late success is recorded only for its original object and account', async () => {
+  const f = panelFixture(); const operation = f.panel.submit(); f.panel.aboutToDisappear();
+  f.requests[0].resolve(report()); await operation;
+  assert.equal(f.panel.submitted, false);
+  const reopened = panelFixture(false); reopened.panel.aboutToAppear();
+  assert.equal(reopened.panel.submitted, true);
+  reopened.changeSession(); reopened.panel.onTargetChanged();
+  assert.equal(reopened.panel.submitted, false); assert.equal(reopened.panel.unconfirmed, false);
+});
+
+test('verification shows candidate record IDs but does not infer a historical match is a new write', async () => {
+  const f = panelFixture(); const operation = f.panel.submit();
+  f.requests[0].reject(ErrorMapper.fromTransportCode(2300028)); await operation;
+  const verify = f.panel.verifySubmission(); assert.equal(f.queries.length, 1);
+  f.queries[0].resolve([report()]); await verify;
+  assert.match(f.panel.verificationMessage, /#32/);
+  assert.equal(f.panel.submitted, false); assert.equal(f.panel.unconfirmed, true);
+  await f.panel.submit(); assert.equal(f.requests.length, 1);
+});
+
+test('no matching records never enables an automatic or manual blind replay', async () => {
+  const f = panelFixture(); const operation = f.panel.submit();
+  f.requests[0].reject(ErrorMapper.network()); await operation;
+  const verify = f.panel.verifySubmission(); f.queries[0].resolve([]); await verify;
+  assert.match(f.panel.verificationMessage, /不能据此判断未写入/);
+  await f.panel.submit(); assert.equal(f.requests.length, 1);
+});
+
+test('cancellation uses instance-specific create and verification keys', async () => {
+  const a = panelFixture(); const operationA = a.panel.submit();
+  const b = panelFixture(false); b.panel.targetId = 8; const operationB = b.panel.submit();
+  assert.notEqual(a.requests[0].key, b.requests[0].key);
+  a.panel.aboutToDisappear(); assert.equal(a.cancellations[0].create, a.requests[0].key);
+  assert.notEqual(a.cancellations[0].create, b.requests[0].key);
+  a.requests[0].reject(ErrorMapper.stale()); b.requests[0].resolve(report({ targetId: 8, reportId: 33 }));
+  await Promise.all([operationA, operationB]); assert.equal(b.panel.submitted, true);
+});
+
+test('unknown current identity and self-report cannot send a request', async () => {
+  for (const currentUserId of [0, 12]) {
+    const f = panelFixture(); f.panel.currentUserId = currentUserId;
+    await f.panel.submit(); assert.equal(f.requests.length, 0);
+  }
+});
+
+test('a changed session cannot submit the previous account draft before props catch up', async () => {
+  const f = panelFixture(); f.panel.aboutToAppear(); f.panel.reason = '旧账号草稿';
+  f.changeSession(); const unexpected = f.panel.submit();
+  if (f.requests.length > 0) f.requests[0].resolve(report()); await unexpected;
+  assert.equal(f.requests.length, 0); assert.equal(f.panel.reason, ''); assert.equal(f.panel.busy, false);
+  f.panel.reason = '仍未核实身份'; const repeated = f.panel.submit();
+  if (f.requests.length > 0) f.requests.at(-1).resolve(report()); await repeated; assert.equal(f.requests.length, 0);
+});
+
+test('an old account completion clears stale busy without unlocking another identity', async () => {
+  const f = panelFixture(); f.panel.aboutToAppear(); f.panel.reason = '旧账号';
+  const operation = f.panel.submit(); f.changeSession();
+  f.requests[0].resolve(report()); await operation;
+  assert.equal(f.panel.busy, false); assert.equal(f.panel.submitted, false); assert.equal(f.panel.reason, '');
+  f.panel.reason = '尚未核实'; const repeated = f.panel.submit();
+  if (f.requests.length > 1) f.requests.at(-1).resolve(report()); await repeated; assert.equal(f.requests.length, 1);
+});
+
+test('verification never sends an old pending record under a new session', async () => {
+  const f = panelFixture(); f.panel.aboutToAppear(); f.panel.reason = '原账号原因';
+  const operation = f.panel.submit(); f.requests[0].reject(ErrorMapper.network()); await operation;
+  f.changeSession(); const verify = f.panel.verifySubmission();
+  if (f.queries.length > 0) f.queries[0].resolve([]); await verify; assert.equal(f.queries.length, 0);
+  assert.equal(f.panel.unconfirmed, false); assert.equal(f.panel.busy, false);
+});
+
+test('same account role-version changes keep unknown submissions blocked without restoring old input', async () => {
+  const f = panelFixture(); const sent = f.panel.submit(); f.requests[0].reject(ErrorMapper.network()); await sent;
+  const reentered = panelFixture(false); reentered.changeSession(); reentered.panel.reason = '';
+  reentered.panel.aboutToAppear();
+  assert.equal(reentered.panel.unconfirmed, true); assert.equal(reentered.panel.reason, '');
+  reentered.panel.reason = '新角色仍不得盲重发'; const repeat = reentered.panel.submit();
+  if (reentered.requests.length) reentered.requests[0].resolve(report()); await repeat;
+  assert.equal(reentered.requests.length, 0);
+});
+
+test('another account never inherits an old actor unknown record', async () => {
+  const f = panelFixture(); const sent = f.panel.submit(); f.requests[0].reject(ErrorMapper.network()); await sent;
+  const other = panelFixture(false); other.changeSession(); other.panel.currentUserId = 99;
+  other.panel.aboutToAppear(); assert.equal(other.panel.unconfirmed, false);
+  other.panel.reason = '新账号自己的内容'; const sentOther = other.panel.submit();
+  assert.equal(other.requests.length, 1); other.requests[0].resolve(report({ reporterId: 99 })); await sentOther;
+  assert.equal(other.panel.submitted, true);
+});
+
+test('old logical-version ambiguity can be verified using the current version guard', async () => {
+  const f = panelFixture(); const sent = f.panel.submit(); f.requests[0].reject(ErrorMapper.network()); await sent;
+  const reentered = panelFixture(false); reentered.changeSession(); reentered.panel.aboutToAppear();
+  const verify = reentered.panel.verifySubmission();
+  assert.equal(reentered.queries.length, 1); reentered.queries[0].resolve([report()]); await verify;
+  assert.match(reentered.panel.verificationMessage, /#32/); assert.equal(reentered.panel.unconfirmed, true);
+});
+
+test('a second version change while verifying ignores old records and clears busy', async () => {
+  const f = panelFixture(); const sent = f.panel.submit(); f.requests[0].reject(ErrorMapper.network()); await sent;
+  const reentered = panelFixture(false); reentered.changeSession(); reentered.panel.aboutToAppear();
+  const verify = reentered.panel.verifySubmission();
+  assert.equal(reentered.queries.length, 1); reentered.changeSession();
+  reentered.queries[0].resolve([report()]); await verify;
+  assert.equal(reentered.panel.verificationMessage, ''); assert.equal(reentered.panel.busy, false);
 });

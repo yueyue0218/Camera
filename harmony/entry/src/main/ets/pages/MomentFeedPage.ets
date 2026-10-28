@@ -41,6 +41,7 @@ export struct MomentFeedPage {
   private readonly listRequestKey: string = createMomentFeedRequestKey();
   private lifecycle?: MomentFeedLifecycle;
   onRequireLogin?: () => void;
+  onOpenAuthor?: (userId: number, role: string) => void;
 
   aboutToAppear(): void {
     this.active = true;
@@ -477,6 +478,19 @@ export struct MomentFeedPage {
     this.interactions?.close();
   }
 
+  private openAuthor(item: MomentSummary): void {
+    this.synchronizeSession();
+    const current = this.detailOpen && this.interaction.item?.momentId === item.momentId ? this.interaction.item :
+      this.items.find((record: MomentSummary) => record.momentId === item.momentId);
+    if (!this.active || current === undefined || !this.appClient.sessionManager.isAuthenticated() ||
+      this.favoriteBusyId !== 0 || this.interaction.likeBusyId !== 0 || this.requestInFlight ||
+      this.selectedReportId === item.momentId || !['CUSTOMER', 'PROVIDER'].includes(current.authorRole)) {
+      return;
+    }
+    this.closeDetail();
+    this.onOpenAuthor?.(current.authorId, current.authorRole);
+  }
+
   private async toggleLike(item: MomentSummary): Promise<void> {
     this.synchronizeSession();
     const current = this.detailOpen && this.interaction.item?.momentId === item.momentId ? this.interaction.item :
@@ -609,6 +623,8 @@ export struct MomentFeedPage {
                   this.requestInFlight || this.favoriteUncertain,
                 onToggleLike: (target: MomentSummary) => this.toggleLike(target),
                 onOpenDetail: (target: MomentSummary) => this.openDetail(target),
+                onOpenAuthor: this.onOpenAuthor === undefined ? undefined :
+                  (target: MomentSummary) => this.openAuthor(target),
                 onToggleFavorite: (target: MomentSummary) => this.toggleFavorite(target),
                 reportAllowed: this.currentUserId > 0 && item.authorId !== this.currentUserId,
                 onRequestReport: (target: MomentSummary) => this.openReport(target)
@@ -674,6 +690,7 @@ export struct MomentFeedPage {
     MomentDetailPanel({ state: this.interaction, onClose: () => this.closeDetail(),
       onRetry: () => this.readDetail(this.interaction.targetId, false),
       onRequireLogin: () => { this.closeDetail(); this.onRequireLogin?.(); },
-      onToggleLike: (item: MomentSummary) => this.toggleLike(item) })
+      onToggleLike: (item: MomentSummary) => this.toggleLike(item),
+      onOpenAuthor: this.onOpenAuthor === undefined ? undefined : (item: MomentSummary) => this.openAuthor(item) })
   }
 }
