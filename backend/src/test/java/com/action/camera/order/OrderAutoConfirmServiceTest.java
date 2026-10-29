@@ -13,6 +13,7 @@ import com.action.camera.order.repository.OrderRepository;
 import com.action.camera.order.repository.OrderStatusLogRepository;
 import com.action.camera.order.repository.PaymentRecordRepository;
 import com.action.camera.order.service.OrderService;
+import com.action.camera.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -61,6 +62,9 @@ class OrderAutoConfirmServiceTest {
     @Mock
     private OrderDisplayService orderDisplayService;
 
+    @Mock
+    private UserRepository userRepository;
+
     private OrderService orderService;
 
     @BeforeEach
@@ -71,7 +75,8 @@ class OrderAutoConfirmServiceTest {
                 orderStatusLogRepository,
                 deliveryRepository,
                 userDisplayService,
-                orderDisplayService
+                orderDisplayService,
+                userRepository
         );
     }
 

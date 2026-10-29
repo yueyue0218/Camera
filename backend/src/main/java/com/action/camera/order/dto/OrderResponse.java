@@ -33,6 +33,7 @@ public class OrderResponse {
     private String quoteSnapshotJson;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private String shootLocation;
 
     public static OrderResponse from(Order order, String customerNickname, String providerNickname) {
         return new OrderResponse(
@@ -56,7 +57,8 @@ public class OrderResponse {
                 order.getDeliveryDeadline(),
                 order.getQuoteSnapshotJson(),
                 order.getCreatedAt(),
-                order.getUpdatedAt()
+                order.getUpdatedAt(),
+                order.getShootLocation()
         );
     }
 }

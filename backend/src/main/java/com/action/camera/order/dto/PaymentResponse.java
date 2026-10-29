@@ -21,6 +21,7 @@ public class PaymentResponse {
     private Long amountCent;
     private String payMethod;
     private LocalDateTime paidAt;
+    private String paymentStatus;
 
     public static PaymentResponse from(PaymentRecord paymentRecord, Order order) {
         return new PaymentResponse(
@@ -31,7 +32,8 @@ public class PaymentResponse {
                 order.getEscrowStatus(),
                 paymentRecord.getAmountCent(),
                 paymentRecord.getPayMethod(),
-                paymentRecord.getPaidAt()
+                paymentRecord.getPaidAt(),
+                paymentRecord.getStatus()
         );
     }
 }
