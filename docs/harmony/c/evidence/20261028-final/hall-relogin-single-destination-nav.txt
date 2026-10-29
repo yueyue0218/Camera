@@ -1,0 +1,12 @@
+10-28 18:25:44.718 20667 20667 I A00000/PortraCNavAudit: route=Hall visible=0 stack=2 version=4 key=moments.c.feed.3
+10-28 18:27:34.678 20667 20667 I A00000/PortraCNavAudit: route=Hall visible=1 stack=1 version=5 key=moments.c.feed.3
+10-28 18:27:44.395 20667 20667 I A00000/PortraCNavAudit: route=Hall visible=0 stack=2 version=5 key=moments.c.feed.3
+10-28 18:28:03.758 20667 20667 I A00000/PortraCNavAudit: route=Hall visible=1 stack=1 version=6 key=moments.c.feed.3
+10-28 18:28:53.636 20667 20667 I A00000/PortraCNavAudit: route=Hall visible=1 stack=1 version=6 key=moments.c.feed.5
+10-28 18:28:55.221 20667 20667 I A00000/PortraCNavAudit: route=Hall visible=0 stack=2 version=6 key=moments.c.feed.5
+10-28 18:28:58.322 20667 20667 I A00000/PortraCNavAudit: route=Hall visible=1 stack=1 version=6 key=moments.c.feed.5
+10-28 18:29:00.588 20667 20667 I A00000/PortraCNavAudit: route=Hall visible=0 stack=2 version=6 key=moments.c.feed.5
+10-28 18:29:05.639 20667 20667 I A00000/PortraCNavAudit: route=Hall visible=1 stack=1 version=6 key=moments.c.feed.5
+10-28 18:29:12.578 20667 20667 I A00000/PortraCNavAudit: route=Hall visible=1 stack=1 version=6 key=moments.c.feed.7
+10-28 18:29:25.038 20667 20667 I A00000/PortraCNavAudit: route=Hall visible=0 stack=2 version=6 key=moments.c.feed.7
+10-28 18:29:32.292 20667 20667 I A00000/PortraCNavAudit: route=Hall visible=1 stack=1 version=6 key=moments.c.feed.7

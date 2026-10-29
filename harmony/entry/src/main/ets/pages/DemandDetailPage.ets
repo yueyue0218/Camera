@@ -56,26 +56,31 @@ export struct DemandDetailPage {
       if (version === this.requestVersion) {
         this.demand = result;
         if (this.appClient.sessionManager.isAuthenticated()) {
+          const sessionVersion = this.appClient.sessionManager.getSessionVersion();
           try {
             const session = await this.appClient.apiService.currentSession();
-            if (version === this.requestVersion) {
+            if (version === this.requestVersion &&
+              sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
               this.userId = session.userId;
               this.role = session.role;
               if (session.userId === result.customerId) {
                 const responses = await this.appClient.apiService.listDemandResponses(this.demandId);
-                if (version === this.requestVersion) {
+                if (version === this.requestVersion &&
+                  sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
                   this.responses = Array.isArray(responses) ? responses : [];
                 }
               } else if (this.role.trim().toUpperCase() === 'PROVIDER') {
                 const responses = await this.appClient.apiService.listMyDemandResponses();
-                if (version === this.requestVersion && Array.isArray(responses)) {
+                if (version === this.requestVersion &&
+                  sessionVersion === this.appClient.sessionManager.getSessionVersion() && Array.isArray(responses)) {
                   this.ownResponse = responses.find((item: DemandResponseSummary) =>
                     item.demandId === this.demandId) ?? null;
                 }
               }
             }
           } catch {
-            if (version === this.requestVersion) {
+            if (version === this.requestVersion &&
+              sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
               this.actionError = '响应信息暂不可用，请重试';
             }
           }

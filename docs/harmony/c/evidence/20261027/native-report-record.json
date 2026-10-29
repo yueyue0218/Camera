@@ -1,0 +1,12 @@
+{
+  "origin": "http://127.0.0.1:18088",
+  "database": "portra_c_admin_20261027",
+  "nativeEvidence": "cross-20261027-native-submitted",
+  "reporterId": 3,
+  "reportId": 1,
+  "targetType": "MOMENT",
+  "targetId": 1,
+  "reason": "C-NATIVE-20261027-LOCAL-TEST-ONLY",
+  "status": "PENDING",
+  "readOnlyVerification": true
+}

@@ -1,0 +1,1000 @@
+diff --git a/harmony/entry/src/main/ets/features/user/ReportPanel.ets b/harmony/entry/src/main/ets/features/user/ReportPanel.ets
+index c3fdd95..cbf3509 100644
+--- a/harmony/entry/src/main/ets/features/user/ReportPanel.ets
++++ b/harmony/entry/src/main/ets/features/user/ReportPanel.ets
+@@ -3 +3 @@ import { CreateReportPayload, ReportSummary } from '../../model/ApiModels';
+-import { PortraError } from '../../network/ErrorMapper';
++import { ErrorMapper, PortraError } from '../../network/ErrorMapper';
+@@ -4,0 +5 @@ import { PortraTheme } from '../../theme/PortraTheme';
++import { createReportInstanceKey, ReportSubmissionRecord, ReportSubmissionStore } from './ReportSubmissionStore';
+@@ -8,4 +9,4 @@ export struct ReportPanel {
+-  @Prop targetType: string = '';
+-  @Prop targetId: number = 0;
+-  @Prop ownerId: number = 0;
+-  @Prop currentUserId: number = 0;
++  @Prop @Watch('onTargetChanged') targetType: string = '';
++  @Prop @Watch('onTargetChanged') targetId: number = 0;
++  @Prop @Watch('onTargetChanged') ownerId: number = 0;
++  @Prop @Watch('onTargetChanged') currentUserId: number = 0;
+@@ -16,0 +18,2 @@ export struct ReportPanel {
++  @State private unconfirmed: boolean = false;
++  @State private verificationMessage: string = '';
+@@ -18,0 +22,9 @@ export struct ReportPanel {
++  private readonly store: ReportSubmissionStore = ReportSubmissionStore.shared;
++  private readonly instanceKey: string = createReportInstanceKey();
++  private generation: number = 0;
++  private active: boolean = true;
++  private sessionVersion: number = -1;
++  private identityBlocked: boolean = false;
++  private createKey: string = '';
++  private myKey: string = '';
++  private record?: ReportSubmissionRecord;
+@@ -20,0 +33,7 @@ export struct ReportPanel {
++  aboutToAppear(): void {
++    this.active = true;
++    this.identityBlocked = false;
++    this.sessionVersion = this.appClient.sessionManager.getSessionVersion();
++    this.restoreSubmission();
++  }
++
+@@ -22 +41,76 @@ export struct ReportPanel {
+-    this.appClient.apiService.cancelReports();
++    this.active = false;
++    this.invalidate();
++    this.clearForm();
++  }
++
++  private onTargetChanged(): void {
++    const changedAccount = this.sessionVersion >= 0 &&
++      this.sessionVersion !== this.appClient.sessionManager.getSessionVersion();
++    this.invalidate();
++    this.clearForm();
++    this.sessionVersion = this.appClient.sessionManager.getSessionVersion();
++    if (changedAccount) {
++      this.identityBlocked = true;
++    }
++    if (this.identityBlocked) {
++      this.errorMessage = '登录身份已变化，请关闭并重新进入页面核实身份后再举报。';
++      return;
++    }
++    this.restoreSubmission();
++  }
++
++  private synchronizeIdentity(): boolean {
++    const current = this.appClient.sessionManager.getSessionVersion();
++    if (this.sessionVersion < 0) {
++      this.sessionVersion = current;
++    }
++    if (this.sessionVersion !== current) {
++      this.invalidate();
++      this.clearForm();
++      this.sessionVersion = current;
++      this.identityBlocked = true;
++    }
++    if (this.identityBlocked) {
++      this.errorMessage = '登录身份已变化，请关闭并重新进入页面核实身份后再举报。';
++    }
++    return !this.identityBlocked;
++  }
++
++  private invalidate(): void {
++    if (this.record !== undefined && this.busy) {
++      this.store.markUnknown(this.record);
++    }
++    this.generation++;
++    // Empty keys are instance-local too; never invoke the legacy global cancellation.
++    this.appClient.apiService.cancelReports(this.createKey || `${this.instanceKey}.none.create`,
++      this.myKey || `${this.instanceKey}.none.my`);
++    this.createKey = '';
++    this.myKey = '';
++    this.busy = false;
++  }
++
++  private clearForm(): void {
++    this.reason = '';
++    this.description = '';
++    this.errorMessage = '';
++    this.verificationMessage = '';
++    this.submitted = false;
++    this.unconfirmed = false;
++    this.expanded = false;
++    this.record = undefined;
++  }
++
++  private restoreSubmission(): void {
++    this.record = this.store.find(this.appClient.sessionManager.getSessionVersion(), this.currentUserId,
++      this.targetType, this.targetId) ?? this.store.findUnconfirmed(this.currentUserId, this.targetType, this.targetId);
++    this.submitted = this.record?.state === 'confirmed';
++    this.unconfirmed = this.record !== undefined && !this.submitted;
++    if (this.unconfirmed) {
++      this.errorMessage = '举报请求可能已写入，请核实结果，不要重复提交。';
++    }
++  }
++
++  private isCurrent(token: number, version: number, payload: CreateReportPayload, actorId: number): boolean {
++    return this.active && this.synchronizeIdentity() && token === this.generation &&
++      version === this.appClient.sessionManager.getSessionVersion() && actorId === this.currentUserId &&
++      payload.targetType === this.targetType.trim().toUpperCase() && payload.targetId === this.targetId;
+@@ -29,0 +124,8 @@ export struct ReportPanel {
++  private validResult(result: ReportSummary, payload: CreateReportPayload, actorId: number): boolean {
++    if (result === null || result === undefined || !Number.isSafeInteger(result.reportId) || result.reportId <= 0 ||
++      result.targetType !== payload.targetType || result.targetId !== payload.targetId || result.reporterId !== actorId) {
++      return false;
++    }
++    return result.status === 'PENDING' || result.status === 'RESOLVED';
++  }
++
+@@ -31 +133 @@ export struct ReportPanel {
+-    if (this.busy || this.submitted) {
++    if (!this.active || !this.synchronizeIdentity() || this.busy || this.submitted) {
+@@ -37,0 +140,4 @@ export struct ReportPanel {
++    this.restoreSubmission();
++    if (this.submitted || this.unconfirmed) {
++      return;
++    }
+@@ -40,2 +146,3 @@ export struct ReportPanel {
+-    if (!this.validTargetType() || !Number.isSafeInteger(this.targetId) || this.targetId <= 0) {
+-      this.errorMessage = '举报对象无效';
++    if (!this.validTargetType() || !Number.isSafeInteger(this.targetId) || this.targetId <= 0 ||
++      !Number.isSafeInteger(this.currentUserId) || this.currentUserId <= 0 || this.ownerId === this.currentUserId) {
++      this.errorMessage = '举报对象或当前身份无效';
+@@ -51,0 +159,9 @@ export struct ReportPanel {
++    const payload: CreateReportPayload = { targetType: this.targetType.trim().toUpperCase(),
++      targetId: this.targetId, reason: normalizedReason,
++      description: normalizedDescription.length > 0 ? normalizedDescription : undefined };
++    const version = this.appClient.sessionManager.getSessionVersion();
++    const actorId = this.currentUserId;
++    const token = ++this.generation;
++    this.createKey = `${this.instanceKey}.create.${token}`;
++    const record = this.store.begin(this.createKey, version, actorId, payload);
++    this.record = record;
+@@ -54,6 +169,0 @@ export struct ReportPanel {
+-    const payload: CreateReportPayload = {
+-      targetType: this.targetType.trim().toUpperCase(),
+-      targetId: this.targetId,
+-      reason: normalizedReason,
+-      description: normalizedDescription.length > 0 ? normalizedDescription : undefined
+-    };
+@@ -61,5 +171,8 @@ export struct ReportPanel {
+-      const result: ReportSummary = await this.appClient.apiService.createReport(payload);
+-      if (result === null || !Number.isSafeInteger(result.reportId) || result.reportId <= 0 ||
+-        result.targetType !== payload.targetType || result.targetId !== payload.targetId ||
+-        result.status.trim().length === 0) {
+-        throw new Error('举报结果格式异常');
++      const result = await this.appClient.apiService.createReport(payload, record.key);
++      if (!this.validResult(result, payload, actorId)) {
++        throw ErrorMapper.parse();
++      }
++      // A known response may update only its old memory record; it never updates another view.
++      this.store.confirm(record, result);
++      if (!this.isCurrent(token, version, payload, actorId)) {
++        return;
+@@ -67,0 +181 @@ export struct ReportPanel {
++      this.unconfirmed = false;
+@@ -70 +184,14 @@ export struct ReportPanel {
+-      this.errorMessage = (error as PortraError).message || '举报提交失败';
++      const mapped = error as PortraError;
++      const rejected = (mapped.httpStatus >= 400 && mapped.httpStatus < 500) ||
++        (mapped.kind === 'business' && mapped.businessCode >= 40000 && mapped.businessCode < 50000);
++      if (rejected) {
++        this.store.reject(record);
++      } else {
++        this.store.markUnknown(record);
++      }
++      if (!this.isCurrent(token, version, payload, actorId)) {
++        return;
++      }
++      this.unconfirmed = !rejected;
++      this.errorMessage = rejected ? (mapped.message || '举报请求未被接受，请核对后重试。') :
++        '举报结果未确认，服务器可能已写入。请核实结果，不要重复提交。';
+@@ -72 +199,49 @@ export struct ReportPanel {
+-      this.busy = false;
++      if (this.isCurrent(token, version, payload, actorId)) {
++        this.busy = false;
++      }
++    }
++  }
++
++  private cancelForm(): void {
++    this.invalidate();
++    this.expanded = false;
++    this.errorMessage = '';
++    this.restoreSubmission();
++  }
++
++  private async verifySubmission(): Promise<void> {
++    if (!this.active || !this.synchronizeIdentity() || this.busy || !this.appClient.sessionManager.isAuthenticated()) {
++      return;
++    }
++    this.restoreSubmission();
++    const record = this.record;
++    if (record === undefined || record.state === 'confirmed') {
++      return;
++    }
++    const version = this.appClient.sessionManager.getSessionVersion();
++    const token = ++this.generation;
++    this.myKey = `${this.instanceKey}.my.${token}`;
++    this.busy = true;
++    this.verificationMessage = '';
++    try {
++      const reports = await this.appClient.apiService.listMyReports(this.myKey);
++      if (!this.isCurrent(token, version, record.payload, record.actorId)) {
++        return;
++      }
++      if (!Array.isArray(reports)) {
++        throw ErrorMapper.parse();
++      }
++      const matches = reports.filter((item: ReportSummary) => this.validResult(item, record.payload, record.actorId) &&
++        item.reason === record.payload.reason && (item.description ?? '') === (record.payload.description ?? ''));
++      this.verificationMessage = matches.length > 0 ? matches.slice(0, 3).map((item: ReportSummary) =>
++        `举报 #${item.reportId}，${item.status === 'PENDING' ? '待处理' : '已处理'}，${item.createdAt || '时间未知'}`).join('；') +
++        '。请核对记录；同样原因也可能来自历史提交，仍不自动重发。' :
++        '暂未查到匹配记录，不能据此判断未写入。请稍后再次核实或联系平台，不要重复提交。';
++    } catch (error) {
++      if (this.isCurrent(token, version, record.payload, record.actorId)) {
++        this.verificationMessage = (error as PortraError).message || '核实失败，请稍后重试；不要重复提交。';
++      }
++    } finally {
++      if (this.isCurrent(token, version, record.payload, record.actorId)) {
++        this.busy = false;
++      }
+@@ -83,0 +259,12 @@ export struct ReportPanel {
++        } else if (this.unconfirmed) {
++          Text('举报结果待核实，请勿重复提交')
++            .fontSize(12)
++            .fontColor(PortraTheme.secondaryText)
++          Button(this.busy ? '核实中' : '核实结果')
++            .enabled(!this.busy)
++            .onClick(() => this.verifySubmission())
++          if (this.verificationMessage.length > 0) {
++            Text(this.verificationMessage)
++              .fontSize(12)
++              .fontColor(PortraTheme.secondaryText)
++          }
+@@ -116,2 +303 @@ export struct ReportPanel {
+-                this.expanded = false;
+-                this.errorMessage = '';
++                this.cancelForm();
+diff --git a/harmony/entry/src/main/ets/features/user/ReportSubmissionStore.ets b/harmony/entry/src/main/ets/features/user/ReportSubmissionStore.ets
+new file mode 100644
+index 0000000..e7e5a3c
+--- /dev/null
++++ b/harmony/entry/src/main/ets/features/user/ReportSubmissionStore.ets
+@@ -0,0 +1,80 @@
++import { CreateReportPayload, ReportSummary } from '../../model/ApiModels';
++
++let nextReportInstance: number = 0;
++
++export function createReportInstanceKey(): string {
++  nextReportInstance++;
++  return `reports.instance.${nextReportInstance}`;
++}
++
++export class ReportSubmissionRecord {
++  readonly key: string;
++  readonly sessionVersion: number;
++  readonly actorId: number;
++  readonly payload: CreateReportPayload;
++  state: string = 'pending';
++  report?: ReportSummary;
++
++  constructor(key: string, sessionVersion: number, actorId: number, payload: CreateReportPayload) {
++    this.key = key;
++    this.sessionVersion = sessionVersion;
++    this.actorId = actorId;
++    this.payload = payload;
++  }
++}
++
++/** Memory-only ambiguity survives component destruction, isolated by account/session/object. */
++export class ReportSubmissionStore {
++  static readonly shared: ReportSubmissionStore = new ReportSubmissionStore();
++  private entries: Map<string, ReportSubmissionRecord> = new Map<string, ReportSubmissionRecord>();
++
++  find(sessionVersion: number, actorId: number, targetType: string, targetId: number): ReportSubmissionRecord | undefined {
++    return this.entries.get(this.identity(sessionVersion, actorId, targetType, targetId));
++  }
++
++  findUnconfirmed(actorId: number, targetType: string, targetId: number): ReportSubmissionRecord | undefined {
++    let pending: ReportSubmissionRecord | undefined = undefined;
++    const normalized = targetType.trim().toUpperCase();
++    this.entries.forEach((record: ReportSubmissionRecord) => {
++      if (record.actorId === actorId && record.payload.targetType === normalized && record.payload.targetId === targetId &&
++        (record.state === 'pending' || record.state === 'unknown')) {
++        pending = record;
++      }
++    });
++    return pending;
++  }
++
++  begin(key: string, sessionVersion: number, actorId: number, payload: CreateReportPayload): ReportSubmissionRecord {
++    const record = new ReportSubmissionRecord(key, sessionVersion, actorId, payload);
++    this.entries.set(this.identity(sessionVersion, actorId, payload.targetType, payload.targetId), record);
++    return record;
++  }
++
++  markUnknown(record: ReportSubmissionRecord): void {
++    if (this.owns(record) && record.state !== 'confirmed') {
++      record.state = 'unknown';
++    }
++  }
++
++  confirm(record: ReportSubmissionRecord, report: ReportSummary): void {
++    if (this.owns(record)) {
++      record.state = 'confirmed';
++      record.report = report;
++    }
++  }
++
++  reject(record: ReportSubmissionRecord): void {
++    if (this.owns(record)) {
++      this.entries.delete(this.identity(record.sessionVersion, record.actorId,
++        record.payload.targetType, record.payload.targetId));
++    }
++  }
++
++  private owns(record: ReportSubmissionRecord): boolean {
++    return this.find(record.sessionVersion, record.actorId, record.payload.targetType, record.payload.targetId) === record;
++  }
++
++  private identity(sessionVersion: number, actorId: number, targetType: string, targetId: number): string {
++    return `${sessionVersion}:${actorId}:${targetType.trim().toUpperCase()}:${targetId}`;
++  }
++}
+diff --git a/harmony/entry/src/main/ets/network/ApiService.ets b/harmony/entry/src/main/ets/network/ApiService.ets
+index e0c2858..d9739eb 100644
+--- a/harmony/entry/src/main/ets/network/ApiService.ets
++++ b/harmony/entry/src/main/ets/network/ApiService.ets
+@@ -221 +221 @@ export class ApiService implements NativeSessionApi {
+-  listProfileMoments(authorId: number, authorRole: string, page: number = 1, size: number = 12):
++  listProfileMoments(authorId: number, authorRole: string, page: number = 1, size: number = 12, requestKey?: string):
+@@ -229 +229 @@ export class ApiService implements NativeSessionApi {
+-      `moments.profile.${authorId}.${role}`);
++      requestKey ?? `moments.profile.${authorId}.${role}`);
+@@ -262 +262 @@ export class ApiService implements NativeSessionApi {
+-  getPublicProfile(userId: number, role: string): Promise<PublicUserProfile> {
++  getPublicProfile(userId: number, role: string, requestKey?: string): Promise<PublicUserProfile> {
+@@ -268 +268,6 @@ export class ApiService implements NativeSessionApi {
+-      `/users/${userId}/public-profile?role=${normalizedRole}`, `users.${userId}.${normalizedRole}.profile`);
++      `/users/${userId}/public-profile?role=${normalizedRole}`, requestKey ?? `users.${userId}.${normalizedRole}.profile`);
++  }
++
++  cancelPublicProfile(profileRequestKey: string, momentsRequestKey: string): void {
++    this.client.cancelRequest(profileRequestKey);
++    this.client.cancelRequest(momentsRequestKey);
+@@ -415,2 +420,2 @@ export class ApiService implements NativeSessionApi {
+-  createReport(payload: CreateReportPayload): Promise<ReportSummary> {
+-    return this.client.post<ReportSummary>('/reports', payload, 'reports.create');
++  createReport(payload: CreateReportPayload, requestKey: string = 'reports.create'): Promise<ReportSummary> {
++    return this.client.post<ReportSummary>('/reports', payload, requestKey);
+@@ -419,2 +424,2 @@ export class ApiService implements NativeSessionApi {
+-  listMyReports(): Promise<ReportSummary[]> {
+-    return this.client.get<ReportSummary[]>('/reports/my', 'reports.my');
++  listMyReports(requestKey: string = 'reports.my'): Promise<ReportSummary[]> {
++    return this.client.get<ReportSummary[]>('/reports/my', requestKey);
+@@ -423,3 +428,3 @@ export class ApiService implements NativeSessionApi {
+-  cancelReports(): void {
+-    this.client.cancelRequest('reports.create');
+-    this.client.cancelRequest('reports.my');
++  cancelReports(createRequestKey: string = 'reports.create', myRequestKey: string = 'reports.my'): void {
++    this.client.cancelRequest(createRequestKey);
++    this.client.cancelRequest(myRequestKey);
+diff --git a/harmony/entry/src/main/ets/pages/PublicProfilePage.ets b/harmony/entry/src/main/ets/pages/PublicProfilePage.ets
+new file mode 100644
+index 0000000..4fa35e2
+--- /dev/null
++++ b/harmony/entry/src/main/ets/pages/PublicProfilePage.ets
+@@ -0,0 +1,192 @@
++import { AppClient } from '../app/AppClient';
++import { PortraAvatar } from '../common/components/PortraAvatar';
++import { PortraLoading } from '../common/components/PortraLoading';
++import { MomentCard } from '../features/moments/MomentCard';
++import { MomentFeedFormatter } from '../features/moments/MomentFeedModels';
++import { MomentSummary, PublicUserProfile } from '../model/ApiModels';
++import { ErrorMapper, PortraError } from '../network/ErrorMapper';
++import { PortraTheme } from '../theme/PortraTheme';
++
++let nextPublicProfileInstance: number = 0;
++
++/** B-owned public view of the existing user system, never a second identity store. */
++@Component
++export struct PublicProfilePage {
++  @Prop @Watch('onTargetChanged') targetUserId: number = 0;
++  @Prop @Watch('onTargetChanged') targetRole: string = '';
++  @State private profile: PublicUserProfile | undefined = undefined;
++  @State private moments: MomentSummary[] = [];
++  @State private loading: boolean = true;
++  @State private errorMessage: string = '';
++  @State private authenticationRequired: boolean = false;
++  private readonly appClient: AppClient = AppClient.shared;
++  private readonly requestKey: string = `users.public.instance.${++nextPublicProfileInstance}`;
++  private generation: number = 0;
++  private active: boolean = false;
++  onBack?: () => void;
++  onRequireLogin?: () => void;
++
++  aboutToAppear(): void {
++    this.active = true;
++    this.load();
++  }
++
++  aboutToDisappear(): void {
++    this.active = false;
++    this.generation++;
++    this.appClient.apiService.cancelPublicProfile(`${this.requestKey}.profile`, `${this.requestKey}.moments`);
++    this.profile = undefined;
++    this.moments = [];
++  }
++
++  private onTargetChanged(): void {
++    if (this.active) {
++      this.load();
++    }
++  }
++
++  private isCurrent(token: number, sessionVersion: number, userId: number, role: string): boolean {
++    if (!this.active || token !== this.generation || this.targetUserId !== userId ||
++      this.targetRole.trim().toUpperCase() !== role) {
++      return false;
++    }
++    if (sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
++      this.generation++;
++      this.appClient.apiService.cancelPublicProfile(`${this.requestKey}.profile`, `${this.requestKey}.moments`);
++      this.profile = undefined;
++      this.moments = [];
++      this.loading = false;
++      this.authenticationRequired = !this.appClient.sessionManager.isAuthenticated();
++      this.errorMessage = '身份已变化，请重新读取用户主页。';
++      return false;
++    }
++    return true;
++  }
++
++  private async load(): Promise<void> {
++    const token = ++this.generation;
++    const sessionVersion = this.appClient.sessionManager.getSessionVersion();
++    const userId = this.targetUserId;
++    const role = this.targetRole.trim().toUpperCase();
++    this.appClient.apiService.cancelPublicProfile(`${this.requestKey}.profile`, `${this.requestKey}.moments`);
++    this.profile = undefined;
++    this.moments = [];
++    this.loading = true;
++    this.errorMessage = '';
++    this.authenticationRequired = false;
++    if (!Number.isSafeInteger(userId) || userId <= 0 || !['CUSTOMER', 'PROVIDER'].includes(role)) {
++      this.loading = false;
++      this.errorMessage = '无效的用户主页';
++      return;
++    }
++    if (!this.appClient.sessionManager.isAuthenticated()) {
++      this.loading = false;
++      this.authenticationRequired = true;
++      this.errorMessage = '登录后查看用户主页';
++      return;
++    }
++    try {
++      const profile = await this.appClient.apiService.getPublicProfile(userId, role, `${this.requestKey}.profile`);
++      if (!this.isCurrent(token, sessionVersion, userId, role)) {
++        return;
++      }
++      if (profile === null || profile.userId !== userId || profile.currentRole !== role ||
++        !Number.isSafeInteger(profile.followerCount) || profile.followerCount < 0 ||
++        !Number.isSafeInteger(profile.followingCount) || profile.followingCount < 0 ||
++        !Number.isSafeInteger(profile.momentCount) || profile.momentCount < 0) {
++        throw ErrorMapper.parse();
++      }
++      this.profile = profile;
++      const page = await this.appClient.apiService.listProfileMoments(userId, role, 1, 12, `${this.requestKey}.moments`);
++      if (!this.isCurrent(token, sessionVersion, userId, role)) {
++        return;
++      }
++      if (page === null || !Array.isArray(page.records) ||
++        page.records.some((item: MomentSummary) => !MomentFeedFormatter.isValid(item) ||
++          item.authorId !== userId || item.authorRole !== role)) {
++        throw ErrorMapper.parse();
++      }
++      this.moments = MomentFeedFormatter.deduplicate(page.records);
++    } catch (error) {
++      if (!this.isCurrent(token, sessionVersion, userId, role)) {
++        return;
++      }
++      const mapped = error as PortraError;
++      this.authenticationRequired = ErrorMapper.isAuthenticationExpired(mapped);
++      this.errorMessage = mapped.message || '用户主页读取失败';
++      if (this.authenticationRequired) {
++        this.profile = undefined;
++        this.moments = [];
++      }
++    } finally {
++      if (this.isCurrent(token, sessionVersion, userId, role)) {
++        this.loading = false;
++      }
++    }
++  }
++
++  private displayName(): string {
++    return this.profile?.nickname?.trim() || `用户 #${this.targetUserId}`;
++  }
++
++  build() {
++    Column({ space: PortraTheme.spacingMd }) {
++      Row() {
++        Button('返回')
++          .onClick(() => this.onBack?.())
++        Text('用户主页')
++          .layoutWeight(1)
++          .fontSize(PortraTheme.fontTitle)
++          .fontWeight(FontWeight.Bold)
++      }
++      .width('100%')
++      .padding(PortraTheme.spacingLg)
++      if (this.loading) {
++        PortraLoading({ label: '正在读取用户主页' })
++      } else {
++        Scroll() {
++          Column({ space: PortraTheme.spacingMd }) {
++            if (this.errorMessage.length > 0) {
++              Text(this.errorMessage)
++                .fontColor(PortraTheme.danger)
++              Button(this.authenticationRequired ? '去登录' : '重新读取')
++                .onClick(() => this.authenticationRequired ? this.onRequireLogin?.() : this.load())
++            }
++            if (this.profile !== undefined) {
++              PortraAvatar({ displayName: this.displayName(), avatarSize: 56 })
++              Text(this.displayName())
++                .fontSize(PortraTheme.fontTitle)
++                .fontWeight(FontWeight.Bold)
++              Text(`${this.targetRole === 'PROVIDER' ? '摄影师' : '约拍用户'} #${this.targetUserId}`)
++                .fontColor(PortraTheme.secondaryText)
++              if ((this.profile.bio?.trim().length ?? 0) > 0) {
++                Text(this.profile.bio || '')
++                  .width('100%')
++              }
++              Text(`关注者 ${this.profile.followerCount} · 关注 ${this.profile.followingCount} · 动态 ${this.profile.momentCount}`)
++                .fontColor(PortraTheme.secondaryText)
++              Text('近期动态')
++                .fontSize(PortraTheme.fontTitle)
++              if (this.moments.length === 0) {
++                Text('暂无可展示的动态')
++                  .fontColor(PortraTheme.secondaryText)
++              } else {
++                ForEach(this.moments, (item: MomentSummary) => {
++                  MomentCard({ item: item })
++                }, (item: MomentSummary) => JSON.stringify(item))
++              }
++            }
++          }
++          .width('100%')
++          .padding(PortraTheme.spacingLg)
++          .alignItems(HorizontalAlign.Start)
++        }
++        .width('100%')
++        .layoutWeight(1)
++      }
++    }
++    .width('100%')
++    .height('100%')
++    .backgroundColor(PortraTheme.pageBackground)
++  }
++}
+diff --git a/harmony/entry/src/main/ets/model/NavigationModels.ets b/harmony/entry/src/main/ets/model/NavigationModels.ets
+index f864a8c..379d421 100644
+--- a/harmony/entry/src/main/ets/model/NavigationModels.ets
++++ b/harmony/entry/src/main/ets/model/NavigationModels.ets
+@@ -10 +10,2 @@ export enum AppRoute {
+-  PROFILE = 'Profile'
++  PROFILE = 'Profile',
++  PUBLIC_PROFILE = 'PublicProfile'
+@@ -17,0 +19,4 @@ export interface NavigationRouteParam {
++  readonly userId?: number;
++  readonly userRole?: string;
++  /** Existing HALL destination can return a successful Moments login to tab 1. */
++  readonly initialTab?: number;
+diff --git a/harmony/entry/src/main/ets/navigation/NavigationPolicy.ets b/harmony/entry/src/main/ets/navigation/NavigationPolicy.ets
+index 45440f2..d4d65a1 100644
+--- a/harmony/entry/src/main/ets/navigation/NavigationPolicy.ets
++++ b/harmony/entry/src/main/ets/navigation/NavigationPolicy.ets
+@@ -19 +19,2 @@ export class NavigationPolicy {
+-    AppRoute.PROFILE
++    AppRoute.PROFILE,
++    AppRoute.PUBLIC_PROFILE
+@@ -24 +25 @@ export class NavigationPolicy {
+-      route === AppRoute.ORDER || route === AppRoute.PROFILE;
++      route === AppRoute.ORDER || route === AppRoute.PROFILE || route === AppRoute.PUBLIC_PROFILE;
+@@ -34 +35,2 @@ export class NavigationPolicy {
+-          conversationId: param.conversationId
++          conversationId: param.conversationId,
++          userId: param.userId, userRole: param.userRole, initialTab: param.initialTab
+@@ -40,0 +43,9 @@ export class NavigationPolicy {
++  static validPublicUserId(param: NavigationRouteParam): number | undefined {
++    return NavigationPolicy.positiveId(param.userId);
++  }
++
++  static validPublicUserRole(param: NavigationRouteParam): string | undefined {
++    const role = param.userRole?.trim().toUpperCase();
++    return role === 'CUSTOMER' || role === 'PROVIDER' ? role : undefined;
++  }
++
+@@ -49,0 +61,3 @@ export class NavigationPolicy {
++    if (param.returnRoute === AppRoute.HALL && param.initialTab === 1) {
++      return '登录后继续查看动态';
++    }
+@@ -85,0 +100,2 @@ export class NavigationPolicy {
++      case AppRoute.PUBLIC_PROFILE:
++        return '用户主页';
+diff --git a/harmony/entry/src/main/ets/pages/Index.ets b/harmony/entry/src/main/ets/pages/Index.ets
+index a9a922d..9ec0952 100644
+--- a/harmony/entry/src/main/ets/pages/Index.ets
++++ b/harmony/entry/src/main/ets/pages/Index.ets
+@@ -12,0 +13 @@ import { ProfilePage } from './ProfilePage';
++import { PublicProfilePage } from './PublicProfilePage';
+@@ -41 +42 @@ struct Index {
+-        this.AppShell();
++        this.AppShell((param as NavigationRouteParam).initialTab ?? 0);
+@@ -63,0 +65,2 @@ struct Index {
++      } else if (name === AppRoute.PUBLIC_PROFILE) {
++        this.PublicProfileDestination(param);
+@@ -84 +87 @@ struct Index {
+-  AppShell() {
++  AppShell(initialTab: number = 0) {
+@@ -85,0 +89,4 @@ struct Index {
++      initialTab: initialTab,
++      onOpenAuthor: (userId: number, role: string) => this.openPage(AppRoute.PUBLIC_PROFILE,
++        { userId: userId, userRole: role }),
++      onRequireMomentLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.HALL, initialTab: 1 }),
+@@ -163,0 +171,21 @@ struct Index {
++  @Builder
++  PublicProfileDestination(param: Object) {
++    if (this.validPublicUserId(param) === 0 || this.validPublicUserRole(param).length === 0) {
++      this.PlaceholderPage('用户主页', '无效的用户身份');
++    } else {
++      PublicProfilePage({ targetUserId: this.validPublicUserId(param), targetRole: this.validPublicUserRole(param),
++        onBack: () => this.appPathStack.pop(), onRequireLogin: () => {
++          this.appPathStack.pop();
++          this.openPage(AppRoute.PUBLIC_PROFILE, param as NavigationRouteParam);
++        } });
++    }
++  }
++
++  private validPublicUserId(param: Object): number {
++    return NavigationPolicy.validPublicUserId(param as NavigationRouteParam) ?? 0;
++  }
++
++  private validPublicUserRole(param: Object): string {
++    return NavigationPolicy.validPublicUserRole(param as NavigationRouteParam) ?? '';
++  }
++
+@@ -182 +210,2 @@ struct Index {
+-      returnRoute: route, demandId: param.demandId, serviceId: param.serviceId
++      returnRoute: route, demandId: param.demandId, serviceId: param.serviceId,
++      userId: param.userId, userRole: param.userRole, initialTab: param.initialTab
+@@ -192,0 +222,4 @@ struct Index {
++    const paths = this.appPathStack.getAllPathName();
++    if (returnRoute === AppRoute.HALL && paths.length > 0 && paths[paths.length - 1] === AppRoute.HALL) {
++      return;
++    }
+@@ -197 +230,2 @@ struct Index {
+-        conversationId: param.conversationId
++        conversationId: param.conversationId,
++        userId: param.userId, userRole: param.userRole, initialTab: param.initialTab
+diff --git a/harmony/entry/src/main/ets/features/shell/PortraAppShell.ets b/harmony/entry/src/main/ets/features/shell/PortraAppShell.ets
+index c928c54..81a26e1 100644
+--- a/harmony/entry/src/main/ets/features/shell/PortraAppShell.ets
++++ b/harmony/entry/src/main/ets/features/shell/PortraAppShell.ets
+@@ -8,0 +9,7 @@ export struct PortraAppShell {
++  @Prop initialTab: number = 0;
++  onOpenAuthor?: (userId: number, role: string) => void;
++  onRequireMomentLogin?: () => void;
++
++  aboutToAppear(): void {
++    this.selectedTab = this.initialTab === 1 ? 1 : 0;
++  }
+@@ -44 +51,2 @@ export struct PortraAppShell {
+-        MomentFeedPage({ onRequireLogin: () => this.onOpenRoute?.(AppRoute.LOGIN) })
++        MomentFeedPage({ onRequireLogin: () => this.onRequireMomentLogin !== undefined ?
++          this.onRequireMomentLogin() : this.onOpenRoute?.(AppRoute.LOGIN), onOpenAuthor: this.onOpenAuthor })
+diff --git a/harmony/tests/moment-report-contract.test.cjs b/harmony/tests/moment-report-contract.test.cjs
+index 097d8c6..071f6b3 100644
+--- a/harmony/tests/moment-report-contract.test.cjs
++++ b/harmony/tests/moment-report-contract.test.cjs
+@@ -47,5 +46,0 @@ const { ErrorMapper } = require('../entry/src/main/ets/network/ErrorMapper.ets')
+-// Owner handoff requirements are executable TODOs while the shared files remain
+-// unchanged. Strict mode deliberately exits nonzero until the owner fixes them.
+-// This does not replace device checks of ArkUI @Watch or lifecycle delivery.
+-const strict = process.env.PORTRA_REQUIRE_SHARED_REPORTS === '1';
+-const pending = id => ({ todo: strict ? false : `${id}: owner implementation not provided` });
+@@ -56 +51,2 @@ function report(overrides = {}) {
+-function panelFixture() {
++function panelFixture(reset = true) {
++  if (reset) require('../entry/src/main/ets/features/user/ReportSubmissionStore.ets').ReportSubmissionStore.shared.entries.clear();
+@@ -58 +54 @@ function panelFixture() {
+-  const requests = [];
++  const requests = [], queries = [], cancellations = [];
+@@ -65,2 +61,3 @@ function panelFixture() {
+-    cancelReports() {},
+-    listMyReports() { return Promise.resolve([]); }
++    cancelReports(create, mine) { cancellations.push({ create, mine }); },
++    listMyReports(key) { const call = { key }; queries.push(call);
++      return new Promise((resolve, reject) => Object.assign(call, { resolve, reject })); }
+@@ -74 +71 @@ function panelFixture() {
+-    .replace(/@(State|Prop)\s+/g, '');
++    .replace(/@Watch\('[^']+'\)\s*/g, '').replace(/@(State|Prop)\s+/g, '');
+@@ -86 +83 @@ function panelFixture() {
+-  return { panel, requests, changeSession() { version++; } };
++  return { panel, requests, queries, cancellations, changeSession() { version++; } };
+@@ -123 +120 @@ test('report refuses an invalid server ID and preserves the input', async () =>
+-test('report response for a previous target cannot mark the new target submitted', pending('C-SHARED-03'), async () => {
++test('report response for a previous target cannot mark the new target submitted', async () => {
+@@ -131 +128 @@ test('report response for a previous target cannot mark the new target submitted
+-test('closed report ignores late errors', pending('C-SHARED-03'), async () => {
++test('closed report ignores late errors', async () => {
+@@ -139 +136 @@ test('closed report ignores late errors', pending('C-SHARED-03'), async () => {
+-test('old account report success cannot update a new session', pending('C-SHARED-03'), async () => {
++test('old account report success cannot update a new session', async () => {
+@@ -147 +144 @@ test('old account report success cannot update a new session', pending('C-SHARED
+-test('report success only accepts the real PENDING or RESOLVED state', pending('C-SHARED-03'), async () => {
++test('report success only accepts the real PENDING or RESOLVED state', async () => {
+@@ -154 +151 @@ test('report success only accepts the real PENDING or RESOLVED state', pending('
+-test('an ambiguous report timeout does not blindly submit again', pending('C-SHARED-03'), async () => {
++test('an ambiguous report timeout does not blindly submit again', async () => {
+@@ -165 +162 @@ test('an ambiguous report timeout does not blindly submit again', pending('C-SHA
+-test('two report instance request keys do not supersede one another', pending('C-SHARED-04'), async () => {
++test('two report instance request keys do not supersede one another', async () => {
+@@ -176 +173 @@ test('two report instance request keys do not supersede one another', pending('C
+-test('cancelling one report instance leaves the other instance live', pending('C-SHARED-04'), async () => {
++test('cancelling one report instance leaves the other instance live', async () => {
+@@ -186,0 +184,135 @@ test('cancelling one report instance leaves the other instance live', pending('C
++
++test('target watch resets form and old finally cannot release the next submission', async () => {
++  const f = panelFixture(); const first = f.panel.submit();
++  f.panel.targetId = 8; f.panel.onTargetChanged();
++  assert.equal(f.panel.reason, ''); assert.equal(f.panel.description, '');
++  assert.equal(f.panel.submitted, false); assert.equal(f.panel.busy, false);
++  f.panel.reason = '新对象原因'; const second = f.panel.submit();
++  f.requests[0].resolve(report()); await first;
++  assert.equal(f.panel.busy, true); assert.equal(f.panel.submitted, false);
++  f.requests[1].resolve(report({ targetId: 8, reportId: 33 })); await second;
++  assert.equal(f.panel.submitted, true); assert.equal(f.panel.busy, false);
++});
++
++test('a different reporter or malformed state cannot confirm submission', async () => {
++  for (const data of [report({ reporterId: 99 }), report({ status: null }), report({ status: 'pending' })]) {
++    const f = panelFixture(); const operation = f.panel.submit();
++    f.requests[0].resolve(data); await operation;
++    assert.equal(f.panel.submitted, false); assert.equal(f.panel.unconfirmed, true);
++  }
++});
++
++test('closing during submission keeps ambiguity across a new component and never replays', async () => {
++  const f = panelFixture(); const operation = f.panel.submit(); f.panel.aboutToDisappear();
++  const reopened = panelFixture(false); await reopened.panel.submit();
++  assert.equal(reopened.requests.length, 0); assert.equal(reopened.panel.unconfirmed, true);
++  f.requests[0].reject(ErrorMapper.stale()); await operation;
++  assert.equal(f.panel.errorMessage, '');
++});
++
++test('known late success is recorded only for its original object and account', async () => {
++  const f = panelFixture(); const operation = f.panel.submit(); f.panel.aboutToDisappear();
++  f.requests[0].resolve(report()); await operation;
++  assert.equal(f.panel.submitted, false);
++  const reopened = panelFixture(false); reopened.panel.aboutToAppear();
++  assert.equal(reopened.panel.submitted, true);
++  reopened.changeSession(); reopened.panel.onTargetChanged();
++  assert.equal(reopened.panel.submitted, false); assert.equal(reopened.panel.unconfirmed, false);
++});
++
++test('verification shows candidate record IDs but does not infer a historical match is a new write', async () => {
++  const f = panelFixture(); const operation = f.panel.submit();
++  f.requests[0].reject(ErrorMapper.fromTransportCode(2300028)); await operation;
++  const verify = f.panel.verifySubmission(); assert.equal(f.queries.length, 1);
++  f.queries[0].resolve([report()]); await verify;
++  assert.match(f.panel.verificationMessage, /#32/);
++  assert.equal(f.panel.submitted, false); assert.equal(f.panel.unconfirmed, true);
++  await f.panel.submit(); assert.equal(f.requests.length, 1);
++});
++
++test('no matching records never enables an automatic or manual blind replay', async () => {
++  const f = panelFixture(); const operation = f.panel.submit();
++  f.requests[0].reject(ErrorMapper.network()); await operation;
++  const verify = f.panel.verifySubmission(); f.queries[0].resolve([]); await verify;
++  assert.match(f.panel.verificationMessage, /不能据此判断未写入/);
++  await f.panel.submit(); assert.equal(f.requests.length, 1);
++});
++
++test('cancellation uses instance-specific create and verification keys', async () => {
++  const a = panelFixture(); const operationA = a.panel.submit();
++  const b = panelFixture(false); b.panel.targetId = 8; const operationB = b.panel.submit();
++  assert.notEqual(a.requests[0].key, b.requests[0].key);
++  a.panel.aboutToDisappear(); assert.equal(a.cancellations[0].create, a.requests[0].key);
++  assert.notEqual(a.cancellations[0].create, b.requests[0].key);
++  a.requests[0].reject(ErrorMapper.stale()); b.requests[0].resolve(report({ targetId: 8, reportId: 33 }));
++  await Promise.all([operationA, operationB]); assert.equal(b.panel.submitted, true);
++});
++
++test('unknown current identity and self-report cannot send a request', async () => {
++  for (const currentUserId of [0, 12]) {
++    const f = panelFixture(); f.panel.currentUserId = currentUserId;
++    await f.panel.submit(); assert.equal(f.requests.length, 0);
++  }
++});
++
++test('a changed session cannot submit the previous account draft before props catch up', async () => {
++  const f = panelFixture(); f.panel.aboutToAppear(); f.panel.reason = '旧账号草稿';
++  f.changeSession(); const unexpected = f.panel.submit();
++  if (f.requests.length > 0) f.requests[0].resolve(report()); await unexpected;
++  assert.equal(f.requests.length, 0); assert.equal(f.panel.reason, ''); assert.equal(f.panel.busy, false);
++  f.panel.reason = '仍未核实身份'; const repeated = f.panel.submit();
++  if (f.requests.length > 0) f.requests.at(-1).resolve(report()); await repeated; assert.equal(f.requests.length, 0);
++});
++
++test('an old account completion clears stale busy without unlocking another identity', async () => {
++  const f = panelFixture(); f.panel.aboutToAppear(); f.panel.reason = '旧账号';
++  const operation = f.panel.submit(); f.changeSession();
++  f.requests[0].resolve(report()); await operation;
++  assert.equal(f.panel.busy, false); assert.equal(f.panel.submitted, false); assert.equal(f.panel.reason, '');
++  f.panel.reason = '尚未核实'; const repeated = f.panel.submit();
++  if (f.requests.length > 1) f.requests.at(-1).resolve(report()); await repeated; assert.equal(f.requests.length, 1);
++});
++
++test('verification never sends an old pending record under a new session', async () => {
++  const f = panelFixture(); f.panel.aboutToAppear(); f.panel.reason = '原账号原因';
++  const operation = f.panel.submit(); f.requests[0].reject(ErrorMapper.network()); await operation;
++  f.changeSession(); const verify = f.panel.verifySubmission();
++  if (f.queries.length > 0) f.queries[0].resolve([]); await verify; assert.equal(f.queries.length, 0);
++  assert.equal(f.panel.unconfirmed, false); assert.equal(f.panel.busy, false);
++});
++
++test('same account role-version changes keep unknown submissions blocked without restoring old input', async () => {
++  const f = panelFixture(); const sent = f.panel.submit(); f.requests[0].reject(ErrorMapper.network()); await sent;
++  const reentered = panelFixture(false); reentered.changeSession(); reentered.panel.reason = '';
++  reentered.panel.aboutToAppear();
++  assert.equal(reentered.panel.unconfirmed, true); assert.equal(reentered.panel.reason, '');
++  reentered.panel.reason = '新角色仍不得盲重发'; const repeat = reentered.panel.submit();
++  if (reentered.requests.length) reentered.requests[0].resolve(report()); await repeat;
++  assert.equal(reentered.requests.length, 0);
++});
++
++test('another account never inherits an old actor unknown record', async () => {
++  const f = panelFixture(); const sent = f.panel.submit(); f.requests[0].reject(ErrorMapper.network()); await sent;
++  const other = panelFixture(false); other.changeSession(); other.panel.currentUserId = 99;
++  other.panel.aboutToAppear(); assert.equal(other.panel.unconfirmed, false);
++  other.panel.reason = '新账号自己的内容'; const sentOther = other.panel.submit();
++  assert.equal(other.requests.length, 1); other.requests[0].resolve(report({ reporterId: 99 })); await sentOther;
++  assert.equal(other.panel.submitted, true);
++});
++
++test('old logical-version ambiguity can be verified using the current version guard', async () => {
++  const f = panelFixture(); const sent = f.panel.submit(); f.requests[0].reject(ErrorMapper.network()); await sent;
++  const reentered = panelFixture(false); reentered.changeSession(); reentered.panel.aboutToAppear();
++  const verify = reentered.panel.verifySubmission();
++  assert.equal(reentered.queries.length, 1); reentered.queries[0].resolve([report()]); await verify;
++  assert.match(reentered.panel.verificationMessage, /#32/); assert.equal(reentered.panel.unconfirmed, true);
++});
++
++test('a second version change while verifying ignores old records and clears busy', async () => {
++  const f = panelFixture(); const sent = f.panel.submit(); f.requests[0].reject(ErrorMapper.network()); await sent;
++  const reentered = panelFixture(false); reentered.changeSession(); reentered.panel.aboutToAppear();
++  const verify = reentered.panel.verifySubmission();
++  assert.equal(reentered.queries.length, 1); reentered.changeSession();
++  reentered.queries[0].resolve([report()]); await verify;
++  assert.equal(reentered.panel.verificationMessage, ''); assert.equal(reentered.panel.busy, false);
++});
+diff --git a/harmony/tests/moment-public-profile.test.cjs b/harmony/tests/moment-public-profile.test.cjs
+new file mode 100644
+index 0000000..b03b09d
+--- /dev/null
++++ b/harmony/tests/moment-public-profile.test.cjs
+@@ -0,0 +1,86 @@
++const assert = require('node:assert/strict');
++const { test } = require('node:test');
++const fs = require('node:fs');
++const path = require('node:path');
++const Module = require('node:module');
++const sdk = process.env.DEVECO_SDK_HOME;
++if (!sdk) throw new Error('Set DEVECO_SDK_HOME');
++const ts = require(path.join(sdk, 'default/openharmony/ets/build-tools/ets-loader/node_modules/typescript'));
++const root = path.resolve(__dirname, '../entry/src/main/ets');
++require.extensions['.ets'] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
++  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 }
++}).outputText, filename);
++function deferred() { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; });
++  return { promise, resolve, reject }; }
++function profile(id = 12) { return { userId: id, currentRole: 'PROVIDER', nickname: '真实作者',
++  bio: '公开简介', followerCount: 3, followingCount: 2, momentCount: 1 }; }
++function moment(id = 12) { return { momentId: 7, authorId: id, authorRole: 'PROVIDER',
++  likeCount: 1, favoriteCount: 2, likedByCurrentUser: false, favoritedByCurrentUser: false }; }
++function fixture() {
++  let version = 3; const profiles = [], moments = [], cancellations = [];
++  const app = { sessionManager: { getSessionVersion: () => version, isAuthenticated: () => true }, apiService: {
++    getPublicProfile(id, role, key) { const p = deferred(); profiles.push({ id, role, key, ...p }); return p.promise; },
++    listProfileMoments(id, role, page, size, key) { const p = deferred(); moments.push({ id, role, page, size, key, ...p }); return p.promise; },
++    cancelPublicProfile(profile, moments) { cancellations.push({ profile, moments }); }
++  } };
++  const filename = path.join(root, 'pages/PublicProfilePage.ets');
++  const source = fs.readFileSync(filename, 'utf8');
++  const plain = (source.slice(0, source.indexOf('  build() {')) + '\n}')
++    .replace(/^@Component\s*$/m, '').replace('export struct ', 'export class ')
++    .replace(/@Watch\('[^']+'\)\s*/g, '').replace(/@(State|Prop)\s+/g, '');
++  const loaded = new Module(filename, module); loaded.filename = filename; loaded.paths = module.paths;
++  const original = loaded.require.bind(loaded);
++  loaded.require = name => name === '../app/AppClient' ? { AppClient: { shared: app } } : original(name);
++  loaded._compile(ts.transpileModule(plain, { compilerOptions: {
++    module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021
++  } }).outputText, filename);
++  function create() { const page = new loaded.exports.PublicProfilePage();
++    Object.assign(page, { targetUserId: 12, targetRole: 'PROVIDER', active: true }); return page; }
++  return { page: create(), create, profiles, moments, cancellations, changeSession() { version++; } };
++}
++async function tick() { await new Promise(resolve => setImmediate(resolve)); }
++test('public author page uses existing real profile and matching role moment APIs', async () => {
++  const f = fixture(); const read = f.page.load(); f.profiles[0].resolve(profile()); await tick();
++  assert.equal(f.page.displayName(), '真实作者'); assert.equal(f.moments[0].id, 12);
++  f.moments[0].resolve({ records: [moment()], total: 1 }); await read;
++  assert.equal(f.page.moments.length, 1); assert.equal(f.page.loading, false);
++});
++test('target changes clear old profile and ignore old profile success/catch/finally', async () => {
++  for (const fail of [false, true]) {
++    const f = fixture(); const old = f.page.load(); f.page.targetUserId = 13; f.page.onTargetChanged();
++    if (fail) f.profiles[0].reject(new Error('old')); else f.profiles[0].resolve(profile());
++    await old; assert.equal(f.page.profile, undefined); assert.equal(f.page.loading, true);
++    assert.equal(f.page.errorMessage, ''); f.profiles[1].resolve(profile(13)); await tick();
++    f.moments[0].resolve({ records: [moment(13)], total: 1 }); await tick();
++    assert.equal(f.page.profile.userId, 13);
++  }
++});
++test('a hidden page and changed account cannot accept an old public profile result', async () => {
++  const f = fixture(); const read = f.page.load(); f.changeSession(); f.page.aboutToDisappear();
++  f.profiles[0].resolve(profile()); await read;
++  assert.equal(f.page.profile, undefined); assert.deepEqual(f.page.moments, []);
++});
++
++test('account change between profile and moments clears the partially loaded view', async () => {
++  const f = fixture(); const read = f.page.load(); f.profiles[0].resolve(profile()); await tick();
++  assert.equal(f.page.profile.userId, 12); f.changeSession();
++  f.moments[0].resolve({ records: [moment()], total: 1 }); await read;
++  assert.equal(f.page.profile, undefined); assert.deepEqual(f.page.moments, []);
++  assert.equal(f.page.loading, false);
++});
++test('wrong user, role or malformed counters are never shown', async () => {
++  for (const value of [profile(99), { ...profile(), currentRole: 'CUSTOMER' }, { ...profile(), followerCount: -1 }]) {
++    const f = fixture(); const read = f.page.load(); f.profiles[0].resolve(value); await read;
++    assert.equal(f.page.profile, undefined); assert.ok(f.page.errorMessage.length > 0);
++  }
++});
++test('each public page cancels only its own keys and legacy B card stays readonly', async () => {
++  const f = fixture(); const a = f.page.load(); const other = f.create(); const b = other.load();
++  assert.notEqual(f.profiles[0].key, f.profiles[1].key);
++  f.page.aboutToDisappear(); assert.equal(f.cancellations.at(-1).profile, f.profiles[0].key);
++  assert.notEqual(f.cancellations.at(-1).profile, f.profiles[1].key);
++  f.profiles[0].resolve(profile()); f.profiles[1].resolve(profile()); await tick();
++  f.moments[0].resolve({ records: [], total: 0 }); await Promise.all([a, b]);
++  const source = fs.readFileSync(path.join(root, 'pages/PublicProfilePage.ets'), 'utf8');
++  assert.match(source, /MomentCard\(\{ item: item \}\)/);
++});
+diff --git a/harmony/tests/navigation.test.cjs b/harmony/tests/navigation.test.cjs
+index 6e5a76c..971890f 100644
+--- a/harmony/tests/navigation.test.cjs
++++ b/harmony/tests/navigation.test.cjs
+@@ -26 +26 @@ test('all planned destinations have one stable route name', () => {
+-    AppRoute.MESSAGE, AppRoute.ORDER, AppRoute.PROFILE
++    AppRoute.MESSAGE, AppRoute.ORDER, AppRoute.PROFILE, AppRoute.PUBLIC_PROFILE
+@@ -28 +28 @@ test('all planned destinations have one stable route name', () => {
+-  assert.equal(new Set(NavigationPolicy.routes).size, 9);
++  assert.equal(new Set(NavigationPolicy.routes).size, 10);
+@@ -90,0 +91,16 @@ test('rapid repeated navigation is accepted only after the cooldown', () => {
++
++test('public profile login preserves the existing user identity and validates it', () => {
++  const result = NavigationPolicy.resolve(AppRoute.PUBLIC_PROFILE, { userId: 12, userRole: 'PROVIDER' }, false);
++  assert.equal(result.route, AppRoute.LOGIN); assert.equal(result.param.returnRoute, AppRoute.PUBLIC_PROFILE);
++  assert.equal(result.param.userId, 12); assert.equal(result.param.userRole, 'PROVIDER');
++  assert.equal(NavigationPolicy.validPublicUserId({ userId: 0 }), undefined);
++  assert.equal(NavigationPolicy.validPublicUserRole({ userRole: 'ADMIN' }), undefined);
++});
++
++test('normal Moments login has an explicit HALL tab return without changing other login targets', () => {
++  const models = fs.readFileSync(path.join(sourceRoot, 'pages/Index.ets'), 'utf8');
++  assert.match(models, /onRequireMomentLogin:.*AppRoute.LOGIN, \{ returnRoute: AppRoute.HALL, initialTab: 1 \}/);
++  assert.equal(NavigationPolicy.loginDescription({ returnRoute: AppRoute.HALL, initialTab: 1 }), '登录后继续查看动态');
++  const existing = NavigationPolicy.resolve(AppRoute.CONVERSATION_DETAIL, { conversationId: 42 }, false);
++  assert.equal(existing.param.returnRoute, AppRoute.CONVERSATION_DETAIL); assert.equal(existing.param.conversationId, 42);
++});

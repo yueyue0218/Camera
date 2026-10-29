@@ -7,7 +7,12 @@ export enum AppRoute {
   PUBLISH = 'Publish',
   MESSAGE = 'Message',
   ORDER = 'Order',
-  PROFILE = 'Profile'
+  PROFILE = 'Profile',
+  PUBLIC_PROFILE = 'PublicProfile',
+  NOTIFICATIONS = 'Notifications',
+  CREDIT = 'Credit',
+  ORDER_ENGAGEMENT = 'OrderEngagement',
+  MOMENT_DETAIL = 'MomentDetail'
 }
 
 export interface DemandDetailRouteParam {
@@ -15,6 +20,14 @@ export interface DemandDetailRouteParam {
 }
 
 export interface NavigationRouteParam {
+  readonly targetKind?: string;
+  readonly targetId?: number;
+  readonly orderId?: number;
+  readonly momentId?: number;
+  readonly userId?: number;
+  readonly userRole?: string;
+  /** Existing HALL destination can return a successful Moments login to tab 1. */
+  readonly initialTab?: number;
   readonly demandId?: number;
   readonly serviceId?: number;
   readonly conversationId?: number;

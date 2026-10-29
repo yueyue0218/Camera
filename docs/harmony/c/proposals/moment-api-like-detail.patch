@@ -1,0 +1,52 @@
+diff --git a/harmony/entry/src/main/ets/network/ApiService.ets b/harmony/entry/src/main/ets/network/ApiService.ets
+--- a/harmony/entry/src/main/ets/network/ApiService.ets
++++ b/harmony/entry/src/main/ets/network/ApiService.ets
+@@ -174,1 +174,48 @@
++  async getMoment(momentId: number, requestKey: string = 'moments.detail'): Promise<MomentSummary> {
++    this.requireMomentId(momentId);
++    const result = await this.client.get<MomentSummary>(`/moments/${momentId}`, requestKey);
++    return this.requireMomentResult(result, momentId);
++  }
++
++  cancelMomentDetail(requestKey: string = 'moments.detail'): void {
++    this.client.cancelRequest(requestKey);
++  }
++
++  async likeMoment(momentId: number, requestKey?: string): Promise<MomentSummary> {
++    this.requireMomentId(momentId);
++    const result = await this.client.put<MomentSummary>(`/moments/${momentId}/like`, undefined,
++      requestKey ?? `moments.${momentId}.like`);
++    return this.requireMomentResult(result, momentId, true);
++  }
++
++  async unlikeMoment(momentId: number, requestKey?: string): Promise<MomentSummary> {
++    this.requireMomentId(momentId);
++    const result = await this.client.delete<MomentSummary>(`/moments/${momentId}/like`,
++      requestKey ?? `moments.${momentId}.like`);
++    return this.requireMomentResult(result, momentId, false);
++  }
++
++  cancelMomentLike(momentId: number, requestKey?: string): void {
++    this.requireMomentId(momentId);
++    this.client.cancelRequest(requestKey ?? `moments.${momentId}.like`);
++  }
++
++  private requireMomentId(momentId: number): void {
++    if (!Number.isSafeInteger(momentId) || momentId <= 0) {
++      throw ErrorMapper.parse();
++    }
++  }
++
++  private requireMomentResult(result: MomentSummary, momentId: number, expectedLiked?: boolean): MomentSummary {
++    if (result === null || result === undefined || result.momentId !== momentId ||
++      !Number.isSafeInteger(result.likeCount) || result.likeCount < 0 ||
++      !Number.isSafeInteger(result.favoriteCount) || result.favoriteCount < 0 ||
++      typeof result.likedByCurrentUser !== 'boolean' || typeof result.favoritedByCurrentUser !== 'boolean' ||
++      (expectedLiked !== undefined && result.likedByCurrentUser !== expectedLiked)) {
++      throw ErrorMapper.parse();
++    }
++    return result;
++  }
++
++
+   listProfileMoments(authorId: number, authorRole: string, page: number = 1, size: number = 12):

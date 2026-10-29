@@ -1,3 +1,5 @@
+import { NotificationTarget } from '../features/notifications/NotificationTargetResolver';
+import { NotificationPage } from './NotificationPage';
 import { AppClient } from '../app/AppClient';
 import { PortraAvatar } from '../common/components/PortraAvatar';
 import { PortraEmptyView } from '../common/components/PortraEmptyView';
@@ -18,6 +20,11 @@ export struct MessagePage {
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
   onBack?: () => void;
+  onOpenMoment?: (id: number) => void;
+  onOpenCredit?: () => void;
+  onOpenOrders?: () => void;
+  onOpenTarget?: (target: NotificationTarget) => void;
+  onRequireLogin?: () => void;
   onOpenConversation?: (conversationId: number) => void;
 
   aboutToAppear(): void {
@@ -122,6 +129,7 @@ export struct MessagePage {
 
   build() {
     Column() {
+      if (this.selectedTab === 0) {
       PortraPageHeading({ title: '消息', eyebrow: 'CONVERSATIONS', onBack: this.onBack })
       Row({ space: 20 }) {
         this.Tab('聊天', 0)
@@ -131,9 +139,12 @@ export struct MessagePage {
       .height(50)
       .padding({ left: 14 })
       .border({ width: { bottom: 1 }, color: PortraTheme.border })
+      }
 
       if (this.selectedTab === 1) {
-        PortraEmptyView({ message: '通知列表尚未接入' })
+        NotificationPage({ onBack: () => this.selectedTab = 0, onOpenMoment: this.onOpenMoment,
+          onOpenCredit: this.onOpenCredit, onOpenOrders: this.onOpenOrders, onOpenTarget: this.onOpenTarget, onRequireLogin: this.onRequireLogin })
+          .layoutWeight(1)
       } else if (this.loading) {
         PortraLoading({ label: '正在读取会话' })
       } else if (this.errorMessage.length > 0) {
