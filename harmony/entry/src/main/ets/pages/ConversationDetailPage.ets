@@ -238,16 +238,22 @@ export struct ConversationDetailPage {
     if (this.busy || message.messageId >= 0) return;
     if (message.deliveryStatus === SendStatus.UNCERTAIN && this.uncertainResendId !== message.messageId) {
       this.busy = true;
+      const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
+      const version = this.requestVersion;
       try {
         const remote = await this.appClient.apiService.listMessages(this.conversationId);
+        if (version !== this.requestVersion || token !==
+          (this.appClient.sessionManager.getSession()?.accessToken ?? '')) return;
         this.showMessages(ConversationMessageState.merge(this.messages, remote));
-        const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
         ConversationMemory.writeMessages(token, this.userId, this.conversationId, this.messages);
         if (!this.messages.some(item => item.messageId === message.messageId)) return;
         this.uncertainResendId = message.messageId;
         this.actionError = '尚未查到发送结果。再次点击才会重发，可能产生重复消息。';
       } catch (error) {
-        this.actionError = (error as PortraError).message || '暂时无法核对发送结果';
+        if (version === this.requestVersion && token ===
+          (this.appClient.sessionManager.getSession()?.accessToken ?? '')) {
+          this.actionError = (error as PortraError).message || '暂时无法核对发送结果';
+        }
       } finally {
         this.busy = false;
       }
@@ -269,6 +275,12 @@ export struct ConversationDetailPage {
       const outcome = await ConversationTextSender.send((id: number, content: string) =>
         this.appClient.apiService.sendMessage(id, content), token,
         this.userId, this.conversationId, pending);
+      if (token !== (this.appClient.sessionManager.getSession()?.accessToken ?? '')) {
+        this.invalidateAccount();
+        if (this.appClient.sessionManager.isAuthenticated()) this.initialize();
+        else this.errorMessage = '登录状态已失效，请重新登录';
+        return;
+      }
       if (outcome.sent !== undefined &&
         ConversationDraftStore.read(this.userId, this.conversationId).trim() === pending.content) {
           ConversationDraftStore.write(this.userId, this.conversationId, '');
