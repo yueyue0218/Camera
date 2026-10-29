@@ -117,6 +117,7 @@ export interface MessageSummary {
   readonly fileName?: string;
   readonly createdAt?: string;
   readonly quotationId?: number;
+  readonly deliveryStatus?: string;
 }
 
 export interface SendTextMessagePayload {

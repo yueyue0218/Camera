@@ -143,9 +143,10 @@ export class ApiService implements NativeSessionApi {
     return this.client.get<UserBrief>(`/users/${userId}/brief${suffix}`, `users.${userId}.brief`);
   }
 
-  listMessages(conversationId: number): Promise<MessageSummary[]> {
+  listMessages(conversationId: number,
+    requestKey: string = `conversations.${conversationId}.messages`): Promise<MessageSummary[]> {
     return this.client.get<MessageSummary[]>(`/conversations/${conversationId}/messages`,
-      `conversations.${conversationId}.messages`);
+      requestKey);
   }
 
   sendMessage(conversationId: number, content: string): Promise<MessageSummary> {

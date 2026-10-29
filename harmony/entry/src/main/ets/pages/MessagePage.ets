@@ -95,7 +95,8 @@ export struct MessagePage {
           const peerRole = item.otherUserId === item.participantBId ? 'PROVIDER' : 'CUSTOMER';
           const brief = old ? null : await this.appClient.apiService.getUserBrief(item.otherUserId, peerRole)
             .catch(() => null);
-          const messages = await this.appClient.apiService.listMessages(item.conversationId);
+          const messages = await this.appClient.apiService.listMessages(item.conversationId,
+            `conversations.list.preview.${item.conversationId}`);
           const row = ConversationListModel.row(item, brief, messages);
           if (row !== null) rows.push(old ? {
             conversation: row.conversation, peerName: old.peerName,

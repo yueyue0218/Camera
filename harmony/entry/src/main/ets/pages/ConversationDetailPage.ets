@@ -3,10 +3,12 @@ import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraLoading } from '../common/components/PortraLoading';
 import { PortraPageHeading } from '../common/components/PortraPageHeading';
 import { PortraAvatar } from '../common/components/PortraAvatar';
+import { ConversationMemory } from '../features/conversation/ConversationMemory';
+import { ConversationMessageState, SendStatus } from '../features/conversation/ConversationMessageState';
 import { ConversationTimeline, ConversationTimelineItem, TimelineKind } from '../features/conversation/ConversationTimeline';
 import { TextMessageBubble } from '../features/conversation/TextMessageBubble';
 import { ConversationSummary, CreateQuotePayload, MessageSummary, QuoteSummary } from '../model/ApiModels';
-import { PortraError } from '../network/ErrorMapper';
+import { ErrorKind, PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
 
 @Component
@@ -28,6 +30,7 @@ export struct ConversationDetailPage {
   @State private quoteDelivery: string = '';
   @State private quoteLocation: string = '';
   @State private quoteService: string = '';
+  @State private uncertainResendId: number = 0;
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
   private contentVersion: number = 0;
@@ -35,6 +38,7 @@ export struct ConversationDetailPage {
   onBack?: () => void;
 
   aboutToAppear(): void {
+    this.busy = false;
     this.initialize();
     this.refreshTimer = setInterval(() => this.refreshContent(), 5000);
   }
@@ -56,6 +60,17 @@ export struct ConversationDetailPage {
     this.errorMessage = '';
     try {
       const session = await this.appClient.apiService.currentSession();
+      if (version !== this.requestVersion) return;
+      const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
+      this.userId = session.userId;
+      ConversationMemory.establishAccount(token, session.userId);
+      const cached = ConversationMemory.read(token, session.userId).find(row =>
+        row.conversation.conversationId === this.conversationId);
+      if (cached !== undefined) {
+        this.conversation = cached.conversation;
+        this.messages = ConversationMemory.readMessages(token, session.userId, this.conversationId);
+        this.loading = false;
+      }
       const conversations = await this.appClient.apiService.listConversations('conversations.detail.list');
       const match = conversations.find((item: ConversationSummary) => item.conversationId === this.conversationId);
       if (match === undefined) {
@@ -64,14 +79,18 @@ export struct ConversationDetailPage {
       const messages = await this.appClient.apiService.listMessages(this.conversationId);
       const quotes = await this.appClient.apiService.listQuotes(this.conversationId);
       if (version === this.requestVersion) {
-        this.userId = session.userId;
         this.conversation = match;
-        this.messages = Array.isArray(messages) ? messages : [];
+        this.messages = ConversationMessageState.merge(this.messages, Array.isArray(messages) ? messages : []);
+        ConversationMemory.writeMessages(token, this.userId, this.conversationId, this.messages);
         this.quotes = Array.isArray(quotes) ? quotes : [];
       }
     } catch (error) {
       if (version === this.requestVersion) {
-        this.errorMessage = (error as PortraError).message || '会话加载失败';
+        if (this.conversation !== null) {
+          this.actionError = (error as PortraError).message || '暂时无法更新会话';
+        } else {
+          this.errorMessage = (error as PortraError).message || '会话加载失败';
+        }
       }
     } finally {
       if (version === this.requestVersion) {
@@ -90,7 +109,9 @@ export struct ConversationDetailPage {
       const messages = await this.appClient.apiService.listMessages(this.conversationId);
       const quotes = await this.appClient.apiService.listQuotes(this.conversationId);
       if (version === this.requestVersion && contentVersion === this.contentVersion && !this.busy) {
-        this.messages = Array.isArray(messages) ? messages : this.messages;
+        this.messages = ConversationMessageState.merge(this.messages, Array.isArray(messages) ? messages : []);
+        const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
+        ConversationMemory.writeMessages(token, this.userId, this.conversationId, this.messages);
         this.quotes = Array.isArray(quotes) ? quotes : this.quotes;
       }
     } catch {
@@ -100,20 +121,71 @@ export struct ConversationDetailPage {
 
   private async send(): Promise<void> {
     const content = this.draft.trim();
-    if (this.busy || !content) {
+    if (this.busy || !content || this.userId <= 0) {
       return;
     }
+    const pending = ConversationMessageState.pending(this.conversationId, this.userId, content);
+    this.messages = [...this.messages, pending];
+    const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
+    ConversationMemory.writeMessages(token, this.userId, this.conversationId, this.messages);
+    await this.sendPending(pending);
+  }
+
+  private async retryMessage(message: MessageSummary): Promise<void> {
+    if (this.busy || message.messageId >= 0) return;
+    if (message.deliveryStatus === SendStatus.UNCERTAIN && this.uncertainResendId !== message.messageId) {
+      try {
+        const remote = await this.appClient.apiService.listMessages(this.conversationId);
+        this.messages = ConversationMessageState.merge(this.messages, remote);
+        const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
+        ConversationMemory.writeMessages(token, this.userId, this.conversationId, this.messages);
+        if (!this.messages.some(item => item.messageId === message.messageId)) return;
+        this.uncertainResendId = message.messageId;
+        this.actionError = '尚未查到发送结果。再次点击才会重发，可能产生重复消息。';
+      } catch (error) {
+        this.actionError = (error as PortraError).message || '暂时无法核对发送结果';
+      }
+      return;
+    }
+    this.uncertainResendId = 0;
+    await this.sendPending(message);
+  }
+
+  private async sendPending(pending: MessageSummary): Promise<void> {
+    const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
+    const version = this.requestVersion;
     this.busy = true;
     this.contentVersion++;
     this.actionError = '';
+    this.messages = ConversationMessageState.status(this.messages, pending.messageId, SendStatus.SENDING);
+    ConversationMemory.writeMessages(token, this.userId, this.conversationId, this.messages);
     try {
-      const sent = await this.appClient.apiService.sendMessage(this.conversationId, content);
-      this.messages = [...this.messages, sent];
-      this.draft = '';
+      const sent = await this.appClient.apiService.sendMessage(this.conversationId, pending.content ?? '');
+      if (!sent || !Number.isSafeInteger(sent.messageId) || sent.messageId <= 0) throw new Error('发送结果无法确认');
+      const current = ConversationMemory.readMessages(token, this.userId, this.conversationId);
+      const merged = ConversationMessageState.confirm(current, pending.messageId, sent);
+      ConversationMemory.writeMessages(token, this.userId, this.conversationId, merged);
+      ConversationMemory.noteMessage(token, this.userId, this.conversationId, sent);
+      if (version === this.requestVersion) {
+        this.messages = merged;
+        if (this.draft.trim() === pending.content) this.draft = '';
+      }
     } catch (error) {
-      this.actionError = (error as PortraError).message || '发送失败，内容已保留';
+      const mapped = error as PortraError;
+      const definite = mapped.kind === ErrorKind.CONFIG ||
+        (mapped.kind === ErrorKind.HTTP && mapped.httpStatus >= 400 && mapped.httpStatus < 500) ||
+        (mapped.kind === ErrorKind.BUSINESS && mapped.businessCode < 50000);
+      const status = definite ? SendStatus.FAILED : SendStatus.UNCERTAIN;
+      const current = ConversationMemory.readMessages(token, this.userId, this.conversationId);
+      const next = ConversationMessageState.status(current, pending.messageId, status);
+      ConversationMemory.writeMessages(token, this.userId, this.conversationId, next);
+      if (version === this.requestVersion) {
+        this.messages = next;
+        this.actionError = definite ? '发送失败，内容已保留，可重试。' :
+          '发送结果未确认。请先查询结果，避免重复发送。';
+      }
     } finally {
-      this.busy = false;
+      if (version === this.requestVersion) this.busy = false;
     }
   }
 
@@ -237,6 +309,15 @@ export struct ConversationDetailPage {
         } else if (item.message !== undefined) {
           if (item.message.messageType === 'TEXT') {
             TextMessageBubble({ text: item.message.content ?? '', mine: item.senderId === this.userId })
+            if (item.message.deliveryStatus === SendStatus.SENDING) {
+              Text('发送中').fontSize(10).fontColor(PortraTheme.mutedText)
+            } else if (item.message.deliveryStatus === SendStatus.FAILED ||
+              item.message.deliveryStatus === SendStatus.UNCERTAIN) {
+              Button(item.message.deliveryStatus === SendStatus.UNCERTAIN ?
+                this.uncertainResendId === item.message.messageId ? '确认再次发送' : '查询结果' : '重试')
+                .fontSize(11).height(32)
+                .onClick(() => this.retryMessage(item.message!))
+            }
           } else {
             Text(item.message.messageType === 'IMAGE' ? '[图片]' : `[附件] ${item.message.fileName ?? ''}`)
               .fontSize(13).fontColor(PortraTheme.secondaryText)
