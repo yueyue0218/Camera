@@ -72,7 +72,7 @@ export class ErrorMapper {
   }
 
   static network(): PortraError {
-    return new PortraError(ErrorKind.NETWORK, '无法连接服务器，请检查网络或开发环境地址。');
+    return new PortraError(ErrorKind.NETWORK, '暂时无法连接，请检查网络后重试。');
   }
 
   static parse(): PortraError {

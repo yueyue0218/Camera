@@ -1,8 +1,9 @@
-import { MessageSummary, QuoteSummary } from '../../model/ApiModels';
+import { MessageSummary, OrderSummary, QuoteSummary } from '../../model/ApiModels';
 
 export enum TimelineKind {
   MESSAGE = 'message',
-  QUOTE = 'quote'
+  QUOTE = 'quote',
+  ORDER = 'order'
 }
 
 export interface ConversationTimelineItem {
@@ -12,11 +13,12 @@ export interface ConversationTimelineItem {
   readonly senderId: number;
   readonly message?: MessageSummary;
   readonly quote?: QuoteSummary;
+  readonly order?: OrderSummary;
 }
 
 /** One stable chronological stream; no synthetic backend events. */
 export class ConversationTimeline {
-  static build(messages: MessageSummary[], quotes: QuoteSummary[]): ConversationTimelineItem[] {
+  static build(messages: MessageSummary[], quotes: QuoteSummary[], orders: OrderSummary[] = []): ConversationTimelineItem[] {
     const items: ConversationTimelineItem[] = [];
     const knownQuotes = new Set<number>();
     quotes.forEach((quote: QuoteSummary) => {
@@ -27,6 +29,15 @@ export class ConversationTimeline {
           createdAt: quote.createdAt ?? '', senderId: quote.providerUserId, quote: quote });
       }
     });
+    const knownOrders = new Set<number>();
+    orders.forEach((order: OrderSummary) => {
+      if (order !== null && Number.isSafeInteger(order.orderId) && order.orderId > 0 &&
+        !knownOrders.has(order.orderId)) {
+        knownOrders.add(order.orderId);
+        items.push({ key: `order:${order.orderId}`, kind: TimelineKind.ORDER,
+          createdAt: order.createdAt ?? '', senderId: order.providerUserId ?? 0, order: order });
+      }
+    });
     const knownMessages = new Set<string>();
     messages.forEach((message: MessageSummary) => {
       if (message === null || message.messageId === undefined || message.messageId === null) return;
@@ -35,6 +46,8 @@ export class ConversationTimeline {
       knownMessages.add(key);
       if (message.messageType === 'QUOTE' && message.quotationId !== undefined &&
         knownQuotes.has(message.quotationId)) return;
+      if (message.messageType === 'ORDER' && message.orderId !== undefined &&
+        knownOrders.has(message.orderId)) return;
       items.push({ key: key, kind: TimelineKind.MESSAGE,
         createdAt: message.createdAt ?? '', senderId: message.senderId, message: message });
     });

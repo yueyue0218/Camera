@@ -10,6 +10,9 @@ import { ServiceDetailPage } from './ServiceDetailPage';
 import { ConversationDetailPage } from './ConversationDetailPage';
 import { MessagePage } from './MessagePage';
 import { OrderPage } from './OrderPage';
+import { OrderDetailPage } from './OrderDetailPage';
+import { QuoteDetailPage } from './QuoteDetailPage';
+import { QuoteFormPage } from './QuoteFormPage';
 import { ProfilePage } from './ProfilePage';
 import { PublishPage } from './PublishPage';
 import { PortraTheme } from '../theme/PortraTheme';
@@ -46,6 +49,12 @@ struct Index {
         this.ServiceDetailDestination(param);
       } else if (name === AppRoute.CONVERSATION_DETAIL) {
         this.ConversationDetailDestination(param);
+      } else if (name === AppRoute.QUOTE_FORM) {
+        this.QuoteFormDestination(param);
+      } else if (name === AppRoute.QUOTE_DETAIL) {
+        this.QuoteDetailDestination(param);
+      } else if (name === AppRoute.ORDER_DETAIL) {
+        this.OrderDetailDestination(param);
       } else if (name === AppRoute.PUBLISH) {
         PublishPage({
           onBack: () => this.appPathStack.pop(),
@@ -61,7 +70,8 @@ struct Index {
             this.openPage(AppRoute.CONVERSATION_DETAIL, { conversationId: conversationId })
         });
       } else if (name === AppRoute.ORDER) {
-        OrderPage({ onBack: () => this.appPathStack.pop() });
+        OrderPage({ onBack: () => this.appPathStack.pop(),
+          onOpenOrder: (orderId: number) => this.openPage(AppRoute.ORDER_DETAIL, { orderId: orderId }) });
       } else if (name === AppRoute.PROFILE) {
         ProfilePage({
           onBack: () => this.appPathStack.pop(),
@@ -160,7 +170,67 @@ struct Index {
       this.PlaceholderPage('约拍会话', '无效的会话编号');
     } else {
       ConversationDetailPage({ conversationId: this.validConversationId(param),
-        onBack: () => this.appPathStack.pop() });
+        onBack: () => this.appPathStack.pop(),
+        onCreateQuote: () => this.openPage(AppRoute.QUOTE_FORM,
+          { conversationId: this.validConversationId(param) }),
+        onOpenQuote: (quoteId: number) => this.openPage(AppRoute.QUOTE_DETAIL,
+          { conversationId: this.validConversationId(param), quoteId: quoteId }),
+        onOpenOrder: (orderId: number) => this.openPage(AppRoute.ORDER_DETAIL,
+          { orderId: orderId, conversationId: this.validConversationId(param), fromConversation: true }),
+        onPayOrder: (orderId: number) => this.openPage(AppRoute.ORDER_DETAIL,
+          { orderId: orderId, conversationId: this.validConversationId(param), fromConversation: true,
+            openPayment: true }) });
+    }
+  }
+
+  @Builder
+  QuoteFormDestination(param: Object) {
+    if (!this.validConversationId(param) ||
+      ((param as NavigationRouteParam).quoteId !== undefined &&
+        !NavigationPolicy.validQuoteId(param as NavigationRouteParam))) {
+      this.PlaceholderPage('报价', '无法打开这份报价');
+    } else {
+      QuoteFormPage({ conversationId: this.validConversationId(param),
+        quoteId: (param as NavigationRouteParam).quoteId ?? 0,
+        onBack: () => this.appPathStack.pop(),
+        onSaved: () => {
+          this.appPathStack.pop();
+          if ((param as NavigationRouteParam).quoteId !== undefined) this.appPathStack.pop();
+        } });
+    }
+  }
+
+  @Builder
+  QuoteDetailDestination(param: Object) {
+    if (!this.validConversationId(param) || !NavigationPolicy.validQuoteId(param as NavigationRouteParam)) {
+      this.PlaceholderPage('报价', '无法打开这份报价');
+    } else {
+      QuoteDetailPage({ conversationId: this.validConversationId(param),
+        quoteId: (param as NavigationRouteParam).quoteId!,
+        onBack: () => this.appPathStack.pop(),
+        onEdit: () => this.openPage(AppRoute.QUOTE_FORM, param as NavigationRouteParam),
+        onConfirmed: () => this.appPathStack.pop(),
+        onOpenOrder: (orderId: number) => this.openPage(AppRoute.ORDER_DETAIL,
+          { orderId: orderId, conversationId: this.validConversationId(param) }) });
+    }
+  }
+
+  @Builder
+  OrderDetailDestination(param: Object) {
+    if (!NavigationPolicy.validOrderId(param as NavigationRouteParam)) {
+      this.PlaceholderPage('订单', '无法打开这笔订单');
+    } else {
+      OrderDetailPage({ orderId: (param as NavigationRouteParam).orderId!,
+        openPayment: (param as NavigationRouteParam).openPayment === true,
+        onBack: () => this.appPathStack.pop(),
+        onOpenConversation: (conversationId: number) => {
+          if ((param as NavigationRouteParam).fromConversation === true &&
+            (param as NavigationRouteParam).conversationId === conversationId) {
+            this.appPathStack.pop();
+          } else {
+            this.openPage(AppRoute.CONVERSATION_DETAIL, { conversationId: conversationId });
+          }
+        } });
     }
   }
 
@@ -182,7 +252,10 @@ struct Index {
 
   private openLoginFor(route: AppRoute, param: NavigationRouteParam): void {
     const loginParam: NavigationRouteParam = {
-      returnRoute: route, demandId: param.demandId, serviceId: param.serviceId
+      returnRoute: route, demandId: param.demandId, serviceId: param.serviceId,
+      conversationId: param.conversationId, quoteId: param.quoteId, orderId: param.orderId,
+      fromConversation: param.fromConversation,
+      openPayment: param.openPayment
     };
     this.pushRoute(AppRoute.LOGIN, loginParam);
   }
@@ -197,7 +270,9 @@ struct Index {
       const returnParam: NavigationRouteParam = {
         demandId: param.demandId,
         serviceId: param.serviceId,
-        conversationId: param.conversationId
+        conversationId: param.conversationId,
+        quoteId: param.quoteId, orderId: param.orderId, fromConversation: param.fromConversation,
+        openPayment: param.openPayment
       };
       this.pushRoute(returnRoute, returnParam);
     }

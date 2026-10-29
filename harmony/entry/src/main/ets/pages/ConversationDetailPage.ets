@@ -11,8 +11,12 @@ import { ConversationVisibility } from '../features/conversation/ConversationVis
 import { ConversationMessageState, SendStatus } from '../features/conversation/ConversationMessageState';
 import { ConversationTextSender } from '../features/conversation/ConversationTextSender';
 import { ConversationTimeline, ConversationTimelineItem, TimelineKind } from '../features/conversation/ConversationTimeline';
+import { QuoteEventCard } from '../features/conversation/QuoteEventCard';
+import { OrderEventCard } from '../features/conversation/OrderEventCard';
+import { OrderWorkflow } from '../features/conversation/OrderWorkflow';
+import { QuoteWorkflow } from '../features/conversation/QuoteWorkflow';
 import { TextMessageBubble } from '../features/conversation/TextMessageBubble';
-import { ConversationSummary, CreateQuotePayload, MessageSummary, QuoteSummary } from '../model/ApiModels';
+import { ConversationSummary, MessageSummary, OrderSummary, QuoteSummary } from '../model/ApiModels';
 import { PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
 
@@ -28,14 +32,8 @@ export struct ConversationDetailPage {
   @State private peerName: string = '约拍会话';
   @State private messages: MessageSummary[] = [];
   @State private quotes: QuoteSummary[] = [];
+  @State private orders: OrderSummary[] = [];
   @State private draft: string = '';
-  @State private showQuoteForm: boolean = false;
-  @State private quoteAmount: string = '';
-  @State private quoteStart: string = '';
-  @State private quoteEnd: string = '';
-  @State private quoteDelivery: string = '';
-  @State private quoteLocation: string = '';
-  @State private quoteService: string = '';
   @State private uncertainResendId: number = 0;
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
@@ -48,6 +46,10 @@ export struct ConversationDetailPage {
   private readonly threadScroller: Scroller = new Scroller();
   private previousKeyboardAvoidMode?: KeyboardAvoidMode;
   onBack?: () => void;
+  onCreateQuote?: () => void;
+  onOpenQuote?: (quoteId: number) => void;
+  onOpenOrder?: (orderId: number) => void;
+  onPayOrder?: (orderId: number) => void;
 
   aboutToAppear(): void {
     this.busy = false;
@@ -100,6 +102,7 @@ export struct ConversationDetailPage {
     this.conversation = null;
     this.messages = [];
     this.quotes = [];
+    this.orders = [];
     this.draft = '';
     this.peerName = '约拍会话';
     this.busy = false;
@@ -174,6 +177,7 @@ export struct ConversationDetailPage {
           cached === undefined);
         ConversationMemory.writeMessages(token, this.userId, this.conversationId, this.messages);
         this.quotes = Array.isArray(quotes) ? quotes : [];
+        this.refreshOrders(version);
       }
     } catch (error) {
       if (this.visible && version === this.requestVersion) {
@@ -210,9 +214,21 @@ export struct ConversationDetailPage {
         const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
         ConversationMemory.writeMessages(token, this.userId, this.conversationId, this.messages);
         this.quotes = Array.isArray(quotes) ? quotes : this.quotes;
+        this.refreshOrders(version);
       }
     } catch {
       // Keep the last readable conversation during a temporary refresh failure.
+    }
+  }
+
+  private async refreshOrders(version: number): Promise<void> {
+    try {
+      const orders = await this.appClient.apiService.listOrders();
+      if (this.visible && version === this.requestVersion && Array.isArray(orders)) {
+        this.orders = OrderWorkflow.inConversation(orders, this.conversationId);
+      }
+    } catch {
+      // Messages and quotes remain usable while order updates are unavailable.
     }
   }
 
@@ -295,112 +311,6 @@ export struct ConversationDetailPage {
     }
   }
 
-  private normalizedDateTime(value: string): string | undefined {
-    const input = value.trim().replace(' ', 'T');
-    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(input) || Number.isNaN(Date.parse(input))) {
-      return undefined;
-    }
-    return `${input}:00`;
-  }
-
-  private async createQuote(): Promise<void> {
-    if (this.busy) {
-      return;
-    }
-    const start = this.normalizedDateTime(this.quoteStart);
-    const end = this.normalizedDateTime(this.quoteEnd);
-    const delivery = this.normalizedDateTime(this.quoteDelivery);
-    const amount = Number(this.quoteAmount.trim());
-    const amountCent = Math.round(amount * 100);
-    if (!start || !end || !delivery || Date.parse(start) >= Date.parse(end) ||
-      Date.parse(end) >= Date.parse(delivery) || !this.quoteLocation.trim() || !this.quoteService.trim() ||
-      !this.quoteAmount.trim() || !Number.isFinite(amount) || amount <= 0 || !Number.isSafeInteger(amountCent)) {
-      this.actionError = '请检查金额、时间、地点和拍摄内容';
-      return;
-    }
-    const payload: CreateQuotePayload = {
-      conversationId: this.conversationId, amountCent: amountCent,
-      shootStartTime: start, shootEndTime: end, deliveryDeadline: delivery,
-      location: this.quoteLocation.trim(), serviceContent: this.quoteService.trim()
-    };
-    this.busy = true;
-    this.contentVersion++;
-    this.actionError = '';
-    try {
-      const quote = await this.appClient.apiService.createQuote(payload);
-      this.quotes = [quote, ...this.quotes];
-      this.showQuoteForm = false;
-    } catch (error) {
-      this.actionError = (error as PortraError).message || '提交约定失败';
-    } finally {
-      this.busy = false;
-    }
-  }
-
-  private async confirmQuote(quoteId: number): Promise<void> {
-    if (this.busy) {
-      return;
-    }
-    this.busy = true;
-    this.contentVersion++;
-    this.actionError = '';
-    try {
-      await this.appClient.apiService.confirmQuote(quoteId);
-      await this.refreshAfterAction();
-    } catch (error) {
-      this.actionError = (error as PortraError).message || '确认失败';
-    } finally {
-      this.busy = false;
-    }
-  }
-
-  private async refreshAfterAction(): Promise<void> {
-    const result = await this.appClient.apiService.listQuotes(this.conversationId);
-    this.quotes = Array.isArray(result) ? result : this.quotes;
-  }
-
-  @Builder
-  private QuoteForm() {
-    Column({ space: 10 }) {
-      Text('拍摄约定').fontSize(17).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
-      TextInput({ text: this.quoteAmount, placeholder: '报价金额（元）' })
-        .type(InputType.Number).onChange((value: string) => this.quoteAmount = value)
-      TextInput({ text: this.quoteStart, placeholder: '开始：2026-10-12 14:00' })
-        .onChange((value: string) => this.quoteStart = value)
-      TextInput({ text: this.quoteEnd, placeholder: '结束：2026-10-12 16:00' })
-        .onChange((value: string) => this.quoteEnd = value)
-      TextInput({ text: this.quoteDelivery, placeholder: '交付：2026-10-19 18:00' })
-        .onChange((value: string) => this.quoteDelivery = value)
-      TextInput({ text: this.quoteLocation, placeholder: '拍摄地点' })
-        .onChange((value: string) => this.quoteLocation = value)
-      TextArea({ text: this.quoteService, placeholder: '拍摄内容及交付约定' })
-        .height(80).onChange((value: string) => this.quoteService = value)
-      Button(this.busy ? '提交中' : '发送约定供客户确认')
-        .enabled(!this.busy).onClick(() => this.createQuote())
-    }
-    .width('100%').padding(14).backgroundColor(PortraTheme.surface).borderRadius(8)
-  }
-
-  @Builder
-  private QuoteItem(item: QuoteSummary) {
-    Column({ space: 8 }) {
-      Text(item.status === 'CONFIRMED' ? '双方约定已确认' :
-        item.status === 'PENDING_CONFIRM' ? '等待客户确认' : '约定已结束')
-        .fontSize(14).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primary)
-      Text(`¥${(item.amountCent / 100).toFixed(2)} · ${item.location}`)
-        .fontSize(14).fontColor(PortraTheme.primaryText)
-      Text(`${item.shootStartTime.replace('T', ' ').slice(0, 16)} - ${item.shootEndTime.replace('T', ' ').slice(11, 16)}`)
-        .fontSize(12).fontColor(PortraTheme.secondaryText)
-      Text(item.serviceContent).fontSize(13).fontColor(PortraTheme.secondaryText)
-      if (item.status === 'PENDING_CONFIRM' && this.userId === item.customerId) {
-        Button(this.busy ? '确认中' : '确认约拍约定')
-          .enabled(!this.busy).onClick(() => this.confirmQuote(item.quotationId))
-      }
-    }
-    .width('100%').alignItems(HorizontalAlign.Start)
-    .padding(14).backgroundColor(PortraTheme.surface).borderRadius(8)
-  }
-
   @Builder
   private TimelineRow(item: ConversationTimelineItem) {
     Row({ space: 8 }) {
@@ -411,7 +321,11 @@ export struct ConversationDetailPage {
       }
       Column({ space: 4 }) {
         if (item.kind === TimelineKind.QUOTE && item.quote !== undefined) {
-          this.QuoteItem(item.quote)
+          QuoteEventCard({ quote: item.quote, onOpen: () => this.onOpenQuote?.(item.quote!.quotationId) })
+        } else if (item.kind === TimelineKind.ORDER && item.order !== undefined) {
+          OrderEventCard({ order: item.order, userId: this.userId,
+            onOpen: () => this.onOpenOrder?.(item.order!.orderId),
+            onPay: () => this.onPayOrder?.(item.order!.orderId) })
         } else if (item.message !== undefined) {
           if (item.message.messageType === 'TEXT') {
             TextMessageBubble({ text: item.message.content ?? '', mine: item.senderId === this.userId })
@@ -463,19 +377,17 @@ export struct ConversationDetailPage {
               Button('刷新').onClick(() => this.refreshContent())
             }
             .width('100%')
-            if (this.messages.length === 0 && this.quotes.length === 0) {
+            if (this.messages.length === 0 && this.quotes.length === 0 && this.orders.length === 0) {
               Text('从一句问候开始')
                 .fontSize(13).fontColor(PortraTheme.secondaryText)
                 .width('100%').textAlign(TextAlign.Center).padding(24)
             }
-            ForEach(ConversationTimeline.build(this.messages, this.quotes), (item: ConversationTimelineItem) => {
+            ForEach(ConversationTimeline.build(this.messages, this.quotes, this.orders), (item: ConversationTimelineItem) => {
               this.TimelineRow(item)
             }, (item: ConversationTimelineItem) => item.key)
             if (this.conversation?.participantBId === this.userId) {
-              if (this.showQuoteForm) {
-                this.QuoteForm()
-              } else {
-                Button('提出拍摄约定').onClick(() => this.showQuoteForm = true)
+              if (QuoteWorkflow.active(this.quotes) === undefined) {
+                Button('发送报价').onClick(() => this.onCreateQuote?.())
               }
             }
           }

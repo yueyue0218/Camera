@@ -38,7 +38,8 @@ export class NavigationPolicy {
           conversationId: param.conversationId,
           quoteId: param.quoteId,
           orderId: param.orderId,
-          fromConversation: param.fromConversation
+          fromConversation: param.fromConversation,
+          openPayment: param.openPayment
         }
       };
     }

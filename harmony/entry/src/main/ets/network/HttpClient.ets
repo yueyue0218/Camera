@@ -113,11 +113,11 @@ export class HttpClient implements AuthTokenController {
     authenticated: boolean, body?: Object): Promise<T> {
     const profile = EnvironmentConfig.current();
     if (!EnvironmentConfig.isUsable(profile)) {
-      throw ErrorMapper.config(`当前环境 ${profile.name} 没有可用的服务端地址。`);
+      throw ErrorMapper.config('暂时无法连接服务。');
     }
 
     if (!path.startsWith('/') || path.startsWith('//') || /[\\\s#]/.test(path)) {
-      throw ErrorMapper.config('接口必须使用以单个 / 开头的相对路径。');
+      throw ErrorMapper.config('暂时无法完成请求。');
     }
     const request = http.createHttp();
     const requestVersion = this.beginRequest(requestKey, request);

@@ -14,6 +14,7 @@ export class ConversationVisibility {
   static key(route: string, param: NavigationRouteParam = {}): string {
     if (route === AppRoute.CONVERSATION_DETAIL) return `detail:${param.conversationId ?? 0}`;
     if (route === AppRoute.MESSAGE) return 'list';
+    if (route === AppRoute.ORDER) return 'orders';
     return '';
   }
 
