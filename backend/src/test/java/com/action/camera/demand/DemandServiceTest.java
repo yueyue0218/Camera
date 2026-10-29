@@ -91,6 +91,19 @@ class DemandServiceTest {
     }
 
     @Test
+    void ownerPublicationsAreBoundToAuthenticatedIdentity() {
+        DemandDto own = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        demandService.createDemand(otherCustomer, demandRequest("PORTRAIT", "NJU"));
+        assertThat(demandService.listMyPublications(customer, 1, 10).getRecords())
+                .extracting(DemandDto::getDemandId).containsExactly(own.getDemandId());
+        assertThat(demandService.listMyPublications(admin, 1, 10).getRecords()).isEmpty();
+        assertThatThrownBy(() -> demandService.listMyPublications(provider, 1, 10))
+                .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> demandService.listMyPublications(null, 1, 10))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
     void createDemandStoresOpenDemand() {
         DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
 

@@ -16,6 +16,12 @@ import java.util.Optional;
 
 public interface ServicePackageRepository extends JpaRepository<ServicePackage, Long> {
 
+    @Query(value = "select e from ServicePackage e where e.providerId = :userId and e.status = com.action.camera.servicepackage.domain.ServicePackageStatus.ONLINE and e.moderationStatus = com.action.camera.admin.domain.ModerationStatus.VISIBLE and (e.hiddenByProvider = false or e.hiddenByProvider is null) order by e.updatedAt desc, e.id desc")
+    Page<ServicePackage> findPublicByUser(@Param("userId") Long userId, Pageable pageable);
+
+    @Query("select e from ServicePackage e where e.providerId = :userId and (e.hiddenByProvider = false or e.hiddenByProvider is null) order by e.updatedAt desc, e.id desc")
+    Page<ServicePackage> findOwnerPage(@Param("userId") Long userId, Pageable pageable);
+
     List<ServicePackage> findByStatus(ServicePackageStatus status);
 
     List<ServicePackage> findByProviderIdAndStatusAndHiddenByProviderFalse(

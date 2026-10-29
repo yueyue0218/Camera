@@ -30,6 +30,48 @@ class DemandRepositoryPaginationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+
+    @Test
+    void ownerPageIncludesLegacyNullAndPrivateStatesButExcludesHiddenAndOtherOwners() {
+        jdbcTemplate.execute("alter table demands alter column hidden_by_customer drop not null");
+        Demand normal = demand(801L, "NJ", "PORTRAIT", 100, 200, null);
+        Demand legacy = demand(801L, "NJ", "PORTRAIT", 100, 200, null);
+        Demand privateState = demand(801L, "NJ", "PORTRAIT", 100, 200, null);
+        privateState.setStatus(DemandStatus.CLOSED);
+        privateState.setModerationStatus(ModerationStatus.HIDDEN);
+        Demand hidden = demand(801L, "NJ", "PORTRAIT", 100, 200, null);
+        hidden.setHiddenByCustomer(true);
+        Demand other = demand(802L, "NJ", "PORTRAIT", 100, 200, null);
+        repository.saveAllAndFlush(List.of(normal, legacy, privateState, hidden, other));
+        // SQL bypasses entity defaults to reproduce historical rows.
+        jdbcTemplate.update("update demands set hidden_by_customer = null where id = ?", legacy.getId());
+        var first = repository.findOwnerPage(801L, PageRequest.of(0, 2));
+        var second = repository.findOwnerPage(801L, PageRequest.of(1, 2));
+        assertThat(first.getTotalElements()).isEqualTo(3);
+        assertThat(second.getTotalElements()).isEqualTo(3);
+        assertThat(first.getContent()).extracting(Demand::getId).containsExactly(privateState.getId(), legacy.getId());
+        assertThat(second.getContent()).extracting(Demand::getId).containsExactly(normal.getId());
+        assertThat(repository.findPublicByUser(801L, PageRequest.of(0, 10)).getContent())
+                .extracting(Demand::getId).containsExactly(legacy.getId(), normal.getId());
+    }
+
+    @Test
+    void publicAuthorPagesExcludeOtherOwnersClosedHiddenAndModeratedRows() {
+        Demand a = demand(801L, "NJ", "PORTRAIT", 100, 200, null);
+        Demand b = demand(801L, "NJ", "PORTRAIT", 100, 200, null);
+        Demand other = demand(802L, "NJ", "PORTRAIT", 100, 200, null);
+        Demand closed = demand(801L, "NJ", "PORTRAIT", 100, 200, null); closed.setStatus(DemandStatus.CLOSED);
+        Demand hidden = demand(801L, "NJ", "PORTRAIT", 100, 200, null); hidden.setHiddenByCustomer(true);
+        Demand moderated = demand(801L, "NJ", "PORTRAIT", 100, 200, null); moderated.setModerationStatus(ModerationStatus.HIDDEN);
+        repository.saveAllAndFlush(List.of(a, b, other, closed, hidden, moderated));
+        var first = repository.findPublicByUser(801L, PageRequest.of(0, 1));
+        var second = repository.findPublicByUser(801L, PageRequest.of(1, 1));
+        assertThat(first.getTotalElements()).isEqualTo(2);
+        assertThat(second.getContent()).hasSize(1);
+        assertThat(first.getContent().get(0).getId()).isNotEqualTo(second.getContent().get(0).getId());
+        assertThat(first.getContent().get(0).getCustomerId()).isEqualTo(801L);
+    }
+
     @Test
     void publicPageFiltersCountsAndPagesInDatabase() {
         LocalDate targetDate = LocalDate.of(2026, 10, 1);

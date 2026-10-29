@@ -84,6 +84,18 @@ public class ServicePackageController {
         ));
     }
 
+    @GetMapping("/by-user/{userId}")
+    public Result<PageResult<ServicePackageCardDto>> publicByUser(@PathVariable Long userId,
+            @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "12") int size) {
+        return Result.success(servicePackageService.listPublicByUser(userId, page, size));
+    }
+
+    @GetMapping("/me/publications")
+    public Result<PageResult<ServicePackageCardDto>> myPublications(@RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size, HttpServletRequest request) {
+        return Result.success(servicePackageService.listMyPublications(currentUserProvider.getCurrentUser(request), page, size));
+    }
+
     @GetMapping("/me/history")
     public Result<List<ServicePackageCardDto>> listMyServicePackageHistory(HttpServletRequest httpRequest) {
         CurrentUser currentUser = currentUserProvider.getCurrentUser(httpRequest);

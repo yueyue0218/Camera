@@ -358,6 +358,21 @@ public class ServicePackageService {
     }
 
     @Transactional(readOnly = true)
+    public PageResult<ServicePackageCardDto> listPublicByUser(Long userId, int page, int size) {
+        int safePage = Math.max(1, page), safeSize = Math.max(1, Math.min(50, size));
+        var result = servicePackageRepository.findPublicByUser(userId, PageRequest.of(safePage - 1, safeSize));
+        return new PageResult<>(result.getContent().stream().map(item -> ServicePackageMapper.toCard(item, photographerInfo(item.getProviderId()), null)).toList(), safePage, safeSize, result.getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<ServicePackageCardDto> listMyPublications(CurrentUser user, int page, int size) {
+        ensureProviderOrAdmin(user);
+        int safePage = Math.max(1, page), safeSize = Math.max(1, Math.min(50, size));
+        var result = servicePackageRepository.findOwnerPage(user.getUserId(), PageRequest.of(safePage - 1, safeSize));
+        return new PageResult<>(result.getContent().stream().map(item -> ServicePackageMapper.toCard(item, photographerInfo(item.getProviderId()), null, moderationView(item))).toList(), safePage, safeSize, result.getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
     public List<ServicePackageCardDto> listMyServicePackageHistory(CurrentUser currentUser) {
         ensureProviderOrAdmin(currentUser);
         List<ServicePackage> packages = servicePackageRepository.findOwnerHistory(currentUser.getUserId());

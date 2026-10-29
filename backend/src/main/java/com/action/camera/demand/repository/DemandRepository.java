@@ -19,6 +19,12 @@ import java.util.Optional;
 
 public interface DemandRepository extends JpaRepository<Demand, Long> {
 
+    @Query(value = "select e from Demand e where e.customerId = :userId and e.status = com.action.camera.demand.domain.DemandStatus.OPEN and e.moderationStatus = com.action.camera.admin.domain.ModerationStatus.VISIBLE and (e.hiddenByCustomer = false or e.hiddenByCustomer is null) order by e.updatedAt desc, e.id desc")
+    Page<Demand> findPublicByUser(@Param("userId") Long userId, Pageable pageable);
+
+    @Query("select e from Demand e where e.customerId = :userId and (e.hiddenByCustomer = false or e.hiddenByCustomer is null) order by e.updatedAt desc, e.id desc")
+    Page<Demand> findOwnerPage(@Param("userId") Long userId, Pageable pageable);
+
     List<Demand> findByStatus(DemandStatus status);
 
     @Query(value = """

@@ -249,6 +249,21 @@ public class DemandService {
     }
 
     @Transactional(readOnly = true)
+    public PageResult<DemandDto> listPublicByUser(Long userId, int page, int size) {
+        int safePage = Math.max(1, page), safeSize = Math.max(1, Math.min(50, size));
+        var result = demandRepository.findPublicByUser(userId, PageRequest.of(safePage - 1, safeSize));
+        return new PageResult<>(result.getContent().stream().map(this::toDemandDto).toList(), safePage, safeSize, result.getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<DemandDto> listMyPublications(CurrentUser user, int page, int size) {
+        requireCustomerOrAdmin(user);
+        int safePage = Math.max(1, page), safeSize = Math.max(1, Math.min(50, size));
+        var result = demandRepository.findOwnerPage(user.getUserId(), PageRequest.of(safePage - 1, safeSize));
+        return new PageResult<>(result.getContent().stream().map(this::toOwnerDemandDto).toList(), safePage, safeSize, result.getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
     public List<DemandDto> listMyDemandHistory(CurrentUser user) {
         requireCustomerOrAdmin(user);
         return demandRepository.findOwnerHistory(user.getUserId(), List.of(DemandStatus.OPEN, DemandStatus.CLOSED))

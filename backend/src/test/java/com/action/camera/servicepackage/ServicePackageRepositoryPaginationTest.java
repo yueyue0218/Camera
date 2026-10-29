@@ -30,6 +30,31 @@ class ServicePackageRepositoryPaginationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+
+    @Test
+    void ownerPageIncludesLegacyNullAndPrivateStatesButExcludesHiddenAndOtherOwners() {
+        jdbcTemplate.execute("alter table service_packages alter column hidden_by_provider drop not null");
+        ServicePackage normal = servicePackage(801L, "NJ", 100L, LocalDate.of(2026, 9, 6), ModerationStatus.VISIBLE, false);
+        ServicePackage legacy = servicePackage(801L, "NJ", 100L, LocalDate.of(2026, 9, 6), ModerationStatus.VISIBLE, false);
+        ServicePackage privateState = servicePackage(801L, "NJ", 100L, LocalDate.of(2026, 9, 6), ModerationStatus.VISIBLE, false);
+        privateState.setStatus(ServicePackageStatus.OFFLINE);
+        privateState.setModerationStatus(ModerationStatus.HIDDEN);
+        ServicePackage hidden = servicePackage(801L, "NJ", 100L, LocalDate.of(2026, 9, 6), ModerationStatus.VISIBLE, false);
+        hidden.setHiddenByProvider(true);
+        ServicePackage other = servicePackage(802L, "NJ", 100L, LocalDate.of(2026, 9, 6), ModerationStatus.VISIBLE, false);
+        repository.saveAllAndFlush(List.of(normal, legacy, privateState, hidden, other));
+        // SQL bypasses entity defaults to reproduce historical rows.
+        jdbcTemplate.update("update service_packages set hidden_by_provider = null where id = ?", legacy.getId());
+        var first = repository.findOwnerPage(801L, PageRequest.of(0, 2));
+        var second = repository.findOwnerPage(801L, PageRequest.of(1, 2));
+        assertThat(first.getTotalElements()).isEqualTo(3);
+        assertThat(second.getTotalElements()).isEqualTo(3);
+        assertThat(first.getContent()).extracting(ServicePackage::getId).containsExactly(privateState.getId(), legacy.getId());
+        assertThat(second.getContent()).extracting(ServicePackage::getId).containsExactly(normal.getId());
+        assertThat(repository.findPublicByUser(801L, PageRequest.of(0, 10)).getContent())
+                .extracting(ServicePackage::getId).containsExactly(legacy.getId(), normal.getId());
+    }
+
     @Test
     void publicPageFiltersCountsSortsAndPagesInDatabase() {
         LocalDate availableDate = LocalDate.of(2026, 9, 6);

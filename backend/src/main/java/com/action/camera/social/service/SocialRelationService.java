@@ -130,13 +130,19 @@ public class SocialRelationService {
     public PublicProfileResponse getPublicProfile(Long userId, String role, CurrentUser currentUser) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
-        Long currentUserId = requireCurrentUserId(currentUser);
+        Long currentUserId = currentUser == null ? null : currentUser.getUserId();
         String resolvedRole = (role != null && !role.isBlank()) ? role.toUpperCase() : user.getCurrentRole();
+        if (!"ACTIVE".equals(user.getStatus())) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
+        }
+        if (!"CUSTOMER".equals(resolvedRole) && !"PROVIDER".equals(resolvedRole)) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "unsupported role");
+        }
         boolean isProvider = "PROVIDER".equalsIgnoreCase(resolvedRole);
 
         long followerCount = userFollowRepository.countByFollowingUserIdAndTargetRole(userId, resolvedRole);
         long followingCount = userFollowRepository.countByFollowerIdAndTargetRole(userId, resolvedRole);
-        boolean followedByCurrentUser = userFollowRepository.existsByFollowerIdAndFollowingUserId(currentUserId, userId);
+        boolean followedByCurrentUser = currentUserId != null && userFollowRepository.existsByFollowerIdAndFollowingUserId(currentUserId, userId);
         long momentCount = momentPostRepository.countByAuthorIdAndAuthorRoleAndStatusAndModerationStatus(
                 userId, resolvedRole, MomentStatus.PUBLISHED, ModerationStatus.VISIBLE);
 
@@ -173,7 +179,7 @@ public class SocialRelationService {
                 followedByCurrentUser,
                 momentCount,
                 providerProfile,
-                user.getCityCode()
+                Boolean.TRUE.equals(user.getLocationVisible()) ? user.getCityCode() : null
         );
     }
 
