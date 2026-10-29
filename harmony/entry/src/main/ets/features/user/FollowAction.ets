@@ -15,8 +15,10 @@ export struct FollowAction {
   @State private errorMessage: string = '';
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
+  private sessionVersion: number = -1;
 
   aboutToAppear(): void {
+    this.busy = false;
     this.load();
   }
 
@@ -28,13 +30,20 @@ export struct FollowAction {
 
   private async load(): Promise<void> {
     const version = ++this.requestVersion;
+    const sessionVersion = this.appClient.sessionManager.getSessionVersion();
+    this.sessionVersion = sessionVersion;
     this.loading = true;
     this.errorMessage = '';
     try {
       const result: PublicUserProfile = await this.appClient.apiService.getPublicProfile(
         this.targetUserId, this.targetRole);
+      if (version !== this.requestVersion ||
+        sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
+        return;
+      }
       const following = await this.appClient.apiService.listFollowing(this.currentUserId, this.targetRole);
-      if (version !== this.requestVersion) {
+      if (version !== this.requestVersion ||
+        sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
         return;
       }
       if (result === null || result.userId !== this.targetUserId ||
@@ -49,12 +58,18 @@ export struct FollowAction {
         item !== null && item.userId === this.targetUserId);
       this.followerCount = result.followerCount;
     } catch (error) {
-      if (version === this.requestVersion) {
+      if (version === this.requestVersion &&
+        sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
         this.errorMessage = (error as PortraError).message || '关注状态暂不可用';
       }
     } finally {
       if (version === this.requestVersion) {
         this.loading = false;
+        if (sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
+          this.followed = false;
+          this.followerCount = 0;
+          this.errorMessage = '账号状态已变化，请重新打开页面';
+        }
       }
     }
   }
@@ -63,12 +78,22 @@ export struct FollowAction {
     if (this.loading || this.busy) {
       return;
     }
+    const version = this.requestVersion;
+    const sessionVersion = this.sessionVersion;
+    if (sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
+      this.errorMessage = '账号状态已变化，请重新打开页面';
+      return;
+    }
     this.busy = true;
     this.errorMessage = '';
     try {
       const result = this.followed ?
         await this.appClient.apiService.unfollowUser(this.targetUserId, this.targetRole) :
         await this.appClient.apiService.followUser(this.targetUserId, this.targetRole);
+      if (version !== this.requestVersion ||
+        sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
+        return;
+      }
       if (result === null || result.targetUserId !== this.targetUserId ||
         result.followed === this.followed || !Number.isSafeInteger(result.followerCount) ||
         result.followerCount < 0) {
@@ -77,9 +102,14 @@ export struct FollowAction {
       this.followed = result.followed;
       this.followerCount = result.followerCount;
     } catch (error) {
-      this.errorMessage = (error as PortraError).message || '关注操作失败';
+      if (version === this.requestVersion &&
+        sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
+        this.errorMessage = (error as PortraError).message || '关注操作失败';
+      }
     } finally {
-      this.busy = false;
+      if (version === this.requestVersion) {
+        this.busy = false;
+      }
     }
   }
 

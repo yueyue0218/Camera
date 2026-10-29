@@ -79,11 +79,13 @@ camera:
     refresh-ttl: P${SESSION_REFRESH_TTL_DAYS:30}D
   sms:
     provider: ${SMS_PROVIDER:}
+    staging-aliyun-enabled: ${SMS_STAGING_ALIYUN_ENABLED:false}
     endpoint: ${SMS_ENDPOINT:dysmsapi.aliyuncs.com}
     access-key-id: ${SMS_ACCESS_KEY_ID:}
     access-key-secret: ${SMS_ACCESS_KEY_SECRET:}
     sign-name: ${SMS_SIGN_NAME:}
     login-template-id: ${SMS_LOGIN_TEMPLATE_ID:}
+    code-parameter-name: ${SMS_CODE_PARAMETER_NAME:code}
     code-pepper: ${SMS_CODE_PEPPER:}
     code-ttl: ${SMS_CODE_TTL:5m}
     resend-cooldown: ${SMS_RESEND_COOLDOWN:60s}

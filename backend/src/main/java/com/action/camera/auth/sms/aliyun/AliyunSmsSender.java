@@ -48,7 +48,7 @@ public class AliyunSmsSender implements SmsSender {
 
     private String templateParameters(String code) {
         try {
-            return objectMapper.writeValueAsString(Map.of("code", code));
+            return objectMapper.writeValueAsString(Map.of(properties.getCodeParameterName(), code));
         } catch (JsonProcessingException e) {
             throw new SmsDeliveryException("Unable to serialize SMS template parameters", e);
         }

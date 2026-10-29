@@ -1,4 +1,5 @@
 package com.action.camera.tempstaging;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
@@ -11,6 +12,7 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration(proxyBeanMethods = false)
+@ConditionalOnProperty(prefix = "camera.sms", name = "staging-dypns-enabled", havingValue = "false", matchIfMissing = true)
 @Profile("temp-staging")
 public class TempStagingWebConfig implements WebMvcConfigurer {
 
