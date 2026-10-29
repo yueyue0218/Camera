@@ -1,3 +1,5 @@
+import { OrderEngagementPage } from './OrderEngagementPage';
+import { NotificationTarget } from '../features/notifications/NotificationTargetResolver';
 import { NotificationPage } from './NotificationPage';
 import { CreditPage } from './CreditPage';
 import { NotificationMomentPage } from './NotificationMomentPage';
@@ -27,6 +29,7 @@ struct Index {
   private readonly appClient: AppClient = AppClient.shared;
   private readonly navigationClickGuard: NavigationClickGuard = new NavigationClickGuard();
   private restorePromise?: Promise<void>;
+  @State private orderReloadEpoch: number = 0;
 
   aboutToAppear(): void {
     this.restorePromise = this.appClient.restoreSession();
@@ -61,7 +64,14 @@ struct Index {
         NotificationPage({ onBack: () => this.appPathStack.pop(),
           onRequireLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.NOTIFICATIONS }),
           onOpenMoment: (id: number) => this.openPage(AppRoute.MOMENT_DETAIL, { momentId: id }),
-          onOpenCredit: () => this.openPage(AppRoute.CREDIT), onOpenOrders: () => this.openPage(AppRoute.ORDER) });
+          onOpenCredit: () => this.openPage(AppRoute.CREDIT), onOpenTarget: (target: NotificationTarget) => this.openNotificationTarget(target), onOpenOrders: () => this.openPage(AppRoute.ORDER) });
+      } else if (name === AppRoute.ORDER_ENGAGEMENT) {
+        OrderEngagementPage({ targetKind: (param as NavigationRouteParam).targetKind ?? 'order',
+          targetId: (param as NavigationRouteParam).targetId ?? 0, expectedOrderId: (param as NavigationRouteParam).orderId ?? 0,
+          onBack: () => this.appPathStack.pop(),
+          onRequireLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.ORDER_ENGAGEMENT,
+            targetKind: (param as NavigationRouteParam).targetKind, targetId: (param as NavigationRouteParam).targetId,
+            orderId: (param as NavigationRouteParam).orderId }) });
       } else if (name === AppRoute.CREDIT) {
         CreditPage({ onBack: () => this.appPathStack.pop(),
           onRequireLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.CREDIT }) });
@@ -73,14 +83,15 @@ struct Index {
       } else if (name === AppRoute.MESSAGE) {
         MessagePage({
           onOpenMoment: (id: number) => this.openPage(AppRoute.MOMENT_DETAIL, { momentId: id }),
-          onOpenCredit: () => this.openPage(AppRoute.CREDIT), onOpenOrders: () => this.openPage(AppRoute.ORDER),
+          onOpenCredit: () => this.openPage(AppRoute.CREDIT), onOpenTarget: (target: NotificationTarget) => this.openNotificationTarget(target), onOpenOrders: () => this.openPage(AppRoute.ORDER),
           onRequireLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.MESSAGE }),
           onBack: () => this.appPathStack.pop(),
           onOpenConversation: (conversationId: number) =>
             this.openPage(AppRoute.CONVERSATION_DETAIL, { conversationId: conversationId })
         });
       } else if (name === AppRoute.ORDER) {
-        OrderPage({ onBack: () => this.appPathStack.pop() });
+        OrderPage({ reloadEpoch: this.orderReloadEpoch, onBack: () => this.appPathStack.pop(),
+          onOpenEngagement: (id: number) => this.openPage(AppRoute.ORDER_ENGAGEMENT, { targetKind: 'order', targetId: id }) });
       } else if (name === AppRoute.PUBLIC_PROFILE) {
         this.PublicProfileDestination(param);
       } else if (name === AppRoute.PROFILE) {
@@ -101,6 +112,9 @@ struct Index {
       }
     }
     .hideTitleBar(true)
+    .onShown(() => {
+      if (name === AppRoute.ORDER) { this.orderReloadEpoch++; }
+    })
   }
 
   @Builder
@@ -221,13 +235,16 @@ struct Index {
     return NavigationPolicy.validConversationId(param as NavigationRouteParam) ?? 0;
   }
 
+  private openNotificationTarget(target: NotificationTarget): void {
+    this.openPage(AppRoute.ORDER_ENGAGEMENT, { targetKind: target.kind, targetId: target.id, orderId: target.orderId });
+  }
   private pushRoute(route: AppRoute, param: NavigationRouteParam): void {
     this.appPathStack.pushPathByName(route, param);
   }
 
   private openLoginFor(route: AppRoute, param: NavigationRouteParam): void {
     const loginParam: NavigationRouteParam = {
-      returnRoute: route, momentId: param.momentId, demandId: param.demandId, serviceId: param.serviceId,
+      returnRoute: route, targetKind: param.targetKind, targetId: param.targetId, orderId: param.orderId, momentId: param.momentId, demandId: param.demandId, serviceId: param.serviceId,
       userId: param.userId, userRole: param.userRole, initialTab: param.initialTab
     };
     this.pushRoute(AppRoute.LOGIN, loginParam);
@@ -245,6 +262,7 @@ struct Index {
     }
     if (returnRoute !== undefined && returnRoute !== AppRoute.LOGIN) {
       const returnParam: NavigationRouteParam = {
+        targetKind: param.targetKind, targetId: param.targetId, orderId: param.orderId,
         momentId: param.momentId,
         demandId: param.demandId,
         serviceId: param.serviceId,

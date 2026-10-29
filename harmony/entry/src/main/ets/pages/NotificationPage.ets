@@ -1,3 +1,4 @@
+import { NotificationTarget, NotificationTargetResolver } from '../features/notifications/NotificationTargetResolver';
 import { uiObserver } from '@kit.ArkUI';
 import { AppClient } from '../app/AppClient';
 import { NotificationSummary } from '../model/ApiModels';
@@ -19,6 +20,7 @@ export struct NotificationPage {
   onOpenMoment?: (id: number) => void;
   onOpenCredit?: () => void;
   onOpenOrders?: () => void;
+  onOpenTarget?: (target: NotificationTarget) => void;
 
   aboutToAppear(): void {
     this.controller = new NotificationController(new NotificationApiBinding(AppClient.shared.apiService), new ActivitySessionBinding(AppClient.shared.sessionManager),
@@ -60,16 +62,15 @@ export struct NotificationPage {
   }
   private related(item: NotificationSummary): void {
     if (!this.controller?.canOpen(item.notificationId)) { return; }
-    // Only implemented native destinations; never execute a server-provided URL.
-    if (item.type.includes('MOMENT') && Number.isSafeInteger(item.relatedId) && (item.relatedId ?? 0) > 0) {
-      this.onOpenMoment?.(item.relatedId as number);
-    } else if (item.type.includes('CREDIT')) { this.onOpenCredit?.(); }
-    else if (NotificationFormat.category(item) === 'order' || NotificationFormat.category(item) === 'appeal' ||
-      NotificationFormat.category(item) === 'review') { this.onOpenOrders?.(); }
+    const target = NotificationTargetResolver.resolve(item); if (target === undefined) { return; }
+    if (target.kind === 'moment') { this.onOpenMoment?.(target.id); }
+    else if (target.kind === 'credit') { this.onOpenCredit?.(); }
+    else if (['order','review','complaint','dispute'].includes(target.kind)) { this.onOpenTarget?.(target); }
   }
   private canOpen(item: NotificationSummary): boolean {
-    return (item.type.includes('MOMENT') && Number.isSafeInteger(item.relatedId) && (item.relatedId ?? 0) > 0) ||
-      item.type.includes('CREDIT') || ['order', 'appeal', 'review'].includes(NotificationFormat.category(item));
+    const target = NotificationTargetResolver.resolve(item); if (target === undefined) { return false; }
+    return target.kind === 'moment' || target.kind === 'credit' ||
+      (this.onOpenTarget !== undefined && ['order','review','complaint','dispute'].includes(target.kind));
   }
   @Builder
   private Notice(item: NotificationSummary) {

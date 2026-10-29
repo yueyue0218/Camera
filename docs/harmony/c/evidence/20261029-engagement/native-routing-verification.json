@@ -1,0 +1,36 @@
+{
+  "origin": "http://127.0.0.1:18090",
+  "database": "portra_c_engagement_recovery_20261029",
+  "evidenceType": "official emulator normal UI navigation and observed target records",
+  "targets": [
+    {
+      "notificationId": 38,
+      "type": "ORDER_PAID",
+      "orderId": 6,
+      "screenshot": "notice-order.png"
+    },
+    {
+      "notificationId": 52,
+      "type": "DISPUTE_CREATED",
+      "disputeId": 2,
+      "orderId": 7,
+      "status": "OPEN",
+      "screenshot": "notice-dispute.png"
+    },
+    {
+      "notificationId": 45,
+      "type": "REVIEW_FOLLOW_UP_RECEIVED",
+      "reviewId": 3,
+      "orderId": 2,
+      "screenshot": "notice-followup.png"
+    },
+    {
+      "notificationId": 48,
+      "type": "REVIEW_COMPLAINT_CREATED",
+      "complaintId": 2,
+      "reviewId": 4,
+      "orderId": 2,
+      "screenshot": "notice-complaint.png"
+    }
+  ]
+}

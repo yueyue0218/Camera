@@ -1,3 +1,4 @@
+import { OrderEngagementSummary, ReviewSummary, ReviewComplaintSummary, DisputeSummary, CreateReviewPayload, ReviewTextPayload, CreateReviewComplaintPayload, DisputeReasonPayload } from '../model/ApiModels';
 import { NotificationSummary, CreditSummary, CreditRecordSummary } from '../model/ApiModels';
 import { NativeSessionApi } from '../auth/NativeSessionApi';
 import { AcceptedDemandResponse, ConfirmQuoteResult, ConversationSummary, CreateDemandPayload,
@@ -441,6 +442,56 @@ export class ApiService implements NativeSessionApi {
     this.client.cancelRequest(`conversations.${conversationId}.send`);
     this.client.cancelRequest(`conversations.${conversationId}.createQuote`);
   }
+
+  getOrder(id: number, requestKey: string = 'engagement.getOrder'): Promise<OrderEngagementSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.get<OrderEngagementSummary>(`/orders/${id}`, requestKey);
+  }
+  listOrderReviews(id: number, requestKey: string = 'engagement.listOrderReviews'): Promise<ReviewSummary[]> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.get<ReviewSummary[]>(`/orders/${id}/reviews`, requestKey);
+  }
+  getReview(id: number, requestKey: string = 'engagement.getReview'): Promise<ReviewSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.get<ReviewSummary>(`/reviews/${id}`, requestKey);
+  }
+  listReviewComplaints(id: number, requestKey: string = 'engagement.listReviewComplaints'): Promise<ReviewComplaintSummary[]> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.get<ReviewComplaintSummary[]>(`/reviews/${id}/complaints`, requestKey);
+  }
+  getReviewComplaint(id: number, requestKey: string = 'engagement.getReviewComplaint'): Promise<ReviewComplaintSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.get<ReviewComplaintSummary>(`/reviews/complaints/${id}`, requestKey);
+  }
+  listOrderDisputes(id: number, requestKey: string = 'engagement.listOrderDisputes'): Promise<DisputeSummary[]> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.get<DisputeSummary[]>(`/orders/${id}/disputes`, requestKey);
+  }
+  getDispute(id: number, requestKey: string = 'engagement.getDispute'): Promise<DisputeSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.get<DisputeSummary>(`/disputes/${id}`, requestKey);
+  }
+  createReview(id: number, payload: CreateReviewPayload, requestKey: string = 'engagement.createReview'): Promise<ReviewSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.post<ReviewSummary>(`/orders/${id}/reviews`, payload, requestKey);
+  }
+  followUpReview(id: number, payload: ReviewTextPayload, requestKey: string = 'engagement.followUpReview'): Promise<ReviewSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.post<ReviewSummary>(`/reviews/${id}/follow-up`, payload, requestKey);
+  }
+  createReviewComplaint(id: number, payload: CreateReviewComplaintPayload, requestKey: string = 'engagement.createReviewComplaint'): Promise<ReviewComplaintSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.post<ReviewComplaintSummary>(`/reviews/${id}/complaints`, payload, requestKey);
+  }
+  createDispute(id: number, payload: DisputeReasonPayload, requestKey: string = 'engagement.createDispute'): Promise<DisputeSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.post<DisputeSummary>(`/orders/${id}/disputes`, payload, requestKey);
+  }
+  replyDispute(id: number, payload: ReviewTextPayload, requestKey: string = 'engagement.replyDispute'): Promise<DisputeSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.post<DisputeSummary>(`/disputes/${id}/replies`, payload, requestKey);
+  }
+  cancelEngagementRequests(keys: string[]): void { keys.forEach((key: string) => this.client.cancelRequest(key)); }
 
   listOrders(): Promise<OrderSummary[]> {
     return this.client.get<OrderSummary[]>('/orders', 'orders.list');

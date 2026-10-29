@@ -94,9 +94,9 @@ function apiFixture() {
 test('report validates trimmed reason and description limits before sending', async () => {
   for (const input of [
     { reason: '  ', description: '', sent: false },
-    { reason: '字'.repeat(500), description: '文'.repeat(1000), sent: true },
+    { reason: '字'.repeat(500), description: '文'.repeat(200), sent: true },
     { reason: '字'.repeat(501), description: '', sent: false },
-    { reason: '字', description: '文'.repeat(1001), sent: false }
+    { reason: '字', description: '文'.repeat(201), sent: false }
   ]) {
     const { panel, requests } = panelFixture();
     Object.assign(panel, { reason: input.reason, description: input.description });
@@ -315,4 +315,30 @@ test('a second version change while verifying ignores old records and clears bus
   assert.equal(reentered.queries.length, 1); reentered.changeSession();
   reentered.queries[0].resolve([report()]); await verify;
   assert.equal(reentered.panel.verificationMessage, ''); assert.equal(reentered.panel.busy, false);
+});
+
+test('unknown report result closes editable dialog and keeps the shared verification guard', async () => {
+  const f=panelFixture();f.panel.expanded=true;
+  const sent=f.panel.submit();f.requests[0].reject(ErrorMapper.network());await sent;
+  assert.equal(f.panel.expanded,false);assert.equal(f.panel.unconfirmed,true);
+  const retry=f.panel.submit();await retry;assert.equal(f.requests.length,1);
+});
+
+test('cancel clears editable report fields without losing an uncertain submission guard', async () => {
+  const f = panelFixture();
+  Object.assign(f.panel, { expanded: true, description: '未提交的旧说明' });
+  f.panel.cancelForm();
+  assert.equal(f.panel.expanded, false);
+  assert.equal(f.panel.reason, '');
+  assert.equal(f.panel.description, '');
+  assert.equal(f.panel.busy, false);
+  f.panel.reason = '真实提交原因'; f.panel.description = '真实说明';
+  const sent = f.panel.submit();
+  f.panel.cancelForm();
+  assert.equal(f.panel.description, '');
+  assert.equal(f.panel.reason, '');
+  assert.equal(f.panel.unconfirmed, true);
+  f.requests[0].reject(ErrorMapper.network()); await sent;
+  await f.panel.submit();
+  assert.equal(f.requests.length, 1);
 });

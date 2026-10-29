@@ -1,3 +1,4 @@
+import { ReportDialogBody } from './ReportDialogBody';
 import { AppClient } from '../../app/AppClient';
 import { CreateReportPayload, ReportSummary } from '../../model/ApiModels';
 import { ErrorMapper, PortraError } from '../../network/ErrorMapper';
@@ -152,8 +153,11 @@ export struct ReportPanel {
       this.errorMessage = '请填写 1 至 500 字的举报原因';
       return;
     }
-    if (normalizedDescription.length > 1000) {
-      this.errorMessage = '补充说明不能超过 1000 字';
+    if (this.description.length > 0 && normalizedDescription.length === 0) {
+      this.errorMessage = '补充说明不能只包含空白字符。'; return;
+    }
+    if (normalizedDescription.length > 200) {
+      this.errorMessage = '补充说明不能超过 200 字';
       return;
     }
     const payload: CreateReportPayload = { targetType: this.targetType.trim().toUpperCase(),
@@ -193,6 +197,7 @@ export struct ReportPanel {
         return;
       }
       this.unconfirmed = !rejected;
+      if (this.unconfirmed) { this.expanded = false; }
       this.errorMessage = rejected ? (mapped.message || '举报请求未被接受，请核对后重试。') :
         '举报结果未确认，服务器可能已写入。请核实结果，不要重复提交。';
     } finally {
@@ -204,8 +209,7 @@ export struct ReportPanel {
 
   private cancelForm(): void {
     this.invalidate();
-    this.expanded = false;
-    this.errorMessage = '';
+    this.clearForm();
     this.restoreSubmission();
   }
 
@@ -252,74 +256,33 @@ export struct ReportPanel {
     if (this.ownerId <= 0 || this.ownerId !== this.currentUserId) {
       Column({ space: 10 }) {
         if (this.submitted) {
-          Text('举报已提交，平台将按流程处理')
-            .width('100%')
-            .fontSize(12)
-            .fontColor(PortraTheme.secondaryText)
+          Text('举报已提交，平台将按流程处理').fontSize(13).fontColor(PortraTheme.secondaryText)
         } else if (this.unconfirmed) {
-          Text('举报结果待核实，请勿重复提交')
-            .fontSize(12)
-            .fontColor(PortraTheme.secondaryText)
-          Button(this.busy ? '核实中' : '核实结果')
-            .enabled(!this.busy)
-            .onClick(() => this.verifySubmission())
-          if (this.verificationMessage.length > 0) {
-            Text(this.verificationMessage)
-              .fontSize(12)
-              .fontColor(PortraTheme.secondaryText)
-          }
-        } else if (!this.expanded) {
-          Button(this.appClient.sessionManager.isAuthenticated() ? '举报此内容' : '登录后举报')
-            .height(36)
-            .fontSize(12)
-            .fontColor(PortraTheme.secondaryText)
-            .backgroundColor(PortraTheme.surface)
-            .border({ width: 1, color: PortraTheme.border })
-            .onClick(() => {
-              if (!this.appClient.sessionManager.isAuthenticated()) {
-                this.onRequireLogin?.();
-              } else {
-                this.expanded = true;
-              }
-            })
+          Text('举报结果待核实，请勿重复提交').fontSize(13).fontColor(PortraTheme.secondaryText)
+          Button(this.busy ? '核实中' : '核实结果').constraintSize({ minHeight: 44 }).enabled(!this.busy).onClick(() => this.verifySubmission())
+          if (this.verificationMessage) { Text(this.verificationMessage).fontSize(13).fontColor(PortraTheme.secondaryText) }
         } else {
-          TextInput({ text: this.reason, placeholder: '举报原因（必填）' })
-            .height(44)
-            .backgroundColor(PortraTheme.surface)
-            .borderRadius(8)
-            .onChange((value: string) => this.reason = value)
-          TextArea({ text: this.description, placeholder: '补充说明（可选）' })
-            .height(82)
-            .backgroundColor(PortraTheme.surface)
-            .borderRadius(8)
-            .onChange((value: string) => this.description = value)
-          Row({ space: 10 }) {
-            Button('取消')
-              .layoutWeight(1)
-              .height(40)
-              .backgroundColor(PortraTheme.surface)
-              .fontColor(PortraTheme.secondaryText)
-              .onClick(() => {
-                this.cancelForm();
-              })
-            Button(this.busy ? '提交中' : '提交举报')
-              .layoutWeight(1)
-              .height(40)
-              .enabled(!this.busy)
-              .onClick(() => this.submit())
-          }
-          .width('100%')
+          Button(this.appClient.sessionManager.isAuthenticated() ? '举报此内容' : '登录后举报')
+            .constraintSize({ minHeight: 44 }).fontSize(13).fontColor(PortraTheme.secondaryText).backgroundColor(PortraTheme.surface)
+            .border({ width: 1, color: PortraTheme.border }).borderRadius(10)
+            .onClick(() => {
+              if (!this.synchronizeIdentity()) { return; }
+              if (!this.appClient.sessionManager.isAuthenticated()) { this.onRequireLogin?.(); }
+              else { this.expanded = true; }
+            })
         }
-        if (this.errorMessage.length > 0) {
-          Text(this.errorMessage)
-            .width('100%')
-            .fontSize(12)
-            .fontColor(PortraTheme.danger)
-        }
-      }
-      .width('100%')
-      .alignItems(HorizontalAlign.Start)
-      .padding({ top: 10, bottom: 10 })
+        if (this.errorMessage && !this.expanded) { Text(this.errorMessage).fontSize(13).fontColor(PortraTheme.danger) }
+      }.width('100%').alignItems(HorizontalAlign.Start).padding({ top: 10, bottom: 10 })
+        .bindSheet(this.expanded, this.FormBody(), { height: SheetSize.LARGE, showClose: false,
+          backgroundColor: PortraTheme.surface, keyboardAvoidMode: SheetKeyboardAvoidMode.RESIZE_ONLY,
+          onWillDismiss: (action: DismissSheetAction) => { this.cancelForm(); action.dismiss(); } })
     }
+  }
+  @Builder private FormBody() {
+    ReportDialogBody({ reason: this.reason, description: this.description, busy: this.busy,
+      error: this.errorMessage, groupKey: this.instanceKey,
+      onReason: (value: string) => { if (this.synchronizeIdentity() && !this.busy) { this.reason=value; this.errorMessage=''; } },
+      onDescription: (value: string) => { if (this.synchronizeIdentity() && !this.busy) { this.description=value; this.errorMessage=''; } },
+      onCancel: () => this.cancelForm(), onSubmit: () => this.submit() })
   }
 }

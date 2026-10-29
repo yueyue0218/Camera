@@ -1,5 +1,30 @@
 # C 模块交付与真实验收记录
 
+最终补充：模拟器订单通知38→order6、纠纷通知52→dispute2/order7，追评45→review3/order2、评价申诉48→complaint2/review4/order2均实际验证；最终包200字键盘及真实系统Home恢复旧草稿清理通过，见[精确目标证据](evidence/20261029-engagement/native-routing-verification.json)。
+
+<!-- ENGAGEMENT-MOBILE-20261029 -->
+## 2026-10-29：200字手机弹窗与精确业务通知已接入
+
+用户明确确认“已获公共、B、D维护者授权，应用并验收”，本轮9个边界文件已正式应用，不再等待此授权。起点31986688d74833dd5b64a09fca24bb7fd18cd899；fetch后integration仍b258ec8114ac1ff8f360099155f5d284f1247c41，没有另外可复用的公共修复提交。公共依赖随[Draft PR25](https://github.com/yueyue0218/Camera/pull/25)的本轮授权补丁交付，唯一base不变，无自动合并。
+
+按原Web OrdersPage/ReportDialog迁移评价、追评、评价申诉、订单申诉/回复、共享举报、记录及放弃确认。正文/补充说明统一**最多200字**；原举报原因固定单选，保留旧调用兼容。米白/深蓝、浅色说明、星级/单选、可滚内容和固定底部按钮，键盘缩小时继续可操作；没有迁移Web本地假成功回退。
+
+真实GET订单/评价/评价申诉/订单纠纷，真实POST五种业务表单；唯一认证HttpClient与名义委托，无新认证/网络层。通知按typed ID精确读取对应对象并关联订单，坏metadata/类型冲突/非法ID不跳错误对象。D订单页回调可选、无回调保留旧展开；真实NavDestination.onShown刷新保留的列表。举报仍唯一ReportPanel/Store，呈现单独抽出；关闭清草稿、unknown防重保留，超时只核实。
+
+| 修改分组 | 真实文件（源文件相对harmony/entry/src/main/ets；测试为仓库相对路径） |
+| --- | --- |
+| 已授权公共/B/D文件 | `model/ApiModels.ets`、`network/ApiService.ets`、`model/NavigationModels.ets`、`navigation/NavigationPolicy.ets`、`pages/Index.ets`、`pages/MessagePage.ets`、`pages/OrderPage.ets`、`features/user/ReportPanel.ets`、`features/user/ReportDialogBody.ets` |
+| C实现 | `features/engagement/EngagementController.ets`、`features/engagement/EngagementDialogs.ets`、`features/engagement/EngagementApiBinding.ets`、`features/notifications/NotificationTargetResolver.ets`、`pages/OrderEngagementPage.ets`、`pages/NotificationPage.ets` |
+| 行为回归 | `harmony/tests/engagement-behavior.test.cjs`、`harmony/tests/engagement-api.test.cjs`、`harmony/tests/notification-target.test.cjs`、`harmony/tests/moment-report-contract.test.cjs`、`harmony/tests/navigation.test.cjs` |
+
+正式**216/216、0fail/skip/TODO、exit0**；assembleHap **exit0、1分9.971秒**；最终HAP SHA256 **96853387CA72C675BB6A2B6158022A08191ACA807294BF4973C466C0AC9AF5F2**，实际安装并完成举报取消/超时/同reportId核实。相关举报独立26/26通过；设备发现的按钮初始禁用冻结、取消残留、返回旧订单状态均有RED/GREEN，未靠Node冒充导航。具体[文件清单与补丁](proposals/engagement-mobile/README.md)、[模拟器截图、业务记录、命令和退出码](evidence/20261029-engagement/README.md)。
+
+初轮真实原生完成评价/追评/评价申诉/订单申诉；恢复新隔离库后完成原生对方申诉回复、举报与精确追评/评价申诉通知。不同内存库和包来源分别记录。未修改Web/后端、共享配置、主题、认证、A页面，主工作区三份未提交frontend SHA保持。保留原Feed/缓存/筛选/收藏并发、点赞/完整详情、作者与root/HALL生命周期及既有Web闭环成果。
+
+本轮设备按用户要求只验模拟器。**举报处理结果自动通知仍缺后端事件**，不能宣称能从不存在的通知跳转；准确交接见shared-change-requests。关注角色解析、其他Web深链、系统推送/实时角标未扩展。团队原生测试环境/部署SHA/合法后台与发布签名升级仍未验证，本地H2与unsigned不代表完整发布验收；实体设备不列本轮条件。
+
+## 先前阶段记录（按原时点保留，当前状态以上为准）
+
 <!-- WEB-UI-MIGRATION-20261028 -->
 更新：2026-10-28，新增用户明确要求的Web风格原生通知/信用迁移。**已接入真实通知，替换占位；本人信用与动态风格迁移已安装并完成隔离本地验收。** 公共、B、D维护者9文件本轮已明确获授权，原公共边界不再作为这部分阻塞；其余边界保留。
 

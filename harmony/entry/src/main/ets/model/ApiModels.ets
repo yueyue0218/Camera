@@ -473,3 +473,30 @@ export interface CreditRecordSummary {
   readonly reason?: string;
   readonly createdAt?: string;
 }
+
+export interface OrderEngagementSummary extends OrderSummary {
+  readonly customerId: number;
+  readonly providerUserId: number;
+  readonly refundStatus?: string;
+}
+export interface ReviewSummary {
+  readonly reviewId: number; readonly orderId: number; readonly reviewerId: number;
+  readonly targetUserId: number; readonly reviewerNickname?: string; readonly targetUserNickname?: string;
+  readonly direction?: string; readonly rating: number; readonly content: string; readonly isVisible: boolean;
+  readonly replyContent?: string; readonly replyTime?: string; readonly createdAt?: string; readonly complaintStatus?: string;
+}
+export interface ReviewComplaintSummary {
+  readonly complaintId: number; readonly reviewId: number; readonly orderId: number; readonly complainantId: number;
+  readonly respondentId?: number; readonly reason: string; readonly status: string;
+  readonly arbitrationResult?: string; readonly arbitrationComment?: string; readonly createdAt?: string; readonly handledAt?: string;
+}
+export interface DisputeReplySummary { readonly id: number; readonly disputeId: number; readonly replierId: number; readonly content: string; readonly createdAt?: string; }
+export interface DisputeSummary {
+  readonly id: number; readonly orderId: number; readonly initiatorId: number; readonly reason: string; readonly status: string;
+  readonly resolution?: string; readonly responsibility?: string; readonly adminComment?: string;
+  readonly createdAt?: string; readonly resolvedAt?: string; readonly replies: DisputeReplySummary[];
+}
+export interface CreateReviewPayload { readonly rating: number; readonly content: string; }
+export interface ReviewTextPayload { readonly content: string; }
+export interface CreateReviewComplaintPayload { readonly reason: string; readonly evidenceFileIds: string; }
+export interface DisputeReasonPayload { readonly reason: string; }

@@ -1,3 +1,4 @@
+import { NotificationTarget } from '../features/notifications/NotificationTargetResolver';
 import { NotificationPage } from './NotificationPage';
 import { AppClient } from '../app/AppClient';
 import { PortraAvatar } from '../common/components/PortraAvatar';
@@ -22,6 +23,7 @@ export struct MessagePage {
   onOpenMoment?: (id: number) => void;
   onOpenCredit?: () => void;
   onOpenOrders?: () => void;
+  onOpenTarget?: (target: NotificationTarget) => void;
   onRequireLogin?: () => void;
   onOpenConversation?: (conversationId: number) => void;
 
@@ -141,7 +143,7 @@ export struct MessagePage {
 
       if (this.selectedTab === 1) {
         NotificationPage({ onBack: () => this.selectedTab = 0, onOpenMoment: this.onOpenMoment,
-          onOpenCredit: this.onOpenCredit, onOpenOrders: this.onOpenOrders, onRequireLogin: this.onRequireLogin })
+          onOpenCredit: this.onOpenCredit, onOpenOrders: this.onOpenOrders, onOpenTarget: this.onOpenTarget, onRequireLogin: this.onRequireLogin })
           .layoutWeight(1)
       } else if (this.loading) {
         PortraLoading({ label: '正在读取会话' })

@@ -1,5 +1,15 @@
 # C 公共依赖交付状态
 
+最终补充：模拟器订单通知38→order6、纠纷通知52→dispute2/order7，追评45→review3/order2、评价申诉48→complaint2/review4/order2均实际验证；最终包200字键盘及真实系统Home恢复旧草稿清理通过，见[精确目标证据](evidence/20261029-engagement/native-routing-verification.json)。
+
+## 2026-10-29最新：本轮9文件授权已应用，C-SHARED-08部分解除
+
+已获公共、B、D维护者授权，真实ApiService用户态GET/POST、DTO、ORDER_ENGAGEMENT路由/登录返回、Index、D Message/Order及B ReportPanel/ReportDialogBody正式应用。订单/评价/评价申诉/订单纠纷按独立typed ID读取并聚焦；模拟器追评review3/order2、申诉complaint2/review4/order2已验证，未把列表落点当精确目标。详情/表单会话与实例保护、200字、取消清理和unknown防重均接入；216/216和构建exit0。[最终签名/补丁](proposals/engagement-mobile/README.md)、[真实证据](evidence/20261029-engagement/README.md)。维护者独立PR无，公共改动随现C Draft PR25交付。
+
+仍缺 **REPORT结果通知**：核对backend/src/main/java/com/action/camera/report/service/ReportService.java的resolve没有创建通知。请后端维护者在一次合法成功处理事务提交后通过既有NotificationService.createNotification(NotificationCreateRequest)向reporter生成REPORT_RESOLVED，relatedType=REPORT、relatedId=reportId，metadata至少reportId，正文仅本人可见的处理结果；用dedupeKey防重复，同report不重复resolve。C只复用GET /reports/my（ApiService.listMyReports(key?)），ReportSummary已有resolution/adminComment；后端事件就绪后C再按reportId给本人结果落点，无需ADMIN接口。兼容既有resolve调用及通知DTO，不造GET /reports/{id}。验收：测试举报→既有Web合法处理一次→同ID结果通知→原生本人结果，403/账号切换/跨实例取消；未获后端授权，本轮不改它。关注通知仍缺可靠角色，不能猜用户身份；其他深链/推送不扩大范围。团队原生环境/SHA/合法后台及签名升级另待，实体设备不列本轮条件。
+
+## 历史交接（以下缺口以新段落更新为准）
+
 ## 2026-10-29：C-SHARED-08 通知精确业务跳转待接入
 
 已核查后端已有订单/评价/评价申诉/订单纠纷的对象ID与用户态GET；鸿蒙当前仍只进订单列表，未精确定位。举报处理后端当前未创建结果通知，不能承诺能从该通知跳转。精确目标文件、建议签名、ID语义、兼容及模拟器用例见[维护者交接](proposals/notification-deep-links/README.md)。086a752没有把这些标为完成。实体设备按用户要求不列本轮条件。

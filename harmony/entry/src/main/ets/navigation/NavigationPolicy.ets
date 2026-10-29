@@ -8,6 +8,7 @@ const EMPTY_PARAM: NavigationRouteParam = {};
  */
 export class NavigationPolicy {
   static readonly routes: AppRoute[] = [
+    AppRoute.ORDER_ENGAGEMENT,
     AppRoute.LOGIN,
     AppRoute.HALL,
     AppRoute.DEMAND_DETAIL,
@@ -21,7 +22,7 @@ export class NavigationPolicy {
   ];
 
   static requiresAuthentication(route: AppRoute): boolean {
-    return route === AppRoute.PUBLISH || route === AppRoute.CONVERSATION_DETAIL || route === AppRoute.MESSAGE ||
+    return route === AppRoute.ORDER_ENGAGEMENT || route === AppRoute.PUBLISH || route === AppRoute.CONVERSATION_DETAIL || route === AppRoute.MESSAGE ||
       route === AppRoute.ORDER || route === AppRoute.PROFILE || route === AppRoute.PUBLIC_PROFILE || route === AppRoute.NOTIFICATIONS || route === AppRoute.CREDIT || route === AppRoute.MOMENT_DETAIL;
   }
 
@@ -31,7 +32,7 @@ export class NavigationPolicy {
       return {
         route: AppRoute.LOGIN,
         param: {
-          returnRoute: route,
+          returnRoute: route, targetKind: param.targetKind, targetId: param.targetId, orderId: param.orderId,
           conversationId: param.conversationId, momentId: param.momentId,
           userId: param.userId, userRole: param.userRole, initialTab: param.initialTab
         }
@@ -81,6 +82,7 @@ export class NavigationPolicy {
 
   static label(route: AppRoute): string {
     switch (route) {
+      case AppRoute.ORDER_ENGAGEMENT: return '本次约拍的评价与申诉';
       case AppRoute.NOTIFICATIONS: return '通知';
       case AppRoute.CREDIT: return '信用分';
       case AppRoute.MOMENT_DETAIL: return '动态详情';
