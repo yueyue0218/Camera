@@ -42,6 +42,21 @@ export class PublicImagePolicy {
   }
 }
 
+/**
+ * Moment images are stored by the current backend as inline image data. Keep
+ * that exceptional boundary opt-in and accept only a small set of image MIME
+ * types with a syntactically valid base64 payload.
+ */
+export class InlineImagePolicy {
+  static accepts(source: string): boolean {
+    const normalized = source.trim();
+    if (PublicImagePolicy.accepts(normalized)) {
+      return true;
+    }
+    return /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(normalized);
+  }
+}
+
 export class AvatarFallbackPolicy {
   static label(displayName: string): string {
     const normalized = displayName.trim();

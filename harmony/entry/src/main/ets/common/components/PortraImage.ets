@@ -1,8 +1,9 @@
 import { PortraTheme } from '../../theme/PortraTheme';
-import { PublicImagePolicy } from './ComponentPolicy';
+import { InlineImagePolicy, PublicImagePolicy } from './ComponentPolicy';
 
 /**
- * Displays packaged resources or public HTTPS images only.
+ * Displays packaged resources or public HTTPS images. Callers rendering the
+ * backend's explicit inline-image contract must opt in with allowInlineData.
  * Authenticated file downloads must be fetched by a credential-aware service and must not be passed as a URL here.
  */
 @Component
@@ -13,13 +14,14 @@ export struct PortraImage {
   @Prop cornerRadius: number = PortraTheme.radius;
   @Prop fallbackText: string = '图片暂不可用';
   @Prop contentDescription: string = '图片';
+  @Prop allowInlineData: boolean = false;
   @State private loadFailed: boolean = false;
 
   private canLoad(): boolean {
     if (typeof this.source !== 'string') {
       return true;
     }
-    return PublicImagePolicy.accepts(this.source);
+    return this.allowInlineData ? InlineImagePolicy.accepts(this.source) : PublicImagePolicy.accepts(this.source);
   }
 
   build() {

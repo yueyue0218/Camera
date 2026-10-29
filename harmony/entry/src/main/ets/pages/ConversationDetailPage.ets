@@ -105,7 +105,11 @@ export struct ConversationDetailPage {
     this.actionError = '';
     try {
       const sent = await this.appClient.apiService.sendMessage(this.conversationId, content);
-      this.messages = [...this.messages, sent];
+      if (sent === null || sent.conversationId !== this.conversationId || !Number.isSafeInteger(sent.messageId) ||
+        sent.messageId <= 0 || sent.messageType !== 'TEXT') {
+        throw new Error('发送结果缺少有效消息编号');
+      }
+      this.messages = [...this.messages.filter((item: MessageSummary) => item.messageId !== sent.messageId), sent];
       this.draft = '';
     } catch (error) {
       this.actionError = (error as PortraError).message || '发送失败，内容已保留';
@@ -147,6 +151,10 @@ export struct ConversationDetailPage {
     this.actionError = '';
     try {
       const quote = await this.appClient.apiService.createQuote(payload);
+      if (quote === null || quote.conversationId !== this.conversationId ||
+        !Number.isSafeInteger(quote.quotationId) || quote.quotationId <= 0) {
+        throw new Error('约定结果缺少有效编号');
+      }
       this.quotes = [quote, ...this.quotes];
       this.showQuoteForm = false;
     } catch (error) {
@@ -164,7 +172,11 @@ export struct ConversationDetailPage {
     this.contentVersion++;
     this.actionError = '';
     try {
-      await this.appClient.apiService.confirmQuote(quoteId);
+      const result = await this.appClient.apiService.confirmQuote(quoteId);
+      if (result === null || result.quotationId !== quoteId || result.quotationStatus !== 'CONFIRMED' ||
+        !Number.isSafeInteger(result.orderId) || result.orderId <= 0) {
+        throw new Error('确认结果缺少有效订单');
+      }
       await this.refreshAfterAction();
     } catch (error) {
       this.actionError = (error as PortraError).message || '确认失败';
