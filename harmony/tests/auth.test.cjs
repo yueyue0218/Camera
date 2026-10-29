@@ -30,6 +30,13 @@ const Tag = {
 const assets = new Map();
 const assetCalls = { add: [], query: [], remove: [] };
 let assetQueryError = null;
+const preferenceValues = new Map();
+const preferenceStore = {
+  getSync(key, defaultValue) { return preferenceValues.get(key) ?? defaultValue; },
+  putSync(key, value) { preferenceValues.set(key, value); },
+  deleteSync(key) { preferenceValues.delete(key); },
+  flushSync() {}
+};
 function aliasKey(bytes) { return Buffer.from(bytes).toString('hex'); }
 const asset = {
   Tag,
@@ -60,7 +67,11 @@ class ArkTextDecoder {
 }
 const mocks = {
   '@kit.NetworkKit': { http }, '@kit.AssetStoreKit': { asset },
-  '@kit.ArkTS': { util: { TextEncoder: ArkTextEncoder, TextDecoder: ArkTextDecoder } },
+  '@kit.ArkData': { preferences: { getPreferencesSync() { return preferenceStore; } } },
+  '@kit.ArkTS': { util: {
+    TextEncoder: ArkTextEncoder, TextDecoder: ArkTextDecoder,
+    generateRandomUUID() { return '12345678-1234-4123-8123-123456789abc'; }
+  } },
   '@kit.BasicServicesKit': { BusinessError: class BusinessError extends Error {} }
 };
 class TestBuildProfile {

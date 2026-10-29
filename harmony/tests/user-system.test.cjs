@@ -92,6 +92,19 @@ test('conversation hiding and reports preserve server-authoritative results', as
   { targetType: 'DEMAND', targetId: 7, reason: '不当内容' });
 });
 
+test('account cancellation is submitted to and read from the authenticated server', async () => {
+  const client = new HttpClient();
+  client.setAccessToken('session-token');
+  const api = new ApiService(client);
+  await expectRequest(() => api.getAccountCancellation(), 'GET',
+    '/users/me/cancellation-request',
+    { requestId: null, status: 'NOT_REQUESTED' });
+  await expectRequest(() => api.requestAccountCancellation(' no longer needed '), 'POST',
+    '/users/me/cancellation-request',
+    { requestId: 4, status: 'PENDING', reason: 'no longer needed' },
+    { reason: 'no longer needed' });
+});
+
 test('pages integrate role isolation, deduplication, follow, favorite and report behavior', () => {
   const read = relative => fs.readFileSync(path.join(sourceRoot, relative), 'utf8');
   const profile = read('pages/ProfilePage.ets');
@@ -110,4 +123,26 @@ test('pages integrate role isolation, deduplication, follow, favorite and report
   assert.match(follow, /result\.followed === this\.followed/);
   assert.match(report, /\['USER', 'DEMAND', 'SERVICE_PACKAGE', 'MOMENT', 'REVIEW'\]/);
   assert.match(report, /result\.targetType !== payload\.targetType/);
+});
+
+test('profile exposes privacy controls and server-backed account cancellation', () => {
+  const read = relative => fs.readFileSync(path.join(sourceRoot, relative), 'utf8');
+  const profile = read('pages/ProfilePage.ets');
+  const index = read('pages/Index.ets');
+  const appClient = read('app/AppClient.ets');
+  assert.match(profile, /Portra 用户协议/);
+  assert.match(profile, /Portra 隐私政策/);
+  assert.match(profile, /个人信息出境单独同意书/);
+  assert.match(profile, /撤回隐私及出境同意/);
+  assert.match(profile, /在线提交申请并查询处理状态/);
+  assert.match(profile, /getAccountCancellation\(\)/);
+  assert.match(profile, /requestAccountCancellation/);
+  assert.match(profile, /3336578810@qq\.com/);
+  assert.match(profile, /await this\.appClient\.sessionManager\.signOut\(\)/);
+  assert.match(profile, /this\.appClient\.withdrawRequiredPrivacyConsent\(\)/);
+  assert.ok(profile.indexOf('await this.appClient.sessionManager.signOut()') <
+    profile.indexOf('this.appClient.withdrawRequiredPrivacyConsent()'));
+  assert.match(appClient, /PrivacyConsentStore\.clear/);
+  assert.match(index, /consentGateState = ConsentGateState\.REQUIRED/);
+  assert.doesNotMatch(profile, /deleteAccount\(/);
 });

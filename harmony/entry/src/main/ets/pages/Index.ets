@@ -12,9 +12,16 @@ import { OrderPage } from './OrderPage';
 import { ProfilePage } from './ProfilePage';
 import { PublishPage } from './PublishPage';
 import { PortraTheme } from '../theme/PortraTheme';
+import { PrivacyConsentPage } from '../privacy/PrivacyConsentPage';
 
 const EMPTY_ROUTE_PARAM: NavigationRouteParam = {};
 const PROFILE_LOGIN_PARAM: NavigationRouteParam = { returnRoute: AppRoute.PROFILE };
+
+enum ConsentGateState {
+  CHECKING = 'CHECKING',
+  REQUIRED = 'REQUIRED',
+  ACCEPTED = 'ACCEPTED'
+}
 
 @Entry
 @Component
@@ -23,9 +30,48 @@ struct Index {
   private readonly appClient: AppClient = AppClient.shared;
   private readonly navigationClickGuard: NavigationClickGuard = new NavigationClickGuard();
   private restorePromise?: Promise<void>;
+  @State private consentGateState: ConsentGateState = ConsentGateState.CHECKING;
+  @State private consentError: string = '';
 
   aboutToAppear(): void {
-    this.restorePromise = this.appClient.restoreSession();
+    if (this.appClient.hasRequiredPrivacyConsent()) {
+      this.consentGateState = ConsentGateState.ACCEPTED;
+      this.beginPostConsentBootstrap();
+    } else {
+      this.consentGateState = ConsentGateState.REQUIRED;
+    }
+  }
+
+  private acceptPrivacyConsent(): void {
+    this.consentError = '';
+    try {
+      this.appClient.acceptRequiredPrivacyConsent(Date.now());
+      this.consentGateState = ConsentGateState.ACCEPTED;
+      this.beginPostConsentBootstrap();
+    } catch {
+      this.consentError = '同意记录保存失败，请检查设备存储后重试';
+    }
+  }
+
+  private declinePrivacyConsent(): void {
+    this.consentError = '';
+    this.appClient.terminateApplication().catch(() => {
+      this.consentError = '暂时无法退出应用，请使用系统返回桌面';
+    });
+  }
+
+  private onPrivacyConsentWithdrawn(): void {
+    this.appPathStack.clear();
+    this.restorePromise = undefined;
+    this.consentError = '';
+    this.consentGateState = ConsentGateState.REQUIRED;
+  }
+
+  private beginPostConsentBootstrap(): void {
+    const bootstrap = this.appClient.bootstrapAfterPrivacyConsent().catch(() => {
+      this.consentError = '设备信息初始化失败，登录功能暂时不可用';
+    });
+    this.restorePromise = bootstrap;
   }
 
   @Builder
@@ -71,7 +117,8 @@ struct Index {
           },
           onOpenOrders: () => this.openPage(AppRoute.ORDER),
           onOpenMessages: () => this.openPage(AppRoute.MESSAGE),
-          onOpenPublish: () => this.openPage(AppRoute.PUBLISH)
+          onOpenPublish: () => this.openPage(AppRoute.PUBLISH),
+          onPrivacyConsentWithdrawn: () => this.onPrivacyConsentWithdrawn()
         });
       } else {
         this.PlaceholderPage('页面不存在', '未找到对应的导航目标。');
@@ -212,11 +259,33 @@ struct Index {
   }
 
   build() {
-    Navigation(this.appPathStack) {
-      this.AppShell()
+    if (this.consentGateState === ConsentGateState.CHECKING) {
+      Column({ space: 12 }) {
+        Text('PORTRA')
+          .fontSize(18)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(PortraTheme.primary)
+        Text('正在检查本机隐私设置')
+          .fontSize(13)
+          .fontColor(PortraTheme.secondaryText)
+      }
+      .width('100%')
+      .height('100%')
+      .justifyContent(FlexAlign.Center)
+      .backgroundColor(PortraTheme.pageBackground)
+    } else if (this.consentGateState === ConsentGateState.REQUIRED) {
+      PrivacyConsentPage({
+        errorMessage: this.consentError,
+        onAccept: () => this.acceptPrivacyConsent(),
+        onDecline: () => this.declinePrivacyConsent()
+      })
+    } else {
+      Navigation(this.appPathStack) {
+        this.AppShell()
+      }
+      .navDestination(this.PageMap)
+      .hideTitleBar(true)
+      .mode(NavigationMode.Stack)
     }
-    .navDestination(this.PageMap)
-    .hideTitleBar(true)
-    .mode(NavigationMode.Stack)
   }
 }

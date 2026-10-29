@@ -60,3 +60,18 @@ test('failed identity persistence cannot silently invent a different device', ()
   assert.throws(() => DeviceIdentityStore.getOrCreate({}), /Installation identity is unavailable/);
   failFlush = false;
 });
+
+test('login and automatic registration require explicit legal agreement', () => {
+  const loginSource = fs.readFileSync(path.join(sourceRoot, 'pages/LoginPage.ets'), 'utf8');
+  const documentSource = fs.readFileSync(
+    path.join(sourceRoot, 'privacy/LegalDocumentContent.ets'), 'utf8');
+  assert.match(loginSource, /agreementsAccepted: boolean = false/);
+  assert.match(loginSource, /if \(!this\.ensureAgreementsAccepted\(\)\)/);
+  assert.equal((loginSource.match(/if \(!this\.ensureAgreementsAccepted\(\)\)/g) || []).length, 2);
+  assert.match(loginSource, /enabled\(this\.agreementsAccepted && !this\.sendingCode/);
+  assert.match(loginSource, /disabled: this\.sendingCode \|\| !this\.agreementsAccepted/);
+  assert.match(loginSource, /LegalDocumentKind\.USER_AGREEMENT/);
+  assert.match(loginSource, /LegalDocumentKind\.PRIVACY_POLICY/);
+  assert.match(documentSource, /export const USER_AGREEMENT_SECTIONS/);
+  assert.match(documentSource, /export const PRIVACY_POLICY_SECTIONS/);
+});

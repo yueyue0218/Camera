@@ -1,5 +1,6 @@
 import { NativeSessionApi } from '../auth/NativeSessionApi';
-import { AcceptedDemandResponse, ConfirmQuoteResult, ConversationSummary, CreateDemandPayload,
+import { AcceptedDemandResponse, AccountCancellationPayload, AccountCancellationSummary,
+  ConfirmQuoteResult, ConversationSummary, CreateDemandPayload,
   CreateDemandResponsePayload, CreateQuotePayload, CreateReportPayload, CreateServicePackagePayload,
   CreateServicePackageResult,
   DemandListQuery, DemandResponseSummary, DemandSummary, MessageSummary, NativeRefreshRequest, NativeSessionResponse,
@@ -376,6 +377,24 @@ export class ApiService implements NativeSessionApi {
   cancelReports(): void {
     this.client.cancelRequest('reports.create');
     this.client.cancelRequest('reports.my');
+  }
+
+  getAccountCancellation(): Promise<AccountCancellationSummary> {
+    return this.client.get<AccountCancellationSummary>(
+      '/users/me/cancellation-request', 'users.me.cancellation.get');
+  }
+
+  requestAccountCancellation(reason?: string): Promise<AccountCancellationSummary> {
+    const normalizedReason = reason?.trim() ?? '';
+    const payload: AccountCancellationPayload = normalizedReason.length > 0 ?
+      { reason: normalizedReason } : {};
+    return this.client.post<AccountCancellationSummary>(
+      '/users/me/cancellation-request', payload, 'users.me.cancellation.create');
+  }
+
+  cancelAccountCancellationRequests(): void {
+    this.client.cancelRequest('users.me.cancellation.get');
+    this.client.cancelRequest('users.me.cancellation.create');
   }
 
   async refresh(refreshToken: string): Promise<NativeSessionResponse> {

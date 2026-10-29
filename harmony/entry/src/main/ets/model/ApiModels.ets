@@ -424,3 +424,17 @@ export interface OrderSummary {
   readonly createdAt?: string;
   readonly demandId?: number;
 }
+
+export interface AccountCancellationPayload {
+  readonly reason?: string;
+}
+
+export interface AccountCancellationSummary {
+  readonly requestId?: number;
+  readonly status: string;
+  readonly reason?: string;
+  readonly requestedAt?: string;
+  readonly updatedAt?: string;
+  readonly processedAt?: string;
+  readonly resolutionNote?: string;
+}
