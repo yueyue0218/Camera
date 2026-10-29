@@ -1,3 +1,4 @@
+import { image } from '@kit.ImageKit';
 import { AppClient } from '../app/AppClient';
 import { PortraAvatar } from '../common/components/PortraAvatar';
 import { PortraEmptyView } from '../common/components/PortraEmptyView';
@@ -8,7 +9,7 @@ import { ConversationListItem, ConversationListModel } from '../features/convers
 import { ConversationMemory } from '../features/conversation/ConversationMemory';
 import { ConversationVisibility } from '../features/conversation/ConversationVisibility';
 import { ConversationSummary } from '../model/ApiModels';
-import { PortraError } from '../network/ErrorMapper';
+import { ErrorKind, PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
 
 @Component
@@ -17,14 +18,23 @@ export struct MessagePage {
   @State private loading: boolean = true;
   @State private errorMessage: string = '';
   @State private conversations: ConversationListItem[] = [];
+  @State private avatarImages: Map<number, image.PixelMap> = new Map<number, image.PixelMap>();
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
   private remoteVersion: number = 0;
   private accountId: number = 0;
+  private activeToken: string = '';
   private refreshTimer: number = -1;
   private readonly listScroller: Scroller = new Scroller();
   private visible: boolean = false;
   private restoreTimer: number = -1;
+  private avatarToken: string = '';
+  private avatarAccountId: number = 0;
+  private avatarRequests: Set<number> = new Set<number>();
+  private failedAvatars: Set<number> = new Set<number>();
+  private avatarQueue: number[] = [];
+  private avatarWorkers: number = 0;
+  private avatarGeneration: number = 0;
   onBack?: () => void;
   onOpenConversation?: (conversationId: number) => void;
 
@@ -40,21 +50,29 @@ export struct MessagePage {
     if (this.restoreTimer >= 0) clearTimeout(this.restoreTimer);
     this.appClient.apiService.cancelConversations();
     this.appClient.apiService.cancelCurrentSession();
+    this.resetAvatars('', 0);
   }
 
   private setVisible(visible: boolean): void {
     if (this.visible === visible) return;
     this.visible = visible;
     if (visible) {
-      if (this.accountId > 0) this.refresh();
+      const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
+      if (this.accountId > 0 && token === this.activeToken) {
+        this.resetAvatars(token, this.accountId);
+        this.refresh();
+      }
       else this.load();
       this.refreshTimer = setInterval(() => this.refresh(), 15000);
       this.restoreScroll();
+      this.primeAvatars(this.conversations);
     } else {
       if (this.refreshTimer >= 0) clearInterval(this.refreshTimer);
       this.refreshTimer = -1;
       this.remoteVersion++;
       this.appClient.apiService.cancelConversations();
+      this.avatarQueue = [];
+      this.avatarRequests.forEach((fileId: number) => this.appClient.apiService.cancelAvatarThumbnail(fileId));
     }
   }
 
@@ -71,6 +89,12 @@ export struct MessagePage {
   private async load(): Promise<void> {
     const version = ++this.requestVersion;
     const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
+    if (token !== this.activeToken) {
+      this.accountId = 0;
+      this.conversations = [];
+      this.resetAvatars('', 0);
+    }
+    this.activeToken = token;
     this.conversations = ConversationMemory.read(token, this.accountId);
     this.loading = this.conversations.length === 0;
     this.errorMessage = '';
@@ -78,13 +102,22 @@ export struct MessagePage {
       const session = await this.appClient.apiService.currentSession();
       if (!this.visible || version !== this.requestVersion) return;
       this.accountId = session.userId;
+      this.resetAvatars(token, session.userId);
       this.conversations = ConversationMemory.read(token, session.userId);
       this.loading = this.conversations.length === 0;
       this.restoreScroll();
+      this.primeAvatars(this.conversations);
       await this.loadRemote(version, token);
     } catch (error) {
       if (version === this.requestVersion) {
-        this.errorMessage = this.conversations.length ? '' : (error as PortraError).message || '消息加载失败';
+        const failure = error as PortraError;
+        if (!this.appClient.sessionManager.isAuthenticated() || failure.httpStatus === 403 ||
+          failure.businessCode === 40301) {
+          this.conversations = [];
+          this.accountId = 0;
+          this.resetAvatars('', 0);
+        }
+        this.errorMessage = this.conversations.length ? '' : failure.message || '消息加载失败';
       }
     } finally {
       if (version === this.requestVersion) {
@@ -94,12 +127,29 @@ export struct MessagePage {
   }
 
   private async refresh(): Promise<void> {
-    if (this.accountId <= 0 || !this.appClient.sessionManager.isAuthenticated()) return;
     const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
+    if (!token || !this.appClient.sessionManager.isAuthenticated()) {
+      this.accountId = 0;
+      this.activeToken = '';
+      this.conversations = [];
+      this.resetAvatars('', 0);
+      this.errorMessage = '登录状态已失效，请重新登录';
+      return;
+    }
+    if (token !== this.activeToken || this.accountId <= 0) {
+      this.load();
+      return;
+    }
     try {
       await this.loadRemote(this.requestVersion, token);
     } catch {
-      // Keep the last verified list during a transient refresh failure.
+      if (!this.appClient.sessionManager.isAuthenticated()) {
+        this.accountId = 0;
+        this.activeToken = '';
+        this.conversations = [];
+        this.resetAvatars('', 0);
+        this.errorMessage = '登录状态已失效，请重新登录';
+      }
     }
   }
 
@@ -153,9 +203,80 @@ export struct MessagePage {
       (order.get(left.conversation.conversationId) ?? 0) - (order.get(right.conversation.conversationId) ?? 0));
     this.conversations = rows;
     ConversationMemory.write(token, this.accountId, rows);
+    this.primeAvatars(rows);
     this.errorMessage = '';
     this.loading = false;
     this.restoreScroll();
+  }
+
+  private resetAvatars(token: string, accountId: number): void {
+    if (token === this.avatarToken && accountId === this.avatarAccountId) return;
+    this.avatarRequests.forEach((fileId: number) => this.appClient.apiService.cancelAvatarThumbnail(fileId));
+    this.avatarRequests.clear();
+    this.avatarQueue = [];
+    this.avatarGeneration++;
+    this.avatarImages.forEach((avatar: image.PixelMap) => avatar.release().catch(() => {}));
+    this.avatarImages = new Map<number, image.PixelMap>();
+    this.failedAvatars.clear();
+    this.avatarToken = token;
+    this.avatarAccountId = accountId;
+  }
+
+  private primeAvatars(rows: ConversationListItem[]): void {
+    if (!this.visible || !this.avatarToken || this.avatarAccountId <= 0) return;
+    rows.forEach((row: ConversationListItem) => {
+      const id = row.avatarFileId ?? 0;
+      if (id > 0 && !this.avatarImages.has(id) && !this.avatarRequests.has(id) &&
+        !this.failedAvatars.has(id) && !this.avatarQueue.includes(id)) this.avatarQueue.push(id);
+    });
+    this.drainAvatars();
+  }
+
+  private drainAvatars(): void {
+    while (this.visible && this.avatarWorkers < 3 && this.avatarQueue.length > 0) {
+      const fileId = this.avatarQueue.shift()!;
+      this.avatarWorkers++;
+      this.loadAvatar(fileId).finally(() => {
+        this.avatarWorkers--;
+        this.drainAvatars();
+      });
+    }
+  }
+
+  private async loadAvatar(fileId: number): Promise<void> {
+    if (this.avatarRequests.has(fileId)) return;
+    const token = this.avatarToken;
+    const accountId = this.avatarAccountId;
+    const generation = this.avatarGeneration;
+    this.avatarRequests.add(fileId);
+    try {
+      const bytes = await this.appClient.apiService.getAvatarThumbnail(fileId);
+      const source = image.createImageSource(bytes);
+      let pixelMap: image.PixelMap;
+      try {
+        pixelMap = await source.createPixelMap({ desiredSize: { width: 96, height: 96 } });
+      } finally {
+        await source.release();
+      }
+      if (this.visible && token === this.avatarToken && accountId === this.avatarAccountId &&
+        token === this.appClient.sessionManager.getSession()?.accessToken) {
+        const next = new Map<number, image.PixelMap>(this.avatarImages);
+        next.set(fileId, pixelMap);
+        this.avatarImages = next;
+      } else {
+        await pixelMap.release();
+      }
+    } catch (error) {
+      if ((error as PortraError)?.kind !== ErrorKind.STALE && token === this.avatarToken &&
+        accountId === this.avatarAccountId && this.visible) {
+        this.failedAvatars.add(fileId);
+      }
+    } finally {
+      if (generation === this.avatarGeneration) {
+        this.avatarRequests.delete(fileId);
+        if (this.visible) this.primeAvatars(this.conversations);
+      }
+    }
   }
 
   @Builder
@@ -210,7 +331,12 @@ export struct MessagePage {
 
             ForEach(this.conversations, (item: ConversationListItem) => {
               Row({ space: 12 }) {
-                PortraAvatar({ displayName: item.peerName, avatarSize: 48 })
+                if (this.avatarImages.has(item.avatarFileId ?? 0)) {
+                  Image(this.avatarImages.get(item.avatarFileId ?? 0) as image.PixelMap)
+                    .width(48).height(48).borderRadius(24).objectFit(ImageFit.Cover)
+                } else {
+                  PortraAvatar({ displayName: item.peerName, avatarSize: 48 })
+                }
                 Column({ space: 5 }) {
                   Text(item.peerName)
                     .fontSize(15)

@@ -50,5 +50,7 @@ test('failed and uncertain messages keep their original content and ID for retry
     assert.equal(item.messageId, pending.messageId);
     assert.equal(item.content, '保留');
     assert.equal(item.deliveryStatus, status);
+    assert.equal(ConversationMessageState.retryForContent([item], 1, '保留')?.messageId, pending.messageId);
+    assert.equal(ConversationMessageState.retryForContent([item], 2, '保留'), undefined);
   }
 });

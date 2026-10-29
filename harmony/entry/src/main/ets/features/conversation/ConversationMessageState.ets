@@ -37,6 +37,11 @@ export class ConversationMessageState {
     } : item);
   }
 
+  static retryForContent(messages: MessageSummary[], senderId: number, content: string): MessageSummary | undefined {
+    return messages.find((item: MessageSummary) => item.messageId < 0 &&
+      item.senderId === senderId && item.content === content);
+  }
+
   static confirm(messages: MessageSummary[], tempId: number, confirmed: MessageSummary): MessageSummary[] {
     const remaining = messages.filter((item: MessageSummary) => item.messageId !== tempId);
     return ConversationMessageState.merge(remaining, [confirmed]);

@@ -1,3 +1,4 @@
+import { KeyboardAvoidMode } from '@kit.ArkUI';
 import { AppClient } from '../app/AppClient';
 import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraLoading } from '../common/components/PortraLoading';
@@ -5,6 +6,7 @@ import { PortraPageHeading } from '../common/components/PortraPageHeading';
 import { PortraAvatar } from '../common/components/PortraAvatar';
 import { ConversationMemory } from '../features/conversation/ConversationMemory';
 import { ConversationDraftStore } from '../features/conversation/ConversationDraftStore';
+import { ConversationListModel } from '../features/conversation/ConversationListModel';
 import { ConversationVisibility } from '../features/conversation/ConversationVisibility';
 import { ConversationMessageState, SendStatus } from '../features/conversation/ConversationMessageState';
 import { ConversationTimeline, ConversationTimelineItem, TimelineKind } from '../features/conversation/ConversationTimeline';
@@ -22,6 +24,7 @@ export struct ConversationDetailPage {
   @State private actionError: string = '';
   @State private conversation: ConversationSummary | null = null;
   @State private userId: number = 0;
+  @State private peerName: string = '约拍会话';
   @State private messages: MessageSummary[] = [];
   @State private quotes: QuoteSummary[] = [];
   @State private draft: string = '';
@@ -35,12 +38,14 @@ export struct ConversationDetailPage {
   @State private uncertainResendId: number = 0;
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
+  private activeToken: string = '';
   private contentVersion: number = 0;
   private refreshTimer: number = -1;
   private draftTimer: number = -1;
   private scrollTimer: number = -1;
   private visible: boolean = false;
   private readonly threadScroller: Scroller = new Scroller();
+  private previousKeyboardAvoidMode?: KeyboardAvoidMode;
   onBack?: () => void;
 
   aboutToAppear(): void {
@@ -64,15 +69,39 @@ export struct ConversationDetailPage {
     if (this.visible === visible) return;
     this.visible = visible;
     if (visible) {
+      this.previousKeyboardAvoidMode = this.getUIContext().getKeyboardAvoidMode();
+      this.getUIContext().setKeyboardAvoidMode(KeyboardAvoidMode.RESIZE);
+      if (this.activeToken !== (this.appClient.sessionManager.getSession()?.accessToken ?? '')) {
+        this.invalidateAccount();
+      }
       if (this.conversation === null || this.userId <= 0) this.initialize();
       else this.refreshContent();
       this.refreshTimer = setInterval(() => this.refreshContent(), 5000);
     } else {
+      if (this.previousKeyboardAvoidMode !== undefined) {
+        this.getUIContext().setKeyboardAvoidMode(this.previousKeyboardAvoidMode);
+        this.previousKeyboardAvoidMode = undefined;
+      }
       if (this.refreshTimer >= 0) clearInterval(this.refreshTimer);
       this.refreshTimer = -1;
       this.contentVersion++;
       this.appClient.apiService.cancelConversationDetail(this.conversationId);
+      this.loading = false;
     }
+  }
+
+  private invalidateAccount(): void {
+    this.saveDraft();
+    this.requestVersion++;
+    this.contentVersion++;
+    this.activeToken = '';
+    this.userId = 0;
+    this.conversation = null;
+    this.messages = [];
+    this.quotes = [];
+    this.draft = '';
+    this.peerName = '约拍会话';
+    this.busy = false;
   }
 
   private changeDraft(value: string): void {
@@ -107,8 +136,10 @@ export struct ConversationDetailPage {
     this.errorMessage = '';
     try {
       const session = await this.appClient.apiService.currentSession();
-      if (version !== this.requestVersion) return;
+      if (!this.visible || version !== this.requestVersion) return;
       const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
+      if (!token) throw new Error('请重新登录');
+      this.activeToken = token;
       this.userId = session.userId;
       this.draft = ConversationDraftStore.read(session.userId, this.conversationId);
       ConversationMemory.establishAccount(token, session.userId);
@@ -116,6 +147,7 @@ export struct ConversationDetailPage {
         row.conversation.conversationId === this.conversationId);
       if (cached !== undefined) {
         this.conversation = cached.conversation;
+        this.peerName = cached.peerName;
         this.showMessages(ConversationMemory.readMessages(token, session.userId, this.conversationId), true);
         this.loading = false;
       }
@@ -125,9 +157,17 @@ export struct ConversationDetailPage {
       if (match === undefined) {
         throw new Error('会话不存在或无权查看');
       }
+      if (cached === undefined || cached.peerName === 'Portra 用户') {
+        const peerRole = match.otherUserId === match.participantBId ? 'PROVIDER' : 'CUSTOMER';
+        this.appClient.apiService.getUserBrief(match.otherUserId, peerRole).then((brief) => {
+          if (version === this.requestVersion && this.visible) {
+            this.peerName = ConversationListModel.safeName(brief);
+          }
+        }).catch(() => {});
+      }
       const messages = await this.appClient.apiService.listMessages(this.conversationId);
       const quotes = await this.appClient.apiService.listQuotes(this.conversationId);
-      if (version === this.requestVersion) {
+      if (this.visible && version === this.requestVersion) {
         this.conversation = match;
         this.showMessages(ConversationMessageState.merge(this.messages, Array.isArray(messages) ? messages : []),
           cached === undefined);
@@ -135,7 +175,7 @@ export struct ConversationDetailPage {
         this.quotes = Array.isArray(quotes) ? quotes : [];
       }
     } catch (error) {
-      if (version === this.requestVersion) {
+      if (this.visible && version === this.requestVersion) {
         if (this.conversation !== null) {
           this.actionError = (error as PortraError).message || '暂时无法更新会话';
         } else {
@@ -143,7 +183,7 @@ export struct ConversationDetailPage {
         }
       }
     } finally {
-      if (version === this.requestVersion) {
+      if (this.visible && version === this.requestVersion) {
         this.loading = false;
       }
     }
@@ -151,6 +191,12 @@ export struct ConversationDetailPage {
 
   private async refreshContent(): Promise<void> {
     if (!this.visible || this.loading || this.busy || this.conversation === null) {
+      return;
+    }
+    if (this.activeToken !== (this.appClient.sessionManager.getSession()?.accessToken ?? '')) {
+      this.invalidateAccount();
+      if (this.appClient.sessionManager.isAuthenticated()) this.initialize();
+      else this.errorMessage = '登录状态已失效，请重新登录';
       return;
     }
     const version = this.requestVersion;
@@ -174,6 +220,11 @@ export struct ConversationDetailPage {
     if (this.busy || !content || this.userId <= 0) {
       return;
     }
+    const retry = ConversationMessageState.retryForContent(this.messages, this.userId, content);
+    if (retry !== undefined) {
+      await this.retryMessage(retry);
+      return;
+    }
     const pending = ConversationMessageState.pending(this.conversationId, this.userId, content);
     this.saveDraft();
     this.showMessages([...this.messages, pending], true);
@@ -185,6 +236,7 @@ export struct ConversationDetailPage {
   private async retryMessage(message: MessageSummary): Promise<void> {
     if (this.busy || message.messageId >= 0) return;
     if (message.deliveryStatus === SendStatus.UNCERTAIN && this.uncertainResendId !== message.messageId) {
+      this.busy = true;
       try {
         const remote = await this.appClient.apiService.listMessages(this.conversationId);
         this.showMessages(ConversationMessageState.merge(this.messages, remote));
@@ -195,6 +247,8 @@ export struct ConversationDetailPage {
         this.actionError = '尚未查到发送结果。再次点击才会重发，可能产生重复消息。';
       } catch (error) {
         this.actionError = (error as PortraError).message || '暂时无法核对发送结果';
+      } finally {
+        this.busy = false;
       }
       return;
     }
@@ -353,7 +407,7 @@ export struct ConversationDetailPage {
   private TimelineRow(item: ConversationTimelineItem) {
     Row({ space: 8 }) {
       if (item.senderId !== this.userId) {
-        PortraAvatar({ displayName: '对方', avatarSize: 34 })
+        PortraAvatar({ displayName: this.peerName, avatarSize: 34 })
       } else {
         Blank().layoutWeight(1)
       }
@@ -397,7 +451,7 @@ export struct ConversationDetailPage {
 
   build() {
     Column() {
-      PortraPageHeading({ title: '约拍会话', eyebrow: 'CONVERSATION', onBack: this.onBack })
+      PortraPageHeading({ title: this.peerName, eyebrow: 'CONVERSATION', onBack: this.onBack })
       if (this.loading) {
         PortraLoading({ label: '正在加载会话' })
       } else if (this.errorMessage.length > 0) {
@@ -437,8 +491,11 @@ export struct ConversationDetailPage {
         Row({ space: 8 }) {
           TextInput({ text: this.draft, placeholder: '发送消息' })
             .layoutWeight(1).height(46).backgroundColor(PortraTheme.pageBackground)
+            .maxLength(4000).enterKeyType(EnterKeyType.Send)
             .onChange((value: string) => this.changeDraft(value))
+            .onSubmit(() => this.send())
           Button(this.busy ? '发送中' : '发送')
+            .width(76).height(46).borderRadius(8)
             .enabled(!this.busy && this.draft.trim().length > 0)
             .onClick(() => this.send())
         }

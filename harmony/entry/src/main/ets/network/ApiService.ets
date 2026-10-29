@@ -143,6 +143,15 @@ export class ApiService implements NativeSessionApi {
     return this.client.get<UserBrief>(`/users/${userId}/brief${suffix}`, `users.${userId}.brief`);
   }
 
+  getAvatarThumbnail(fileId: number): Promise<ArrayBuffer> {
+    if (!Number.isSafeInteger(fileId) || fileId <= 0) return Promise.reject(ErrorMapper.parse());
+    return this.client.getBinary(`/files/${fileId}/thumbnail`, `avatar.${fileId}`);
+  }
+
+  cancelAvatarThumbnail(fileId: number): void {
+    this.client.cancelRequest(`avatar.${fileId}`);
+  }
+
   listMessages(conversationId: number,
     requestKey: string = `conversations.${conversationId}.messages`): Promise<MessageSummary[]> {
     return this.client.get<MessageSummary[]>(`/conversations/${conversationId}/messages`,

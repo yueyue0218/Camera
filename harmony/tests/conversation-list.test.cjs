@@ -44,5 +44,11 @@ test('memory list cannot be read with another token or account', () => {
   assert.equal(ConversationMemory.read('token-A', 2).length, 0);
   ConversationMemory.noteMessage('token-A', 1, 8, { messageType: 'TEXT', content: '已收到' });
   assert.equal(ConversationMemory.read('token-A', 1)[0].preview, '已收到');
+  ConversationMemory.writeListOffset('token-A', 1, 140);
+  assert.equal(ConversationMemory.readListOffset('token-A', 1), 140);
+  assert.equal(ConversationMemory.readListOffset('token-B', 1), 0);
+  ConversationMemory.establishAccount('token-B', 2);
+  assert.equal(ConversationMemory.read('token-B', 2).length, 0);
+  assert.equal(ConversationMemory.readListOffset('token-B', 2), 0);
   ConversationMemory.clear();
 });

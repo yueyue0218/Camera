@@ -10,7 +10,7 @@ const ts = require(path.join(sdk, 'default/openharmony/ets/build-tools/ets-loade
 const sourceRoot = path.resolve(__dirname, '../entry/src/main/ets');
 const calls = [];
 const http = {
-  RequestMethod: { GET: 'GET', POST: 'POST' }, HttpDataType: { STRING: 1 },
+  RequestMethod: { GET: 'GET', POST: 'POST' }, HttpDataType: { STRING: 1, ARRAY_BUFFER: 2 },
   createHttp() {
     const call = { destroyed: 0 };
     calls.push(call);
@@ -56,6 +56,30 @@ test('valid payload and explicit null success are preserved', async () => {
     complete(calls.at(-1), data);
     assert.deepEqual(await result, data);
   }
+});
+
+test('avatar binary uses authenticated no-cache GET and rejects stale or oversized responses', async () => {
+  const client = new HttpClient();
+  client.setAccessToken('avatar-token');
+  const pending = client.getBinary('/files/9/thumbnail', 'avatar.9');
+  const call = calls.at(-1);
+  assert.equal(call.options.header.Authorization, 'Bearer avatar-token');
+  assert.equal(call.options.expectDataType, 2);
+  assert.equal(call.options.usingCache, false);
+  call.resolve({ responseCode: 200, result: new ArrayBuffer(12) });
+  assert.equal((await pending).byteLength, 12);
+
+  const oversized = client.getBinary('/files/9/thumbnail', 'avatar.9');
+  calls.at(-1).resolve({ responseCode: 200, result: new ArrayBuffer(2 * 1024 * 1024 + 1) });
+  await assert.rejects(oversized, hasKind('parse'));
+
+  const stale = client.getBinary('/files/9/thumbnail', 'avatar.9');
+  const oldCall = calls.at(-1);
+  const current = client.getBinary('/files/9/thumbnail', 'avatar.9');
+  calls.at(-1).resolve({ responseCode: 200, result: new ArrayBuffer(1) });
+  oldCall.resolve({ responseCode: 200, result: new ArrayBuffer(1) });
+  assert.equal((await current).byteLength, 1);
+  await assert.rejects(stale, hasKind('stale'));
 });
 
 for (const result of ['null', '[]', '{}', 'true', '<html>failure</html>',

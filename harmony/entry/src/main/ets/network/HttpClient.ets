@@ -40,6 +40,44 @@ export class HttpClient implements AuthTokenController {
     return this.request<T>(http.RequestMethod.GET, path, requestKey, false);
   }
 
+  async getBinary(path: string, requestKey: string = path): Promise<ArrayBuffer> {
+    const profile = EnvironmentConfig.current();
+    if (!EnvironmentConfig.isUsable(profile) || !path.startsWith('/') || path.startsWith('//') ||
+      /[\\\s#]/.test(path)) throw ErrorMapper.config('图片地址不可用');
+    const request = http.createHttp();
+    const requestVersion = this.beginRequest(requestKey, request);
+    const authorization = this.authInterceptor.authorizationHeader();
+    try {
+      if (!authorization) throw ErrorMapper.config('登录后才能读取头像');
+      const response = await request.request(this.buildUrl(profile.baseUrl, path), {
+        method: http.RequestMethod.GET,
+        header: { 'Authorization': authorization },
+        expectDataType: http.HttpDataType.ARRAY_BUFFER,
+        connectTimeout: 10000,
+        readTimeout: 15000,
+        maxRedirects: 0,
+        usingCache: false
+      });
+      if (!this.isCurrentRequest(requestKey, requestVersion)) throw ErrorMapper.stale();
+      if (response.responseCode < 200 || response.responseCode >= 300) {
+        const mappedError = ErrorMapper.fromHttpStatus(response.responseCode);
+        await this.handleAuthenticationExpired(mappedError);
+        throw mappedError;
+      }
+      if (!(response.result instanceof ArrayBuffer) || response.result.byteLength > 2 * 1024 * 1024) {
+        throw ErrorMapper.parse();
+      }
+      return response.result;
+    } catch (error) {
+      if (!this.isCurrentRequest(requestKey, requestVersion)) throw ErrorMapper.stale();
+      if (error instanceof PortraError) throw error;
+      throw ErrorMapper.fromTransportCode((error as BusinessError)?.code);
+    } finally {
+      request.destroy();
+      this.releaseRequest(requestKey, request);
+    }
+  }
+
   async post<T>(path: string, body?: Object, requestKey: string = path): Promise<T> {
     return this.request<T>(http.RequestMethod.POST, path, requestKey, true, body);
   }
