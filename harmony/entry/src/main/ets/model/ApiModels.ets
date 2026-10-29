@@ -210,6 +210,12 @@ export interface ConversationSummary {
   readonly createdAt?: string;
 }
 
+export interface UserBrief {
+  readonly userId: number;
+  readonly nickname?: string;
+  readonly avatarFileId?: number;
+}
+
 export interface OrderSummary {
   readonly orderId: number;
   readonly orderNo?: string;

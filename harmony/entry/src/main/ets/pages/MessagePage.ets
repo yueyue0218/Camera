@@ -4,6 +4,8 @@ import { PortraEmptyView } from '../common/components/PortraEmptyView';
 import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraLoading } from '../common/components/PortraLoading';
 import { PortraPageHeading } from '../common/components/PortraPageHeading';
+import { ConversationListItem, ConversationListModel } from '../features/conversation/ConversationListModel';
+import { ConversationMemory } from '../features/conversation/ConversationMemory';
 import { ConversationSummary } from '../model/ApiModels';
 import { PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
@@ -13,45 +15,108 @@ export struct MessagePage {
   @State private selectedTab: number = 0;
   @State private loading: boolean = true;
   @State private errorMessage: string = '';
-  @State private conversations: ConversationSummary[] = [];
+  @State private conversations: ConversationListItem[] = [];
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
+  private accountId: number = 0;
+  private refreshTimer: number = -1;
   onBack?: () => void;
   onOpenConversation?: (conversationId: number) => void;
 
   aboutToAppear(): void {
     this.load();
+    this.refreshTimer = setInterval(() => this.refresh(), 15000);
   }
 
   aboutToDisappear(): void {
     this.requestVersion++;
+    if (this.refreshTimer >= 0) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = -1;
+    }
     this.appClient.apiService.cancelConversations();
+    this.appClient.apiService.cancelCurrentSession();
   }
 
   private async load(): Promise<void> {
     const version = ++this.requestVersion;
-    this.loading = true;
+    const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
+    this.conversations = ConversationMemory.read(token, this.accountId);
+    this.loading = this.conversations.length === 0;
     this.errorMessage = '';
     try {
-      const result = await this.appClient.apiService.listConversations();
-      if (version === this.requestVersion) {
-        if (!Array.isArray(result)) {
-          this.errorMessage = '会话数据格式异常';
-        } else {
-          this.conversations = result.filter((item: ConversationSummary) =>
-            item !== null && Number.isSafeInteger(item.conversationId) && item.conversationId > 0 &&
-            Number.isSafeInteger(item.otherUserId) && item.otherUserId > 0);
-        }
-      }
+      const session = await this.appClient.apiService.currentSession();
+      if (version !== this.requestVersion) return;
+      this.accountId = session.userId;
+      this.conversations = ConversationMemory.read(token, session.userId);
+      this.loading = this.conversations.length === 0;
+      await this.loadRemote(version, token);
     } catch (error) {
       if (version === this.requestVersion) {
-        this.errorMessage = (error as PortraError).message || '消息加载失败';
+        this.errorMessage = this.conversations.length ? '' : (error as PortraError).message || '消息加载失败';
       }
     } finally {
       if (version === this.requestVersion) {
         this.loading = false;
       }
     }
+  }
+
+  private async refresh(): Promise<void> {
+    if (this.accountId <= 0 || !this.appClient.sessionManager.isAuthenticated()) return;
+    const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
+    try {
+      await this.loadRemote(this.requestVersion, token);
+    } catch {
+      // Keep the last verified list during a transient refresh failure.
+    }
+  }
+
+  private async loadRemote(version: number, token: string): Promise<void> {
+    const result = await this.appClient.apiService.listConversations();
+    if (!Array.isArray(result)) throw new Error('会话数据格式异常');
+    const current = ConversationMemory.read(token, this.accountId);
+    const cached = new Map<number, ConversationListItem>();
+    current.forEach((row: ConversationListItem) => cached.set(row.conversation.conversationId, row));
+    const summaries = result.filter((item: ConversationSummary) =>
+      ConversationListModel.validSummary(item, this.accountId));
+    const rows: ConversationListItem[] = [];
+    let cursor = 0;
+    const worker = async (): Promise<void> => {
+      while (cursor < summaries.length) {
+        const item = summaries[cursor++];
+        const old = cached.get(item.conversationId);
+        if (old && old.conversation.lastMessageTime === item.lastMessageTime) {
+          rows.push({ conversation: item, peerName: old.peerName, avatarFileId: old.avatarFileId,
+            preview: old.preview, previewTime: old.previewTime });
+          continue;
+        }
+        try {
+          const peerRole = item.otherUserId === item.participantBId ? 'PROVIDER' : 'CUSTOMER';
+          const brief = old ? null : await this.appClient.apiService.getUserBrief(item.otherUserId, peerRole)
+            .catch(() => null);
+          const messages = await this.appClient.apiService.listMessages(item.conversationId);
+          const row = ConversationListModel.row(item, brief, messages);
+          if (row !== null) rows.push(old ? {
+            conversation: row.conversation, peerName: old.peerName,
+            avatarFileId: old.avatarFileId, preview: row.preview, previewTime: row.previewTime
+          } : row);
+        } catch {
+          if (old) rows.push({ conversation: item, peerName: old.peerName,
+            avatarFileId: old.avatarFileId, preview: old.preview, previewTime: old.previewTime });
+        }
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+    if (version !== this.requestVersion || token !== this.appClient.sessionManager.getSession()?.accessToken) return;
+    const order = new Map<number, number>();
+    summaries.forEach((item: ConversationSummary, index: number) => order.set(item.conversationId, index));
+    rows.sort((left: ConversationListItem, right: ConversationListItem) =>
+      (order.get(left.conversation.conversationId) ?? 0) - (order.get(right.conversation.conversationId) ?? 0));
+    this.conversations = rows;
+    ConversationMemory.write(token, this.accountId, rows);
+    this.errorMessage = '';
+    this.loading = false;
   }
 
   @Builder
@@ -104,16 +169,15 @@ export struct MessagePage {
             .width('100%')
             .padding({ left: 20, right: 20, top: 20, bottom: 10 })
 
-            ForEach(this.conversations, (item: ConversationSummary) => {
+            ForEach(this.conversations, (item: ConversationListItem) => {
               Row({ space: 12 }) {
-                PortraAvatar({ displayName: '约', avatarSize: 48 })
+                PortraAvatar({ displayName: item.peerName, avatarSize: 48 })
                 Column({ space: 5 }) {
-                  Text('约拍会话')
+                  Text(item.peerName)
                     .fontSize(15)
                     .fontWeight(FontWeight.Bold)
                     .fontColor(PortraTheme.primaryText)
-                  Text(item.orderId ? `订单 #${item.orderId} · 对方 #${item.otherUserId}` :
-                    `对方用户 #${item.otherUserId}`)
+                  Text(item.preview)
                     .fontSize(12)
                     .fontColor(PortraTheme.secondaryText)
                     .maxLines(1)
@@ -121,7 +185,7 @@ export struct MessagePage {
                 }
                 .layoutWeight(1)
                 .alignItems(HorizontalAlign.Start)
-                Text(typeof item.lastMessageTime === 'string' ? item.lastMessageTime.slice(0, 10) : '')
+                Text(ConversationListModel.timeLabel(item.previewTime))
                   .fontSize(11)
                   .fontColor(PortraTheme.mutedText)
               }
@@ -129,9 +193,9 @@ export struct MessagePage {
               .height(78)
               .padding({ left: 20, right: 20 })
               .backgroundColor(PortraTheme.surface)
-              .onClick(() => this.onOpenConversation?.(item.conversationId))
+              .onClick(() => this.onOpenConversation?.(item.conversation.conversationId))
               Divider().color(PortraTheme.border).padding({ left: 80 })
-            }, (item: ConversationSummary) => item.conversationId.toString())
+            }, (item: ConversationListItem) => item.conversation.conversationId.toString())
 
           }
           .width('100%')

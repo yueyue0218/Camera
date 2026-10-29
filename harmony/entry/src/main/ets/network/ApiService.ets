@@ -5,6 +5,7 @@ import { AcceptedDemandResponse, ConfirmQuoteResult, ConversationSummary, Create
   OrderSummary, PageResult, QuoteSummary, SendSmsCodeRequest, ServicePackageDetail, ServicePackageSummary,
   SendTextMessagePayload, SessionSummary, StartServiceChatPayload, StartServiceChatResult,
   VerifyNativeSmsCodeRequest } from '../model/ApiModels';
+import { UserBrief } from '../model/ApiModels';
 import { ErrorMapper } from './ErrorMapper';
 import { HttpClient } from './HttpClient';
 
@@ -135,6 +136,11 @@ export class ApiService implements NativeSessionApi {
 
   cancelConversations(requestKey: string = 'conversations.list'): void {
     this.client.cancelRequest(requestKey);
+  }
+
+  getUserBrief(userId: number, role: string): Promise<UserBrief> {
+    const suffix = role === 'PROVIDER' ? '?role=PROVIDER' : '?role=CUSTOMER';
+    return this.client.get<UserBrief>(`/users/${userId}/brief${suffix}`, `users.${userId}.brief`);
   }
 
   listMessages(conversationId: number): Promise<MessageSummary[]> {
