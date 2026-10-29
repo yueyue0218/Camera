@@ -164,7 +164,7 @@ export class MomentFeedCache {
   }
 
   /** A destroyed view must not discard a write that is still running on the server. */
-  trackFavorite(request: Promise<MomentSummary>, sessionVersion: number): void {
+  trackFavorite<T>(request: Promise<T>, sessionVersion: number): void {
     this.writeRevisions.set(sessionVersion, this.getWriteRevision(sessionVersion) + 1);
     const pending = request.then(() => this.finishFavorite(sessionVersion),
       () => this.finishFavorite(sessionVersion));

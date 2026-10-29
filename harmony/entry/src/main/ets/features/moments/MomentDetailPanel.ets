@@ -17,6 +17,7 @@ class MomentImageFrame {
 export struct MomentDetailPanel {
   @Prop @Watch('onStateChanged') state: MomentInteractionSnapshot = new MomentInteractionSnapshot();
   @State private imageIndex: number = 0;
+  @State private ownerMenuOpen: boolean = false;
   @State private imageFailed: boolean = false;
   @State private imageRatio: number = 1;
   @State private imageFrameVersion: number = 0;
@@ -26,6 +27,14 @@ export struct MomentDetailPanel {
   private completed: Set<number> = new Set<number>();
   private failedImages: Set<number> = new Set<number>();
   private lastTargetId: number = 0;
+  @Prop canManage: boolean = false;
+  @Prop managementEnabled: boolean = false;
+  @Prop managementBusy: boolean = false;
+  @Prop managementMessage: string = '';
+  @Prop canVerifyManagement: boolean = false;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  onVerifyManagement?: () => void;
   onClose?: () => void;
   onRetry?: () => void;
   onRequireLogin?: () => void;
@@ -35,7 +44,7 @@ export struct MomentDetailPanel {
   aboutToAppear(): void { this.onStateChanged(); }
   private onStateChanged(): void {
     const targetChanged = this.lastTargetId !== this.state.targetId;
-    if (targetChanged) { this.imageIndex = 0; this.lastTargetId = this.state.targetId; }
+    if (targetChanged) { this.ownerMenuOpen = false; this.imageIndex = 0; this.lastTargetId = this.state.targetId; }
     this.imageIndex = Math.max(0, Math.min(this.imageIndex, this.state.images.length - 1));
     if (targetChanged || this.state.images.length !== this.albumSources.length ||
       this.state.images.some((source: string, index: number) => source !== this.albumSources[index])) {
@@ -114,13 +123,30 @@ export struct MomentDetailPanel {
     }.width('100%').aspectRatio(this.imageRatio).height(this.albumSizing ? 120 : undefined).backgroundColor('#FBF7EF')
   }
 
+  @Builder
+  private OwnerMenu() {
+    Column() {
+      Button('编辑').width('100%').height(48).fontColor('#242529').backgroundColor('#FFFDF9')
+        .onClick(() => { this.ownerMenuOpen = false; this.onEdit?.(); })
+      Button('删除').width('100%').height(48).fontColor('#B65745').backgroundColor('#FFFDF9')
+        .onClick(() => { this.ownerMenuOpen = false; this.onDelete?.(); })
+    }.width(160).padding(8).backgroundColor('#FFFDF9').borderRadius(12).shadow({ radius: 12, color: '#22000000' })
+  }
+
   build() {
+    Stack({ alignContent: Alignment.TopEnd }) {
     Column() {
       Row({ space: 12 }) {
         if (this.state.item !== undefined) {
-          MomentAuthor({ item: this.state.item, disabled: this.state.likeBusyId !== 0 || this.state.favoriteBusyId !== 0,
+          MomentAuthor({ item: this.state.item, disabled: this.managementBusy || this.state.likeBusyId !== 0 || this.state.favoriteBusyId !== 0,
             onOpenAuthor: this.onOpenAuthor }).layoutWeight(1)
         } else { Blank() }
+        if (this.canManage && this.state.item !== undefined) {
+          Button({ type: ButtonType.Circle }) { Text('⋯').fontSize(28).fontColor('#242529') }
+            .width(48).height(48).backgroundColor('#EEE8DF').accessibilityText('管理我的动态')
+            .enabled(this.managementEnabled && !this.state.loading && this.state.likeBusyId === 0 && this.state.favoriteBusyId === 0)
+            .onClick(() => this.ownerMenuOpen = !this.ownerMenuOpen)
+        }
         Button({ type: ButtonType.Circle }) {
           Image($r('app.media.c_moment_close_ink')).width(18).height(18).accessibilityLevel('no')
         }.width(48).height(48).backgroundColor('#EEE8DF')
@@ -141,6 +167,10 @@ export struct MomentDetailPanel {
           Text(`${this.imageIndex + 1} / ${this.state.images.length}`)
             .width('100%').textAlign(TextAlign.Center).fontSize(11).fontColor('#77736F')
         }
+        if (this.managementMessage.length > 0) {
+          Text(this.managementMessage).width('100%').fontSize(12).fontColor('#B65745')
+          if (this.canVerifyManagement) { Button('核实服务器状态').onClick(() => this.onVerifyManagement?.()) }
+        }
         if (this.state.message.length > 0) {
           Text(this.state.message).fontSize(12).fontColor('#B65745')
           Button(this.state.authenticationRequired ? '去登录' : '重新读取')
@@ -157,12 +187,12 @@ export struct MomentDetailPanel {
             MomentActionButton({ action: 'like', selected: this.state.item.likedByCurrentUser,
               count: this.state.item.likeCount, momentId: this.state.item.momentId,
               busy: this.state.likeBusyId !== 0, interactive: this.onToggleLike !== undefined,
-              disabled: this.state.favoriteBusyId !== 0 || this.state.uncertainMomentId === this.state.targetId,
+              disabled: this.managementBusy || this.state.favoriteBusyId !== 0 || this.state.uncertainMomentId === this.state.targetId,
               onToggle: () => { if (this.state.item !== undefined) { this.onToggleLike?.(this.state.item); } } })
             MomentActionButton({ action: 'favorite', selected: this.state.item.favoritedByCurrentUser,
               count: this.state.item.favoriteCount, momentId: this.state.item.momentId,
               busy: this.state.favoriteBusyId !== 0, interactive: this.onToggleFavorite !== undefined,
-              disabled: this.state.likeBusyId !== 0 || this.state.favoriteUncertainMomentId === this.state.targetId,
+              disabled: this.managementBusy || this.state.likeBusyId !== 0 || this.state.favoriteUncertainMomentId === this.state.targetId,
               onToggle: () => { if (this.state.item !== undefined) { this.onToggleFavorite?.(this.state.item); } } })
           }.width('100%')
         }
@@ -173,5 +203,10 @@ export struct MomentDetailPanel {
       }.width('100%').layoutWeight(1).scrollBar(BarState.Off).align(Alignment.Top)
     }.width('100%').height('100%').backgroundColor('#FBF7EF')
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
+      if (this.ownerMenuOpen && this.canManage) {
+        Column().width('100%').height('100%').onClick(() => this.ownerMenuOpen = false)
+        Column() { this.OwnerMenu() }.margin({ top: 60, right: 16 })
+      }
+    }.width('100%').height('100%')
   }
 }
