@@ -27,6 +27,7 @@ export class AuthSessionManager {
   private session: AuthSession | null = null;
   private restoreVersion: number = 0;
   private credentialError: CredentialStoreError | null = null;
+  private expirationPromise?: Promise<boolean>;
   private refreshPromise?: Promise<boolean>;
   private refreshVersion: number = -1;
   // Asset operations are ordered across refresh, login, logout and expiration.
@@ -105,6 +106,10 @@ export class AuthSessionManager {
   async restore(version: number): Promise<void> {
     if (version !== this.restoreVersion) {
       return;
+    }
+    if (this.status === AuthStatus.GUEST) {
+      this.status = AuthStatus.RESTORING;
+      this.credentialError = null;
     }
     try {
       await this.refreshForVersion(version);
@@ -258,6 +263,9 @@ export class AuthSessionManager {
   }
 
   markExpired(): Promise<boolean> {
+    if (this.expirationPromise !== undefined) {
+      return this.expirationPromise;
+    }
     if (this.status !== AuthStatus.AUTHENTICATED && this.status !== AuthStatus.RESTORING) {
       return Promise.resolve(true);
     }
@@ -266,11 +274,13 @@ export class AuthSessionManager {
     this.status = AuthStatus.EXPIRED;
     this.credentialError = null;
     this.authTokenController.clearAccessToken();
-    return this.clearStoredCredential(version);
+    this.expirationPromise = this.clearStoredCredential(version);
+    return this.expirationPromise;
   }
 
   private invalidateIdentity(): number {
     this.restoreVersion += 1;
+    this.expirationPromise = undefined;
     this.pendingRotation = undefined;
     this.pendingRotationVersion = -1;
     return this.restoreVersion;

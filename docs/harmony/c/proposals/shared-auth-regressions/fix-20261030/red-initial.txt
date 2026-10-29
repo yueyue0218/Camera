@@ -1,0 +1,82 @@
+✔ Asset Store keeps an environment-scoped, local, encrypted token record (4.1321ms)
+✔ Asset Store rejects cross-environment and empty credentials (0.9708ms)
+✔ restore accepts only a valid credential from the current environment (1.0664ms)
+✔ temporary refresh failure keeps the stored credential for a later retry (0.4578ms)
+✔ storage failures never create an in-memory authenticated session (0.6417ms)
+✖ application session restore deduplicates concurrency and retries after a transient failure (6.8802ms)
+✔ sign out clears local authentication even when secure deletion fails (1.3805ms)
+✖ concurrent expiration clears the credential once (1.2882ms)
+✔ 401 and 40101 try refresh and expire a rejected session; 403 does not refresh (2.919ms)
+✖ concurrent expiration waits for the same failed deletion result (10.0685ms)
+✔ an old expiration completion cannot expire a newer signed-in identity (1.5235ms)
+✔ concurrent expired GETs share one rotation and retry with the new bearer (1.3893ms)
+✔ a recovered POST PUT DELETE or PATCH is never automatically replayed (1.5324ms)
+✔ changing session invalidates the old account request (0.4583ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 11
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 915.0816
+
+✖ failing tests:
+
+test at harmony\tests\auth.test.cjs:210:1
+✖ application session restore deduplicates concurrency and retries after a transient failure (6.8802ms)
+  AssertionError [ERR_ASSERTION]: explicit retry must reach the refresh endpoint
+
+  0 !== 1
+
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\Camera\.tmp\c-auth-fix-candidate-20261030\harmony\tests\auth.test.cjs:227:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at harmony\tests\auth.test.cjs:257:1
+✖ concurrent expiration clears the credential once (1.2882ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be reference-equal to "expected":
+  + actual - expected
+
+    Promise {
+  +   <pending>,
+  +   Symbol(async_id_symbol): 1059,
+  -   Symbol(async_id_symbol): 1063,
+      Symbol(trigger_async_id_symbol): 1033,
+  -   true
+    }
+
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\Camera\.tmp\c-auth-fix-candidate-20261030\harmony\tests\auth.test.cjs:267:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [Promise],
+    expected: [Promise],
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at harmony\tests\auth.test.cjs:318:1
+✖ concurrent expiration waits for the same failed deletion result (10.0685ms)
+  AssertionError [ERR_ASSERTION]: a concurrent caller must not report success while deletion is pending
+
+  true !== false
+
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\Camera\.tmp\c-auth-fix-candidate-20261030\harmony\tests\auth.test.cjs:332:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

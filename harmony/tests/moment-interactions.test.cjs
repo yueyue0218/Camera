@@ -206,3 +206,5 @@ test('favorite old success/error/finally cannot alter a different account reques
   assert.equal(f.state.item.momentId,8);assert.equal(f.state.favoriteBusyId,0);
  }
 });
+
+test('a DELETED detail readable by its author never restores obsolete content or actions',async()=>{const f=fixture();const open=f.controller.open(7);f.reads[0].resolve(moment({status:'DELETED'}));await open;assert.equal(f.state.item,undefined);assert.deepEqual(f.state.images,[]);assert.equal(f.state.unavailableMomentId,7);assert.match(f.state.message,/删除/);assert.equal(f.updates.length,0)});

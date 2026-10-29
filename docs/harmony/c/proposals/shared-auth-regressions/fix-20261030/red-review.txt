@@ -1,0 +1,60 @@
+✔ Asset Store keeps an environment-scoped, local, encrypted token record (3.9573ms)
+✔ Asset Store rejects cross-environment and empty credentials (0.7415ms)
+✔ restore accepts only a valid credential from the current environment (0.9962ms)
+✔ temporary refresh failure keeps the stored credential for a later retry (0.4743ms)
+✔ storage failures never create an in-memory authenticated session (0.5854ms)
+✔ application session restore deduplicates concurrency and retries after a transient failure (7.4932ms)
+✔ sign out clears local authentication even when secure deletion fails (0.5295ms)
+✔ concurrent expiration clears the credential once (1.4342ms)
+✔ 401 and 40101 try refresh and expire a rejected session; 403 does not refresh (2.1142ms)
+✔ concurrent expiration waits for the same failed deletion result (2.0394ms)
+✔ an old expiration completion cannot expire a newer signed-in identity (5.4023ms)
+✔ concurrent expired GETs share one rotation and retry with the new bearer (2.1819ms)
+✔ a recovered POST PUT DELETE or PATCH is never automatically replayed (1.439ms)
+✔ changing session invalidates the old account request (0.4238ms)
+✖ explicit restore retry persists an already rotated credential without sending the old refresh again (16.979ms)
+✖ a lifecycle restore after failed logout deletion cannot restore the signed-out account (13.3782ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 14
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 866.0313
+
+✖ failing tests:
+
+test at harmony\tests\auth.test.cjs:451:1
+✖ explicit restore retry persists an already rotated credential without sending the old refresh again (16.979ms)
+  AssertionError [ERR_ASSERTION]: never rotate the already consumed refresh token again
+
+  17 !== 16
+
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\auth.test.cjs:470:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 17,
+    expected: 16,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at harmony\tests\auth.test.cjs:477:1
+✖ a lifecycle restore after failed logout deletion cannot restore the signed-out account (13.3782ms)
+  AssertionError [ERR_ASSERTION]: returning to Index must not revive a signed-out account
+
+  20 !== 19
+
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\auth.test.cjs:497:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 20,
+    expected: 19,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
