@@ -27,6 +27,10 @@ export class MomentApiBinding implements MomentInteractionApi {
     return this.api.unlikeMoment(id, key);
   }
 
+  favoriteMoment(id: number): Promise<MomentSummary> { return this.api.favoriteMoment(id); }
+
+  unfavoriteMoment(id: number): Promise<MomentSummary> { return this.api.unfavoriteMoment(id); }
+
   cancelMomentLike(id: number, key?: string): void {
     this.api.cancelMomentLike(id, key);
   }

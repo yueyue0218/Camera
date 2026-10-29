@@ -1,3 +1,10 @@
+export interface CreateMomentPayload {
+  readonly title: string;
+  readonly content: string;
+  readonly imageDataList: string[];
+  readonly mentions?: string[];
+}
+
 /**
  * Minimal API models shared by the network layer and feature pages.
  * Field names follow the current Spring Boot DTOs; this is not mock data.

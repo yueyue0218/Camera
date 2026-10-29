@@ -1,9 +1,10 @@
+import { MomentFavoriteApi, MomentFavoriteWrite } from './MomentFavoriteWrite';
 import { MomentSummary } from '../../model/ApiModels';
 import { ErrorMapper, PortraError } from '../../network/ErrorMapper';
 import { createMomentFeedRequestKey, MomentFeedCache, MomentFeedFormatter } from './MomentFeedModels';
 
 /** Supplied by the shared API owner; this file contains no transport or credentials. */
-export interface MomentInteractionApi {
+export interface MomentInteractionApi extends MomentFavoriteApi {
   getMoment(momentId: number, requestKey?: string): Promise<MomentSummary>;
   cancelMomentDetail(requestKey?: string): void;
   likeMoment(momentId: number, requestKey?: string): Promise<MomentSummary>;
@@ -21,6 +22,8 @@ export class MomentInteractionSnapshot {
   item?: MomentSummary;
   images: string[] = [];
   loading: boolean = false;
+  favoriteBusyId: number = 0;
+  favoriteUncertainMomentId: number = 0;
   likeBusyId: number = 0;
   uncertainMomentId: number = 0;
   message: string = '';
@@ -94,18 +97,19 @@ export class MomentInteractions {
       this.cache.markUncertainLike(this.sessionVersion, this.state.likeBusyId);
       this.api.cancelMomentLike(this.state.likeBusyId, `${this.requestKey}.like`);
     }
+    if (this.state.favoriteBusyId > 0) { this.cache.markUncertainFavorite(this.sessionVersion, this.state.favoriteBusyId); }
     this.state = new MomentInteractionSnapshot();
     this.publish();
   }
 
-  close(): void {
+  close(preserveMessage: boolean = false): void {
     this.readGeneration++;
     this.api.cancelMomentDetail(`${this.requestKey}.detail`);
     this.state.targetId = 0;
     this.state.item = undefined;
     this.state.images = [];
     this.state.loading = false;
-    this.state.message = '';
+    if (!preserveMessage) { this.state.message = ''; }
     this.state.unavailableMomentId = 0;
     this.publish();
   }
@@ -115,7 +119,7 @@ export class MomentInteractions {
   }
 
   async open(momentId: number): Promise<void> {
-    if (!this.ready() || !Number.isSafeInteger(momentId) || momentId <= 0 || this.state.likeBusyId !== 0) {
+    if (!this.ready() || !Number.isSafeInteger(momentId) || momentId <= 0 || this.state.likeBusyId !== 0 || this.state.favoriteBusyId !== 0) {
       return;
     }
     this.close();
@@ -174,6 +178,8 @@ export class MomentInteractions {
       this.state.images = images;
       this.cache.clearUncertainLike(version, momentId);
       this.state.uncertainMomentId = 0;
+      this.cache.clearUncertainFavorite(version, momentId);
+      this.state.favoriteUncertainMomentId = 0;
       this.onReconciled(MomentDetailData.feedPreview(result));
     } catch (error) {
       if (this.isCurrent(view, version) && read === this.readGeneration) {
@@ -193,7 +199,7 @@ export class MomentInteractions {
   }
 
   async toggleLike(item: MomentSummary): Promise<void> {
-    if (!this.ready() || !MomentFeedFormatter.isValid(item) || this.state.likeBusyId !== 0 ||
+    if (!this.ready() || !MomentFeedFormatter.isValid(item) || this.state.likeBusyId !== 0 || this.state.favoriteBusyId !== 0 ||
       this.state.loading || this.isLikeUncertain(item.momentId) || this.cache.hasPendingFavorite(this.sessionVersion)) {
       return;
     }
@@ -241,6 +247,33 @@ export class MomentInteractions {
     }
   }
 
+  async toggleFavorite(item: MomentSummary): Promise<void> {
+    const current = this.state.item;
+    if (!this.ready() || current === undefined || current.momentId !== item.momentId ||
+      this.state.targetId !== current.momentId || !MomentFeedFormatter.isValid(current) || this.state.loading ||
+      this.state.likeBusyId !== 0 || this.state.favoriteBusyId !== 0 ||
+      this.cache.hasUncertainFavorite(this.sessionVersion, current.momentId) ||
+      this.cache.hasPendingFavorite(this.sessionVersion)) { return; }
+    const view = this.generation; const version = this.sessionVersion;
+    this.state.favoriteBusyId = current.momentId; this.state.message = ''; this.publish();
+    try {
+      const result = await MomentFavoriteWrite.execute(this.api, this.cache, version, current);
+      if (!this.isCurrent(view, version)) { return; }
+      const images = MomentDetailData.images(result);
+      if (this.state.targetId === result.momentId) { this.state.item = result; this.state.images = images; }
+      this.onReconciled(MomentDetailData.feedPreview(result));
+    } catch (error) {
+      if (this.isCurrent(view, version)) {
+        this.cache.markUncertainFavorite(version, current.momentId);
+        this.state.favoriteUncertainMomentId = current.momentId;
+        this.setError(error as PortraError, '收藏结果未确认，请重新读取核实后再操作。');
+        if (!this.state.authenticationRequired) { this.state.message = '收藏结果未确认，请重新读取核实后再操作。'; }
+      }
+    } finally {
+      if (this.isCurrent(view, version)) { this.state.favoriteBusyId = 0; this.publish(); }
+    }
+  }
+
   private ready(): boolean {
     if (!this.active) {
       return false;
@@ -281,6 +314,7 @@ export class MomentInteractions {
 
   private publish(): void {
     this.onChange({ targetId: this.state.targetId, item: this.state.item, images: this.state.images.slice(),
+      favoriteBusyId: this.state.favoriteBusyId, favoriteUncertainMomentId: this.state.favoriteUncertainMomentId,
       loading: this.state.loading, likeBusyId: this.state.likeBusyId,
       uncertainMomentId: this.state.uncertainMomentId, message: this.state.message,
       authenticationRequired: this.state.authenticationRequired, unavailableMomentId: this.state.unavailableMomentId });
