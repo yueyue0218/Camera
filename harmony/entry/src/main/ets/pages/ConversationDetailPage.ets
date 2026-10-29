@@ -4,6 +4,8 @@ import { PortraLoading } from '../common/components/PortraLoading';
 import { PortraPageHeading } from '../common/components/PortraPageHeading';
 import { PortraAvatar } from '../common/components/PortraAvatar';
 import { ConversationMemory } from '../features/conversation/ConversationMemory';
+import { ConversationDraftStore } from '../features/conversation/ConversationDraftStore';
+import { ConversationVisibility } from '../features/conversation/ConversationVisibility';
 import { ConversationMessageState, SendStatus } from '../features/conversation/ConversationMessageState';
 import { ConversationTimeline, ConversationTimelineItem, TimelineKind } from '../features/conversation/ConversationTimeline';
 import { TextMessageBubble } from '../features/conversation/TextMessageBubble';
@@ -35,23 +37,68 @@ export struct ConversationDetailPage {
   private requestVersion: number = 0;
   private contentVersion: number = 0;
   private refreshTimer: number = -1;
+  private draftTimer: number = -1;
+  private scrollTimer: number = -1;
+  private visible: boolean = false;
+  private readonly threadScroller: Scroller = new Scroller();
   onBack?: () => void;
 
   aboutToAppear(): void {
     this.busy = false;
-    this.initialize();
-    this.refreshTimer = setInterval(() => this.refreshContent(), 5000);
+    ConversationVisibility.subscribe(`detail:${this.conversationId}`,
+      (visible: boolean) => this.setVisible(visible));
   }
 
   aboutToDisappear(): void {
+    ConversationVisibility.unsubscribe(`detail:${this.conversationId}`);
+    this.setVisible(false);
+    this.saveDraft();
     this.requestVersion++;
-    if (this.refreshTimer >= 0) {
-      clearInterval(this.refreshTimer);
-      this.refreshTimer = -1;
-    }
+    if (this.scrollTimer >= 0) clearTimeout(this.scrollTimer);
     this.appClient.apiService.cancelConversationDetail(this.conversationId);
     this.appClient.apiService.cancelCurrentSession();
     this.appClient.apiService.cancelConversations('conversations.detail.list');
+  }
+
+  private setVisible(visible: boolean): void {
+    if (this.visible === visible) return;
+    this.visible = visible;
+    if (visible) {
+      if (this.conversation === null || this.userId <= 0) this.initialize();
+      else this.refreshContent();
+      this.refreshTimer = setInterval(() => this.refreshContent(), 5000);
+    } else {
+      if (this.refreshTimer >= 0) clearInterval(this.refreshTimer);
+      this.refreshTimer = -1;
+      this.contentVersion++;
+      this.appClient.apiService.cancelConversationDetail(this.conversationId);
+    }
+  }
+
+  private changeDraft(value: string): void {
+    this.draft = value;
+    if (this.draftTimer >= 0) clearTimeout(this.draftTimer);
+    this.draftTimer = setTimeout(() => this.saveDraft(), 300);
+  }
+
+  private saveDraft(): void {
+    if (this.draftTimer >= 0) clearTimeout(this.draftTimer);
+    this.draftTimer = -1;
+    if (this.userId > 0) ConversationDraftStore.write(this.userId, this.conversationId, this.draft);
+  }
+
+  private showMessages(messages: MessageSummary[], follow: boolean = false): void {
+    const atEnd = follow || this.threadScroller.isAtEnd();
+    this.messages = messages;
+    if (atEnd) this.scrollToBottom();
+  }
+
+  private scrollToBottom(): void {
+    if (this.scrollTimer >= 0) clearTimeout(this.scrollTimer);
+    this.scrollTimer = setTimeout(() => {
+      if (this.visible) this.threadScroller.scrollEdge(Edge.Bottom);
+      this.scrollTimer = -1;
+    }, 30);
   }
 
   private async initialize(): Promise<void> {
@@ -63,15 +110,17 @@ export struct ConversationDetailPage {
       if (version !== this.requestVersion) return;
       const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
       this.userId = session.userId;
+      this.draft = ConversationDraftStore.read(session.userId, this.conversationId);
       ConversationMemory.establishAccount(token, session.userId);
       const cached = ConversationMemory.read(token, session.userId).find(row =>
         row.conversation.conversationId === this.conversationId);
       if (cached !== undefined) {
         this.conversation = cached.conversation;
-        this.messages = ConversationMemory.readMessages(token, session.userId, this.conversationId);
+        this.showMessages(ConversationMemory.readMessages(token, session.userId, this.conversationId), true);
         this.loading = false;
       }
       const conversations = await this.appClient.apiService.listConversations('conversations.detail.list');
+      if (!this.visible || version !== this.requestVersion) return;
       const match = conversations.find((item: ConversationSummary) => item.conversationId === this.conversationId);
       if (match === undefined) {
         throw new Error('会话不存在或无权查看');
@@ -80,7 +129,8 @@ export struct ConversationDetailPage {
       const quotes = await this.appClient.apiService.listQuotes(this.conversationId);
       if (version === this.requestVersion) {
         this.conversation = match;
-        this.messages = ConversationMessageState.merge(this.messages, Array.isArray(messages) ? messages : []);
+        this.showMessages(ConversationMessageState.merge(this.messages, Array.isArray(messages) ? messages : []),
+          cached === undefined);
         ConversationMemory.writeMessages(token, this.userId, this.conversationId, this.messages);
         this.quotes = Array.isArray(quotes) ? quotes : [];
       }
@@ -100,7 +150,7 @@ export struct ConversationDetailPage {
   }
 
   private async refreshContent(): Promise<void> {
-    if (this.loading || this.busy || this.conversation === null) {
+    if (!this.visible || this.loading || this.busy || this.conversation === null) {
       return;
     }
     const version = this.requestVersion;
@@ -109,7 +159,7 @@ export struct ConversationDetailPage {
       const messages = await this.appClient.apiService.listMessages(this.conversationId);
       const quotes = await this.appClient.apiService.listQuotes(this.conversationId);
       if (version === this.requestVersion && contentVersion === this.contentVersion && !this.busy) {
-        this.messages = ConversationMessageState.merge(this.messages, Array.isArray(messages) ? messages : []);
+        this.showMessages(ConversationMessageState.merge(this.messages, Array.isArray(messages) ? messages : []));
         const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
         ConversationMemory.writeMessages(token, this.userId, this.conversationId, this.messages);
         this.quotes = Array.isArray(quotes) ? quotes : this.quotes;
@@ -125,7 +175,8 @@ export struct ConversationDetailPage {
       return;
     }
     const pending = ConversationMessageState.pending(this.conversationId, this.userId, content);
-    this.messages = [...this.messages, pending];
+    this.saveDraft();
+    this.showMessages([...this.messages, pending], true);
     const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
     ConversationMemory.writeMessages(token, this.userId, this.conversationId, this.messages);
     await this.sendPending(pending);
@@ -136,7 +187,7 @@ export struct ConversationDetailPage {
     if (message.deliveryStatus === SendStatus.UNCERTAIN && this.uncertainResendId !== message.messageId) {
       try {
         const remote = await this.appClient.apiService.listMessages(this.conversationId);
-        this.messages = ConversationMessageState.merge(this.messages, remote);
+        this.showMessages(ConversationMessageState.merge(this.messages, remote));
         const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
         ConversationMemory.writeMessages(token, this.userId, this.conversationId, this.messages);
         if (!this.messages.some(item => item.messageId === message.messageId)) return;
@@ -157,7 +208,7 @@ export struct ConversationDetailPage {
     this.busy = true;
     this.contentVersion++;
     this.actionError = '';
-    this.messages = ConversationMessageState.status(this.messages, pending.messageId, SendStatus.SENDING);
+    this.showMessages(ConversationMessageState.status(this.messages, pending.messageId, SendStatus.SENDING), true);
     ConversationMemory.writeMessages(token, this.userId, this.conversationId, this.messages);
     try {
       const sent = await this.appClient.apiService.sendMessage(this.conversationId, pending.content ?? '');
@@ -166,9 +217,12 @@ export struct ConversationDetailPage {
       const merged = ConversationMessageState.confirm(current, pending.messageId, sent);
       ConversationMemory.writeMessages(token, this.userId, this.conversationId, merged);
       ConversationMemory.noteMessage(token, this.userId, this.conversationId, sent);
+      if (ConversationDraftStore.read(this.userId, this.conversationId).trim() === pending.content) {
+        ConversationDraftStore.write(this.userId, this.conversationId, '');
+      }
       if (version === this.requestVersion) {
-        this.messages = merged;
-        if (this.draft.trim() === pending.content) this.draft = '';
+        this.showMessages(merged, true);
+        if (this.draft.trim() === pending.content) this.changeDraft('');
       }
     } catch (error) {
       const mapped = error as PortraError;
@@ -180,7 +234,7 @@ export struct ConversationDetailPage {
       const next = ConversationMessageState.status(current, pending.messageId, status);
       ConversationMemory.writeMessages(token, this.userId, this.conversationId, next);
       if (version === this.requestVersion) {
-        this.messages = next;
+        this.showMessages(next, true);
         this.actionError = definite ? '发送失败，内容已保留，可重试。' :
           '发送结果未确认。请先查询结果，避免重复发送。';
       }
@@ -349,7 +403,7 @@ export struct ConversationDetailPage {
       } else if (this.errorMessage.length > 0) {
         PortraErrorView({ message: this.errorMessage, onRetry: () => this.initialize() })
       } else {
-        Scroll() {
+        Scroll(this.threadScroller) {
           Column({ space: 12 }) {
             Row() {
               Text('消息').fontSize(17).fontWeight(FontWeight.Bold)
@@ -383,7 +437,7 @@ export struct ConversationDetailPage {
         Row({ space: 8 }) {
           TextInput({ text: this.draft, placeholder: '发送消息' })
             .layoutWeight(1).height(46).backgroundColor(PortraTheme.pageBackground)
-            .onChange((value: string) => this.draft = value)
+            .onChange((value: string) => this.changeDraft(value))
           Button(this.busy ? '发送中' : '发送')
             .enabled(!this.busy && this.draft.trim().length > 0)
             .onClick(() => this.send())

@@ -7,6 +7,17 @@ export class ConversationMemory {
   private static userId: number = 0;
   private static rows: ConversationListItem[] = [];
   private static messages: Map<number, MessageSummary[]> = new Map<number, MessageSummary[]>();
+  private static listOffset: number = 0;
+
+  static readListOffset(token: string, userId: number): number {
+    return token === ConversationMemory.token && userId === ConversationMemory.userId
+      ? ConversationMemory.listOffset : 0;
+  }
+
+  static writeListOffset(token: string, userId: number, offset: number): void {
+    if (token === ConversationMemory.token && userId === ConversationMemory.userId &&
+      Number.isFinite(offset) && offset >= 0) ConversationMemory.listOffset = offset;
+  }
 
   static read(token: string, userId: number): ConversationListItem[] {
     return token && token === ConversationMemory.token && userId === ConversationMemory.userId
@@ -58,5 +69,6 @@ export class ConversationMemory {
     ConversationMemory.userId = 0;
     ConversationMemory.rows = [];
     ConversationMemory.messages.clear();
+    ConversationMemory.listOffset = 0;
   }
 }

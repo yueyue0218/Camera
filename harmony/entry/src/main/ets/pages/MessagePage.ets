@@ -6,6 +6,7 @@ import { PortraLoading } from '../common/components/PortraLoading';
 import { PortraPageHeading } from '../common/components/PortraPageHeading';
 import { ConversationListItem, ConversationListModel } from '../features/conversation/ConversationListModel';
 import { ConversationMemory } from '../features/conversation/ConversationMemory';
+import { ConversationVisibility } from '../features/conversation/ConversationVisibility';
 import { ConversationSummary } from '../model/ApiModels';
 import { PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
@@ -18,24 +19,53 @@ export struct MessagePage {
   @State private conversations: ConversationListItem[] = [];
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
+  private remoteVersion: number = 0;
   private accountId: number = 0;
   private refreshTimer: number = -1;
+  private readonly listScroller: Scroller = new Scroller();
+  private visible: boolean = false;
+  private restoreTimer: number = -1;
   onBack?: () => void;
   onOpenConversation?: (conversationId: number) => void;
 
   aboutToAppear(): void {
-    this.load();
-    this.refreshTimer = setInterval(() => this.refresh(), 15000);
+    ConversationVisibility.subscribe('list', (visible: boolean) => this.setVisible(visible));
   }
 
   aboutToDisappear(): void {
+    ConversationVisibility.unsubscribe('list');
+    this.setVisible(false);
     this.requestVersion++;
-    if (this.refreshTimer >= 0) {
-      clearInterval(this.refreshTimer);
-      this.refreshTimer = -1;
-    }
+    this.remoteVersion++;
+    if (this.restoreTimer >= 0) clearTimeout(this.restoreTimer);
     this.appClient.apiService.cancelConversations();
     this.appClient.apiService.cancelCurrentSession();
+  }
+
+  private setVisible(visible: boolean): void {
+    if (this.visible === visible) return;
+    this.visible = visible;
+    if (visible) {
+      if (this.accountId > 0) this.refresh();
+      else this.load();
+      this.refreshTimer = setInterval(() => this.refresh(), 15000);
+      this.restoreScroll();
+    } else {
+      if (this.refreshTimer >= 0) clearInterval(this.refreshTimer);
+      this.refreshTimer = -1;
+      this.remoteVersion++;
+      this.appClient.apiService.cancelConversations();
+    }
+  }
+
+  private restoreScroll(): void {
+    if (this.restoreTimer >= 0) clearTimeout(this.restoreTimer);
+    this.restoreTimer = setTimeout(() => {
+      const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
+      const offset = ConversationMemory.readListOffset(token, this.accountId);
+      if (this.visible && offset > 0) this.listScroller.scrollTo({ xOffset: 0, yOffset: offset });
+      this.restoreTimer = -1;
+    }, 100);
   }
 
   private async load(): Promise<void> {
@@ -46,10 +76,11 @@ export struct MessagePage {
     this.errorMessage = '';
     try {
       const session = await this.appClient.apiService.currentSession();
-      if (version !== this.requestVersion) return;
+      if (!this.visible || version !== this.requestVersion) return;
       this.accountId = session.userId;
       this.conversations = ConversationMemory.read(token, session.userId);
       this.loading = this.conversations.length === 0;
+      this.restoreScroll();
       await this.loadRemote(version, token);
     } catch (error) {
       if (version === this.requestVersion) {
@@ -73,6 +104,7 @@ export struct MessagePage {
   }
 
   private async loadRemote(version: number, token: string): Promise<void> {
+    const remoteVersion = ++this.remoteVersion;
     const result = await this.appClient.apiService.listConversations();
     if (!Array.isArray(result)) throw new Error('会话数据格式异常');
     const current = ConversationMemory.read(token, this.accountId);
@@ -105,11 +137,16 @@ export struct MessagePage {
         } catch {
           if (old) rows.push({ conversation: item, peerName: old.peerName,
             avatarFileId: old.avatarFileId, preview: old.preview, previewTime: old.previewTime });
+          else {
+            const row = ConversationListModel.row(item, null, []);
+            if (row !== null) rows.push(row);
+          }
         }
       }
     };
     await Promise.all([worker(), worker(), worker()]);
-    if (version !== this.requestVersion || token !== this.appClient.sessionManager.getSession()?.accessToken) return;
+    if (!this.visible || version !== this.requestVersion || remoteVersion !== this.remoteVersion ||
+      token !== this.appClient.sessionManager.getSession()?.accessToken) return;
     const order = new Map<number, number>();
     summaries.forEach((item: ConversationSummary, index: number) => order.set(item.conversationId, index));
     rows.sort((left: ConversationListItem, right: ConversationListItem) =>
@@ -118,6 +155,7 @@ export struct MessagePage {
     ConversationMemory.write(token, this.accountId, rows);
     this.errorMessage = '';
     this.loading = false;
+    this.restoreScroll();
   }
 
   @Builder
@@ -158,7 +196,7 @@ export struct MessagePage {
       } else if (this.conversations.length === 0) {
         PortraEmptyView({ message: '还没有会话' })
       } else {
-        Scroll() {
+        Scroll(this.listScroller) {
           Column({ space: 0 }) {
             Row() {
               Text('最近消息').fontSize(18).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
@@ -203,6 +241,10 @@ export struct MessagePage {
         }
         .layoutWeight(1)
         .scrollBar(BarState.Off)
+        .onDidScroll(() => {
+          const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
+          ConversationMemory.writeListOffset(token, this.accountId, this.listScroller.currentOffset().yOffset);
+        })
       }
     }
     .width('100%')

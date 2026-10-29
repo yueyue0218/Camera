@@ -1,6 +1,7 @@
 import { AppClient } from '../app/AppClient';
 import { PortraEmptyView } from '../common/components/PortraEmptyView';
 import { PortraAppShell } from '../features/shell/PortraAppShell';
+import { ConversationVisibility } from '../features/conversation/ConversationVisibility';
 import { AppRoute, NavigationRouteParam } from '../model/NavigationModels';
 import { NavigationClickGuard, NavigationPolicy } from '../navigation/NavigationPolicy';
 import { LoginPage } from './LoginPage';
@@ -78,6 +79,8 @@ struct Index {
       }
     }
     .hideTitleBar(true)
+    .onShown(() => ConversationVisibility.show(name, param as NavigationRouteParam))
+    .onHidden(() => ConversationVisibility.hide(name, param as NavigationRouteParam))
   }
 
   @Builder

@@ -3,6 +3,8 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 import { AppClient } from '../app/AppClient';
 import { DeviceIdentityStore } from '../storage/DeviceIdentityStore';
+import { ConversationDraftStore } from '../features/conversation/ConversationDraftStore';
+import { ConversationVisibility } from '../features/conversation/ConversationVisibility';
 
 const DOMAIN = 0x0000;
 
@@ -14,6 +16,7 @@ export default class EntryAbility extends UIAbility {
     } catch {
       hilog.error(DOMAIN, 'testTag', '%{public}s', 'Installation identity is unavailable');
     }
+    ConversationDraftStore.configure(this.context);
   }
 
   onDestroy(): void {
@@ -47,10 +50,12 @@ export default class EntryAbility extends UIAbility {
   onForeground(): void {
     // Ability has brought to foreground
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onForeground');
+    ConversationVisibility.setForeground(true);
   }
 
   onBackground(): void {
     // Ability has back to background
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onBackground');
+    ConversationVisibility.setForeground(false);
   }
 }
