@@ -9,10 +9,11 @@ import { ConversationDraftStore } from '../features/conversation/ConversationDra
 import { ConversationListModel } from '../features/conversation/ConversationListModel';
 import { ConversationVisibility } from '../features/conversation/ConversationVisibility';
 import { ConversationMessageState, SendStatus } from '../features/conversation/ConversationMessageState';
+import { ConversationTextSender } from '../features/conversation/ConversationTextSender';
 import { ConversationTimeline, ConversationTimelineItem, TimelineKind } from '../features/conversation/ConversationTimeline';
 import { TextMessageBubble } from '../features/conversation/TextMessageBubble';
 import { ConversationSummary, CreateQuotePayload, MessageSummary, QuoteSummary } from '../model/ApiModels';
-import { ErrorKind, PortraError } from '../network/ErrorMapper';
+import { PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
 
 @Component
@@ -265,32 +266,17 @@ export struct ConversationDetailPage {
     this.showMessages(ConversationMessageState.status(this.messages, pending.messageId, SendStatus.SENDING), true);
     ConversationMemory.writeMessages(token, this.userId, this.conversationId, this.messages);
     try {
-      const sent = await this.appClient.apiService.sendMessage(this.conversationId, pending.content ?? '');
-      if (!sent || !Number.isSafeInteger(sent.messageId) || sent.messageId <= 0) throw new Error('发送结果无法确认');
-      const current = ConversationMemory.readMessages(token, this.userId, this.conversationId);
-      const merged = ConversationMessageState.confirm(current, pending.messageId, sent);
-      ConversationMemory.writeMessages(token, this.userId, this.conversationId, merged);
-      ConversationMemory.noteMessage(token, this.userId, this.conversationId, sent);
-      if (ConversationDraftStore.read(this.userId, this.conversationId).trim() === pending.content) {
-        ConversationDraftStore.write(this.userId, this.conversationId, '');
+      const outcome = await ConversationTextSender.send((id: number, content: string) =>
+        this.appClient.apiService.sendMessage(id, content), token,
+        this.userId, this.conversationId, pending);
+      if (outcome.sent !== undefined &&
+        ConversationDraftStore.read(this.userId, this.conversationId).trim() === pending.content) {
+          ConversationDraftStore.write(this.userId, this.conversationId, '');
       }
       if (version === this.requestVersion) {
-        this.showMessages(merged, true);
-        if (this.draft.trim() === pending.content) this.changeDraft('');
-      }
-    } catch (error) {
-      const mapped = error as PortraError;
-      const definite = mapped.kind === ErrorKind.CONFIG ||
-        (mapped.kind === ErrorKind.HTTP && mapped.httpStatus >= 400 && mapped.httpStatus < 500) ||
-        (mapped.kind === ErrorKind.BUSINESS && mapped.businessCode < 50000);
-      const status = definite ? SendStatus.FAILED : SendStatus.UNCERTAIN;
-      const current = ConversationMemory.readMessages(token, this.userId, this.conversationId);
-      const next = ConversationMessageState.status(current, pending.messageId, status);
-      ConversationMemory.writeMessages(token, this.userId, this.conversationId, next);
-      if (version === this.requestVersion) {
-        this.showMessages(next, true);
-        this.actionError = definite ? '发送失败，内容已保留，可重试。' :
-          '发送结果未确认。请先查询结果，避免重复发送。';
+        this.showMessages(outcome.messages, true);
+        if (outcome.sent !== undefined && this.draft.trim() === pending.content) this.changeDraft('');
+        if (outcome.errorText !== undefined) this.actionError = outcome.errorText;
       }
     } finally {
       if (version === this.requestVersion) this.busy = false;
