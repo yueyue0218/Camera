@@ -1,5 +1,11 @@
 # C 公共依赖交付状态
 
+## 2026-10-29最终：固定相册基线、同色补齐、下拉刷新及发布入口
+
+详情按同相册最高显示图片固定基线，短图以页面同色补齐，切图文字不动；删刷新键改真实下拉，发布按钮单独留足间距。新手机发布表单50/200字、1—9图；2个公共文件已明确授权，沿用现有认证。发布顶部安全区已修。最终构建exit0/15.720秒，包83F6B5B10040D04645C7851004D5D4C8D056678ED7650E19777827675CDD58C6已安装。
+
+全套260/255pass/5fail；独立集成基线认证10/5pass/5fail，五项名称完全相同，本轮无新增回归，不冒充全套通过。真实切图1741=1741、下拉服务端更新/恢复已验证；图库/设备POST仍未验收。[修改、命令、截图、剩余项](evidence/20261029-final-album-publish/README.md)。[本轮PR26](https://github.com/yueyue0218/Camera/pull/26)，唯一base integration/harmony-v1；用户已显式授权检查后推送/合并，实际合并状态以GitHub为准，main不操作。
+
 ## 2026-10-29最新：动态卡片、详情互动与举报身份修复
 
 米白页面仅图片区域黑底；点图独立详情、小箭头切图、头像昵称可点。减弱粗蓝边/重印章，删“约拍记录”；爱心/书签只图标+数量、无加载动效，详情也可收藏/取消。返回后二次点图锁与失败核实隐藏锁已修；举报身份实例key，真实刷新/前后台/详情作者返回正常。Mate90Pro API26当前包SHA 87424F5F9AA09D596F71D7A44D766767232B7562BC5F1A2CFB5CD529840BD8CE。
@@ -188,3 +194,7 @@ HTTPS获取远端成功，integration仍为`b258ec8`，所列举报/点赞/详�
 用户明确回复“已获公共网络维护者授权，应用补丁并接入验收”。唯一新增公共改动为ApiService.ets的47行适配，精确补丁保留在proposals/moment-api-like-detail.patch；不修改HttpClient/认证/DTO/公共导航/B表单。上文01/02“仍缺”的描述为授权前核查历史，当前以本段及表格为准。维护者独立PR/SHA仍无，此能力随现有C PR25提交。
 
 新增真实源码契约与C状态回归，全套134项127通过/7举报TODO，严格举报仍2通过/7失败；最终assembleHap退出0。真实本地API26已验证点赞/取消、完整五图、关闭重入/系统返回、Web下架后404及恢复重读、同进程后台清详情和同条举报草稿互斥。完整证据见[evidence](evidence/20261028-like-detail/README.md)。未解除03/04/05、成功切身份、HALL和团队环境/真机依赖。
+
+## C-SHARED-10：累计Feed容量/分页缩略图（待维护者）
+
+本轮C单次发布已有160KiB/图及1.5MiB总预算，但既有无分页listMoments仍不能保证累计响应在SDK默认5MiB内。请公共/后端维护者在backend social/service/MomentService.java与MomentController.java、MomentDto.java和harmony network/ApiService.ets提供GET /moments/feed?scope&page&size及listMomentFeed(scope,page,size,key?):Promise<PageResult<MomentSummary>>，每页响应预算≤2MiB，列表最多3张低体积缩略图；保留原GET /moments数组签名与GET /moments/{id}完整图片，不直接改HttpClient掩盖。验收：多账号连续9图动态、分页/去重/切身份、列表预算和完整详情一致。C本轮不擅改这些公共文件。

@@ -4,6 +4,7 @@ import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraEmptyView } from '../common/components/PortraEmptyView';
 import { PortraLoading } from '../common/components/PortraLoading';
 import { MomentFavoriteWrite } from '../features/moments/MomentFavoriteWrite';
+import { MomentPublishPanel } from '../features/moments/MomentPublishPanel';
 import { MomentCard } from '../features/moments/MomentCard';
 import { MomentInteractions, MomentInteractionSnapshot, MomentDetailData } from '../features/moments/MomentInteractions';
 import { MomentApiBinding, MomentSessionBinding } from '../features/moments/MomentInteractionBindings';
@@ -17,6 +18,9 @@ import { PortraTheme } from '../theme/PortraTheme';
 
 @Component
 export struct MomentFeedPage {
+  @State private pullRefreshing: boolean = false;
+  private pullInFlight: boolean = false;
+  @State private publishOpen: boolean = false;
   @State private loading: boolean = true;
   @State private errorMessage: string = '';
   @State private authenticationRequired: boolean = false;
@@ -132,6 +136,8 @@ export struct MomentFeedPage {
 
   private suspendFeed(clearCache: boolean = true): void {
     this.active = false;
+    this.pullRefreshing = false; this.pullInFlight = false;
+    this.publishOpen = false;
     this.detailNavigationPending = false;
     this.interactions?.suspend();
     this.viewVersion++;
@@ -159,6 +165,8 @@ export struct MomentFeedPage {
         this.cache.clear();
       }
       if (this.sessionVersion >= 0) { this.appClient.apiService.cancelCurrentSession(this.identityRequestKey); }
+      this.pullRefreshing = false; this.pullInFlight = false;
+      this.publishOpen = false;
       this.detailNavigationPending = false;
       this.sessionVersion = current;
       this.viewVersion++;
@@ -423,7 +431,7 @@ export struct MomentFeedPage {
       this.favoriteUncertain = true;
       const mapped = error as PortraError;
       this.authenticationRequired = ErrorMapper.isAuthenticationExpired(mapped);
-      this.errorMessage = `${mapped.message?.length > 0 ? mapped.message : '收藏结果未确认。'} 请刷新确认后再操作。`;
+      this.errorMessage = `${mapped.message?.length > 0 ? mapped.message : '收藏结果未确认。'} 请下拉刷新确认后再操作。`;
       if (this.authenticationRequired) {
         this.showAuthenticationRequired();
       }
@@ -521,6 +529,33 @@ export struct MomentFeedPage {
     await this.ensureInteractions().toggleLike(current);
   }
 
+  private async refreshFromPull(): Promise<void> {
+    this.synchronizeSession();
+    if (!this.active || this.requestInFlight || this.favoriteBusyId !== 0 || this.interaction.likeBusyId !== 0 ||
+      this.selectedReportId !== 0 || this.publishOpen || this.pullInFlight) {
+      if (!this.pullInFlight) { this.pullRefreshing = false; } return;
+    }
+    const view = this.viewVersion, version = this.sessionVersion;
+    this.pullInFlight = true; this.pullRefreshing = true;
+    try { await this.load(true); }
+    finally {
+      if (view === this.viewVersion && version === this.sessionVersion) { this.pullInFlight = false; this.pullRefreshing = false; }
+    }
+  }
+
+  private openPublish(): void {
+    this.synchronizeSession(); if (!this.active) { return; }
+    if (!this.appClient.sessionManager.isAuthenticated()) { this.onRequireLogin?.(); return; }
+    if (this.favoriteBusyId !== 0 || this.interaction.likeBusyId !== 0 || this.cache.hasPendingFavorite(this.sessionVersion)) { return; }
+    this.selectedReportId = 0; this.publishOpen = true;
+  }
+  private afterPublish(_item: MomentSummary): void {
+    this.synchronizeSession(); if (!this.active || !this.publishOpen) { return; }
+    this.publishOpen = false; this.scope = 'latest'; this.cache.clear();
+    this.requestVersion++; this.appClient.apiService.cancelMoments(this.listRequestKey);
+    this.requestInFlight = false; this.load(true);
+  }
+
   build() {
     Column() {
       Row() {
@@ -534,15 +569,10 @@ export struct MomentFeedPage {
         }
         .alignItems(HorizontalAlign.Start)
         Blank()
-        Button(this.requestInFlight ? '刷新中' : '刷新')
-          .height(36)
-          .fontSize(PortraTheme.fontBodySmall)
-          .fontColor(PortraTheme.primary)
-          .backgroundColor(PortraTheme.primarySoft)
-          .borderRadius(PortraTheme.radiusPill)
-          .enabled(!this.requestInFlight && this.favoriteBusyId === 0 && this.interaction.likeBusyId === 0)
-          .accessibilityText('刷新当前动态频道')
-          .onClick(() => this.load(true))
+        Button('＋ 发布动态').height(44).width(116).fontSize(14).fontColor('#FFFFFF').backgroundColor('#1746C5')
+          .padding({ left: 12, right: 12 }).margin({ left: 16 })
+          .enabled(this.favoriteBusyId === 0 && this.interaction.likeBusyId === 0)
+          .accessibilityText('发布新的动态').onClick(() => this.openPublish())
       }
       .width('100%')
       .constraintSize({ minHeight: 120 })
@@ -593,6 +623,8 @@ export struct MomentFeedPage {
           .onClick(() => this.loadReportIdentity())
       }
 
+      Refresh({ refreshing: $$this.pullRefreshing }) {
+        Column() {
       if (this.loading) {
         PortraLoading({ label: '正在读取动态…' })
           .layoutWeight(1)
@@ -615,7 +647,7 @@ export struct MomentFeedPage {
                   .layoutWeight(1)
                   .fontSize(PortraTheme.fontBodySmall)
                   .fontColor(PortraTheme.danger)
-                Button(this.authenticationRequired ? '去登录' : '刷新确认')
+                Button(this.authenticationRequired ? '去登录' : '重新核实')
                   .height(32)
                   .fontSize(PortraTheme.fontCaption)
                   .fontColor(PortraTheme.primary)
@@ -690,10 +722,23 @@ export struct MomentFeedPage {
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.Spring)
       }
+        }.width('100%').height('100%')
+      }.width('100%').layoutWeight(1)
+        .pullToRefresh(this.selectedReportId === 0 && this.favoriteBusyId === 0 && this.interaction.likeBusyId === 0 && !this.publishOpen)
+        .onRefreshing(() => this.refreshFromPull())
     }
     .width('100%')
     .height('100%')
     .backgroundColor(PortraTheme.pageBackground)
     .onAppear(() => this.observeLifecycle())
+    .bindContentCover(this.publishOpen, this.publishBuilder(), { modalTransition: ModalTransition.ALPHA,
+      onDisappear: () => this.publishOpen = false })
+  }
+
+  @Builder
+  private publishBuilder() {
+    MomentPublishPanel({ onClose: () => this.publishOpen = false,
+      onRequireLogin: () => { this.publishOpen = false; this.onRequireLogin?.(); },
+      onPublished: (item: MomentSummary) => this.afterPublish(item) })
   }
 }

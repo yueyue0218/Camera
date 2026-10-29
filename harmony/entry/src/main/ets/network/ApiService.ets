@@ -1,3 +1,4 @@
+import { CreateMomentPayload } from '../model/ApiModels';
 import { OrderEngagementSummary, ReviewSummary, ReviewComplaintSummary, DisputeSummary, CreateReviewPayload, ReviewTextPayload, CreateReviewComplaintPayload, DisputeReasonPayload } from '../model/ApiModels';
 import { NotificationSummary, CreditSummary, CreditRecordSummary } from '../model/ApiModels';
 import { NativeSessionApi } from '../auth/NativeSessionApi';
@@ -18,6 +19,14 @@ export class ApiService implements NativeSessionApi {
 
   constructor(client: HttpClient = new HttpClient()) {
     this.client = client;
+  }
+
+  createMoment(payload: CreateMomentPayload, requestKey: string = 'moments.create'): Promise<MomentSummary> {
+    return this.client.post<MomentSummary>('/moments', payload, requestKey);
+  }
+
+  cancelMomentCreate(requestKey: string = 'moments.create'): void {
+    this.client.cancelRequest(requestKey);
   }
 
   listDemands(page: number = 1, size: number = 10, requestKey: string = 'demands.list'):
