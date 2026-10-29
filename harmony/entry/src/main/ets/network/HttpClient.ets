@@ -80,6 +80,10 @@ export class HttpClient implements AuthTokenController {
     return this.request<T>(http.RequestMethod.PUT, path, requestKey, true, body);
   }
 
+  async patch<T>(path: string, body?: Object, requestKey: string = path): Promise<T> {
+    return this.request<T>(http.RequestMethod.PATCH, path, requestKey, true, body);
+  }
+
   cancelAllRequests(): void {
     this.requestScopes.forEach((_scoped: boolean, key: string) => {
       this.cancelRequest(key);

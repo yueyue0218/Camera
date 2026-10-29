@@ -1,0 +1,176 @@
+{
+  "baseCommit": "31986688d74833dd5b64a09fca24bb7fd18cd899",
+  "applied": true,
+  "installed": true,
+  "characterLimit": 200,
+  "ownerBoundaryFiles": 9,
+  "candidateTests": {
+    "passed": 213,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 0,
+    "exitCode": 0
+  },
+  "candidateBuild": {
+    "exitCode": 0,
+    "duration": "16 s 812 ms",
+    "hapSha256": "a9726e648481b63c02461c6255701fe7949bf2d0913a87793200674d109f86b8"
+  },
+  "patchSha256": "b7b9140d3fb24a0e5240f09ebb6a8db19a6210a8940116002487643e7738167e",
+  "files": [
+    {
+      "file": "harmony/entry/src/main/ets/model/ApiModels.ets",
+      "ownerApprovalRequired": true,
+      "baseSha256": "b353789393b74ef843242a4ab91def207e15dff9c0c0090365ef4661321babf7",
+      "candidateSha256": "a7fba9331e762e9d67eb966b67255a3e45a10cd4b117991d8c08adee8621057b",
+      "appliedSha256": "a7fba9331e762e9d67eb966b67255a3e45a10cd4b117991d8c08adee8621057b"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/network/ApiService.ets",
+      "ownerApprovalRequired": true,
+      "baseSha256": "859ecf80204140015f03adfee7e2a3c7e49e892d501200683b6056dbfa42f2fa",
+      "candidateSha256": "82f71ad16d75f3dd5b4d699135e5669de177ad266e3d44eae1647105e76e89ed",
+      "appliedSha256": "d7583fe6ef000b2563fc97e2e88d479b27e5be7e4a4c2ea45bfa4984dedbb9f7"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/model/NavigationModels.ets",
+      "ownerApprovalRequired": true,
+      "baseSha256": "4f08ed82081ceee6bf4320909409250e8dc22bbb1d2848149aa5e0e365f311a1",
+      "candidateSha256": "b188d36dab296210c37250c51ea06deb098f8ab365198db699077154b2f753c9",
+      "appliedSha256": "d820d5ba55fabff2b67e1efefc346cdd34182e4a795e4cd4bcd6fbdfe9b2f03e"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/navigation/NavigationPolicy.ets",
+      "ownerApprovalRequired": true,
+      "baseSha256": "efeb6187a99262590b7dc862e1d9d0e66a2b262f91c8141c8144472b78d5fdcc",
+      "candidateSha256": "f9d6147078484dde46b9d7440ac66d75ccbb44da0e10d725791b2f66baf8b849",
+      "appliedSha256": "a967e4bccd477b387d6770ccb478512d1e43a10e853ad3404f8c1265a4494450"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/pages/Index.ets",
+      "ownerApprovalRequired": true,
+      "baseSha256": "6bcc1ec62d528cc5c39004272d7a2c353e2784f8e3c88909da96a8c306bed9dc",
+      "candidateSha256": "03bf9d845eea6365ba3bf80a590483a369884cf972f7445212b44b1c68712543",
+      "appliedSha256": "2cb5c5947017bf128cb4c57183e5b10a8861e655cdf5614424cebd55c347fb58"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/pages/MessagePage.ets",
+      "ownerApprovalRequired": true,
+      "baseSha256": "51acf55da4c11909239d8fd725b7d577630b01de17c8dfc0a31dcd9dba127236",
+      "candidateSha256": "a2bff4ce5c92dba453ff232eb9807bbd8215e13d1c398a0d17535b2b92ee8c41",
+      "appliedSha256": "3d84fa2713d651ffccf8d78d3bb682425716c3f0dab8c5ea461ee224be79920c"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/pages/OrderPage.ets",
+      "ownerApprovalRequired": true,
+      "baseSha256": "b7b443c73de9db0c70cd1f52019944b592684471ab188e693ad935cac927f97f",
+      "candidateSha256": "1f339345b66d585b2685b68a2c87d5cd7d902c7f58a21cbc5d016130974ff1d3",
+      "appliedSha256": "9e47c2642df913ab3f9927bf857870bcd4fe800c6feef89eb68e09ef4b454e26"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/features/user/ReportPanel.ets",
+      "ownerApprovalRequired": true,
+      "baseSha256": "a005ad0a39bde84bb4b92a25913d566dcc9013efa1de6c97cad429fa1188450d",
+      "candidateSha256": "175e5514aed95079581eb1d6cf4a4b676fe2ca14a1b3afee9a76279987fdc6ee",
+      "appliedSha256": "efe30ff740a477ca7edccc6e634e9a41aa917dae8ca604db5f2154df7d19b044"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/features/user/ReportDialogBody.ets",
+      "ownerApprovalRequired": true,
+      "baseSha256": null,
+      "candidateSha256": "d772cf4a42dd2d3a8e780ecf84d78090211f181d44284e753ba8235e60073ab8",
+      "appliedSha256": "90af2e6d0817fc73d075191da4ec5f4314e934045c52a87834cae357cb6207da"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/features/engagement/EngagementController.ets",
+      "ownerApprovalRequired": false,
+      "baseSha256": null,
+      "candidateSha256": "d7d758bec5579f791e56dadd9ea46df95c5e0aeed2bbdc45e8861be8eab46fa4",
+      "appliedSha256": "c8778494a50c6776bf63e0339148e88296e59a9f809a5d63f7becb8b4a0d18f2"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/features/engagement/EngagementDialogs.ets",
+      "ownerApprovalRequired": false,
+      "baseSha256": null,
+      "candidateSha256": "1ff4c6c71f0bcf10fc30c04e38e927da9666bb0a199b0ba18e74afb5db3bac24",
+      "appliedSha256": "ce27106a5b9a5b83da8b27eedf5bc5d0c720bd63bb547fdaef5c68f8747b5dab"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/features/engagement/EngagementApiBinding.ets",
+      "ownerApprovalRequired": false,
+      "baseSha256": null,
+      "candidateSha256": "dc3618026ef379b0513885005104a2d61c56cc858f0e927b34da7f525611c939",
+      "appliedSha256": "d54b3740f97afc809b17f1f9866f21b5a2b2556df944dd9189c9ae304e48d0a5"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/features/notifications/NotificationTargetResolver.ets",
+      "ownerApprovalRequired": false,
+      "baseSha256": null,
+      "candidateSha256": "5095990ac2a493ff0c5f2f6feb7501efb19cb5279dd44aa6e697ffa7ba64fdca",
+      "appliedSha256": "b9072d2a2e3233a98799aeec9cf40413d53d09c121f52e3e42239a5dff8f7bc9"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/pages/OrderEngagementPage.ets",
+      "ownerApprovalRequired": false,
+      "baseSha256": null,
+      "candidateSha256": "f6e91a0e714349910c94b2c1c48328f83018b854ac76f16712230443571607fc",
+      "appliedSha256": "87d02bbfa2b569bbae3691a2754d9ddbded6066bea6312878e4623e9135ec995"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/pages/NotificationPage.ets",
+      "ownerApprovalRequired": false,
+      "baseSha256": "703baaf0cf4dcb4a150992973f8d6b060e2bb4a76fe6e7712eebc5202d1e11d4",
+      "candidateSha256": "8692335f8b1664c2acece7fd40a6c47ad700dee7110505ec31b3acc525326f19",
+      "appliedSha256": "4755b754b4f0e21f9a850c866f93060fb7a60724f705c95b31873b78d70c0e6f"
+    },
+    {
+      "file": "harmony/tests/engagement-behavior.test.cjs",
+      "ownerApprovalRequired": false,
+      "baseSha256": null,
+      "candidateSha256": "89a33aca832760a545ad4bdbfeb7b7540ec488885efd863442ef5c475ae7138d",
+      "appliedSha256": "5364a10346473160c144a3e1820282294b7dc303be2ffe6332adf0fcf60ace2b"
+    },
+    {
+      "file": "harmony/tests/engagement-api.test.cjs",
+      "ownerApprovalRequired": false,
+      "baseSha256": null,
+      "candidateSha256": "057196d52cda0c7d47a4946c1ed49c0f201d4bd945adccf92d29a288ef1c3cb3",
+      "appliedSha256": "7ac9ad0d71e620d92b07550da9798ee9f7bebfaf4da0f7165ece939a8daa4564"
+    },
+    {
+      "file": "harmony/tests/notification-target.test.cjs",
+      "ownerApprovalRequired": false,
+      "baseSha256": null,
+      "candidateSha256": "4826916f0756b88ba3e76bc7ba30a42e31c76b4cc1318c7c5c6b777ec7c425fd",
+      "appliedSha256": "426b018f1c55baafd6252c9516405e635da446e3cfd00aeaec9013def1f327d1"
+    },
+    {
+      "file": "harmony/tests/moment-report-contract.test.cjs",
+      "ownerApprovalRequired": false,
+      "baseSha256": "6d5c53faa8ba933c38413b0512d3ef20185380425a28ae05dbc56d2adf028a23",
+      "candidateSha256": "b446f083045cb387085f102abf473a5c9e6b8508dbb2e5531ec82eac1ce45d7a",
+      "appliedSha256": "4744465fef0979288a23f978a8d1b2ec13fc89a3e50148122d9b9ab3803f3b94"
+    },
+    {
+      "file": "harmony/tests/navigation.test.cjs",
+      "ownerApprovalRequired": false,
+      "baseSha256": "99842891d34799f52acb108b236642602ee8b5a65a6999da2c8631e392ec23cb",
+      "candidateSha256": "9350deabca74febeaadc35f25310a04b0272370beca549cf474e07b3f7979437",
+      "appliedSha256": "9350deabca74febeaadc35f25310a04b0272370beca549cf474e07b3f7979437"
+    }
+  ],
+  "ownerAuthorization": "User confirmed public/B/D owner authorization; applied and simulator acceptance",
+  "formalTests": {
+    "passed": 216,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 0,
+    "exitCode": 0
+  },
+  "formalBuild": {
+    "exitCode": 0,
+    "duration": "1 min 9 s 971 ms",
+    "hapSha256": "96853387ca72c675bb6a2b6158022a08191aca807294bf4973c466c0ac9af5f2"
+  },
+  "evidence": "../../evidence/20261029-engagement/README.md"
+}

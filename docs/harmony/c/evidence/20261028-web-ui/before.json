@@ -1,0 +1,40 @@
+{
+  "origin": "http://127.0.0.1:18090",
+  "database": "portra_c_final_20261028",
+  "actorId": 1,
+  "role": "PROVIDER",
+  "momentId": 3,
+  "title": "秋日光影 · 鸿蒙 UI 验收",
+  "notificationIds": [
+    {
+      "notificationId": 3,
+      "type": "FOLLOWED",
+      "isRead": false,
+      "relatedId": 2
+    },
+    {
+      "notificationId": 2,
+      "type": "MOMENT_LIKED",
+      "isRead": false,
+      "relatedId": 3
+    }
+  ],
+  "unread": 2,
+  "credit": {
+    "userId": 1,
+    "creditScore": 80,
+    "creditLevel": "待积累",
+    "recordCount": 0,
+    "lastUpdatedAt": null,
+    "effectiveOrderCount": 0,
+    "completedOrderCount": 0,
+    "goodReviewRate": null,
+    "defaultRate": null,
+    "riskRecordCount": 0,
+    "receivedReviewCount": 0,
+    "averageRating": null
+  },
+  "recordCount": 0,
+  "generatedThroughOrdinaryLikeAndFollow": true,
+  "directNotificationWrites": false
+}

@@ -9,6 +9,7 @@ import { PortraTheme } from '../theme/PortraTheme';
 
 @Component
 export struct OrderPage {
+  @Prop @Watch('onReloadRequested') reloadEpoch: number = 0;
   @State private loading: boolean = true;
   @State private errorMessage: string = '';
   @State private orders: OrderSummary[] = [];
@@ -17,6 +18,12 @@ export struct OrderPage {
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
   onBack?: () => void;
+  onOpenEngagement?: (orderId: number) => void;
+
+  private onReloadRequested(): void {
+    // Initial appearance already loads; retained destinations reload on real Navigation show.
+    if (!this.loading) { this.load(); }
+  }
 
   aboutToAppear(): void {
     this.load();
@@ -181,8 +188,11 @@ export struct OrderPage {
               .backgroundColor(PortraTheme.surface)
               .borderRadius(8)
               .border({ width: 1, color: PortraTheme.border })
-              .onClick(() => this.selectedOrderId = this.selectedOrderId === item.orderId ? 0 : item.orderId)
-            }, (item: OrderSummary) => item.orderId.toString())
+              .onClick(() => {
+                if (this.onOpenEngagement !== undefined) { this.onOpenEngagement(item.orderId); }
+                else { this.selectedOrderId = this.selectedOrderId === item.orderId ? 0 : item.orderId; }
+              })
+            }, (item: OrderSummary) => `${item.orderId}:${this.requestVersion}`)
           }
           .width('100%')
           .padding({ left: 20, right: 20, bottom: 24 })

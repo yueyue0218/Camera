@@ -424,3 +424,79 @@ export interface OrderSummary {
   readonly createdAt?: string;
   readonly demandId?: number;
 }
+
+export interface NotificationSummary {
+  readonly notificationId: number;
+  readonly recipientUserId: number;
+  readonly actorUserId?: number | null;
+  readonly title: string;
+  readonly content: string;
+  readonly type: string;
+  readonly eventType?: string;
+  readonly relatedType?: string;
+  readonly relatedId?: number | null;
+  readonly targetType?: string;
+  readonly targetId?: number | null;
+  readonly sourceType?: string;
+  readonly sourceId?: number | null;
+  readonly metadataJson?: string | null;
+  readonly navigationPath?: string | null;
+  readonly isRead: boolean;
+  readonly createdAt?: string;
+}
+export interface CreditSummary {
+  readonly userId: number;
+  readonly creditScore?: number | null;
+  readonly creditLevel?: string;
+  readonly recordCount?: number;
+  readonly lastUpdatedAt?: string | null;
+  readonly effectiveOrderCount?: number;
+  readonly completedOrderCount?: number;
+  readonly goodReviewRate?: number | null;
+  readonly defaultRate?: number | null;
+  readonly riskRecordCount?: number;
+  readonly receivedReviewCount?: number;
+  readonly averageRating?: number | null;
+}
+export interface CreditRecordSummary {
+  readonly recordId: number;
+  readonly userId: number;
+  readonly relatedOrderId?: number | null;
+  readonly eventType?: string;
+  readonly scoreChange?: number | null;
+  readonly beforeScore?: number | null;
+  readonly scoreAfter?: number | null;
+  readonly afterScore?: number | null;
+  readonly appliedScoreChange?: number | null;
+  readonly sourceType?: string | null;
+  readonly sourceId?: number | null;
+  readonly reason?: string;
+  readonly createdAt?: string;
+}
+
+export interface OrderEngagementSummary extends OrderSummary {
+  readonly customerId: number;
+  readonly providerUserId: number;
+  readonly refundStatus?: string;
+}
+export interface ReviewSummary {
+  readonly reviewId: number; readonly orderId: number; readonly reviewerId: number;
+  readonly targetUserId: number; readonly reviewerNickname?: string; readonly targetUserNickname?: string;
+  readonly direction?: string; readonly rating: number; readonly content: string; readonly isVisible: boolean;
+  readonly replyContent?: string; readonly replyTime?: string; readonly createdAt?: string; readonly complaintStatus?: string;
+}
+export interface ReviewComplaintSummary {
+  readonly complaintId: number; readonly reviewId: number; readonly orderId: number; readonly complainantId: number;
+  readonly respondentId?: number; readonly reason: string; readonly status: string;
+  readonly arbitrationResult?: string; readonly arbitrationComment?: string; readonly createdAt?: string; readonly handledAt?: string;
+}
+export interface DisputeReplySummary { readonly id: number; readonly disputeId: number; readonly replierId: number; readonly content: string; readonly createdAt?: string; }
+export interface DisputeSummary {
+  readonly id: number; readonly orderId: number; readonly initiatorId: number; readonly reason: string; readonly status: string;
+  readonly resolution?: string; readonly responsibility?: string; readonly adminComment?: string;
+  readonly createdAt?: string; readonly resolvedAt?: string; readonly replies: DisputeReplySummary[];
+}
+export interface CreateReviewPayload { readonly rating: number; readonly content: string; }
+export interface ReviewTextPayload { readonly content: string; }
+export interface CreateReviewComplaintPayload { readonly reason: string; readonly evidenceFileIds: string; }
+export interface DisputeReasonPayload { readonly reason: string; }

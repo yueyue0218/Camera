@@ -1,0 +1,4 @@
+10-28 18:34:18.775 25683 25683 I A00000/PortraCNavAudit: route=ROOT visible=0 stack=0 version=2 key=moments.c.feed.1
+10-28 18:34:39.017 25683 25683 I A00000/PortraCNavAudit: [a92ab1cfbee29af, 1e87b87, 2d04da1] route=ROOT visible=1 stack=0 version=2 key=moments.c.feed.1
+10-28 18:35:15.901 25683 25683 I A00000/PortraCNavAudit: route=ROOT visible=0 stack=1 version=2 key=moments.c.feed.1
+10-28 18:35:32.730 25683 25683 I A00000/PortraCNavAudit: route=ROOT visible=1 stack=0 version=3 key=moments.c.feed.1

@@ -1,0 +1,4 @@
+10-28 18:21:06.871 20667 20667 I A00000/PortraCNavAudit: route=Hall visible=0 stack=2 version=3 key=moments.c.feed.3
+10-28 18:21:57.777 20667 20667 I A00000/PortraCNavAudit: route=Hall visible=1 stack=1 version=4 key=moments.c.feed.3
+10-28 18:22:59.459 20667 20667 I A00000/PortraCNavAudit: route=Hall visible=0 stack=1 version=4 key=moments.c.feed.3
+10-28 18:24:47.052 20667 20667 I A00000/PortraCNavAudit: [a92ab1cd6eda574, 2179a10, 1204e14] route=Hall visible=1 stack=1 version=4 key=moments.c.feed.3

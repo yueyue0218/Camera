@@ -72,12 +72,17 @@ function moment(overrides = {}) {
 }
 function setup() {
   let sessionVersion = 3, authenticated = true;
-  const lists = [], favorites = [], sessions = [];
+  const lists = [], favorites = [], sessions = [], details = [], likes = [];
   const app = {
     sessionManager: { isAuthenticated: () => authenticated, getSessionVersion: () => sessionVersion },
     apiService: {
       listMoments(scope, key) { const pending = deferred(); lists.push({ scope, key, ...pending }); return pending.promise; },
       cancelMoments(key) { cancellations.push(key); },
+      getMoment(id, key) { const p = deferred(); details.push({ id, key, ...p }); return p.promise; },
+      cancelMomentDetail() {},
+      likeMoment(id, key) { const p = deferred(); likes.push({ id, key, desired: true, ...p }); return p.promise; },
+      unlikeMoment(id, key) { const p = deferred(); likes.push({ id, key, desired: false, ...p }); return p.promise; },
+      cancelMomentLike() {},
       favoriteMoment(id) { const pending = deferred(); favorites.push({ id, desired: true, ...pending }); return pending.promise; },
       unfavoriteMoment(id) { const pending = deferred(); favorites.push({ id, desired: false, ...pending }); return pending.promise; },
       currentSession() { const pending = deferred(); sessions.push(pending); return pending.promise; }
@@ -113,10 +118,83 @@ function setup() {
   const createPage = () => { const created = new loaded.exports.MomentFeedPage(); events.bind(created); return created; };
   const page = createPage();
   page.aboutToAppear();
-  return { page, lists, favorites, sessions, createPage, events, cancellations,
+  return { page, lists, favorites, sessions, details, likes, createPage, events, cancellations,
     changeSession() { sessionVersion++; }, expire() { sessionVersion++; authenticated = false; } };
 }
 async function tick() { await new Promise(resolve => setImmediate(resolve)); }
+
+test('author callback uses the current real author and is blocked by a same-object report draft', async () => {
+  const f = setup(); f.lists[0].resolve([moment()]); await tick();
+  const calls = []; f.page.onOpenAuthor = (id, role) => calls.push({ id, role });
+  f.page.selectedReportId = 7; f.page.openAuthor(f.page.items[0]); assert.deepEqual(calls, []);
+  f.page.selectedReportId = 0; f.page.openAuthor(moment({ authorId: 999 }));
+  assert.deepEqual(calls, [{ id: 12, role: 'PROVIDER' }], 'never trust stale row author data');
+  f.events.background(); f.page.handleVisibility(false); f.page.openAuthor(moment());
+  assert.equal(calls.length, 1);
+});
+
+test('author navigation closes detail and accepts only real supported roles', async () => {
+  const f = setup(); f.lists[0].resolve([moment()]); await tick();
+  const calls = []; f.page.onOpenAuthor = (id, role) => calls.push({ id, role });
+  const read = f.page.openDetail(f.page.items[0]); f.details[0].resolve(moment()); await read;
+  f.page.openAuthor(moment()); assert.equal(f.page.detailOpen, false); assert.equal(calls.length, 1);
+  f.page.items = [moment({ authorRole: 'ADMIN' })]; f.page.openAuthor(f.page.items[0]); assert.equal(calls.length, 1);
+});
+
+test('Feed opens real detail, keeps three previews and updates server like state', async () => {
+  const f = setup(); f.lists[0].resolve([moment()]); await tick();
+  const read = f.page.openDetail(f.page.items[0]); assert.equal(f.details.length, 1);
+  f.details[0].resolve(moment({ imageDataList: ['1', '2', '3', '4', '5'] })); await read;
+  assert.equal(f.page.detailOpen, true); assert.equal(f.page.interaction.images.length, 5);
+  assert.equal(f.page.items[0].imageDataList.length, 3);
+  f.page.closeDetail(); assert.equal(f.page.detailOpen, false);
+  const like = f.page.toggleLike(f.page.items[0]); assert.equal(f.likes.length, 1);
+  f.likes[0].resolve(moment({ likedByCurrentUser: true, likeCount: 17 })); await like;
+  assert.equal(f.page.items[0].likeCount, 17); assert.equal(f.page.items[0].likedByCurrentUser, true);
+});
+
+test('like and detail preserve same-object report drafts and reject queued report during like', async () => {
+  const f = setup(); f.lists[0].resolve([moment()]); f.sessions[0].resolve({ userId: 21 }); await tick();
+  f.page.openReport(f.page.items[0]); assert.equal(f.page.selectedReportId, 7);
+  await f.page.toggleLike(f.page.items[0]); await f.page.openDetail(f.page.items[0]);
+  assert.equal(f.likes.length, 0); assert.equal(f.details.length, 0); assert.equal(f.page.selectedReportId, 7);
+  f.page.selectedReportId = 0; const like = f.page.toggleLike(f.page.items[0]);
+  f.page.openReport(f.page.items[0]); assert.equal(f.page.selectedReportId, 0);
+  f.likes[0].resolve(moment({ likedByCurrentUser: true })); await like;
+});
+
+test('background invalidates a detail sheet and 404 removes stale Feed content', async () => {
+  const f = setup(); f.lists[0].resolve([moment()]); await tick(); f.page.observeLifecycle();
+  const old = f.page.openDetail(f.page.items[0]); f.events.background();
+  assert.equal(f.page.detailOpen, false); f.details[0].resolve(moment()); await old;
+  assert.equal(f.page.interaction.item, undefined); f.events.foreground();
+  f.lists[1].resolve([moment()]); await tick();
+  const hidden = f.page.openDetail(f.page.items[0]);
+  f.details[1].reject(ErrorMapper.fromHttpStatus(404)); await hidden;
+  assert.deepEqual(f.page.items, []); assert.equal(f.page.interaction.item, undefined);
+});
+
+test('top-level uncertain result verification protects a same-object report draft', async () => {
+  const f = setup(); f.lists[0].resolve([moment()]); f.sessions[0].resolve({ userId: 21 }); await tick();
+  const write = f.page.toggleLike(f.page.items[0]); f.likes[0].reject({ kind: 'timeout' }); await write;
+  f.page.openReport(f.page.items[0]); assert.equal(f.page.selectedReportId, 7);
+  await f.page.verifyLikeResult(); assert.equal(f.details.length, 0);
+  assert.equal(f.page.selectedReportId, 7);
+  f.page.selectedReportId = 0; f.page.items = [];
+  const read = f.page.verifyLikeResult(); assert.equal(f.details.length, 1, 'verification works after scope changed');
+  f.details[0].resolve(moment({ likedByCurrentUser: true })); await read;
+});
+
+test('a Feed response issued before another instance write must re-read before painting', async () => {
+  const f = setup(); f.lists[0].resolve([moment()]); await tick();
+  const other = f.createPage(); other.aboutToAppear();
+  const write = f.page.toggleLike(f.page.items[0]);
+  f.likes[0].resolve(moment({ likedByCurrentUser: true, likeCount: 17 })); await write;
+  f.lists[1].resolve([moment()]); await tick();
+  assert.equal(f.lists.length, 3); assert.equal(other.requestInFlight, true);
+  f.lists[2].resolve([moment({ likedByCurrentUser: true, likeCount: 17 })]); await tick();
+  assert.equal(other.items[0].likeCount, 17);
+});
 
 test('same-ID server replacements and a new view cannot reuse an old rendered feed row', () => {
   const { page } = setup();

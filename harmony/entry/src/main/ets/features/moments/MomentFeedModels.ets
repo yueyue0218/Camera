@@ -57,7 +57,7 @@ export class MomentFeedFormatter {
   }
 
   static isValid(item: MomentSummary): boolean {
-    return item !== null && Number.isSafeInteger(item.momentId) && item.momentId > 0 &&
+    return item !== null && item !== undefined && Number.isSafeInteger(item.momentId) && item.momentId > 0 &&
       Number.isSafeInteger(item.authorId) && item.authorId > 0 && typeof item.authorRole === 'string' &&
       Number.isSafeInteger(item.likeCount) && item.likeCount >= 0 &&
       Number.isSafeInteger(item.favoriteCount) && item.favoriteCount >= 0 &&
@@ -100,6 +100,8 @@ export class MomentFeedCache {
   private readonly ttlMs: number;
   private entries: Map<string, MomentFeedCacheEntry> = new Map<string, MomentFeedCacheEntry>();
   private pendingFavorites: Map<number, Promise<void>> = new Map<number, Promise<void>>();
+  private uncertainLikes: Map<number, Set<number>> = new Map<number, Set<number>>();
+  private writeRevisions: Map<number, number> = new Map<number, number>();
 
   constructor(ttlMs: number = 60000) {
     this.ttlMs = ttlMs;
@@ -122,12 +124,35 @@ export class MomentFeedCache {
     return this.pendingFavorites.has(sessionVersion);
   }
 
+  getWriteRevision(sessionVersion: number): number {
+    return this.writeRevisions.get(sessionVersion) ?? 0;
+  }
+
+  hasUncertainLike(sessionVersion: number, momentId: number): boolean {
+    return this.uncertainLikes.get(sessionVersion)?.has(momentId) ?? false;
+  }
+
+  markUncertainLike(sessionVersion: number, momentId: number): void {
+    const ids = this.uncertainLikes.get(sessionVersion) ?? new Set<number>();
+    ids.add(momentId);
+    this.uncertainLikes.set(sessionVersion, ids);
+  }
+
+  clearUncertainLike(sessionVersion: number, momentId: number): void {
+    const ids = this.uncertainLikes.get(sessionVersion);
+    ids?.delete(momentId);
+    if (ids?.size === 0) {
+      this.uncertainLikes.delete(sessionVersion);
+    }
+  }
+
   waitForFavorite(sessionVersion: number): Promise<void> {
     return this.pendingFavorites.get(sessionVersion) ?? Promise.resolve();
   }
 
   /** A destroyed view must not discard a write that is still running on the server. */
   trackFavorite(request: Promise<MomentSummary>, sessionVersion: number): void {
+    this.writeRevisions.set(sessionVersion, this.getWriteRevision(sessionVersion) + 1);
     const pending = request.then(() => this.finishFavorite(sessionVersion),
       () => this.finishFavorite(sessionVersion));
     this.pendingFavorites.set(sessionVersion, pending);
