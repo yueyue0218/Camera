@@ -1,3 +1,7 @@
+## 2026-10-30 本人动态编辑/删除及确认卡片
+
+已获公共网络维护者授权，仅ApiService新增4方法；C统一详情本人三点菜单、共用表单真实PUT编辑、二次确认真实DELETE。287/287回归、assembleHap exit0/17.809秒；真实模拟器完成保存→服务端读回4张/Feed3张、取消删除保留、确认删除后作者DELETED/他人404/列表消失。确认卡片按反馈增加顶部留白、圆角和按钮间距。精确文件、命令和证据见[本轮交付](evidence/20261030-owner-actions/README.md)。用户本轮明确要求检查后立即推送合并，唯一目标integration/harmony-v1。
+
 ## 2026-10-30 C-SHARED-09 已授权应用，原5项认证失败已修复
 
 仅修改 AppClient.ets、AuthSessionManager.ets 和 auth.test.cjs。失败后同身份版本恢复、并发过期共享真实清理结果，保留待持久化的轮转凭据并阻止退出后旧账号恢复；同步测试端口并新增8项边界回归。最终全套268/268（exit0），assembleHap exit0/16.620秒，最终包真实模拟器7项验收通过。精确命令、补丁、红绿与设备证据见[修复交付](proposals/shared-auth-regressions/fix-20261030/README.md)。本轮不宣称整个C模块或团队环境完整验收完成；原PR26以下记录按时点保留。
@@ -202,3 +206,6 @@ HTTPS获取远端成功，integration仍为`b258ec8`，所列举报/点赞/详�
 ## C-SHARED-10：累计Feed容量/分页缩略图（待维护者）
 
 本轮C单次发布已有160KiB/图及1.5MiB总预算，但既有无分页listMoments仍不能保证累计响应在SDK默认5MiB内。请公共/后端维护者在backend social/service/MomentService.java与MomentController.java、MomentDto.java和harmony network/ApiService.ets提供GET /moments/feed?scope&page&size及listMomentFeed(scope,page,size,key?):Promise<PageResult<MomentSummary>>，每页响应预算≤2MiB，列表最多3张低体积缩略图；保留原GET /moments数组签名与GET /moments/{id}完整图片，不直接改HttpClient掩盖。验收：多账号连续9图动态、分页/去重/切身份、列表预算和完整详情一致。C本轮不擅改这些公共文件。
+
+## C-SHARED-11：本人动态编辑删除
+公共方法确实缺失，唯一目标ApiService.ets；签名、接入、兼容及验收见[可应用补丁与5项候选契约](proposals/moment-owner-actions/README.md)。等待对应维护者授权，C控制器/表单复用与回归继续推进。

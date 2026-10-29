@@ -29,6 +29,30 @@ export class ApiService implements NativeSessionApi {
     this.client.cancelRequest(requestKey);
   }
 
+  async updateMoment(momentId: number, payload: CreateMomentPayload, requestKey?: string): Promise<MomentSummary> {
+    this.requireMomentId(momentId);
+    const result = await this.client.put<MomentSummary>(`/moments/${momentId}`, payload,
+      requestKey ?? `moments.${momentId}.update`);
+    return this.requireMomentResult(result, momentId);
+  }
+
+  async deleteMoment(momentId: number, requestKey?: string): Promise<void> {
+    this.requireMomentId(momentId);
+    const result = await this.client.delete<void>(`/moments/${momentId}`,
+      requestKey ?? `moments.${momentId}.delete`);
+    if (result !== null && result !== undefined) { throw ErrorMapper.parse(); }
+  }
+
+  cancelMomentUpdate(momentId: number, requestKey?: string): void {
+    this.requireMomentId(momentId);
+    this.client.cancelRequest(requestKey ?? `moments.${momentId}.update`);
+  }
+
+  cancelMomentDelete(momentId: number, requestKey?: string): void {
+    this.requireMomentId(momentId);
+    this.client.cancelRequest(requestKey ?? `moments.${momentId}.delete`);
+  }
+
   listDemands(page: number = 1, size: number = 10, requestKey: string = 'demands.list'):
     Promise<PageResult<DemandSummary>> {
     return this.client.getPublic<PageResult<DemandSummary>>(

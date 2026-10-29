@@ -13,6 +13,7 @@ import { MomentPublishController, MomentPublishSnapshot } from './MomentPublishC
 
 @Component
 export struct MomentPublishPanel {
+  @Prop @Watch('editingTargetChanged') editingId: number = 0;
   @State private state: MomentPublishSnapshot = new MomentPublishSnapshot();
   @State private picking: boolean = false;
   @State private topInset: number = 40;
@@ -26,10 +27,11 @@ export struct MomentPublishPanel {
     this.controller = new MomentPublishController(new MomentPublishApiBinding(AppClient.shared.apiService),
       new MomentSessionBinding(AppClient.shared.sessionManager), MomentFeedCache.shared,
       (value: MomentPublishSnapshot) => this.state = value, (item: MomentSummary) => this.onPublished?.(item));
-    this.controller.open();
+    this.controller.open(this.editingId);
   }
   aboutToDisappear(): void { this.active = false; this.controller?.close(); this.controller = undefined; }
 
+  private editingTargetChanged(): void { this.picking = false; this.controller?.open(this.editingId); }
   private async readSafeArea(): Promise<void> {
     const context = this.getUIContext().getHostContext();
     if (context === undefined) { return; }
@@ -94,34 +96,34 @@ export struct MomentPublishPanel {
       Row({ space: 12 }) {
         Column({ space: 4 }) {
           Text('PORTRA FILE').fontSize(10).letterSpacing(2).fontColor('#1746C5')
-          Text('发布动态').fontSize(24).fontWeight(FontWeight.Bold).fontColor('#242529')
+          Text(this.editingId > 0 ? '编辑动态' : '发布动态').fontSize(24).fontWeight(FontWeight.Bold).fontColor('#242529')
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
         Button({ type: ButtonType.Circle }) {
           Image($r('app.media.c_moment_close_ink')).width(18).height(18)
-        }.width(48).height(48).backgroundColor('#EEE8DF').accessibilityText('取消发布动态').onClick(() => this.onClose?.())
+        }.width(48).height(48).backgroundColor('#EEE8DF').accessibilityText(this.editingId > 0 ? '取消编辑动态' : '取消发布动态').onClick(() => this.onClose?.())
       }.width('100%').padding(20).border({ width: { bottom: 1 }, color: '#E8E2DB' })
       Scroll() {
         Column({ space: 14 }) {
-          Text('分享今天想留下来的画面。').fontSize(14).fontColor('#77736F')
-          if (this.state.loading) { Text('正在确认发布账号…').fontSize(12).fontColor('#77736F') }
+          Text(this.editingId > 0 ? '更新这条动态的文字或照片。' : '分享今天想留下来的画面。').fontSize(14).fontColor('#77736F')
+          if (this.state.loading) { Text(this.editingId > 0 ? '正在读取完整动态…' : '正在确认发布账号…').fontSize(12).fontColor('#77736F') }
           if (this.state.message.length > 0) {
             Text(this.state.message).width('100%').fontSize(13).fontColor('#B65745').padding(12).backgroundColor('#FFF0EC').borderRadius(10)
             if (this.state.uncertain) {
-              Button('返回动态查看').onClick(() => this.onClose?.())
-              Button('已核实未发布，重新编辑').enabled(this.state.canConfirmAbsent).onClick(() => this.controller?.confirmVerifiedAbsent())
+              Button(this.editingId > 0 ? '返回详情核实' : '返回动态查看').onClick(() => this.onClose?.())
+              if (this.editingId === 0) { Button('已核实未发布，重新编辑').enabled(this.state.canConfirmAbsent).onClick(() => this.controller?.confirmVerifiedAbsent()) }
             } else if (this.state.actorId === 0 && !this.state.loading) {
-              Button('去登录').onClick(() => this.onRequireLogin?.())
+              Button(this.editingId > 0 ? '返回详情' : '去登录').onClick(() => this.editingId > 0 ? this.onClose?.() : this.onRequireLogin?.())
             }
           }
           Text('标题').fontSize(14).fontWeight(FontWeight.Medium).fontColor('#242529')
           TextInput({ text: this.state.title, placeholder: '为今天的记录起个名字' })
-            .maxLength(50).height(52).fontSize(16).backgroundColor('#FFFDF9').borderRadius(10)
+            .maxLength(Math.max(50, this.state.title.length)).height(52).fontSize(16).backgroundColor('#FFFDF9').borderRadius(10)
             .border({ width: 1, color: '#E8E2DB' }).enabled(this.state.actorId > 0 && !this.state.submitting && !this.state.uncertain)
             .onChange((value: string) => this.controller?.updateTitle(value))
           Text(`${this.state.title.length}/50`).width('100%').textAlign(TextAlign.End).fontSize(11).fontColor('#77736F')
           Text('正文').fontSize(14).fontWeight(FontWeight.Medium).fontColor('#242529')
           TextArea({ text: this.state.content, placeholder: '写下这张照片背后的故事…' })
-            .maxLength(200).height(148).fontSize(15).backgroundColor('#FFFDF9').borderRadius(10)
+            .maxLength(Math.max(200, this.state.content.length)).height(148).fontSize(15).backgroundColor('#FFFDF9').borderRadius(10)
             .border({ width: 1, color: '#E8E2DB' }).enabled(this.state.actorId > 0 && !this.state.submitting && !this.state.uncertain)
             .onChange((value: string) => this.controller?.updateContent(value))
           Text(`${this.state.content.length}/200`).width('100%').textAlign(TextAlign.End).fontSize(11).fontColor('#77736F')
@@ -147,7 +149,7 @@ export struct MomentPublishPanel {
       }.width('100%').layoutWeight(1).scrollBar(BarState.Off).align(Alignment.Top)
       Row({ space: 12 }) {
         Button('取消').height(48).fontColor('#67615A').backgroundColor('#EEE8DF').layoutWeight(1).onClick(() => this.onClose?.())
-        Button(this.state.submitting ? '发布中…' : '发布动态').height(48).fontColor('#FFFFFF').backgroundColor('#1746C5')
+        Button(this.state.submitting ? (this.editingId > 0 ? '保存中…' : '发布中…') : (this.editingId > 0 ? '保存修改' : '发布动态')).height(48).fontColor('#FFFFFF').backgroundColor('#1746C5')
           .layoutWeight(2).enabled(this.state.canSubmit && !this.picking).onClick(() => this.controller?.submit())
       }.width('100%').padding(20).border({ width: { top: 1 }, color: '#E8E2DB' })
     }.width('100%').height('100%').padding({ top: this.topInset + 8 }).backgroundColor('#FBF7EF')

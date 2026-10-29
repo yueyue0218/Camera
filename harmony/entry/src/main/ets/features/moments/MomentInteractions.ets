@@ -173,6 +173,9 @@ export class MomentInteractions {
       if (result === undefined || !MomentFeedFormatter.isValid(result) || result.momentId !== momentId) {
         throw ErrorMapper.parse();
       }
+      if (result.status === 'DELETED') {
+        this.cache.clear(); this.state.unavailableMomentId = momentId; this.state.message = '该动态已删除。'; return;
+      }
       const images = MomentDetailData.images(result);
       this.state.item = result;
       this.state.images = images;
