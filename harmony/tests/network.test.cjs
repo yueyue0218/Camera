@@ -10,7 +10,7 @@ const ts = require(path.join(sdk, 'default/openharmony/ets/build-tools/ets-loade
 const sourceRoot = path.resolve(__dirname, '../entry/src/main/ets');
 const calls = [];
 const http = {
-  RequestMethod: { GET: 'GET', POST: 'POST' }, HttpDataType: { STRING: 1, ARRAY_BUFFER: 2 },
+  RequestMethod: { GET: 'GET', POST: 'POST', PUT: 'PUT' }, HttpDataType: { STRING: 1, ARRAY_BUFFER: 2 },
   createHttp() {
     const call = { destroyed: 0 };
     calls.push(call);
@@ -299,7 +299,9 @@ test('appointment flow uses authenticated demand, conversation and quote endpoin
     assert.equal(call.url, EnvironmentConfig.current().baseUrl + route);
     assert.equal(call.options.method, method);
     assert.equal(call.options.header.Authorization, 'Bearer appointment-token');
-    complete(call, {});
+    const response = route === '/quotations' ? { quotationId: 19, conversationId: 14, amountCent: 30000 } :
+      route === '/quotations/19/confirm' ? { quotationId: 19, quotationStatus: 'CONFIRMED', orderId: 31 } : {};
+    complete(call, response);
     await promise;
   }
 
@@ -317,6 +319,52 @@ test('absolute URLs and ambiguous paths are rejected before network access', asy
     await assert.rejects(new HttpClient().get(url), hasKind('config'));
   }
   assert.equal(calls.length, before);
+});
+
+test('quote and order writes use the real contract and reject malformed acknowledgements', async () => {
+  const client = new HttpClient();
+  client.setAccessToken('workflow-token');
+  const api = new ApiService(client);
+  const payload = { conversationId: 14, amountCent: 29900,
+    shootStartTime: '2026-11-08T14:00:00', shootEndTime: '2026-11-08T16:00:00',
+    deliveryDeadline: '2026-11-15T18:00:00', location: '城市公园', serviceContent: '双人写真' };
+
+  const created = api.createQuote(payload);
+  let call = calls.at(-1);
+  assert.equal(call.options.method, 'POST');
+  assert.equal(call.url, EnvironmentConfig.current().baseUrl + '/quotations');
+  complete(call, { quotationId: 19, conversationId: 14, amountCent: 29900 });
+  assert.equal((await created).quotationId, 19);
+
+  const edited = api.updateQuote(19, payload);
+  call = calls.at(-1);
+  assert.equal(call.options.method, 'PUT');
+  assert.equal(call.url, EnvironmentConfig.current().baseUrl + '/quotations/19');
+  complete(call, { quotationId: 19, conversationId: 14, amountCent: 29900 });
+  assert.equal((await edited).quotationId, 19);
+
+  const rejected = api.rejectQuote(19, '时间不合适');
+  call = calls.at(-1);
+  assert.equal(JSON.parse(call.options.extraData).rejectReason, '时间不合适');
+  complete(call, { quotationId: 19, quotationStatus: 'REJECTED' });
+  await rejected;
+
+  const confirmed = api.confirmQuote(19);
+  call = calls.at(-1);
+  complete(call, { quotationId: 19, quotationStatus: 'CONFIRMED', orderId: 27 });
+  assert.equal((await confirmed).orderId, 27);
+
+  const payment = api.mockPay(27, 29900);
+  call = calls.at(-1);
+  assert.equal(call.url, EnvironmentConfig.current().baseUrl + '/orders/27/payments');
+  assert.equal(JSON.parse(call.options.extraData).payMethod, 'MOCK_PAY');
+  assert.equal(JSON.parse(call.options.extraData).amountCent, 29900);
+  complete(call, { paymentId: 81, orderId: 27, amountCent: 29900, paymentStatus: 'SUCCESS' });
+  assert.equal((await payment).paymentId, 81);
+
+  const malformed = api.mockPay(27, 29900);
+  complete(calls.at(-1), { paymentId: 0, orderId: 27, amountCent: 29900 });
+  await assert.rejects(malformed, hasKind('parse'));
 });
 
 test('build products select one endpoint without a committed fallback', () => {

@@ -117,6 +117,7 @@ export interface MessageSummary {
   readonly fileName?: string;
   readonly createdAt?: string;
   readonly quotationId?: number;
+  readonly orderId?: number;
   readonly deliveryStatus?: string;
 }
 
@@ -142,6 +143,14 @@ export interface QuoteSummary {
   readonly serviceContent: string;
   readonly status: string;
   readonly createdAt?: string;
+  readonly expireTime?: string;
+  readonly originalCount?: number;
+  readonly refinedCount?: number;
+  readonly photoUsageScope?: string;
+  readonly terms?: string;
+  readonly contractTerms?: string;
+  readonly safetyNoticeVersion?: string;
+  readonly remark?: string;
 }
 
 export interface CreateQuotePayload {
@@ -152,6 +161,14 @@ export interface CreateQuotePayload {
   readonly deliveryDeadline: string;
   readonly location: string;
   readonly serviceContent: string;
+  readonly originalCount?: number;
+  readonly refinedCount?: number;
+  readonly photoUsageScope?: string;
+  readonly terms?: string;
+  readonly contractTerms?: string;
+  readonly safetyNoticeVersion?: string;
+  readonly expireTime?: string;
+  readonly remark?: string;
 }
 
 export interface ConfirmQuoteResult {
@@ -159,6 +176,33 @@ export interface ConfirmQuoteResult {
   readonly quotationStatus: string;
   readonly orderId: number;
   readonly orderStatus: string;
+}
+
+export interface RejectQuoteResult {
+  readonly quotationId: number;
+  readonly quotationStatus: string;
+}
+
+export interface RejectQuotePayload {
+  readonly rejectReason: string;
+}
+
+export interface MockPaymentPayload {
+  readonly payMethod: string;
+  readonly amountCent: number;
+}
+
+export interface PaymentResult {
+  readonly paymentId: number;
+  readonly orderId: number;
+  readonly orderStatus: string;
+  readonly paymentStatus: string;
+  readonly amountCent: number;
+}
+
+export interface OrderStatusLogSummary {
+  readonly toStatus: string;
+  readonly createdAt?: string;
 }
 
 export interface StartServiceChatResult {
@@ -228,4 +272,13 @@ export interface OrderSummary {
   readonly amountCent?: number;
   readonly createdAt?: string;
   readonly demandId?: number;
+  readonly quoteId?: number;
+  readonly conversationId?: number;
+  readonly customerId?: number;
+  readonly providerUserId?: number;
+  readonly shootStartTime?: string;
+  readonly shootEndTime?: string;
+  readonly deliveryDeadline?: string;
+  readonly shootLocation?: string;
+  readonly escrowStatus?: string;
 }

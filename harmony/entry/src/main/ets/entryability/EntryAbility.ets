@@ -4,6 +4,7 @@ import { window } from '@kit.ArkUI';
 import { AppClient } from '../app/AppClient';
 import { DeviceIdentityStore } from '../storage/DeviceIdentityStore';
 import { ConversationDraftStore } from '../features/conversation/ConversationDraftStore';
+import { QuoteDraftStore } from '../features/conversation/QuoteDraftStore';
 import { ConversationVisibility } from '../features/conversation/ConversationVisibility';
 
 const DOMAIN = 0x0000;
@@ -17,6 +18,7 @@ export default class EntryAbility extends UIAbility {
       hilog.error(DOMAIN, 'testTag', '%{public}s', 'Installation identity is unavailable');
     }
     ConversationDraftStore.configure(this.context);
+    QuoteDraftStore.configure(this.context);
   }
 
   onDestroy(): void {

@@ -13,6 +13,9 @@ export class NavigationPolicy {
     AppRoute.DEMAND_DETAIL,
     AppRoute.SERVICE_DETAIL,
     AppRoute.CONVERSATION_DETAIL,
+    AppRoute.QUOTE_FORM,
+    AppRoute.QUOTE_DETAIL,
+    AppRoute.ORDER_DETAIL,
     AppRoute.PUBLISH,
     AppRoute.MESSAGE,
     AppRoute.ORDER,
@@ -21,6 +24,7 @@ export class NavigationPolicy {
 
   static requiresAuthentication(route: AppRoute): boolean {
     return route === AppRoute.PUBLISH || route === AppRoute.CONVERSATION_DETAIL || route === AppRoute.MESSAGE ||
+      route === AppRoute.QUOTE_FORM || route === AppRoute.QUOTE_DETAIL || route === AppRoute.ORDER_DETAIL ||
       route === AppRoute.ORDER || route === AppRoute.PROFILE;
   }
 
@@ -31,7 +35,10 @@ export class NavigationPolicy {
         route: AppRoute.LOGIN,
         param: {
           returnRoute: route,
-          conversationId: param.conversationId
+          conversationId: param.conversationId,
+          quoteId: param.quoteId,
+          orderId: param.orderId,
+          fromConversation: param.fromConversation
         }
       };
     }
@@ -61,6 +68,14 @@ export class NavigationPolicy {
     return NavigationPolicy.positiveId(param.conversationId);
   }
 
+  static validQuoteId(param: NavigationRouteParam): number | undefined {
+    return NavigationPolicy.positiveId(param.quoteId);
+  }
+
+  static validOrderId(param: NavigationRouteParam): number | undefined {
+    return NavigationPolicy.positiveId(param.orderId);
+  }
+
   private static positiveId(id: number | undefined): number | undefined {
     return typeof id === 'number' && Number.isSafeInteger(id) && id > 0 ? id : undefined;
   }
@@ -77,6 +92,11 @@ export class NavigationPolicy {
         return '摄影橱窗';
       case AppRoute.CONVERSATION_DETAIL:
         return '会话';
+      case AppRoute.QUOTE_FORM:
+      case AppRoute.QUOTE_DETAIL:
+        return '报价';
+      case AppRoute.ORDER_DETAIL:
+        return '订单详情';
       case AppRoute.PUBLISH:
         return '发布需求';
       case AppRoute.MESSAGE:

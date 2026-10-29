@@ -86,6 +86,10 @@ export class HttpClient implements AuthTokenController {
     return this.request<T>(http.RequestMethod.POST, path, requestKey, false, body);
   }
 
+  async put<T>(path: string, body: Object, requestKey: string = path): Promise<T> {
+    return this.request<T>(http.RequestMethod.PUT, path, requestKey, true, body);
+  }
+
   cancelAllRequests(): void {
     this.activeRequests.forEach((_request: http.HttpRequest, key: string) => {
       this.cancelRequest(key);

@@ -2,7 +2,9 @@ import { NativeSessionApi } from '../auth/NativeSessionApi';
 import { AcceptedDemandResponse, ConfirmQuoteResult, ConversationSummary, CreateDemandPayload,
   CreateDemandResponsePayload, CreateQuotePayload,
   DemandResponseSummary, DemandSummary, MessageSummary, NativeRefreshRequest, NativeSessionResponse,
-  OrderSummary, PageResult, QuoteSummary, SendSmsCodeRequest, ServicePackageDetail, ServicePackageSummary,
+  MockPaymentPayload, OrderStatusLogSummary, OrderSummary, PageResult, PaymentResult, QuoteSummary,
+  RejectQuotePayload, RejectQuoteResult,
+  SendSmsCodeRequest, ServicePackageDetail, ServicePackageSummary,
   SendTextMessagePayload, SessionSummary, StartServiceChatPayload, StartServiceChatResult,
   VerifyNativeSmsCodeRequest } from '../model/ApiModels';
 import { UserBrief } from '../model/ApiModels';
@@ -169,13 +171,36 @@ export class ApiService implements NativeSessionApi {
       `conversations.${conversationId}.quotes`);
   }
 
-  createQuote(payload: CreateQuotePayload): Promise<QuoteSummary> {
-    return this.client.post<QuoteSummary>('/quotations', payload, `conversations.${payload.conversationId}.createQuote`);
+  async createQuote(payload: CreateQuotePayload): Promise<QuoteSummary> {
+    const result = await this.client.post<QuoteSummary>('/quotations', payload,
+      `conversations.${payload.conversationId}.createQuote`);
+    return this.requireQuote(result, payload.conversationId);
   }
 
-  confirmQuote(quoteId: number): Promise<ConfirmQuoteResult> {
-    return this.client.post<ConfirmQuoteResult>(`/quotations/${quoteId}/confirm`,
+  async updateQuote(quoteId: number, payload: CreateQuotePayload): Promise<QuoteSummary> {
+    const result = await this.client.put<QuoteSummary>(`/quotations/${quoteId}`, payload,
+      `quotations.${quoteId}.update`);
+    const quote = this.requireQuote(result, payload.conversationId);
+    if (quote.quotationId !== quoteId) throw ErrorMapper.parse();
+    return quote;
+  }
+
+  async rejectQuote(quoteId: number, reason: string): Promise<RejectQuoteResult> {
+    const payload: RejectQuotePayload = { rejectReason: reason };
+    const result = await this.client.post<RejectQuoteResult>(`/quotations/${quoteId}/reject`,
+      payload, `quotations.${quoteId}.reject`);
+    if (result === null || result.quotationId !== quoteId || result.quotationStatus !== 'REJECTED') {
+      throw ErrorMapper.parse();
+    }
+    return result;
+  }
+
+  async confirmQuote(quoteId: number): Promise<ConfirmQuoteResult> {
+    const result = await this.client.post<ConfirmQuoteResult>(`/quotations/${quoteId}/confirm`,
       undefined, `quotations.${quoteId}.confirm`);
+    if (result === null || result.quotationId !== quoteId || !Number.isSafeInteger(result.orderId) ||
+      result.orderId <= 0 || result.quotationStatus !== 'CONFIRMED') throw ErrorMapper.parse();
+    return result;
   }
 
   cancelConversationDetail(conversationId: number): void {
@@ -185,6 +210,32 @@ export class ApiService implements NativeSessionApi {
 
   listOrders(): Promise<OrderSummary[]> {
     return this.client.get<OrderSummary[]>('/orders', 'orders.list');
+  }
+
+  getOrder(orderId: number): Promise<OrderSummary> {
+    return this.client.get<OrderSummary>(`/orders/${orderId}`, `orders.${orderId}.detail`);
+  }
+
+  getOrderStatusLogs(orderId: number): Promise<OrderStatusLogSummary[]> {
+    return this.client.get<OrderStatusLogSummary[]>(`/orders/${orderId}/status-logs`, `orders.${orderId}.logs`);
+  }
+
+  async mockPay(orderId: number, amountCent: number): Promise<PaymentResult> {
+    const payload: MockPaymentPayload = { payMethod: 'MOCK_PAY', amountCent: amountCent };
+    const result = await this.client.post<PaymentResult>(`/orders/${orderId}/payments`,
+      payload, `orders.${orderId}.pay`);
+    return this.requirePayment(result, orderId, amountCent);
+  }
+
+  async getPayment(orderId: number): Promise<PaymentResult> {
+    const result = await this.client.get<PaymentResult>(`/orders/${orderId}/payments`, `orders.${orderId}.payment`);
+    return this.requirePayment(result, orderId);
+  }
+
+  cancelOrderDetail(orderId: number): void {
+    this.client.cancelRequest(`orders.${orderId}.detail`);
+    this.client.cancelRequest(`orders.${orderId}.logs`);
+    this.client.cancelRequest(`orders.${orderId}.payment`);
   }
 
   cancelOrders(): void {
@@ -210,5 +261,21 @@ export class ApiService implements NativeSessionApi {
       throw ErrorMapper.parse();
     }
     return response;
+  }
+
+  private requireQuote(quote: QuoteSummary, conversationId: number): QuoteSummary {
+    if (quote === null || !Number.isSafeInteger(quote.quotationId) || quote.quotationId <= 0 ||
+      quote.conversationId !== conversationId || !Number.isSafeInteger(quote.amountCent) ||
+      quote.amountCent <= 0) throw ErrorMapper.parse();
+    return quote;
+  }
+
+  private requirePayment(payment: PaymentResult, orderId: number, amountCent?: number): PaymentResult {
+    if (payment === null || !Number.isSafeInteger(payment.paymentId) || payment.paymentId <= 0 ||
+      payment.orderId !== orderId || !Number.isSafeInteger(payment.amountCent) ||
+      payment.amountCent < 0 || (amountCent !== undefined && payment.amountCent !== amountCent)) {
+      throw ErrorMapper.parse();
+    }
+    return payment;
   }
 }

@@ -22,10 +22,10 @@ const { NavigationClickGuard, NavigationPolicy } =
 test('all planned destinations have one stable route name', () => {
   assert.deepEqual(NavigationPolicy.routes, [
     AppRoute.LOGIN, AppRoute.HALL, AppRoute.DEMAND_DETAIL, AppRoute.SERVICE_DETAIL,
-    AppRoute.CONVERSATION_DETAIL, AppRoute.PUBLISH,
+    AppRoute.CONVERSATION_DETAIL, AppRoute.QUOTE_FORM, AppRoute.QUOTE_DETAIL, AppRoute.ORDER_DETAIL, AppRoute.PUBLISH,
     AppRoute.MESSAGE, AppRoute.ORDER, AppRoute.PROFILE
   ]);
-  assert.equal(new Set(NavigationPolicy.routes).size, 9);
+  assert.equal(new Set(NavigationPolicy.routes).size, 12);
 });
 
 test('hall, public details and login remain public', () => {
@@ -38,6 +38,7 @@ test('hall, public details and login remain public', () => {
 
 test('protected guest destinations redirect to login and preserve the target', () => {
   for (const route of [AppRoute.PUBLISH, AppRoute.MESSAGE, AppRoute.CONVERSATION_DETAIL,
+    AppRoute.QUOTE_FORM, AppRoute.QUOTE_DETAIL, AppRoute.ORDER_DETAIL,
     AppRoute.ORDER, AppRoute.PROFILE]) {
     const result = NavigationPolicy.resolve(route, {}, false);
     assert.equal(result.route, AppRoute.LOGIN);
@@ -48,6 +49,7 @@ test('protected guest destinations redirect to login and preserve the target', (
 
 test('authenticated sessions can enter protected destinations', () => {
   for (const route of [AppRoute.PUBLISH, AppRoute.MESSAGE, AppRoute.CONVERSATION_DETAIL,
+    AppRoute.QUOTE_FORM, AppRoute.QUOTE_DETAIL, AppRoute.ORDER_DETAIL,
     AppRoute.ORDER, AppRoute.PROFILE]) {
     const result = NavigationPolicy.resolve(route, {}, true);
     assert.equal(result.route, route);
@@ -71,6 +73,16 @@ test('service and conversation details reject invalid IDs and preserve conversat
   assert.equal(NavigationPolicy.validConversationId({ conversationId: -1 }), undefined);
   const result = NavigationPolicy.resolve(AppRoute.CONVERSATION_DETAIL, { conversationId: 42 }, false);
   assert.equal(result.param.conversationId, 42);
+});
+
+test('quote and order targets preserve real IDs through login', () => {
+  assert.equal(NavigationPolicy.validQuoteId({ quoteId: 22 }), 22);
+  assert.equal(NavigationPolicy.validOrderId({ orderId: 35 }), 35);
+  assert.equal(NavigationPolicy.validOrderId({ orderId: -1 }), undefined);
+  const route = NavigationPolicy.resolve(AppRoute.QUOTE_DETAIL,
+    { conversationId: 8, quoteId: 22 }, false);
+  assert.equal(route.param.conversationId, 8);
+  assert.equal(route.param.quoteId, 22);
 });
 
 test('route labels and direct login description are deterministic', () => {

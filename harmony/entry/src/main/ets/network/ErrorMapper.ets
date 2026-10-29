@@ -50,9 +50,18 @@ export class ErrorMapper {
     if (code === 40401) {
       return new PortraError(ErrorKind.BUSINESS, '请求的内容不存在。', 200, code);
     }
+    if (code === 40001) {
+      return new PortraError(ErrorKind.BUSINESS, '请检查填写内容。', 200, code);
+    }
+    if (code === 40901) {
+      return new PortraError(ErrorKind.BUSINESS, '当前状态已变化，请刷新后查看。', 200, code);
+    }
+    if (code === 40902) {
+      return new PortraError(ErrorKind.BUSINESS, '请勿重复操作，刷新后查看。', 200, code);
+    }
     // Backend error messages can contain SQL and other internal details.
     return new PortraError(ErrorKind.BUSINESS,
-      code >= 50000 ? '服务器暂时不可用，请稍后再试。' : `请求未能完成（${code}）。`, 200, code);
+      code >= 50000 ? '服务器暂时不可用，请稍后再试。' : '暂时无法完成，请稍后再试。', 200, code);
   }
 
   static fromTransportCode(code: number): PortraError {
