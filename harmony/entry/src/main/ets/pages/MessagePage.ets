@@ -59,6 +59,7 @@ export struct MessagePage {
     if (visible) {
       const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
       if (this.accountId > 0 && token === this.activeToken) {
+        this.conversations = ConversationMemory.read(token, this.accountId);
         this.resetAvatars(token, this.accountId);
         this.refresh();
       }
