@@ -25,6 +25,7 @@ export class AppClient {
   readonly apiService: ApiService;
   private restorePromise?: Promise<void>;
   private restoreStarted: boolean = false;
+  private restoreVersion: number = 0;
   private deviceId: string = '';
 
   private constructor() {
@@ -36,19 +37,25 @@ export class AppClient {
     this.apiService = new ApiService(httpClient);
     this.sessionManager = new AuthSessionManager(httpClient, credentialStore, environment.name, this.apiService);
     expiredHandler.bind(this.sessionManager);
+    this.restoreVersion = this.sessionManager.getSessionVersion();
   }
 
   restoreSession(): Promise<void> {
     if (this.restorePromise !== undefined) {
       return this.restorePromise;
     }
-    if (this.restoreStarted || this.sessionManager.isAuthenticated()) {
+    // A changed generation belongs to login, logout or expiration, not startup retry.
+    if (this.sessionManager.isAuthenticated() ||
+      this.restoreVersion !== this.sessionManager.getSessionVersion()) {
       return Promise.resolve();
     }
-    this.restoreStarted = true;
 
-    const version = this.sessionManager.beginRestore();
-    const restore = this.restoreAndRelease(version);
+    if (!this.restoreStarted) {
+      this.restoreVersion = this.sessionManager.beginRestore();
+      this.restoreStarted = true;
+    }
+    // Keep the same generation so a rotated credential awaiting persistence is reused.
+    const restore = this.restoreAndRelease(this.restoreVersion);
     this.restorePromise = restore;
     return restore;
   }
