@@ -1,0 +1,54 @@
+> hvigor [32mUP-TO-DATE :entry:dev@PreBuild...  [39m
+> hvigor [32mFinished :entry:dev@CreateModuleInfo... after 3 ms [39m
+> hvigor [32mUP-TO-DATE :entry:dev@GenerateMetadata...  [39m
+> hvigor [32mFinished :entry:dev@ConfigureCmake... after 1 ms [39m
+> hvigor [32mUP-TO-DATE :entry:dev@MergeProfile...  [39m
+> hvigor [32mUP-TO-DATE :entry:dev@CreateBuildProfile...  [39m
+> hvigor [32mFinished :entry:dev@PreCheckSyscap... after 1 ms [39m
+> hvigor [32mUP-TO-DATE :entry:dev@GeneratePkgContextInfo...  [39m
+> hvigor [32mFinished :entry:dev@GeneratePkgSdkInfo... after 7 ms [39m
+> hvigor [32mFinished :entry:dev@ProcessIntegratedHsp... after 2 ms [39m
+> hvigor [32mFinished :entry:dev@BuildNativeWithCmake... after 1 ms [39m
+> hvigor [32mUP-TO-DATE :entry:dev@MakePackInfo...  [39m
+> hvigor [32mFinished :entry:dev@SyscapTransform... after 18 ms [39m
+> hvigor [32mUP-TO-DATE :entry:dev@ProcessProfile...  [39m
+> hvigor [32mUP-TO-DATE :entry:dev@ProcessRouterMap...  [39m
+> hvigor [32mUP-TO-DATE :entry:dev@ProcessShareConfig...  [39m
+> hvigor [32mFinished :entry:dev@ProcessStartupConfig... after 10 ms [39m
+> hvigor [32mFinished :entry:dev@BuildNativeWithNinja... after 1 ms [39m
+> hvigor [32mUP-TO-DATE :entry:dev@ProcessResource...  [39m
+> hvigor [32mUP-TO-DATE :entry:dev@GenerateLoaderJson...  [39m
+> hvigor [32mUP-TO-DATE :entry:dev@ProcessLibs...  [39m
+> hvigor [32mUP-TO-DATE :entry:dev@CompileResource...  [39m
+> hvigor [32mUP-TO-DATE :entry:dev@DoNativeStrip...  [39m
+> hvigor [32mFinished :entry:dev@BuildJS... after 14 ms [39m
+> hvigor [32mUP-TO-DATE :entry:dev@CacheNativeLibs...  [39m
+> hvigor WARN: WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/moments/MomentPublishPanel.ets:43:31
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/moments/MomentPublishPanel.ets:45:33
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/moments/MomentPublishPanel.ets:48:34
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/moments/MomentPublishPanel.ets:67:43
+ 'packing' has been deprecated.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/moments/MomentPublishPanel.ets:76:30
+ Function may throw exceptions. Special handling is required.
+
+
+> hvigor [32mFinished :entry:dev@CompileArkTS... after 7 s 299 ms [39m
+> hvigor [32mUP-TO-DATE :entry:dev@GeneratePkgModuleJson...  [39m
+> hvigor [32mFinished :entry:dev@ProcessCompiledResources... after 2 ms [39m
+> hvigor [32mFinished :entry:dev@PackageHap... after 884 ms [39m
+> hvigor [32mFinished :entry:dev@PackingCheck... after 18 ms [39m
+> hvigor WARN: Will skip sign 'hos_hap'. No signingConfigs profile is configured in current project.
+             If needed, configure the signingConfigs in C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\build-profile.json5.
+> hvigor [32mFinished :entry:dev@SignHap... after 4 ms [39m
+> hvigor [32mFinished :entry:dev@CollectDebugSymbol... after 4 ms [39m
+> hvigor [32mFinished :entry:assembleHap... after 1 ms [39m
+> hvigor [32mBUILD SUCCESSFUL in 16 s 620 ms [39m
+
+33 tasks in total: 17 executed, 16 up-to-date
