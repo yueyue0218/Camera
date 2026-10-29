@@ -19,6 +19,7 @@ const { ErrorMapper } = require('../entry/src/main/ets/network/ErrorMapper.ets')
 
 function nativeEvents() {
   const navigation = new Set(), destinations = new Set(), application = new Set();
+  const routes = [];
   let destination;
   let stackSize = 0;
   let failRegistration = false;
@@ -41,6 +42,7 @@ function nativeEvents() {
     }
   };
   return {
+    routes,
     context: {
       getUIObserver: () => observer,
       getHostContext: () => ({ getApplicationContext: () => appContext }),
@@ -48,7 +50,7 @@ function nativeEvents() {
     },
     bind(page) {
       page.getUIContext = () => this.context;
-      page.queryNavigationInfo = () => ({ navigationId: '', pathStack: { size: () => stackSize } });
+      page.queryNavigationInfo = () => ({ navigationId: '', pathStack: { size: () => stackSize, pushPathByName: (name, param) => routes.push({ name, param }) } });
       page.queryNavDestinationInfo = () => destination;
     },
     route(size, info) { stackSize = size; destination = info; for (const cb of navigation) cb({}); },
@@ -72,7 +74,7 @@ function moment(overrides = {}) {
 }
 function setup() {
   let sessionVersion = 3, authenticated = true;
-  const lists = [], favorites = [], sessions = [], details = [], likes = [];
+  const lists = [], favorites = [], sessions = [], details = [], likes = [], identityCancellations = [];
   const app = {
     sessionManager: { isAuthenticated: () => authenticated, getSessionVersion: () => sessionVersion },
     apiService: {
@@ -85,7 +87,8 @@ function setup() {
       cancelMomentLike() {},
       favoriteMoment(id) { const pending = deferred(); favorites.push({ id, desired: true, ...pending }); return pending.promise; },
       unfavoriteMoment(id) { const pending = deferred(); favorites.push({ id, desired: false, ...pending }); return pending.promise; },
-      currentSession() { const pending = deferred(); sessions.push(pending); return pending.promise; }
+      currentSession(key) { const pending = deferred(); sessions.push({key, ...pending}); return pending.promise; },
+      cancelCurrentSession(key) { identityCancellations.push(key); }
     }
   };
   const cancellations = [];
@@ -113,12 +116,12 @@ function setup() {
     return originalRequire(name);
   };
   loaded._compile(compiled.outputText, filename);
-  MomentFeedCache.shared.clear();
+  MomentFeedCache.shared = new MomentFeedCache();
   const events = nativeEvents();
   const createPage = () => { const created = new loaded.exports.MomentFeedPage(); events.bind(created); return created; };
   const page = createPage();
   page.aboutToAppear();
-  return { page, lists, favorites, sessions, details, likes, createPage, events, cancellations,
+  return { page, lists, favorites, sessions, details, likes, createPage, events, cancellations, identityCancellations,
     changeSession() { sessionVersion++; }, expire() { sessionVersion++; authenticated = false; } };
 }
 async function tick() { await new Promise(resolve => setImmediate(resolve)); }
@@ -136,16 +139,16 @@ test('author callback uses the current real author and is blocked by a same-obje
 test('author navigation closes detail and accepts only real supported roles', async () => {
   const f = setup(); f.lists[0].resolve([moment()]); await tick();
   const calls = []; f.page.onOpenAuthor = (id, role) => calls.push({ id, role });
-  const read = f.page.openDetail(f.page.items[0]); f.details[0].resolve(moment()); await read;
+  const read = f.page.readDetail(7, true); f.details[0].resolve(moment()); await read;
   f.page.openAuthor(moment()); assert.equal(f.page.detailOpen, false); assert.equal(calls.length, 1);
   f.page.items = [moment({ authorRole: 'ADMIN' })]; f.page.openAuthor(f.page.items[0]); assert.equal(calls.length, 1);
 });
 
-test('Feed opens real detail, keeps three previews and updates server like state', async () => {
+test('Feed verification reads full GET without a sheet, keeps previews and updates server like state', async () => {
   const f = setup(); f.lists[0].resolve([moment()]); await tick();
-  const read = f.page.openDetail(f.page.items[0]); assert.equal(f.details.length, 1);
+  const read = f.page.readDetail(7, true); assert.equal(f.details.length, 1);
   f.details[0].resolve(moment({ imageDataList: ['1', '2', '3', '4', '5'] })); await read;
-  assert.equal(f.page.detailOpen, true); assert.equal(f.page.interaction.images.length, 5);
+  assert.equal(f.page.detailOpen, false); assert.equal(f.page.interaction.images.length, 5);
   assert.equal(f.page.items[0].imageDataList.length, 3);
   f.page.closeDetail(); assert.equal(f.page.detailOpen, false);
   const like = f.page.toggleLike(f.page.items[0]); assert.equal(f.likes.length, 1);
@@ -163,13 +166,13 @@ test('like and detail preserve same-object report drafts and reject queued repor
   f.likes[0].resolve(moment({ likedByCurrentUser: true })); await like;
 });
 
-test('background invalidates a detail sheet and 404 removes stale Feed content', async () => {
+test('background invalidates a result verification and 404 removes stale Feed content', async () => {
   const f = setup(); f.lists[0].resolve([moment()]); await tick(); f.page.observeLifecycle();
-  const old = f.page.openDetail(f.page.items[0]); f.events.background();
+  const old = f.page.readDetail(7, true); f.events.background();
   assert.equal(f.page.detailOpen, false); f.details[0].resolve(moment()); await old;
   assert.equal(f.page.interaction.item, undefined); f.events.foreground();
   f.lists[1].resolve([moment()]); await tick();
-  const hidden = f.page.openDetail(f.page.items[0]);
+  const hidden = f.page.readDetail(7, true);
   f.details[1].reject(ErrorMapper.fromHttpStatus(404)); await hidden;
   assert.deepEqual(f.page.items, []); assert.equal(f.page.interaction.item, undefined);
 });
@@ -564,4 +567,86 @@ test('foreground before HALL shown resumes on its own ON_SHOWN without another s
   events.destinationUpdate({ ...hall, state: 0 });
   assert.equal(lists.length, 2);
   assert.equal(page.active, true);
+});
+
+
+test('favorite on and off uses current server state, retains three previews and survives refresh', async () => {
+  const f = setup(); f.lists[0].resolve([moment()]); await tick();
+  const stale = f.page.items[0];
+  const save = f.page.toggleFavorite(stale);
+  assert.equal(f.favorites[0].desired, true);
+  f.favorites[0].resolve(moment({ favoritedByCurrentUser: true, favoriteCount: 42, imageDataList: ['1','2','3','4','5'] }));
+  await save;
+  assert.equal(f.page.items[0].favoriteCount, 42);
+  assert.equal(f.page.items[0].imageDataList.length, 3);
+  const remove = f.page.toggleFavorite(stale);
+  assert.equal(f.favorites[1].desired, false, 'a stale row must still cancel the current server-backed state');
+  f.favorites[1].resolve(moment({ favoritedByCurrentUser: false, favoriteCount: 41, imageDataList: ['1','2','3','4','5'] }));
+  await remove;
+  assert.equal(f.page.items[0].favoriteCount, 41);
+  assert.equal(f.page.items[0].favoritedByCurrentUser, false);
+  const refresh = f.page.load(true);
+  f.lists[1].resolve([moment({ favoritedByCurrentUser: false, favoriteCount: 41 })]); await refresh;
+  assert.equal(f.page.items[0].favoritedByCurrentUser, false);
+});
+
+
+test('picture opens the existing full-page MomentDetail route once, never a Feed sheet or preview album', async () => {
+  const f = setup(); f.lists[0].resolve([moment()]); await tick();
+  const first = f.page.openDetail(f.page.items[0]); const repeated = f.page.openDetail(f.page.items[0]);
+  assert.deepEqual(f.events.routes, [{name:'MomentDetail', param:{momentId:7}}]);
+  assert.equal(f.details.length, 0, 'destination owns full GET; Feed never passes a preview album');
+  await first; await repeated;
+  assert.equal(f.page.detailOpen, false);
+  f.page.aboutToDisappear(); await f.page.openDetail(moment());
+  assert.equal(f.events.routes.length, 1);
+});
+
+test('picture navigation rejects report drafts, pending writes, stale rows and changed sessions', async () => {
+  const f = setup(); f.lists[0].resolve([moment()]); await tick();
+  f.page.selectedReportId=7; await f.page.openDetail(moment()); f.page.selectedReportId=0;
+  f.page.favoriteBusyId=7; await f.page.openDetail(moment()); f.page.favoriteBusyId=0;
+  await f.page.openDetail(moment({momentId:99})); f.changeSession(); await f.page.openDetail(moment());
+  assert.deepEqual(f.events.routes, []);
+});
+
+
+test('returning from a picture destination allows the next one-tap navigation', async () => {
+ const f=setup();f.lists[0].resolve([moment()]);await tick();f.page.observeLifecycle();
+ await f.page.openDetail(f.page.items[0]);assert.equal(f.events.routes.length,1);
+ f.events.route(1,undefined);assert.deepEqual(f.page.items,[]);
+ f.events.route(0,undefined);f.lists[1].resolve([moment()]);await tick();
+ await f.page.openDetail(f.page.items[0]);assert.equal(f.events.routes.length,2);
+});
+
+
+test('failed result verification retains its warning without leaving a hidden detail lock', async () => {
+ const f=setup();f.lists[0].resolve([moment(),moment({momentId:8})]);await tick();
+ const like=f.page.toggleLike(f.page.items[0]);f.likes[0].reject({kind:'timeout'});await like;
+ const verify=f.page.verifyLikeResult();f.details[0].reject({kind:'network',message:'无法核实，请重试'});await verify;
+ assert.match(f.page.interaction.message,/无法核实/);
+ const other=f.page.toggleLike(f.page.items[1]);assert.equal(f.page.detailOpen,false);
+ f.likes[1].resolve(moment({momentId:8,likedByCurrentUser:true}));await other;
+ const save=f.page.toggleFavorite(f.page.items[1]);assert.equal(f.favorites.length,1);
+ f.favorites[0].resolve(moment({momentId:8,likedByCurrentUser:true,favoritedByCurrentUser:true}));await save;
+});
+
+
+test('each Feed owns its report identity request and only cancels that instance on hide', async () => {
+ const f=setup();f.lists[0].resolve([moment()]);await tick();
+ const other=f.createPage();other.aboutToAppear();
+ assert.equal(typeof f.sessions[0].key,'string');assert.notEqual(f.sessions[0].key,'auth.session');
+ assert.notEqual(f.sessions[0].key,f.sessions[1].key);
+ f.page.aboutToDisappear();assert.ok(f.identityCancellations.includes(f.sessions[0].key));
+ assert.ok(!f.identityCancellations.includes(f.sessions[1].key));
+ f.sessions[0].resolve({userId:21});f.sessions[1].resolve({userId:21});
+ f.lists[1].resolve([moment()]);await tick();
+ assert.equal(f.page.currentUserId,0);assert.equal(other.currentUserId,21);assert.equal(other.reportIdentityError,'');
+});
+
+test('transient report identity failure remains retryable and successful retry clears the warning', async () => {
+ const f=setup();f.lists[0].resolve([moment()]);f.sessions[0].reject({kind:'network'});await tick();
+ assert.match(f.page.reportIdentityError,/举报身份/);assert.equal(f.page.currentUserId,0);
+ const retry=f.page.loadReportIdentity();f.sessions[1].resolve({userId:21});await retry;
+ assert.equal(f.page.reportIdentityError,'');assert.equal(f.page.currentUserId,21);
 });

@@ -105,8 +105,10 @@ test('pages integrate role isolation, deduplication, follow, favorite and report
   assert.match(profile, /this\.role === 'CUSTOMER'/);
   assert.match(messages, /normalizeConversations/);
   assert.match(messages, /hideConversation/);
-  assert.match(feed, /favoriteMoment/);
-  assert.match(feed, /unfavoriteMoment/);
+  assert.match(feed, /MomentFavoriteWrite\.execute/);
+  const favorite = read('features/moments/MomentFavoriteWrite.ets');
+  assert.match(favorite, /api\.favoriteMoment/);
+  assert.match(favorite, /api\.unfavoriteMoment/);
   assert.match(follow, /result\.followed === this\.followed/);
   assert.match(report, /\['USER', 'DEMAND', 'SERVICE_PACKAGE', 'MOMENT', 'REVIEW'\]/);
   assert.match(report, /result\.targetType !== payload\.targetType/);
