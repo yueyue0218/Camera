@@ -2,6 +2,9 @@ import { AppClient } from '../app/AppClient';
 import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraLoading } from '../common/components/PortraLoading';
 import { PortraPageHeading } from '../common/components/PortraPageHeading';
+import { PortraAvatar } from '../common/components/PortraAvatar';
+import { ConversationTimeline, ConversationTimelineItem, TimelineKind } from '../features/conversation/ConversationTimeline';
+import { TextMessageBubble } from '../features/conversation/TextMessageBubble';
 import { ConversationSummary, CreateQuotePayload, MessageSummary, QuoteSummary } from '../model/ApiModels';
 import { PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
@@ -220,6 +223,43 @@ export struct ConversationDetailPage {
     .padding(14).backgroundColor(PortraTheme.surface).borderRadius(8)
   }
 
+  @Builder
+  private TimelineRow(item: ConversationTimelineItem) {
+    Row({ space: 8 }) {
+      if (item.senderId !== this.userId) {
+        PortraAvatar({ displayName: '对方', avatarSize: 34 })
+      } else {
+        Blank().layoutWeight(1)
+      }
+      Column({ space: 4 }) {
+        if (item.kind === TimelineKind.QUOTE && item.quote !== undefined) {
+          this.QuoteItem(item.quote)
+        } else if (item.message !== undefined) {
+          if (item.message.messageType === 'TEXT') {
+            TextMessageBubble({ text: item.message.content ?? '', mine: item.senderId === this.userId })
+          } else {
+            Text(item.message.messageType === 'IMAGE' ? '[图片]' : `[附件] ${item.message.fileName ?? ''}`)
+              .fontSize(13).fontColor(PortraTheme.secondaryText)
+              .padding(10).backgroundColor(PortraTheme.surface).borderRadius(8)
+          }
+        }
+        if (item.createdAt.length >= 16) {
+          Text(item.createdAt.replace('T', ' ').slice(5, 16))
+            .fontSize(10).fontColor(PortraTheme.mutedText)
+        }
+      }
+      .constraintSize({ maxWidth: '76%' })
+      .alignItems(item.senderId === this.userId ? HorizontalAlign.End : HorizontalAlign.Start)
+      if (item.senderId !== this.userId) {
+        Blank().layoutWeight(1)
+      } else {
+        PortraAvatar({ displayName: '我', avatarSize: 34 })
+      }
+    }
+    .width('100%')
+    .alignItems(VerticalAlign.Top)
+  }
+
   build() {
     Column() {
       PortraPageHeading({ title: '约拍会话', eyebrow: 'CONVERSATION', onBack: this.onBack })
@@ -236,23 +276,14 @@ export struct ConversationDetailPage {
               Button('刷新').onClick(() => this.refreshContent())
             }
             .width('100%')
-            ForEach(this.messages, (item: MessageSummary) => {
-              Row() {
-                if (item.senderId === this.userId) { Blank() }
-                Text(item.messageType === 'TEXT' ? (item.content ?? '') :
-                  item.messageType === 'IMAGE' ? '[图片]' : `[附件] ${item.fileName ?? ''}`)
-                  .fontSize(14).fontColor(PortraTheme.primaryText)
-                  .padding(10).backgroundColor(item.senderId === this.userId ?
-                    PortraTheme.primarySoft : PortraTheme.surface).borderRadius(8)
-                if (item.senderId !== this.userId) { Blank() }
-              }
-              .width('100%')
-            }, (item: MessageSummary) => item.messageId.toString())
-            Divider().color(PortraTheme.border)
-            Text('约拍约定').fontSize(17).fontWeight(FontWeight.Bold).width('100%')
-            ForEach(this.quotes, (item: QuoteSummary) => {
-              this.QuoteItem(item)
-            }, (item: QuoteSummary) => item.quotationId.toString())
+            if (this.messages.length === 0 && this.quotes.length === 0) {
+              Text('从一句问候开始')
+                .fontSize(13).fontColor(PortraTheme.secondaryText)
+                .width('100%').textAlign(TextAlign.Center).padding(24)
+            }
+            ForEach(ConversationTimeline.build(this.messages, this.quotes), (item: ConversationTimelineItem) => {
+              this.TimelineRow(item)
+            }, (item: ConversationTimelineItem) => item.key)
             if (this.conversation?.participantBId === this.userId) {
               if (this.showQuoteForm) {
                 this.QuoteForm()

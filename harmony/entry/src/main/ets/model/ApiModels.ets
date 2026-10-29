@@ -116,6 +116,7 @@ export interface MessageSummary {
   readonly content?: string;
   readonly fileName?: string;
   readonly createdAt?: string;
+  readonly quotationId?: number;
 }
 
 export interface SendTextMessagePayload {
@@ -139,6 +140,7 @@ export interface QuoteSummary {
   readonly location: string;
   readonly serviceContent: string;
   readonly status: string;
+  readonly createdAt?: string;
 }
 
 export interface CreateQuotePayload {
