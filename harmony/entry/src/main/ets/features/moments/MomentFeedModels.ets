@@ -100,6 +100,7 @@ export class MomentFeedCache {
   private readonly ttlMs: number;
   private entries: Map<string, MomentFeedCacheEntry> = new Map<string, MomentFeedCacheEntry>();
   private pendingFavorites: Map<number, Promise<void>> = new Map<number, Promise<void>>();
+  private uncertainFavorites: Map<number, Set<number>> = new Map<number, Set<number>>();
   private uncertainLikes: Map<number, Set<number>> = new Map<number, Set<number>>();
   private writeRevisions: Map<number, number> = new Map<number, number>();
 
@@ -144,6 +145,18 @@ export class MomentFeedCache {
     if (ids?.size === 0) {
       this.uncertainLikes.delete(sessionVersion);
     }
+  }
+
+  hasUncertainFavorite(sessionVersion: number, momentId: number): boolean {
+    return this.uncertainFavorites.get(sessionVersion)?.has(momentId) ?? false;
+  }
+  markUncertainFavorite(sessionVersion: number, momentId: number): void {
+    const ids = this.uncertainFavorites.get(sessionVersion) ?? new Set<number>();
+    ids.add(momentId); this.uncertainFavorites.set(sessionVersion, ids);
+  }
+  clearUncertainFavorite(sessionVersion: number, momentId: number): void {
+    const ids = this.uncertainFavorites.get(sessionVersion); ids?.delete(momentId);
+    if (ids?.size === 0) { this.uncertainFavorites.delete(sessionVersion); }
   }
 
   waitForFavorite(sessionVersion: number): Promise<void> {

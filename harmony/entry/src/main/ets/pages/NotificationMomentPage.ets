@@ -4,7 +4,8 @@ import { MomentDetailPanel } from '../features/moments/MomentDetailPanel';
 import { MomentInteractions, MomentInteractionSnapshot } from '../features/moments/MomentInteractions';
 import { MomentFeedCache } from '../features/moments/MomentFeedModels';
 import { MomentFeedLifecycle } from '../features/moments/MomentFeedLifecycle';
-import { PortraTheme } from '../theme/PortraTheme';
+import { AppRoute, NavigationRouteParam } from '../model/NavigationModels';
+import { MomentSummary } from '../model/ApiModels';
 import { MomentApiBinding, MomentSessionBinding } from '../features/moments/MomentInteractionBindings';
 
 @Component
@@ -14,6 +15,7 @@ export struct NotificationMomentPage {
   private interactions?: MomentInteractions;
   private lifecycle?: MomentFeedLifecycle;
   private visible: boolean = false;
+  private visibleSessionVersion: number = -1;
   onBack?: () => void;
   onRequireLogin?: () => void;
   aboutToAppear(): void {
@@ -27,6 +29,16 @@ export struct NotificationMomentPage {
     }
     this.interactions?.open(this.momentId);
   }
+  private openAuthor(item: MomentSummary): void {
+    const current = this.state.item;
+    if (this.visibleSessionVersion !== AppClient.shared.sessionManager.getSessionVersion() ||
+      !this.visible || this.state.likeBusyId !== 0 || this.state.favoriteBusyId !== 0 || !AppClient.shared.sessionManager.isAuthenticated() ||
+      current === undefined || current.momentId !== item.momentId || !['CUSTOMER', 'PROVIDER'].includes(current.authorRole)) { return; }
+    const navigation = this.queryNavigationInfo();
+    if (navigation === undefined) { return; }
+    const param: NavigationRouteParam = { userId: current.authorId, userRole: current.authorRole };
+    navigation.pathStack.pushPathByName(AppRoute.PUBLIC_PROFILE, param);
+  }
   private observe(): void {
     if (this.lifecycle !== undefined) { return; }
     try {
@@ -39,7 +51,7 @@ export struct NotificationMomentPage {
           destination.state !== uiObserver.NavDestinationState.ON_DISAPPEAR && destination.state !== uiObserver.NavDestinationState.ON_WILL_DISAPPEAR;
       }, (visible: boolean) => {
         if (this.visible === visible) { return; } this.visible = visible;
-        if (visible) { this.interactions?.resume(); this.read(); } else { this.interactions?.suspend(); }
+        if (visible) { this.visibleSessionVersion = AppClient.shared.sessionManager.getSessionVersion(); this.interactions?.resume(); this.read(); } else { this.interactions?.suspend(); }
       }, () => { this.interactions?.suspend(); this.state.message = '页面状态监听不可用，请返回重试。'; });
       this.lifecycle.start();
     } catch { this.state.message = '页面状态监听不可用，请返回重试。'; }
@@ -47,9 +59,10 @@ export struct NotificationMomentPage {
   build() {
     Column() {
       MomentDetailPanel({ state: this.state, onClose: this.onBack, onRetry: () => this.read(),
-        onRequireLogin: this.onRequireLogin, onToggleLike: () => {
+        onRequireLogin: this.onRequireLogin,
+        onToggleFavorite: (item: MomentSummary) => this.interactions?.toggleFavorite(item), onOpenAuthor: (item: MomentSummary) => this.openAuthor(item), onToggleLike: () => {
           if (this.state.item !== undefined) { this.interactions?.toggleLike(this.state.item); }
         } })
-    }.width('100%').height('100%').backgroundColor(PortraTheme.pageBackground).onAppear(() => this.observe())
+    }.width('100%').height('100%').backgroundColor('#FBF7EF').onAppear(() => this.observe())
   }
 }

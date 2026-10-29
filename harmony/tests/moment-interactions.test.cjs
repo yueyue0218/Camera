@@ -19,19 +19,21 @@ function moment(extra = {}) { return { momentId: 7, authorId: 12, authorRole: 'C
   likedByCurrentUser: false, favoriteCount: 1, favoritedByCurrentUser: false, ...extra }; }
 function fixture(cache = new MomentFeedCache()) {
   let version = 1, authenticated = true, state;
-  const reads = [], likes = [], cancelled = [], updates = [];
+  const reads = [], likes = [], favorites = [], cancelled = [], updates = [];
   const api = {
     getMoment(id, key) { const p = deferred(); reads.push({ id, key, ...p }); return p.promise; },
     cancelMomentDetail(key) { cancelled.push(key); },
     likeMoment(id, key) { const p = deferred(); likes.push({ id, key, desired: true, ...p }); return p.promise; },
     unlikeMoment(id, key) { const p = deferred(); likes.push({ id, key, desired: false, ...p }); return p.promise; },
-    cancelMomentLike(id, key) { cancelled.push(key); }
+    cancelMomentLike(id, key) { cancelled.push(key); },
+    favoriteMoment(id) { const p = deferred(); favorites.push({id, desired:true, ...p}); return p.promise; },
+    unfavoriteMoment(id) { const p = deferred(); favorites.push({id, desired:false, ...p}); return p.promise; }
   };
   const controller = new MomentInteractions(api, {
     getSessionVersion: () => version, isAuthenticated: () => authenticated
   }, cache, value => { state = value; }, value => updates.push(value));
   controller.resume();
-  return { controller, reads, likes, cancelled, updates, cache, get state() { return state; },
+  return { controller, reads, likes, favorites, cancelled, updates, cache, get state() { return state; },
     changeSession(guest = false) { version++; authenticated = !guest; } };
 }
 test('detail starts empty and uses full GET response, not the Feed preview', async () => {
@@ -152,4 +154,55 @@ test('an old GET 404 cannot hide an object after another view completed a newer 
   assert.equal(a.state.unavailableMomentId, 0); assert.equal(a.reads.length, 2);
   a.reads[1].resolve(moment({ likedByCurrentUser: true })); await read;
   assert.equal(a.state.item.likedByCurrentUser, true);
+});
+
+
+test('detail favorite and cancel use current server state/count and retain the full album', async () => {
+ const f=fixture();const read=f.controller.open(7);f.reads[0].resolve(moment());await read;
+ const stale=f.state.item; const save=f.controller.toggleFavorite(stale);
+ assert.equal(f.favorites[0].desired,true);assert.equal(f.state.item.favoritedByCurrentUser,false);
+ await f.controller.toggleFavorite(stale);await f.controller.toggleLike(stale);
+ assert.equal(f.favorites.length,1);assert.equal(f.likes.length,0);
+ f.favorites[0].resolve(moment({favoritedByCurrentUser:true,favoriteCount:42}));await save;
+ assert.equal(f.state.item.favoriteCount,42);assert.equal(f.state.images.length,5);
+ assert.equal(f.updates.at(-1).imageDataList.length,3);
+ const remove=f.controller.toggleFavorite(stale);assert.equal(f.favorites[1].desired,false);
+ f.favorites[1].resolve(moment({favoritedByCurrentUser:false,favoriteCount:41}));await remove;
+ assert.equal(f.state.item.favoritedByCurrentUser,false);assert.equal(f.state.item.favoriteCount,41);
+ assert.equal(f.state.favoriteBusyId,0);
+});
+
+test('unknown favorite survives a new page instance and requires a real GET before retry', async () => {
+ const cache=new MomentFeedCache();const f=fixture(cache);const read=f.controller.open(7);f.reads[0].resolve(moment());await read;
+ const save=f.controller.toggleFavorite(f.state.item);f.favorites[0].reject({kind:'timeout'});await save;
+ assert.equal(f.state.favoriteUncertainMomentId,7);await f.controller.toggleFavorite(f.state.item);
+ assert.equal(f.favorites.length,1);assert.equal(cache.hasUncertainFavorite(1,7),true);
+ const next=fixture(cache);await next.controller.toggleFavorite(moment());assert.equal(next.favorites.length,0);
+ const verify=next.controller.open(7);next.reads[0].resolve(moment({favoritedByCurrentUser:true}));await verify;
+ assert.equal(cache.hasUncertainFavorite(1,7),false);
+ const remove=next.controller.toggleFavorite(next.state.item);assert.equal(next.favorites[0].desired,false);
+ next.favorites[0].resolve(moment());await remove;
+});
+
+test('hidden favorite response cannot reopen detail and another instance waits for the write', async () => {
+ const cache=new MomentFeedCache(),f=fixture(cache);const read=f.controller.open(7);f.reads[0].resolve(moment());await read;
+ const save=f.controller.toggleFavorite(f.state.item);f.controller.suspend();
+ const next=fixture(cache);const open=next.controller.open(7);assert.equal(next.reads.length,0);
+ f.favorites[0].resolve(moment({favoritedByCurrentUser:true,favoriteCount:9}));await save;
+ await new Promise(resolve=>setImmediate(resolve));assert.equal(f.state.item,undefined);
+ next.reads[0].resolve(moment({favoritedByCurrentUser:true,favoriteCount:9}));await open;
+ assert.equal(next.state.item.favoriteCount,9);assert.equal(next.state.favoriteBusyId,0);
+});
+
+test('favorite old success/error/finally cannot alter a different account request', async () => {
+ for(const failure of [false,true]){
+  const f=fixture();const read=f.controller.open(7);f.reads[0].resolve(moment());await read;
+  const old=f.controller.toggleFavorite(f.state.item);f.changeSession();f.controller.suspend();f.controller.resume();
+  const freshRead=f.controller.open(8);f.reads[1].resolve(moment({momentId:8}));await freshRead;
+  const fresh=f.controller.toggleFavorite(f.state.item);
+  if(failure)f.favorites[0].reject({kind:'timeout'});else f.favorites[0].resolve(moment({favoritedByCurrentUser:true}));
+  await old;assert.equal(f.state.targetId,8);assert.equal(f.state.favoriteBusyId,8);assert.equal(f.state.message,'');
+  f.favorites[1].resolve(moment({momentId:8,favoritedByCurrentUser:true}));await fresh;
+  assert.equal(f.state.item.momentId,8);assert.equal(f.state.favoriteBusyId,0);
+ }
 });

@@ -3,19 +3,24 @@ import { AppClient } from '../app/AppClient';
 import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraEmptyView } from '../common/components/PortraEmptyView';
 import { PortraLoading } from '../common/components/PortraLoading';
+import { MomentFavoriteWrite } from '../features/moments/MomentFavoriteWrite';
+import { MomentPublishPanel } from '../features/moments/MomentPublishPanel';
 import { MomentCard } from '../features/moments/MomentCard';
-import { MomentDetailPanel } from '../features/moments/MomentDetailPanel';
-import { MomentInteractions, MomentInteractionSnapshot } from '../features/moments/MomentInteractions';
+import { MomentInteractions, MomentInteractionSnapshot, MomentDetailData } from '../features/moments/MomentInteractions';
 import { MomentApiBinding, MomentSessionBinding } from '../features/moments/MomentInteractionBindings';
 import { createMomentFeedRequestKey, MomentFeedCache, MomentFeedFormatter } from '../features/moments/MomentFeedModels';
 import { MomentFeedLifecycle } from '../features/moments/MomentFeedLifecycle';
 import { ReportPanel } from '../features/user/ReportPanel';
+import { AppRoute, NavigationRouteParam } from '../model/NavigationModels';
 import { MomentSummary } from '../model/ApiModels';
 import { ErrorMapper, PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
 
 @Component
 export struct MomentFeedPage {
+  @State private pullRefreshing: boolean = false;
+  private pullInFlight: boolean = false;
+  @State private publishOpen: boolean = false;
   @State private loading: boolean = true;
   @State private errorMessage: string = '';
   @State private authenticationRequired: boolean = false;
@@ -31,6 +36,7 @@ export struct MomentFeedPage {
   @State private lifecycleUnavailable: boolean = false;
   @State private interaction: MomentInteractionSnapshot = new MomentInteractionSnapshot();
   @State private detailOpen: boolean = false;
+  private detailNavigationPending: boolean = false;
   private interactions?: MomentInteractions;
   private readonly appClient: AppClient = AppClient.shared;
   private readonly cache: MomentFeedCache = MomentFeedCache.shared;
@@ -39,6 +45,7 @@ export struct MomentFeedPage {
   private sessionVersion: number = -1;
   private active: boolean = false;
   private readonly listRequestKey: string = createMomentFeedRequestKey();
+  private readonly identityRequestKey: string = `${this.listRequestKey}.identity`;
   private lifecycle?: MomentFeedLifecycle;
   onRequireLogin?: () => void;
   onOpenAuthor?: (userId: number, role: string) => void;
@@ -129,6 +136,9 @@ export struct MomentFeedPage {
 
   private suspendFeed(clearCache: boolean = true): void {
     this.active = false;
+    this.pullRefreshing = false; this.pullInFlight = false;
+    this.publishOpen = false;
+    this.detailNavigationPending = false;
     this.interactions?.suspend();
     this.viewVersion++;
     this.requestVersion++;
@@ -144,6 +154,7 @@ export struct MomentFeedPage {
     this.items = [];
     this.loading = false;
     this.errorMessage = '';
+    this.appClient.apiService.cancelCurrentSession(this.identityRequestKey);
     this.appClient.apiService.cancelMoments(this.listRequestKey);
   }
 
@@ -153,6 +164,10 @@ export struct MomentFeedPage {
       if (this.sessionVersion >= 0) {
         this.cache.clear();
       }
+      if (this.sessionVersion >= 0) { this.appClient.apiService.cancelCurrentSession(this.identityRequestKey); }
+      this.pullRefreshing = false; this.pullInFlight = false;
+      this.publishOpen = false;
+      this.detailNavigationPending = false;
       this.sessionVersion = current;
       this.viewVersion++;
       this.requestVersion++;
@@ -283,6 +298,7 @@ export struct MomentFeedPage {
         throw ErrorMapper.parse();
       }
       const nextItems = MomentFeedFormatter.deduplicate(result);
+      nextItems.forEach((item: MomentSummary) => this.cache.clearUncertainFavorite(sessionVersion, item.momentId));
       this.items = nextItems;
       this.favoriteUncertain = false;
       this.cache.write(nextItems, Date.now(), sessionVersion, scope);
@@ -326,7 +342,7 @@ export struct MomentFeedPage {
     this.reportIdentityLoading = true;
     this.reportIdentityError = '';
     try {
-      const session = await this.appClient.apiService.currentSession();
+      const session = await this.appClient.apiService.currentSession(this.identityRequestKey);
       if (!this.isCurrent(viewVersion, sessionVersion)) {
         return;
       }
@@ -394,11 +410,8 @@ export struct MomentFeedPage {
     this.favoriteBusyId = item.momentId;
     this.errorMessage = '';
     try {
-      const request = current.favoritedByCurrentUser ?
-        this.appClient.apiService.unfavoriteMoment(item.momentId) :
-        this.appClient.apiService.favoriteMoment(item.momentId);
-      this.cache.trackFavorite(request, sessionVersion);
-      const result = await request;
+      const result = await MomentFavoriteWrite.execute(new MomentApiBinding(this.appClient.apiService),
+        this.cache, sessionVersion, current);
       if (!this.isCurrent(viewVersion, sessionVersion)) {
         return;
       }
@@ -407,7 +420,7 @@ export struct MomentFeedPage {
         throw ErrorMapper.parse();
       }
       this.items = this.items.map((current: MomentSummary) =>
-        current.momentId === result.momentId ? result : current);
+        current.momentId === result.momentId ? MomentDetailData.feedPreview(result) : current);
       this.cache.clear();
       this.cache.write(this.items, Date.now(), sessionVersion, scope);
     } catch (error) {
@@ -418,7 +431,7 @@ export struct MomentFeedPage {
       this.favoriteUncertain = true;
       const mapped = error as PortraError;
       this.authenticationRequired = ErrorMapper.isAuthenticationExpired(mapped);
-      this.errorMessage = `${mapped.message?.length > 0 ? mapped.message : '收藏结果未确认。'} 请刷新确认后再操作。`;
+      this.errorMessage = `${mapped.message?.length > 0 ? mapped.message : '收藏结果未确认。'} 请下拉刷新确认后再操作。`;
       if (this.authenticationRequired) {
         this.showAuthenticationRequired();
       }
@@ -435,7 +448,7 @@ export struct MomentFeedPage {
         new MomentSessionBinding(this.appClient.sessionManager), this.cache,
         (state: MomentInteractionSnapshot) => {
           this.interaction = state;
-          this.detailOpen = state.targetId > 0 && this.active;
+          this.detailOpen = state.loading && this.active;
           if (state.unavailableMomentId > 0) {
             this.items = this.items.filter((item: MomentSummary) => item.momentId !== state.unavailableMomentId);
           }
@@ -457,11 +470,25 @@ export struct MomentFeedPage {
   }
 
   private async openDetail(item: MomentSummary): Promise<void> {
-    await this.readDetail(item.momentId, true);
+    this.synchronizeSession();
+    const current = this.items.find((row: MomentSummary) => row.momentId === item.momentId);
+    if (!this.active || current === undefined || this.detailNavigationPending ||
+      this.favoriteBusyId !== 0 || this.interaction.likeBusyId !== 0 || this.selectedReportId === item.momentId ||
+      this.cache.hasPendingFavorite(this.sessionVersion) || !this.appClient.sessionManager.isAuthenticated()) { return; }
+    const navigation = this.queryNavigationInfo();
+    if (navigation === undefined) { this.errorMessage = '图片页面暂不可用，请重试。'; return; }
+    this.detailNavigationPending = true;
+    const param: NavigationRouteParam = { momentId: current.momentId };
+    try { navigation.pathStack.pushPathByName(AppRoute.MOMENT_DETAIL, param); }
+    catch { this.detailNavigationPending = false; this.errorMessage = '图片页面暂不可用，请重试。'; }
   }
 
   private async verifyLikeResult(): Promise<void> {
-    await this.readDetail(this.interaction.uncertainMomentId, false);
+    if (this.interaction.loading) { return; }
+    const view = this.viewVersion; const version = this.sessionVersion;
+    const target = this.interaction.uncertainMomentId;
+    await this.readDetail(target, false);
+    if (this.isCurrent(view, version) && this.interaction.targetId === target) { this.interactions?.close(true); }
   }
 
   private async readDetail(momentId: number, requireListed: boolean): Promise<void> {
@@ -502,6 +529,33 @@ export struct MomentFeedPage {
     await this.ensureInteractions().toggleLike(current);
   }
 
+  private async refreshFromPull(): Promise<void> {
+    this.synchronizeSession();
+    if (!this.active || this.requestInFlight || this.favoriteBusyId !== 0 || this.interaction.likeBusyId !== 0 ||
+      this.selectedReportId !== 0 || this.publishOpen || this.pullInFlight) {
+      if (!this.pullInFlight) { this.pullRefreshing = false; } return;
+    }
+    const view = this.viewVersion, version = this.sessionVersion;
+    this.pullInFlight = true; this.pullRefreshing = true;
+    try { await this.load(true); }
+    finally {
+      if (view === this.viewVersion && version === this.sessionVersion) { this.pullInFlight = false; this.pullRefreshing = false; }
+    }
+  }
+
+  private openPublish(): void {
+    this.synchronizeSession(); if (!this.active) { return; }
+    if (!this.appClient.sessionManager.isAuthenticated()) { this.onRequireLogin?.(); return; }
+    if (this.favoriteBusyId !== 0 || this.interaction.likeBusyId !== 0 || this.cache.hasPendingFavorite(this.sessionVersion)) { return; }
+    this.selectedReportId = 0; this.publishOpen = true;
+  }
+  private afterPublish(_item: MomentSummary): void {
+    this.synchronizeSession(); if (!this.active || !this.publishOpen) { return; }
+    this.publishOpen = false; this.scope = 'latest'; this.cache.clear();
+    this.requestVersion++; this.appClient.apiService.cancelMoments(this.listRequestKey);
+    this.requestInFlight = false; this.load(true);
+  }
+
   build() {
     Column() {
       Row() {
@@ -515,15 +569,10 @@ export struct MomentFeedPage {
         }
         .alignItems(HorizontalAlign.Start)
         Blank()
-        Button(this.requestInFlight ? '刷新中' : '刷新')
-          .height(36)
-          .fontSize(PortraTheme.fontBodySmall)
-          .fontColor(PortraTheme.primary)
-          .backgroundColor(PortraTheme.primarySoft)
-          .borderRadius(PortraTheme.radiusPill)
-          .enabled(!this.requestInFlight && this.favoriteBusyId === 0 && this.interaction.likeBusyId === 0)
-          .accessibilityText('刷新当前动态频道')
-          .onClick(() => this.load(true))
+        Button('＋ 发布动态').height(44).width(116).fontSize(14).fontColor('#FFFFFF').backgroundColor('#1746C5')
+          .padding({ left: 12, right: 12 }).margin({ left: 16 })
+          .enabled(this.favoriteBusyId === 0 && this.interaction.likeBusyId === 0)
+          .accessibilityText('发布新的动态').onClick(() => this.openPublish())
       }
       .width('100%')
       .constraintSize({ minHeight: 120 })
@@ -538,7 +587,7 @@ export struct MomentFeedPage {
             .fontSize(PortraTheme.fontBodySmall)
             .fontColor(PortraTheme.danger)
           Button('核实结果')
-            .enabled(this.interaction.likeBusyId === 0 && this.selectedReportId !== this.interaction.uncertainMomentId)
+            .enabled(!this.interaction.loading && this.interaction.likeBusyId === 0 && this.selectedReportId !== this.interaction.uncertainMomentId)
             .onClick(() => this.verifyLikeResult())
         }
         .width('100%')
@@ -574,6 +623,8 @@ export struct MomentFeedPage {
           .onClick(() => this.loadReportIdentity())
       }
 
+      Refresh({ refreshing: $$this.pullRefreshing }) {
+        Column() {
       if (this.loading) {
         PortraLoading({ label: '正在读取动态…' })
           .layoutWeight(1)
@@ -596,7 +647,7 @@ export struct MomentFeedPage {
                   .layoutWeight(1)
                   .fontSize(PortraTheme.fontBodySmall)
                   .fontColor(PortraTheme.danger)
-                Button(this.authenticationRequired ? '去登录' : '刷新确认')
+                Button(this.authenticationRequired ? '去登录' : '重新核实')
                   .height(32)
                   .fontSize(PortraTheme.fontCaption)
                   .fontColor(PortraTheme.primary)
@@ -614,6 +665,8 @@ export struct MomentFeedPage {
               Column({ space: PortraTheme.spacingSm }) {
               MomentCard({
                 item: item,
+                detailDisabled: this.selectedReportId === item.momentId || this.favoriteBusyId !== 0 ||
+                  this.interaction.likeBusyId !== 0,
                 likeBusy: this.interaction.likeBusyId === item.momentId,
                 likeUncertain: this.interactions?.isLikeUncertain(item.momentId) ?? false,
                 favoriteBusy: this.favoriteBusyId === item.momentId,
@@ -669,27 +722,23 @@ export struct MomentFeedPage {
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.Spring)
       }
+        }.width('100%').height('100%')
+      }.width('100%').layoutWeight(1)
+        .pullToRefresh(this.selectedReportId === 0 && this.favoriteBusyId === 0 && this.interaction.likeBusyId === 0 && !this.publishOpen)
+        .onRefreshing(() => this.refreshFromPull())
     }
     .width('100%')
     .height('100%')
     .backgroundColor(PortraTheme.pageBackground)
     .onAppear(() => this.observeLifecycle())
-    .bindSheet(this.detailOpen, this.detailBuilder(), {
-      height: SheetSize.LARGE,
-      showClose: false,
-      onWillDismiss: (action: DismissSheetAction) => {
-        this.closeDetail();
-        action.dismiss();
-      }
-    })
+    .bindContentCover(this.publishOpen, this.publishBuilder(), { modalTransition: ModalTransition.ALPHA,
+      onDisappear: () => this.publishOpen = false })
   }
 
   @Builder
-  private detailBuilder() {
-    MomentDetailPanel({ state: this.interaction, onClose: () => this.closeDetail(),
-      onRetry: () => this.readDetail(this.interaction.targetId, false),
-      onRequireLogin: () => { this.closeDetail(); this.onRequireLogin?.(); },
-      onToggleLike: (item: MomentSummary) => this.toggleLike(item),
-      onOpenAuthor: this.onOpenAuthor === undefined ? undefined : (item: MomentSummary) => this.openAuthor(item) })
+  private publishBuilder() {
+    MomentPublishPanel({ onClose: () => this.publishOpen = false,
+      onRequireLogin: () => { this.publishOpen = false; this.onRequireLogin?.(); },
+      onPublished: (item: MomentSummary) => this.afterPublish(item) })
   }
 }
