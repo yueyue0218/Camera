@@ -25,11 +25,16 @@ export struct OrderDetailPage {
   private readonly api = AppClient.shared.apiService;
   private requestVersion: number = 0;
   private paymentPromptConsumed: boolean = false;
+  private active: boolean = false;
   onBack?: () => void;
   onOpenConversation?: (conversationId: number) => void;
 
-  aboutToAppear(): void { this.load(); }
+  aboutToAppear(): void {
+    this.active = true;
+    this.load();
+  }
   aboutToDisappear(): void {
+    this.active = false;
     this.requestVersion++;
     this.api.cancelOrderDetail(this.orderId);
   }
@@ -71,14 +76,17 @@ export struct OrderDetailPage {
     this.notice = '';
     this.errorMessage = '';
     const amount = this.order.amountCent;
+    const version = this.requestVersion;
     try {
       const result = await this.api.mockPay(this.orderId, amount);
+      if (!this.active || version !== this.requestVersion) return;
       if (result.orderId !== this.orderId) throw new Error('支付结果待确认');
       this.showPay = false;
       await this.load();
       this.notice = this.order?.status === 'PAID_PENDING_SHOOT' ? '支付成功' : '正在核对支付结果';
       this.paymentUncertain = this.order?.status === 'PENDING_PAYMENT';
     } catch (error) {
+      if (!this.active || version !== this.requestVersion) return;
       this.showPay = false;
       await this.reconcilePayment(error as PortraError);
     } finally { this.busy = false; }

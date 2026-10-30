@@ -25,13 +25,20 @@ export struct QuoteDetailPage {
   @State private showConfirm: boolean = false;
   private readonly api = AppClient.shared.apiService;
   private requestVersion: number = 0;
+  private active: boolean = false;
   onBack?: () => void;
   onEdit?: () => void;
   onConfirmed?: () => void;
   onOpenOrder?: (orderId: number) => void;
 
-  aboutToAppear(): void { this.load(); }
-  aboutToDisappear(): void { this.requestVersion++; }
+  aboutToAppear(): void {
+    this.active = true;
+    this.load();
+  }
+  aboutToDisappear(): void {
+    this.active = false;
+    this.requestVersion++;
+  }
 
   private async load(): Promise<void> {
     const version = ++this.requestVersion;
@@ -65,11 +72,13 @@ export struct QuoteDetailPage {
 
   private async confirm(): Promise<void> {
     if (this.busy || this.quote === null) return;
+    const version = this.requestVersion;
     this.busy = true;
     this.showConfirm = false;
     this.errorMessage = '';
     try {
       const result = await this.api.confirmQuote(this.quoteId);
+      if (!this.active || version !== this.requestVersion) return;
       if (result.orderId > 0) {
         this.orderId = result.orderId;
         this.onConfirmed?.();
@@ -77,6 +86,7 @@ export struct QuoteDetailPage {
         await this.load();
       }
     } catch (error) {
+      if (!this.active || version !== this.requestVersion) return;
       await this.load();
       this.errorMessage = (error as PortraError).message || '暂时无法确认报价';
     } finally { this.busy = false; }
@@ -84,13 +94,16 @@ export struct QuoteDetailPage {
 
   private async reject(): Promise<void> {
     if (this.busy || this.quote === null) return;
+    const version = this.requestVersion;
     this.busy = true;
     this.errorMessage = '';
     try {
       await this.api.rejectQuote(this.quoteId, this.rejectReason.trim());
+      if (!this.active || version !== this.requestVersion) return;
       this.showReject = false;
       await this.load();
     } catch (error) {
+      if (!this.active || version !== this.requestVersion) return;
       await this.load();
       this.errorMessage = (error as PortraError).message || '暂时无法拒绝报价';
     } finally { this.busy = false; }
