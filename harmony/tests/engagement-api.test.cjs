@@ -20,4 +20,24 @@ test('review followup complaint dispute and reply preserve exact POST payload an
  }
 });
 test('unsafe business IDs make no HTTP request',async()=>{assert.equal(typeof api.getOrder,'function');const count=calls.length;for(const id of [0,-1,NaN,Number.MAX_SAFE_INTEGER+1])await assert.rejects(api.getOrder(id,'bad'));assert.equal(calls.length,count);});
+test('photo authorization uses the order-scoped read and exact write contracts',async()=>{
+ const read=api.listPhotoAuthorizations(11,'aftercare.auth.read');
+ assert.ok(calls.at(-1).url.endsWith('/orders/11/photo-authorizations'));
+ assert.equal(calls.at(-1).options.method,'GET');respond([]);await read;
+ const payload={fileIds:[21,22],remark:'用于作品集'};
+ const request=api.requestPhotoAuthorization(11,payload);
+ assert.ok(calls.at(-1).url.endsWith('/orders/11/photo-authorizations/requests'));
+ assert.equal(calls.at(-1).options.method,'POST');
+ assert.deepEqual(JSON.parse(calls.at(-1).options.extraData),payload);respond({});await request;
+ for(const approve of [true,false]){
+  const decision=api.decidePhotoAuthorization(35,approve,'已查看照片');
+  assert.ok(calls.at(-1).url.endsWith(`/photo-authorizations/35/${approve?'approve':'reject'}`));
+  assert.equal(calls.at(-1).options.method,'POST');respond({});await decision;
+ }
+ const count=calls.length;
+ await assert.rejects(api.listPhotoAuthorizations(0));
+ await assert.rejects(api.requestPhotoAuthorization(11,{fileIds:[0],remark:''}));
+ await assert.rejects(api.decidePhotoAuthorization(-1,true,''));
+ assert.equal(calls.length,count);
+});
 test('cancel engagement A preserves B and legacy orders list',async()=>{assert.equal(typeof api.cancelEngagementRequests,'function');const a=api.getOrder(11,'a.order'),b=api.getOrder(12,'b.order'),legacy=api.listOrders();const first=calls.at(-3),second=calls.at(-2),last=calls.at(-1);api.cancelEngagementRequests(['a.order']);first.resolve({responseCode:200,result:JSON.stringify({code:200,message:'success',data:{}})});await assert.rejects(a);assert.notEqual(second.destroyed,true);assert.notEqual(last.destroyed,true);second.resolve({responseCode:200,result:JSON.stringify({code:200,message:'success',data:{}})});last.resolve({responseCode:200,result:JSON.stringify({code:200,message:'success',data:[]})});await Promise.all([b,legacy]);});
