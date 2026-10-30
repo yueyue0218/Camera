@@ -23,11 +23,15 @@ export struct NotificationPage {
   onOpenOrders?: () => void;
   onOpenTarget?: (target: NotificationTarget) => void;
 
+  private readonly identityChanged: () => void = () => { this.controller?.suspend(); };
+
   aboutToAppear(): void {
+    AppClient.shared.sessionManager.observeIdentity(this.identityChanged);
     this.controller = new NotificationController(new NotificationApiBinding(AppClient.shared.apiService), new ActivitySessionBinding(AppClient.shared.sessionManager),
       (state: NotificationSnapshot) => this.snapshot = state);
   }
   aboutToDisappear(): void {
+    AppClient.shared.sessionManager.unobserveIdentity(this.identityChanged);
     this.lifecycle?.stop();
     this.lifecycle = undefined;
     this.visible = false;
@@ -64,7 +68,6 @@ export struct NotificationPage {
         (visible: boolean) => {
           if (this.visible === visible) { return; }
           this.visible = visible;
-          this.expandedId = 0;
           if (visible) { this.controller?.resume(); this.controller?.load(); }
           else { this.controller?.suspend(); }
         }, () => this.handleLifecycleUnavailable());
@@ -116,7 +119,7 @@ export struct NotificationPage {
         .width('100%').fontSize(11).fontColor(PortraTheme.secondaryText)
       if (this.expandedId === item.notificationId && this.canOpen(item)) {
         Button(NotificationTargetResolver.resolve(item)?.kind==='report'?'查看举报结果':'查看相关内容').fontSize(12).constraintSize({minHeight:44}).fontColor(PortraTheme.primary).backgroundColor(PortraTheme.primarySoft)
-          .enabled(!this.snapshot.busy && !this.snapshot.loading).onClick(() => this.related(item))
+          .enabled(!this.snapshot.busy && !this.snapshot.loading && !this.snapshot.refreshing).onClick(() => this.related(item))
       }
     }.width('100%').alignItems(HorizontalAlign.Start).padding(18)
       .backgroundColor(item.isRead ? PortraTheme.surface : '#F0F4FF').borderRadius(18)
@@ -135,7 +138,7 @@ export struct NotificationPage {
             .fontSize(12).fontColor(PortraTheme.secondaryText)
         }.alignItems(HorizontalAlign.Start).layoutWeight(1)
         Button('全部已读').fontSize(11).height(36).fontColor(PortraTheme.primary).backgroundColor(PortraTheme.primarySoft)
-          .enabled(this.snapshot.unread > 0 && !this.snapshot.busy && !this.snapshot.loading && !this.snapshot.uncertain)
+          .enabled(this.snapshot.unread > 0 && !this.snapshot.busy && !this.snapshot.loading && !this.snapshot.refreshing && !this.snapshot.uncertain)
           .onClick(() => this.controller?.markAllRead())
       }.width('100%').padding({ left: 14, right: 20, top: 18, bottom: 22 })
       Row({space:12}) {
@@ -170,11 +173,11 @@ export struct NotificationPage {
             Row() {
               Text(`已加载 ${this.snapshot.items.length} / ${this.snapshot.total} 条`).fontSize(11).fontColor(PortraTheme.secondaryText)
               Blank()
-              Button(this.lifecycleUnavailable ? '重试监听' : this.snapshot.busy ? '处理中' : this.snapshot.uncertain ? '刷新核实' : '刷新')
+              Button(this.lifecycleUnavailable ? '重试监听' : this.snapshot.refreshing ? '刷新中' : this.snapshot.busy ? '处理中' : this.snapshot.uncertain ? '刷新核实' : '刷新')
                 .fontSize(11).height(32).fontColor(PortraTheme.primary).backgroundColor(Color.Transparent)
-                .enabled(!this.snapshot.busy).onClick(() => {
+                .enabled(!this.snapshot.busy && !this.snapshot.refreshing).onClick(() => {
                   if (this.lifecycleUnavailable) { this.observe(); }
-                  else { this.controller?.load(); }
+                  else { this.controller?.resume(); this.controller?.load(); }
                 })
             }.width('100%')
             if (this.items().length === 0) {
@@ -187,7 +190,7 @@ export struct NotificationPage {
             if (this.snapshot.items.length < this.snapshot.total) {
               Button(this.snapshot.loadingMore ? '加载中' : '加载更多').fontSize(13).height(40)
                 .backgroundColor(PortraTheme.primarySoft).fontColor(PortraTheme.primary)
-                .enabled(!this.snapshot.loadingMore && !this.snapshot.busy).onClick(() => this.controller?.loadMore())
+                .enabled(!this.snapshot.loadingMore && !this.snapshot.refreshing && !this.snapshot.busy).onClick(() => this.controller?.loadMore())
             }
           }
         }.width('100%').padding(20)

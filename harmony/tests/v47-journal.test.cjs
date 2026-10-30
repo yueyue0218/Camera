@@ -29,6 +29,7 @@ function load(relative, page = false) {
     .replace(/@(State|Prop)\s+/g,'').replace(/@Watch\('[^']+'\)\s*/g,'');
   const mod = new Module(filename,module);
   mod.require = name => {
+    if(name.endsWith('/UiPerf')) return {UiPerf:{mark(){}}};
     if(name.endsWith('/AppClient')) return {AppClient:{shared:app}};
     if(name === '@kit.ArkUI') return {promptAction:{showToast: o=>notices.push(o.message)}};
     if(name === '@kit.ArkData') return {preferences:{getPreferencesSync:()=>store}};
@@ -55,6 +56,12 @@ const {DemandDetailPage} = load('pages/DemandDetailPage.ets',true);
 const {DemandInterestList} = load('features/user/DemandInterestList.ets',true);
 const {PublishDraftStore} = load('features/publish/PublishDraftStore.ets');
 const {ApiService} = load('network/ApiService.ets');
+// Action tests start after identity/secondary verification. Pending-state behavior lives in detail-performance.test.cjs.
+function readyDetail(Page) {
+  const p = new Page();
+  Object.assign(p, {active:true, loadedIdentity:epoch, secondaryReady:true});
+  return p;
+}
 function deferred() {let resolve,reject; const promise=new Promise((a,b)=>{resolve=a;reject=b;}); return {promise,resolve,reject};}
 function page(role='CUSTOMER') {
   const p=new PublishPage(); Object.assign(p,{identity:epoch,role,sessionLoading:false,title:'拍',description:'光',city:'上海',
@@ -140,7 +147,7 @@ test('draft round-trip restores failed uploads and missing local files without t
 });
 
 test('interest pagination finds page two; failed toggle never confirms; successful toggle broadcasts and toasts',async()=>{
-  const p=new ServiceDetailPage();p.serviceId=999;p.detail={serviceId:999,providerId:8,status:'ONLINE',isAvailable:true};
+  const p=readyDetail(ServiceDetailPage);p.serviceId=999;p.detail={serviceId:999,providerId:8,status:'ONLINE',isAvailable:true};
   app.apiService.currentSession=async()=>({userId:7,role:'CUSTOMER'});const pages=[];
   app.apiService.listServicePackageInterests=async page=>{pages.push(page);return {records:page===1?[{serviceId:1}]:[{serviceId:999}],size:100,total:101}};
   await p.restorePrivateState(0);assert.deepEqual(pages,[1,2]);assert.equal(p.interested,true);
@@ -151,7 +158,7 @@ test('interest pagination finds page two; failed toggle never confirms; successf
 });
 
 test('chat is deduplicated and unavailable/self/provider/guest rules do not call service endpoint',async()=>{
-  const p=new ServiceDetailPage();Object.assign(p,{serviceId:9,role:'CUSTOMER',userId:7,detail:{providerId:8,status:'ONLINE',isAvailable:true}});
+  const p=readyDetail(ServiceDetailPage);Object.assign(p,{serviceId:9,role:'CUSTOMER',userId:7,detail:{providerId:8,status:'ONLINE',isAvailable:true}});
   let calls=0,opened=0,logins=0;const d=deferred();app.apiService.startServiceChat=()=>{calls++;return d.promise};
   p.onOpenConversation=id=>opened=id;p.onRequireLogin=()=>logins++;
   const pending=p.startChat();await p.startChat();assert.equal(calls,1);d.resolve({serviceId:9,conversationId:12});await pending;assert.equal(opened,12);
@@ -160,7 +167,7 @@ test('chat is deduplicated and unavailable/self/provider/guest rules do not call
 });
 
 test('demand cannot chat before accepted response; accepted response opens real conversation and stale result is suppressed',async()=>{
-  const p=new DemandDetailPage();Object.assign(p,{demandId:2,role:'PROVIDER',userId:7,demand:{customerId:8,status:'OPEN'}});
+  const p=readyDetail(DemandDetailPage);Object.assign(p,{demandId:2,role:'PROVIDER',userId:7,demand:{customerId:8,status:'OPEN'}});
   let calls=0,opened=0;app.apiService.openAcceptedDemandChat=async()=>{calls++;return {conversationId:33}};p.onOpenConversation=id=>opened=id;
   await p.startChat();assert.equal(calls,0);assert.match(p.actionError,/先填写/);
   p.ownResponse={responseId:3,status:'PENDING_CUSTOMER_ACCEPT'};await p.startChat();assert.equal(calls,0);
@@ -199,7 +206,7 @@ test('return from preview preserves fields; system back is consumed during previ
 });
 
 test('late old detail response cannot overwrite a different business ID',async()=>{
-  const p=new ServiceDetailPage(),old=deferred(),fresh=deferred();p.serviceId=10;
+  const p=readyDetail(ServiceDetailPage),old=deferred(),fresh=deferred();p.serviceId=10;
   authenticated=false;app.apiService.getServicePackage=id=>id===10?old.promise:fresh.promise;
   const first=p.load();p.serviceId=11;const second=p.load();fresh.resolve({serviceId:11,title:'new'});await second;
   old.resolve({serviceId:10,title:'old'});await first;assert.equal(p.detail.serviceId,11);assert.equal(p.loading,false);authenticated=true;
@@ -292,7 +299,7 @@ test('existing edit and offline adapters retain exact verbs, paths and payloads'
 
 
 test('intention and chat have independent duplicate guards and pending UI state', async()=>{
-  const p=new ServiceDetailPage();
+  const p=readyDetail(ServiceDetailPage);
   Object.assign(p,{role:'CUSTOMER',userId:7,serviceId:3,detail:{providerId:9,status:'ONLINE',isAvailable:true}});
   const interest=deferred(), chat=deferred(); let adds=0,chats=0;
   app.apiService.addServicePackageInterest=()=>{adds++;return interest.promise;};
@@ -306,7 +313,7 @@ test('intention and chat have independent duplicate guards and pending UI state'
 });
 
 test('demand intention waits for persisted server acknowledgement, prevents duplicate click and can be removed',async()=>{
- const p=new DemandDetailPage();Object.assign(p,{demandId:12,userId:7,role:'PROVIDER',interestReady:true,
+ const p=readyDetail(DemandDetailPage);Object.assign(p,{demandId:12,userId:7,role:'PROVIDER',interestReady:true,
   demand:{customerId:8,status:'OPEN'}});
  let adds=0,removes=0;const write=deferred();const previousEvents=events;
  app.apiService.addDemandInterest=()=>{adds++;return write.promise};
@@ -319,7 +326,7 @@ test('demand intention waits for persisted server acknowledgement, prevents dupl
 });
 test('demand intention failure, malformed confirmation and stale identity never show success',async()=>{
  for(const mode of ['failure','malformed','logout']){
-  const p=new DemandDetailPage();Object.assign(p,{demandId:12,userId:7,role:'PROVIDER',interestReady:true,
+  const p=readyDetail(DemandDetailPage);Object.assign(p,{demandId:12,userId:7,role:'PROVIDER',interestReady:true,
    demand:{customerId:8,status:'OPEN'}});const write=deferred();const previousEvents=events;
   app.apiService.addDemandInterest=()=>write.promise;const pending=p.toggleInterest();
   if(mode==='failure')write.reject(new Error('offline'));
@@ -331,7 +338,7 @@ test('demand intention failure, malformed confirmation and stale identity never 
 test('demand intention respects role, target owner, remote-state readiness and closed target',async()=>{
  let writes=0;app.apiService.addDemandInterest=async()=>writes++;
  for(const props of [{role:'CUSTOMER'},{userId:8},{interestReady:false},{demand:{customerId:8,status:'CLOSED'}}]){
-  const p=new DemandDetailPage();Object.assign(p,{demandId:12,userId:7,role:'PROVIDER',interestReady:true,
+  const p=readyDetail(DemandDetailPage);Object.assign(p,{demandId:12,userId:7,role:'PROVIDER',interestReady:true,
    demand:{customerId:8,status:'OPEN'}},props);await p.toggleInterest();assert.ok(p.actionError);
  }
  assert.equal(writes,0);

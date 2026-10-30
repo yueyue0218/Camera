@@ -587,3 +587,13 @@ test('a retry that finds no credential clears the preceding storage error', asyn
   assert.equal(app.sessionManager.getCredentialError(), null);
   assert.equal(calls.length, before);
 });
+
+test('private snapshot listeners invalidate synchronously for identity changes, not token rotation', async()=>{
+ const manager=new AuthSessionManager(tokenController(),new MemoryCredentialStore(),EnvironmentName.DEV,nativeSessionApi());
+ const versions=[];const listener=()=>versions.push(manager.getSessionVersion());manager.observeIdentity(listener);
+ const login=manager.signIn('test-access','test-refresh');assert.equal(versions.length,1);await login;
+ await manager.refreshAccessToken();assert.equal(versions.length,1);
+ await manager.notifyIdentityChanged();assert.equal(versions.length,2);
+ const expiry=manager.markExpired();assert.equal(versions.length,3);await expiry;
+ manager.unobserveIdentity(listener);await manager.signOut();assert.equal(versions.length,3);
+});

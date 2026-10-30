@@ -1,3 +1,6 @@
+import { DetailVisibility } from '../common/performance/DetailVisibility';
+import { MomentFeedLifecycle } from '../features/moments/MomentFeedLifecycle';
+import { UiPerf } from '../common/performance/UiPerf';
 import { PublicationActions } from '../features/publish/PublicationActions';
 import { promptAction } from '@kit.ArkUI';
 import { ContentChanges } from '../features/user/ContentChanges';
@@ -10,12 +13,12 @@ import { PortraLoading } from '../common/components/PortraLoading';
 import { FollowAction } from '../features/user/FollowAction';
 import { ReportPanel } from '../features/user/ReportPanel';
 import { ServicePackageDetail, ServicePackageSummary } from '../model/ApiModels';
-import { PortraError } from '../network/ErrorMapper';
+import { ErrorKind, PortraError } from '../network/ErrorMapper';
 
 @Component
 export struct ServiceDetailPage {
-  @Prop @Watch('load') serviceId: number = 0;
-  @Prop @Watch('onVisibleEpoch') visibleEpoch: number = 0;
+  @Prop @Watch('onTargetChanged') serviceId: number = 0;
+  @Prop visibleEpoch: number = 0;
   @State private detail: ServicePackageDetail | null = null;
   @State private loading: boolean = true;
   @State private chatBusy: boolean = false;
@@ -27,51 +30,117 @@ export struct ServiceDetailPage {
   @State private interested: boolean = false;
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
+  private lifecycle?: MomentFeedLifecycle;
+  private active: boolean = false;
+  private inFlight: boolean = false;
+  private loadedIdentity: number = -1;
+  private loadedId: number = 0;
+  @State private secondaryLoading: boolean = false;
+  @State private secondaryReady: boolean = false;
+  private readonly identityChanged: () => void = () => { this.invalidate(); };
+
   onEdit?: (id: number) => void;
   onOpenAuthor?: (id: number, role: string) => void;
   onBack?: () => void;
   onRequireLogin?: () => void;
   onOpenConversation?: (conversationId: number) => void;
 
+  private readonly contentChanged: (kind?: string) => void = (kind?: string) => {
+    if (kind === 'content') { this.onTargetChanged(); }
+  };
+
   aboutToAppear(): void {
-    this.load();
+    // A detached instance missed identity events; invalidate before ArkUI renders its retained body.
+    if (this.loadedIdentity !== -1 && (this.loadedIdentity !== this.appClient.sessionManager.getSessionVersion() ||
+      this.loadedId !== this.serviceId)) { this.invalidate(); }
+    ContentChanges.observe(this.contentChanged);
+    this.appClient.sessionManager.observeIdentity(this.identityChanged);
   }
 
-  private onVisibleEpoch(): void {
-    if (this.visibleEpoch > 0) { this.load(); } else { this.requestVersion++; }
+  private invalidate(): void {
+    this.requestVersion++;
+    this.inFlight = false;
+    this.detail = null;
+    this.userId = 0;
+    this.secondaryReady = false;
+    this.secondaryLoading = false;
+    this.loadedIdentity = -1;
+    this.loading = false;
+    this.errorMessage = '内容状态已变化，请刷新';
+  }
+
+  private onTargetChanged(): void {
+    this.invalidate();
+    if (this.active) { this.load(); }
+  }
+
+  private observe(): void {
+    if (this.lifecycle !== undefined) { return; }
+    try {
+      this.lifecycle = DetailVisibility.create(this.getUIContext(), () => this.queryNavigationInfo(),
+        () => this.queryNavDestinationInfo(), (visible: boolean) => {
+          this.active = visible;
+          if (visible) { UiPerf.mark('ServiceDetailPage.shown'); this.load(); }
+          else { this.requestVersion++; this.inFlight = false; this.secondaryReady = false; }
+        }, () => { this.active = false; this.lifecycle = undefined; this.invalidate(); });
+      this.lifecycle.start();
+    } catch { this.active = false; this.lifecycle = undefined; this.invalidate(); }
   }
 
   aboutToDisappear(): void {
+    ContentChanges.unobserve(this.contentChanged);
+    this.lifecycle?.stop();
+    this.lifecycle = undefined;
+    this.active = false;
     this.requestVersion++;
-    this.appClient.apiService.cancelServiceDetail(this.serviceId);
+    this.inFlight = false;
+    this.appClient.sessionManager.unobserveIdentity(this.identityChanged);
+  }
+
+  private current(version: number, identity: number): boolean {
+    return this.active && version === this.requestVersion &&
+      identity === this.appClient.sessionManager.getSessionVersion();
   }
 
   private async load(): Promise<void> {
+    if (!this.active) { return; }
+    const identity = this.appClient.sessionManager.getSessionVersion();
+    const same = this.loadedIdentity === identity && this.loadedId === this.serviceId;
+    if (this.inFlight && same) { return; }
+    if (!same) { this.invalidate(); }
     const version = ++this.requestVersion;
-    this.loading = true;
-    this.detail = null;
+    this.loadedIdentity = identity; this.loadedId = this.serviceId;
+    this.inFlight = true;
+    this.loading = this.detail === null;
+    this.secondaryLoading = false; this.secondaryReady = false;
     this.chatBusy = false; this.interestBusy = false;
-    this.errorMessage = '';
-    this.actionError = '';
-    this.role = '';
-    this.userId = 0;
-    this.interested = false;
+    this.userId = 0; this.role = ''; this.interested = false;
+    this.errorMessage = ''; this.actionError = '';
     try {
       const result = await this.appClient.apiService.getServicePackage(this.serviceId);
-      if (version === this.requestVersion) {
-        if (!result || result.serviceId !== this.serviceId) { throw new Error('橱窗编号不匹配'); }
-        this.detail = result;
-        if (this.appClient.sessionManager.isAuthenticated()) {
-          await this.restorePrivateState(version);
-        }
-      }
+      if (!this.current(version, identity)) { return; }
+      if (!result || result.serviceId !== this.serviceId) { throw new Error('详情编号不匹配'); }
+      this.detail = result;
+      this.loading = false;
+      UiPerf.mark('ServiceDetailPage.primaryReady');
+      this.secondaryLoading = this.appClient.sessionManager.isAuthenticated();
+      if (!this.appClient.sessionManager.isAuthenticated()) { this.secondaryReady = true; }
+      if (this.appClient.sessionManager.isAuthenticated()) { await this.restorePrivateState(version); }
+      if (this.current(version, identity)) { UiPerf.mark('ServiceDetailPage.secondaryDone'); }
     } catch (error) {
-      if (version === this.requestVersion) {
-        this.errorMessage = (error as PortraError).message || '橱窗加载失败';
+      if (this.current(version, identity)) {
+        const failure = error as PortraError;
+        // Only transient failures may retain a previously public body. Private history fails closed.
+        if ((failure.kind !== ErrorKind.NETWORK && failure.kind !== ErrorKind.TIMEOUT) || !(this.detail?.status === 'ONLINE' && this.detail?.isAvailable === true)) {
+          this.detail = null;
+        }
+        this.errorMessage = failure.message || '详情加载失败';
+        this.actionError = this.errorMessage;
       }
     } finally {
-      if (version === this.requestVersion) {
-        this.loading = false;
+      if (this.current(version, identity)) {
+        this.loading = false; this.inFlight = false; this.secondaryLoading = false;
+        if (same) { UiPerf.mark('ServiceDetailPage.refreshDone'); }
       }
     }
   }
@@ -79,7 +148,7 @@ export struct ServiceDetailPage {
   private async restorePrivateState(version: number): Promise<void> {
     const sessionVersion = this.appClient.sessionManager.getSessionVersion();
     try {
-      const session = await this.appClient.apiService.currentSession();
+      const session = await this.appClient.apiService.currentSession('service.detail.identity');
       if (version !== this.requestVersion ||
         sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
         return;
@@ -101,14 +170,17 @@ export struct ServiceDetailPage {
         }
 
       }
+      if (this.current(version, sessionVersion)) { this.secondaryReady = true; }
     } catch (error) {
       if (version === this.requestVersion && sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
+        this.userId = 0; this.role = ''; this.secondaryReady = false;
         this.actionError = (error as PortraError).message || '个人操作状态暂不可用';
       }
     }
   }
 
   private async startChat(): Promise<void> {
+    if (this.appClient.sessionManager.isAuthenticated() && (!this.secondaryReady || this.loadedIdentity !== this.appClient.sessionManager.getSessionVersion())) { return; }
     if (this.chatBusy) { return; }
     if (!this.appClient.sessionManager.isAuthenticated()) { this.onRequireLogin?.(); return; }
     if (this.role !== 'CUSTOMER' || this.userId === this.detail?.providerId) { this.actionError = '仅单主可以咨询其他摄影师的橱窗'; return; }
@@ -129,6 +201,7 @@ export struct ServiceDetailPage {
   }
 
   private async toggleInterest(): Promise<void> {
+    if (this.appClient.sessionManager.isAuthenticated() && (!this.secondaryReady || this.loadedIdentity !== this.appClient.sessionManager.getSessionVersion())) { return; }
     if (this.interestBusy) { return; }
     if (!this.appClient.sessionManager.isAuthenticated()) { this.onRequireLogin?.(); return; }
     if (this.role !== 'CUSTOMER' || this.userId === this.detail?.providerId) { this.actionError = '仅单主可以标记其他摄影师的橱窗意向'; return; }
@@ -144,7 +217,7 @@ export struct ServiceDetailPage {
       } else { await this.appClient.apiService.cancelServicePackageInterest(this.serviceId); }
       if (version !== this.requestVersion || identity !== this.appClient.sessionManager.getSessionVersion()) { return; }
       this.interested = next;
-      ContentChanges.publish();
+      ContentChanges.publish('service-interest');
       promptAction.showToast({ message: next ? '已加入我的意向' : '已移出我的意向' });
     } catch (error) {
       if (version === this.requestVersion && identity === this.appClient.sessionManager.getSessionVersion()) {
@@ -161,7 +234,7 @@ export struct ServiceDetailPage {
     Column() {
       JournalHeading({ title: this.detail?.title ?? '摄影橱窗', onBack: this.onBack })
       if (this.loading) { PortraLoading({ label: '正在加载橱窗' }) }
-      else if (this.errorMessage) { PortraErrorView({ message: this.errorMessage, onRetry: () => this.load() }) }
+      else if (this.errorMessage && this.detail === null) { PortraErrorView({ message: this.errorMessage, onRetry: () => { if (this.lifecycle === undefined) { this.observe(); } else { this.load(); } } }) }
       else if (this.detail !== null) {
         Scroll() {
           Column() {
@@ -200,13 +273,14 @@ export struct ServiceDetailPage {
                 onEdit: this.onEdit, onChanged: () => this.load() })
               ReportPanel({ targetType: 'SERVICE_PACKAGE', targetId: this.serviceId, ownerId: this.detail.providerId ?? 0,
                 currentUserId: this.userId, onRequireLogin: this.onRequireLogin })
+              if (this.actionError && !this.secondaryLoading) { Button('重试操作状态').onClick(() => this.load()) }
               Text('Portra · frame your moments.').fontSize(14).fontColor('#AFA8A1').padding({ top: 34, bottom: 28 })
             }.width('100%').padding({ left: 17, right: 17 }).alignItems(HorizontalAlign.Start)
           }.width('100%')
         }.layoutWeight(1).scrollBar(BarState.Off)
-        JournalActions({ price: this.price(), selected: this.interested, starEnabled: !this.interestBusy, chatEnabled: !this.chatBusy, notice: this.actionError,
+        JournalActions({ price: this.price(), selected: this.interested, starEnabled: !this.interestBusy && this.secondaryReady, chatEnabled: !this.chatBusy && this.secondaryReady, notice: this.secondaryLoading ? '正在确认操作状态…' : this.actionError,
           onStar: () => this.toggleInterest(), onChat: () => this.startChat() })
       }
-    }.width('100%').height('100%').backgroundColor(JournalStyle.paper)
+    }.width('100%').height('100%').backgroundColor(JournalStyle.paper).onAppear(() => this.observe())
   }
 }

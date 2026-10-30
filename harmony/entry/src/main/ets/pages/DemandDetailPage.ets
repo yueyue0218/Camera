@@ -1,3 +1,6 @@
+import { DetailVisibility } from '../common/performance/DetailVisibility';
+import { MomentFeedLifecycle } from '../features/moments/MomentFeedLifecycle';
+import { UiPerf } from '../common/performance/UiPerf';
 import { promptAction } from '@kit.ArkUI';
 import { PublicationActions } from '../features/publish/PublicationActions';
 import { JournalText } from '../features/publish/JournalText';
@@ -11,13 +14,13 @@ import { FollowAction } from '../features/user/FollowAction';
 import { ContentChanges } from '../features/user/ContentChanges';
 import { ReportPanel } from '../features/user/ReportPanel';
 import { DemandResponseSummary, DemandSummary } from '../model/ApiModels';
-import { PortraError } from '../network/ErrorMapper';
+import { ErrorKind, PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
 
 @Component
 export struct DemandDetailPage {
-  @Prop @Watch('load') demandId: number = 0;
-  @Prop @Watch('onVisibleEpoch') visibleEpoch: number = 0;
+  @Prop @Watch('onTargetChanged') demandId: number = 0;
+  @Prop visibleEpoch: number = 0;
   @State private loading: boolean = true;
   @State private demand: DemandSummary | null = null;
   @State private errorMessage: string = '';
@@ -35,25 +38,77 @@ export struct DemandDetailPage {
   @State private responsePrice: string = '';
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
+  private lifecycle?: MomentFeedLifecycle;
+  private active: boolean = false;
+  private inFlight: boolean = false;
+  private loadedIdentity: number = -1;
+  private loadedId: number = 0;
+  @State private secondaryLoading: boolean = false;
+  @State private secondaryReady: boolean = false;
+  private readonly identityChanged: () => void = () => { this.invalidate(); };
+
   onEdit?: (id: number) => void;
   onOpenAuthor?: (id: number, role: string) => void;
   onBack?: () => void;
   onRequireLogin?: () => void;
   onOpenConversation?: (conversationId: number) => void;
 
+  private readonly contentChanged: (kind?: string) => void = (kind?: string) => {
+    if (kind === 'content') { this.onTargetChanged(); }
+  };
+
   aboutToAppear(): void {
-    this.load();
+    // A detached instance missed identity events; invalidate before ArkUI renders its retained body.
+    if (this.loadedIdentity !== -1 && (this.loadedIdentity !== this.appClient.sessionManager.getSessionVersion() ||
+      this.loadedId !== this.demandId)) { this.invalidate(); }
+    ContentChanges.observe(this.contentChanged);
+    this.appClient.sessionManager.observeIdentity(this.identityChanged);
   }
 
-  private onVisibleEpoch(): void {
-    if (this.visibleEpoch > 0) { this.load(); } else { this.requestVersion++; }
+  private invalidate(): void {
+    this.requestVersion++;
+    this.inFlight = false;
+    this.demand = null;
+    this.userId = 0; this.role = ''; this.responses = []; this.ownResponse = null;
+    this.responseMessage = ''; this.responsePrice = ''; this.actionNotice = '';
+    this.secondaryReady = false;
+    this.secondaryLoading = false;
+    this.loadedIdentity = -1;
+    this.loading = false;
+    this.errorMessage = '内容状态已变化，请刷新';
+  }
+
+  private onTargetChanged(): void {
+    this.invalidate();
+    if (this.active) { this.load(); }
+  }
+
+  private observe(): void {
+    if (this.lifecycle !== undefined) { return; }
+    try {
+      this.lifecycle = DetailVisibility.create(this.getUIContext(), () => this.queryNavigationInfo(),
+        () => this.queryNavDestinationInfo(), (visible: boolean) => {
+          this.active = visible;
+          if (visible) { UiPerf.mark('DemandDetailPage.shown'); this.load(); }
+          else { this.requestVersion++; this.inFlight = false; this.secondaryReady = false; }
+        }, () => { this.active = false; this.lifecycle = undefined; this.invalidate(); });
+      this.lifecycle.start();
+    } catch { this.active = false; this.lifecycle = undefined; this.invalidate(); }
   }
 
   aboutToDisappear(): void {
+    ContentChanges.unobserve(this.contentChanged);
+    this.lifecycle?.stop();
+    this.lifecycle = undefined;
+    this.active = false;
     this.requestVersion++;
-    this.appClient.apiService.cancelDemandDetail();
-    this.appClient.apiService.cancelDemandActions(this.demandId);
-    this.appClient.apiService.cancelDemandInterests(this.demandId);
+    this.inFlight = false;
+    this.appClient.sessionManager.unobserveIdentity(this.identityChanged);
+  }
+
+  private current(version: number, identity: number): boolean {
+    return this.active && version === this.requestVersion &&
+      identity === this.appClient.sessionManager.getSessionVersion();
   }
 
   private async loadDemand(version: number): Promise<DemandSummary> {
@@ -64,81 +119,110 @@ export struct DemandDetailPage {
       // Closed intentions retain a read-only history, with access decided again by the server.
       if (version === this.requestVersion && identity === this.appClient.sessionManager.getSessionVersion() &&
         this.appClient.sessionManager.isAuthenticated()) {
-        const state = await this.appClient.apiService.getDemandInterest(demandId);
-        if (state?.interested === true && state.targetType === 'DEMAND' &&
-          state.demandId === demandId && state.demand?.demandId === demandId) { return state.demand; }
+        try {
+          const state = await this.appClient.apiService.getDemandInterest(demandId);
+          if (state?.interested === true && state.targetType === 'DEMAND' &&
+            state.demandId === demandId && state.demand?.demandId === demandId) { return state.demand; }
+        } catch (historyError) {
+          // A failed fallback must not turn a primary denial/deletion into a retainable transport error.
+          const primary = error as PortraError;
+          if (primary.kind === ErrorKind.NETWORK || primary.kind === ErrorKind.TIMEOUT) {
+            throw historyError as PortraError;
+          }
+        }
       }
-      throw error instanceof Error ? error : new Error(String(error));
+      throw error as PortraError;
     }
   }
 
   private async load(): Promise<void> {
+    if (!this.active) { return; }
+    const identity = this.appClient.sessionManager.getSessionVersion();
+    const same = this.loadedIdentity === identity && this.loadedId === this.demandId;
+    if (this.inFlight && same) { return; }
+    if (!same) { this.invalidate(); }
     const version = ++this.requestVersion;
-    this.loading = true;
-    this.demand = null;
-    this.actionBusy = false;
-    this.interestBusy = false; this.interested = false; this.interestReady = false;
-    this.responseMessage = '';
-    this.responsePrice = '';
-    this.errorMessage = '';
-    this.actionError = '';
-    this.actionNotice = '';
-    this.userId = 0;
-    this.role = '';
-    this.responses = [];
-    this.ownResponse = null;
+    this.loadedIdentity = identity; this.loadedId = this.demandId;
+    this.inFlight = true;
+    this.loading = this.demand === null;
+    this.secondaryLoading = false; this.secondaryReady = false;
+    this.actionBusy = false; this.interestBusy = false; this.interestReady = false; this.responses = []; this.ownResponse = null;
+    this.userId = 0; this.role = ''; this.interested = false;
+    this.errorMessage = ''; this.actionError = '';
     try {
       const result = await this.loadDemand(version);
-      if (version === this.requestVersion) {
-        this.demand = result;
-        if (this.appClient.sessionManager.isAuthenticated()) {
-          const sessionVersion = this.appClient.sessionManager.getSessionVersion();
-          try {
-            const session = await this.appClient.apiService.currentSession();
-            if (version === this.requestVersion &&
-              sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
-              this.userId = session.userId;
-              this.role = session.role;
-              if (session.userId === result.customerId) {
-                const responses = await this.appClient.apiService.listDemandResponses(this.demandId);
-                if (version === this.requestVersion &&
-                  sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
-                  this.responses = Array.isArray(responses) ? responses : [];
-                }
-              } else if (this.role.trim().toUpperCase() === 'PROVIDER') {
-                const state = await this.appClient.apiService.getDemandInterest(this.demandId);
-                if (version !== this.requestVersion || sessionVersion !== this.appClient.sessionManager.getSessionVersion()) { return; }
-                if (!state || state.demandId !== this.demandId || state.targetType !== 'DEMAND' ||
-                  typeof state.interested !== 'boolean') { throw new Error('需求意向状态异常'); }
-                this.interested = state.interested; this.interestReady = true;
-                const responses = await this.appClient.apiService.listMyDemandResponses();
-                if (version === this.requestVersion &&
-                  sessionVersion === this.appClient.sessionManager.getSessionVersion() && Array.isArray(responses)) {
-                  this.ownResponse = responses.find((item: DemandResponseSummary) =>
-                    item.demandId === this.demandId) ?? null;
-                }
-              }
-            }
-          } catch {
-            if (version === this.requestVersion &&
-              sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
-              this.actionError = '响应信息暂不可用，请重试';
-            }
-          }
-        }
-      }
+      if (!this.current(version, identity)) { return; }
+      if (!result || result.demandId !== this.demandId) { throw new Error('详情编号不匹配'); }
+      this.demand = result;
+      this.loading = false;
+      UiPerf.mark('DemandDetailPage.primaryReady');
+      this.secondaryLoading = this.appClient.sessionManager.isAuthenticated();
+      if (!this.appClient.sessionManager.isAuthenticated()) { this.secondaryReady = true; }
+      if (this.appClient.sessionManager.isAuthenticated()) { await this.restorePrivateState(version, result); }
+      if (this.current(version, identity)) { UiPerf.mark('DemandDetailPage.secondaryDone'); }
     } catch (error) {
-      if (version === this.requestVersion) {
-        this.errorMessage = (error as PortraError).message || '需求加载失败';
+      if (this.current(version, identity)) {
+        const failure = error as PortraError;
+        // Only transient failures may retain a previously public body. Private history fails closed.
+        if ((failure.kind !== ErrorKind.NETWORK && failure.kind !== ErrorKind.TIMEOUT) || !(this.demand?.status === 'OPEN')) {
+          this.demand = null;
+        }
+        this.errorMessage = failure.message || '详情加载失败';
+        this.actionError = this.errorMessage;
       }
     } finally {
-      if (version === this.requestVersion) {
-        this.loading = false;
+      if (this.current(version, identity)) {
+        this.loading = false; this.inFlight = false; this.secondaryLoading = false;
+        if (same) { UiPerf.mark('DemandDetailPage.refreshDone'); }
+      }
+    }
+  }
+
+  private async restorePrivateState(version: number, result: DemandSummary): Promise<void> {
+    if (this.appClient.sessionManager.isAuthenticated()) {
+      const sessionVersion = this.appClient.sessionManager.getSessionVersion();
+      try {
+        const session = await this.appClient.apiService.currentSession('demand.detail.identity');
+        if (version === this.requestVersion &&
+          sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
+          this.userId = session.userId;
+          this.role = session.role;
+          if (session.userId === result.customerId) {
+            const responses = await this.appClient.apiService.listDemandResponses(this.demandId);
+            if (version === this.requestVersion &&
+              sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
+              if (!Array.isArray(responses)) { throw new Error('响应数据异常'); }
+              this.responses = responses;
+            }
+          } else if (this.role.trim().toUpperCase() === 'PROVIDER') {
+            const state = await this.appClient.apiService.getDemandInterest(this.demandId);
+            if (version !== this.requestVersion || sessionVersion !== this.appClient.sessionManager.getSessionVersion()) { return; }
+            if (!state || state.demandId !== this.demandId || state.targetType !== 'DEMAND' ||
+              typeof state.interested !== 'boolean') { throw new Error('需求意向状态异常'); }
+            this.interested = state.interested; this.interestReady = true;
+            const responses = await this.appClient.apiService.listMyDemandResponses();
+            if (!this.current(version, sessionVersion)) { return; }
+            if (!Array.isArray(responses)) { throw new Error('响应数据异常'); }
+            if (version === this.requestVersion &&
+              sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
+              this.ownResponse = responses.find((item: DemandResponseSummary) =>
+                item.demandId === this.demandId) ?? null;
+            }
+          }
+          if (this.current(version, sessionVersion)) { this.secondaryReady = true; }
+        }
+      } catch {
+        if (version === this.requestVersion &&
+          sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
+          this.userId = 0; this.role = ''; this.secondaryReady = false;
+          this.actionError = '响应信息暂不可用，请重试';
+        }
       }
     }
   }
 
   private async toggleInterest(): Promise<void> {
+    if (this.appClient.sessionManager.isAuthenticated() && (!this.secondaryReady || this.loadedIdentity !== this.appClient.sessionManager.getSessionVersion())) { return; }
     if (this.interestBusy) { return; }
     if (!this.appClient.sessionManager.isAuthenticated()) { this.onRequireLogin?.(); return; }
     if (this.role.trim().toUpperCase() !== 'PROVIDER' || this.userId === this.demand?.customerId) {
@@ -168,6 +252,7 @@ export struct DemandDetailPage {
   }
 
   private async respond(): Promise<void> {
+    if (this.appClient.sessionManager.isAuthenticated() && (!this.secondaryReady || this.loadedIdentity !== this.appClient.sessionManager.getSessionVersion())) { return; }
     if (!this.appClient.sessionManager.isAuthenticated()) { this.onRequireLogin?.(); return; }
     if (this.role.trim().toUpperCase() !== 'PROVIDER' || this.userId === this.demand?.customerId || this.demand?.status !== 'OPEN' || this.ownResponse !== null) {
       this.actionError = '当前不能响应此需求'; return;
@@ -211,6 +296,7 @@ export struct DemandDetailPage {
   }
 
   private async accept(responseId: number): Promise<void> {
+    if (this.appClient.sessionManager.isAuthenticated() && (!this.secondaryReady || this.loadedIdentity !== this.appClient.sessionManager.getSessionVersion())) { return; }
     if (!this.appClient.sessionManager.isAuthenticated()) { this.onRequireLogin?.(); return; }
     if (this.userId !== this.demand?.customerId || !this.responses.some((item: DemandResponseSummary) =>
       item.responseId === responseId && item.status === 'PENDING_CUSTOMER_ACCEPT')) { this.actionError = '当前不能接受此响应'; return; }
@@ -245,6 +331,7 @@ export struct DemandDetailPage {
 
   private readonly scroll: Scroller = new Scroller();
   private async startChat(): Promise<void> {
+    if (this.appClient.sessionManager.isAuthenticated() && (!this.secondaryReady || this.loadedIdentity !== this.appClient.sessionManager.getSessionVersion())) { return; }
     if (this.actionBusy) { return; }
     if (!this.appClient.sessionManager.isAuthenticated()) { this.onRequireLogin?.(); return; }
     if (this.userId === this.demand?.customerId) { this.actionError = '这是你发布的需求，请在下方选择摄影师响应'; this.scroll.scrollEdge(Edge.Bottom); return; }
@@ -280,6 +367,9 @@ export struct DemandDetailPage {
       }
       if (!this.appClient.sessionManager.isAuthenticated()) {
         Button('登录后响应').onClick(() => this.onRequireLogin?.())
+      } else if (!this.secondaryReady) {
+        Text(this.secondaryLoading ? '正在读取响应信息…' : '响应信息不可用，请刷新详情').fontSize(13)
+        Button('重试').enabled(!this.secondaryLoading).onClick(() => this.load())
       } else if (this.userId === this.demand?.customerId) {
         if (this.responses.length === 0) {
           Text('暂无响应').fontSize(13).fontColor(PortraTheme.secondaryText)
@@ -330,7 +420,7 @@ export struct DemandDetailPage {
     Column() {
       JournalHeading({ title: this.demand?.scene ?? '约拍需求', onBack: this.onBack })
       if (this.loading) { PortraLoading({ label: '正在加载需求' }) }
-      else if (this.errorMessage) { PortraErrorView({ message: this.errorMessage, onRetry: () => this.load() }) }
+      else if (this.errorMessage && this.demand === null) { PortraErrorView({ message: this.errorMessage, onRetry: () => { if (this.lifecycle === undefined) { this.observe(); } else { this.load(); } } }) }
       else if (this.demand !== null) {
         Scroll(this.scroll) {
           Column() {
@@ -370,11 +460,11 @@ export struct DemandDetailPage {
           }.width('100%')
         }.layoutWeight(1).scrollBar(BarState.Off)
         JournalActions({ service: false, price: HallTextFormatter.budget(this.demand.budgetMinCent, this.demand.budgetMaxCent),
-          selected: this.interested, starEnabled: !this.interestBusy,
-          chatEnabled: !this.actionBusy && (this.demand.status === 'OPEN' || this.ownResponse?.status === 'ACCEPTED'),
-          notice: this.actionError, onChat: () => this.startChat(),
+          selected: this.interested, starEnabled: !this.interestBusy && this.secondaryReady,
+          chatEnabled: !this.actionBusy && this.secondaryReady && (this.demand.status === 'OPEN' || this.ownResponse?.status === 'ACCEPTED'),
+          notice: this.secondaryLoading ? '正在确认操作状态…' : this.actionError, onChat: () => this.startChat(),
           onStar: () => this.toggleInterest() })
       }
-    }.width('100%').height('100%').backgroundColor(JournalStyle.paper)
+    }.width('100%').height('100%').backgroundColor(JournalStyle.paper).onAppear(() => this.observe())
   }
 }

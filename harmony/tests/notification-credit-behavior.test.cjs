@@ -40,3 +40,42 @@ test('credit reads only own private records and ignores hidden old results',asyn
  const c=new CreditController(api,{getSessionVersion:()=>version,isAuthenticated:()=>true},s=>state=s);c.resume();const p=c.load();await tick();assert.equal(records[0].id,7);c.suspend();version++;c.resume();summaries[0].resolve({userId:7,creditScore:99});records[0].resolve([]);await p;assert.equal(state.summary,undefined);assert.equal(state.loading,false);assert.ok(keys.length>0);
 });
 test('null credit score keeps real summary metrics and does not invent an error',async()=>{let state;const c=new CreditController({currentSession:async()=>({userId:7}),cancelCurrentSession(){},getCreditSummary:async()=>({userId:7,creditScore:null,creditLevel:'待积累',effectiveOrderCount:0}),listCreditRecords:async()=>[],cancelCreditRequests(){}},{getSessionVersion:()=>1,isAuthenticated:()=>true},s=>state=s);c.resume();await c.load();assert.equal(state.error,'');assert.equal(state.summary.effectiveOrderCount,0);assert.equal(CreditFormat.score(state.summary.creditScore),'暂无');});
+
+test('notification return retains loaded pages and refreshes the same window',async()=>{
+ const f=fixture(),first=Array.from({length:20},(_,i)=>notice(i+1));await loaded(f,first,21);
+ const more=f.controller.loadMore();f.list.at(-1).resolve({records:[notice(21,true)],page:1,size:20,total:21});await more;
+ f.controller.suspend();assert.equal(f.state.items.length,21);assert.equal(f.state.page,1);f.controller.resume();
+ const p=f.controller.load();await tick();assert.equal(f.state.items.length,21);assert.equal(f.state.loading,false);
+ f.list.at(-1).resolve({records:first,page:0,size:20,total:21});f.count.at(-1).resolve(20);await tick();
+ assert.equal(f.list.at(-1).page,1);f.list.at(-1).resolve({records:[notice(21,false)],page:1,size:20,total:21});await p;
+ assert.equal(f.state.items.length,21);assert.equal(f.state.page,1);assert.equal(f.state.items.at(-1).isRead,true);
+});
+test('confirmed read survives a stale server list on return without optimistic success',async()=>{
+ const f=fixture();await loaded(f);const p=f.controller.markRead(1);assert.equal(f.state.items[0].isRead,false);
+ f.writes[0].resolve(notice(1,true));await tick();assert.equal(f.state.items[0].isRead,true);
+ f.list.at(-1).resolve({records:[notice(1,false)],page:0,size:20,total:1});f.count.at(-1).resolve(0);await p;
+ f.controller.suspend();f.controller.resume();assert.equal(f.state.items[0].isRead,true);
+});
+test('notification refresh rejection clears private snapshot on revoked permission',async()=>{
+ const f=fixture();await loaded(f);f.controller.suspend();f.controller.resume();const p=f.controller.load();await tick();
+ f.list.at(-1).reject({httpStatus:403});f.count.at(-1).resolve(0);await p;assert.equal(f.state.items.length,0);assert.equal(f.controller.canOpen(1),false);
+});
+test('notification pending read is uncertain after hiding and old reply cannot mutate retained snapshot',async()=>{
+ const f=fixture();await loaded(f);const p=f.controller.markRead(1);f.controller.suspend();assert.equal(f.state.items.length,1);assert.equal(f.state.uncertain,true);
+ f.writes.at(-1).resolve(notice(1,true));await p;assert.equal(f.state.items[0].isRead,false);f.change();f.controller.resume();assert.equal(f.state.items.length,0);
+});
+
+test('pagination permission denial invalidates all retained notifications',async()=>{
+ const f=fixture();await loaded(f,[notice()],2);const p=f.controller.loadMore();f.list.at(-1).reject({httpStatus:403});await p;
+ assert.equal(f.state.items.length,0);assert.equal(f.state.unread,0);
+});
+test('read mutation permission denial invalidates all retained notifications',async()=>{
+ const f=fixture();await loaded(f);const p=f.controller.markRead(1);f.writes.at(-1).reject({businessCode:40301});await p;
+ assert.equal(f.state.items.length,0);assert.equal(f.state.unread,0);
+});
+test('mark-all only confirms returned records before authoritative refresh completes',async()=>{
+ const f=fixture();await loaded(f,[notice(1),notice(2)]);const p=f.controller.markAllRead();f.writes.at(-1).resolve([notice(1,true)]);await tick();
+ assert.equal(f.state.items.find(x=>x.notificationId===2).isRead,false);
+ f.list.at(-1).resolve({records:[notice(1,true),notice(2)],page:0,size:20,total:2});f.count.at(-1).resolve(1);await p;
+ assert.equal(f.state.items.find(x=>x.notificationId===2).isRead,false);assert.equal(f.state.unread,1);
+});
