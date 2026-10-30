@@ -57,7 +57,8 @@ export struct PortraAppShell {
   build() {
     Column() {
       Stack() {
-        HallPage({ reselectEpoch: this.hallReselectEpoch, sessionEpoch: this.sessionEpoch, onOpenAuthor: this.onOpenAuthor,
+        HallPage({ reselectEpoch: this.hallReselectEpoch, sessionEpoch: this.sessionEpoch,
+          hallActive: this.selectedTab === 0, onOpenAuthor: this.onOpenAuthor,
           onSearch: () => this.openSearch(),
           onNotice: () => this.onOpenRoute?.(AppRoute.NOTIFICATIONS),
           onPublish: () => this.onOpenRoute?.(AppRoute.PUBLISH),
