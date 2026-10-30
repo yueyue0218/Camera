@@ -12,7 +12,7 @@
 
 ## 文件、兼容与证据
 
-[10个维护者文件](owner-files.txt)；[后端最终差异](owner-backend.patch)、[公共DTO差异](owner-dto.patch)均以本轮同步后6d05318为基线。已应用后的校验应使用git apply --reverse --check，勿重复apply。ReportResponse保留旧构造兼容，DTO仅可选扩展；原NotificationService默认sourceId回落行为保持。
+[10个维护者文件](owner-files.txt)；[后端最终差异](owner-backend.patch)、[公共DTO差异](owner-dto.patch)均以本轮同步后6d05318为基线。这些是原C基线6d05318的授权审阅副本；当前独立集成PR以449173a实际diff为准，不要重复apply，详见[独立集成验证](../../evidence/20261030-report-results/integration-publish.md)。ReportResponse保留旧构造兼容，DTO仅可选扩展；原NotificationService默认sourceId回落行为保持。
 
 [完整证据与剩余项](../../evidence/20261030-report-results/README.md)。鸿蒙394/394；后端842项中840通过、2项原有MySQL专项跳过；最终dev及staging HAP构建成功。没有执行共享MySQL迁移、没有部署、没有推送/合并。随后用户单独授权仅本轮隔离H2临时ADMIN，已创建；原计划默认禁止ADMIN由这次明确授权仅对该本地夹具覆盖。
 
