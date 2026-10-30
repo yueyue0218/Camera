@@ -3,6 +3,7 @@ import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraLoading } from '../common/components/PortraLoading';
 import { PortraPageHeading } from '../common/components/PortraPageHeading';
 import { QuoteDetailContent } from '../features/conversation/QuoteDetailContent';
+import { ConversationListModel } from '../features/conversation/ConversationListModel';
 import { QuoteWorkflow } from '../features/conversation/QuoteWorkflow';
 import { OrderSummary, QuoteSummary } from '../model/ApiModels';
 import { PortraError } from '../network/ErrorMapper';
@@ -15,6 +16,7 @@ export struct QuoteDetailPage {
   @State private quote: QuoteSummary | null = null;
   @State private orderId: number = 0;
   @State private userId: number = 0;
+  @State private providerName: string = '';
   @State private loading: boolean = true;
   @State private busy: boolean = false;
   @State private errorMessage: string = '';
@@ -43,11 +45,16 @@ export struct QuoteDetailPage {
       if (quote === undefined) throw new Error('报价不存在');
       this.userId = session.userId;
       this.quote = quote;
+      this.api.getUserBrief(quote.providerUserId, 'PROVIDER').then((brief) => {
+        if (version === this.requestVersion) this.providerName = ConversationListModel.safeName(brief);
+      }).catch(() => {
+        if (version === this.requestVersion) this.providerName = '摄影师';
+      });
       if (quote.status === 'CONFIRMED') {
-        const orders = await this.api.listOrders();
-        if (version === this.requestVersion) {
+        this.api.listOrders().then((orders: OrderSummary[]) => {
+          if (version !== this.requestVersion) return;
           this.orderId = orders.find((order: OrderSummary) => order.quoteId === this.quoteId)?.orderId ?? 0;
-        }
+        }).catch(() => {});
       }
     } catch (error) {
       if (version === this.requestVersion) this.errorMessage = (error as PortraError).message || '报价暂时无法查看';
@@ -98,7 +105,7 @@ export struct QuoteDetailPage {
         PortraErrorView({ message: this.errorMessage || '报价暂时无法查看', onRetry: () => this.load() })
       } else {
         Scroll() {
-          QuoteDetailContent({ quote: this.quote! })
+          QuoteDetailContent({ quote: this.quote!, providerName: this.providerName })
             .padding({ left: 20, right: 20, top: 20, bottom: 30 })
         }.layoutWeight(1).scrollBar(BarState.Off)
         if (this.errorMessage) Text(this.errorMessage).fontColor(PortraTheme.danger).fontSize(12)

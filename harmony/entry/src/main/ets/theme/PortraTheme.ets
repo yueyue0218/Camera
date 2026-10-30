@@ -13,6 +13,8 @@ export class PortraTheme {
   static readonly rose: string = '#E8C7B8';
   static readonly mist: string = '#CBD6DF';
   static readonly danger: string = '#B65745';
+  static readonly attention: string = '#C96A30';
+  static readonly success: string = '#32765B';
   static readonly border: string = '#E8E2DB';
   static readonly white: string = '#FFFFFF';
 

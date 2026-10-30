@@ -6,6 +6,7 @@ import { QuoteWorkflow } from './QuoteWorkflow';
 @Component
 export struct QuoteDetailContent {
   @Prop quote: QuoteSummary;
+  @Prop providerName: string = '';
 
   @Builder
   private Detail(label: string, value: string) {
@@ -21,9 +22,12 @@ export struct QuoteDetailContent {
         Text('约拍报价').fontSize(13).fontColor(PortraTheme.secondaryText)
         Text(OrderWorkflow.money(this.quote.amountCent)).fontSize(30).fontWeight(FontWeight.Bold)
           .fontColor(PortraTheme.primaryText)
-        Text(QuoteWorkflow.status(this.quote)).fontSize(13).fontColor(PortraTheme.primary)
+        Text(QuoteWorkflow.status(this.quote)).fontSize(13)
+          .fontColor(this.quote.status === 'PENDING_CONFIRM' ? PortraTheme.attention :
+            this.quote.status === 'CONFIRMED' ? PortraTheme.success : PortraTheme.secondaryText)
       }.alignItems(HorizontalAlign.Start).width('100%')
       Divider().color(PortraTheme.border)
+      this.Detail('摄影师', this.providerName || '摄影师')
       Text('拍摄安排').fontSize(16).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
       this.Detail('开始', QuoteWorkflow.dateInput(this.quote.shootStartTime))
       this.Detail('结束', QuoteWorkflow.dateInput(this.quote.shootEndTime))

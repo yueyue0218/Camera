@@ -85,7 +85,7 @@ export struct RejectedQuotePreview {
 export struct QuoteDetailPreview {
   build() {
     Scroll() {
-      QuoteDetailContent({ quote: PENDING_QUOTE })
+      QuoteDetailContent({ quote: PENDING_QUOTE, providerName: '林屿' })
         .padding(20)
     }.width('100%').height('100%').backgroundColor(PortraTheme.pageBackground)
   }

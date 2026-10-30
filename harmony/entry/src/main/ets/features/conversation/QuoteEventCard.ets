@@ -13,7 +13,9 @@ export struct QuoteEventCard {
       Row() {
         Text('约拍报价').fontSize(14).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
         Blank()
-        Text(QuoteWorkflow.status(this.quote)).fontSize(12).fontColor(PortraTheme.secondaryText)
+        Text(QuoteWorkflow.status(this.quote)).fontSize(12)
+          .fontColor(this.quote.status === 'PENDING_CONFIRM' ? PortraTheme.attention :
+            this.quote.status === 'CONFIRMED' ? PortraTheme.success : PortraTheme.secondaryText)
       }.width('100%')
       Text(OrderWorkflow.money(this.quote.amountCent)).fontSize(22).fontWeight(FontWeight.Bold)
         .fontColor(PortraTheme.primaryText)

@@ -15,7 +15,9 @@ export struct OrderEventCard {
       Row() {
         Text('约拍订单').fontSize(14).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
         Blank()
-        Text(OrderWorkflow.status(this.order.status)).fontSize(12).fontColor(PortraTheme.secondaryText)
+        Text(OrderWorkflow.status(this.order.status)).fontSize(12)
+          .fontColor(this.order.status === 'PENDING_PAYMENT' ? PortraTheme.attention :
+            this.order.status === 'COMPLETED' ? PortraTheme.success : PortraTheme.secondaryText)
       }.width('100%')
       Text(OrderWorkflow.money(this.order.amountCent)).fontSize(22).fontWeight(FontWeight.Bold)
         .fontColor(PortraTheme.primaryText)
