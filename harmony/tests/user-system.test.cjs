@@ -51,7 +51,7 @@ async function expectRequest(invoke, method, suffix, data, body) {
   const call = calls.at(-1);
   assert.equal(call.options.method, method);
   assert.equal(call.url, TestBuildProfile.PORTRA_BASE_URL + suffix);
-  assert.equal(call.options.header.Authorization, 'Bearer session-token');
+  assert.equal(call.options.header.Authorization, suffix.includes('/public-profile?') ? undefined : 'Bearer session-token');
   if (body !== undefined) assert.deepEqual(JSON.parse(call.options.extraData), body);
   complete(call, data);
   return promise;
@@ -90,6 +90,31 @@ test('conversation hiding and reports preserve server-authoritative results', as
   { reportId: 2, reporterId: 3, targetType: 'DEMAND', targetId: 7,
     reason: '不当内容', status: 'PENDING' },
   { targetType: 'DEMAND', targetId: 7, reason: '不当内容' });
+});
+
+test('identity permission errors remain visible instead of falling back to a different profile response', async () => {
+  const client = new HttpClient(); client.setAccessToken('session-token'); const api = new ApiService(client);
+  const before = calls.length; const request = api.currentSession('hall.identity');
+  calls.at(-1).resolve({ responseCode: 200, result: JSON.stringify({ code: 40301, message: 'forbidden', data: null }) });
+  await assert.rejects(request, error => error.businessCode === 40301);
+  assert.equal(calls.length, before + 1);
+});
+
+test('profile and order workspace query the confirmed role with independent cancellation keys', async () => {
+  const client = new HttpClient(); client.setAccessToken('session-token'); const api = new ApiService(client);
+  for (const role of ['CUSTOMER', 'PROVIDER']) {
+    await expectRequest(() => api.listOrders(role, 'profile.orders'), 'GET', '/orders?role=' + role, []);
+  }
+});
+
+test('publication preview and management refresh cannot cancel each other', async () => {
+  const client = new HttpClient(); client.setAccessToken('session-token'); const api = new ApiService(client);
+  const preview = api.listMyDemands(1); const first = calls.at(-1);
+  const management = api.listMyDemands(1, 'workspace.demands'); const second = calls.at(-1);
+  assert.equal(first.destroyed, 0);
+  complete(first, { records: [], page: 1, size: 10, total: 0 });
+  complete(second, { records: [], page: 1, size: 10, total: 0 });
+  await Promise.all([preview, management]);
 });
 
 test('pages integrate role isolation, deduplication, follow, favorite and report behavior', () => {

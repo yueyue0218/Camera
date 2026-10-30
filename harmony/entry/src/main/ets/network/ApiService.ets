@@ -11,8 +11,12 @@ import { AcceptedDemandResponse, ConfirmQuoteResult, ConversationSummary, Create
   ServicePackageSummary, SocialUserBrief, SwitchRolePayload, SwitchRoleResult, UserProfileSummary,
   SendTextMessagePayload, SessionSummary, StartServiceChatPayload, StartServiceChatResult,
   VerifyNativeSmsCodeRequest } from '../model/ApiModels';
-import { ErrorMapper } from './ErrorMapper';
-import { HttpClient } from './HttpClient';
+import { UpdateProfilePayload } from '../model/ApiModels';
+import { ErrorMapper, PortraError } from './ErrorMapper';
+import { UploadedImage, HttpClient } from './HttpClient';
+
+interface DemandChatSnapshot { responseId: number; demandId: number; customerId: number; providerId: number; responseStatus: string; }
+interface DemandChatPayload { responseId: number; demandId: number; customerId: number; providerUserId: number; status: string; }
 
 export class ApiService implements NativeSessionApi {
   private readonly client: HttpClient;
@@ -86,7 +90,7 @@ export class ApiService implements NativeSessionApi {
     if (!Number.isSafeInteger(demandId) || demandId <= 0) {
       throw ErrorMapper.parse();
     }
-    const result = await this.client.getPublic<DemandSummary>(`/demands/${demandId}`, 'demands.detail');
+    const result = await this.client.get<DemandSummary>(`/demands/${demandId}`, 'demands.detail');
     if (result === null || result.demandId !== demandId) {
       throw ErrorMapper.parse();
     }
@@ -99,6 +103,22 @@ export class ApiService implements NativeSessionApi {
 
   createDemand(payload: CreateDemandPayload): Promise<DemandSummary> {
     return this.client.post<DemandSummary>('/demands', payload, 'demands.create');
+  }
+
+  async openAcceptedDemandChat(responseId: number): Promise<ConversationSummary> {
+    if (!Number.isSafeInteger(responseId) || responseId <= 0) { throw ErrorMapper.parse(); }
+    const identity = this.client.getIdentityEpoch();
+    const snapshot = await this.client.get<DemandChatSnapshot>(
+      `/demands/responses/${responseId}/accepted-snapshot`, `demands.chat.${responseId}`);
+    if (identity !== this.client.getIdentityEpoch() || !snapshot || snapshot.responseId !== responseId || snapshot.responseStatus !== 'ACCEPTED' ||
+      !Number.isSafeInteger(snapshot.demandId) || snapshot.demandId <= 0 ||
+      !Number.isSafeInteger(snapshot.customerId) || snapshot.customerId <= 0 ||
+      !Number.isSafeInteger(snapshot.providerId) || snapshot.providerId <= 0) {
+      throw ErrorMapper.parse();
+    }
+    const payload: DemandChatPayload = { responseId: snapshot.responseId, demandId: snapshot.demandId,
+      customerId: snapshot.customerId, providerUserId: snapshot.providerId, status: snapshot.responseStatus };
+    return this.client.post<ConversationSummary>('/conversations/from-response', payload, `demands.chat.${responseId}`);
   }
 
   respondToDemand(demandId: number, message: string, expectedPriceCent?: number): Promise<DemandResponseSummary> {
@@ -157,7 +177,7 @@ export class ApiService implements NativeSessionApi {
   }
 
   getServicePackage(serviceId: number): Promise<ServicePackageDetail> {
-    return this.client.getPublic<ServicePackageDetail>(`/service-packages/${serviceId}`, 'servicePackages.detail');
+    return this.client.get<ServicePackageDetail>(`/service-packages/${serviceId}`, 'servicePackages.detail');
   }
 
   startServiceChat(serviceId: number): Promise<StartServiceChatResult> {
@@ -253,6 +273,10 @@ export class ApiService implements NativeSessionApi {
   }
 
 
+  listPublicMoments(userId: number, role: string, page: number, key: string): Promise<ProfileMomentPage> {
+    return this.client.getPublic<ProfileMomentPage>(`/moments/profile?authorId=${userId}&authorRole=${this.requireIdentityRole(role)}&page=${this.safePage(page)}&size=12`, key);
+  }
+
   listProfileMoments(authorId: number, authorRole: string, page: number = 1, size: number = 12, requestKey?: string):
     Promise<ProfileMomentPage> {
     const role = this.requireIdentityRole(authorRole);
@@ -270,6 +294,12 @@ export class ApiService implements NativeSessionApi {
       'moments.favorites');
   }
 
+  listLikedMoments(page: number = 1, size: number = 12): Promise<PageResult<MomentSummary>> {
+    return this.client.get<PageResult<MomentSummary>>(
+      `/moments/me/interactions?interaction=LIKED&page=${this.safePage(page)}&size=${this.safeSize(size)}`,
+      'moments.likes');
+  }
+
   favoriteMoment(momentId: number): Promise<MomentSummary> {
     if (!Number.isSafeInteger(momentId) || momentId <= 0) {
       return Promise.reject(ErrorMapper.parse());
@@ -284,6 +314,36 @@ export class ApiService implements NativeSessionApi {
     return this.client.delete<MomentSummary>(`/moments/${momentId}/favorite`, `moments.${momentId}.favorite`);
   }
 
+  uploadImage(data: ArrayBuffer, bizType: string, mime: string, filename: string): Promise<UploadedImage> {
+    return this.client.uploadImage(data, bizType, mime, filename);
+  }
+  updateMyProfile(payload: UpdateProfilePayload): Promise<void> {
+    return this.client.patch<void>('/users/me', payload, 'users.me.update');
+  }
+  listMyDemands(page: number = 1, requestKey: string = 'profile.demands'): Promise<PageResult<DemandSummary>> {
+    return this.client.get<PageResult<DemandSummary>>(`/demands/me/publications?page=${this.safePage(page)}&size=10`, requestKey);
+  }
+  listMyServices(page: number = 1, requestKey: string = 'profile.services'): Promise<PageResult<ServicePackageSummary>> {
+    return this.client.get<PageResult<ServicePackageSummary>>(`/service-packages/me/publications?page=${this.safePage(page)}&size=10`, requestKey);
+  }
+  updateDemand(id: number, payload: CreateDemandPayload): Promise<DemandSummary> {
+    return this.client.put<DemandSummary>(`/demands/${id}`, payload, 'demands.update');
+  }
+  closeDemand(id: number): Promise<DemandSummary> {
+    return this.client.patch<DemandSummary>(`/demands/${id}/close`, undefined, 'demands.close');
+  }
+  updateService(id: number, payload: CreateServicePackagePayload): Promise<ServicePackageDetail> {
+    return this.client.put<ServicePackageDetail>(`/service-packages/${id}`, payload, 'servicePackages.update');
+  }
+  offlineService(id: number): Promise<ServicePackageDetail> {
+    return this.client.patch<ServicePackageDetail>(`/service-packages/${id}/offline`, undefined, 'servicePackages.offline');
+  }
+  listPublicDemands(userId: number, page: number, key: string): Promise<PageResult<DemandSummary>> {
+    return this.client.getPublic<PageResult<DemandSummary>>(`/demands/by-user/${userId}?page=${this.safePage(page)}&size=12`, key);
+  }
+  listPublicServices(userId: number, page: number, key: string): Promise<PageResult<ServicePackageSummary>> {
+    return this.client.getPublic<PageResult<ServicePackageSummary>>(`/service-packages/by-user/${userId}?page=${this.safePage(page)}&size=12`, key);
+  }
   getMyProfile(): Promise<UserProfileSummary> {
     return this.client.get<UserProfileSummary>('/users/me', 'users.me');
   }
@@ -299,13 +359,14 @@ export class ApiService implements NativeSessionApi {
     if (!Number.isSafeInteger(userId) || userId <= 0) {
       return Promise.reject(ErrorMapper.parse());
     }
-    return this.client.get<PublicUserProfile>(
+    return this.client.getPublic<PublicUserProfile>(
       `/users/${userId}/public-profile?role=${normalizedRole}`, requestKey ?? `users.${userId}.${normalizedRole}.profile`);
   }
 
   cancelPublicProfile(profileRequestKey: string, momentsRequestKey: string): void {
     this.client.cancelRequest(profileRequestKey);
     this.client.cancelRequest(momentsRequestKey);
+    this.client.cancelRequest(profileRequestKey.replace(/\.profile$/, '.content'));
   }
 
   listFollowers(userId: number, role: string): Promise<SocialUserBrief[]> {
@@ -338,6 +399,7 @@ export class ApiService implements NativeSessionApi {
     this.client.cancelRequest('users.me');
     this.client.cancelRequest('users.me.role');
     this.client.cancelRequest('moments.favorites');
+    this.client.cancelRequest('profile.orders');
     if (userId !== undefined && Number.isSafeInteger(userId) && userId > 0) {
       ['CUSTOMER', 'PROVIDER'].forEach((identityRole: string) => {
         this.cancelSocialUserRequests(userId, identityRole);
@@ -380,17 +442,40 @@ export class ApiService implements NativeSessionApi {
     this.client.cancelRequest('auth.sms.verify');
   }
 
-  async currentSession(requestKey: string = 'auth.session'): Promise<SessionSummary> {
-    const response = await this.client.get<SessionSummary>('/auth/session', requestKey);
-    if (response === null || !Number.isSafeInteger(response.userId) || response.userId <= 0 ||
-      typeof response.nickname !== 'string' || typeof response.role !== 'string') {
+  // Both endpoints are server-authoritative. A failing optional session summary
+  // must not disable the hall/search/publish UI if /users/me still verifies the
+  // same signed-in account. Callers that are already recovering /users/me may
+  // opt out of the reverse fallback to avoid a circular retry chain.
+  async currentSession(requestKey: string = 'auth.session', allowProfileFallback: boolean = true): Promise<SessionSummary> {
+    try {
+      const response = await this.client.get<SessionSummary>('/auth/session', requestKey);
+      if (response === null || !Number.isSafeInteger(response.userId) || response.userId <= 0 ||
+        typeof response.nickname !== 'string' ||
+        (response.role !== 'CUSTOMER' && response.role !== 'PROVIDER')) {
+        throw ErrorMapper.parse();
+      }
+      return response;
+    } catch (error) {
+      if (!allowProfileFallback || ErrorMapper.isStale(error as PortraError) ||
+        ErrorMapper.isAuthenticationExpired(error as PortraError) ||
+        (error as PortraError).httpStatus === 403 || (error as PortraError).businessCode === 40301) {
+        throw error as PortraError;
+      }
+    }
+    // Use an independent request key: never cancel the personal page's
+    // simultaneous /users/me load when the hall or search is recovering.
+    const profile = await this.client.get<UserProfileSummary>('/users/me', `${requestKey}.profileFallback`);
+    if (profile === null || !Number.isSafeInteger(profile.id) || profile.id <= 0 ||
+      (profile.currentRole !== 'CUSTOMER' && profile.currentRole !== 'PROVIDER')) {
       throw ErrorMapper.parse();
     }
-    return response;
+    // Do not fabricate sessionId, deviceId, admin permission or other metadata.
+    return { userId: profile.id, nickname: profile.nickname ?? '', role: profile.currentRole };
   }
 
   cancelCurrentSession(requestKey: string = 'auth.session'): void {
     this.client.cancelRequest(requestKey);
+    this.client.cancelRequest(`${requestKey}.profileFallback`);
   }
 
   listNotifications(page: number = 0, size: number = 20, requestKey: string = 'notifications.list'):
@@ -526,8 +611,9 @@ export class ApiService implements NativeSessionApi {
   }
   cancelEngagementRequests(keys: string[]): void { keys.forEach((key: string) => this.client.cancelRequest(key)); }
 
-  listOrders(): Promise<OrderSummary[]> {
-    return this.client.get<OrderSummary[]>('/orders', 'orders.list');
+  listOrders(role?: string, requestKey: string = 'orders.list'): Promise<OrderSummary[]> {
+    const path = role === undefined ? '/orders' : `/orders?role=${this.requireIdentityRole(role)}`;
+    return this.client.get<OrderSummary[]>(path, requestKey);
   }
 
   cancelOrders(): void {

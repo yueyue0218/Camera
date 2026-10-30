@@ -1,6 +1,7 @@
 import { EnvironmentConfig } from '../common/config/EnvironmentConfig';
 import { AuthSessionManager } from '../auth/AuthSessionManager';
 import { ApiService } from '../network/ApiService';
+import { FileImageService } from '../network/FileImageService';
 import { AuthInterceptor } from '../network/AuthInterceptor';
 import { AuthenticationExpiredHandler, HttpClient } from '../network/HttpClient';
 import { AssetCredentialStore } from '../storage/AssetCredentialStore';
@@ -23,6 +24,7 @@ export class AppClient {
 
   readonly sessionManager: AuthSessionManager;
   readonly apiService: ApiService;
+  readonly fileImages: FileImageService;
   private restorePromise?: Promise<void>;
   private restoreStarted: boolean = false;
   private restoreVersion: number = 0;
@@ -35,6 +37,7 @@ export class AppClient {
     const expiredHandler = new SessionExpiredHandler();
     const httpClient = new HttpClient(authInterceptor, expiredHandler);
     this.apiService = new ApiService(httpClient);
+    this.fileImages = new FileImageService(httpClient);
     this.sessionManager = new AuthSessionManager(httpClient, credentialStore, environment.name, this.apiService);
     expiredHandler.bind(this.sessionManager);
     this.restoreVersion = this.sessionManager.getSessionVersion();

@@ -136,6 +136,40 @@ function nativeSessionApi(accessToken = 'restored-access', nextRefreshToken = 'r
   };
 }
 
+test('role notification waits for in-flight renewal and preserves the rotated credential', async () => {
+  let resolve;
+  const controller = tokenController(), store = new MemoryCredentialStore();
+  const api = nativeSessionApi();
+  api.refresh = () => new Promise(done => { resolve = done; });
+  const manager = new AuthSessionManager(controller, store, EnvironmentName.DEV, api);
+  await manager.signIn('test-access', 'test-refresh');
+  const epoch = manager.getSessionVersion();
+  const renewal = manager.refreshAccessToken();
+  await new Promise(setImmediate);
+  const changed = manager.notifyIdentityChanged();
+  assert.equal(manager.getSessionVersion(), epoch);
+  resolve({ accessToken: 'new-access', refreshToken: 'new-refresh' });
+  assert.equal(await renewal, true); assert.equal(await changed, true);
+  assert.equal(manager.getSessionVersion(), epoch + 1);
+  assert.equal(controller.token, 'new-access'); assert.equal(store.credential.refreshToken, 'new-refresh');
+});
+
+test('logout while role notification waits for renewal cannot resurrect a session', async () => {
+  let resolve;
+  const store = new MemoryCredentialStore(), api = nativeSessionApi();
+  api.refresh = () => new Promise(done => { resolve = done; });
+  const manager = new AuthSessionManager(tokenController(), store, EnvironmentName.DEV, api);
+  await manager.signIn('test-access', 'test-refresh');
+  const renewal = manager.refreshAccessToken();
+  const rejected = assert.rejects(renewal);
+  await new Promise(setImmediate);
+  const changed = manager.notifyIdentityChanged();
+  await manager.signOut();
+  resolve({ accessToken: 'old-access', refreshToken: 'old-refresh' });
+  await rejected; assert.equal(await changed, false);
+  assert.equal(manager.isAuthenticated(), false); assert.equal(store.credential, null);
+});
+
 test('Asset Store keeps an environment-scoped, local, encrypted token record', async () => {
   assets.clear();
   assetCalls.add.length = assetCalls.query.length = assetCalls.remove.length = 0;
@@ -224,7 +258,7 @@ test('application session restore deduplicates concurrency and retries after a t
   assetQueryError = null;
   const store = new AssetCredentialStore('dev', 'portra:dev');
   await store.save({ refreshToken: 'retry-token', environment: 'dev' });
-  const retry = AppClient.shared.restoreSession();
+  const retry = AppClient.shared.sessionManager.restore(AppClient.shared.sessionManager.beginRestore());
   assert.notEqual(retry, first);
   const previousCallCount = calls.length;
   await new Promise(resolve => setImmediate(resolve));
@@ -275,6 +309,7 @@ test('concurrent expiration clears the credential once', async () => {
   assert.equal(controller.token, '');
   releaseClear();
   assert.equal(await first, true);
+  assert.equal(await second, true);
 });
 
 test('401 and 40101 try refresh and expire a rejected session; 403 does not refresh', async () => {

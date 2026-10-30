@@ -6,33 +6,45 @@ import { HallTextFormatter } from '../HallUiModels';
 
 @Component
 export struct PortraPublishBanner {
+  @Prop role: string = '';
+  @Prop roleLoading: boolean = false;
+  @Prop roleError: string = '';
   onPublish?: () => void;
+  onRetryRole?: () => void;
 
   build() {
     Column() {
-      Text('想拍，现在就开始')
-        .width('100%')
-        .fontSize(PortraTheme.fontHero)
-        .fontWeight(FontWeight.Bold)
-        .fontColor('#18150D')
-        .maxLines(2)
-      Text('找到合适的摄影师，分享你的拍摄灵感')
-        .width('100%')
-        .fontSize(PortraTheme.fontBodySmall)
-        .fontColor('#776525')
-        .margin({ top: PortraTheme.spacingXs })
-        .maxLines(2)
-      Button('发布拍摄需求')
-        .height(36)
-        .padding({ left: 15, right: 15 })
-        .fontSize(13)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(PortraTheme.white)
-        .backgroundColor(PortraTheme.primary)
-        .borderRadius(PortraTheme.radiusPill)
-        .margin({ top: PortraTheme.spacingMd })
-        .alignSelf(ItemAlign.Start)
-        .onClick(() => this.onPublish?.())
+      if (this.roleLoading) {
+        Text('正在确认当前身份')
+          .width('100%').fontSize(PortraTheme.fontHero).fontWeight(FontWeight.Bold).fontColor('#18150D')
+        Text('正在同步账号权限，请稍候')
+          .width('100%').fontSize(PortraTheme.fontBodySmall).fontColor('#776525')
+          .margin({ top: PortraTheme.spacingXs })
+        Button('确认中…').height(36).enabled(false).margin({ top: PortraTheme.spacingMd })
+      } else if (this.roleError.length > 0) {
+        Text('暂时无法确认身份')
+          .width('100%').fontSize(PortraTheme.fontHero).fontWeight(FontWeight.Bold).fontColor('#18150D')
+        Text(this.roleError)
+          .width('100%').fontSize(PortraTheme.fontBodySmall).fontColor('#776525')
+          .margin({ top: PortraTheme.spacingXs }).maxLines(2)
+        Button('重试读取身份')
+          .height(36).padding({ left: 15, right: 15 }).fontSize(13)
+          .fontColor(PortraTheme.white).backgroundColor(PortraTheme.primary)
+          .borderRadius(PortraTheme.radiusPill).margin({ top: PortraTheme.spacingMd })
+          .alignSelf(ItemAlign.Start).onClick(() => this.onRetryRole?.())
+      } else {
+        Text(this.role === 'PROVIDER' ? '展示作品，开始接单' : this.role === 'CUSTOMER' ? '想拍，现在就开始' : '登录，开启拍摄之旅')
+          .width('100%').fontSize(PortraTheme.fontHero).fontWeight(FontWeight.Bold)
+          .fontColor('#18150D').maxLines(2)
+        Text(this.role === 'PROVIDER' ? '发布摄影橱窗，让约拍用户找到你' : this.role === 'CUSTOMER' ? '找到合适的摄影师，分享你的拍摄灵感' : '登录后确认身份，继续浏览公开内容')
+          .width('100%').fontSize(PortraTheme.fontBodySmall).fontColor('#776525')
+          .margin({ top: PortraTheme.spacingXs }).maxLines(2)
+        Button(this.role === 'PROVIDER' ? '发布摄影橱窗' : this.role === 'CUSTOMER' ? '发布拍摄需求' : '登录后发布')
+          .height(36).padding({ left: 15, right: 15 }).fontSize(13).fontWeight(FontWeight.Medium)
+          .fontColor(PortraTheme.white).backgroundColor(PortraTheme.primary)
+          .borderRadius(PortraTheme.radiusPill).margin({ top: PortraTheme.spacingMd })
+          .alignSelf(ItemAlign.Start).onClick(() => this.onPublish?.())
+      }
     }
     .width('100%')
     .constraintSize({ minHeight: 132 })
@@ -48,6 +60,7 @@ export struct PortraPublishBanner {
 @Component
 export struct ShowcaseCard {
   @Prop item: ServicePackageSummary;
+  onOpenAuthor?: (userId: number, role: string) => void;
   onOpen?: (serviceId: number) => void;
 
   private coverSource(): string {
@@ -69,6 +82,7 @@ export struct ShowcaseCard {
       Stack({ alignContent: Alignment.TopStart }) {
         PortraImage({
           source: this.coverSource(),
+          fileId: this.item.coverPortfolioId ?? this.item.portfolioIds?.[0] ?? 0,
           imageWidth: '100%',
           imageHeight: 190,
           cornerRadius: 0,
@@ -131,6 +145,7 @@ export struct ShowcaseCard {
         Row({ space: 7 }) {
           PortraAvatar({
             source: this.item.photographerAvatarUrl ?? '',
+            fileId: this.item.photographerAvatarFileId ?? 0,
             displayName: this.item.photographerNickname ?? '',
             avatarSize: 26
           })
@@ -141,6 +156,8 @@ export struct ShowcaseCard {
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
+        .onTouch((event: TouchEvent) => event.stopPropagation())
+        .onClick(() => { const id = this.item.providerId ?? this.item.photographerId ?? 0; if (id > 0) { this.onOpenAuthor?.(id, 'PROVIDER'); } })
         .width('100%')
         .padding({ top: 6 })
         .border({ width: { top: 1 }, color: '#13211F24' })
@@ -163,6 +180,7 @@ export struct ShowcaseCard {
 @Component
 export struct DemandCard {
   @Prop item: DemandSummary;
+  onOpenAuthor?: (userId: number, role: string) => void;
   onOpen?: (demandId: number) => void;
 
   private firstUrl(values: (string | undefined)[]): string {
@@ -196,6 +214,7 @@ export struct DemandCard {
     Row() {
       PortraImage({
         source: this.coverSource(),
+        fileId: this.item.referenceFileIds?.[0] ?? 0,
         imageWidth: 108,
         imageHeight: 148,
         cornerRadius: 0,
@@ -209,6 +228,7 @@ export struct DemandCard {
         Row({ space: 7 }) {
           PortraAvatar({
             source: this.avatarSource(),
+            fileId: this.item.customerAvatarFileId ?? 0,
             displayName: this.item.customerNickname ?? '',
             avatarSize: 24
           })
@@ -229,6 +249,8 @@ export struct DemandCard {
             .backgroundColor(PortraTheme.accentSoft)
             .borderRadius(PortraTheme.spacingSm)
         }
+        .onTouch((event: TouchEvent) => event.stopPropagation())
+        .onClick(() => { if ((this.item.customerId ?? 0) > 0) { this.onOpenAuthor?.(this.item.customerId as number, 'CUSTOMER'); } })
         .width('100%')
         Text(HallTextFormatter.nonEmpty(this.item.scene, '拍摄需求'))
           .width('100%')

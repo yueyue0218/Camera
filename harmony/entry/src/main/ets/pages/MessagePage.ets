@@ -12,6 +12,21 @@ import { PortraTheme } from '../theme/PortraTheme';
 
 @Component
 export struct MessagePage {
+  @Prop @Watch('refreshTab') activeTab: boolean = true;
+  @Prop @Watch('reloadWhenActive') sessionEpoch: number = 0;
+  private loadedSessionVersion: number = -1;
+
+  private reloadWhenActive(): void {
+    if (this.activeTab) { this.load(); }
+  }
+
+  private refreshTab(): void {
+    if (this.activeTab && this.loadedSessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
+      this.load();
+    }
+  }
+
+  @State private requiresLogin: boolean = false;
   @State private selectedTab: number = 0;
   @State private loading: boolean = true;
   @State private errorMessage: string = '';
@@ -40,13 +55,17 @@ export struct MessagePage {
   }
 
   private async load(): Promise<void> {
+    this.loadedSessionVersion = this.appClient.sessionManager.getSessionVersion();
     const version = ++this.requestVersion;
     this.loading = true;
     this.errorMessage = '';
     this.conversations = [];
+    this.requiresLogin = !this.appClient.sessionManager.isAuthenticated();
+    if (this.requiresLogin) { this.loading = false; return; }
+    const sessionVersion = this.loadedSessionVersion;
     try {
       const result = await this.appClient.apiService.listConversations();
-      if (version === this.requestVersion) {
+      if (version === this.requestVersion && sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
         if (!Array.isArray(result)) {
           this.errorMessage = '会话数据格式异常';
         } else {
@@ -54,11 +73,13 @@ export struct MessagePage {
         }
       }
     } catch (error) {
-      if (version === this.requestVersion) {
-        this.errorMessage = (error as PortraError).message || '消息加载失败';
+      if (version === this.requestVersion && sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
+        const mapped = error as PortraError;
+        this.requiresLogin = mapped.httpStatus === 401 || mapped.businessCode === 40101;
+        this.errorMessage = mapped.message || '消息加载失败';
       }
     } finally {
-      if (version === this.requestVersion) {
+      if (version === this.requestVersion && sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
         this.loading = false;
       }
     }
@@ -141,10 +162,12 @@ export struct MessagePage {
       .border({ width: { bottom: 1 }, color: PortraTheme.border })
       }
 
-      if (this.selectedTab === 1) {
+      if (this.selectedTab === 1 && this.activeTab) {
         NotificationPage({ onBack: () => this.selectedTab = 0, onOpenMoment: this.onOpenMoment,
           onOpenCredit: this.onOpenCredit, onOpenOrders: this.onOpenOrders, onOpenTarget: this.onOpenTarget, onRequireLogin: this.onRequireLogin })
           .layoutWeight(1)
+      } else if (this.requiresLogin) {
+        Button('登录后查看消息').margin(24).onClick(() => this.onRequireLogin?.())
       } else if (this.loading) {
         PortraLoading({ label: '正在读取会话' })
       } else if (this.errorMessage.length > 0) {

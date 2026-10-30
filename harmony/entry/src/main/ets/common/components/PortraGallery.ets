@@ -12,6 +12,8 @@ export struct PortraGallery {
   @Prop @Watch('reset') fileIds: number[] = [];
   @Prop @Watch('reset') sources: string[] = [];
   @Prop moduleHeight: number = 332;
+  @Prop journal: boolean = false;
+  @Prop thumbnails: boolean = false;
   @State private index: number = 0;
   @State private previewOpen: boolean = false;
   @State private original: OriginalImageState = new OriginalImageState();
@@ -162,11 +164,39 @@ export struct PortraGallery {
 
   build() {
     Column({ space: 0 }) {
+      if (this.journal) {
+        if (this.thumbnails) {
+          Scroll() {
+            Row({ space: 9 }) {
+              ForEach(this.fileIds.length > 0 ? this.fileIds.map((id: number) => id.toString()) : this.sources,
+                (_key: string, position: number) => {
+                  PortraImage({ fileId: this.fileIds[position] ?? 0, source: this.fileIds.length > 0 ? '' : this.sources[position],
+                    imageWidth: 140, imageHeight: 180, cornerRadius: 11, contentDescription: `第 ${position + 1} 张图片` })
+                    .onClick(() => { this.index = position; this.open(); })
+                }, (key: string) => key)
+            }
+          }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
+          if (this.count() === 0) { Text('尚未添加参考图片').fontSize(12).fontColor('#9A938C').padding(20) }
+        } else {
+          Stack({ alignContent: Alignment.BottomEnd }) {
+            PortraImage({ fileId: this.fileIds[0] ?? 0, source: this.fileIds.length > 0 ? '' : (this.sources[0] ?? ''),
+              variant: 'medium', imageWidth: '100%', imageHeight: this.moduleHeight, cornerRadius: 18,
+              fallbackText: '尚未添加参考图片', contentDescription: '封面，点击查看全部图片' })
+            if (this.count() > 0) {
+              Text(`01 / ${this.count().toString().padStart(2, '0')} ↗`).fontSize(10).fontColor(Color.White)
+                .padding({ left: 10, right: 10, top: 7, bottom: 7 }).backgroundColor('#55302E2D')
+                .borderRadius(9).margin({ bottom: 13, right: 13 })
+            }
+          }.width('100%').height(this.moduleHeight).borderRadius(18).clip(true)
+            .onClick(() => { this.index = 0; this.open(); })
+        }
+      } else {
       PortraImage({ fileId: this.currentFileId(), source: this.currentSource(), variant: 'medium',
         contain: true, imageWidth: '100%', imageHeight: Math.max(1, this.moduleHeight - (this.count() > 0 ? 44 : 0)), fallbackText: '暂无图片',
         contentDescription: `第 ${this.index + 1} 张图片，点击查看大图`, allowInlineData: true })
         .onClick(() => this.open())
       if (this.count() > 0) { this.Controls(false) }
+      }
     }.width('100%')
     .bindContentCover($$this.previewOpen, this.Preview(), { modalTransition: ModalTransition.NONE,
       onWillDismiss: (action: DismissContentCoverAction) => {

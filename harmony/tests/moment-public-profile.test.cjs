@@ -20,7 +20,9 @@ function fixture() {
   let version = 3; const profiles = [], moments = [], cancellations = [];
   const app = { sessionManager: { getSessionVersion: () => version, isAuthenticated: () => true }, apiService: {
     getPublicProfile(id, role, key) { const p = deferred(); profiles.push({ id, role, key, ...p }); return p.promise; },
-    listProfileMoments(id, role, page, size, key) { const p = deferred(); moments.push({ id, role, page, size, key, ...p }); return p.promise; },
+    listPublicMoments(id, role, page, key) { const p = deferred(); moments.push({ id, role, page, size: 12, key, ...p }); return p.promise; },
+    async listPublicServices() { return { records: [], total: 0 }; },
+    async listPublicDemands() { return { records: [], total: 0 }; },
     cancelPublicProfile(profile, moments) { cancellations.push({ profile, moments }); }
   } };
   const filename = path.join(root, 'pages/PublicProfilePage.ets');
@@ -74,7 +76,7 @@ test('wrong user, role or malformed counters are never shown', async () => {
     assert.equal(f.page.profile, undefined); assert.ok(f.page.errorMessage.length > 0);
   }
 });
-test('each public page cancels only its own keys and legacy B card stays readonly', async () => {
+test('each public page cancels only its own keys and offers real moment detail navigation', async () => {
   const f = fixture(); const a = f.page.load(); const other = f.create(); const b = other.load();
   assert.notEqual(f.profiles[0].key, f.profiles[1].key);
   f.page.aboutToDisappear(); assert.equal(f.cancellations.at(-1).profile, f.profiles[0].key);
@@ -82,5 +84,5 @@ test('each public page cancels only its own keys and legacy B card stays readonl
   f.profiles[0].resolve(profile()); f.profiles[1].resolve(profile()); await tick();
   f.moments[0].resolve({ records: [], total: 0 }); await Promise.all([a, b]);
   const source = fs.readFileSync(path.join(root, 'pages/PublicProfilePage.ets'), 'utf8');
-  assert.match(source, /MomentCard\(\{ item: item \}\)/);
+  assert.match(source, /onOpenDetail:.*this\.onOpenMoment\?\.\(moment\.momentId\)/);
 });

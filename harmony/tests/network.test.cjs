@@ -217,7 +217,7 @@ test('business read-only pages use the existing API paths and authentication bou
   const detail = api.getDemand(12);
   let call = calls.at(-1);
   assert.equal(call.url, EnvironmentConfig.current().baseUrl + '/demands/12');
-  assert.equal(call.options.header.Authorization, undefined);
+  assert.equal(call.options.header.Authorization, 'Bearer current-token');
   complete(call, { demandId: 12, scene: '校园摄影' });
   assert.equal((await detail).demandId, 12);
 
@@ -305,7 +305,7 @@ test('appointment flow uses authenticated demand, conversation and quote endpoin
   const service = api.getServicePackage(21);
   const call = calls.at(-1);
   assert.equal(call.url, EnvironmentConfig.current().baseUrl + '/service-packages/21');
-  assert.equal(call.options.header.Authorization, undefined);
+  assert.equal(call.options.header.Authorization, 'Bearer appointment-token');
   complete(call, { serviceId: 21, title: '自然人像' });
   assert.equal((await service).serviceId, 21);
 });

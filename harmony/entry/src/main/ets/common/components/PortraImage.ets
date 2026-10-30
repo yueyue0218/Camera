@@ -1,14 +1,17 @@
+import { image } from '@kit.ImageKit';
+import { AppClient } from '../../app/AppClient';
+import { ImageLease, ImageVariant } from '../../network/FileImageService';
+import { PortraError } from '../../network/ErrorMapper';
 import { PortraTheme } from '../../theme/PortraTheme';
-import { InlineImagePolicy, PublicImagePolicy } from './ComponentPolicy';
+import { FileImagePolicy, InlineImagePolicy, PublicImagePolicy } from './ComponentPolicy';
 
-/**
- * Displays packaged resources or public HTTPS images. Callers rendering the
- * backend's explicit inline-image contract must opt in with allowInlineData.
- * Authenticated file downloads must be fetched by a credential-aware service and must not be passed as a URL here.
- */
+/** File IDs use the shared authenticated binary boundary; URL/inline sources retain ArkUI caching. */
 @Component
 export struct PortraImage {
-  @Prop source: ResourceStr = '';
+  @Prop @Watch('reload') source: ResourceStr = '';
+  @Prop @Watch('reload') fileId: number = 0;
+  @Prop @Watch('reload') variant: ImageVariant = 'thumbnail';
+  @Prop contain: boolean = false;
   @Prop imageWidth: Length = 160;
   @Prop imageHeight: Length = 120;
   @Prop cornerRadius: number = PortraTheme.radius;
@@ -16,6 +19,90 @@ export struct PortraImage {
   @Prop contentDescription: string = '图片';
   @Prop allowInlineData: boolean = false;
   @State private loadFailed: boolean = false;
+
+  @State private pixelMap: image.PixelMap | undefined = undefined;
+  @State private loading: boolean = false;
+  @State private failure: string = '';
+  private alive: boolean = false;
+  private generation: number = 0;
+  private lease?: ImageLease;
+  private readonly identityChanged: () => void = () => {
+    this.clearImage();
+    // HttpClient completes token replacement synchronously before this microtask.
+    Promise.resolve().then(() => this.reload());
+  };
+
+  aboutToAppear(): void {
+    this.alive = true;
+    AppClient.shared.fileImages.observe(this.identityChanged);
+    this.reload();
+  }
+
+  aboutToDisappear(): void {
+    this.alive = false;
+    AppClient.shared.fileImages.unobserve(this.identityChanged);
+    this.clearImage();
+  }
+
+  private clearImage(): void {
+    this.generation++;
+    this.lease?.release();
+    this.lease = undefined;
+    const old = this.pixelMap;
+    this.pixelMap = undefined;
+    old?.release().catch(() => {});
+  }
+
+  private async reload(): Promise<void> {
+    this.clearImage();
+    this.loadFailed = false;
+    this.failure = '';
+    this.loading = false;
+    if (!this.alive || this.resolvedFileId() === 0) { return; }
+    const version = this.generation;
+    const service = AppClient.shared.fileImages;
+    const epoch = service.epoch();
+    this.loading = true;
+    let decoder: image.ImageSource | undefined = undefined;
+    let lease: ImageLease | undefined = undefined;
+    try {
+      lease = service.acquire(this.resolvedFileId(), this.variant);
+      this.lease = lease;
+      const bytes = await lease.promise;
+      if (!this.alive || version !== this.generation || epoch !== service.epoch()) { return; }
+      decoder = image.createImageSource(bytes);
+      const info = await decoder.getImageInfo();
+      // Bound decoded memory, including originals. Preserve aspect ratio.
+      const bound = this.variant === 'thumbnail' ? 512 : (this.variant === 'medium' ? 1600 : 2560);
+      const scale = Math.min(1, bound / Math.max(info.size.width, info.size.height));
+      const pixels = await decoder.createPixelMap({ desiredSize: {
+        width: Math.max(1, Math.round(info.size.width * scale)),
+        height: Math.max(1, Math.round(info.size.height * scale))
+      } });
+      if (!this.alive || version !== this.generation || epoch !== service.epoch()) {
+        await pixels.release();
+        return;
+      }
+      this.pixelMap = pixels;
+    } catch (error) {
+      if (this.alive && version === this.generation && epoch === service.epoch()) {
+        const mapped = error as PortraError;
+        this.failure = mapped.httpStatus === 403 || mapped.businessCode === 40301 ? '无权限查看图片' :
+          (mapped.httpStatus === 404 || mapped.businessCode === 40401 ? '图片不存在' :
+          (mapped.httpStatus === 401 || mapped.businessCode === 40101 ? '请登录后查看图片' : '图片加载失败'));
+        this.loadFailed = true;
+      }
+    } finally {
+      decoder?.release().catch(() => {});
+      lease?.release();
+      if (version === this.generation) { this.loading = false; }
+    }
+  }
+
+  private resolvedFileId(): number {
+    return this.fileId !== 0 ? this.fileId :
+      (typeof this.source === 'string' ? FileImagePolicy.id(this.source) : 0);
+  }
 
   private canLoad(): boolean {
     if (typeof this.source !== 'string') {
@@ -26,11 +113,16 @@ export struct PortraImage {
 
   build() {
     Stack() {
-      if (this.canLoad()) {
+      if (this.resolvedFileId() !== 0 && this.pixelMap !== undefined) {
+        Image(this.pixelMap)
+          .width('100%').height('100%')
+          .objectFit(this.contain ? ImageFit.Contain : ImageFit.Cover)
+          .accessibilityText(this.contentDescription)
+      } else if (this.resolvedFileId() === 0 && this.canLoad()) {
         Image(this.source)
           .width('100%')
           .height('100%')
-          .objectFit(ImageFit.Cover)
+          .objectFit(this.contain ? ImageFit.Contain : ImageFit.Cover)
           .opacity(this.loadFailed ? 0 : 1)
           .accessibilityText(this.contentDescription)
           .onComplete(() => {
@@ -41,7 +133,15 @@ export struct PortraImage {
           })
       }
 
-      if (!this.canLoad() || this.loadFailed) {
+      if (this.loading) {
+        Text('图片加载中').fontSize(12).fontColor(PortraTheme.secondaryText)
+      } else if (this.resolvedFileId() !== 0 && this.loadFailed) {
+        Column({ space: 4 }) {
+          Text(this.failure).fontSize(12).fontColor(PortraTheme.secondaryText)
+          Button('重试图片').fontSize(11).height(28)
+            .onClick(() => this.reload())
+        }
+      } else if (this.resolvedFileId() === 0 && (!this.canLoad() || this.loadFailed)) {
         Text(this.fallbackText)
           .fontSize(12)
           .fontColor(PortraTheme.secondaryText)

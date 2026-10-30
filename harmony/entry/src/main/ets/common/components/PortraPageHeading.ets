@@ -8,6 +8,7 @@ export struct PortraPageHeading {
 
   build() {
     Row({ space: 12 }) {
+      if (this.onBack !== undefined) {
       Button('‹')
         .width(36)
         .height(36)
@@ -17,6 +18,7 @@ export struct PortraPageHeading {
         .borderRadius(18)
         .accessibilityText('返回')
         .onClick(() => this.onBack?.())
+      }
       Column({ space: 2 }) {
         if (this.eyebrow.length > 0) {
           Text(this.eyebrow)
