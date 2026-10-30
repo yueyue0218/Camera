@@ -84,7 +84,7 @@ export struct OrderPage {
 
   build() {
     Column() {
-      PortraPageHeading({ title: '我的订单', eyebrow: 'ORDERS / PORTRA', onBack: this.onBack })
+      PortraPageHeading({ title: '我的约拍', eyebrow: '', onBack: this.onBack })
       Row({ space: 8 }) {
         this.FilterTab('全部', 0)
         this.FilterTab('进行中', 1)
@@ -105,7 +105,8 @@ export struct OrderPage {
             ForEach(this.visibleOrders(), (item: OrderSummary) => {
               Column({ space: 13 }) {
                 Row() {
-                  Text(item.orderNo || '约拍订单')
+                  Text([item.customerNickname, item.providerNickname].filter((name: string | undefined) =>
+                    typeof name === 'string' && name.trim().length > 0).join(' · ') || '约拍双方')
                     .layoutWeight(1)
                     .fontSize(12)
                     .fontColor(PortraTheme.secondaryText)
@@ -119,12 +120,11 @@ export struct OrderPage {
                 .width('100%')
                 Row() {
                   Column({ space: 5 }) {
-                    Text('约拍订单')
+                    Text('约拍')
                       .fontSize(17)
                       .fontWeight(FontWeight.Bold)
                       .fontColor(PortraTheme.primaryText)
-                    Text([item.customerNickname, item.providerNickname].filter((name: string | undefined) =>
-                      typeof name === 'string' && name.trim().length > 0).join(' · ') || '约拍双方')
+                    Text((item.shootStartTime ?? '').replace('T', ' ').slice(0, 16) || '拍摄时间待定')
                       .fontSize(12)
                       .fontColor(PortraTheme.secondaryText)
                       .maxLines(1)
@@ -142,7 +142,7 @@ export struct OrderPage {
                 .width('100%')
                 Divider().color(PortraTheme.border)
                 Row() {
-                  Text(typeof item.createdAt === 'string' ? item.createdAt.slice(0, 10) : '')
+                  Text(item.shootLocation ?? '')
                     .layoutWeight(1)
                     .fontSize(11)
                     .fontColor(PortraTheme.mutedText)

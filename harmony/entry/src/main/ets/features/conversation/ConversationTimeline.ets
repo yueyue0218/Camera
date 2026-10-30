@@ -1,9 +1,17 @@
-import { MessageSummary, OrderSummary, QuoteSummary } from '../../model/ApiModels';
+import { DeliverySummary, MessageSummary, OrderStatusLogSummary, OrderSummary, QuoteSummary } from '../../model/ApiModels';
 
 export enum TimelineKind {
   MESSAGE = 'message',
   QUOTE = 'quote',
-  ORDER = 'order'
+  ORDER = 'order',
+  FULFILLMENT = 'fulfillment'
+}
+
+export interface FulfillmentEvent {
+  readonly orderId: number;
+  readonly title: string;
+  readonly detail: string;
+  readonly openGallery: boolean;
 }
 
 export interface ConversationTimelineItem {
@@ -14,11 +22,13 @@ export interface ConversationTimelineItem {
   readonly message?: MessageSummary;
   readonly quote?: QuoteSummary;
   readonly order?: OrderSummary;
+  readonly event?: FulfillmentEvent;
 }
 
 /** One stable chronological stream; no synthetic backend events. */
 export class ConversationTimeline {
-  static build(messages: MessageSummary[], quotes: QuoteSummary[], orders: OrderSummary[] = []): ConversationTimelineItem[] {
+  static build(messages: MessageSummary[], quotes: QuoteSummary[], orders: OrderSummary[] = [],
+    logs: OrderStatusLogSummary[] = [], deliveries: DeliverySummary[] = []): ConversationTimelineItem[] {
     const items: ConversationTimelineItem[] = [];
     const knownQuotes = new Set<number>();
     quotes.forEach((quote: QuoteSummary) => {
@@ -37,6 +47,33 @@ export class ConversationTimeline {
         items.push({ key: `order:${order.orderId}`, kind: TimelineKind.ORDER,
           createdAt: order.createdAt ?? '', senderId: order.providerUserId ?? 0, order: order });
       }
+    });
+    const knownDeliveries = new Set<number>();
+    deliveries.forEach((batch: DeliverySummary) => {
+      const order = orders.find((item: OrderSummary) => item.orderId === batch.orderId);
+      if (order === undefined || !Number.isSafeInteger(batch.deliveryId) || batch.deliveryId <= 0 ||
+        knownDeliveries.has(batch.deliveryId)) return;
+      knownDeliveries.add(batch.deliveryId);
+      const imageCount = (batch.files ?? []).filter(file => file.fileType === 'IMAGE').length;
+      items.push({ key: `delivery:${batch.deliveryId}`, kind: TimelineKind.FULFILLMENT,
+        createdAt: batch.uploadTime ?? '', senderId: order.providerUserId ?? 0,
+        event: { orderId: order.orderId, title: batch.deliveryRound > 1 ? '返修作品已上传' : '作品已上传',
+          detail: `${imageCount} 张照片`, openGallery: true } });
+    });
+    const knownLogs = new Set<number>();
+    logs.forEach((log: OrderStatusLogSummary) => {
+      const order = orders.find((item: OrderSummary) => item.orderId === log.orderId);
+      if (order === undefined || !Number.isSafeInteger(log.logId) || log.logId! <= 0 ||
+        knownLogs.has(log.logId!)) return;
+      knownLogs.add(log.logId!);
+      const title = log.toStatus === 'REWORK_REQUIRED' ? '客户申请返修' :
+        log.toStatus === 'COMPLETED' ? '约拍已完成' :
+        log.toStatus === 'CANCELLED' || log.toStatus === 'REFUNDED' ? '约拍已取消' : '';
+      if (!title) return;
+      items.push({ key: `status:${log.logId}`, kind: TimelineKind.FULFILLMENT,
+        createdAt: log.createdAt ?? '', senderId: log.operatorId ?? 0,
+        event: { orderId: order.orderId, title: title, detail: '',
+          openGallery: log.toStatus === 'REWORK_REQUIRED' } });
     });
     const knownMessages = new Set<string>();
     messages.forEach((message: MessageSummary) => {

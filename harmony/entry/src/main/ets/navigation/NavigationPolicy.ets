@@ -16,6 +16,8 @@ export class NavigationPolicy {
     AppRoute.QUOTE_FORM,
     AppRoute.QUOTE_DETAIL,
     AppRoute.ORDER_DETAIL,
+    AppRoute.DELIVERY_GALLERY,
+    AppRoute.DELIVERY_UPLOAD,
     AppRoute.PUBLISH,
     AppRoute.MESSAGE,
     AppRoute.ORDER,
@@ -25,6 +27,7 @@ export class NavigationPolicy {
   static requiresAuthentication(route: AppRoute): boolean {
     return route === AppRoute.PUBLISH || route === AppRoute.CONVERSATION_DETAIL || route === AppRoute.MESSAGE ||
       route === AppRoute.QUOTE_FORM || route === AppRoute.QUOTE_DETAIL || route === AppRoute.ORDER_DETAIL ||
+      route === AppRoute.DELIVERY_GALLERY || route === AppRoute.DELIVERY_UPLOAD ||
       route === AppRoute.ORDER || route === AppRoute.PROFILE;
   }
 
@@ -38,6 +41,7 @@ export class NavigationPolicy {
           conversationId: param.conversationId,
           quoteId: param.quoteId,
           orderId: param.orderId,
+          deliveryId: param.deliveryId,
           openPayment: param.openPayment
         }
       };
@@ -108,6 +112,10 @@ export class NavigationPolicy {
         return '报价';
       case AppRoute.ORDER_DETAIL:
         return '订单详情';
+      case AppRoute.DELIVERY_GALLERY:
+        return '作品相册';
+      case AppRoute.DELIVERY_UPLOAD:
+        return '上传照片';
       case AppRoute.PUBLISH:
         return '发布需求';
       case AppRoute.MESSAGE:

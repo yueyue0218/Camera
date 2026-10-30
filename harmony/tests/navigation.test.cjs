@@ -22,10 +22,11 @@ const { NavigationClickGuard, NavigationPolicy } =
 test('all planned destinations have one stable route name', () => {
   assert.deepEqual(NavigationPolicy.routes, [
     AppRoute.LOGIN, AppRoute.HALL, AppRoute.DEMAND_DETAIL, AppRoute.SERVICE_DETAIL,
-    AppRoute.CONVERSATION_DETAIL, AppRoute.QUOTE_FORM, AppRoute.QUOTE_DETAIL, AppRoute.ORDER_DETAIL, AppRoute.PUBLISH,
+    AppRoute.CONVERSATION_DETAIL, AppRoute.QUOTE_FORM, AppRoute.QUOTE_DETAIL, AppRoute.ORDER_DETAIL,
+    AppRoute.DELIVERY_GALLERY, AppRoute.DELIVERY_UPLOAD, AppRoute.PUBLISH,
     AppRoute.MESSAGE, AppRoute.ORDER, AppRoute.PROFILE
   ]);
-  assert.equal(new Set(NavigationPolicy.routes).size, 12);
+  assert.equal(new Set(NavigationPolicy.routes).size, 14);
 });
 
 test('hall, public details and login remain public', () => {
@@ -39,6 +40,7 @@ test('hall, public details and login remain public', () => {
 test('protected guest destinations redirect to login and preserve the target', () => {
   for (const route of [AppRoute.PUBLISH, AppRoute.MESSAGE, AppRoute.CONVERSATION_DETAIL,
     AppRoute.QUOTE_FORM, AppRoute.QUOTE_DETAIL, AppRoute.ORDER_DETAIL,
+    AppRoute.DELIVERY_GALLERY, AppRoute.DELIVERY_UPLOAD,
     AppRoute.ORDER, AppRoute.PROFILE]) {
     const result = NavigationPolicy.resolve(route, {}, false);
     assert.equal(result.route, AppRoute.LOGIN);
@@ -50,6 +52,7 @@ test('protected guest destinations redirect to login and preserve the target', (
 test('authenticated sessions can enter protected destinations', () => {
   for (const route of [AppRoute.PUBLISH, AppRoute.MESSAGE, AppRoute.CONVERSATION_DETAIL,
     AppRoute.QUOTE_FORM, AppRoute.QUOTE_DETAIL, AppRoute.ORDER_DETAIL,
+    AppRoute.DELIVERY_GALLERY, AppRoute.DELIVERY_UPLOAD,
     AppRoute.ORDER, AppRoute.PROFILE]) {
     const result = NavigationPolicy.resolve(route, {}, true);
     assert.equal(result.route, route);

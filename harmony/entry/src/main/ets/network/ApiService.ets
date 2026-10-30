@@ -2,13 +2,14 @@ import { NativeSessionApi } from '../auth/NativeSessionApi';
 import { AcceptedDemandResponse, ConfirmQuoteResult, ConversationSummary, CreateDemandPayload,
   CreateDemandResponsePayload, CreateQuotePayload, CreateReportPayload, CreateServicePackagePayload,
   CreateServicePackageResult,
-  DemandListQuery, DemandResponseSummary, DemandSummary, MessageSummary, NativeRefreshRequest, NativeSessionResponse,
+  DemandListQuery, DemandResponseSummary, DemandSummary, DeliverySummary, MessageSummary, NativeRefreshRequest,
+  NativeSessionResponse,
   FollowState, MockPaymentPayload, MomentSummary, OrderStatusLogSummary, OrderSummary, PageResult, PaymentResult,
   ProfileMomentPage, PublicUserProfile, QuoteSummary, RejectQuotePayload, RejectQuoteResult,
   ReportSummary, SendSmsCodeRequest, ServicePackageDetail, ServicePackageInterest, ServicePackageListQuery,
   ServicePackageSummary, SocialUserBrief, SwitchRolePayload, SwitchRoleResult, UserProfileSummary,
   SendTextMessagePayload, SessionSummary, StartServiceChatPayload, StartServiceChatResult,
-  VerifyNativeSmsCodeRequest } from '../model/ApiModels';
+  OrderTransitionPayload, ReworkPayload, StatusTransitionResult, VerifyNativeSmsCodeRequest } from '../model/ApiModels';
 import { UserBrief } from '../model/ApiModels';
 import { ErrorMapper } from './ErrorMapper';
 import { HttpClient } from './HttpClient';
@@ -409,6 +410,37 @@ export class ApiService implements NativeSessionApi {
     return this.client.get<OrderStatusLogSummary[]>(`/orders/${orderId}/status-logs`, `orders.${orderId}.logs`);
   }
 
+  listDeliveries(orderId: number): Promise<DeliverySummary[]> {
+    return this.client.get<DeliverySummary[]>(`/orders/${orderId}/deliveries`, `orders.${orderId}.deliveries`);
+  }
+
+  getDeliveryImage(fileId: number, variant: 'thumbnail' | 'medium'): Promise<ArrayBuffer> {
+    if (!Number.isSafeInteger(fileId) || fileId <= 0) return Promise.reject(ErrorMapper.parse());
+    return this.client.getBinary(`/files/${fileId}/${variant}`, `delivery.${fileId}.${variant}`,
+      variant === 'thumbnail' ? 2 * 1024 * 1024 : 12 * 1024 * 1024);
+  }
+
+  cancelDeliveryImage(fileId: number, variant: 'thumbnail' | 'medium'): void {
+    this.client.cancelRequest(`delivery.${fileId}.${variant}`);
+  }
+
+  cancelOrder(orderId: number): Promise<StatusTransitionResult> {
+    return this.client.post<StatusTransitionResult>(`/orders/${orderId}/cancel`, undefined,
+      `orders.${orderId}.cancel`);
+  }
+
+  requestRework(orderId: number, reason: string): Promise<StatusTransitionResult> {
+    const payload: ReworkPayload = { reason: reason };
+    return this.client.post<StatusTransitionResult>(`/orders/${orderId}/request-rework`, payload,
+      `orders.${orderId}.rework`);
+  }
+
+  confirmReceipt(orderId: number): Promise<StatusTransitionResult> {
+    const payload: OrderTransitionPayload = { targetStatus: 'COMPLETED', reason: '客户确认收片' };
+    return this.client.post<StatusTransitionResult>(`/orders/${orderId}/status-transitions`,
+      payload, `orders.${orderId}.receipt`);
+  }
+
   async mockPay(orderId: number, amountCent: number): Promise<PaymentResult> {
     const payload: MockPaymentPayload = { payMethod: 'MOCK_PAY', amountCent: amountCent };
     const result = await this.client.post<PaymentResult>(`/orders/${orderId}/payments`,
@@ -425,6 +457,7 @@ export class ApiService implements NativeSessionApi {
     this.client.cancelRequest(`orders.${orderId}.detail`);
     this.client.cancelRequest(`orders.${orderId}.logs`);
     this.client.cancelRequest(`orders.${orderId}.payment`);
+    this.client.cancelRequest(`orders.${orderId}.deliveries`);
   }
 
   cancelOrders(): void {

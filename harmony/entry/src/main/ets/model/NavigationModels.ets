@@ -7,6 +7,8 @@ export enum AppRoute {
   QUOTE_FORM = 'QuoteForm',
   QUOTE_DETAIL = 'QuoteDetail',
   ORDER_DETAIL = 'OrderDetail',
+  DELIVERY_GALLERY = 'DeliveryGallery',
+  DELIVERY_UPLOAD = 'DeliveryUpload',
   PUBLISH = 'Publish',
   MESSAGE = 'Message',
   ORDER = 'Order',
@@ -23,6 +25,7 @@ export interface NavigationRouteParam {
   readonly conversationId?: number;
   readonly quoteId?: number;
   readonly orderId?: number;
+  readonly deliveryId?: number;
   readonly openPayment?: boolean;
   /** Protected destination requested before authentication. */
   readonly returnRoute?: AppRoute;

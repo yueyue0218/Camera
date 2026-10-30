@@ -9,6 +9,8 @@ export struct OrderEventCard {
   @Prop userId: number = 0;
   onOpen?: () => void;
   onPay?: () => void;
+  onOpenGallery?: () => void;
+  onOpenUpload?: () => void;
 
   build() {
     Column({ space: 9 }) {
@@ -30,6 +32,13 @@ export struct OrderEventCard {
         if (OrderWorkflow.canPay(this.order, this.userId)) {
           Button('确认支付').height(42).backgroundColor(PortraTheme.primary)
             .onClick(() => this.onPay?.())
+        } else if (OrderWorkflow.canUpload(this.order, this.userId)) {
+          Button(this.order.status === 'REWORK_REQUIRED' ? '重新上传' : '上传照片')
+            .height(42).backgroundColor(PortraTheme.primary)
+            .onClick(() => this.onOpenUpload?.())
+        } else if (OrderWorkflow.hasGallery(this.order)) {
+          Button('查看照片').height(42).backgroundColor(PortraTheme.primary)
+            .onClick(() => this.onOpenGallery?.())
         }
       }
     }

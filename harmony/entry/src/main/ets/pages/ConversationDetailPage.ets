@@ -13,10 +13,12 @@ import { ConversationTextSender } from '../features/conversation/ConversationTex
 import { ConversationTimeline, ConversationTimelineItem, TimelineKind } from '../features/conversation/ConversationTimeline';
 import { QuoteEventCard } from '../features/conversation/QuoteEventCard';
 import { OrderEventCard } from '../features/conversation/OrderEventCard';
+import { FulfillmentEventCard } from '../features/conversation/FulfillmentEventCard';
 import { OrderWorkflow } from '../features/conversation/OrderWorkflow';
 import { QuoteWorkflow } from '../features/conversation/QuoteWorkflow';
 import { TextMessageBubble } from '../features/conversation/TextMessageBubble';
-import { ConversationSummary, MessageSummary, OrderSummary, QuoteSummary } from '../model/ApiModels';
+import { ConversationSummary, DeliverySummary, MessageSummary, OrderStatusLogSummary, OrderSummary,
+  QuoteSummary } from '../model/ApiModels';
 import { PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
 
@@ -29,10 +31,12 @@ export struct ConversationDetailPage {
   @State private actionError: string = '';
   @State private conversation: ConversationSummary | null = null;
   @State private userId: number = 0;
-  @State private peerName: string = '约拍会话';
+  @State private peerName: string = '聊天';
   @State private messages: MessageSummary[] = [];
   @State private quotes: QuoteSummary[] = [];
   @State private orders: OrderSummary[] = [];
+  @State private orderLogs: OrderStatusLogSummary[] = [];
+  @State private deliveries: DeliverySummary[] = [];
   @State private draft: string = '';
   @State private uncertainResendId: number = 0;
   private readonly appClient: AppClient = AppClient.shared;
@@ -43,6 +47,7 @@ export struct ConversationDetailPage {
   private draftTimer: number = -1;
   private scrollTimer: number = -1;
   private visible: boolean = false;
+  private orderSignature: string = '';
   private readonly threadScroller: Scroller = new Scroller();
   private previousKeyboardAvoidMode?: KeyboardAvoidMode;
   onBack?: () => void;
@@ -50,6 +55,8 @@ export struct ConversationDetailPage {
   onOpenQuote?: (quoteId: number) => void;
   onOpenOrder?: (orderId: number) => void;
   onPayOrder?: (orderId: number) => void;
+  onOpenGallery?: (orderId: number) => void;
+  onOpenUpload?: (orderId: number) => void;
 
   aboutToAppear(): void {
     this.busy = false;
@@ -103,8 +110,11 @@ export struct ConversationDetailPage {
     this.messages = [];
     this.quotes = [];
     this.orders = [];
+    this.orderLogs = [];
+    this.deliveries = [];
+    this.orderSignature = '';
     this.draft = '';
-    this.peerName = '约拍会话';
+    this.peerName = '聊天';
     this.busy = false;
   }
 
@@ -225,7 +235,26 @@ export struct ConversationDetailPage {
     try {
       const orders = await this.appClient.apiService.listOrders();
       if (this.visible && version === this.requestVersion && Array.isArray(orders)) {
-        this.orders = OrderWorkflow.inConversation(orders, this.conversationId);
+        const current = OrderWorkflow.inConversation(orders, this.conversationId);
+        const signature = current.map((order: OrderSummary) => `${order.orderId}:${order.status}`).join('|');
+        this.orders = current;
+        if (signature === this.orderSignature) return;
+        const logs: OrderStatusLogSummary[] = [];
+        const deliveries: DeliverySummary[] = [];
+        let complete = true;
+        for (const order of current) {
+          try {
+            const result = await Promise.all([this.appClient.apiService.getOrderStatusLogs(order.orderId),
+              this.appClient.apiService.listDeliveries(order.orderId)]);
+            if (Array.isArray(result[0])) logs.push(...result[0] as OrderStatusLogSummary[]);
+            if (Array.isArray(result[1])) deliveries.push(...result[1] as DeliverySummary[]);
+          } catch { complete = false; }
+        }
+        if (this.visible && version === this.requestVersion) {
+          this.orderLogs = logs;
+          this.deliveries = deliveries;
+          if (complete) this.orderSignature = signature;
+        }
       }
     } catch {
       // Messages and quotes remain usable while order updates are unavailable.
@@ -325,7 +354,13 @@ export struct ConversationDetailPage {
         } else if (item.kind === TimelineKind.ORDER && item.order !== undefined) {
           OrderEventCard({ order: item.order, userId: this.userId,
             onOpen: () => this.onOpenOrder?.(item.order!.orderId),
-            onPay: () => this.onPayOrder?.(item.order!.orderId) })
+            onPay: () => this.onPayOrder?.(item.order!.orderId),
+            onOpenGallery: () => this.onOpenGallery?.(item.order!.orderId),
+            onOpenUpload: () => this.onOpenUpload?.(item.order!.orderId) })
+        } else if (item.kind === TimelineKind.FULFILLMENT && item.event !== undefined) {
+          FulfillmentEventCard({ event: item.event,
+            onOpen: () => item.event!.openGallery ? this.onOpenGallery?.(item.event!.orderId) :
+              this.onOpenOrder?.(item.event!.orderId) })
         } else if (item.message !== undefined) {
           if (item.message.messageType === 'TEXT') {
             TextMessageBubble({ text: item.message.content ?? '', mine: item.senderId === this.userId })
@@ -363,9 +398,9 @@ export struct ConversationDetailPage {
 
   build() {
     Column() {
-      PortraPageHeading({ title: this.peerName, eyebrow: 'CONVERSATION', onBack: this.onBack })
+      PortraPageHeading({ title: this.peerName, eyebrow: '', onBack: this.onBack })
       if (this.loading) {
-        PortraLoading({ label: '正在加载会话' })
+        PortraLoading({ label: '正在打开聊天' })
       } else if (this.errorMessage.length > 0) {
         PortraErrorView({ message: this.errorMessage, onRetry: () => this.initialize() })
       } else {
@@ -382,7 +417,8 @@ export struct ConversationDetailPage {
                 .fontSize(13).fontColor(PortraTheme.secondaryText)
                 .width('100%').textAlign(TextAlign.Center).padding(24)
             }
-            ForEach(ConversationTimeline.build(this.messages, this.quotes, this.orders), (item: ConversationTimelineItem) => {
+            ForEach(ConversationTimeline.build(this.messages, this.quotes, this.orders,
+              this.orderLogs, this.deliveries), (item: ConversationTimelineItem) => {
               this.TimelineRow(item)
             }, (item: ConversationTimelineItem) => item.key)
             if (this.conversation?.participantBId === this.userId) {

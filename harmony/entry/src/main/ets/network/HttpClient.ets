@@ -40,7 +40,7 @@ export class HttpClient implements AuthTokenController {
     return this.request<T>(http.RequestMethod.GET, path, requestKey, false);
   }
 
-  async getBinary(path: string, requestKey: string = path): Promise<ArrayBuffer> {
+  async getBinary(path: string, requestKey: string = path, maxBytes: number = 2 * 1024 * 1024): Promise<ArrayBuffer> {
     const profile = EnvironmentConfig.current();
     if (!EnvironmentConfig.isUsable(profile) || !path.startsWith('/') || path.startsWith('//') ||
       /[\\\s#]/.test(path)) throw ErrorMapper.config('图片地址不可用');
@@ -48,13 +48,13 @@ export class HttpClient implements AuthTokenController {
     const requestVersion = this.beginRequest(requestKey, request);
     const authorization = this.authInterceptor.authorizationHeader();
     try {
-      if (!authorization) throw ErrorMapper.config('登录后才能读取头像');
+      if (!authorization) throw ErrorMapper.config('登录后才能查看照片');
       const response = await request.request(this.buildUrl(profile.baseUrl, path), {
         method: http.RequestMethod.GET,
         header: { 'Authorization': authorization },
         expectDataType: http.HttpDataType.ARRAY_BUFFER,
         connectTimeout: 10000,
-        readTimeout: 15000,
+        readTimeout: maxBytes > 2 * 1024 * 1024 ? 30000 : 15000,
         maxRedirects: 0,
         usingCache: false
       });
@@ -64,7 +64,7 @@ export class HttpClient implements AuthTokenController {
         await this.handleAuthenticationExpired(mappedError);
         throw mappedError;
       }
-      if (!(response.result instanceof ArrayBuffer) || response.result.byteLength > 2 * 1024 * 1024) {
+      if (!(response.result instanceof ArrayBuffer) || response.result.byteLength > maxBytes) {
         throw ErrorMapper.parse();
       }
       return response.result;

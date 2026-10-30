@@ -19,6 +19,7 @@ export struct OrderDetailPage {
   @State private loading: boolean = true;
   @State private busy: boolean = false;
   @State private showPay: boolean = false;
+  @State private showCancel: boolean = false;
   @State private errorMessage: string = '';
   @State private notice: string = '';
   @State private paymentUncertain: boolean = false;
@@ -28,6 +29,8 @@ export struct OrderDetailPage {
   private active: boolean = false;
   onBack?: () => void;
   onOpenConversation?: (conversationId: number) => void;
+  onOpenGallery?: () => void;
+  onOpenUpload?: () => void;
 
   aboutToAppear(): void {
     this.active = true;
@@ -113,6 +116,23 @@ export struct OrderDetailPage {
     }
   }
 
+  private async cancel(): Promise<void> {
+    if (this.busy || this.order === null || this.paymentUncertain ||
+      !OrderWorkflow.canCancel(this.order, this.userId)) return;
+    this.busy = true;
+    this.errorMessage = '';
+    try {
+      await this.api.cancelOrder(this.orderId);
+      this.showCancel = false;
+      await this.load();
+      this.notice = '约拍已取消';
+    } catch (error) {
+      const message = (error as PortraError).message || '操作未完成，请重试';
+      await this.load();
+      this.errorMessage = message;
+    } finally { this.busy = false; }
+  }
+
   @Builder
   private Detail(label: string, value: string) {
     Row({ space: 12 }) {
@@ -142,6 +162,13 @@ export struct OrderDetailPage {
             this.Detail('拍摄时间', QuoteWorkflow.dateInput(this.order!.shootStartTime ?? ''))
             this.Detail('拍摄地点', this.order!.shootLocation ?? '待更新')
             this.Detail('约拍费用', OrderWorkflow.money(this.order!.amountCent))
+            if (OrderWorkflow.hasGallery(this.order!)) {
+              Button('查看照片').height(46).width('100%').onClick(() => this.onOpenGallery?.())
+            }
+            if (OrderWorkflow.canUpload(this.order!, this.userId)) {
+              Button(this.order!.status === 'REWORK_REQUIRED' ? '重新上传' : '上传照片')
+                .height(46).width('100%').onClick(() => this.onOpenUpload?.())
+            }
             Divider().color(PortraTheme.border)
             Text('订单进度').fontSize(17).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
             ForEach(this.logs, (log: OrderStatusLogSummary) => {
@@ -158,9 +185,13 @@ export struct OrderDetailPage {
               }.width('100%')
             })
             if (this.order!.conversationId !== undefined && this.order!.conversationId! > 0) {
-              Button('返回会话').height(44).backgroundColor(PortraTheme.surface)
+              Button('返回聊天').height(44).backgroundColor(PortraTheme.surface)
                 .fontColor(PortraTheme.primary).onClick(() =>
                   this.onOpenConversation?.(this.order!.conversationId!))
+            }
+            if (OrderWorkflow.canCancel(this.order!, this.userId) && !this.paymentUncertain) {
+              Button('取消约拍').height(44).backgroundColor(PortraTheme.surface)
+                .fontColor(PortraTheme.danger).enabled(!this.busy).onClick(() => this.showCancel = true)
             }
           }.width('100%').alignItems(HorizontalAlign.Start)
             .padding({ left: 20, right: 20, top: 20, bottom: 30 })
@@ -187,6 +218,25 @@ export struct OrderDetailPage {
           Blank().layoutWeight(1)
           MockPaymentConfirm({ amountCent: this.order!.amountCent ?? 0, busy: this.busy,
             onCancel: () => this.showPay = false, onConfirm: () => this.pay() })
+        }.width('100%').height('100%').backgroundColor('#66000000')
+      }
+      if (this.showCancel && this.order !== null) {
+        Column() {
+          Blank().layoutWeight(1)
+          Column({ space: 14 }) {
+            Text('取消这次约拍？').fontSize(18).fontWeight(FontWeight.Bold)
+              .fontColor(PortraTheme.primaryText)
+            if (this.order!.status === 'PAID_PENDING_SHOOT') {
+              Text('当前为模拟支付，不涉及真实退款。').fontSize(13)
+                .fontColor(PortraTheme.secondaryText)
+            }
+            Row({ space: 12 }) {
+              Button('再想想').layoutWeight(1).height(46).backgroundColor(PortraTheme.surface)
+                .fontColor(PortraTheme.primary).onClick(() => this.showCancel = false)
+              Button(this.busy ? '处理中' : '确认取消').layoutWeight(1).height(46)
+                .enabled(!this.busy).onClick(() => this.cancel())
+            }.width('100%')
+          }.width('100%').padding(20).backgroundColor(PortraTheme.surface)
         }.width('100%').height('100%').backgroundColor('#66000000')
       }
     }.width('100%').height('100%')

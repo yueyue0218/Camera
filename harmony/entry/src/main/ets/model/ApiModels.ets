@@ -314,8 +314,47 @@ export interface PaymentResult {
 }
 
 export interface OrderStatusLogSummary {
+  readonly logId?: number;
+  readonly orderId?: number;
   readonly toStatus: string;
   readonly createdAt?: string;
+  readonly reason?: string;
+  readonly operatorId?: number;
+}
+
+export interface DeliveryFileSummary {
+  readonly fileId: number;
+  readonly fileName?: string;
+  readonly mimeType?: string;
+  readonly fileSize?: number;
+  readonly fileType?: string;
+  readonly sortOrder?: number;
+}
+
+export interface DeliverySummary {
+  readonly deliveryId: number;
+  readonly orderId: number;
+  readonly deliveryRound: number;
+  readonly isLatest?: boolean;
+  readonly originalCount?: number;
+  readonly refinedCount?: number;
+  readonly remark?: string;
+  readonly uploadTime?: string;
+  readonly files?: DeliveryFileSummary[];
+}
+
+export interface StatusTransitionResult {
+  readonly toStatus: string;
+  readonly createdAt?: string;
+}
+
+export interface ReworkPayload {
+  readonly reason: string;
+}
+
+export interface OrderTransitionPayload {
+  readonly targetStatus: string;
+  readonly reason: string;
 }
 
 export interface StartServiceChatResult {

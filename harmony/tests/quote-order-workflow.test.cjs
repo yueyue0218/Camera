@@ -55,10 +55,36 @@ test('order payment is limited to its customer and pending status', () => {
   assert.deepEqual(OrderWorkflow.inConversation([order, { ...order, orderId: 5, conversationId: 8 }], 7), [order]);
 });
 
+test('delivery actions follow order state and participant', () => {
+  const base = { orderId: 4, customerId: 1, providerUserId: 2, status: 'PENDING_DELIVERY' };
+  assert.equal(OrderWorkflow.canUpload(base, 2), true);
+  assert.equal(OrderWorkflow.canUpload(base, 1), false);
+  assert.equal(OrderWorkflow.hasGallery(base), false);
+  const delivered = { ...base, status: 'DELIVERED_PENDING_CONFIRM' };
+  assert.equal(OrderWorkflow.canReviewDelivery(delivered, 1), true);
+  assert.equal(OrderWorkflow.canReviewDelivery(delivered, 2), false);
+  assert.equal(OrderWorkflow.hasGallery(delivered), true);
+  assert.equal(OrderWorkflow.canUpload({ ...base, status: 'REWORK_REQUIRED' }, 2), true);
+  assert.equal(OrderWorkflow.canCancel({ ...base, status: 'PAID_PENDING_SHOOT' }, 1), true);
+  assert.equal(OrderWorkflow.canCancel(delivered, 1), false);
+});
+
 test('quote and order appear once in chronological conversation stream', () => {
   const order = { orderId: 4, conversationId: 7, providerUserId: 2,
     createdAt: '2026-11-01T10:01:00' };
   const timeline = ConversationTimeline.build([], [quote, quote], [order, order]);
   assert.deepEqual(timeline.map(item => item.key), ['quote:9', 'order:4']);
   assert.equal(timeline[1].kind, TimelineKind.ORDER);
+});
+
+test('real delivery batches and status logs become one event each', () => {
+  const order = { orderId: 4, conversationId: 7, providerUserId: 2,
+    createdAt: '2026-11-01T10:00:00' };
+  const delivery = { deliveryId: 12, orderId: 4, deliveryRound: 2,
+    uploadTime: '2026-11-08T18:00:00', files: [{ fileId: 5, fileType: 'IMAGE' }] };
+  const log = { logId: 13, orderId: 4, toStatus: 'REWORK_REQUIRED', operatorId: 1,
+    createdAt: '2026-11-08T17:00:00' };
+  const timeline = ConversationTimeline.build([], [], [order], [log, log], [delivery, delivery]);
+  assert.deepEqual(timeline.map(item => item.key), ['order:4', 'status:13', 'delivery:12']);
+  assert.equal(timeline[2].event.detail, '1 张照片');
 });

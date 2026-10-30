@@ -11,6 +11,8 @@ import { ConversationDetailPage } from './ConversationDetailPage';
 import { MessagePage } from './MessagePage';
 import { OrderPage } from './OrderPage';
 import { OrderDetailPage } from './OrderDetailPage';
+import { DeliveryGalleryPage } from './DeliveryGalleryPage';
+import { DeliveryUploadPage } from './DeliveryUploadPage';
 import { QuoteDetailPage } from './QuoteDetailPage';
 import { QuoteFormPage } from './QuoteFormPage';
 import { ProfilePage } from './ProfilePage';
@@ -55,6 +57,10 @@ struct Index {
         this.QuoteDetailDestination(param);
       } else if (name === AppRoute.ORDER_DETAIL) {
         this.OrderDetailDestination(param);
+      } else if (name === AppRoute.DELIVERY_GALLERY) {
+        this.DeliveryGalleryDestination(param);
+      } else if (name === AppRoute.DELIVERY_UPLOAD) {
+        this.DeliveryUploadDestination(param);
       } else if (name === AppRoute.PUBLISH) {
         PublishPage({
           onBack: () => this.appPathStack.pop(),
@@ -178,7 +184,11 @@ struct Index {
         onOpenOrder: (orderId: number) => this.openPage(AppRoute.ORDER_DETAIL,
           { orderId: orderId, conversationId: this.validConversationId(param) }),
         onPayOrder: (orderId: number) => this.openPage(AppRoute.ORDER_DETAIL,
-          { orderId: orderId, conversationId: this.validConversationId(param), openPayment: true }) });
+          { orderId: orderId, conversationId: this.validConversationId(param), openPayment: true }),
+        onOpenGallery: (orderId: number) => this.openPage(AppRoute.DELIVERY_GALLERY,
+          { orderId: orderId }),
+        onOpenUpload: (orderId: number) => this.openPage(AppRoute.DELIVERY_UPLOAD,
+          { orderId: orderId }) });
     }
   }
 
@@ -224,8 +234,50 @@ struct Index {
         onBack: () => this.appPathStack.pop(),
         onOpenConversation: (conversationId: number) => {
           this.returnToConversation(conversationId);
+        },
+        onOpenGallery: () => this.openPage(AppRoute.DELIVERY_GALLERY,
+          { orderId: (param as NavigationRouteParam).orderId! }),
+        onOpenUpload: () => this.openPage(AppRoute.DELIVERY_UPLOAD,
+          { orderId: (param as NavigationRouteParam).orderId! }) });
+    }
+  }
+
+  @Builder
+  DeliveryGalleryDestination(param: Object) {
+    if (!NavigationPolicy.validOrderId(param as NavigationRouteParam)) {
+      this.PlaceholderPage('作品相册', '无法打开这次约拍的照片');
+    } else {
+      DeliveryGalleryPage({ orderId: (param as NavigationRouteParam).orderId!,
+        onBack: () => this.appPathStack.pop(),
+        onOpenUpload: () => this.openPage(AppRoute.DELIVERY_UPLOAD,
+          { orderId: (param as NavigationRouteParam).orderId! }) });
+    }
+  }
+
+  @Builder
+  DeliveryUploadDestination(param: Object) {
+    if (!NavigationPolicy.validOrderId(param as NavigationRouteParam)) {
+      this.PlaceholderPage('上传照片', '无法打开这次约拍');
+    } else {
+      DeliveryUploadPage({ orderId: (param as NavigationRouteParam).orderId!,
+        onBack: () => this.appPathStack.pop(),
+        onUploaded: () => {
+          this.appPathStack.pop();
+          this.openGallery((param as NavigationRouteParam).orderId!);
         } });
     }
+  }
+
+  private openGallery(orderId: number): void {
+    const names = this.appPathStack.getAllPathName();
+    for (let index = names.length - 1; index >= 0; index--) {
+      const routeParam = this.appPathStack.getParamByIndex(index) as NavigationRouteParam | undefined;
+      if (names[index] === AppRoute.DELIVERY_GALLERY && routeParam?.orderId === orderId) {
+        this.appPathStack.popToIndex(index);
+        return;
+      }
+    }
+    this.openPage(AppRoute.DELIVERY_GALLERY, { orderId: orderId });
   }
 
   private validDemandId(param: Object): number {
