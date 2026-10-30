@@ -88,8 +88,9 @@ export struct OrderDetailPage {
       if (result.orderId !== this.orderId) throw new Error('支付结果待确认');
       this.showPay = false;
       await this.load();
-      this.notice = this.order?.status === 'PAID_PENDING_SHOOT' ? '支付成功' : '正在核对支付结果';
+      this.notice = this.order?.status === 'PAID_PENDING_SHOOT' ? '' : '正在核对支付结果';
       this.paymentUncertain = this.order?.status === 'PENDING_PAYMENT';
+      if (this.order?.status === 'PAID_PENDING_SHOOT') this.showSelfPaymentNotice();
     } catch (error) {
       if (!this.active || version !== this.requestVersion) return;
       this.showPay = false;
@@ -104,9 +105,10 @@ export struct OrderDetailPage {
       if (order.status !== 'PENDING_PAYMENT') {
         const payment = await this.api.getPayment(this.orderId);
         this.notice = payment.paymentId > 0 && order.status === 'PAID_PENDING_SHOOT' ?
-          '支付成功' : '订单状态已更新';
+          '' : '订单状态已更新';
         await this.load();
         this.paymentUncertain = false;
+        if (payment.paymentId > 0 && order.status === 'PAID_PENDING_SHOOT') this.showSelfPaymentNotice();
         return;
       }
       this.paymentUncertain = true;
@@ -116,6 +118,11 @@ export struct OrderDetailPage {
       this.paymentUncertain = true;
       this.notice = '支付结果待确认，请稍后刷新订单';
     }
+  }
+
+  private showSelfPaymentNotice(): void {
+    AlertDialog.show({ title: '支付', message: '请自行支付',
+      primaryButton: { value: '知道了', action: () => {} } });
   }
 
   private async cancel(): Promise<void> {
@@ -252,7 +259,7 @@ export struct OrderDetailPage {
           }.width('100%').padding({ left: 20, right: 20, top: 10, bottom: 16 })
         } else if (OrderWorkflow.canPay(this.order!, this.userId)) {
           Row() {
-            Button(this.busy ? '处理中' : '确认支付').height(48).width('100%').enabled(!this.busy)
+            Button(this.busy ? '处理中' : '支付').height(48).width('100%').enabled(!this.busy)
               .onClick(() => this.showPay = true)
           }.width('100%').padding({ left: 20, right: 20, top: 10, bottom: 16 })
         }
@@ -272,7 +279,7 @@ export struct OrderDetailPage {
             Text('取消这次约拍？').fontSize(18).fontWeight(FontWeight.Bold)
               .fontColor(PortraTheme.primaryText)
             if (this.order!.status === 'PAID_PENDING_SHOOT') {
-              Text('当前为模拟支付，不涉及真实退款。').fontSize(13)
+              Text('如已支付，请与对方联系处理。').fontSize(13)
                 .fontColor(PortraTheme.secondaryText)
             }
             Row({ space: 12 }) {

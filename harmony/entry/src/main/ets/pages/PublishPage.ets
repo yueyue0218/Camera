@@ -683,7 +683,7 @@ export struct PublishPage {
             Checkbox().select(this.negotiable).selectedColor(JournalStyle.blue).onChange((v: boolean) => this.negotiable = v)
             Text('预算可以根据拍摄方案再沟通').fontSize(11).fontColor('#716B66').layoutWeight(1)
           }.width('100%')
-          Text('预算仅供双方沟通参考；Portra 首发版不提供线上支付。').fontSize(10).lineHeight(17).fontColor(JournalStyle.muted)
+          Text('预算仅供双方沟通参考，费用请与对方协商。').fontSize(10).lineHeight(17).fontColor(JournalStyle.muted)
         }
       }.width('100%').padding(16).backgroundColor(JournalStyle.surface).borderRadius(19)
         .border({ width: 1, color: '#E6DED5' }).margin({ bottom: 16 })

@@ -18,7 +18,7 @@ export class ConversationTaskModel {
     if (order !== undefined) {
       if (userId !== order.customerId && userId !== order.providerUserId) return null;
       const id = order.orderId;
-      if (OrderWorkflow.canPay(order, userId)) return { label: '待确认支付', button: '确认支付', action: 'pay', targetId: id };
+      if (OrderWorkflow.canPay(order, userId)) return { label: '待支付', button: '支付', action: 'pay', targetId: id };
       if (OrderWorkflow.canUpload(order, userId)) return { label: OrderWorkflow.task(order, userId),
         button: order.status === 'REWORK_REQUIRED' ? '重新上传' : '上传照片', action: 'upload', targetId: id };
       if (OrderWorkflow.hasGallery(order) && order.status !== 'COMPLETED') return {

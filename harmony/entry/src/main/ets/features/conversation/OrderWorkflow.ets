@@ -19,7 +19,7 @@ export class OrderWorkflow {
 
   static task(order: OrderSummary, userId: number): string {
     if (order.status === 'PENDING_PAYMENT') {
-      return order.customerId === userId ? '请确认支付' : '等待客户支付';
+      return order.customerId === userId ? '待支付' : '等待客户支付';
     }
     if (order.status === 'PAID_PENDING_SHOOT') return '等待拍摄';
     if (order.status === 'PENDING_DELIVERY') return order.providerUserId === userId ?
