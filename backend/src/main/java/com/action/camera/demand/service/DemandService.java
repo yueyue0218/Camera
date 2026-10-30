@@ -1,5 +1,7 @@
 package com.action.camera.demand.service;
 
+import com.action.camera.common.region.ProvinceNames;
+
 import com.action.camera.admin.dto.ModerationView;
 import com.action.camera.application.FileReferenceValidator;
 import com.action.camera.common.ErrorCode;
@@ -211,7 +213,7 @@ public class DemandService {
                 .filter(demand -> !Boolean.TRUE.equals(demand.getHiddenByCustomer()))
                 .filter(demand -> demand.getExpireTime() == null
                         || demand.getExpireTime().isAfter(LocalDateTime.now()))
-                .filter(demand -> normalizedCity == null || equalsIgnoreCase(demand.getCityCode(), normalizedCity))
+                .filter(demand -> normalizedCity == null || ProvinceNames.matches(demand.getCityCode(), normalizedCity))
                 .filter(demand -> normalizedScene == null || equalsIgnoreCase(demand.getScene(), normalizedScene))
                 .filter(demand -> expectedDate == null || expectedDate.equals(demand.getExpectedDate()))
                 .filter(demand -> normalizedTag == null || demand.getStyleTags().contains(normalizedTag))
@@ -246,6 +248,21 @@ public class DemandService {
         int fromIndex = Math.min((safePage - 1) * safeSize, filtered.size());
         int toIndex = Math.min(fromIndex + safeSize, filtered.size());
         return new PageResult<>(filtered.subList(fromIndex, toIndex), safePage, safeSize, filtered.size());
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<DemandDto> listPublicByUser(Long userId, int page, int size) {
+        int safePage = Math.max(1, page), safeSize = Math.max(1, Math.min(50, size));
+        var result = demandRepository.findPublicByUser(userId, PageRequest.of(safePage - 1, safeSize));
+        return new PageResult<>(result.getContent().stream().map(this::toDemandDto).toList(), safePage, safeSize, result.getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<DemandDto> listMyPublications(CurrentUser user, int page, int size) {
+        requireCustomerOrAdmin(user);
+        int safePage = Math.max(1, page), safeSize = Math.max(1, Math.min(50, size));
+        var result = demandRepository.findOwnerPage(user.getUserId(), PageRequest.of(safePage - 1, safeSize));
+        return new PageResult<>(result.getContent().stream().map(this::toOwnerDemandDto).toList(), safePage, safeSize, result.getTotalElements());
     }
 
     @Transactional(readOnly = true)

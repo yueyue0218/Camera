@@ -25,6 +25,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -33,6 +34,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 
 @SpringBootTest
+@org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 @TestPropertySource(properties = {
     "spring.datasource.url=jdbc:h2:mem:user_service_test;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;NON_KEYWORDS=CURRENT_ROLE;DB_CLOSE_DELAY=-1",
     "spring.datasource.driver-class-name=org.h2.Driver",
@@ -43,6 +45,12 @@ import static org.mockito.Mockito.doThrow;
     "jwt.secret=test-secret-key-for-unit-testing-purposes-only"
 })
 class UserServiceTest {
+
+    @Autowired
+    private org.springframework.test.web.servlet.MockMvc mvc;
+
+    @Autowired
+    private com.action.camera.auth.service.AuthSessionService sessions;
 
     @Autowired
     private UserService userService;
@@ -79,6 +87,21 @@ class UserServiceTest {
         userRoleBindingRepository.deleteAll();
         userRepository.deleteAll();
         fileRepository.deleteAll();
+    }
+
+    @Test
+    void administratorMaySwitchOnlyToPreviouslyBoundBusinessRoles() {
+        User admin = createTestUser("241880184", "test123456", "ACTIVE", "ADMIN");
+        grantRoleBinding(admin.getId(), "ADMIN");
+        assertThatThrownBy(() -> userService.switchRole(admin.getId(), "PROVIDER"))
+                .isInstanceOf(BusinessException.class).extracting("errorCode").isEqualTo(ErrorCode.FORBIDDEN);
+        assertThat(userRoleBindingRepository.existsByUserIdAndRole(admin.getId(), "PROVIDER")).isFalse();
+        assertThat(userRepository.findById(admin.getId()).orElseThrow().getCurrentRole()).isEqualTo("ADMIN");
+        grantRoleBinding(admin.getId(), "CUSTOMER");
+        assertThat(userService.switchRole(admin.getId(), "CUSTOMER").getCurrentRole()).isEqualTo("CUSTOMER");
+        assertThatThrownBy(() -> userService.switchRole(admin.getId(), "PROVIDER"))
+                .isInstanceOf(BusinessException.class);
+        assertThat(userRoleBindingRepository.existsByUserIdAndRole(admin.getId(), "ADMIN")).isTrue();
     }
 
     @Test
@@ -311,6 +334,32 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("updating photographer avatar does not overwrite customer avatar")
+    void updateProviderAvatar_preservesCustomerAvatar() {
+        User user = createTestUser("241880178", "test123456", "ACTIVE");
+        grantRoleBinding(user.getId(), "PROVIDER");
+        FileRecord customerAvatar = createAvatarFile(user.getId(), "customer-original.png");
+        FileRecord providerAvatar = createAvatarFile(user.getId(), "provider-new.png");
+        UpdateProfileRequest customer = new UpdateProfileRequest();
+        customer.setRole("CUSTOMER");
+        customer.setAvatarFileId(customerAvatar.getId());
+        userService.updateMyProfile(user.getId(), customer);
+
+        UpdateProfileRequest provider = new UpdateProfileRequest();
+        provider.setRole("PROVIDER");
+        provider.setAvatarFileId(providerAvatar.getId());
+        userService.updateMyProfile(user.getId(), provider);
+
+        UserProfileResponse profile = userService.getMyProfile(user.getId());
+        assertThat(profile.getCustomerAvatarFileId()).isEqualTo(customerAvatar.getId());
+        assertThat(profile.getProviderAvatarFileId()).isEqualTo(providerAvatar.getId());
+        assertThat(userService.getUserBrief(user.getId(), "CUSTOMER").getAvatarFileId())
+                .isEqualTo(customerAvatar.getId());
+        assertThat(userService.getUserBrief(user.getId(), "PROVIDER").getAvatarFileId())
+                .isEqualTo(providerAvatar.getId());
+    }
+
+    @Test
     @DisplayName("profile update rejects a missing avatar file reference")
     void updateProfile_rejectsMissingAvatarFile() {
         User user = createTestUser("241880177", "test123456", "ACTIVE");
@@ -326,20 +375,46 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("switching to provider requires an existing role binding and creates no profile")
-    void switchRole_providerRequiresBinding() {
+    @DisplayName("switching to provider self-activates the role binding and creates a provider profile")
+    void switchRole_providerSelfActivationCreatesBindingAndProfile() {
         User user = createTestUser("241880175", "test123456", "ACTIVE");
+
+        var response = userService.switchRole(user.getId(), "PROVIDER");
+
+        assertThat(response.getCurrentRole()).isEqualTo("PROVIDER");
+        assertThat(userRoleBindingRepository.existsByUserIdAndRole(user.getId(), "PROVIDER")).isTrue();
+        assertThat(userRepository.findById(user.getId()).orElseThrow().getCurrentRole()).isEqualTo("PROVIDER");
+        assertThat(providerProfileMapper.selectCount(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ProviderProfile>()
+                        .eq(ProviderProfile::getUserId, user.getId())))
+                .isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("disabled users cannot activate photographer role")
+    void switchRole_disabledUserCannotSelfActivate() {
+        User user = createTestUser("241880179", "test123456", "DISABLED");
 
         assertThatThrownBy(() -> userService.switchRole(user.getId(), "PROVIDER"))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.FORBIDDEN);
-        assertThat(userRepository.findById(user.getId()).orElseThrow().getCurrentRole())
-                .isEqualTo("CUSTOMER");
+        assertThat(userRoleBindingRepository.existsByUserIdAndRole(user.getId(), "PROVIDER")).isFalse();
     }
 
     @Test
-    @DisplayName("switching to a bound provider role only changes the UI view")
+    @DisplayName("ordinary users cannot activate administrator role")
+    void switchRole_cannotSelfActivateAdmin() {
+        User user = createTestUser("241880180", "test123456", "ACTIVE");
+        assertThatThrownBy(() -> userService.switchRole(user.getId(), "ADMIN"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.FORBIDDEN);
+        assertThat(userRoleBindingRepository.existsByUserIdAndRole(user.getId(), "ADMIN")).isFalse();
+    }
+
+    @Test
+    @DisplayName("switching to an already bound provider role ensures its provider profile exists")
     void switchRole_boundProviderSucceeds() {
         User user = createTestUser("241880176", "test123456", "ACTIVE");
         grantRoleBinding(user.getId(), "PROVIDER");
@@ -350,7 +425,82 @@ class UserServiceTest {
         assertThat(providerProfileMapper.selectCount(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ProviderProfile>()
                         .eq(ProviderProfile::getUserId, user.getId())))
-                .isZero();
+                .isEqualTo(1);
+    }
+
+    @Test
+    void roleSwitch_httpRoundTripPersistsAndProtectsPrivileges() throws Exception {
+        User user = createTestUser("241880181", "test123456", "ACTIVE");
+        grantRoleBinding(user.getId(), "CUSTOMER");
+        var login = sessions.issue(user, "CUSTOMER", false, "role-test", "JUnit");
+        String bearer = "Bearer " + login.response().getToken();
+        for (String role : List.of("PROVIDER", "PROVIDER", "CUSTOMER", "PROVIDER")) {
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/users/me/role")
+                    .header("Authorization", bearer).contentType("application/json")
+                    .content("{\"role\":\"" + role + "\"}"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value(200))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.currentRole").value(role));
+            for (String path : List.of("/users/me", "/auth/session")) {
+                mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", bearer))
+                        .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                                path.equals("/users/me") ? "$.data.currentRole" : "$.data.role").value(role));
+            }
+            assertThat(userRepository.findById(user.getId()).orElseThrow().getCurrentRole()).isEqualTo(role);
+        }
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/users/me/role")
+                .header("Authorization", bearer).contentType("application/json").content("{\"role\":\"ADMIN\"}"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value(40301));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/users/me/role")
+                .contentType("application/json").content("{\"role\":\"PROVIDER\"}"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value(40101));
+        assertThat(userRoleBindingRepository.existsByUserIdAndRole(user.getId(), "ADMIN")).isFalse();
+        var refreshed = sessions.refresh(login.refreshToken());
+        assertThat(refreshed.response().getRole()).isEqualTo("PROVIDER");
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/users/me/role")
+                .header("Authorization", bearer).contentType("application/json").content("{\"role\":\"INVALID\"}"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value(40001));
+        User disabled = userRepository.findById(user.getId()).orElseThrow();
+        disabled.setStatus("DISABLED"); userRepository.saveAndFlush(disabled);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/users/me/role")
+                .header("Authorization", bearer).contentType("application/json").content("{\"role\":\"CUSTOMER\"}"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value(40101));
+        assertThat(userRepository.findById(user.getId()).orElseThrow().getCurrentRole()).isEqualTo("PROVIDER");
+        assertThat(providerProfileMapper.selectCount(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ProviderProfile>()
+                .eq(ProviderProfile::getUserId, user.getId()))).isEqualTo(1);
+    }
+
+    @Test
+    void concurrentActivationCreatesExactlyOneBindingAndProfile() throws Exception {
+        User user = createTestUser("241880182", "test123456", "ACTIVE");
+        var start = new java.util.concurrent.CountDownLatch(1);
+        var executor = java.util.concurrent.Executors.newFixedThreadPool(4);
+        try {
+            var futures = new java.util.ArrayList<java.util.concurrent.Future<String>>();
+            for (int i = 0; i < 4; i++) {
+                futures.add(executor.submit(() -> { start.await(); return userService.switchRole(user.getId(), "PROVIDER").getCurrentRole(); }));
+            }
+            start.countDown();
+            for (var future : futures) { assertThat(future.get(15, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo("PROVIDER"); }
+            assertThat(userRoleBindingRepository.findAll().stream().filter(binding -> binding.getUserId().equals(user.getId()))).hasSize(1);
+            assertThat(providerProfileMapper.selectCount(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ProviderProfile>()
+                    .eq(ProviderProfile::getUserId, user.getId()))).isEqualTo(1);
+        } finally { executor.shutdownNow(); }
+    }
+
+    @Test
+    void providerCanSaveSharedPrivacyWithoutChangingCustomerName() {
+        User user = createTestUser("241880183", "test123456", "ACTIVE");
+        userService.switchRole(user.getId(), "PROVIDER");
+        UpdateProfileRequest request = new UpdateProfileRequest();
+        request.setRole("PROVIDER"); request.setNickname("Photographer");
+        request.setLocationDisplay("南京"); request.setLocationVisible(false); request.setBirthdayVisible(false);
+        userService.updateMyProfile(user.getId(), request);
+        var profile = userService.getMyProfile(user.getId());
+        assertThat(profile.getProviderNickname()).isEqualTo("Photographer");
+        assertThat(profile.getCustomerNickname()).isEqualTo("Test User");
+        assertThat(profile.getLocationDisplay()).isEqualTo("南京");
+        assertThat(profile.getLocationVisible()).isFalse();
+        assertThat(profile.getBirthdayVisible()).isFalse();
     }
 
     private User createTestUser(String studentNo, String password, String status) {

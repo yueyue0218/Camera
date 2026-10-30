@@ -125,6 +125,17 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <excludes>
+                    <!-- Developer overrides are not release inputs. -->
+                    <exclude>application-local.yml</exclude>
+                    <exclude>application-local.yaml</exclude>
+                    <exclude>application-local.properties</exclude>
+                </excludes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.jacoco</groupId>

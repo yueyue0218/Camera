@@ -18,7 +18,8 @@ export struct ServiceDetailPage {
   @Prop @Watch('onVisibleEpoch') visibleEpoch: number = 0;
   @State private detail: ServicePackageDetail | null = null;
   @State private loading: boolean = true;
-  @State private busy: boolean = false;
+  @State private chatBusy: boolean = false;
+  @State private interestBusy: boolean = false;
   @State private errorMessage: string = '';
   @State private actionError: string = '';
   @State private role: string = '';
@@ -49,7 +50,7 @@ export struct ServiceDetailPage {
     const version = ++this.requestVersion;
     this.loading = true;
     this.detail = null;
-    this.busy = false;
+    this.chatBusy = false; this.interestBusy = false;
     this.errorMessage = '';
     this.actionError = '';
     this.role = '';
@@ -108,13 +109,13 @@ export struct ServiceDetailPage {
   }
 
   private async startChat(): Promise<void> {
-    if (this.busy) { return; }
+    if (this.chatBusy) { return; }
     if (!this.appClient.sessionManager.isAuthenticated()) { this.onRequireLogin?.(); return; }
     if (this.role !== 'CUSTOMER' || this.userId === this.detail?.providerId) { this.actionError = '仅单主可以咨询其他摄影师的橱窗'; return; }
     if (this.detail?.status !== 'ONLINE' || this.detail.isAvailable !== true) { this.actionError = '此橱窗当前不可咨询'; return; }
     const version = this.requestVersion;
     const identity = this.appClient.sessionManager.getSessionVersion();
-    this.busy = true; this.actionError = '';
+    this.chatBusy = true; this.actionError = '';
     try {
       const result = await this.appClient.apiService.startServiceChat(this.serviceId);
       if (version !== this.requestVersion || identity !== this.appClient.sessionManager.getSessionVersion()) { return; }
@@ -124,17 +125,17 @@ export struct ServiceDetailPage {
       if (version === this.requestVersion && identity === this.appClient.sessionManager.getSessionVersion()) {
         this.actionError = (error as PortraError).message || '发起咨询失败';
       }
-    } finally { if (version === this.requestVersion) { this.busy = false; } }
+    } finally { if (version === this.requestVersion) { this.chatBusy = false; } }
   }
 
   private async toggleInterest(): Promise<void> {
-    if (this.busy) { return; }
+    if (this.interestBusy) { return; }
     if (!this.appClient.sessionManager.isAuthenticated()) { this.onRequireLogin?.(); return; }
     if (this.role !== 'CUSTOMER' || this.userId === this.detail?.providerId) { this.actionError = '仅单主可以标记其他摄影师的橱窗意向'; return; }
-    if (this.detail?.status !== 'ONLINE' || this.detail.isAvailable !== true) { this.actionError = '此橱窗当前不可收藏'; return; }
+    if (this.detail?.status !== 'ONLINE' || this.detail.isAvailable !== true) { this.actionError = '此橱窗当前不可加入意向'; return; }
     const version = this.requestVersion;
     const identity = this.appClient.sessionManager.getSessionVersion();
-    this.busy = true; this.actionError = '';
+    this.interestBusy = true; this.actionError = '';
     const next = !this.interested;
     try {
       if (next) {
@@ -149,7 +150,7 @@ export struct ServiceDetailPage {
       if (version === this.requestVersion && identity === this.appClient.sessionManager.getSessionVersion()) {
         this.actionError = (error as PortraError).message || '意向操作失败';
       }
-    } finally { if (version === this.requestVersion) { this.busy = false; } }
+    } finally { if (version === this.requestVersion) { this.interestBusy = false; } }
   }
 
   private price(): string {
@@ -203,7 +204,7 @@ export struct ServiceDetailPage {
             }.width('100%').padding({ left: 17, right: 17 }).alignItems(HorizontalAlign.Start)
           }.width('100%')
         }.layoutWeight(1).scrollBar(BarState.Off)
-        JournalActions({ price: this.price(), selected: this.interested, actionsEnabled: !this.busy, notice: this.actionError,
+        JournalActions({ price: this.price(), selected: this.interested, starEnabled: !this.interestBusy, chatEnabled: !this.chatBusy, notice: this.actionError,
           onStar: () => this.toggleInterest(), onChat: () => this.startChat() })
       }
     }.width('100%').height('100%').backgroundColor(JournalStyle.paper)

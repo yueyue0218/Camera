@@ -22,9 +22,6 @@ export struct ProfileWorkspace {
   @State private name: string = '';
   @State private bio: string = '';
   @State private avatar: number = 0;
-  @State private location: string = '';
-  @State private locationVisible: boolean = false;
-  @State private birthdayVisible: boolean = false;
   private generation: number = 0;
   private readonly app: AppClient = AppClient.shared;
   private readonly changed: () => void = () => { if (!this.editOnly) { this.load(); } };
@@ -81,9 +78,6 @@ export struct ProfileWorkspace {
     this.name = (this.profile.currentRole === 'PROVIDER' ? this.profile.providerNickname : this.profile.customerNickname) ?? this.profile.nickname ?? '';
     this.bio = (this.profile.currentRole === 'PROVIDER' ? this.profile.providerBio : this.profile.customerBio) ?? this.profile.bio ?? '';
     this.avatar = (this.profile.currentRole === 'PROVIDER' ? this.profile.providerAvatarFileId : this.profile.customerAvatarFileId) ?? this.profile.avatarFileId ?? 0;
-    this.location = this.profile.locationDisplay ?? '';
-    this.locationVisible = this.profile.locationVisible === true;
-    this.birthdayVisible = this.profile.birthdayVisible === true;
     this.editing = true;
   }
   private async pickAvatar(): Promise<void> {
@@ -104,8 +98,7 @@ export struct ProfileWorkspace {
     this.busy = true; this.error = '';
     try {
       const payload: UpdateProfilePayload = { nickname: this.name.trim(), bio: this.bio.trim(), role: this.profile.currentRole,
-        avatarFileId: this.avatar > 0 ? this.avatar : undefined, locationDisplay: this.location.trim(),
-        locationVisible: this.locationVisible, birthdayVisible: this.birthdayVisible };
+        avatarFileId: this.avatar > 0 ? this.avatar : undefined };
       await this.app.apiService.updateMyProfile(payload);
       if (generation !== this.generation || epoch !== this.app.sessionManager.getSessionVersion()) { return; }
       this.editing = false; ContentChanges.publish(); this.onSaved?.();
@@ -132,7 +125,7 @@ export struct ProfileWorkspace {
     finally { if (generation === this.generation) { this.busy = false; } }
   }
   // Visual contract: v39 .profile-settings-form + two .profile-menu-row elements.
-  // Account privacy is persisted by PATCH /users/me for both identities.
+  // Omit location/privacy fields: editing identity must preserve existing server privacy preferences.
   @Builder
   private Editor() {
     Column({ space: 0 }) {
@@ -153,26 +146,6 @@ export struct ProfileWorkspace {
           .border({ width: 1, color: '#E7E0D9' }).borderRadius(12)
           .enabled(!this.busy).onChange((value: string) => this.bio = value)
           .margin({ bottom: 12 })
-        Text('所在地区').width('100%').fontSize(11).fontColor('#908984')
-          .margin({ bottom: 6 })
-        TextInput({ text: this.location, placeholder: '填写所在地区' })
-          .width('100%').height(38).fontSize(13)
-          .backgroundColor('#F6F3EE').fontColor('#77736F')
-          .border({ width: 1, color: '#E7E0D9' }).borderRadius(12)
-          .enabled(!this.busy).maxLength(100).onChange((value: string) => this.location = value)
-          .margin({ bottom: 10 })
-        Row({ space: 8 }) {
-          Text(this.birthdayVisible ? '☑ 展示年龄' : '□ 展示年龄')
-            .fontSize(11).fontColor('#77736F').layoutWeight(1)
-            .height(38).padding({ left: 12, top: 11 })
-            .border({ width: 1, color: '#E7E0D9' }).borderRadius(12)
-            .enabled(!this.busy).onClick(() => this.birthdayVisible = !this.birthdayVisible)
-          Text(this.locationVisible ? '☑ 展示地区' : '□ 展示地区')
-            .fontSize(11).fontColor('#77736F').layoutWeight(1)
-            .height(38).padding({ left: 12, top: 11 })
-            .border({ width: 1, color: '#E7E0D9' }).borderRadius(12)
-            .enabled(!this.busy).onClick(() => this.locationVisible = !this.locationVisible)
-        }.width('100%')
         Button(this.busy ? '保存中…' : '保存资料')
           .width('100%').height(42).margin({ top: 13 })
           .fontSize(13).fontWeight(FontWeight.Bold).fontColor('#FFFFFF')
@@ -193,21 +166,6 @@ export struct ProfileWorkspace {
       }.width('100%').height(51).padding({ left: 4, right: 4 })
         .border({ width: 1, color: '#E8E2DB' })
         .onClick(() => this.pickAvatar())
-      Row({ space: 10 }) {
-        Text('♧').fontSize(21).fontColor('#77716B').width(26)
-        Column({ space: 2 }) {
-          Text('隐私设置').fontSize(12.5).fontWeight(FontWeight.Medium)
-            .fontColor('#333337')
-          Text('管理公开资料范围').fontSize(9.5).fontColor('#A09993')
-        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-        Text('›').fontSize(18).fontColor('#AAA39D')
-      }.width('100%').height(51).padding({ left: 4, right: 4 })
-        .border({ width: 1, color: '#E8E2DB' })
-        .onClick(() => AlertDialog.show({
-          title: '隐私设置',
-          message: '在上方勾选展示年龄、展示地区，再点击保存资料。未填写生日时不会展示年龄。',
-          confirm: { value: '知道了', action: () => {} }
-        }))
     }.width('100%').alignItems(HorizontalAlign.Start)
   }
 
@@ -287,12 +245,12 @@ export struct ProfileWorkspace {
           Column({ space: 4 }) {
             Text(this.profile.currentRole === 'PROVIDER' ? '我的橱窗' : '我的需求')
               .fontSize(17).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
-            Text('已发布内容与管理').fontSize(11).fontColor(PortraTheme.secondaryText)
           }.layoutWeight(1).alignItems(HorizontalAlign.Start)
           Button('＋ 新发布').height(36).fontSize(12).fontColor(PortraTheme.primary)
             .backgroundColor(PortraTheme.primarySoft).enabled(!this.busy)
             .onClick(() => this.onPublish?.())
         }.width('100%')
+        Text('管理已发布内容，查看详情或更新状态').fontSize(11).fontColor(PortraTheme.secondaryText)
         if (this.loading) { Text('正在读取发布记录…').fontColor(PortraTheme.secondaryText) }
         if (this.error.length > 0) {
           Text(this.error).fontSize(12).fontColor(PortraTheme.danger)

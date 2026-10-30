@@ -1,3 +1,4 @@
+import { promptAction } from '@kit.ArkUI';
 import { PublicationActions } from '../features/publish/PublicationActions';
 import { JournalText } from '../features/publish/JournalText';
 import { JournalBrief, JournalStyle, JournalHeading, JournalKicker, JournalTitle, JournalFacts, JournalPerson, JournalSection, JournalRow, JournalActions } from '../features/publish/JournalUI';
@@ -313,8 +314,8 @@ export struct DemandDetailPage {
           }.width('100%')
         }.layoutWeight(1).scrollBar(BarState.Off)
         JournalActions({ service: false, price: HallTextFormatter.budget(this.demand.budgetMinCent, this.demand.budgetMaxCent),
-          actionsEnabled: !this.actionBusy, notice: this.actionError, onChat: () => this.startChat(),
-          onStar: () => { this.actionError = '需求收藏暂未开放，当前未保存意向'; } })
+          chatEnabled: !this.actionBusy, notice: this.actionError, onChat: () => this.startChat(),
+          onStar: () => { promptAction.showToast({ message: '此需求暂不支持加入意向，可直接咨询需求方' }); } })
       }
     }.width('100%').height('100%').backgroundColor(JournalStyle.paper)
   }

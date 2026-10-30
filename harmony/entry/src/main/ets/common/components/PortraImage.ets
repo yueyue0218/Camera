@@ -1,3 +1,4 @@
+import { UiPerf } from '../performance/UiPerf';
 import { image } from '@kit.ImageKit';
 import { AppClient } from '../../app/AppClient';
 import { ImageLease, ImageVariant } from '../../network/FileImageService';
@@ -68,7 +69,10 @@ export struct PortraImage {
     try {
       lease = service.acquire(this.resolvedFileId(), this.variant);
       this.lease = lease;
+      const fetchStart = Date.now();
       const bytes = await lease.promise;
+      UiPerf.elapsed('image.bytes.' + this.variant, fetchStart);
+      const decodeStart = Date.now();
       if (!this.alive || version !== this.generation || epoch !== service.epoch()) { return; }
       decoder = image.createImageSource(bytes);
       const info = await decoder.getImageInfo();
@@ -84,6 +88,7 @@ export struct PortraImage {
         return;
       }
       this.pixelMap = pixels;
+      UiPerf.elapsed('image.decode.' + this.variant, decodeStart);
     } catch (error) {
       if (this.alive && version === this.generation && epoch === service.epoch()) {
         const mapped = error as PortraError;

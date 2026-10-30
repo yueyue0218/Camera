@@ -1,3 +1,4 @@
+import { UiPerf } from '../common/performance/UiPerf';
 import { OrderEngagementPage } from './OrderEngagementPage';
 import { NotificationTarget } from '../features/notifications/NotificationTargetResolver';
 import { NotificationPage } from './NotificationPage';
@@ -264,6 +265,7 @@ struct Index {
       this.PlaceholderPage('用户主页', '无效的用户身份');
     } else {
       PublicProfilePage({
+          onOpenSelf: () => { this.appPathStack.clear(); this.mainTab = 3; },
           onOpenMoment: (id: number) => this.openPage(AppRoute.MOMENT_DETAIL, { momentId: id }),
           onOpenDemand: (id: number) => this.openPage(AppRoute.DEMAND_DETAIL, { demandId: id }),
           onOpenService: (id: number) => this.openPage(AppRoute.SERVICE_DETAIL, { serviceId: id }), targetUserId: this.validPublicUserId(param), targetRole: this.validPublicUserRole(param),
@@ -334,6 +336,7 @@ struct Index {
   }
 
   private async openPage(route: AppRoute, param: NavigationRouteParam = EMPTY_ROUTE_PARAM): Promise<void> {
+    UiPerf.mark('route.click.' + route);
     if (!this.navigationClickGuard.accept(Date.now())) {
       return;
     }

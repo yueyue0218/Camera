@@ -1,3 +1,8 @@
+import { ProvinceLocation } from '../common/location/ProvinceLocation';
+import { common } from '@kit.AbilityKit';
+import { UiPerf } from '../common/performance/UiPerf';
+import { ProfileIdentity } from '../features/user/ProfileIdentity';
+import { ProfileHeader } from '../features/user/ProfileHeader';
 import { ProfileWorkspace } from '../features/user/ProfileWorkspace';
 import { AppClient } from '../app/AppClient';
 import { PortraAvatar } from '../common/components/PortraAvatar';
@@ -28,6 +33,8 @@ export struct ProfilePage {
   @Prop @Watch('refreshTab') sessionEpoch: number = 0;
   private loadedSessionVersion: number = -1;
   @State private section: string = 'home';
+  private readonly detailScroller: Scroller = new Scroller();
+  @State private socialError: string = '';
   @State private contentTab: string = 'primary';
   @State private interests: ServicePackageSummary[] = [];
   @State private recentDemand: DemandSummary | undefined = undefined;
@@ -45,7 +52,11 @@ export struct ProfilePage {
   @State private interestPage: number = 0;
   @State private favoriteLoaded: boolean = false;
   @State private socialLoaded: boolean = false;
-  private readonly changed: () => void = () => { if (this.activeTab && this.section !== 'settings') { this.load(false); } };
+  private readonly changed: (kind?: string) => void = (kind?: string) => {
+    if (!this.activeTab || this.section === 'settings') { return; }
+    if (kind === 'relations') { this.loadSocial(); } else { this.load(false); }
+  };
+  private socialGeneration: number = 0;
 
   private refreshTab(): void {
     if (this.activeTab && this.loadedSessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
@@ -112,7 +123,16 @@ export struct ProfilePage {
   onEditService?: (id: number) => void;
   onPrivacyConsentWithdrawn?: () => void;
 
+  @State private locatedRegionLabel: string = '尚未定位';
+  private readonly locationChanged: () => void = () => this.readLocatedRegion();
+  private readLocatedRegion(): void {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    this.locatedRegionLabel = ProvinceLocation.cached(context)?.label() ?? '尚未定位';
+  }
   aboutToAppear(): void {
+    ProvinceLocation.observe(this.locationChanged);
+    this.readLocatedRegion();
+    ProvinceLocation.refreshAuthorized(this.getUIContext().getHostContext() as common.UIAbilityContext);
     this.signingOut = false;
     this.switchingRole = false;
     ContentChanges.observe(this.changed);
@@ -120,7 +140,9 @@ export struct ProfilePage {
   }
 
   aboutToDisappear(): void {
+    ProvinceLocation.unobserve(this.locationChanged);
     this.loadVersion++;
+    this.socialGeneration++;
     this.cancellationRequestVersion++;
     this.roleSwitchVersion++;
     this.interestGeneration++;
@@ -132,6 +154,7 @@ export struct ProfilePage {
   }
 
   private async load(resetNavigation: boolean = true): Promise<void> {
+    this.socialGeneration++;
     this.loadedSessionVersion = this.appClient.sessionManager.getSessionVersion();
     this.signingOut = false;
     const version = ++this.loadVersion;
@@ -177,11 +200,12 @@ export struct ProfilePage {
     this.favoriteTotal = 0;
     this.favoriteLoaded = false;
     this.socialLoaded = false;
+    this.socialError = '';
     try {
       let profile: UserProfileSummary;
       let degraded = false;
       try {
-        profile = await this.appClient.apiService.getMyProfile();
+        profile = await UiPerf.request('profile.identity', () => this.appClient.apiService.getMyProfile());
       } catch (error) {
         const failure = error as PortraError;
         if (!this.appClient.sessionManager.isAuthenticated() ||
@@ -204,6 +228,7 @@ export struct ProfilePage {
         throw new Error('个人资料格式异常');
       }
       this.profile = profile;
+      UiPerf.mark('profile.identity.ready');
       this.role = profile.currentRole;
       this.userId = profile.id;
       this.nickname = this.profileNickname(profile);
@@ -216,6 +241,7 @@ export struct ProfilePage {
         return;
       }
 
+      this.loadSocial();
       // The workspace preview comes from the same authenticated page API as management.
       try {
         if (profile.currentRole === 'CUSTOMER') {
@@ -287,23 +313,6 @@ export struct ProfilePage {
           this.errorMessage = (error as PortraError).message || '收藏读取失败';
         }
       }
-      try {
-        const followers = await this.appClient.apiService.listFollowers(profile.id, profile.currentRole);
-        if (version !== this.loadVersion || sessionVersion !== this.appClient.sessionManager.getSessionVersion()) { return; }
-        this.followers = this.validSocialUsers(followers);
-        const customerFollowing = await this.appClient.apiService.listFollowing(profile.id, 'CUSTOMER');
-        if (version !== this.loadVersion || sessionVersion !== this.appClient.sessionManager.getSessionVersion()) { return; }
-        const providerFollowing = await this.appClient.apiService.listFollowing(profile.id, 'PROVIDER');
-        if (version !== this.loadVersion || sessionVersion !== this.appClient.sessionManager.getSessionVersion()) { return; }
-        this.following = this.mergeSocialUsers(
-          this.validSocialUsers(customerFollowing), this.validSocialUsers(providerFollowing));
-        this.socialLoaded = true;
-      } catch (error) {
-        if (version !== this.loadVersion || sessionVersion !== this.appClient.sessionManager.getSessionVersion()) { return; }
-        if (version === this.loadVersion && sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
-          this.errorMessage = (error as PortraError).message || '关注信息读取失败';
-        }
-      }
       if (this.section === 'intent' && profile.currentRole === 'CUSTOMER' &&
         version === this.loadVersion && sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
         this.loadInterests();
@@ -350,29 +359,7 @@ export struct ProfilePage {
     return roleBio?.trim() || this.profile.bio?.trim() || '';
   }
 
-  private profileLocationLine(): string {
-    if (this.profile === null) { return ''; }
-    const parts: string[] = [];
-    if (this.profile.locationVisible !== false && this.profile.locationDisplay?.trim()) {
-      parts.push(this.profile.locationDisplay.trim());
-    }
-    if (this.profile.genderVisible !== false && this.profile.gender) {
-      const gender = this.profile.gender.toUpperCase();
-      if (gender === 'FEMALE' || gender === 'F') { parts.push('♀'); }
-      if (gender === 'MALE' || gender === 'M') { parts.push('♂'); }
-    }
-    if (this.profile.birthdayVisible !== false && this.profile.birthday) {
-      const birthday = new Date(this.profile.birthday);
-      const now = new Date();
-      if (!Number.isNaN(birthday.getTime()) && birthday.getTime() <= now.getTime()) {
-        let age = now.getFullYear() - birthday.getFullYear();
-        if (now.getMonth() < birthday.getMonth() ||
-          (now.getMonth() === birthday.getMonth() && now.getDate() < birthday.getDate())) { age--; }
-        if (age >= 0 && age <= 120) { parts.push(`${age}岁`); }
-      }
-    }
-    return parts.length > 0 ? parts.join(' · ') : '地区与年龄未公开';
-  }
+  private profileLocationLine(): string { return this.locatedRegionLabel; }
 
   private mergeSocialUsers(first: SocialUserBrief[], second: SocialUserBrief[]): SocialUserBrief[] {
     const result: SocialUserBrief[] = [];
@@ -384,6 +371,37 @@ export struct ProfilePage {
       }
     });
     return result;
+  }
+
+  private async loadSocial(): Promise<void> {
+    const generation = ++this.socialGeneration;
+    const started = Date.now();
+    UiPerf.mark('profile.relations.start');
+    const epoch = this.appClient.sessionManager.getSessionVersion();
+    const userId = this.userId, role = this.role;
+    if (userId <= 0) { return; }
+    this.socialError = '';
+    try {
+      const followers = await this.appClient.apiService.listFollowers(userId, role);
+      if (generation !== this.socialGeneration || epoch !== this.appClient.sessionManager.getSessionVersion()) { return; }
+      const customers = await this.appClient.apiService.listFollowing(userId, 'CUSTOMER');
+      if (generation !== this.socialGeneration || epoch !== this.appClient.sessionManager.getSessionVersion()) { return; }
+      const providers = await this.appClient.apiService.listFollowing(userId, 'PROVIDER');
+      if (generation !== this.socialGeneration || epoch !== this.appClient.sessionManager.getSessionVersion() ||
+        userId !== this.userId || role !== this.role) { return; }
+      if (!Array.isArray(followers) || !Array.isArray(customers) || !Array.isArray(providers)) {
+        throw new Error('关注列表格式异常');
+      }
+      this.followers = this.validSocialUsers(followers);
+      this.following = this.mergeSocialUsers(this.validSocialUsers(customers), this.validSocialUsers(providers));
+      this.socialLoaded = true;
+      UiPerf.elapsed('profile.relations.ready', started);
+    } catch (error) {
+      if (generation === this.socialGeneration && epoch === this.appClient.sessionManager.getSessionVersion() &&
+        userId === this.userId && role === this.role) {
+        this.socialError = (error as PortraError).message || '关注信息读取失败';
+      }
+    }
   }
 
   private validSocialUsers(source: SocialUserBrief[]): SocialUserBrief[] {
@@ -532,11 +550,13 @@ export struct ProfilePage {
   }
 
   private openSection(section: string): void {
+    UiPerf.mark('profile.click.' + section);
     if (section === 'credit') { this.onOpenCredit?.(); return; }
     if (section === 'orders') { this.onOpenOrders?.(); return; }
     if (section === 'messages') { this.onOpenMessages?.(); return; }
     if (section === 'intent' && this.role !== 'CUSTOMER') { return; }
     this.section = section;
+    this.detailScroller.scrollTo({ xOffset: 0, yOffset: 0 });
     if (section === 'intent') { this.loadInterests(); }
     if (section === 'likes') { this.loadLikes(); }
   }
@@ -595,7 +615,8 @@ export struct ProfilePage {
   private sectionTitle(): string {
     switch (this.section) {
       case 'settings': return '资料与设置';
-      case 'relationships': return '关注与粉丝';
+      case 'following': return '我的关注';
+      case 'followers': return '我的粉丝';
       case 'collections': return '我的收藏';
       case 'likes': return '我的点赞';
       case 'intent': return '我的意向';
@@ -826,7 +847,11 @@ export struct ProfilePage {
             .alignItems(HorizontalAlign.Start)
           }
           .width('100%')
-          .onClick(() => this.onOpenAuthor?.(item.userId, item.currentRole))
+          .constraintSize({ minHeight: 56 })
+          .onClick(() => {
+            if (item.userId === this.userId) { this.openSection('home'); }
+            else { this.onOpenAuthor?.(item.userId, item.currentRole); }
+          })
         }, (item: SocialUserBrief) => `${item.userId}-${item.currentRole}`)
       }
     }
@@ -866,14 +891,7 @@ export struct ProfilePage {
   // v39 reference: profile-detail-header, 58px high, 16px horizontal inset.
   @Builder
   private SubviewHeader() {
-    Row({ space: 10 }) {
-      Button('‹').width(38).height(38).padding(0).fontSize(29)
-        .fontColor('#625D58').backgroundColor(Color.Transparent)
-        .accessibilityText('返回我的主页').onClick(() => this.section = 'home')
-      Text(this.sectionTitle()).fontSize(24).fontWeight(FontWeight.Bold)
-        .fontColor('#292A2E').layoutWeight(1)
-    }.width('100%').height(58).padding({ left: 16, right: 16 })
-      .backgroundColor('#F6F3EE')
+    ProfileHeader({ title: this.sectionTitle(), onBack: () => this.section = 'home' })
   }
 
   // v39 identity statistics are inline, not full-width elevated blocks.
@@ -1028,48 +1046,14 @@ export struct ProfilePage {
       }
       Scroll() {
         Column({ space: 0 }) {
-          // Identity group has NO outer card or thick separator in v39.
-          Column({ space: 0 }) {
-            Row({ space: 14 }) {
-              PortraImage({ fileId: this.roleAvatarId(), imageWidth: 76, imageHeight: 76,
-                cornerRadius: 22, fallbackText: this.nickname.slice(0, 2),
-                contentDescription: `${this.nickname}的头像` })
-              Column({ space: 5 }) {
-                Row({ space: 8 }) {
-                  Text(this.nickname).fontSize(20).fontWeight(FontWeight.Bold)
-                    .fontColor('#242529').maxLines(1).layoutWeight(1)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  Row({ space: 4 }) {
-                    Text('♢').fontSize(13).fontColor('#5E6B9F')
-                    Text('信用').fontSize(9.5).fontColor('#5E6B9F')
-                    Text(this.profile?.creditScore === null || this.profile?.creditScore === undefined ?
-                      '—' : `${this.profile?.creditScore}`).fontSize(11.5).fontWeight(FontWeight.Bold)
-                      .fontColor('#1735B9')
-                  }.height(25).padding({ left: 7, right: 7 })
-                    .borderRadius(9).backgroundColor('#EEF1FF')
-                    .border({ width: 1, color: '#DBE1F6' })
-                    .onClick(() => this.onOpenCredit?.())
-                }.width('100%')
-                Text(`UID ${this.userId}`).fontSize(10.5).fontColor('#98918B')
-                Text(this.profileLocationLine())
-                  .fontSize(11.5).fontColor('#68635E')
-              }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-            }.width('100%').height(76)
-            if (this.profileBio().length > 0) {
-              Text(this.profileBio()).fontSize(12.5).lineHeight(21)
-                .fontColor('#58534F').width('100%').margin({ top: 13 })
-                .maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
-            } else {
-              Text('还没有填写个人简介').fontSize(12.5).fontColor('#918A84')
-                .margin({ top: 13 }).onClick(() => this.openSection('settings'))
-            }
-
-          }.width('100%').alignItems(HorizontalAlign.Start)
-            .padding({ left: 2, right: 2, top: 12 })
+          ProfileIdentity({ nickname: this.nickname, userId: this.userId, avatarFileId: this.roleAvatarId(),
+            identityLine: this.profileLocationLine(), bio: this.profileBio(), owner: true,
+            creditLabel: this.profile?.creditScore === null || this.profile?.creditScore === undefined ? '—' : `${this.profile?.creditScore}`,
+            onEdit: () => this.openSection('settings'), onOpenCredit: this.onOpenCredit })
           // Social stats belong directly under the profile and above the role-specific workspace.
           Row({ space: 28 }) {
-            this.StatLink(this.socialLoaded ? `${this.following.length}` : '—', '关注', 'relationships')
-            this.StatLink(this.socialLoaded ? `${this.followers.length}` : '—', '粉丝', 'relationships')
+            this.StatLink(this.socialLoaded ? `${this.following.length}` : '—', '关注', 'following')
+            this.StatLink(this.socialLoaded ? `${this.followers.length}` : '—', '粉丝', 'followers')
           }.width('100%').margin({ top: 12, bottom: 6 })
           // "我的约拍 / 摄影工作" is the single raised card in the reference.
           Column({ space: 0 }) {
@@ -1349,7 +1333,7 @@ export struct ProfilePage {
   private Details() {
     Column({ space: 0 }) {
       this.SubviewHeader()
-      Scroll() {
+      Scroll(this.detailScroller) {
         Column({ space: 13 }) {
           if (this.section === 'settings' && this.profile !== null) {
             ProfileWorkspace({ profile: this.profile, editOnly: true,
@@ -1369,11 +1353,17 @@ export struct ProfilePage {
             if (this.roleSwitchError.length > 0) {
               Text(this.roleSwitchError).fontSize(12).fontColor(PortraTheme.danger)
             }
-          } else if (this.section === 'relationships') {
-            this.SocialPreview('我的关注', this.following)
-            this.SocialPreview('关注我的人', this.followers)
+          } else if (this.section === 'following' || this.section === 'followers') {
+            if (this.socialError.length > 0) {
+              Text(this.socialError).fontSize(12).fontColor(PortraTheme.danger)
+              Button('重试').onClick(() => this.loadSocial())
+            } else if (!this.socialLoaded) {
+              Text('正在读取用户列表…').fontColor(PortraTheme.secondaryText)
+            }
+            if (this.socialLoaded) {
+              this.SocialPreview(this.sectionTitle(), this.section === 'following' ? this.following : this.followers)
+            }
           } else if (this.section === 'collections') {
-            this.QuickLink('我的点赞', '查看点赞的动态', 'likes')
             this.MomentPreview('已收藏的动态', this.favorites)
             if (this.favorites.length < this.favoriteTotal) {
               Button(this.loadingMoreFavorites ? '加载中…' : '加载更多收藏').width('100%')
@@ -1434,10 +1424,12 @@ export struct ProfilePage {
           if (this.errorMessage.length > 0) {
             Text(this.errorMessage).fontSize(12).fontColor(PortraTheme.danger)
           }
-        }.width('100%').padding({ left: 16, right: 16, top: 15, bottom: 32 })
+        }.width('100%').padding({ left: 16, right: 16, top: 20, bottom: 32 })
           .alignItems(HorizontalAlign.Start)
-      }.layoutWeight(1).scrollBar(BarState.Off)
+      }.width('100%').layoutWeight(1).align(Alignment.TopStart).scrollBar(BarState.Off)
+        .onAppear(() => this.detailScroller.scrollTo({ xOffset: 0, yOffset: 0 }))
     }.width('100%').height('100%')
+      .onAreaChange(() => UiPerf.mark('profile.layout.' + this.section))
   }
 
   build() {

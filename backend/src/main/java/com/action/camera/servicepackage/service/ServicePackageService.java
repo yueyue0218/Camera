@@ -1,5 +1,7 @@
 package com.action.camera.servicepackage.service;
 
+import com.action.camera.common.region.ProvinceNames;
+
 import com.action.camera.admin.dto.ModerationView;
 import com.action.camera.application.FileReferenceValidator;
 import com.action.camera.common.ErrorCode;
@@ -217,7 +219,7 @@ public class ServicePackageService {
                 .filter(ServicePackage::isModerationVisible)
                 .filter(servicePackage -> !Boolean.TRUE.equals(servicePackage.getHiddenByProvider()))
                 .filter(servicePackage -> normalizedCity == null
-                        || servicePackage.getCityCode().equalsIgnoreCase(normalizedCity))
+                        || ProvinceNames.matches(servicePackage.getCityCode(), normalizedCity))
                 .filter(servicePackage -> normalizedScene == null
                         || servicePackage.getScene().equalsIgnoreCase(normalizedScene))
                 .filter(servicePackage -> normalizedStyle == null
@@ -355,6 +357,21 @@ public class ServicePackageService {
         ServicePackage saved = servicePackageRepository.save(servicePackage);
         return ServicePackageMapper.toDetail(
                 saved, photographerInfo(saved.getProviderId()), moderationView(saved));
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<ServicePackageCardDto> listPublicByUser(Long userId, int page, int size) {
+        int safePage = Math.max(1, page), safeSize = Math.max(1, Math.min(50, size));
+        var result = servicePackageRepository.findPublicByUser(userId, PageRequest.of(safePage - 1, safeSize));
+        return new PageResult<>(result.getContent().stream().map(item -> ServicePackageMapper.toCard(item, photographerInfo(item.getProviderId()), null)).toList(), safePage, safeSize, result.getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<ServicePackageCardDto> listMyPublications(CurrentUser user, int page, int size) {
+        ensureProviderOrAdmin(user);
+        int safePage = Math.max(1, page), safeSize = Math.max(1, Math.min(50, size));
+        var result = servicePackageRepository.findOwnerPage(user.getUserId(), PageRequest.of(safePage - 1, safeSize));
+        return new PageResult<>(result.getContent().stream().map(item -> ServicePackageMapper.toCard(item, photographerInfo(item.getProviderId()), null, moderationView(item))).toList(), safePage, safeSize, result.getTotalElements());
     }
 
     @Transactional(readOnly = true)

@@ -36,6 +36,7 @@ function load(relative, page = false) {
     if(name.endsWith('/EnvironmentConfig')) return {EnvironmentConfig:{current:()=>({cacheNamespace:'dev',baseUrl:origin})}};
     if(name.endsWith('/ContentChanges')) return {ContentChanges:{publish:()=>events++}};
     if(name.endsWith('/JournalUI')) return {JournalStyle:{paper:'#F6F3EE'}};
+    if(name.endsWith('/ProvinceCatalog')) return load('common/region/ProvinceCatalog.ets');
     if(name.endsWith('/JournalText')) return load('features/publish/JournalText.ets');
     if(name.endsWith('/ReportSubmissionStore')) return load('features/user/ReportSubmissionStore.ets');
     if(name.endsWith('/PublishDraftStore')) return load('features/publish/PublishDraftStore.ets');
@@ -175,14 +176,14 @@ test('accepted-chat adapter verifies server snapshot and identity before posting
   snapshot={...snapshot,responseStatus:'ACCEPTED'};client.get=async()=>{id++;return snapshot};await assert.rejects(api.openAcceptedDemandChat(3));
 });
 
-test('four-page UI includes native cover, dynamic titles, borderless yellow star and both role entry wiring',()=>{
+test('four-page UI includes native cover, dynamic titles, 28vp SVG intention star and both role entry wiring',()=>{
   const read=p=>fs.readFileSync(path.join(root,p),'utf8');
   const service=read('pages/ServiceDetailPage.ets'),demand=read('pages/DemandDetailPage.ets'),publish=read('pages/PublishPage.ets');
   assert.match(service,/title: this.detail\?\.title/);assert.match(demand,/title: this.demand\?\.scene/);
   for(const s of [service,demand]) assert.match(s,/journal: true, moduleHeight: 304/);
-  const ui=read('features/publish/JournalUI.ets');assert.match(ui,/#F5C522/);assert.match(ui,/strokeWidth\(this.selected \? 0/);
+  const ui=read('features/publish/JournalUI.ets');assert.match(read('../resources/base/media/intention_star_selected.svg'), /#F5C522/i);assert.match(ui,/width\(28\)\.height\(28\)/);assert.match(ui,/width\(48\)\.height\(48\)/);
   assert.ok(ui.indexOf('onStar?.()')<ui.indexOf('onChat?.()'));
-  assert.match(demand,/需求收藏暂未开放/);
+  assert.match(demand,/此需求暂不支持加入意向/);
   for(const label of ['橱窗介绍','拍摄想法','拍摄服务','时间与地点','预约与交付','预算预期','作品影集','灵感参考','预览橱窗','预览需求'])assert.ok(publish.includes(label),label);
   assert.doesNotMatch(service+demand+publish,/WebView|localStorage|unsplash/);
   const shell=read('features/shell/PortraAppShell.ets');assert.match(shell,/onPublish:.*AppRoute.PUBLISH/);assert.match(shell,/onOpenPublish:.*AppRoute.PUBLISH/);
@@ -259,7 +260,7 @@ test('both edit modes use update only, preserve existing file IDs and cover orde
 test('clean filters, shared city selector, owner callbacks and original report integration are present',()=>{
   const read=p=>fs.readFileSync(path.join(root,p),'utf8');const filters=read('features/hall/components/HallFilters.ets'),form=read('pages/PublishPage.ets');
   assert.doesNotMatch(filters,/TextInput|customValue|按输入值|仅匹配|chooseDate/);assert.match(filters,/bindMenu/);assert.match(filters,/scrollBar/);
-  assert.match(form,/Select\(HallFilterOptions.cities/);assert.match(form,/请选择服务城市/);assert.doesNotMatch(form,/填写拍摄城市/);
+  assert.match(form,/Select\(HallFilterOptions.cities/);assert.match(form,/请选择服务地区/);assert.doesNotMatch(form,/填写拍摄城市/);
   for(const name of ['Service','Demand']) {const s=read('pages/'+name+'DetailPage.ets');assert.match(s,/PublicationActions/);assert.match(s,/onChanged: \(\) => this.load\(\)/);assert.match(s,/ReportPanel\(/);}
   assert.match(read('pages/Index.ets'),/returnRoute !== AppRoute.SERVICE_DETAIL/);
 });
@@ -285,4 +286,19 @@ test('existing edit and offline adapters retain exact verbs, paths and payloads'
   const service={title:'改',portfolioIds:[13,10]},demand={scene:'改',referenceFileIds:[21]};
   await api.updateService(12,service);await api.updateDemand(23,demand);await api.offlineService(12);await api.closeDemand(23);
   assert.deepEqual(calls,[['PUT','/service-packages/12',service],['PUT','/demands/23',demand],['PATCH','/service-packages/12/offline',undefined],['PATCH','/demands/23/close',undefined]]);
+});
+
+
+test('intention and chat have independent duplicate guards and pending UI state', async()=>{
+  const p=new ServiceDetailPage();
+  Object.assign(p,{role:'CUSTOMER',userId:7,serviceId:3,detail:{providerId:9,status:'ONLINE',isAvailable:true}});
+  const interest=deferred(), chat=deferred(); let adds=0,chats=0;
+  app.apiService.addServicePackageInterest=()=>{adds++;return interest.promise;};
+  app.apiService.startServiceChat=()=>{chats++;return chat.promise;};
+  const a=p.toggleInterest();await p.toggleInterest();
+  assert.equal(adds,1);assert.equal(p.interestBusy,true);assert.equal(p.chatBusy,false);
+  const b=p.startChat();await p.startChat();assert.equal(chats,1);
+  interest.resolve({serviceId:3});await a;
+  assert.equal(p.interested,true);assert.equal(p.interestBusy,false);assert.equal(p.chatBusy,true);
+  chat.resolve({serviceId:3,conversationId:33});await b;assert.equal(p.chatBusy,false);
 });

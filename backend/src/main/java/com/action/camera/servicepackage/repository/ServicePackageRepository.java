@@ -4,6 +4,7 @@ import com.action.camera.admin.domain.ModerationStatus;
 import com.action.camera.servicepackage.domain.ServicePackage;
 import com.action.camera.servicepackage.domain.ServicePackageStatus;
 import jakarta.persistence.LockModeType;
+import com.action.camera.common.region.ProvinceSql;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -15,6 +16,12 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ServicePackageRepository extends JpaRepository<ServicePackage, Long> {
+
+    @Query(value = "select e from ServicePackage e where e.providerId = :userId and e.status = com.action.camera.servicepackage.domain.ServicePackageStatus.ONLINE and e.moderationStatus = com.action.camera.admin.domain.ModerationStatus.VISIBLE and (e.hiddenByProvider = false or e.hiddenByProvider is null) order by e.updatedAt desc, e.id desc")
+    Page<ServicePackage> findPublicByUser(@Param("userId") Long userId, Pageable pageable);
+
+    @Query("select e from ServicePackage e where e.providerId = :userId and (e.hiddenByProvider = false or e.hiddenByProvider is null) order by e.updatedAt desc, e.id desc")
+    Page<ServicePackage> findOwnerPage(@Param("userId") Long userId, Pageable pageable);
 
     List<ServicePackage> findByStatus(ServicePackageStatus status);
 
@@ -30,7 +37,8 @@ public interface ServicePackageRepository extends JpaRepository<ServicePackage, 
             where sp.status = 'ONLINE'
               and sp.moderation_status = 'VISIBLE'
               and coalesce(sp.hidden_by_provider, false) = false
-              and (:cityCode is null or lower(sp.city_code) = lower(:cityCode))
+              and """ + ProvinceSql.SERVICE + """
+
               and (:scene is null or lower(sp.scene) = lower(:scene))
               and (:style is null or instr(lower(coalesce(sp.style_tags, '')), concat('\"', lower(:style), '\"')) > 0)
               and (:minPriceCent is null or sp.base_price_cent >= :minPriceCent)
@@ -71,7 +79,8 @@ public interface ServicePackageRepository extends JpaRepository<ServicePackage, 
             where sp.status = 'ONLINE'
               and sp.moderation_status = 'VISIBLE'
               and coalesce(sp.hidden_by_provider, false) = false
-              and (:cityCode is null or lower(sp.city_code) = lower(:cityCode))
+              and """ + ProvinceSql.SERVICE + """
+
               and (:scene is null or lower(sp.scene) = lower(:scene))
               and (:style is null or instr(lower(coalesce(sp.style_tags, '')), concat('\"', lower(:style), '\"')) > 0)
               and (:minPriceCent is null or sp.base_price_cent >= :minPriceCent)

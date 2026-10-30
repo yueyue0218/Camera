@@ -10,7 +10,7 @@ const method = source.slice(source.indexOf('  private async switchRole()'), sour
 const code = ts.transpileModule(`class Page { ${method} }; module.exports = Page;`, {
   compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS }
 }).outputText;
-const mod = { exports: {} }; new Function('module', code)(mod);
+const mod = { exports: {} }; new Function('module', 'UiPerf', code)(mod, {mark() {}, elapsed() {}});
 function fixture() {
   let epoch = 10, requests = 0, broadcasts = 0, loads = 0, resolve, reject;
   const page = new mod.exports();
@@ -69,4 +69,48 @@ test('hall switches primary content for confirmed identities and keeps public br
   view.currentRole = 'PROVIDER'; view.onRoleChanged(); assert.equal(view.channel, 'demands');
   view.currentRole = ''; view.onRoleChanged(); assert.equal(view.channel, 'demands');
   view.currentRole = 'CUSTOMER'; view.onRoleChanged(); assert.equal(view.channel, 'showcases');
+});
+
+
+function socialFixture() {
+  const methods = source.slice(source.indexOf('  private mergeSocialUsers('), source.indexOf('  private async loadMoreMoments('));
+  const output = ts.transpileModule(`class Page { ${methods} }; module.exports = Page;`, {
+    compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS }
+  }).outputText;
+  const mod = { exports: {} }; new Function('module', 'UiPerf', output)(mod, {mark() {}, elapsed() {}});
+  let epoch = 1;
+  const page = new mod.exports();
+  Object.assign(page, { userId: 7, role: 'CUSTOMER', socialGeneration: 0,
+    section: 'following', loading: false, socialLoaded: true, following: [{ userId: 9 }], followers: [],
+    appClient: { sessionManager: { getSessionVersion: () => epoch }, apiService: {
+      async listFollowers() { return [{ userId: 2, currentRole: 'CUSTOMER' }]; },
+      async listFollowing(id, role) { return [{ userId: 3, currentRole: role }]; }
+    } }
+  });
+  return { page, changeSession() { epoch++; } };
+}
+
+test('relationship refresh replaces server data while preserving the mounted list view', async () => {
+  const f = socialFixture(); await f.page.loadSocial();
+  assert.equal(f.page.following.length, 2); assert.equal(f.page.followers.length, 1);
+  assert.equal(f.page.section, 'following'); assert.equal(f.page.loading, false);
+  assert.equal(f.page.socialLoaded, true); assert.equal(f.page.socialError, '');
+});
+
+test('failed relationship refresh retains last known rows and exposes a retryable error', async () => {
+  const f = socialFixture(); const rows = f.page.following;
+  f.page.appClient.apiService.listFollowers = async () => { throw new Error('offline'); };
+  await f.page.loadSocial();
+  assert.equal(f.page.socialError, 'offline'); assert.equal(f.page.following, rows);
+  f.page.appClient.apiService.listFollowers = async () => [];
+  await f.page.loadSocial(); assert.equal(f.page.socialError, '');
+});
+
+test('late relationship responses cannot overwrite another account or send subsequent requests', async () => {
+  const f = socialFixture(); let resolve, requests = 0;
+  const rows = f.page.following;
+  f.page.appClient.apiService.listFollowers = () => new Promise(r => resolve = r);
+  f.page.appClient.apiService.listFollowing = async () => { requests++; return []; };
+  const read = f.page.loadSocial(); f.changeSession(); resolve([]); await read;
+  assert.equal(f.page.following, rows); assert.equal(requests, 0);
 });

@@ -8,6 +8,7 @@ import com.action.camera.auth.service.AuthSessionService;
 import com.action.camera.auth.service.SessionAuthenticationResult;
 import com.action.camera.credit.service.CreditSnapshotService;
 import com.action.camera.domain.User;
+import com.action.camera.domain.UserRoleBinding;
 import com.action.camera.dto.LoginResponse;
 import com.action.camera.dto.SwitchRoleResponse;
 import com.action.camera.dto.UpdateProfileRequest;
@@ -239,11 +240,29 @@ public class UserService {
         if (targetRole == UserRole.ADMIN) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "不允许切换为 ADMIN");
         }
+        if (targetRole != UserRole.CUSTOMER && targetRole != UserRole.PROVIDER) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "不支持的账号身份");
+        }
 
-        User user = userRepository.findById(userId)
+        // Serialize activation and role changes for this account, including retries from
+        // multiple devices. Both the binding and provider profile are created in this transaction.
+        User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
+        if (!"ACTIVE".equals(user.getStatus())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "当前账号不可切换身份");
+        }
 
-        requireRoleBinding(userId, targetRole);
+        // Self-service role activation: an authenticated user may explicitly opt into either
+        // customer or photographer mode. This is not an admin grant and never grants ADMIN.
+        // Administrators retain the original bound-role-only switching contract.
+        if (hasAdminPermission(user)) {
+            requireRoleBinding(userId, targetRole);
+        } else {
+            ensureRoleBinding(userId, targetRole);
+        }
+        if (targetRole == UserRole.PROVIDER) {
+            ensureProviderProfile(userId);
+        }
 
         if (targetRole.name().equals(user.getCurrentRole())) {
             return new SwitchRoleResponse(user.getId(), user.getCurrentRole(), user.getNickname());
@@ -256,8 +275,14 @@ public class UserService {
 
     @Transactional
     public void updateMyProfile(Long userId, UpdateProfileRequest req) {
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
+        if (!"ACTIVE".equals(user.getStatus())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "当前账号不可修改资料");
+        }
+        if (req.getRole() != null && !"CUSTOMER".equals(req.getRole()) && !"PROVIDER".equals(req.getRole())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "不支持的账号身份");
+        }
         if (req.getAvatarFileId() != null) {
             fileReferenceValidator.requireExisting(List.of(req.getAvatarFileId()), "avatarFileId");
         }
@@ -275,10 +300,8 @@ public class UserService {
             }
             if (req.getAvatarFileId() != null) {
                 pp.setProviderAvatarFileId(req.getAvatarFileId());
-                user.setAvatarFileId(req.getAvatarFileId());
             }
             providerProfileMapper.updateById(pp);
-            userRepository.save(user);
         } else {
             if (req.getNickname() != null && !req.getNickname().isBlank()) {
                 user.setNickname(req.getNickname().trim());
@@ -289,29 +312,40 @@ public class UserService {
             if (req.getAvatarFileId() != null) {
                 user.setAvatarFileId(req.getAvatarFileId());
             }
-            if (req.getCityCode() != null && !req.getCityCode().isBlank()) {
-                user.setCityCode(req.getCityCode().trim());
-            }
-            if (req.getGender() != null) {
-                user.setGender(req.getGender().isBlank() ? null : req.getGender().trim());
-            }
-            if (req.getGenderVisible() != null) {
-                user.setGenderVisible(req.getGenderVisible());
-            }
-            if (req.getBirthday() != null) {
-                user.setBirthday(req.getBirthday().isBlank() ? null : req.getBirthday().trim());
-            }
-            if (req.getBirthdayVisible() != null) {
-                user.setBirthdayVisible(req.getBirthdayVisible());
-            }
-            if (req.getLocationDisplay() != null) {
-                user.setLocationDisplay(req.getLocationDisplay().trim());
-            }
-            if (req.getLocationVisible() != null) {
-                user.setLocationVisible(req.getLocationVisible());
-            }
-            userRepository.save(user);
         }
+        // Location and privacy belong to the account and are editable from either identity.
+        if (req.getCityCode() != null && !req.getCityCode().isBlank()) {
+            user.setCityCode(req.getCityCode().trim());
+        }
+        if (req.getGender() != null) {
+            user.setGender(req.getGender().isBlank() ? null : req.getGender().trim());
+        }
+        if (req.getGenderVisible() != null) {
+            user.setGenderVisible(req.getGenderVisible());
+        }
+        if (req.getBirthday() != null) {
+            user.setBirthday(req.getBirthday().isBlank() ? null : req.getBirthday().trim());
+        }
+        if (req.getBirthdayVisible() != null) {
+            user.setBirthdayVisible(req.getBirthdayVisible());
+        }
+        if (req.getLocationDisplay() != null) {
+            user.setLocationDisplay(req.getLocationDisplay().trim());
+        }
+        if (req.getLocationVisible() != null) {
+            user.setLocationVisible(req.getLocationVisible());
+        }
+        userRepository.save(user);
+    }
+
+    private void ensureRoleBinding(Long userId, UserRole role) {
+        if (userRoleBindingRepository.existsByUserIdAndRole(userId, role.name())) {
+            return;
+        }
+        UserRoleBinding binding = new UserRoleBinding();
+        binding.setUserId(userId);
+        binding.setRole(role.name());
+        userRoleBindingRepository.save(binding);
     }
 
     private void requireRoleBinding(Long userId, UserRole role) {

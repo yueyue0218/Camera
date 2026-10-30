@@ -11,6 +11,10 @@
     {
       "name": "EntryAbility_label",
       "value": "label"
+    },
+    {
+      "name": "province_location_reason",
+      "value": "用于识别所在省级地区，便于筛选拍摄内容；不公开位置，可手动选择地区。"
     }
   ]
 }

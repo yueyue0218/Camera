@@ -1,3 +1,6 @@
+import { promptAction } from '@kit.ArkUI';
+import { ProvinceLocation } from '../../../common/location/ProvinceLocation';
+import { common } from '@kit.AbilityKit';
 import { HallChannel } from '../HallUiModels';
 import { HallFilterState } from '../HallFilterState';
 import { HallFilterOption, HallFilterOptions } from '../HallFilterOptions';
@@ -14,6 +17,35 @@ export struct HallFilters {
   @State private dateOptions: HallFilterOption[] = [];
   private readonly labels: string[] = ['地区', '风格', '价格', '时间'];
 
+  @State private locating: boolean = false;
+  private locationGeneration: number = 0;
+  aboutToDisappear(): void { this.locationGeneration++; }
+  private async locate(): Promise<void> {
+    if (this.locating) { return; }
+    const generation = ++this.locationGeneration;
+    const channel = this.channel;
+    const filters = this.filters;
+    this.locating = true;
+    try {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      const region = await ProvinceLocation.locate(context);
+      if (generation !== this.locationGeneration || channel !== this.channel || filters !== this.filters) { return; }
+      const next = this.filters.copy(); next.city = region.province;
+      this.onChange?.(next); this.close();
+    } catch (error) {
+      if (generation === this.locationGeneration) { promptAction.showToast({ message: (error as Error).message || '定位失败，可手动选择' }); }
+    } finally { this.locating = false; }
+  }
+  private confirmLocation(): void {
+    if (this.locating) { return; }
+    if (ProvinceLocation.authorized(this.getUIContext().getHostContext() as common.UIAbilityContext)) {
+      this.locate(); return;
+    }
+    AlertDialog.show({ title: '使用当前位置筛选',
+      message: '将申请前台大致位置权限，并由系统解析省级地区。Portra 不上传或保存精确坐标，不将定位结果公开到个人资料；你也可以手动选择。',
+      primaryButton: { value: '手动选择', action: () => {} },
+      secondaryButton: { value: '同意并定位', action: () => this.locate() } });
+  }
   private close(): void { this.openField = -1; }
   private toggle(field: number): void {
     this.dateOptions = HallFilterOptions.dates();
@@ -52,6 +84,16 @@ export struct HallFilters {
           }, (option: HallFilterOption) => option.value)
         }.width('100%')
       }.constraintSize({ maxHeight: 280 }).width('100%').scrollBar(BarState.Auto)
+      if (field === 0) {
+        Row() {
+          Button({ type: ButtonType.Normal }) {
+            Text(this.locating ? '正在获取地区…' : '定位当前地区')
+              .fontSize(14).fontColor(PortraTheme.primary).width(152).height(38)
+              .textAlign(TextAlign.Center).backgroundColor(PortraTheme.primarySoft).borderRadius(19)
+          }.width(160).height(48).padding(0).backgroundColor(Color.Transparent)
+            .enabled(!this.locating).onClick(() => this.confirmLocation())
+        }.width('100%').justifyContent(FlexAlign.Center).margin({ top: 4, bottom: 4 })
+      }
       Divider().color(PortraTheme.border)
       Button('重置全部筛选').width('100%').height(44).fontSize(12)
         .fontColor(PortraTheme.secondaryText).backgroundColor(Color.Transparent)

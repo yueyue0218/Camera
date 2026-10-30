@@ -167,7 +167,8 @@ export struct JournalActions {
   @Prop price: string = '';
   @Prop service: boolean = true;
   @Prop selected: boolean = false;
-  @Prop actionsEnabled: boolean = true;
+  @Prop starEnabled: boolean = true;
+  @Prop chatEnabled: boolean = true;
   @Prop notice: string = '';
   onStar?: () => void;
   onChat?: () => void;
@@ -179,17 +180,17 @@ export struct JournalActions {
           Text(this.service ? '参考价格' : '预算范围').fontSize(10).fontColor(JournalStyle.muted)
           Text(this.price).fontSize(this.service ? 21 : 18).fontWeight(FontWeight.Bold).fontColor(JournalStyle.blue)
             .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-        }.constraintSize({ maxWidth: '40%' }).alignItems(HorizontalAlign.Start)
+        }.constraintSize({ maxWidth: '32%' }).alignItems(HorizontalAlign.Start)
         Button({ type: ButtonType.Normal }) {
-          Path().commands('M13 3 L16.1 9.3 L23 10.3 L18 15.2 L19.2 22.2 L13 18.9 L6.8 22.2 L8 15.2 L3 10.3 L9.9 9.3 Z')
-            .width(26).height(26).fill(this.selected ? '#F5C522' : Color.Transparent)
-            .stroke(this.selected ? Color.Transparent : '#35353A').strokeWidth(this.selected ? 0 : 1.65)
-        }.width(38).height(46).padding(0).backgroundColor(Color.Transparent).borderRadius(0)
-          .accessibilityText(this.selected ? '移出我的意向' : '加入我的意向').enabled(this.actionsEnabled).onClick(() => this.onStar?.())
+          Image(this.selected ? $r('app.media.intention_star_selected') : $r('app.media.intention_star'))
+            .width(28).height(28).objectFit(ImageFit.Contain)
+        }.width(48).height(48).padding(0).backgroundColor(Color.Transparent).stateEffect(false)
+          .flexShrink(0)
+          .accessibilityText(this.service ? (this.selected ? '移出我的意向' : '加入我的意向') : '此需求暂不支持加入意向').enabled(this.starEnabled).onClick(() => this.onStar?.()).onTouch((event: TouchEvent) => event.stopPropagation())
         Button(this.service ? '和摄影师聊聊' : '和需求方聊聊').layoutWeight(1).height(46).padding({ left: 7, right: 7 })
           .fontSize(12).fontWeight(FontWeight.Bold).fontColor(Color.White).backgroundColor(JournalStyle.blue).borderRadius(13)
-          .enabled(this.actionsEnabled).onClick(() => this.onChat?.())
-      }.width('100%')
+          .enabled(this.chatEnabled).onClick(() => this.onChat?.()).onTouch((event: TouchEvent) => event.stopPropagation())
+      }.width('100%').alignItems(VerticalAlign.Center)
     }.width('100%').padding({ left: 14, right: 14, top: 11, bottom: 15 })
       .border({ width: { top: 1 }, color: JournalStyle.line }).backgroundColor(JournalStyle.surface)
   }

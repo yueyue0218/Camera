@@ -23,15 +23,16 @@ function fixture(decode = async () => pixel()) {
   return {controller, requests, listeners, get state() {return state;}, identity() {epoch++; for(const f of listeners) f();}};
 }
 
-test('city presets preserve legacy web codes and share exact publish/filter values', () => {
-  const web = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/pages/hall/components/hallUtils.js'),'utf8');
-  const block = web.split('export const CITY_OPTIONS = [')[1].split(']')[0];
-  const expected = [...block.matchAll(/label: '([^']+)', value: '([^']+)'/g)].map(m => [m[1],m[2]]);
-  assert.deepEqual(HallFilterOptions.cities([]).slice(1, 1 + expected.length).map(o => [o.label.replace("（旧地区）", ""),o.value]), expected);
-  assert.equal(HallFilterOptions.cities([]).find(o=>o.value==='320100').label, '南京（历史编码）');
-  for (const value of ['南京','南京市','JS','320100']) assert.equal(HallFilterOptions.cities([value]).filter(o=>o.value===value).length,1);
-  assert.equal(HallFilterOptions.cities(['LEGACY']).at(-1).value,'LEGACY');
-  assert.deepEqual(HallFilterOptions.styles(['纪实', '胶片']).slice(-2).map(o => o.value), ['纪实', '胶片']);
+test('province and style menus reject historical values and share canonical values', () => {
+  const { ProvinceCatalog } = require(path.join(root, 'common/region/ProvinceCatalog.ets'));
+  const options = HallFilterOptions.cities(['南京','南京市','北京市','LEGACY']);
+  assert.equal(options.length, 35); assert.equal(options[0].label, '不限地区');
+  assert.equal(new Set(options.map(o=>o.value)).size, 35);
+  assert.equal(options.filter(o=>o.value==='江苏省').length, 1);
+  for (const value of ['南京','南京市','JS','320100','苏州','苏州市']) assert.equal(ProvinceCatalog.normalize(value),'江苏省');
+  assert.equal(ProvinceCatalog.normalize('北京市'),'北京市');
+  assert.equal(ProvinceCatalog.normalize('LEGACY'),'');
+  assert.equal(HallFilterOptions.styles(['南京','任意历史标签','胶片']).length,16);
 });
 
 test('preset prices preserve inclusive bounds and each dynamic date is one exact local day', () => {
@@ -105,16 +106,16 @@ test('filters are native anchored overlays; original control is confined to the 
 });
 
 
-test('20 exact-value presets (including explicit legacy label) exist before any page is loaded and map exactly to both queries', () => {
+test('15 canonical style presets exist before any page is loaded and map exactly to both queries', () => {
   const options = HallFilterOptions.styles([]);
-  assert.equal(options.length, 21);
-  assert.equal(new Set(options.map(o => o.value)).size, 21);
+  assert.equal(options.length, 16);
+  assert.equal(new Set(options.map(o => o.value)).size, 16);
   for (const option of options.slice(1)) {
     const f = HallFilterOptions.choose(new HallFilterState(), 1, option);
     assert.equal(f.serviceQuery(1,20,'s').style, option.value);
     assert.equal(f.demandQuery(1,20,'s').styleTag, option.value);
   }
-  assert.equal(HallFilterOptions.styles(['日系清新', ' 日系清新 ', '']).length, 21);
+  assert.equal(HallFilterOptions.styles(['日系清新', ' 日系清新 ', '']).length, 16);
 });
 
 test('stop immediately cancels pending work without releasing still-mounted pixels', async () => {

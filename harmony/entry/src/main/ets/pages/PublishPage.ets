@@ -1,3 +1,4 @@
+import { ProvinceCatalog } from '../common/region/ProvinceCatalog';
 import { common } from '@kit.AbilityKit';
 import { promptAction } from '@kit.ArkUI';
 import { PublishDraftStore } from '../features/publish/PublishDraftStore';
@@ -133,7 +134,7 @@ export struct PublishPage {
         if (generation !== this.generation || this.identity !== this.appClient.sessionManager.getSessionVersion()) { return; }
         if (this.role !== 'CUSTOMER' || d.customerId !== session.userId || d.status !== 'OPEN') { throw new Error('当前身份不能编辑此需求'); }
         this.originalDemand = d;
-        this.title = d.scene ?? ''; this.city = d.cityCode ?? ''; this.place = d.location ?? '';
+        this.title = d.scene ?? ''; this.city = ProvinceCatalog.normalize(d.cityCode ?? ''); this.place = d.location ?? '';
         this.time = d.timeDescription ?? ''; this.description = d.description ?? '';
         this.minBudget = d.budgetMinCent === undefined ? '' : String(d.budgetMinCent / 100);
         this.maxBudget = d.budgetMaxCent === undefined ? '' : String(d.budgetMaxCent / 100);
@@ -142,7 +143,7 @@ export struct PublishPage {
         const s = await this.appClient.apiService.getServicePackage(this.serviceId);
         if (generation !== this.generation || this.identity !== this.appClient.sessionManager.getSessionVersion()) { return; }
         if (this.role !== 'PROVIDER' || s.providerId !== session.userId) { throw new Error('当前身份不能编辑此橱窗'); }
-        this.title = s.title ?? ''; this.city = s.cityCode ?? ''; this.place = s.serviceArea ?? '';
+        this.title = s.title ?? ''; this.city = ProvinceCatalog.normalize(s.cityCode ?? ''); this.place = s.serviceArea ?? '';
         this.time = s.timeDescription ?? ''; this.description = s.description ?? ''; this.scene = s.scene ?? '';
         this.minBudget = s.basePriceCent === undefined ? '' : String(s.basePriceCent / 100);
         this.duration = String(s.durationMinutes ?? ''); this.originals = String(s.originalCount ?? '');
@@ -390,7 +391,7 @@ export struct PublishPage {
       if (!value) { return; }
       const draft = JSON.parse(value) as PublishDraft;
       if (typeof draft.title === 'string') { this.title = draft.title; }
-      if (typeof draft.city === 'string') { this.city = draft.city; }
+      if (typeof draft.city === 'string') { this.city = ProvinceCatalog.normalize(draft.city); }
       if (typeof draft.place === 'string') { this.place = draft.place; }
       if (typeof draft.description === 'string') { this.description = draft.description; }
       if (typeof draft.minBudget === 'string') { this.minBudget = draft.minBudget; }
@@ -464,7 +465,7 @@ export struct PublishPage {
   private validateForm(): string {
     if (!this.title.trim() || this.title.trim().length > 30) { return '请填写标题，最多 30 字'; }
     if (!this.description.trim() || this.description.trim().length > 500) { return '请填写描述，最多 500 字'; }
-    if (!this.city.trim() || this.city.trim().length > 20) { return '请填写城市，最多 20 字'; }
+    if (!this.city.trim() || this.city.trim().length > 20) { return '请选择省级地区'; }
     if (this.selectedStyles().length > 3) { return '最多选择 3 项拍摄风格'; }
     if (this.imageCount() > 9) { return '最多添加 9 张图片'; }
     const min = this.parseBudget(this.minBudget), max = this.parseBudget(this.maxBudget);
@@ -578,8 +579,7 @@ export struct PublishPage {
         Text('最多选择 3 项').fontSize(10).fontColor('#AAA39D')
       }.width('100%')
       Flex({ wrap: FlexWrap.Wrap }) {
-        ForEach(this.role === 'PROVIDER' ? ['日系清透', '自然光', '胶片感', '校园写真', '情绪人像', '复古港风', '古风汉服', '纪实抓拍'] :
-          HallFilterOptions.styles(this.selectedStyles()).slice(1).map((option: HallFilterOption) => option.value), (style: string) => {
+        ForEach(HallFilterOptions.styles().slice(1).map((option: HallFilterOption) => option.value), (style: string) => {
           Button((this.selectedStyles().includes(style) ? '✓ ' : '') + HallFilterOptions.styleLabel(style)).height(34).fontSize(11)
             .fontColor(this.selectedStyles().includes(style) ? JournalStyle.blue : '#716B66')
             .backgroundColor(this.selectedStyles().includes(style) ? '#EEF0FC' : '#F8F5F1')
@@ -625,9 +625,9 @@ export struct PublishPage {
         this.SectionTitle('02', this.role === 'PROVIDER' ? '拍摄服务' : '时间与地点', this.role === 'PROVIDER' ? 'SERVICE' : 'TIME & PLACE')
         Row({ space: 11 }) {
           Column() {
-            Text(this.role === 'PROVIDER' ? '服务城市 *' : '拍摄城市 *').fontSize(12).fontColor('#4A4745').margin({ bottom: 8, top: 9 })
+            Text(this.role === 'PROVIDER' ? '服务地区 *' : '拍摄地区 *').fontSize(12).fontColor('#4A4745').margin({ bottom: 8, top: 9 })
             Select(HallFilterOptions.cities(this.city ? [this.city] : []).slice(1).map((option: HallFilterOption): SelectOption => ({ value: option.label })))
-              .value(this.city ? HallFilterOptions.cityLabel(this.city) : this.role === 'PROVIDER' ? '请选择服务城市' : '请选择拍摄城市')
+              .value(this.city ? HallFilterOptions.cityLabel(this.city) : this.role === 'PROVIDER' ? '请选择服务地区' : '请选择拍摄地区')
               .width('100%').height(46).font({ size: 13 }).backgroundColor('#FAF8F4').borderRadius(11)
               .onSelect((index: number) => { this.city = HallFilterOptions.cities(this.city ? [this.city] : [])[index + 1].value; })
           }.layoutWeight(1)

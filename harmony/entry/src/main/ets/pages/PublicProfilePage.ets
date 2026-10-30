@@ -1,7 +1,11 @@
+import { UiPerf } from '../common/performance/UiPerf';
 import { ContentChanges } from '../features/user/ContentChanges';
 import { DemandSummary, ServicePackageSummary } from '../model/ApiModels';
 import { AppClient } from '../app/AppClient';
-import { PortraAvatar } from '../common/components/PortraAvatar';
+import { ProfileIdentity } from '../features/user/ProfileIdentity';
+import { ProfileHeader } from '../features/user/ProfileHeader';
+import { FollowAction } from '../features/user/FollowAction';
+import { PortraImage } from '../common/components/PortraImage';
 import { PortraLoading } from '../common/components/PortraLoading';
 import { MomentCard } from '../features/moments/MomentCard';
 import { MomentFeedFormatter } from '../features/moments/MomentFeedModels';
@@ -23,7 +27,9 @@ export struct PublicProfilePage {
   @State private page: number = 0;
   @State private more: boolean = false;
   @State private loadingMore: boolean = false;
-  private readonly changed: () => void = () => this.load();
+  private readonly changed: (kind?: string) => void = (kind?: string) => {
+    if (kind !== 'relations') { this.load(); }
+  };
   onOpenDemand?: (id: number) => void;
   onOpenService?: (id: number) => void;
   onOpenMoment?: (id: number) => void;
@@ -36,10 +42,16 @@ export struct PublicProfilePage {
   private generation: number = 0;
   private active: boolean = false;
   onBack?: () => void;
+  onOpenSelf?: () => void;
+  @State private viewerId: number = 0;
+  @State private viewerError: string = '';
+  @State private followerCount: number = 0;
+  private readonly scroller: Scroller = new Scroller();
   onRequireLogin?: () => void;
 
   aboutToAppear(): void {
     ContentChanges.observe(this.changed);
+    UiPerf.mark('public.appear');
     this.active = true;
     this.load();
   }
@@ -47,6 +59,7 @@ export struct PublicProfilePage {
   aboutToDisappear(): void {
     ContentChanges.unobserve(this.changed);
     this.active = false;
+    this.appClient.apiService.cancelCurrentSession(`${this.requestKey}.viewer`);
     this.generation++;
     this.appClient.apiService.cancelPublicProfile(`${this.requestKey}.profile`, `${this.requestKey}.moments`);
     this.profile = undefined;
@@ -57,6 +70,7 @@ export struct PublicProfilePage {
 
   private onTargetChanged(): void {
     if (this.active) {
+      this.scroller.scrollTo({ xOffset: 0, yOffset: 0 });
       this.load();
     }
   }
@@ -92,13 +106,14 @@ export struct PublicProfilePage {
     this.errorMessage = '';
     this.momentError = '';
     this.authenticationRequired = false;
+    this.viewerId = 0; this.viewerError = '';
     if (!Number.isSafeInteger(userId) || userId <= 0 || !['CUSTOMER', 'PROVIDER'].includes(role)) {
       this.loading = false;
       this.errorMessage = '无效的用户主页';
       return;
     }
     try {
-      const profile = await this.appClient.apiService.getPublicProfile(userId, role, `${this.requestKey}.profile`);
+      const profile = await UiPerf.request('public.profile', () => this.appClient.apiService.getPublicProfile(userId, role, `${this.requestKey}.profile`));
       if (!this.isCurrent(token, sessionVersion, userId, role)) {
         return;
       }
@@ -109,29 +124,15 @@ export struct PublicProfilePage {
         throw ErrorMapper.parse();
       }
       this.profile = profile;
-      // The primary purpose of this page is to show the author's public offerings.
-      // A failure in the optional moment feed must not prevent loading those offerings.
-      try {
-        await this.loadContent(1, token, sessionVersion, userId, role);
-      } catch (error) {
-        if (!this.isCurrent(token, sessionVersion, userId, role)) { return; }
-        this.errorMessage = (error as Error).message || '公开发布读取失败';
-      }
-      if (!this.isCurrent(token, sessionVersion, userId, role)) { return; }
-      try {
-        const page = await this.appClient.apiService.listPublicMoments(userId, role, 1, `${this.requestKey}.moments`);
-        if (!this.isCurrent(token, sessionVersion, userId, role)) { return; }
-        if (page === null || !Array.isArray(page.records) ||
-          page.records.some((item: MomentSummary) => !MomentFeedFormatter.isValid(item) ||
-            item.authorId !== userId || item.authorRole !== role)) {
-          throw ErrorMapper.parse();
-        }
-        this.moments = MomentFeedFormatter.deduplicate(page.records);
-      } catch (momentError) {
-        if (this.isCurrent(token, sessionVersion, userId, role)) {
-          this.momentError = (momentError as PortraError).message || '动态读取失败';
-        }
-      }
+      UiPerf.mark('public.identity.ready');
+      this.followerCount = profile.followerCount;
+      this.loading = false;
+      await this.loadViewer(token, sessionVersion, userId, role);
+      if (!this.isCurrent(token, sessionVersion, userId, role) || this.viewerId === userId) { return; }
+      await Promise.all([
+        this.loadPublications(token, sessionVersion, userId, role),
+        this.loadMoments(token, sessionVersion, userId, role)
+      ]);
     } catch (error) {
       if (!this.isCurrent(token, sessionVersion, userId, role)) {
         return;
@@ -148,6 +149,57 @@ export struct PublicProfilePage {
         this.loading = false;
       }
     }
+  }
+
+  private async loadViewer(token: number, sessionVersion: number, userId: number, role: string): Promise<void> {
+    const start = Date.now(); UiPerf.mark('public.viewer.start');
+    try {
+      if (this.appClient.sessionManager.isAuthenticated()) {
+        try {
+          const viewer = await this.appClient.apiService.currentSession(`${this.requestKey}.viewer`);
+          if (!this.isCurrent(token, sessionVersion, userId, role)) { return; }
+          this.viewerId = viewer.userId;
+          if (viewer.userId === userId) { this.onOpenSelf?.(); return; }
+        } catch (error) {
+          if (!this.isCurrent(token, sessionVersion, userId, role)) { return; }
+          this.viewerError = '当前身份读取失败，暂不可关注';
+        }
+      }
+
+    } finally { UiPerf.elapsed('public.viewer.end', start); }
+  }
+
+  private async loadPublications(token: number, sessionVersion: number, userId: number, role: string): Promise<void> {
+    const start = Date.now(); UiPerf.mark('public.content.start');
+    try {
+      try {
+        await this.loadContent(1, token, sessionVersion, userId, role);
+      } catch (error) {
+        if (!this.isCurrent(token, sessionVersion, userId, role)) { return; }
+        this.errorMessage = (error as Error).message || '公开发布读取失败';
+      }
+
+    } finally { UiPerf.elapsed('public.content.end', start); }
+  }
+
+  private async loadMoments(token: number, sessionVersion: number, userId: number, role: string): Promise<void> {
+    const start = Date.now(); UiPerf.mark('public.moments.start');
+    try {
+      try {
+        const page = await this.appClient.apiService.listPublicMoments(userId, role, 1, `${this.requestKey}.moments`);
+        if (!this.isCurrent(token, sessionVersion, userId, role)) { return; }
+        if (page === null || !Array.isArray(page.records) ||
+          page.records.some((item: MomentSummary) => !MomentFeedFormatter.isValid(item) ||
+            item.authorId !== userId || item.authorRole !== role)) {
+          throw ErrorMapper.parse();
+        }
+        this.moments = MomentFeedFormatter.deduplicate(page.records);
+      } catch (momentError) {
+        if (this.isCurrent(token, sessionVersion, userId, role)) {
+          this.momentError = (momentError as PortraError).message || '动态读取失败';
+        }
+      }
+    } finally { UiPerf.elapsed('public.moments.end', start); }
   }
 
   private async loadContent(page: number, token: number, epoch: number, userId: number, role: string): Promise<void> {
@@ -179,23 +231,30 @@ export struct PublicProfilePage {
     return this.profile?.nickname?.trim() || `用户 #${this.targetUserId}`;
   }
 
+  @Builder
+  private PublicStat(value: string, label: string) {
+    Row({ space: 4 }) {
+      Text(value).fontSize(14).fontWeight(FontWeight.Bold).fontColor('#2C2D31')
+      Text(label).fontSize(10.5).fontColor('#87817B')
+    }
+  }
+
+  @Builder
+  private PublicationText(title: string, city: string) {
+    Column({ space: 5 }) {
+      Text(title).fontSize(12.5).fontWeight(FontWeight.Medium).fontColor('#313236')
+        .maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
+      if (city.length > 0) { Text(city).fontSize(10).fontColor('#918A84') }
+      Text('查看详情 ›').fontSize(11).fontColor(PortraTheme.primary)
+    }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+  }
+
   build() {
-    Column({ space: PortraTheme.spacingMd }) {
-      Row() {
-        Button('返回')
-          .onClick(() => this.onBack?.())
-        Text('用户主页')
-          .layoutWeight(1)
-          .fontSize(PortraTheme.fontTitle)
-          .fontWeight(FontWeight.Bold)
-      }
-      .width('100%')
-      .padding(PortraTheme.spacingLg)
-      if (this.loading) {
-        PortraLoading({ label: '正在读取用户主页' })
-      } else {
-        Scroll() {
+    Column({ space: 0 }) {
+      ProfileHeader({ title: '用户主页', onBack: this.onBack })
+      Scroll(this.scroller) {
           Column({ space: PortraTheme.spacingMd }) {
+            if (this.loading && this.profile === undefined) { Text('正在读取用户主页…').fontColor(PortraTheme.secondaryText) }
             if (this.errorMessage.length > 0) {
               Text(this.errorMessage)
                 .fontColor(PortraTheme.danger)
@@ -203,28 +262,46 @@ export struct PublicProfilePage {
                 .onClick(() => this.authenticationRequired ? this.onRequireLogin?.() : this.load())
             }
             if (this.profile !== undefined) {
-              PortraAvatar({ displayName: this.displayName(), fileId: this.profile.avatarFileId ?? 0, avatarSize: 56 })
-              Text(this.displayName())
-                .fontSize(PortraTheme.fontTitle)
-                .fontWeight(FontWeight.Bold)
-              Text(`${this.targetRole === 'PROVIDER' ? '摄影师' : '约拍用户'} #${this.targetUserId}`)
-                .fontColor(PortraTheme.secondaryText)
-              if ((this.profile.bio?.trim().length ?? 0) > 0) {
-                Text(this.profile.bio || '')
-                  .width('100%')
+              ProfileIdentity({ nickname: this.displayName(), userId: this.targetUserId,
+                avatarFileId: this.profile.avatarFileId ?? 0, bio: this.profile.bio?.trim() ?? '',
+                identityLine: this.targetRole === 'PROVIDER' ? '摄影师' : '约拍用户' })
+              Row({ space: 28 }) {
+                this.PublicStat(`${this.profile.followingCount}`, '关注')
+                this.PublicStat(`${this.followerCount}`, '粉丝')
+                this.PublicStat(`${this.profile.momentCount}`, '动态')
+              }.width('100%').margin({ top: 12, bottom: 6 })
+              if (this.viewerId > 0 && this.viewerId !== this.targetUserId) {
+                FollowAction({ targetUserId: this.targetUserId, targetRole: this.targetRole,
+                  initialProfile: this.profile, currentUserId: this.viewerId, onChanged: (count: number) => this.followerCount = count })
+              } else if (this.viewerError.length > 0) {
+                Text(this.viewerError).fontSize(12).fontColor(PortraTheme.danger)
+                Button('重试').onClick(() => this.load())
+              } else if (!this.appClient.sessionManager.isAuthenticated()) {
+                Button('登录后关注').fontSize(12).height(36).fontColor(PortraTheme.primary)
+                  .backgroundColor(PortraTheme.primarySoft).onClick(() => this.onRequireLogin?.())
               }
-              Text(`关注者 ${this.profile.followerCount} · 关注 ${this.profile.followingCount} · 动态 ${this.profile.momentCount}`)
-                .fontColor(PortraTheme.secondaryText)
-              Text(this.targetRole === 'PROVIDER' ? '公开橱窗' : '公开需求').fontSize(20)
-              if (this.services.length + this.demands.length === 0) { Text('暂无公开发布') }
+              Text(this.targetRole === 'PROVIDER' ? '公开橱窗' : '公开需求').fontSize(17).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
+              if (!this.loading && this.services.length + this.demands.length === 0) { Text('暂无公开发布') }
               ForEach(this.services, (item: ServicePackageSummary) => {
-                Button(item.title ?? '橱窗').onClick(() => this.onOpenService?.(item.serviceId))
+                Row({ space: 11 }) {
+                  PortraImage({ source: item.coverImage ?? '', imageWidth: 64, imageHeight: 68,
+                    cornerRadius: 10, fallbackText: '橱窗', contentDescription: '公开橱窗封面' })
+                  this.PublicationText(item.title?.trim() || '摄影橱窗', item.cityCode ?? '')
+                }.width('100%').padding(12).backgroundColor(PortraTheme.surface)
+                  .borderRadius(16).border({ width: 1, color: PortraTheme.border })
+                  .onClick(() => this.onOpenService?.(item.serviceId))
               }, (item: ServicePackageSummary) => String(item.serviceId))
               ForEach(this.demands, (item: DemandSummary) => {
-                Button(item.scene ?? '需求').onClick(() => this.onOpenDemand?.(item.demandId))
+                Row({ space: 11 }) {
+                  PortraImage({ fileId: item.referenceFileIds?.[0] ?? 0, imageWidth: 64, imageHeight: 68,
+                    cornerRadius: 10, fallbackText: '需求', contentDescription: '公开需求图片' })
+                  this.PublicationText(item.scene?.trim() || '约拍需求', item.cityCode ?? '')
+                }.width('100%').padding(12).backgroundColor(PortraTheme.surface)
+                  .borderRadius(16).border({ width: 1, color: PortraTheme.border })
+                  .onClick(() => this.onOpenDemand?.(item.demandId))
               }, (item: DemandSummary) => String(item.demandId))
               if (this.more) { Button(this.loadingMore ? '加载中' : '加载更多发布').enabled(!this.loadingMore).onClick(() => this.nextPage()) }
-              Text('近期动态（最多 12 条）')
+              Text('近期动态')
                 .fontSize(PortraTheme.fontTitle)
               if (this.momentError.length > 0) {
                 Text(this.momentError).fontColor(PortraTheme.danger)
@@ -241,15 +318,17 @@ export struct PublicProfilePage {
             }
           }
           .width('100%')
-          .padding(PortraTheme.spacingLg)
+          .padding({ left: 16, right: 16, top: 8, bottom: 32 })
           .alignItems(HorizontalAlign.Start)
         }
         .width('100%')
         .layoutWeight(1)
-      }
+        .align(Alignment.TopStart)
+        .scrollBar(BarState.Off)
     }
     .width('100%')
     .height('100%')
     .backgroundColor(PortraTheme.pageBackground)
+    .onAreaChange(() => UiPerf.mark('public.layout'))
   }
 }
