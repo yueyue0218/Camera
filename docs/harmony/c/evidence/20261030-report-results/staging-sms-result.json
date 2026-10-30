@@ -1,0 +1,11 @@
+{
+  "url": "https://47.76.106.57/auth/sms/send",
+  "httpStatus": 200,
+  "code": 40901,
+  "message": "临时测试环境不提供真实短信登录，请使用测试账号入口",
+  "recipient": "***3685",
+  "attempts": 1,
+  "source": "harmony/README.md staging + ApiService.sendLoginCode",
+  "verification": "host HTTPS only; device not yet verified",
+  "time": "2026-10-30T13:17:50.7217421+08:00"
+}

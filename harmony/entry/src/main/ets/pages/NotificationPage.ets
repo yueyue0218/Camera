@@ -46,7 +46,7 @@ export struct NotificationPage {
   }
   private label(filter: string): string {
     return filter === 'all' ? '全部' : filter === 'unread' ? '未读' : filter === 'order' ? '订单' :
-      filter === 'appeal' ? '申诉' : filter === 'review' ? '评价' : '动态';
+      filter === 'appeal' ? '申诉' : filter === 'review' ? '评价' : filter === 'report' ? '举报' : filter === 'moderation' ? '平台处理' : '动态';
   }
   private count(filter: string): number {
     return this.snapshot.items.filter((item: NotificationSummary) => filter === 'all' ||
@@ -60,17 +60,20 @@ export struct NotificationPage {
     this.expandedId = this.expandedId === item.notificationId ? 0 : item.notificationId;
     if (!item.isRead) { this.controller?.markRead(item.notificationId); }
   }
+  private openReportHistory(): void {
+    if(this.controller?.canOpenReports()){this.onOpenTarget?.(new NotificationTarget('reportList',0));}
+  }
   private related(item: NotificationSummary): void {
     if (!this.controller?.canOpen(item.notificationId)) { return; }
     const target = NotificationTargetResolver.resolve(item); if (target === undefined) { return; }
     if (target.kind === 'moment') { this.onOpenMoment?.(target.id); }
     else if (target.kind === 'credit') { this.onOpenCredit?.(); }
-    else if (['order','review','complaint','dispute'].includes(target.kind)) { this.onOpenTarget?.(target); }
+    else if (['order','review','complaint','dispute','report'].includes(target.kind)) { this.onOpenTarget?.(target); }
   }
   private canOpen(item: NotificationSummary): boolean {
     const target = NotificationTargetResolver.resolve(item); if (target === undefined) { return false; }
     return target.kind === 'moment' || target.kind === 'credit' ||
-      (this.onOpenTarget !== undefined && ['order','review','complaint','dispute'].includes(target.kind));
+      (this.onOpenTarget !== undefined && ['order','review','complaint','dispute','report'].includes(target.kind));
   }
   @Builder
   private Notice(item: NotificationSummary) {
@@ -85,7 +88,7 @@ export struct NotificationPage {
       Text(`${NotificationFormat.label(item)} · ${NotificationFormat.time(item.createdAt)}`)
         .width('100%').fontSize(11).fontColor(PortraTheme.secondaryText)
       if (this.expandedId === item.notificationId && this.canOpen(item)) {
-        Button('查看相关内容').fontSize(12).height(34).fontColor(PortraTheme.primary).backgroundColor(PortraTheme.primarySoft)
+        Button(NotificationTargetResolver.resolve(item)?.kind==='report'?'查看举报结果':'查看相关内容').fontSize(12).constraintSize({minHeight:44}).fontColor(PortraTheme.primary).backgroundColor(PortraTheme.primarySoft)
           .enabled(!this.snapshot.busy && !this.snapshot.loading).onClick(() => this.related(item))
       }
     }.width('100%').alignItems(HorizontalAlign.Start).padding(18)
@@ -108,10 +111,15 @@ export struct NotificationPage {
           .enabled(this.snapshot.unread > 0 && !this.snapshot.busy && !this.snapshot.loading && !this.snapshot.uncertain)
           .onClick(() => this.controller?.markAllRead())
       }.width('100%').padding({ left: 14, right: 20, top: 18, bottom: 22 })
+      Row({space:12}) {
+        Text('查看你提交的举报及处理进度').fontSize(12).fontColor(PortraTheme.secondaryText).layoutWeight(1)
+        Button('我的举报').constraintSize({minHeight:44}).fontSize(13).fontColor(PortraTheme.primary).backgroundColor(PortraTheme.primarySoft)
+          .onClick(()=>{if(this.snapshot.loginRequired){this.onRequireLogin?.();}else{this.openReportHistory();}})
+      }.width('100%').padding({left:20,right:20,bottom:14})
       Scroll() {
         Row({ space: 8 }) {
-          ForEach(['all', 'unread', 'order', 'appeal', 'review', 'dynamic'], (filter: string) => {
-            Button(`${this.label(filter)} ${this.count(filter)}`).height(38).fontSize(12)
+          ForEach(['all', 'unread', 'order', 'appeal', 'review', 'dynamic', 'report', 'moderation'], (filter: string) => {
+            Button(`${this.label(filter)} ${this.count(filter)}`).height(44).fontSize(12)
               .fontWeight(this.filter === filter ? FontWeight.Bold : FontWeight.Regular)
               .fontColor(this.filter === filter ? PortraTheme.primary : PortraTheme.secondaryText)
               .backgroundColor(this.filter === filter ? PortraTheme.primarySoft : PortraTheme.surface)

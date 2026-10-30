@@ -1,0 +1,10 @@
+backend/src/main/java/com/action/camera/report/domain/Report.java
+backend/src/main/java/com/action/camera/report/dto/ReportResponse.java
+backend/src/main/java/com/action/camera/report/service/ReportService.java
+backend/src/main/java/com/action/camera/report/service/ReportTargetValidator.java
+backend/src/main/resources/db/migration/add_admin_governance.sql
+backend/src/main/resources/db/migration/add_report_result_feedback.sql
+backend/src/main/resources/db/README_EXECUTION_ORDER.md
+backend/src/test/java/com/action/camera/integration/ReportNotificationPrivacyTest.java
+backend/src/test/java/com/action/camera/report/ReportServiceTest.java
+harmony/entry/src/main/ets/model/ApiModels.ets

@@ -1,3 +1,5 @@
+import { ReportSubmissionStore } from '../features/user/ReportSubmissionStore';
+import { ReportResultNavigation } from '../features/report/ReportResultNavigation';
 import { uiObserver } from '@kit.ArkUI';
 import { AppClient } from '../app/AppClient';
 import { PortraErrorView } from '../common/components/PortraErrorView';
@@ -469,6 +471,17 @@ export struct MomentFeedPage {
     return this.interactions;
   }
 
+  private openReportProgress(momentId: number): void {
+    this.synchronizeSession();
+    if(!this.active||!this.appClient.sessionManager.isAuthenticated()||this.currentUserId<=0){return;}
+    const record=ReportSubmissionStore.shared.find(this.sessionVersion,this.currentUserId,'MOMENT',momentId);
+    const reportId=ReportResultNavigation.receipt(record,this.sessionVersion,this.currentUserId,momentId);
+    const navigation=this.queryNavigationInfo();
+    if(navigation===undefined){this.errorMessage='举报记录页面暂不可用，请重试。';return;}
+    const param:NavigationRouteParam={targetKind:reportId>0?'report':'reportList',targetId:reportId};
+    try{navigation.pathStack.pushPathByName(AppRoute.ORDER_ENGAGEMENT,param);}
+    catch{this.errorMessage='举报记录页面暂不可用，请重试。';}
+  }
   private async openDetail(item: MomentSummary): Promise<void> {
     this.synchronizeSession();
     const current = this.items.find((row: MomentSummary) => row.momentId === item.momentId);
@@ -694,6 +707,9 @@ export struct MomentFeedPage {
                     currentUserId: this.currentUserId,
                     onRequireLogin: this.onRequireLogin
                   })
+                  Button('查看举报进度').constraintSize({minHeight:44}).fontSize(13)
+                    .fontColor(PortraTheme.primary).backgroundColor(PortraTheme.primarySoft)
+                    .onClick(()=>this.openReportProgress(item.momentId))
                   Button('关闭举报')
                     .fontSize(PortraTheme.fontBodySmall)
                     .fontColor(PortraTheme.secondaryText)
