@@ -1,7 +1,7 @@
 import { PortraBottomNav } from '../../common/components/PortraBottomNav';
-import { PortraEmptyView } from '../../common/components/PortraEmptyView';
 import { AppRoute } from '../../model/NavigationModels';
 import { HallPage } from '../../pages/HallPage';
+import { MomentFeedPage } from '../../pages/MomentFeedPage';
 import { PortraTheme } from '../../theme/PortraTheme';
 
 @Component
@@ -41,18 +41,8 @@ export struct PortraAppShell {
         })
           .layoutWeight(1)
       } else {
-        Column() {
-          Text('动态')
-            .fontSize(24)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(PortraTheme.primaryText)
-          PortraEmptyView({ message: '动态业务不在本轮实现范围内' })
-        }
-        .layoutWeight(1)
-        .width('100%')
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
-        .backgroundColor(PortraTheme.pageBackground)
+        MomentFeedPage({ onRequireLogin: () => this.onOpenRoute?.(AppRoute.LOGIN) })
+          .layoutWeight(1)
       }
 
       PortraBottomNav({ selectedIndex: this.selectedTab, onSelect: (index: number) => this.selectTab(index) })

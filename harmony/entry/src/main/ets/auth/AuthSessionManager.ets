@@ -44,12 +44,26 @@ export class AuthSessionManager {
     return this.session;
   }
 
+  /** Changes whenever credentials are restored, replaced, expired or cleared. */
+  getSessionVersion(): number {
+    return this.restoreVersion;
+  }
+
   isAuthenticated(): boolean {
     return this.status === AuthStatus.AUTHENTICATED && this.session !== null;
   }
 
   getCredentialError(): CredentialStoreError | null {
     return this.credentialError;
+  }
+
+  /** Invalidates role/account-scoped caches after the backend confirms an identity switch. */
+  notifyIdentityChanged(): void {
+    if (!this.isAuthenticated() || this.session === null) {
+      return;
+    }
+    this.restoreVersion += 1;
+    this.authTokenController.setAccessToken(this.session.accessToken);
   }
 
   /** Starts one restore operation and returns its version for stale-result protection. */

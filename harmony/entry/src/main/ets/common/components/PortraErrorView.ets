@@ -3,6 +3,7 @@ import { PortraTheme } from '../../theme/PortraTheme';
 @Component
 export struct PortraErrorView {
   @Prop message: string = '加载失败，请稍后再试';
+  @Prop actionLabel: string = '重试';
   onRetry?: () => void;
 
   build() {
@@ -17,7 +18,7 @@ export struct PortraErrorView {
         .margin({ top: 8 })
         .textAlign(TextAlign.Center)
 
-      Button('重试')
+      Button(this.actionLabel)
         .height(40)
         .margin({ top: 16 })
         .fontColor(PortraTheme.primary)

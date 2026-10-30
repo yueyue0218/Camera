@@ -38,6 +38,13 @@ export interface DemandSummary {
   readonly attachmentUrls?: string[];
   readonly referencePreviewUrls?: string[];
   readonly responseCount?: number;
+  readonly pendingCount?: number;
+  readonly acceptedCount?: number;
+  readonly rejectedCount?: number;
+  readonly timeTags?: string[];
+  readonly recommendReasons?: string[];
+  readonly createdAt?: string;
+  readonly updatedAt?: string;
 }
 
 export interface ServicePackageSummary {
@@ -57,9 +64,37 @@ export interface ServicePackageSummary {
   readonly priceRange?: string;
   readonly status?: string;
   readonly isAvailable?: boolean;
+  readonly availableDates?: string[];
+  readonly timeDescription?: string;
+  readonly timeTags?: string[];
+  readonly portfolioIds?: number[];
+  readonly recommendReasons?: string[];
+  readonly createdAt?: string;
+  readonly updatedAt?: string;
   /** Absent in the current public contract; undefined must render as not favorited. */
   readonly isFavorited?: boolean;
   readonly favoritedByCurrentUser?: boolean;
+}
+
+/** Authenticated social feed item returned by GET /moments. */
+export interface MomentSummary {
+  readonly momentId: number;
+  readonly authorId: number;
+  readonly authorRole: string;
+  readonly title?: string;
+  readonly content?: string;
+  /** Legacy cover field retained by the backend for single-image clients. */
+  readonly imageData?: string;
+  /** Ordered inline image data returned by the current backend. */
+  readonly imageDataList?: string[];
+  readonly mentions?: string[];
+  readonly likeCount: number;
+  readonly likedByCurrentUser: boolean;
+  readonly favoriteCount: number;
+  readonly favoritedByCurrentUser: boolean;
+  readonly createdAt?: string;
+  readonly updatedAt?: string;
+  readonly status?: string;
 }
 
 export interface ApiEnvelope<T> {
@@ -80,21 +115,93 @@ export interface ServicePackageDetail extends ServicePackageSummary {
 
 export interface CreateDemandPayload {
   readonly scene: string;
+  readonly styleTags?: string[];
+  readonly expectedDate?: string;
+  readonly timeSlot?: string;
   readonly cityCode: string;
   readonly location: string;
   readonly timeDescription: string;
+  readonly timeTags?: string[];
   readonly description: string;
   readonly budgetMinCent?: number;
   readonly budgetMaxCent?: number;
+  readonly referenceFileIds?: number[];
+}
+
+export interface DemandListQuery {
+  readonly page: number;
+  readonly size: number;
+  readonly cityCode?: string;
+  readonly scene?: string;
+  readonly status?: string;
+  readonly expectedDate?: string;
+  readonly styleTag?: string;
+  readonly minBudgetCent?: number;
+  readonly maxBudgetCent?: number;
+  readonly timeTag?: string;
+  readonly keyword?: string;
+  readonly sort?: string;
+  readonly feedSeed?: string;
+}
+
+export interface ServicePackageListQuery {
+  readonly page: number;
+  readonly size: number;
+  readonly cityCode?: string;
+  readonly scene?: string;
+  readonly style?: string;
+  readonly minPriceCent?: number;
+  readonly maxPriceCent?: number;
+  readonly availableDate?: string;
+  readonly timeTag?: string;
+  readonly keyword?: string;
+  readonly sort?: string;
+  readonly feedSeed?: string;
+}
+
+export interface CreateServicePackagePayload {
+  readonly title: string;
+  readonly cityCode: string;
+  readonly serviceArea?: string;
+  readonly scene: string;
+  readonly styleTags?: string[];
+  readonly images?: string[];
+  readonly basePriceCent: number;
+  readonly priceRange?: string;
+  readonly durationMinutes: number;
+  readonly originalCount: number;
+  readonly refinedCount: number;
+  readonly deliveryDays: number;
+  readonly availableDates?: string[];
+  readonly portfolioIds?: number[];
+  readonly description?: string;
+  readonly timeDescription: string;
+  readonly timeTags?: string[];
+}
+
+export interface CreateServicePackageResult {
+  readonly serviceId: number;
+  readonly status: string;
+  readonly isAvailable: boolean;
+}
+
+export interface ServicePackageInterest {
+  readonly interestId: number;
+  readonly userId: number;
+  readonly serviceId: number;
+  readonly createdAt?: string;
 }
 
 export interface DemandResponseSummary {
   readonly responseId: number;
   readonly demandId: number;
   readonly providerId: number;
+  readonly providerProfileId?: number;
   readonly message: string;
   readonly expectedPriceCent?: number;
   readonly status: string;
+  readonly rejectReason?: string;
+  readonly responseTime?: string;
 }
 
 export interface CreateDemandResponsePayload {
@@ -104,8 +211,13 @@ export interface CreateDemandResponsePayload {
 
 export interface AcceptedDemandResponse {
   readonly responseId: number;
+  readonly demandId: number;
+  readonly customerId: number;
+  readonly providerId: number;
   readonly conversationId: number;
   readonly responseStatus: string;
+  readonly conversationSourceType: string;
+  readonly sourceId: number;
 }
 
 export interface MessageSummary {
@@ -175,6 +287,7 @@ export interface ConfirmQuoteResult {
   readonly quotationId: number;
   readonly quotationStatus: string;
   readonly orderId: number;
+  readonly orderNo?: string;
   readonly orderStatus: string;
 }
 
@@ -243,6 +356,97 @@ export interface SessionSummary {
   readonly sessionId: string;
   readonly deviceId: string;
   readonly deviceName: string;
+  readonly createdAt?: string;
+  readonly expiresAt?: string;
+}
+
+export interface UserProfileSummary {
+  readonly id: number;
+  readonly studentNo?: string;
+  readonly nickname?: string;
+  readonly school?: string;
+  readonly gender?: string;
+  readonly genderVisible?: boolean;
+  readonly birthday?: string;
+  readonly birthdayVisible?: boolean;
+  readonly locationDisplay?: string;
+  readonly locationVisible?: boolean;
+  readonly cityCode?: string;
+  readonly bio?: string;
+  readonly avatarFileId?: number;
+  readonly currentRole: string;
+  readonly status?: string;
+  readonly creditScore?: number;
+  readonly createdAt?: string;
+  readonly customerNickname?: string;
+  readonly customerAvatarFileId?: number;
+  readonly customerBio?: string;
+  readonly providerNickname?: string;
+  readonly providerAvatarFileId?: number;
+  readonly providerBio?: string;
+}
+
+export interface SwitchRoleResult {
+  readonly id: number;
+  readonly currentRole: string;
+  readonly nickname: string;
+}
+
+export interface SwitchRolePayload {
+  readonly role: string;
+}
+
+export interface SocialUserBrief {
+  readonly userId: number;
+  readonly nickname?: string;
+  readonly avatarFileId?: number;
+  readonly currentRole: string;
+  readonly bio?: string;
+  readonly followedByCurrentUser: boolean;
+}
+
+export interface PublicUserProfile {
+  readonly userId: number;
+  readonly nickname?: string;
+  readonly avatarFileId?: number;
+  readonly bio?: string;
+  readonly currentRole: string;
+  readonly followerCount: number;
+  readonly followingCount: number;
+  readonly followedByCurrentUser: boolean;
+  readonly momentCount: number;
+  readonly cityCode?: string;
+}
+
+export interface FollowState {
+  readonly targetUserId: number;
+  readonly followed: boolean;
+  readonly followerCount: number;
+  readonly followingCount: number;
+}
+
+export interface ProfileMomentPage extends PageResult<MomentSummary> {
+  readonly totalLikeCount: number;
+  readonly totalFavoriteCount: number;
+}
+
+export interface CreateReportPayload {
+  readonly targetType: string;
+  readonly targetId: number;
+  readonly reason: string;
+  readonly description?: string;
+}
+
+export interface ReportSummary {
+  readonly reportId: number;
+  readonly reporterId: number;
+  readonly targetType: string;
+  readonly targetId: number;
+  readonly reason: string;
+  readonly description?: string;
+  readonly status: string;
+  readonly createdAt?: string;
+  readonly resolvedAt?: string;
 }
 
 export interface ConversationSummary {

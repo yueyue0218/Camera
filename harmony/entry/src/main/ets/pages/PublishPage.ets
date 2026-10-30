@@ -15,9 +15,42 @@ export struct PublishPage {
   @State private time: string = '';
   @State private submitting: boolean = false;
   @State private errorMessage: string = '';
+  @State private role: string = '';
+  @State private sessionLoading: boolean = true;
   private readonly appClient: AppClient = AppClient.shared;
   onBack?: () => void;
   onPublished?: (demandId: number) => void;
+
+  aboutToAppear(): void {
+    this.loadRole();
+  }
+
+  aboutToDisappear(): void {
+    this.appClient.apiService.cancelCurrentSession();
+  }
+
+  private async loadRole(): Promise<void> {
+    this.sessionLoading = true;
+    this.role = '';
+    this.errorMessage = '';
+    if (!this.appClient.sessionManager.isAuthenticated()) {
+      this.role = '';
+      this.errorMessage = '请先登录后发布需求';
+      this.sessionLoading = false;
+      return;
+    }
+    try {
+      const session = await this.appClient.apiService.currentSession();
+      this.role = session.role.trim().toUpperCase();
+      if (this.role !== 'CUSTOMER') {
+        this.errorMessage = '摄影师账号不能发布约拍需求';
+      }
+    } catch (error) {
+      this.errorMessage = (error as PortraError).message || '账号角色暂不可用';
+    } finally {
+      this.sessionLoading = false;
+    }
+  }
 
   private parseBudget(value: string): number | undefined {
     if (value.trim().length === 0) {
@@ -31,6 +64,10 @@ export struct PublishPage {
 
   private async publish(): Promise<void> {
     if (this.submitting) {
+      return;
+    }
+    if (this.sessionLoading || this.role !== 'CUSTOMER') {
+      this.errorMessage = '仅单主可以发布约拍需求';
       return;
     }
     const min = this.parseBudget(this.minBudget);
@@ -217,13 +254,14 @@ export struct PublishPage {
         if (this.errorMessage.length > 0) {
           Text(this.errorMessage).fontSize(12).fontColor(PortraTheme.danger).width('100%')
         }
-        Button(this.submitting ? '发布中…' : '发布需求')
+        Button(this.sessionLoading ? '正在确认账号…' :
+          this.role === 'CUSTOMER' ? (this.submitting ? '发布中…' : '发布需求') : '当前角色不可发布需求')
           .width('100%')
           .height(48)
           .fontSize(15)
           .fontColor(PortraTheme.white)
           .backgroundColor(PortraTheme.primary)
-          .enabled(!this.submitting)
+          .enabled(!this.submitting && !this.sessionLoading && this.role === 'CUSTOMER')
           .borderRadius(8)
           .onClick(() => this.publish())
       }

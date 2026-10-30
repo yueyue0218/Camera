@@ -19,6 +19,7 @@ export struct MessagePage {
   @State private errorMessage: string = '';
   @State private conversations: ConversationListItem[] = [];
   @State private avatarImages: Map<number, image.PixelMap> = new Map<number, image.PixelMap>();
+  @State private hidingConversationId: number = 0;
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
   private remoteVersion: number = 0;
@@ -51,6 +52,9 @@ export struct MessagePage {
     this.appClient.apiService.cancelConversations();
     this.appClient.apiService.cancelCurrentSession();
     this.resetAvatars('', 0);
+    if (this.hidingConversationId > 0) {
+      this.appClient.apiService.cancelHideConversation(this.hidingConversationId);
+    }
   }
 
   private setVisible(visible: boolean): void {
@@ -280,6 +284,30 @@ export struct MessagePage {
     }
   }
 
+  private async hideConversation(conversationId: number): Promise<void> {
+    if (this.hidingConversationId !== 0) {
+      return;
+    }
+    this.hidingConversationId = conversationId;
+    this.errorMessage = '';
+    const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
+    const accountId = this.accountId;
+    try {
+      await this.appClient.apiService.hideConversation(conversationId);
+      if (token !== this.appClient.sessionManager.getSession()?.accessToken ||
+        accountId !== this.accountId) return;
+      this.remoteVersion++;
+      this.appClient.apiService.cancelConversations();
+      this.conversations = this.conversations.filter((item: ConversationListItem) =>
+        item.conversation.conversationId !== conversationId);
+      ConversationMemory.write(token, accountId, this.conversations);
+    } catch (error) {
+      this.errorMessage = (error as PortraError).message || '隐藏会话失败';
+    } finally {
+      this.hidingConversationId = 0;
+    }
+  }
+
   @Builder
   private Tab(label: string, index: number) {
     Column({ space: 9 }) {
@@ -351,15 +379,24 @@ export struct MessagePage {
                 }
                 .layoutWeight(1)
                 .alignItems(HorizontalAlign.Start)
-                Text(ConversationListModel.timeLabel(item.previewTime))
-                  .fontSize(11)
-                  .fontColor(PortraTheme.mutedText)
+                .onClick(() => this.onOpenConversation?.(item.conversation.conversationId))
+                Column({ space: 6 }) {
+                  Text(ConversationListModel.timeLabel(item.previewTime))
+                    .fontSize(11)
+                    .fontColor(PortraTheme.mutedText)
+                  Button('查看').height(28).fontSize(11).backgroundColor(PortraTheme.primarySoft)
+                    .fontColor(PortraTheme.primary)
+                    .onClick(() => this.onOpenConversation?.(item.conversation.conversationId))
+                  Button(this.hidingConversationId === item.conversation.conversationId ? '隐藏中' : '隐藏')
+                    .height(28).fontSize(11).backgroundColor(PortraTheme.surface)
+                    .fontColor(PortraTheme.secondaryText).enabled(this.hidingConversationId === 0)
+                    .onClick(() => this.hideConversation(item.conversation.conversationId))
+                }
               }
               .width('100%')
-              .height(78)
+              .height(94)
               .padding({ left: 20, right: 20 })
               .backgroundColor(PortraTheme.surface)
-              .onClick(() => this.onOpenConversation?.(item.conversation.conversationId))
               Divider().color(PortraTheme.border).padding({ left: 80 })
             }, (item: ConversationListItem) => item.conversation.conversationId.toString())
 

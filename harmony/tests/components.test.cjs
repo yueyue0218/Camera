@@ -15,7 +15,7 @@ require.extensions['.ets'] = (module, filename) => {
   module._compile(output.outputText, filename);
 };
 
-const { ActionClickGuard, AvatarFallbackPolicy, PublicImagePolicy } =
+const { ActionClickGuard, AvatarFallbackPolicy, InlineImagePolicy, PublicImagePolicy } =
   require('../entry/src/main/ets/common/components/ComponentPolicy.ets');
 
 test('button actions reject rapid repeats', () => {
@@ -46,6 +46,26 @@ test('string image sources accept public HTTPS only', () => {
   ]) {
     assert.equal(PublicImagePolicy.accepts(source), false);
   }
+});
+
+test('moment inline images are opt-in and restricted to image base64 data', () => {
+  for (const source of [
+    'data:image/png;base64,AAAA',
+    'data:image/jpeg;base64,aGVsbG8=',
+    'data:image/webp;base64,YWJjZA=='
+  ]) {
+    assert.equal(InlineImagePolicy.accepts(source), true);
+    assert.equal(PublicImagePolicy.accepts(source), false);
+  }
+  for (const source of [
+    'data:text/html;base64,AAAA',
+    'data:image/svg+xml;base64,AAAA',
+    'data:image/png;base64,AA AA',
+    'data:image/png,AAAA'
+  ]) {
+    assert.equal(InlineImagePolicy.accepts(source), false);
+  }
+  assert.equal(InlineImagePolicy.accepts('https://cdn.example.com/moment.webp'), true);
 });
 
 test('avatar fallback is deterministic without profile data', () => {

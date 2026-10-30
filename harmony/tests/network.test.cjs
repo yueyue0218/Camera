@@ -10,7 +10,8 @@ const ts = require(path.join(sdk, 'default/openharmony/ets/build-tools/ets-loade
 const sourceRoot = path.resolve(__dirname, '../entry/src/main/ets');
 const calls = [];
 const http = {
-  RequestMethod: { GET: 'GET', POST: 'POST', PUT: 'PUT' }, HttpDataType: { STRING: 1, ARRAY_BUFFER: 2 },
+  RequestMethod: { GET: 'GET', POST: 'POST', PUT: 'PUT', DELETE: 'DELETE' },
+  HttpDataType: { STRING: 1, ARRAY_BUFFER: 2 },
   createHttp() {
     const call = { destroyed: 0 };
     calls.push(call);
@@ -259,8 +260,31 @@ test('business read-only pages use the existing API paths and authentication bou
   complete(call, []);
   assert.deepEqual(await orders, []);
 
+  const moments = api.listMoments('latest');
+  call = calls.at(-1);
+  assert.equal(call.url, EnvironmentConfig.current().baseUrl + '/moments?scope=latest');
+  assert.equal(call.options.header.Authorization, 'Bearer current-token');
+  complete(call, []);
+  assert.deepEqual(await moments, []);
+
   const count = calls.length;
   await assert.rejects(api.getDemand(0), hasKind('parse'));
+  assert.equal(calls.length, count);
+});
+
+test('moment feed scopes are exact and invalid scopes never reach the network', async () => {
+  const client = new HttpClient();
+  client.setAccessToken('feed-token');
+  const api = new ApiService(client);
+  for (const scope of ['latest', 'hot', 'following']) {
+    const promise = api.listMoments(scope);
+    const call = calls.at(-1);
+    assert.equal(call.url, EnvironmentConfig.current().baseUrl + `/moments?scope=${scope}`);
+    complete(call, []);
+    await promise;
+  }
+  const count = calls.length;
+  await assert.rejects(api.listMoments('invented'), hasKind('parse'));
   assert.equal(calls.length, count);
 });
 
@@ -311,6 +335,64 @@ test('appointment flow uses authenticated demand, conversation and quote endpoin
   assert.equal(call.options.header.Authorization, undefined);
   complete(call, { serviceId: 21, title: '自然人像' });
   assert.equal((await service).serviceId, 21);
+});
+
+test('hall queries forward only supported backend filters and stable sorting', async () => {
+  const client = new HttpClient();
+  const api = new ApiService(client);
+  const services = api.listServicePackagesByQuery({ page: 2, size: 20, cityCode: '320100', scene: '人像',
+    style: '自然', minPriceCent: 10000, maxPriceCent: 80000, availableDate: '2026-11-01',
+    timeTag: 'weekend', keyword: '校园 写真', sort: 'recommend', feedSeed: 'device-a' });
+  let call = calls.at(-1);
+  assert.equal(call.url, EnvironmentConfig.current().baseUrl +
+    '/service-packages?page=2&size=20&cityCode=320100&scene=%E4%BA%BA%E5%83%8F&style=%E8%87%AA%E7%84%B6' +
+    '&minPriceCent=10000&maxPriceCent=80000&availableDate=2026-11-01&timeTag=weekend' +
+    '&keyword=%E6%A0%A1%E5%9B%AD%20%E5%86%99%E7%9C%9F&sort=recommend&feedSeed=device-a');
+  complete(call, { records: [], page: 2, size: 20, total: 0 });
+  await services;
+
+  const demands = api.listDemandsByQuery({ page: 1, size: 20, cityCode: '310000', status: 'OPEN',
+    styleTag: '纪实', minBudgetCent: 20000, sort: 'latest', feedSeed: 'device-a' });
+  call = calls.at(-1);
+  assert.equal(call.url, EnvironmentConfig.current().baseUrl +
+    '/demands?page=1&size=20&cityCode=310000&status=OPEN&styleTag=%E7%BA%AA%E5%AE%9E' +
+    '&minBudgetCent=20000&sort=latest&feedSeed=device-a');
+  complete(call, { records: [], page: 1, size: 20, total: 0 });
+  await demands;
+
+  const sanitized = api.listDemandsByQuery({ page: 0, size: 1000, expectedDate: 'not-a-date',
+    minBudgetCent: -1, sort: 'invented' });
+  call = calls.at(-1);
+  assert.equal(call.url, EnvironmentConfig.current().baseUrl + '/demands?page=1&size=100');
+  complete(call, { records: [], page: 1, size: 100, total: 0 });
+  await sanitized;
+});
+
+test('interest, provider response recovery and service creation use authenticated real endpoints', async () => {
+  const client = new HttpClient();
+  client.setAccessToken('core-flow-token');
+  const api = new ApiService(client);
+  const checks = [
+    [() => api.listMyDemandResponses(), '/demands/responses/me', 'GET', []],
+    [() => api.listServicePackageInterests(), '/me/service-package-interests?page=1&size=100', 'GET',
+      { records: [], page: 1, size: 100, total: 0 }],
+    [() => api.addServicePackageInterest(21), '/service-packages/21/interest', 'POST',
+      { interestId: 1, userId: 2, serviceId: 21 }],
+    [() => api.cancelServicePackageInterest(21), '/service-packages/21/interest', 'DELETE', null],
+    [() => api.createServicePackage({ title: '自然人像', cityCode: '320100', scene: '人像',
+      basePriceCent: 30000, durationMinutes: 120, originalCount: 50, refinedCount: 9,
+      deliveryDays: 7, portfolioIds: [8], timeDescription: '周末可约' }),
+    '/service-packages', 'POST', { serviceId: 22, status: 'ONLINE', isAvailable: true }]
+  ];
+  for (const [invoke, route, method, response] of checks) {
+    const promise = invoke();
+    const call = calls.at(-1);
+    assert.equal(call.url, EnvironmentConfig.current().baseUrl + route);
+    assert.equal(call.options.method, method);
+    assert.equal(call.options.header.Authorization, 'Bearer core-flow-token');
+    complete(call, response);
+    await promise;
+  }
 });
 
 test('absolute URLs and ambiguous paths are rejected before network access', async () => {
