@@ -1,4 +1,5 @@
 import { PortraTheme } from '../theme/PortraTheme';
+import { PortraBottomNav } from '../common/components/PortraBottomNav';
 import {
   CROSS_BORDER_CONSENT_SECTIONS,
   CROSS_BORDER_CONSENT_TITLE,
@@ -37,6 +38,9 @@ export struct PrivacyConsentPage {
     onSelectionChange: (selected: boolean) => void, onOpenDocument: () => void) {
     Row({ space: 12 }) {
       Checkbox({ name: label, group: 'portra-legal-consent' })
+        .width(20)
+        .height(20)
+        .shape(CheckBoxShape.CIRCLE)
         .select(selected)
         .selectedColor(PortraTheme.primary)
         .onChange((value: boolean) => onSelectionChange(value))
@@ -60,11 +64,8 @@ export struct PrivacyConsentPage {
       .alignItems(HorizontalAlign.Start)
     }
     .width('100%')
-    .padding(16)
+    .padding({ top: 4, bottom: 4 })
     .alignItems(VerticalAlign.Center)
-    .backgroundColor(PortraTheme.surface)
-    .border({ width: 1, color: selected ? PortraTheme.primary : PortraTheme.border })
-    .borderRadius(PortraTheme.radius)
   }
 
   @Builder
@@ -76,25 +77,25 @@ export struct PrivacyConsentPage {
           .fontSize(16)
           .fontWeight(FontWeight.Bold)
           .fontColor(PortraTheme.primary)
-          .margin({ top: 32 })
+          .margin({ top: 24 })
 
         Row()
           .width(36)
           .height(4)
           .alignSelf(ItemAlign.Start)
           .backgroundColor(PortraTheme.accent)
-          .margin({ top: 9, bottom: 24 })
+          .margin({ top: 7, bottom: 18 })
 
         Text('欢迎使用 Portra')
           .width('100%')
-          .fontSize(27)
+          .fontSize(23)
           .fontWeight(FontWeight.Bold)
           .fontColor(PortraTheme.primaryText)
 
         Text('请先了解我们如何处理和跨境存储您的信息')
           .width('100%')
-          .fontSize(14)
-          .lineHeight(22)
+          .fontSize(13)
+          .lineHeight(20)
           .fontColor(PortraTheme.secondaryText)
           .margin({ top: 10 })
 
@@ -106,22 +107,19 @@ export struct PrivacyConsentPage {
             .fontColor(PortraTheme.primaryText)
           Text('不会新建设备标识，也不会发起大厅、消息和约拍等业务请求。您主动进入个人信息权利申请渠道时，仅进行必要的身份核验和申请处理。')
             .width('100%')
-            .fontSize(13)
-            .lineHeight(21)
+            .fontSize(12)
+            .lineHeight(19)
             .fontColor(PortraTheme.secondaryText)
         }
         .width('100%')
-        .padding(16)
-        .margin({ top: 24 })
-        .backgroundColor(PortraTheme.primarySoft)
-        .borderRadius(PortraTheme.radius)
+        .margin({ top: 18 })
 
         Text('请分别确认以下两项')
           .width('100%')
           .fontSize(14)
           .fontWeight(FontWeight.Medium)
           .fontColor(PortraTheme.primaryText)
-          .margin({ top: 28, bottom: 12 })
+          .margin({ top: 20, bottom: 12 })
 
         Column({ space: 12 }) {
           this.ConsentChoice(
@@ -153,14 +151,14 @@ export struct PrivacyConsentPage {
 
         Button('同意并继续')
           .width('100%')
-          .height(50)
+          .height(44)
           .fontSize(16)
           .fontWeight(FontWeight.Medium)
           .fontColor(PortraTheme.white)
-          .backgroundColor(this.canAccept() ? PortraTheme.primary : PortraTheme.mutedText)
+          .backgroundColor(this.canAccept() ? PortraTheme.primary : '#CECBC7')
           .borderRadius(PortraTheme.radius)
           .enabled(this.canAccept())
-          .margin({ top: 26 })
+          .margin({ top: 20 })
           .onClick(() => {
             if (this.canAccept()) {
               this.onAccept?.();
@@ -169,32 +167,76 @@ export struct PrivacyConsentPage {
 
         Button('不同意并退出')
           .width('100%')
-          .height(48)
+          .height(40)
           .fontSize(14)
           .fontColor(PortraTheme.primaryText)
           .backgroundColor(Color.Transparent)
-          .margin({ top: 8, bottom: 30 })
+          .margin({ top: 6, bottom: 8 })
           .onClick(() => this.onDecline?.())
 
         Button('个人信息权利申请与联系渠道')
           .width('100%').height(44).fontSize(13).fontColor(PortraTheme.primary)
           .backgroundColor(Color.Transparent).onClick(() => this.onOpenPrivacyRights?.())
-
-        Text('运营者：王雯 · 联系邮箱：3336578810@qq.com')
-          .width('100%')
-          .fontSize(11)
-          .textAlign(TextAlign.Center)
-          .fontColor(PortraTheme.mutedText)
-          .margin({ bottom: 32 })
+          .margin({ bottom: 20 })
       }
       .width('100%')
       .padding({ left: 24, right: 24 })
       .alignItems(HorizontalAlign.Start)
     }
-    .width('100%')
-    .height('100%')
+    .width('86%')
+    .constraintSize({ maxWidth: 420 })
+    .height('84%')
     .scrollBar(BarState.Auto)
-    .backgroundColor(PortraTheme.pageBackground)
+    .backgroundColor(PortraTheme.surface)
+    .borderRadius(20)
+    .clip(true)
+    .accessibilityGroup(true)
+    .accessibilityText('隐私授权弹窗，请分别确认以下两项')
+  }
+
+  // Presentation only: do not mount HallPage or start business requests before consent.
+  @Builder
+  private HallBackdrop() {
+    Column() {
+      Row() {
+        Column({ space: 6 }) {
+          Text('PORTRA').fontSize(24).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primary)
+          Row().width(36).height(4).backgroundColor(PortraTheme.accent)
+        }.alignItems(HorizontalAlign.Start)
+        Blank()
+        Image($r('app.media.ic_search')).width(24).height(24).margin({ right: 20 })
+        Image($r('app.media.ic_bell')).width(24).height(24)
+      }.width('100%').padding({ left: 20, right: 20, top: 24, bottom: 24 })
+      Row({ space: 28 }) {
+        Column({ space: 8 }) {
+          Text('摄影橱窗').fontSize(18).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
+          Row().width(24).height(3).backgroundColor(PortraTheme.primary).borderRadius(2)
+        }
+        Text('约拍需求').fontSize(18).fontColor(PortraTheme.secondaryText)
+      }.width('100%').padding({ left: 20, bottom: 12 })
+      Column({ space: 14 }) {
+        ForEach([0, 1, 2], (row: number) => {
+          Row({ space: 12 }) {
+            this.SkeletonCard()
+            this.SkeletonCard()
+          }.width('100%')
+        }, (row: number) => row.toString())
+      }.width('100%').layoutWeight(1).padding({ left: 16, right: 16 }).clip(true)
+      PortraBottomNav({ selectedIndex: 0 })
+    }
+    .width('100%').height('100%').backgroundColor(PortraTheme.pageBackground)
+    .hitTestBehavior(HitTestMode.None)
+    .accessibilityLevel('no-hide-descendants')
+  }
+
+  @Builder
+  private SkeletonCard() {
+    Column({ space: 10 }) {
+      Row().width('100%').height(118).backgroundColor(PortraTheme.pageBackgroundDeep)
+      Row().width('80%').height(12).backgroundColor(PortraTheme.pageBackgroundDeep).borderRadius(4)
+      Row().width('56%').height(10).backgroundColor(PortraTheme.pageBackgroundDeep).borderRadius(4)
+    }.layoutWeight(1).padding({ bottom: 14 }).alignItems(HorizontalAlign.Start)
+    .backgroundColor(PortraTheme.surface).borderRadius(12).clip(true)
   }
 
   @Builder
@@ -266,7 +308,12 @@ export struct PrivacyConsentPage {
 
   build() {
     if (this.activeDocument === LegalDocumentKind.NONE) {
-      this.ConsentOverview()
+      Stack({ alignContent: Alignment.Center }) {
+        this.HallBackdrop()
+        Row().width('100%').height('100%').backgroundColor('#99000000')
+          .hitTestBehavior(HitTestMode.Block)
+        this.ConsentOverview()
+      }.width('100%').height('100%')
     } else {
       this.DocumentView()
     }
