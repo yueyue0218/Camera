@@ -85,6 +85,12 @@ Debug 未填地址时会打印明确的配置警告，运行时继续由 `Enviro
 
 正式大厅只调用上述真实接口，并覆盖 Loading、Empty、Error 和正常列表状态。视觉对照数据仅位于 `entry/src/ohosTest/ets/preview/HallPreview.ets`；DevEco 要求 Preview 入口位于 `src/main/ets`，因此请打开不含数据且未注册到正式页面的 `entry/src/main/ets/preview/HallPreviewEntry.ets`。该入口包含镜头与约拍的 360、390、430 vp 预览，以及 Loading、Empty、Error、长中文、无头像、无图片和长价格/预算边界预览。频道切换会把内容滚动位置复位到顶部，避免较长的镜头列表把旧滚动位置带入约拍列表。默认 HAP 仍需通过示例数据泄漏检查。当前没有连接模拟器或真机，因此系统字体放大和安全区仍需在 Preview 或设备上完成最终视觉验收。
 
+### C 模块报价与订单
+
+会话里的报价和订单卡只展示摘要。摄影师可进入独立表单发送或编辑待确认报价；客户可在报价详情中确认或拒绝。确认后以服务端订单为准，客户的「确认支付」调用现有模拟支付接口，不会真实扣款。支付响应不明时，订单页会查询服务端结果，再提示刷新。订单列表进入独立详情，详情可返回对应会话。
+
+打开 `entry/src/main/ets/preview/QuoteOrderPreviewEntry.ets` 可查看客户、摄影师视角的待确认报价、待支付订单、已拒绝报价、报价详情和支付确认层。静态示例仅位于 `entry/src/ohosTest/ets/preview/QuoteOrderPreview.ets`；正式 HAP 不含这些数据。Preview 可编译不代表已完成真机视觉验收。
+
 ## 提交边界
 
 以下内容由工程忽略，不应提交：`build/`、`.hvigor/`、`oh_modules/`、`.idea/`、`local.properties` 和 HAP 构建产物。签名私钥、密码、token 和个人路径也不得提交。

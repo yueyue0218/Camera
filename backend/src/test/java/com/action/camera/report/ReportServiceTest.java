@@ -53,13 +53,15 @@ class ReportServiceTest {
     @Mock AdminUserService adminUserService;
     @Mock ReviewModerationService reviewModerationService;
     @Mock AdminAuditService adminAuditService;
+    @Mock com.action.camera.notification.service.NotificationService notificationService;
 
     private ReportService service;
 
     @BeforeEach
     void setUp() {
         service = new ReportService(reportRepository, targetValidator, adminPermissionService,
-                contentModerationService, adminUserService, reviewModerationService, adminAuditService);
+                contentModerationService, adminUserService, reviewModerationService, adminAuditService, notificationService);
+        org.mockito.Mockito.lenient().when(targetValidator.targetOwnerId(any(),any())).thenReturn(21L);
         UserContext.setUserId(11L);
     }
 
@@ -173,26 +175,26 @@ class ReportServiceTest {
     void takeDownResolutionUsesContentModerationServiceAndWritesBothAudits() {
         assertDelegates(ReportTargetType.DEMAND, ReportResolution.TAKE_DOWN,
                 () -> verify(contentModerationService)
-                        .takeDownHallItem(AdminHallItemType.DEMAND, 21L, "reason"));
+                        .takeDownHallItem(AdminHallItemType.DEMAND, 21L, "平台已完成审核，你发布的相关内容已被下架。"));
     }
 
     @Test
     void restoreResolutionUsesContentModerationService() {
         assertDelegates(ReportTargetType.SERVICE_PACKAGE, ReportResolution.RESTORE,
                 () -> verify(contentModerationService)
-                        .restoreHallItem(AdminHallItemType.SERVICE_PACKAGE, 21L, "reason"));
+                        .restoreHallItem(AdminHallItemType.SERVICE_PACKAGE, 21L, "平台已完成复核，相关内容已恢复展示。"));
     }
 
     @Test
     void restrictUserResolutionUsesAdminUserService() {
         assertDelegates(ReportTargetType.USER, ReportResolution.RESTRICT_USER,
-                () -> verify(adminUserService).changeStatus(21L, "DISABLED", "reason"));
+                () -> verify(adminUserService).changeStatus(21L, "DISABLED", "平台已完成审核，你的账号已按规则限制使用。"));
     }
 
     @Test
     void reviewHiddenResolutionUsesReviewModerationService() {
         assertDelegates(ReportTargetType.REVIEW, ReportResolution.REVIEW_HIDDEN,
-                () -> verify(reviewModerationService).hideForGovernance(21L, 99L, "REPORT", 7L, "reason"));
+                () -> verify(reviewModerationService).hideForGovernance(21L, 99L, "MODERATION_REVIEW", 21L, "平台已完成审核，你发布的相关评价已被隐藏。"));
     }
 
     @Test
@@ -220,7 +222,7 @@ class ReportServiceTest {
     @Test
     void failedTargetMutationRollsBackReportAndAuditRows() {
         arrangePendingReport(ReportTargetType.MOMENT);
-        when(contentModerationService.takeDownMoment(21L, "reason"))
+        when(contentModerationService.takeDownMoment(eq(21L), org.mockito.ArgumentMatchers.anyString()))
                 .thenThrow(new BusinessException(ErrorCode.STATUS_CONFLICT, "target changed"));
 
         assertError(() -> service.resolve(
@@ -228,6 +230,28 @@ class ReportServiceTest {
 
         verify(reportRepository, never()).save(any());
         verify(adminAuditService, never()).record(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void privateReportNoteCannotBecomeAuthorVisibleModerationReason() {
+        arrangePendingReport(ReportTargetType.MOMENT);
+        service.resolve(7L, new ReportResolveRequest("TAKE_DOWN", "PRIVATE_REPORTER_MARKER reportId=7"));
+        var reason = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(contentModerationService).takeDownMoment(eq(21L), reason.capture());
+        assertThat(reason.getValue()).doesNotContain("PRIVATE_REPORTER_MARKER", "reportId", "7");
+        assertThat(reason.getValue()).contains("平台", "下架");
+    }
+    @Test
+    void publicCreditReversalSourceCannotExposeReportId() {
+        arrangePendingReport(ReportTargetType.REVIEW);
+        service.resolve(7L, new ReportResolveRequest("REVIEW_HIDDEN", "PRIVATE_REPORTER_MARKER"));
+        var source = org.mockito.ArgumentCaptor.forClass(String.class);
+        var sourceId = org.mockito.ArgumentCaptor.forClass(Long.class);
+        var reason = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(reviewModerationService).hideForGovernance(eq(21L), eq(99L), source.capture(), sourceId.capture(), reason.capture());
+        assertThat(source.getValue()).isEqualTo("MODERATION_REVIEW");
+        assertThat(sourceId.getValue()).isEqualTo(21L);
+        assertThat(reason.getValue()).doesNotContain("PRIVATE_REPORTER_MARKER");
     }
 
     private void assertDelegates(ReportTargetType targetType, ReportResolution resolution, Runnable verification) {

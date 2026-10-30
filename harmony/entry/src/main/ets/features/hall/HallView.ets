@@ -13,6 +13,8 @@ import { HallChannel, HallContentState } from './HallUiModels';
 @Component
 export struct HallView {
   @Prop @Watch('onHallReselected') reselectEpoch: number = 0;
+  @Prop noticeUnreadCount: number = 0;
+  @Prop noticeArrivalEpoch: number = 0;
   @Prop serviceRefreshing: boolean = false;
   @Prop demandRefreshing: boolean = false;
   onRefresh?: (channel: HallChannel) => void;
@@ -162,7 +164,8 @@ export struct HallView {
 
   build() {
     Column() {
-      PortraAppBar({ onSearch: this.onSearch, onNotice: this.onNotice })
+      PortraAppBar({ onSearch: this.onSearch, onNotice: this.onNotice,
+        unreadCount: this.noticeUnreadCount, noticeArrivalEpoch: this.noticeArrivalEpoch })
 
       Column({ space: 7 }) {
         HallSegmentedControl({

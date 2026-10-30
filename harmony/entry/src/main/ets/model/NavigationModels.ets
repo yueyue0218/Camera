@@ -4,6 +4,13 @@ export enum AppRoute {
   DEMAND_DETAIL = 'DemandDetail',
   SERVICE_DETAIL = 'ServiceDetail',
   CONVERSATION_DETAIL = 'ConversationDetail',
+  QUOTE_FORM = 'QuoteForm',
+  QUOTE_DETAIL = 'QuoteDetail',
+  ORDER_DETAIL = 'OrderDetail',
+  DELIVERY_GALLERY = 'DeliveryGallery',
+  DELIVERY_UPLOAD = 'DeliveryUpload',
+  PHOTO_AUTHORIZATION = 'PhotoAuthorization',
+  ORDER_REVIEWS = 'OrderReviews',
   PUBLISH = 'Publish',
   MESSAGE = 'Message',
   ORDER = 'Order',
@@ -31,6 +38,10 @@ export interface NavigationRouteParam {
   readonly demandId?: number;
   readonly serviceId?: number;
   readonly conversationId?: number;
+  readonly quoteId?: number;
+  readonly deliveryId?: number;
+  readonly authorizationId?: number;
+  readonly openPayment?: boolean;
   /** Protected destination requested before authentication. */
   readonly returnRoute?: AppRoute;
 }

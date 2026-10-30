@@ -10,6 +10,7 @@ import { NotificationApiBinding, ActivitySessionBinding } from '../features/noti
 @Component
 export struct NotificationPage {
   @State private snapshot: NotificationSnapshot = new NotificationSnapshot();
+  @State private lifecycleUnavailable: boolean = false;
   @State private filter: string = 'all';
   @State private expandedId: number = 0;
   private controller?: NotificationController;
@@ -26,27 +27,53 @@ export struct NotificationPage {
     this.controller = new NotificationController(new NotificationApiBinding(AppClient.shared.apiService), new ActivitySessionBinding(AppClient.shared.sessionManager),
       (state: NotificationSnapshot) => this.snapshot = state);
   }
-  aboutToDisappear(): void { this.lifecycle?.stop(); this.lifecycle = undefined; this.controller?.suspend(); }
+  aboutToDisappear(): void {
+    this.lifecycle?.stop();
+    this.lifecycle = undefined;
+    this.visible = false;
+    this.controller?.suspend();
+  }
+  /** Root-tab content has no NavDestination; standalone notifications do. */
+  private routeVisible(update?: uiObserver.NavDestinationInfo): boolean {
+    const navigation = this.queryNavigationInfo();
+    if (navigation === undefined) { throw new Error('Navigation unavailable'); }
+    let destination = this.queryNavDestinationInfo();
+    if (destination === undefined) { return navigation.pathStack.size() === 0; }
+    if (update?.navDestinationId === destination.navDestinationId) { destination = update; }
+    return destination.index === navigation.pathStack.size() - 1 &&
+      destination.state !== uiObserver.NavDestinationState.ON_HIDDEN && destination.state !== uiObserver.NavDestinationState.ON_WILL_HIDE &&
+      destination.state !== uiObserver.NavDestinationState.ON_DISAPPEAR && destination.state !== uiObserver.NavDestinationState.ON_WILL_DISAPPEAR;
+  }
+  private handleLifecycleUnavailable(): void {
+    this.lifecycle?.stop();
+    this.lifecycle = undefined;
+    this.visible = false;
+    this.controller?.suspend();
+    this.lifecycleUnavailable = true;
+    const failed = new NotificationSnapshot();
+    failed.error = '页面状态监听不可用，请点击重试。';
+    this.snapshot = failed;
+    console.error('[Portra][NotificationPage] lifecycle listener or navigation context unavailable');
+  }
   private observe(): void {
     if (this.lifecycle !== undefined) { return; }
     try {
-      this.lifecycle = new MomentFeedLifecycle(this.getUIContext(), (update?: uiObserver.NavDestinationInfo) => {
-        const navigation = this.queryNavigationInfo(); let destination = this.queryNavDestinationInfo();
-        if (navigation === undefined || destination === undefined) { throw new Error('Navigation unavailable'); }
-        if (update?.navDestinationId === destination.navDestinationId) { destination = update; }
-        return destination.index === navigation.pathStack.size() - 1 &&
-          destination.state !== uiObserver.NavDestinationState.ON_HIDDEN && destination.state !== uiObserver.NavDestinationState.ON_WILL_HIDE &&
-          destination.state !== uiObserver.NavDestinationState.ON_DISAPPEAR && destination.state !== uiObserver.NavDestinationState.ON_WILL_DISAPPEAR;
-      }, (visible: boolean) => {
-        if (this.visible === visible) { return; } this.visible = visible; this.expandedId = 0;
-        if (visible) { this.controller?.resume(); this.controller?.load(); } else { this.controller?.suspend(); }
-      }, () => { this.controller?.suspend(); this.snapshot.error = '页面状态监听不可用，请返回后重试。'; });
+      this.lifecycleUnavailable = false;
+      this.lifecycle = new MomentFeedLifecycle(this.getUIContext(),
+        (update?: uiObserver.NavDestinationInfo) => this.routeVisible(update),
+        (visible: boolean) => {
+          if (this.visible === visible) { return; }
+          this.visible = visible;
+          this.expandedId = 0;
+          if (visible) { this.controller?.resume(); this.controller?.load(); }
+          else { this.controller?.suspend(); }
+        }, () => this.handleLifecycleUnavailable());
       this.lifecycle.start();
-    } catch { this.snapshot.error = '页面状态监听不可用，请返回后重试。'; }
+    } catch { this.handleLifecycleUnavailable(); }
   }
   private label(filter: string): string {
     return filter === 'all' ? '全部' : filter === 'unread' ? '未读' : filter === 'order' ? '订单' :
-      filter === 'appeal' ? '申诉' : filter === 'review' ? '评价' : '动态';
+      filter === 'appeal' ? '投诉' : filter === 'review' ? '评价' : filter === 'report' ? '举报' : filter === 'moderation' ? '平台处理' : '动态';
   }
   private count(filter: string): number {
     return this.snapshot.items.filter((item: NotificationSummary) => filter === 'all' ||
@@ -60,17 +87,20 @@ export struct NotificationPage {
     this.expandedId = this.expandedId === item.notificationId ? 0 : item.notificationId;
     if (!item.isRead) { this.controller?.markRead(item.notificationId); }
   }
+  private openReportHistory(): void {
+    if(this.controller?.canOpenReports()){this.onOpenTarget?.(new NotificationTarget('reportList',0));}
+  }
   private related(item: NotificationSummary): void {
     if (!this.controller?.canOpen(item.notificationId)) { return; }
     const target = NotificationTargetResolver.resolve(item); if (target === undefined) { return; }
     if (target.kind === 'moment') { this.onOpenMoment?.(target.id); }
     else if (target.kind === 'credit') { this.onOpenCredit?.(); }
-    else if (['order','review','complaint','dispute'].includes(target.kind)) { this.onOpenTarget?.(target); }
+    else if (['order','review','complaint','dispute','report'].includes(target.kind)) { this.onOpenTarget?.(target); }
   }
   private canOpen(item: NotificationSummary): boolean {
     const target = NotificationTargetResolver.resolve(item); if (target === undefined) { return false; }
     return target.kind === 'moment' || target.kind === 'credit' ||
-      (this.onOpenTarget !== undefined && ['order','review','complaint','dispute'].includes(target.kind));
+      (this.onOpenTarget !== undefined && ['order','review','complaint','dispute','report'].includes(target.kind));
   }
   @Builder
   private Notice(item: NotificationSummary) {
@@ -85,7 +115,7 @@ export struct NotificationPage {
       Text(`${NotificationFormat.label(item)} · ${NotificationFormat.time(item.createdAt)}`)
         .width('100%').fontSize(11).fontColor(PortraTheme.secondaryText)
       if (this.expandedId === item.notificationId && this.canOpen(item)) {
-        Button('查看相关内容').fontSize(12).height(34).fontColor(PortraTheme.primary).backgroundColor(PortraTheme.primarySoft)
+        Button(NotificationTargetResolver.resolve(item)?.kind==='report'?'查看举报结果':'查看相关内容').fontSize(12).constraintSize({minHeight:44}).fontColor(PortraTheme.primary).backgroundColor(PortraTheme.primarySoft)
           .enabled(!this.snapshot.busy && !this.snapshot.loading).onClick(() => this.related(item))
       }
     }.width('100%').alignItems(HorizontalAlign.Start).padding(18)
@@ -108,10 +138,15 @@ export struct NotificationPage {
           .enabled(this.snapshot.unread > 0 && !this.snapshot.busy && !this.snapshot.loading && !this.snapshot.uncertain)
           .onClick(() => this.controller?.markAllRead())
       }.width('100%').padding({ left: 14, right: 20, top: 18, bottom: 22 })
+      Row({space:12}) {
+        Text('查看你提交的举报及处理进度').fontSize(12).fontColor(PortraTheme.secondaryText).layoutWeight(1)
+        Button('我的举报').constraintSize({minHeight:44}).fontSize(13).fontColor(PortraTheme.primary).backgroundColor(PortraTheme.primarySoft)
+          .onClick(()=>{if(this.snapshot.loginRequired){this.onRequireLogin?.();}else{this.openReportHistory();}})
+      }.width('100%').padding({left:20,right:20,bottom:14})
       Scroll() {
         Row({ space: 8 }) {
-          ForEach(['all', 'unread', 'order', 'appeal', 'review', 'dynamic'], (filter: string) => {
-            Button(`${this.label(filter)} ${this.count(filter)}`).height(38).fontSize(12)
+          ForEach(['all', 'unread', 'order', 'appeal', 'review', 'dynamic', 'report', 'moderation'], (filter: string) => {
+            Button(`${this.label(filter)} ${this.count(filter)}`).height(44).fontSize(12)
               .fontWeight(this.filter === filter ? FontWeight.Bold : FontWeight.Regular)
               .fontColor(this.filter === filter ? PortraTheme.primary : PortraTheme.secondaryText)
               .backgroundColor(this.filter === filter ? PortraTheme.primarySoft : PortraTheme.surface)
@@ -135,9 +170,12 @@ export struct NotificationPage {
             Row() {
               Text(`已加载 ${this.snapshot.items.length} / ${this.snapshot.total} 条`).fontSize(11).fontColor(PortraTheme.secondaryText)
               Blank()
-              Button(this.snapshot.busy ? '处理中' : this.snapshot.uncertain ? '刷新核实' : '刷新')
+              Button(this.lifecycleUnavailable ? '重试监听' : this.snapshot.busy ? '处理中' : this.snapshot.uncertain ? '刷新核实' : '刷新')
                 .fontSize(11).height(32).fontColor(PortraTheme.primary).backgroundColor(Color.Transparent)
-                .enabled(!this.snapshot.busy).onClick(() => this.controller?.load())
+                .enabled(!this.snapshot.busy).onClick(() => {
+                  if (this.lifecycleUnavailable) { this.observe(); }
+                  else { this.controller?.load(); }
+                })
             }.width('100%')
             if (this.items().length === 0) {
               Text(this.filter === 'all' ? '暂无通知' : `暂无${this.label(this.filter)}通知`)

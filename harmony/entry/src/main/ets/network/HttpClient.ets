@@ -72,7 +72,7 @@ export class HttpClient implements AuthTokenController {
     const parts: http.MultiFormData[] = [
       { name: 'file', contentType: mime, remoteFileName: filename, data: data },
       { name: 'bizType', contentType: 'text/plain', data: bizType },
-      { name: 'visibility', contentType: 'text/plain', data: 'PUBLIC' }
+      { name: 'visibility', contentType: 'text/plain', data: bizType === 'REVIEW_EVIDENCE' ? 'PRIVATE' : 'PUBLIC' }
     ];
     return this.request<UploadedImage>(http.RequestMethod.POST, '/files/upload', 'files.upload', true, undefined, false, parts);
   }
@@ -83,6 +83,13 @@ export class HttpClient implements AuthTokenController {
 
   async getPublic<T>(path: string, requestKey: string = path): Promise<T> {
     return this.request<T>(http.RequestMethod.GET, path, requestKey, false);
+  }
+
+  async getBinary(path: string, requestKey: string = path, maxBytes: number = 2 * 1024 * 1024): Promise<ArrayBuffer> {
+    const result = await this.request<ArrayBuffer>(http.RequestMethod.GET, path, requestKey, true,
+      undefined, true);
+    if (result.byteLength > maxBytes) throw ErrorMapper.parse();
+    return result;
   }
 
   async post<T>(path: string, body?: Object, requestKey: string = path): Promise<T> {
@@ -129,11 +136,11 @@ export class HttpClient implements AuthTokenController {
     authenticated: boolean, body?: Object, binary: boolean = false, parts?: http.MultiFormData[]): Promise<T> {
     const profile = EnvironmentConfig.current();
     if (!EnvironmentConfig.isUsable(profile)) {
-      throw ErrorMapper.config(`当前环境 ${profile.name} 没有可用的服务端地址。`);
+      throw ErrorMapper.config('暂时无法连接服务。');
     }
 
     if (!path.startsWith('/') || path.startsWith('//') || /[\\\s#]/.test(path)) {
-      throw ErrorMapper.config('接口必须使用以单个 / 开头的相对路径。');
+      throw ErrorMapper.config('暂时无法完成请求。');
     }
     const requestVersion = this.beginRequest(requestKey);
     const epoch = this.sessionEpoch;
@@ -265,7 +272,7 @@ export class HttpClient implements AuthTokenController {
     }
 
     if (binary) {
-      const headers = response.header as Record<string, string>;
+      const headers = (response.header ?? {}) as Record<string, string>;
       const type = Object.keys(headers).find((key: string) => key.toLowerCase() === 'content-type');
       const mime = type === undefined ? '' : String(headers[type]).split(';')[0].trim().toLowerCase();
       // FileAccessPolicy errors use the global HTTP-200 JSON envelope too.

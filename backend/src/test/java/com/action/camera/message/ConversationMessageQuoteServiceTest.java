@@ -379,7 +379,7 @@ class ConversationMessageQuoteServiceTest {
 
     @Test
     void providerCanCreatePendingQuoteInConversation() {
-        when(conversationRepository.findById(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
+        when(conversationRepository.findByIdForUpdate(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
         when(quoteRepository.findFirstByConversationIdAndStatus(CONVERSATION_ID, QuoteStatus.PENDING_CONFIRM))
                 .thenReturn(Optional.empty());
         when(quoteRepository.save(any(Quote.class))).thenAnswer(invocation -> {
@@ -401,7 +401,7 @@ class ConversationMessageQuoteServiceTest {
 
     @Test
     void customerCannotCreateQuote() {
-        when(conversationRepository.findById(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
+        when(conversationRepository.findByIdForUpdate(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
 
         assertThrows(BusinessException.class,
                 () -> quoteService.createQuoteFromConversation(validQuoteCommand(), CUSTOMER_ID));
@@ -411,7 +411,7 @@ class ConversationMessageQuoteServiceTest {
 
     @Test
     void strangerCannotCreateQuote() {
-        when(conversationRepository.findById(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
+        when(conversationRepository.findByIdForUpdate(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
 
         assertThrows(BusinessException.class,
                 () -> quoteService.createQuoteFromConversation(validQuoteCommand(), STRANGER_ID));
@@ -421,7 +421,7 @@ class ConversationMessageQuoteServiceTest {
 
     @Test
     void pendingQuoteBlocksNewQuoteInSameConversation() {
-        when(conversationRepository.findById(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
+        when(conversationRepository.findByIdForUpdate(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
         when(quoteRepository.findFirstByConversationIdAndStatus(CONVERSATION_ID, QuoteStatus.PENDING_CONFIRM))
                 .thenReturn(Optional.of(new Quote()));
 
@@ -439,7 +439,7 @@ class ConversationMessageQuoteServiceTest {
         assertThrows(BusinessException.class,
                 () -> quoteService.createQuoteFromConversation(command, PROVIDER_USER_ID));
 
-        verify(conversationRepository, never()).findById(any());
+        verify(conversationRepository, never()).findByIdForUpdate(any());
     }
 
     @Test
@@ -450,7 +450,7 @@ class ConversationMessageQuoteServiceTest {
         assertThrows(BusinessException.class,
                 () -> quoteService.createQuoteFromConversation(command, PROVIDER_USER_ID));
 
-        verify(conversationRepository, never()).findById(any());
+        verify(conversationRepository, never()).findByIdForUpdate(any());
     }
 
     @Test
@@ -461,7 +461,7 @@ class ConversationMessageQuoteServiceTest {
         assertThrows(BusinessException.class,
                 () -> quoteService.createQuoteFromConversation(command, PROVIDER_USER_ID));
 
-        verify(conversationRepository, never()).findById(any());
+        verify(conversationRepository, never()).findByIdForUpdate(any());
     }
 
     @Test
@@ -498,12 +498,12 @@ class ConversationMessageQuoteServiceTest {
         assertThrows(BusinessException.class,
                 () -> quoteService.createQuoteFromConversation(command, PROVIDER_USER_ID));
 
-        verify(conversationRepository, never()).findById(any());
+        verify(conversationRepository, never()).findByIdForUpdate(any());
     }
 
     @Test
     void quoteCreationDoesNotCreateQuoteCardMessage() {
-        when(conversationRepository.findById(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
+        when(conversationRepository.findByIdForUpdate(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
         when(quoteRepository.findFirstByConversationIdAndStatus(CONVERSATION_ID, QuoteStatus.PENDING_CONFIRM))
                 .thenReturn(Optional.empty());
         when(quoteRepository.save(any(Quote.class))).thenAnswer(invocation -> invocation.getArgument(0));

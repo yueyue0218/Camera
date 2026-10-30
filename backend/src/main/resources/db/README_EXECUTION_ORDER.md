@@ -141,3 +141,5 @@ push 到 `main` 会在 CI 成功后自动替换后端 JAR 并重启服务，部�
 | migration/add_payment_order_unique_constraint.sql | 支付记录按订单唯一，一次性，执行前必须检查重复数据 | 路径 B |
 | migration/add_dispute_previous_order_status.sql | 争议前状态第一阶段 nullable 迁移，一次性 | 路径 B |
 | migration/sync_current_main_schema.sql | 当前主线列定义与查询索引同步；预检失败即停止，不回填业务数据 | 路径 B |
+
+举报反馈：已有 reports 表先执行 migration/add_report_result_feedback.sql；fresh-init 在 add_admin_governance.sql 建表时含两字段。H2 的 reports 为 JPA 实体，由 create-drop 自动建表，schema-h2.sql 不重复定义。不回填历史结果或补发通知。

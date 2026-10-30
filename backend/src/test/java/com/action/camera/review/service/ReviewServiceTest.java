@@ -91,6 +91,23 @@ class ReviewServiceTest {
     }
 
     @Test
+    void authorCanSeeOwnHiddenReviewWithoutShowingItToTheOtherParticipant() {
+        UserContext.setUserId(CUSTOMER_ID);
+        ReviewResponse created = reviewService.create(
+                COMPLETED_ORDER_ID, new ReviewCreateRequest(4, "原评价"));
+        var review = reviewRepository.findById(created.reviewId()).orElseThrow();
+        review.setIsVisible(false);
+        reviewRepository.saveAndFlush(review);
+
+        assertThat(reviewService.listByOrder(COMPLETED_ORDER_ID))
+                .extracting(ReviewResponse::reviewId).contains(created.reviewId());
+
+        UserContext.setUserId(PROVIDER_ID);
+        assertThat(reviewService.listByOrder(COMPLETED_ORDER_ID))
+                .extracting(ReviewResponse::reviewId).doesNotContain(created.reviewId());
+    }
+
+    @Test
     void createReviewGeneratesCreditRecordAndNotification() {
         UserContext.setUserId(CUSTOMER_ID);
 
@@ -265,6 +282,20 @@ class ReviewServiceTest {
         assertThat(response.replyContent()).isEqualTo("重复追评");
         assertThat(response.replyTime()).isNotNull();
         assertThat(creditRecordRepository.findByUserIdOrderByCreatedAtDesc(PROVIDER_ID)).hasSize(1);
+    }
+
+    @Test
+    void identicalFollowUpDoesNotSendAnotherNotification() {
+        UserContext.setUserId(CUSTOMER_ID);
+        ReviewResponse review = reviewService.create(COMPLETED_ORDER_ID, new ReviewCreateRequest(5, "第一次评价"));
+        ReviewResponse first = reviewService.followUp(review.reviewId(), new ReviewFollowUpRequest("补充评价"));
+        ReviewResponse repeated = reviewService.followUp(review.reviewId(), new ReviewFollowUpRequest("补充评价"));
+
+        assertThat(repeated.replyContent()).isEqualTo(first.replyContent());
+        assertThat(repeated.replyTime()).isEqualTo(first.replyTime());
+        assertThat(notificationRepository.findByUserIdOrderByCreatedAtDesc(PROVIDER_ID))
+                .extracting("type")
+                .containsExactlyInAnyOrder("REVIEW_RECEIVED", "REVIEW_FOLLOW_UP_RECEIVED");
     }
 
     @Test

@@ -1,4 +1,7 @@
 import { ContentChanges } from '../features/user/ContentChanges';
+import { uiObserver } from '@kit.ArkUI';
+import { MomentFeedLifecycle } from '../features/moments/MomentFeedLifecycle';
+import { HallUnreadCounter } from '../features/notifications/HallUnreadCounter';
 import { HallFilterState } from '../features/hall/HallFilterState';
 import { AppClient } from '../app/AppClient';
 import { HallView } from '../features/hall/HallView';
@@ -11,6 +14,9 @@ import { ErrorMapper, PortraError } from '../network/ErrorMapper';
 @Component
 export struct HallPage {
   @Prop reselectEpoch: number = 0;
+  @Prop @Watch('onHallActiveChanged') hallActive: boolean = true;
+  @State private noticeUnreadCount: number = 0;
+  @State private noticeArrivalEpoch: number = 0;
   @State private serviceRefreshing: boolean = false;
   @State private demandRefreshing: boolean = false;
   @Prop @Watch('onSessionEpochChanged') sessionEpoch: number = 0;
@@ -36,6 +42,13 @@ export struct HallPage {
   private roleLoadVersion: number = 0;
   private readonly apiService = AppClient.shared.apiService;
   private readonly appClient: AppClient = AppClient.shared;
+  private readonly noticeCounter: HallUnreadCounter = new HallUnreadCounter(
+    this.apiService, this.appClient.sessionManager, (count: number, epoch: number) => {
+      this.noticeUnreadCount = count;
+      this.noticeArrivalEpoch = epoch;
+    });
+  private noticeLifecycle?: MomentFeedLifecycle;
+  private noticeRouteVisible: boolean = false;
   private readonly pageSize: number = 20;
   private readonly feedSeed: string = Date.now().toString();
   private serviceVersion: number = 0;
@@ -64,6 +77,7 @@ export struct HallPage {
 
   private onSessionEpochChanged(): void {
     // A role switch, login, or logout must refresh both the role-aware banner and hall data.
+    this.noticeCounter.refresh();
     this.serviceFilters = new HallFilterState();
     this.demandFilters = new HallFilterState();
     this.serviceItems = []; this.demandItems = [];
@@ -117,6 +131,10 @@ export struct HallPage {
   }
 
   aboutToDisappear(): void {
+    this.noticeLifecycle?.stop();
+    this.noticeLifecycle = undefined;
+    this.noticeRouteVisible = false;
+    this.noticeCounter.stop();
     ContentChanges.unobserve(this.changed);
     this.serviceVersion++;
     this.demandVersion++;
@@ -126,6 +144,49 @@ export struct HallPage {
     this.apiService.cancelCurrentSession('hall.identity');
     this.apiService.cancelServicePackages();
     this.apiService.cancelDemands();
+  }
+
+  private onHallActiveChanged(): void {
+    this.syncNoticePolling();
+  }
+
+  private syncNoticePolling(): void {
+    if (this.hallActive && this.noticeRouteVisible) { this.noticeCounter.start(); }
+    else { this.noticeCounter.stop(); }
+  }
+
+  private observeNoticeLifecycle(): void {
+    if (this.noticeLifecycle !== undefined) { return; }
+    try {
+      this.noticeLifecycle = new MomentFeedLifecycle(this.getUIContext(),
+        (update?: uiObserver.NavDestinationInfo) => {
+          const navigation = this.queryNavigationInfo();
+          if (navigation === undefined) { throw new Error('Hall navigation unavailable'); }
+          let destination = this.queryNavDestinationInfo();
+          if (destination === undefined) { return navigation.pathStack.size() === 0; }
+          if (update?.navDestinationId === destination.navDestinationId) { destination = update; }
+          return destination.index === navigation.pathStack.size() - 1 &&
+            destination.state !== uiObserver.NavDestinationState.ON_HIDDEN &&
+            destination.state !== uiObserver.NavDestinationState.ON_WILL_HIDE &&
+            destination.state !== uiObserver.NavDestinationState.ON_DISAPPEAR &&
+            destination.state !== uiObserver.NavDestinationState.ON_WILL_DISAPPEAR;
+        }, (visible: boolean) => {
+          this.noticeRouteVisible = visible;
+          this.syncNoticePolling();
+        }, () => {
+          this.noticeLifecycle?.stop();
+          this.noticeLifecycle = undefined;
+          this.noticeRouteVisible = false;
+          this.noticeCounter.stop();
+          console.warn('[Portra][Hall] notification badge lifecycle unavailable');
+        });
+      this.noticeLifecycle.start();
+    } catch (_) {
+      this.noticeLifecycle?.stop();
+      this.noticeLifecycle = undefined;
+      this.noticeRouteVisible = false;
+      this.noticeCounter.stop();
+    }
   }
 
   private reload(): void {
@@ -269,6 +330,7 @@ export struct HallPage {
   build() {
     HallView({
       reselectEpoch: this.reselectEpoch,
+      noticeUnreadCount: this.noticeUnreadCount, noticeArrivalEpoch: this.noticeArrivalEpoch,
       serviceRefreshing: this.serviceRefreshing, demandRefreshing: this.demandRefreshing,
       onRefresh: (channel: HallChannel) => this.refreshChannel(channel),
       serviceState: this.serviceState,
@@ -301,5 +363,6 @@ export struct HallPage {
       onLoadMoreServices: () => this.loadServices(this.serviceVersion, this.servicePage + 1, true),
       onLoadMoreDemands: () => this.loadDemands(this.demandVersion, this.demandPage + 1, true)
     })
+    .onAppear(() => this.observeNoticeLifecycle())
   }
 }

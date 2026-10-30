@@ -14,6 +14,13 @@ export class NavigationPolicy {
     AppRoute.DEMAND_DETAIL,
     AppRoute.SERVICE_DETAIL,
     AppRoute.CONVERSATION_DETAIL,
+    AppRoute.QUOTE_FORM,
+    AppRoute.QUOTE_DETAIL,
+    AppRoute.ORDER_DETAIL,
+    AppRoute.DELIVERY_GALLERY,
+    AppRoute.DELIVERY_UPLOAD,
+    AppRoute.PHOTO_AUTHORIZATION,
+    AppRoute.ORDER_REVIEWS,
     AppRoute.PUBLISH,
     AppRoute.MESSAGE,
     AppRoute.ORDER,
@@ -23,7 +30,12 @@ export class NavigationPolicy {
 
   static requiresAuthentication(route: AppRoute): boolean {
     return route === AppRoute.ORDER_ENGAGEMENT || route === AppRoute.PUBLISH || route === AppRoute.CONVERSATION_DETAIL || route === AppRoute.MESSAGE ||
-      route === AppRoute.ORDER || route === AppRoute.PROFILE || route === AppRoute.NOTIFICATIONS || route === AppRoute.CREDIT || route === AppRoute.MOMENT_DETAIL;
+      route === AppRoute.QUOTE_FORM || route === AppRoute.QUOTE_DETAIL || route === AppRoute.ORDER_DETAIL ||
+      route === AppRoute.DELIVERY_GALLERY || route === AppRoute.DELIVERY_UPLOAD ||
+      route === AppRoute.PHOTO_AUTHORIZATION ||
+      route === AppRoute.ORDER_REVIEWS ||
+      route === AppRoute.ORDER || route === AppRoute.PROFILE || route === AppRoute.NOTIFICATIONS ||
+      route === AppRoute.CREDIT || route === AppRoute.MOMENT_DETAIL;
   }
 
   static resolve(route: AppRoute, param: NavigationRouteParam = EMPTY_PARAM,
@@ -34,7 +46,9 @@ export class NavigationPolicy {
         param: {
           returnRoute: route, demandId: param.demandId, serviceId: param.serviceId, targetKind: param.targetKind, targetId: param.targetId, orderId: param.orderId,
           conversationId: param.conversationId, momentId: param.momentId,
-          userId: param.userId, userRole: param.userRole, initialTab: param.initialTab
+          userId: param.userId, userRole: param.userRole, initialTab: param.initialTab,
+          quoteId: param.quoteId, deliveryId: param.deliveryId,
+          authorizationId: param.authorizationId, openPayment: param.openPayment
         }
       };
     }
@@ -76,6 +90,25 @@ export class NavigationPolicy {
     return NavigationPolicy.positiveId(param.conversationId);
   }
 
+  static validQuoteId(param: NavigationRouteParam): number | undefined {
+    return NavigationPolicy.positiveId(param.quoteId);
+  }
+
+  static validOrderId(param: NavigationRouteParam): number | undefined {
+    return NavigationPolicy.positiveId(param.orderId);
+  }
+
+  static conversationPathIndex(pathNames: string[],
+    paramAt: (index: number) => NavigationRouteParam | undefined, conversationId: number): number {
+    for (let index = pathNames.length - 1; index >= 0; index--) {
+      if (pathNames[index] === AppRoute.CONVERSATION_DETAIL &&
+        paramAt(index)?.conversationId === conversationId) {
+        return index;
+      }
+    }
+    return -1;
+  }
+
   private static positiveId(id: number | undefined): number | undefined {
     return typeof id === 'number' && Number.isSafeInteger(id) && id > 0 ? id : undefined;
   }
@@ -96,6 +129,19 @@ export class NavigationPolicy {
         return '摄影橱窗';
       case AppRoute.CONVERSATION_DETAIL:
         return '会话';
+      case AppRoute.QUOTE_FORM:
+      case AppRoute.QUOTE_DETAIL:
+        return '报价';
+      case AppRoute.ORDER_DETAIL:
+        return '订单详情';
+      case AppRoute.DELIVERY_GALLERY:
+        return '作品相册';
+      case AppRoute.DELIVERY_UPLOAD:
+        return '上传照片';
+      case AppRoute.PHOTO_AUTHORIZATION:
+        return '展示授权';
+      case AppRoute.ORDER_REVIEWS:
+        return '评价';
       case AppRoute.PUBLISH:
         return '发布需求';
       case AppRoute.MESSAGE:

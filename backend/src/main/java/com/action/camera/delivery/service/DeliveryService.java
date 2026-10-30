@@ -14,7 +14,6 @@ import com.action.camera.delivery.entity.Delivery;
 import com.action.camera.delivery.entity.DeliveryFile;
 import com.action.camera.delivery.port.OrderQueryPort;
 import com.action.camera.delivery.port.OrderSnapshot;
-import com.action.camera.delivery.port.OrderStatusPort;
 import com.action.camera.delivery.repository.DeliveryFileRepository;
 import com.action.camera.delivery.repository.DeliveryRepository;
 import com.action.camera.domain.FileRecord;
@@ -74,7 +73,6 @@ public class DeliveryService {
     private final FileService fileService;
     private final FileRepository fileRepository;
     private final OrderQueryPort orderQueryPort;
-    private final OrderStatusPort orderStatusPort;
     private final OrderService orderService;
     private final TransactionTemplate txTemplate;
     private final UserDisplayService userDisplayService;
@@ -94,7 +92,6 @@ public class DeliveryService {
                            FileService fileService,
                            FileRepository fileRepository,
                            OrderQueryPort orderQueryPort,
-                           OrderStatusPort orderStatusPort,
                            OrderService orderService,
                            TransactionTemplate txTemplate,
                            UserDisplayService userDisplayService,
@@ -104,19 +101,13 @@ public class DeliveryService {
         this.fileService = fileService;
         this.fileRepository = fileRepository;
         this.orderQueryPort = orderQueryPort;
-        this.orderStatusPort = orderStatusPort;
         this.orderService = orderService;
         this.txTemplate = txTemplate;
         this.userDisplayService = userDisplayService;
         this.orderDisplayService = orderDisplayService;
     }
 
-    // 注意：此方法不加 @Transactional。
-    // 原因：upload() 内部会通过 COrderHttpAdapter 向本地 OrderController 发起 HTTP 回调以更新订单状态。
-    // 若在外层事务中先向 deliveries 表 INSERT（触发 orders.id 的 FK 共享锁），
-    // 再发起回调 UPDATE orders，会造成同一行的 S 锁与 X 锁跨线程等待，产生死锁。
-    // 修复方案：先在 txTemplate 的独立事务中提交 deliveries/delivery_files，
-    // 释放 FK 共享锁后，再调用 orderStatusPort.changeStatus()。
+    // File storage is external to the DB transaction; failed DB writes remove staged files.
     public DeliveryUploadResponse upload(Long orderId, MultipartFile file, String remark) {
         return upload(orderId, file == null ? List.of() : List.of(file), remark);
     }
@@ -139,16 +130,21 @@ public class DeliveryService {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT, "订单当前状态不允许上传交付文件");
         }
 
-        int nextDeliveryRound = resolveNextDeliveryRound(orderId);
         List<UploadedDeliveryFile> uploadedFiles = uploadDeliveryFiles(uploadFiles, currentUserId);
-
-        // 在独立事务中保存交付记录后立即提交，释放 deliveries→orders FK 共享锁，
-        // 避免后续 changeStatus HTTP 回调时产生 S/X 锁死锁。
         final Long finalUserId = currentUserId;
         final LocalDateTime now = LocalDateTime.now();
-        Delivery saved;
+        DeliveryUploadResponse response;
         try {
-            saved = txTemplate.execute(status -> {
+            response = txTemplate.execute(status -> {
+                Order lockedOrder = orderService.lockForDeliveryUpload(orderId, finalUserId);
+                List<Delivery> previous = deliveryRepository.findByOrderIdOrderByUploadTimeDesc(orderId);
+                int nextDeliveryRound = resolveNextDeliveryRound(previous);
+                for (Delivery existing : previous) {
+                    if (Boolean.TRUE.equals(existing.getIsLatest())) {
+                        existing.setIsLatest(false);
+                        deliveryRepository.save(existing);
+                    }
+                }
                 Delivery delivery = new Delivery();
                 delivery.setOrderId(orderId);
                 delivery.setDeliveryRound(nextDeliveryRound);
@@ -171,70 +167,32 @@ public class DeliveryService {
                     deliveryFile.setUploadTime(now);
                     deliveryFileRepository.save(deliveryFile);
                 }
-                return d;
+                Order changedOrder = lockedOrder.getStatus() == com.action.camera.order.enums.OrderStatus.REWORK_REQUIRED
+                        ? orderService.completeReworkDelivery(orderId, finalUserId, "服务方上传交付文件")
+                        : orderService.markDeliveryUploaded(orderId, finalUserId, "服务方上传交付文件");
+                return new DeliveryUploadResponse(
+                        d.getId(), d.getOrderId(), d.getDeliveryRound(), uploadedFiles.get(0).fileId(),
+                        uploadedFiles.get(0).fileName(), finalUserId, d.getUploadTime(),
+                        changedOrder.getStatus().name(),
+                        uploadedFiles.stream().map(UploadedDeliveryFile::toResponse).toList()
+                );
             });
         } catch (RuntimeException e) {
             cleanupUploadedFiles(uploadedFiles);
             throw e;
         }
 
-        String orderStatus;
-        try {
-            if (REWORK_REQUIRED.equals(uploadableOrder.getStatus())) {
-                Order completedOrder = orderService.completeReworkDelivery(
-                        orderId,
-                        currentUserId,
-                        "服务方上传交付文件"
-                );
-                orderStatus = completedOrder.getStatus().name();
-            } else {
-                Order deliveredOrder = orderService.markDeliveryUploaded(
-                        orderId,
-                        currentUserId,
-                        "服务方上传交付文件"
-                );
-                orderStatus = deliveredOrder.getStatus().name();
-            }
-        } catch (RuntimeException e) {
-            rollbackSavedDelivery(saved.getId(), uploadedFiles);
-            throw e;
-        }
-
         notifyDeliveryUploaded(uploadableOrder);
-
-        return new DeliveryUploadResponse(
-                saved.getId(),
-                saved.getOrderId(),
-                saved.getDeliveryRound(),
-                uploadedFiles.get(0).fileId(),
-                uploadedFiles.get(0).fileName(),
-                finalUserId,
-                saved.getUploadTime(),
-                orderStatus,
-                uploadedFiles.stream().map(UploadedDeliveryFile::toResponse).toList()
-        );
+        return response;
     }
 
-    private int resolveNextDeliveryRound(Long orderId) {
-        return deliveryRepository.findByOrderIdOrderByUploadTimeDesc(orderId).stream()
+    private int resolveNextDeliveryRound(List<Delivery> previous) {
+        return previous.stream()
                 .map(Delivery::getDeliveryRound)
                 .filter(round -> round != null && round > 0)
                 .max(Integer::compareTo)
                 .map(round -> round + 1)
                 .orElse(1);
-    }
-
-    private void rollbackSavedDelivery(Long deliveryId, List<UploadedDeliveryFile> uploadedFiles) {
-        try {
-            txTemplate.execute(status -> {
-                deliveryFileRepository.deleteByDeliveryId(deliveryId);
-                deliveryRepository.deleteById(deliveryId);
-                return null;
-            });
-        } catch (RuntimeException ignored) {
-            // Preserve the original order status failure for the caller.
-        }
-        cleanupUploadedFiles(uploadedFiles);
     }
 
     @Transactional(readOnly = true)

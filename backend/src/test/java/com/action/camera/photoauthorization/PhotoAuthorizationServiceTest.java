@@ -123,7 +123,7 @@ class PhotoAuthorizationServiceTest {
     @Test
     void customerCanApprovePendingAuthorization() {
         PhotoAuthorization authorization = authorization(PhotoAuthorization.STATUS_PENDING);
-        when(photoAuthorizationRepository.findById(AUTHORIZATION_ID)).thenReturn(Optional.of(authorization));
+        when(photoAuthorizationRepository.findByIdForUpdate(AUTHORIZATION_ID)).thenReturn(Optional.of(authorization));
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
         when(photoAuthorizationRepository.save(any(PhotoAuthorization.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -142,7 +142,7 @@ class PhotoAuthorizationServiceTest {
     @Test
     void customerCanRejectPendingAuthorization() {
         PhotoAuthorization authorization = authorization(PhotoAuthorization.STATUS_PENDING);
-        when(photoAuthorizationRepository.findById(AUTHORIZATION_ID)).thenReturn(Optional.of(authorization));
+        when(photoAuthorizationRepository.findByIdForUpdate(AUTHORIZATION_ID)).thenReturn(Optional.of(authorization));
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
         when(photoAuthorizationRepository.save(any(PhotoAuthorization.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -160,7 +160,7 @@ class PhotoAuthorizationServiceTest {
     @Test
     void providerAndStrangerCannotApproveOrRejectForCustomer() {
         PhotoAuthorization authorization = authorization(PhotoAuthorization.STATUS_PENDING);
-        when(photoAuthorizationRepository.findById(AUTHORIZATION_ID)).thenReturn(Optional.of(authorization));
+        when(photoAuthorizationRepository.findByIdForUpdate(AUTHORIZATION_ID)).thenReturn(Optional.of(authorization));
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
 
         BusinessException providerApprove = assertThrows(BusinessException.class,
@@ -175,7 +175,7 @@ class PhotoAuthorizationServiceTest {
 
     @Test
     void nonProviderCannotRequestAuthorization() {
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
 
         BusinessException customerException = assertThrows(BusinessException.class,
                 () -> photoAuthorizationService.requestAuthorization(
@@ -198,7 +198,7 @@ class PhotoAuthorizationServiceTest {
 
     @Test
     void unfinishedOrderCannotRequestAuthorization() {
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.DELIVERED_PENDING_CONFIRM)));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.DELIVERED_PENDING_CONFIRM)));
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> photoAuthorizationService.requestAuthorization(
@@ -214,7 +214,7 @@ class PhotoAuthorizationServiceTest {
 
     @Test
     void fileOutsideOrderCannotBeRequested() {
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
         when(deliveryRepository.findByOrderIdOrderByUploadTimeDesc(ORDER_ID)).thenReturn(List.of(delivery()));
         when(deliveryFileRepository.findByDeliveryIdInAndFileIdIn(
                 eq(List.of(DELIVERY_ID)),
@@ -234,7 +234,7 @@ class PhotoAuthorizationServiceTest {
 
     @Test
     void zipDeliveryFileCannotBeRequestedForPhotoAuthorization() {
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
         when(deliveryRepository.findByOrderIdOrderByUploadTimeDesc(ORDER_ID)).thenReturn(List.of(delivery()));
         when(deliveryFileRepository.findByDeliveryIdInAndFileIdIn(
                 eq(List.of(DELIVERY_ID)),
@@ -255,7 +255,7 @@ class PhotoAuthorizationServiceTest {
 
     @Test
     void duplicateRequestForSameOrderAndFileIsRejected() {
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
         when(deliveryRepository.findByOrderIdOrderByUploadTimeDesc(ORDER_ID)).thenReturn(List.of(delivery()));
         when(deliveryFileRepository.findByDeliveryIdInAndFileIdIn(
                 eq(List.of(DELIVERY_ID)),
@@ -282,7 +282,7 @@ class PhotoAuthorizationServiceTest {
     void cannotApproveOrRejectNonPendingAuthorization() {
         PhotoAuthorization grantedAuthorization = authorization(PhotoAuthorization.STATUS_GRANTED);
         grantedAuthorization.setAuthorizedAt(LocalDateTime.of(2026, 6, 20, 12, 0));
-        when(photoAuthorizationRepository.findById(AUTHORIZATION_ID)).thenReturn(Optional.of(grantedAuthorization));
+        when(photoAuthorizationRepository.findByIdForUpdate(AUTHORIZATION_ID)).thenReturn(Optional.of(grantedAuthorization));
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
 
         BusinessException exception = assertThrows(BusinessException.class,
@@ -422,7 +422,7 @@ class PhotoAuthorizationServiceTest {
     }
 
     private void prepareRequestMocks() {
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order(OrderStatus.COMPLETED)));
         when(deliveryRepository.findByOrderIdOrderByUploadTimeDesc(ORDER_ID)).thenReturn(List.of(delivery()));
         when(deliveryFileRepository.findByDeliveryIdInAndFileIdIn(
                 eq(List.of(DELIVERY_ID)),

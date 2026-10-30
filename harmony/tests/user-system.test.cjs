@@ -141,7 +141,8 @@ test('pages integrate role isolation, deduplication, follow, favorite and report
   assert.match(profile, /listProfileMoments/);
   assert.match(profile, /listFavoriteMoments/);
   assert.match(profile, /this\.role === 'CUSTOMER'/);
-  assert.match(messages, /normalizeConversations/);
+  assert.match(messages, /ConversationListModel\.validSummary/);
+  assert.match(messages, /ConversationMemory\.write/);
   assert.match(messages, /hideConversation/);
   assert.match(feed, /MomentFavoriteWrite\.execute/);
   const favorite = read('features/moments/MomentFavoriteWrite.ets');

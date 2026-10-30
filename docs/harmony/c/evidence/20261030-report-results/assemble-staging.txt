@@ -1,0 +1,132 @@
+> hvigor [32mUP-TO-DATE :entry:staging@PreBuild...  [39m
+> hvigor [32mFinished :entry:staging@CreateModuleInfo... after 2 ms [39m
+> hvigor [32mUP-TO-DATE :entry:staging@GenerateMetadata...  [39m
+> hvigor [32mFinished :entry:staging@ConfigureCmake... after 1 ms [39m
+> hvigor [32mUP-TO-DATE :entry:staging@MergeProfile...  [39m
+> hvigor [32mUP-TO-DATE :entry:staging@CreateBuildProfile...  [39m
+> hvigor [32mFinished :entry:staging@PreCheckSyscap... after 1 ms [39m
+> hvigor [32mUP-TO-DATE :entry:staging@GeneratePkgContextInfo...  [39m
+> hvigor [32mFinished :entry:staging@GeneratePkgSdkInfo... after 9 ms [39m
+> hvigor [32mFinished :entry:staging@ProcessIntegratedHsp... after 2 ms [39m
+> hvigor [32mFinished :entry:staging@BuildNativeWithCmake... after 1 ms [39m
+> hvigor [32mFinished :entry:staging@MakePackInfo... after 8 ms [39m
+> hvigor [32mFinished :entry:staging@SyscapTransform... after 14 ms [39m
+> hvigor [32mUP-TO-DATE :entry:staging@ProcessProfile...  [39m
+> hvigor [32mUP-TO-DATE :entry:staging@ProcessRouterMap...  [39m
+> hvigor [32mUP-TO-DATE :entry:staging@ProcessShareConfig...  [39m
+> hvigor [32mFinished :entry:staging@ProcessStartupConfig... after 8 ms [39m
+> hvigor [32mFinished :entry:staging@BuildNativeWithNinja... after 1 ms [39m
+> hvigor [32mUP-TO-DATE :entry:staging@ProcessResource...  [39m
+> hvigor [32mUP-TO-DATE :entry:staging@GenerateLoaderJson...  [39m
+> hvigor [32mUP-TO-DATE :entry:staging@ProcessLibs...  [39m
+> hvigor [32mFinished :entry:staging@CompileResource... after 592 ms [39m
+> hvigor [32mUP-TO-DATE :entry:staging@DoNativeStrip...  [39m
+> hvigor [32mFinished :entry:staging@BuildJS... after 14 ms [39m
+> hvigor [32mUP-TO-DATE :entry:staging@CacheNativeLibs...  [39m
+> hvigor WARN: WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/moments/MomentPublishPanel.ets:45:31
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/moments/MomentPublishPanel.ets:47:33
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/moments/MomentPublishPanel.ets:50:34
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/moments/MomentPublishPanel.ets:69:43
+ 'packing' has been deprecated.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/moments/MomentPublishPanel.ets:78:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/network/ImageUpload.ets:15:36
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/network/ImageUpload.ets:22:31
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/network/ImageUpload.ets:24:33
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/network/ImageUpload.ets:30:36
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/network/ImageUpload.ets:47:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/user/ProfileWorkspace.ets:117:5
+ 'AlertDialog' has been deprecated.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/user/ProfileWorkspace.ets:117:17
+ 'show' has been deprecated.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/user/ProfileWorkspace.ets:206:24
+ 'AlertDialog' has been deprecated.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/user/ProfileWorkspace.ets:206:36
+ 'show' has been deprecated.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/publish/PublicationActions.ets:34:5
+ 'AlertDialog' has been deprecated.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/publish/PublicationActions.ets:34:17
+ 'show' has been deprecated.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/pages/ServiceDetailPage.ets:147:20
+ 'showToast' has been deprecated.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:15:31
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:15:103
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:19:31
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:20:11
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:21:11
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:24:31
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:25:11
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:26:11
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:30:17
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:30:46
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:32:33
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:41:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/pages/PublishPage.ets:382:65
+ 'showToast' has been deprecated.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-ui-polish/Camera/harmony/entry/src/main/ets/pages/PublishPage.ets:452:22
+ 'show' has been deprecated.
+
+
+> hvigor [32mFinished :entry:staging@CompileArkTS... after 22 s 715 ms [39m
+> hvigor [32mFinished :entry:staging@GeneratePkgModuleJson... after 7 ms [39m
+> hvigor [32mFinished :entry:staging@ProcessCompiledResources... after 3 ms [39m
+> hvigor [32mFinished :entry:staging@PackageHap... after 919 ms [39m
+> hvigor [32mFinished :entry:staging@PackingCheck... after 16 ms [39m
+> hvigor WARN: Will skip sign 'hos_hap'. No signingConfigs profile is configured in current project.
+             If needed, configure the signingConfigs in C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\build-profile.json5.
+> hvigor [32mFinished :entry:staging@SignHap... after 4 ms [39m
+> hvigor [32mFinished :entry:staging@CollectDebugSymbol... after 2 ms [39m
+> hvigor [32mFinished :entry:assembleHap... after 1 ms [39m
+> hvigor [32mBUILD SUCCESSFUL in 32 s 564 ms [39m
+
+33 tasks in total: 20 executed, 13 up-to-date

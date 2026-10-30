@@ -28,6 +28,11 @@ test('old finally cannot clear a successfully loaded newer account view',async()
 test('identity changing before tap cannot send an old notification read under new identity',async()=>{const f=fixture();await loaded(f);f.change();await f.controller.markRead(1);assert.equal(f.writes.length,0);assert.equal(f.state.items.length,0);});
 test('related content requires current visible identity and confirmed read state',async()=>{const f=fixture();await loaded(f);assert.equal(f.controller.canOpen(1),false);await loaded(f,[notice(1,true)]);assert.equal(f.controller.canOpen(1),true);f.change();assert.equal(f.controller.canOpen(1),false);assert.equal(f.state.items.length,0);f.controller.suspend();assert.equal(f.controller.canOpen(1),false);});
 test('notification filter mirrors web categories with appeal before review',()=>{assert.equal(NotificationFormat.category(notice()),'dynamic');assert.equal(NotificationFormat.category({...notice(),type:'REVIEW_COMPLAINT_RESOLVED'}),'appeal');assert.equal(NotificationFormat.category({...notice(),type:'ORDER_STATUS_CHANGED'}),'order');});
+test('review and two complaint targets keep distinct user-facing labels',()=>{
+  assert.equal(NotificationFormat.label({...notice(),type:'REVIEW_RECEIVED'}),'评价');
+  assert.equal(NotificationFormat.label({...notice(),type:'REVIEW_COMPLAINT_RESOLVED'}),'评价投诉');
+  assert.equal(NotificationFormat.label({...notice(),type:'DISPUTE_RESOLVED'}),'订单投诉');
+});
 test('credit formats absent values without inventing score and preserves zero',()=>{assert.equal(CreditFormat.score(undefined),'暂无');assert.equal(CreditFormat.score(null),'暂无');assert.equal(CreditFormat.score(0),'0.0');assert.equal(CreditFormat.percent(0),'0.0%');assert.equal(CreditFormat.metric(undefined),'--');assert.equal(CreditFormat.level({creditScore:80,creditLevel:'待积累'}),'待积累');});
 test('credit does not claim nominal delta when server says applied zero',()=>{assert.equal(CreditFormat.delta({scoreChange:5,appliedScoreChange:0}),0);assert.equal(CreditFormat.delta({beforeScore:80,afterScore:78,scoreChange:5}),-2);});
 test('credit reads only own private records and ignores hidden old results',async()=>{let version=1,state;const summaries=[],records=[],keys=[];
