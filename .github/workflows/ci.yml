@@ -107,7 +107,7 @@ jobs:
 
   deploy-staging:
     name: Deploy successful main SHA to staging
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.STAGING_DEPLOY_ENABLED == 'true' && vars.STAGING_RELEASE_SHA == github.sha
     needs: [frontend, backend]
     uses: ./.github/workflows/deploy.yml
     with:

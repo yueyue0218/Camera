@@ -27,7 +27,7 @@ concurrency:
 jobs:
   deploy:
     name: Plan and deploy staging
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && vars.STAGING_DEPLOY_ENABLED == 'true' && vars.STAGING_RELEASE_SHA == github.sha
     runs-on: ubuntu-latest
     environment: staging
 
@@ -71,6 +71,43 @@ jobs:
           chmod 600 "$HOME/.ssh/id_portra_staging"
           printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Require root-owned privacy migration receipt
+        shell: bash
+        env:
+          STAGING_HOST: ${{ vars.STAGING_HOST }}
+          STAGING_PORT: ${{ vars.STAGING_PORT }}
+          STAGING_USER: ${{ vars.STAGING_USER }}
+        run: |
+          set -euo pipefail
+          receipt="$(mktemp)"
+          trap 'rm -f "$receipt"' EXIT
+          ssh -i "$HOME/.ssh/id_portra_staging" -p "$STAGING_PORT" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes "$STAGING_USER@$STAGING_HOST" \
+            'python3 -' > "$receipt" <<'PY'
+          import os, pathlib, stat
+          path=pathlib.Path('/opt/portra/deploy/migrations/p0-privacy-ready.json')
+          for item in reversed([path,*path.parents]):
+              info=item.lstat()
+              assert not stat.S_ISLNK(info.st_mode)
+              assert info.st_uid==0 and not (info.st_mode & 0o022)
+          assert path.stat().st_size<16384
+          print(path.read_text())
+          PY
+          python3 - "$receipt" <<'PY'
+          import hashlib,json,pathlib,sys
+          value=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert value['status']=='VERIFIED' and value['database']=='portra_staging'
+          assert value['databaseVersion'].startswith('8.0.46')
+          assert value['protocolVersion']=='2026-10-29-v1'
+          assert value['schemaVerified'] is True and value['restoreDrillVerified'] is True
+          assert value['fullP0SchemaVerified'] is True
+          assert len(value['backupSha256'])==64
+          for name in ['add_account_cancellation_requests.sql','add_privacy_rights_and_consent.sql','add_demand_interest_targets.sql']:
+              path=pathlib.Path('backend/src/main/resources/db/migration')/name
+              assert hashlib.sha256(path.read_bytes()).hexdigest()==value['migrationSha256'][name]
+          print('PRIVACY_MIGRATION_RECEIPT=PASS')
+          PY
 
       - name: Determine changed deployment surfaces
         id: plan
@@ -281,30 +318,6 @@ jobs:
             -o BatchMode=yes -o StrictHostKeyChecking=yes -r \
             "$PAYLOAD/." "$STAGING_USER@$STAGING_HOST:/home/portra-deploy/incoming/$TARGET_SHA/"
 
-      - name: Deploy same-SHA backend and frontend release
-        shell: bash
-        env:
-          TARGET_SHA: ${{ steps.revision.outputs.sha }}
-          STAGING_HOST: ${{ vars.STAGING_HOST }}
-          STAGING_PORT: ${{ vars.STAGING_PORT }}
-          STAGING_USER: ${{ vars.STAGING_USER }}
-          STAGING_HEALTH_URL: ${{ vars.STAGING_HEALTH_URL }}
-          STAGING_PUBLIC_URL: ${{ vars.STAGING_PUBLIC_URL }}
-          STAGING_EXPECTED_ORIGIN: ${{ vars.STAGING_EXPECTED_ORIGIN }}
-        run: |
-          set -euo pipefail
-          : "${STAGING_HEALTH_URL:?STAGING_HEALTH_URL is required}"
-          : "${STAGING_PUBLIC_URL:?STAGING_PUBLIC_URL is required}"
-          : "${STAGING_EXPECTED_ORIGIN:?STAGING_EXPECTED_ORIGIN is required}"
-          ssh -i "$HOME/.ssh/id_portra_staging" -p "$STAGING_PORT" \
-            -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            "$STAGING_USER@$STAGING_HOST" \
-            "bash '/home/portra-deploy/incoming/$TARGET_SHA/infra/scripts/deploy-application.sh' \
-              '$TARGET_SHA' \
-              '/home/portra-deploy/incoming/$TARGET_SHA/portra-backend-$TARGET_SHA.jar' \
-              '/home/portra-deploy/incoming/$TARGET_SHA/portra-frontend-$TARGET_SHA.tar.gz' \
-              '$STAGING_HEALTH_URL' '$STAGING_PUBLIC_URL' '$STAGING_EXPECTED_ORIGIN'"
-
       - name: Install versioned deployment scripts
         if: steps.plan.outputs.deploy_infra == 'true'
         shell: bash
@@ -350,6 +363,30 @@ jobs:
             -o BatchMode=yes -o StrictHostKeyChecking=yes \
             "$STAGING_USER@$STAGING_HOST" \
             "sudo /usr/local/sbin/portra-deploy-infra '$TARGET_SHA' '$surface'"
+
+      - name: Deploy same-SHA backend and frontend release
+        shell: bash
+        env:
+          TARGET_SHA: ${{ steps.revision.outputs.sha }}
+          STAGING_HOST: ${{ vars.STAGING_HOST }}
+          STAGING_PORT: ${{ vars.STAGING_PORT }}
+          STAGING_USER: ${{ vars.STAGING_USER }}
+          STAGING_HEALTH_URL: ${{ vars.STAGING_HEALTH_URL }}
+          STAGING_PUBLIC_URL: ${{ vars.STAGING_PUBLIC_URL }}
+          STAGING_EXPECTED_ORIGIN: ${{ vars.STAGING_EXPECTED_ORIGIN }}
+        run: |
+          set -euo pipefail
+          : "${STAGING_HEALTH_URL:?STAGING_HEALTH_URL is required}"
+          : "${STAGING_PUBLIC_URL:?STAGING_PUBLIC_URL is required}"
+          : "${STAGING_EXPECTED_ORIGIN:?STAGING_EXPECTED_ORIGIN is required}"
+          ssh -i "$HOME/.ssh/id_portra_staging" -p "$STAGING_PORT" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$STAGING_USER@$STAGING_HOST" \
+            "bash '/home/portra-deploy/incoming/$TARGET_SHA/infra/scripts/deploy-application.sh' \
+              '$TARGET_SHA' \
+              '/home/portra-deploy/incoming/$TARGET_SHA/portra-backend-$TARGET_SHA.jar' \
+              '/home/portra-deploy/incoming/$TARGET_SHA/portra-frontend-$TARGET_SHA.tar.gz' \
+              '$STAGING_HEALTH_URL' '$STAGING_PUBLIC_URL' '$STAGING_EXPECTED_ORIGIN'"
 
       - name: Verify staging after infrastructure deployment
         if: steps.plan.outputs.deploy_infra == 'true'

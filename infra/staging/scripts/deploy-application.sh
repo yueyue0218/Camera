@@ -178,6 +178,23 @@ if [[ "$current_backend" == "$release_dir" && -L "$app_root/previous" ]]; then
   previous_backend="$(readlink -f "$app_root/previous")"
 fi
 [[ "$previous_backend" == "$release_root/"* && -f "$previous_backend/portra-backend.jar" ]]
+# A first privacy deployment must not automatically reactivate a pre-privacy JAR.
+command -v python3 >/dev/null || fail "Python 3 is required for privacy cutover inspection"
+privacy_aware_jar() {
+  python3 - "$1" <<'PY'
+import sys, zipfile
+with zipfile.ZipFile(sys.argv[1]) as jar:
+    expected=['BOOT-INF/classes/com/action/camera/privacy/controller/PrivacyController.class',
+              'BOOT-INF/classes/com/action/camera/privacy/service/PrivacyRequestInterceptor.class']
+    good=all(name in jar.namelist() for name in expected)
+    good=good and b'PRIVACY_CONSENT_REQUIRED' in jar.read('BOOT-INF/classes/com/action/camera/common/ErrorCode.class')
+raise SystemExit(0 if good else 1)
+PY
+}
+privacy_aware_jar "$source_jar" || fail "Target JAR does not contain the reviewed privacy boundary"
+previous_privacy_aware=false
+privacy_aware_jar "$previous_backend/portra-backend.jar" && previous_privacy_aware=true
+
 old_previous_app_present=false
 old_previous_app_target=""
 if [[ -L "$app_root/previous" ]]; then
@@ -278,6 +295,13 @@ restore_state_file() {
 
 rollback_release() {
   local rollback_failed=false
+  if [[ "$backend_switched" == true && "$previous_privacy_aware" != true ]]; then
+    echo "PRIVACY_CUTOVER_REQUIRES_MANUAL_RECOVERY: refusing pre-privacy JAR rollback" >&2
+    # Keep current pointing at the policy-aware target. A restart also terminates
+    # any old process left running if failure preceded the normal restart.
+    sudo /usr/bin/systemctl restart portra-backend.service || true
+    return 1
+  fi
   echo "Application acceptance failed; restoring backend and frontend" >&2
 
   if [[ "$frontend_switched" == true ]]; then

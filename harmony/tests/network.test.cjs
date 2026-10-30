@@ -83,7 +83,7 @@ test('avatar binary uses authenticated no-cache GET and rejects stale or oversiz
   await assert.rejects(stale, hasKind('stale'));
 });
 
-for (const result of ['null', '[]', '{}', 'true', '<html>failure</html>',
+for (const result of ['null', '[]', '{}', 'true',
   '{"code":"200","message":"success","data":[]}', '{"code":200,"message":"success"}',
   '{"code":200,"data":[]}', new ArrayBuffer(4)]) {
   test(`malformed envelope is a parse error: ${String(result)}`, async () => {
@@ -96,10 +96,46 @@ for (const result of ['null', '[]', '{}', 'true', '<html>failure</html>',
 }
 
 test('HTTP failures are checked before parsing the body', async () => {
-  for (const status of [401, 403, 404, 503]) {
+  for (const status of [401, 403, 404, 500, 503]) {
     const promise = new HttpClient().get('/test');
     calls.at(-1).resolve({ responseCode: status, result: '<html>error</html>' });
     await assert.rejects(promise, error => error.kind === 'http' && error.httpStatus === status);
+  }
+});
+
+test('HTTP 200 SPA fallback is a routing error, including missing or misleading content-type', async () => {
+  for (const header of [{ 'Content-Type': 'text/html; charset=utf-8' },
+    { 'content-type': 'application/xhtml+xml' }, { 'Content-Type': 'application/json' }, {}]) {
+    const promise = new HttpClient().get('/privacy/consent');
+    calls.at(-1).resolve({ responseCode: 200, header, result: '  <!doctype html><html>private-body</html>' });
+    await assert.rejects(promise, error => error.kind === 'config' && error.httpStatus === 200 &&
+      error.message.includes('API 路由') && !error.message.includes('private-body'));
+  }
+});
+
+test('content-type, JSON syntax and response envelope failures have distinct safe messages', async () => {
+  for (const [header, result, kind, message] of [
+    [{ 'content-type': 'text/plain' }, 'gateway-private-details', 'config', /未返回 JSON/],
+    [{ 'content-type': 'application/json' }, '{broken', 'parse', /格式无法识别/],
+    [{ 'content-type': 'application/json' }, '{"code":"200","message":"ok","data":null}', 'parse', /结构与客户端不兼容/]
+  ]) {
+    const promise = new HttpClient().get('/privacy/consent');
+    calls.at(-1).resolve({ responseCode: 200, header, result });
+    await assert.rejects(promise, error => error.kind === kind && message.test(error.message) &&
+      !error.message.includes('private-details'));
+  }
+});
+
+test('JSON content types preserve the numeric business contract and never accept code zero as consent success', async () => {
+  for (const mime of ['application/json; charset=utf-8', 'application/problem+json']) {
+    for (const code of [0, 200, 40101, 40301, 40302, 40401, 50001]) {
+      const promise = new HttpClient().get('/privacy/consent');
+      calls.at(-1).resolve({ responseCode: 200, header: { 'CONTENT-TYPE': mime },
+        result: JSON.stringify({ code, message: 'SQL private-server-details', data: null }) });
+      if (code === 200) assert.equal(await promise, null);
+      else await assert.rejects(promise, error => error.kind === 'business' && error.businessCode === code &&
+        !error.message.includes('private-server-details'));
+    }
   }
 });
 

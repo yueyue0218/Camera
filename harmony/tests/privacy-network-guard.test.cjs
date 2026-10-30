@@ -108,6 +108,30 @@ test('explicit consent allows anonymous requests and includes version/time/insta
   complete(call, ['public']); assert.deepEqual(await pending, ['public']);
 });
 
+test('pre-login SMS and native login carry all three explicit-consent evidence headers', options, async () => {
+  const f = fixture(); f.consent();
+  for (const route of ['/auth/sms/send', '/auth/native/sms/verify']) {
+    const pending = f.client.postPublic(route, {});
+    const call = f.calls.at(-1);
+    assert.equal(call.options.header.Authorization, undefined);
+    assert.equal(call.options.header['X-Portra-Consent-Version'], f.evidence.crossBorderConsentVersion);
+    assert.equal(call.options.header['X-Portra-Consent-Accepted-At'], String(f.evidence.acceptedAtEpochMs));
+    assert.equal(call.options.header['X-Portra-Installation-Id'], f.evidence.installationId);
+    complete(call, null); await pending;
+  }
+});
+
+test('HTML from consent endpoint cannot verify the account or release pending business requests', options, async () => {
+  const f = fixture(); f.consent(); f.client.setAccessToken('test-account');
+  const pending = f.client.get('/privacy/consent');
+  f.calls.at(-1).resolve({ responseCode: 200, header: { 'content-type': 'text/html' }, result: '<html>SPA</html>' });
+  await assert.rejects(pending, error => error.kind === 'config' && error.message.includes('API 路由'));
+  const count = f.calls.length; assert.equal(f.guard.allowed(true), false);
+  await assert.rejects(f.client.get('/orders'), isConfig);
+  await assert.rejects(f.client.getPublic('/demands'), isConfig);
+  assert.equal(f.calls.length, count); assert.equal(f.refreshes, 0);
+});
+
 test('login or account switch requires remote account-consent verification before business requests', options, async () => {
   const f = fixture(); f.consent(); f.client.setAccessToken('first-account');
   await assert.rejects(f.client.get('/auth/session'), isConfig);

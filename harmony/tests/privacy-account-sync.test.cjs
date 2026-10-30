@@ -39,6 +39,22 @@ test('startup respects remote withdrawal and does not turn local cached consent 
     assert.deepEqual(f.decisions, ['WITHDRAWN']);
   }
 });
+
+test('first launch without a restored account never queries or submits server consent', async () => {
+  const f = fixture(); f.client.sessionManager.isAuthenticated = () => false;
+  f.client.privacyApi.consent = async () => { assert.fail('anonymous startup queried account consent'); };
+  await f.client.synchronizePrivacyConsent();
+  assert.equal(f.grants.length, 0); assert.equal(f.acknowledgements, 0);
+  assert.equal(f.violations, 0); assert.equal(f.evidence.pendingServerGrant, false);
+});
+
+test('an incompatible consent endpoint keeps an authenticated account blocked and local evidence pending', async () => {
+  const f = fixture(); f.evidence.pendingServerGrant = true;
+  f.client.privacyApi.consent = async () => { throw new Error('服务接口返回了网页，请联系管理员检查 API 路由及后端部署。'); };
+  await assert.rejects(f.client.synchronizePrivacyConsent(), /API 路由/);
+  assert.equal(f.verified, 0); assert.equal(f.acknowledgements, 0); assert.equal(f.grants.length, 0);
+  assert.equal(f.evidence.pendingServerGrant, true);
+});
 test('only a fresh explicit checkbox action may regrant a withdrawn account', async () => {
   const f = fixture(); f.evidence.pendingServerGrant = true; f.client.explicitConsentAt = 1234;
   f.client.privacyApi.consent = async () => ({ status: 'WITHDRAWN' });

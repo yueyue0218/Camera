@@ -18,7 +18,8 @@ done
 
 body_file="$(mktemp)"
 header_file="$(mktemp)"
-trap 'rm -f "$body_file" "$header_file"' EXIT
+privacy_file="$(mktemp)"
+trap 'rm -f "$body_file" "$header_file" "$privacy_file"' EXIT
 
 for ((attempt = 1; attempt <= attempts; attempt++)); do
   health_status="$(curl --silent --show-error --max-time 10 \
@@ -32,7 +33,22 @@ for ((attempt = 1; attempt <= attempts; attempt++)); do
     --header 'Access-Control-Request-Headers: authorization,content-type' \
     --write-out '%{http_code}' "${expected_origin}/auth/refresh" || true)"
 
-  if [[ "$health_status" == 200 ]] \
+  privacy_result="$(curl --silent --show-error --max-time 10 \
+    --output "$privacy_file" --write-out '%{http_code} %{content_type}' \
+    "${expected_origin}/privacy/consent" || true)"
+  privacy_json=false
+  if python3 - "$privacy_file" <<'PY'
+import json,pathlib,sys
+try:
+    value=json.loads(pathlib.Path(sys.argv[1]).read_text())
+    good=isinstance(value,dict) and value.get('code')==40101 and value.get('data') is None
+except (OSError,ValueError): good=False
+raise SystemExit(0 if good else 1)
+PY
+  then privacy_json=true; fi
+
+  if [[ "$privacy_result" == "200 application/json"* && "$privacy_json" == true ]] \
+    && [[ "$health_status" == 200 ]] \
     && grep -Eq '"code"[[:space:]]*:[[:space:]]*200' "$body_file" \
     && [[ "$public_status" == 200 ]] \
     && [[ "$cors_status" == 200 ]] \
