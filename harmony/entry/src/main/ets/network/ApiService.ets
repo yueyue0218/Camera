@@ -15,6 +15,7 @@ import { AcceptedDemandResponse, AccountCancellationPayload, AccountCancellation
   SendTextMessagePayload, SessionSummary, StartServiceChatPayload, StartServiceChatResult,
   OrderTransitionPayload, ReworkPayload, StatusTransitionResult, VerifyNativeSmsCodeRequest } from '../model/ApiModels';
 import { UpdateProfilePayload } from '../model/ApiModels';
+import { PhotoAuthorizationDecisionPayload, PhotoAuthorizationPayload, PhotoAuthorizationSummary } from '../model/ApiModels';
 import { UserBrief } from '../model/ApiModels';
 import { ErrorMapper, PortraError } from './ErrorMapper';
 import { UploadedImage, HttpClient } from './HttpClient';
@@ -643,6 +644,11 @@ export class ApiService implements NativeSessionApi {
     if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
     return this.client.post<ReviewComplaintSummary>(`/reviews/${id}/complaints`, payload, requestKey);
   }
+  cancelReviewComplaint(id: number): Promise<ReviewComplaintSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) return Promise.reject(ErrorMapper.parse());
+    return this.client.post<ReviewComplaintSummary>(`/reviews/complaints/${id}/cancel`,
+      undefined, `review.complaint.${id}.cancel`);
+  }
   createDispute(id: number, payload: DisputeReasonPayload, requestKey: string = 'engagement.createDispute'): Promise<DisputeSummary> {
     if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
     return this.client.post<DisputeSummary>(`/orders/${id}/disputes`, payload, requestKey);
@@ -666,14 +672,42 @@ export class ApiService implements NativeSessionApi {
     return this.client.get<DeliverySummary[]>(`/orders/${orderId}/deliveries`, `orders.${orderId}.deliveries`);
   }
 
-  getDeliveryImage(fileId: number, variant: 'thumbnail' | 'medium'): Promise<ArrayBuffer> {
+  listPhotoAuthorizations(orderId: number, key: string = `authorizations.${orderId}.list`): Promise<PhotoAuthorizationSummary[]> {
+    if (!Number.isSafeInteger(orderId) || orderId <= 0) return Promise.reject(ErrorMapper.parse());
+    return this.client.get<PhotoAuthorizationSummary[]>(`/orders/${orderId}/photo-authorizations`, key);
+  }
+
+  requestPhotoAuthorization(orderId: number, payload: PhotoAuthorizationPayload): Promise<PhotoAuthorizationSummary> {
+    if (!Number.isSafeInteger(orderId) || orderId <= 0 || !Array.isArray(payload.fileIds) ||
+      payload.fileIds.length === 0 || payload.fileIds.some((id: number) => !Number.isSafeInteger(id) || id <= 0)) {
+      return Promise.reject(ErrorMapper.parse());
+    }
+    return this.client.post<PhotoAuthorizationSummary>(`/orders/${orderId}/photo-authorizations/requests`,
+      payload, `authorizations.${orderId}.request`);
+  }
+
+  decidePhotoAuthorization(id: number, approve: boolean, remark: string): Promise<PhotoAuthorizationSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) return Promise.reject(ErrorMapper.parse());
+    const payload: PhotoAuthorizationDecisionPayload = { remark: remark };
+    return this.client.post<PhotoAuthorizationSummary>(`/photo-authorizations/${id}/${approve ? 'approve' : 'reject'}`,
+      payload, `authorizations.${id}.decision`);
+  }
+
+  cancelPhotoAuthorizationReads(orderId: number): void {
+    this.client.cancelRequest(`authorizations.${orderId}.list`);
+    this.client.cancelRequest(`orders.${orderId}.deliveries`);
+  }
+
+  getDeliveryImage(fileId: number, variant: 'thumbnail' | 'medium',
+    requestKey: string = `delivery.${fileId}.${variant}`): Promise<ArrayBuffer> {
     if (!Number.isSafeInteger(fileId) || fileId <= 0) return Promise.reject(ErrorMapper.parse());
-    return this.client.getBinary(`/files/${fileId}/${variant}`, `delivery.${fileId}.${variant}`,
+    return this.client.getBinary(`/files/${fileId}/${variant}`, requestKey,
       variant === 'thumbnail' ? 2 * 1024 * 1024 : 12 * 1024 * 1024);
   }
 
-  cancelDeliveryImage(fileId: number, variant: 'thumbnail' | 'medium'): void {
-    this.client.cancelRequest(`delivery.${fileId}.${variant}`);
+  cancelDeliveryImage(fileId: number, variant: 'thumbnail' | 'medium',
+    requestKey: string = `delivery.${fileId}.${variant}`): void {
+    this.client.cancelRequest(requestKey);
   }
 
   cancelOrder(orderId: number): Promise<StatusTransitionResult> {

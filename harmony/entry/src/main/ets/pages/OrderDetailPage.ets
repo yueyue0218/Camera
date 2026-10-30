@@ -29,8 +29,9 @@ export struct OrderDetailPage {
   private active: boolean = false;
   onBack?: () => void;
   onOpenConversation?: (conversationId: number) => void;
-  onOpenEngagement?: () => void;
+  onOpenReviews?: () => void;
   onOpenGallery?: () => void;
+  onOpenAuthorization?: () => void;
   onOpenUpload?: () => void;
 
   aboutToAppear(): void {
@@ -166,6 +167,10 @@ export struct OrderDetailPage {
             if (OrderWorkflow.hasGallery(this.order!)) {
               Button('查看照片').height(46).width('100%').onClick(() => this.onOpenGallery?.())
             }
+            if (this.order!.status === 'COMPLETED') {
+              Button('展示授权').height(44).width('100%').backgroundColor(PortraTheme.surface)
+                .fontColor(PortraTheme.primary).onClick(() => this.onOpenAuthorization?.())
+            }
             if (OrderWorkflow.canUpload(this.order!, this.userId)) {
               Button(this.order!.status === 'REWORK_REQUIRED' ? '重新上传' : '上传照片')
                 .height(46).width('100%').onClick(() => this.onOpenUpload?.())
@@ -185,8 +190,10 @@ export struct OrderDetailPage {
                 }.alignItems(HorizontalAlign.Start)
               }.width('100%')
             })
-            Button('评价与申诉').height(44).backgroundColor(PortraTheme.surface)
-              .fontColor(PortraTheme.primary).onClick(() => this.onOpenEngagement?.())
+            if (this.order!.status === 'COMPLETED' || this.order!.status === 'REFUNDED') {
+              Button('评价').height(44).backgroundColor(PortraTheme.surface)
+                .fontColor(PortraTheme.primary).onClick(() => this.onOpenReviews?.())
+            }
             if (this.order!.conversationId !== undefined && this.order!.conversationId! > 0) {
               Button('返回聊天').height(44).backgroundColor(PortraTheme.surface)
                 .fontColor(PortraTheme.primary).onClick(() =>

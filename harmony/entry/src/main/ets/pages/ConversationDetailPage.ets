@@ -1,4 +1,5 @@
 import { KeyboardAvoidMode } from '@kit.ArkUI';
+import { image } from '@kit.ImageKit';
 import { AppClient } from '../app/AppClient';
 import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraLoading } from '../common/components/PortraLoading';
@@ -17,8 +18,10 @@ import { FulfillmentEventCard } from '../features/conversation/FulfillmentEventC
 import { OrderWorkflow } from '../features/conversation/OrderWorkflow';
 import { QuoteWorkflow } from '../features/conversation/QuoteWorkflow';
 import { TextMessageBubble } from '../features/conversation/TextMessageBubble';
+import { PhotoAuthorizationEventCard } from '../features/aftercare/PhotoAuthorizationEventCard';
+import { AftercarePolicy } from '../features/aftercare/AftercarePolicy';
 import { ConversationSummary, DeliverySummary, MessageSummary, OrderStatusLogSummary, OrderSummary,
-  QuoteSummary } from '../model/ApiModels';
+  PhotoAuthorizationSummary, QuoteSummary } from '../model/ApiModels';
 import { PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
 
@@ -37,6 +40,8 @@ export struct ConversationDetailPage {
   @State private orders: OrderSummary[] = [];
   @State private orderLogs: OrderStatusLogSummary[] = [];
   @State private deliveries: DeliverySummary[] = [];
+  @State private authorizations: PhotoAuthorizationSummary[] = [];
+  @State private authorizationThumbnails: Map<number, image.PixelMap> = new Map<number, image.PixelMap>();
   @State private draft: string = '';
   @State private uncertainResendId: number = 0;
   private readonly appClient: AppClient = AppClient.shared;
@@ -48,6 +53,7 @@ export struct ConversationDetailPage {
   private scrollTimer: number = -1;
   private visible: boolean = false;
   private orderSignature: string = '';
+  private lastAuthorizationRefresh: number = 0;
   private readonly threadScroller: Scroller = new Scroller();
   private previousKeyboardAvoidMode?: KeyboardAvoidMode;
   onBack?: () => void;
@@ -57,6 +63,8 @@ export struct ConversationDetailPage {
   onPayOrder?: (orderId: number) => void;
   onOpenGallery?: (orderId: number) => void;
   onOpenUpload?: (orderId: number) => void;
+  onOpenAuthorization?: (orderId: number, authorizationId: number) => void;
+  onOpenReviews?: (orderId: number) => void;
 
   aboutToAppear(): void {
     this.busy = false;
@@ -73,12 +81,21 @@ export struct ConversationDetailPage {
     this.appClient.apiService.cancelConversationDetail(this.conversationId);
     this.appClient.apiService.cancelCurrentSession();
     this.appClient.apiService.cancelConversations('conversations.detail.list');
+    this.authorizations.forEach((authorization: PhotoAuthorizationSummary) =>
+      authorization.files.slice(0, 3).forEach(file =>
+        this.appClient.apiService.cancelDeliveryImage(file.fileId, 'thumbnail',
+          `conversations.${this.conversationId}.authorization.${file.fileId}`)));
+    this.orders.forEach((order: OrderSummary) => this.appClient.apiService.cancelEngagementRequests(
+      [`conversations.${this.conversationId}.authorizations.${order.orderId}`]));
+    this.authorizationThumbnails.forEach((bitmap: image.PixelMap) => bitmap.release());
+    this.authorizationThumbnails = new Map<number, image.PixelMap>();
   }
 
   private setVisible(visible: boolean): void {
     if (this.visible === visible) return;
     this.visible = visible;
     if (visible) {
+      this.lastAuthorizationRefresh = 0;
       this.previousKeyboardAvoidMode = this.getUIContext().getKeyboardAvoidMode();
       this.getUIContext().setKeyboardAvoidMode(KeyboardAvoidMode.RESIZE);
       if (this.activeToken !== (this.appClient.sessionManager.getSession()?.accessToken ?? '')) {
@@ -112,7 +129,11 @@ export struct ConversationDetailPage {
     this.orders = [];
     this.orderLogs = [];
     this.deliveries = [];
+    this.authorizations = [];
+    this.authorizationThumbnails.forEach((bitmap: image.PixelMap) => bitmap.release());
+    this.authorizationThumbnails = new Map<number, image.PixelMap>();
     this.orderSignature = '';
+    this.lastAuthorizationRefresh = 0;
     this.draft = '';
     this.peerName = '聊天';
     this.busy = false;
@@ -238,6 +259,7 @@ export struct ConversationDetailPage {
         const current = OrderWorkflow.inConversation(orders, this.conversationId);
         const signature = current.map((order: OrderSummary) => `${order.orderId}:${order.status}`).join('|');
         this.orders = current;
+        this.refreshAuthorizations(current, version);
         if (signature === this.orderSignature) return;
         const logs: OrderStatusLogSummary[] = [];
         const deliveries: DeliverySummary[] = [];
@@ -259,6 +281,51 @@ export struct ConversationDetailPage {
     } catch {
       // Messages and quotes remain usable while order updates are unavailable.
     }
+  }
+
+  private async refreshAuthorizations(orders: OrderSummary[], version: number): Promise<void> {
+    const now = Date.now();
+    if (now - this.lastAuthorizationRefresh < 12000) return;
+    this.lastAuthorizationRefresh = now;
+    const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
+    const completed = orders.filter((order: OrderSummary) => order.status === 'COMPLETED');
+    if (completed.length === 0) {
+      this.authorizations = [];
+      return;
+    }
+    try {
+      const lists = await Promise.all(completed.map((order: OrderSummary) =>
+        this.appClient.apiService.listPhotoAuthorizations(order.orderId,
+          `conversations.${this.conversationId}.authorizations.${order.orderId}`)));
+      if (!this.visible || version !== this.requestVersion ||
+        token !== (this.appClient.sessionManager.getSession()?.accessToken ?? '')) return;
+      this.authorizations = lists.flat().filter((item: PhotoAuthorizationSummary) =>
+        completed.some((order: OrderSummary) => order.orderId === item.orderId));
+      AftercarePolicy.conversationAuthorizations(this.authorizations).forEach((item: PhotoAuthorizationSummary) =>
+        item.files.slice(0, 3).forEach(file => this.loadAuthorizationThumbnail(file.fileId, version)));
+    } catch {
+      // An unavailable aftercare endpoint must not hide the existing message stream.
+    }
+  }
+
+  private async loadAuthorizationThumbnail(fileId: number, version: number): Promise<void> {
+    if (this.authorizationThumbnails.has(fileId)) return;
+    const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
+    try {
+      const bytes = await this.appClient.apiService.getDeliveryImage(fileId, 'thumbnail',
+        `conversations.${this.conversationId}.authorization.${fileId}`);
+      const source = image.createImageSource(bytes);
+      let bitmap: image.PixelMap;
+      try { bitmap = await source.createPixelMap({ desiredSize: { width: 96, height: 96 } }); }
+      finally { await source.release(); }
+      if (!this.visible || version !== this.requestVersion ||
+        token !== (this.appClient.sessionManager.getSession()?.accessToken ?? '')) {
+        await bitmap.release(); return;
+      }
+      const next = new Map<number, image.PixelMap>(this.authorizationThumbnails);
+      next.set(fileId, bitmap);
+      this.authorizationThumbnails = next;
+    } catch { /* The request remains open even when a thumbnail is temporarily unavailable. */ }
   }
 
   private async send(): Promise<void> {
@@ -421,6 +488,20 @@ export struct ConversationDetailPage {
               this.orderLogs, this.deliveries), (item: ConversationTimelineItem) => {
               this.TimelineRow(item)
             }, (item: ConversationTimelineItem) => item.key)
+            if (AftercarePolicy.conversationAuthorizations(this.authorizations).length > 0) {
+              Text('约拍事项').fontSize(13).fontColor(PortraTheme.secondaryText).width('100%')
+              ForEach(AftercarePolicy.conversationAuthorizations(this.authorizations),
+                (item: PhotoAuthorizationSummary) => {
+                PhotoAuthorizationEventCard({ authorization: item, actorId: this.userId,
+                  thumbnails: this.authorizationThumbnails,
+                  onOpen: () => this.onOpenAuthorization?.(item.orderId, item.id) })
+              }, (item: PhotoAuthorizationSummary) => `authorization:${item.id}`)
+            }
+            ForEach(this.orders.filter((order: OrderSummary) => order.status === 'COMPLETED'),
+              (order: OrderSummary) => {
+                Button('查看本次评价').height(40).backgroundColor(PortraTheme.surface)
+                  .fontColor(PortraTheme.primary).onClick(() => this.onOpenReviews?.(order.orderId))
+              }, (order: OrderSummary) => `reviews:${order.orderId}`)
             if (this.conversation?.participantBId === this.userId) {
               if (QuoteWorkflow.active(this.quotes) === undefined) {
                 Button('发送报价').onClick(() => this.onCreateQuote?.())

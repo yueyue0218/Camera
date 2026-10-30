@@ -9,6 +9,8 @@ export enum AppRoute {
   ORDER_DETAIL = 'OrderDetail',
   DELIVERY_GALLERY = 'DeliveryGallery',
   DELIVERY_UPLOAD = 'DeliveryUpload',
+  PHOTO_AUTHORIZATION = 'PhotoAuthorization',
+  ORDER_REVIEWS = 'OrderReviews',
   PUBLISH = 'Publish',
   MESSAGE = 'Message',
   ORDER = 'Order',
@@ -38,6 +40,7 @@ export interface NavigationRouteParam {
   readonly conversationId?: number;
   readonly quoteId?: number;
   readonly deliveryId?: number;
+  readonly authorizationId?: number;
   readonly openPayment?: boolean;
   /** Protected destination requested before authentication. */
   readonly returnRoute?: AppRoute;

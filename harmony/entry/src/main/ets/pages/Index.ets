@@ -18,6 +18,8 @@ import { PublicProfilePage } from './PublicProfilePage';
 import { OrderDetailPage } from './OrderDetailPage';
 import { DeliveryGalleryPage } from './DeliveryGalleryPage';
 import { DeliveryUploadPage } from './DeliveryUploadPage';
+import { PhotoAuthorizationPage } from './PhotoAuthorizationPage';
+import { OrderReviewsPage } from './OrderReviewsPage';
 import { QuoteDetailPage } from './QuoteDetailPage';
 import { QuoteFormPage } from './QuoteFormPage';
 import { ProfilePage } from './ProfilePage';
@@ -49,6 +51,7 @@ struct Index {
   @State private detailVisibleRoute: string = '';
   @State private detailVisibleId: number = 0;
   private publishBackHandler?: () => boolean;
+  private aftercareBackHandler?: () => boolean;
 
   aboutToAppear(): void {
     if (this.appClient.hasRequiredPrivacyConsent()) {
@@ -121,6 +124,10 @@ struct Index {
         this.DeliveryGalleryDestination(param);
       } else if (name === AppRoute.DELIVERY_UPLOAD) {
         this.DeliveryUploadDestination(param);
+      } else if (name === AppRoute.PHOTO_AUTHORIZATION) {
+        this.PhotoAuthorizationDestination(param);
+      } else if (name === AppRoute.ORDER_REVIEWS) {
+        this.OrderReviewsDestination(param);
       } else if (name === AppRoute.PUBLISH) {
         PublishPage({ demandId: (param as NavigationRouteParam).demandId ?? 0, serviceId: (param as NavigationRouteParam).serviceId ?? 0,
           onBackHandler: (handler: (() => boolean) | undefined) => { this.publishBackHandler = handler; },
@@ -173,7 +180,9 @@ struct Index {
       }
     }
     .hideTitleBar(true)
-    .onBackPressed(() => name === AppRoute.PUBLISH ? (this.publishBackHandler?.() ?? false) : false)
+    .onBackPressed(() => name === AppRoute.PUBLISH ? (this.publishBackHandler?.() ?? false) :
+      name === AppRoute.PHOTO_AUTHORIZATION || name === AppRoute.ORDER_REVIEWS ?
+        (this.aftercareBackHandler?.() ?? false) : false)
     .onShown(() => {
       ConversationVisibility.show(name, param as NavigationRouteParam);
       if (name === AppRoute.ORDER) { this.orderReloadEpoch++; }
@@ -297,6 +306,11 @@ struct Index {
         onOpenGallery: (orderId: number) => this.openPage(AppRoute.DELIVERY_GALLERY,
           { orderId: orderId }),
         onOpenUpload: (orderId: number) => this.openPage(AppRoute.DELIVERY_UPLOAD,
+          { orderId: orderId }),
+        onOpenAuthorization: (orderId: number, authorizationId: number) =>
+          this.openPage(AppRoute.PHOTO_AUTHORIZATION,
+            { orderId: orderId, authorizationId: authorizationId }),
+        onOpenReviews: (orderId: number) => this.openPage(AppRoute.ORDER_REVIEWS,
           { orderId: orderId }) });
     }
   }
@@ -365,13 +379,14 @@ struct Index {
       OrderDetailPage({ orderId: (param as NavigationRouteParam).orderId!,
         openPayment: (param as NavigationRouteParam).openPayment === true,
         onBack: () => this.appPathStack.pop(),
-        onOpenEngagement: () => this.openPage(AppRoute.ORDER_ENGAGEMENT,
-          { targetKind: 'order', targetId: (param as NavigationRouteParam).orderId!,
-            orderId: (param as NavigationRouteParam).orderId! }),
+        onOpenReviews: () => this.openPage(AppRoute.ORDER_REVIEWS,
+          { orderId: (param as NavigationRouteParam).orderId! }),
         onOpenConversation: (conversationId: number) => {
           this.returnToConversation(conversationId);
         },
         onOpenGallery: () => this.openPage(AppRoute.DELIVERY_GALLERY,
+          { orderId: (param as NavigationRouteParam).orderId! }),
+        onOpenAuthorization: () => this.openPage(AppRoute.PHOTO_AUTHORIZATION,
           { orderId: (param as NavigationRouteParam).orderId! }),
         onOpenUpload: () => this.openPage(AppRoute.DELIVERY_UPLOAD,
           { orderId: (param as NavigationRouteParam).orderId! }) });
@@ -387,6 +402,29 @@ struct Index {
         onBack: () => this.appPathStack.pop(),
         onOpenUpload: () => this.openPage(AppRoute.DELIVERY_UPLOAD,
           { orderId: (param as NavigationRouteParam).orderId! }) });
+    }
+  }
+
+  @Builder
+  PhotoAuthorizationDestination(param: Object) {
+    if (!NavigationPolicy.validOrderId(param as NavigationRouteParam)) {
+      this.PlaceholderPage('展示授权', '无法打开这次约拍');
+    } else {
+      PhotoAuthorizationPage({ orderId: (param as NavigationRouteParam).orderId!,
+        initialAuthorizationId: (param as NavigationRouteParam).authorizationId ?? 0,
+        onBackHandler: (handler: (() => boolean) | undefined) => this.aftercareBackHandler = handler,
+        onBack: () => this.appPathStack.pop() });
+    }
+  }
+
+  @Builder
+  OrderReviewsDestination(param: Object) {
+    if (!NavigationPolicy.validOrderId(param as NavigationRouteParam)) {
+      this.PlaceholderPage('评价', '无法打开这次约拍');
+    } else {
+      OrderReviewsPage({ orderId: (param as NavigationRouteParam).orderId!,
+        onBackHandler: (handler: (() => boolean) | undefined) => this.aftercareBackHandler = handler,
+        onBack: () => this.appPathStack.pop() });
     }
   }
 
@@ -429,6 +467,14 @@ struct Index {
   }
 
   private openNotificationTarget(target: NotificationTarget): void {
+    if ((target.kind === 'review' || target.kind === 'complaint') && target.orderId > 0) {
+      this.openPage(AppRoute.ORDER_REVIEWS, { orderId: target.orderId });
+      return;
+    }
+    if (target.kind === 'order' && target.orderId > 0) {
+      this.openPage(AppRoute.ORDER_DETAIL, { orderId: target.orderId });
+      return;
+    }
     this.openPage(AppRoute.ORDER_ENGAGEMENT, { targetKind: target.kind, targetId: target.id, orderId: target.orderId });
   }
   private pushRoute(route: AppRoute, param: NavigationRouteParam): void {
@@ -452,7 +498,8 @@ struct Index {
       orderId: param.orderId, momentId: param.momentId, demandId: param.demandId,
       serviceId: param.serviceId, userId: param.userId, userRole: param.userRole,
       initialTab: param.initialTab, conversationId: param.conversationId,
-      quoteId: param.quoteId, deliveryId: param.deliveryId, openPayment: param.openPayment
+      quoteId: param.quoteId, deliveryId: param.deliveryId,
+      authorizationId: param.authorizationId, openPayment: param.openPayment
     };
     this.pushRoute(AppRoute.LOGIN, loginParam);
   }
@@ -476,7 +523,8 @@ struct Index {
         serviceId: param.serviceId,
         conversationId: param.conversationId,
         userId: param.userId, userRole: param.userRole, initialTab: param.initialTab,
-        quoteId: param.quoteId, deliveryId: param.deliveryId, openPayment: param.openPayment
+        quoteId: param.quoteId, deliveryId: param.deliveryId,
+        authorizationId: param.authorizationId, openPayment: param.openPayment
       };
       this.pushRoute(returnRoute, returnParam);
     }

@@ -72,7 +72,7 @@ export class HttpClient implements AuthTokenController {
     const parts: http.MultiFormData[] = [
       { name: 'file', contentType: mime, remoteFileName: filename, data: data },
       { name: 'bizType', contentType: 'text/plain', data: bizType },
-      { name: 'visibility', contentType: 'text/plain', data: 'PUBLIC' }
+      { name: 'visibility', contentType: 'text/plain', data: bizType === 'REVIEW_EVIDENCE' ? 'PRIVATE' : 'PUBLIC' }
     ];
     return this.request<UploadedImage>(http.RequestMethod.POST, '/files/upload', 'files.upload', true, undefined, false, parts);
   }

@@ -19,6 +19,8 @@ export class NavigationPolicy {
     AppRoute.ORDER_DETAIL,
     AppRoute.DELIVERY_GALLERY,
     AppRoute.DELIVERY_UPLOAD,
+    AppRoute.PHOTO_AUTHORIZATION,
+    AppRoute.ORDER_REVIEWS,
     AppRoute.PUBLISH,
     AppRoute.MESSAGE,
     AppRoute.ORDER,
@@ -30,6 +32,8 @@ export class NavigationPolicy {
     return route === AppRoute.ORDER_ENGAGEMENT || route === AppRoute.PUBLISH || route === AppRoute.CONVERSATION_DETAIL || route === AppRoute.MESSAGE ||
       route === AppRoute.QUOTE_FORM || route === AppRoute.QUOTE_DETAIL || route === AppRoute.ORDER_DETAIL ||
       route === AppRoute.DELIVERY_GALLERY || route === AppRoute.DELIVERY_UPLOAD ||
+      route === AppRoute.PHOTO_AUTHORIZATION ||
+      route === AppRoute.ORDER_REVIEWS ||
       route === AppRoute.ORDER || route === AppRoute.PROFILE || route === AppRoute.NOTIFICATIONS ||
       route === AppRoute.CREDIT || route === AppRoute.MOMENT_DETAIL;
   }
@@ -43,7 +47,8 @@ export class NavigationPolicy {
           returnRoute: route, demandId: param.demandId, serviceId: param.serviceId, targetKind: param.targetKind, targetId: param.targetId, orderId: param.orderId,
           conversationId: param.conversationId, momentId: param.momentId,
           userId: param.userId, userRole: param.userRole, initialTab: param.initialTab,
-          quoteId: param.quoteId, deliveryId: param.deliveryId, openPayment: param.openPayment
+          quoteId: param.quoteId, deliveryId: param.deliveryId,
+          authorizationId: param.authorizationId, openPayment: param.openPayment
         }
       };
     }
@@ -133,6 +138,10 @@ export class NavigationPolicy {
         return '作品相册';
       case AppRoute.DELIVERY_UPLOAD:
         return '上传照片';
+      case AppRoute.PHOTO_AUTHORIZATION:
+        return '展示授权';
+      case AppRoute.ORDER_REVIEWS:
+        return '评价';
       case AppRoute.PUBLISH:
         return '发布需求';
       case AppRoute.MESSAGE:

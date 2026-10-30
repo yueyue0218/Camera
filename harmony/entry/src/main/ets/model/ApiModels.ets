@@ -356,6 +356,35 @@ export interface DeliverySummary {
   readonly files?: DeliveryFileSummary[];
 }
 
+export interface PhotoAuthorizationFileSummary {
+  readonly fileId: number;
+  readonly deliveryId?: number;
+  readonly fileName?: string;
+  readonly fileType?: string;
+  readonly mimeType?: string;
+}
+
+export interface PhotoAuthorizationSummary {
+  readonly id: number;
+  readonly orderId: number;
+  readonly customerId: number;
+  readonly providerUserId: number;
+  readonly photoUsageScope: string;
+  readonly status: string;
+  readonly remark?: string;
+  readonly authorizedAt?: string;
+  readonly files: PhotoAuthorizationFileSummary[];
+}
+
+export interface PhotoAuthorizationPayload {
+  readonly fileIds: number[];
+  readonly remark: string;
+}
+
+export interface PhotoAuthorizationDecisionPayload {
+  readonly remark: string;
+}
+
 export interface StatusTransitionResult {
   readonly toStatus: string;
   readonly createdAt?: string;
@@ -626,6 +655,7 @@ export interface ReviewComplaintSummary {
   readonly complaintId: number; readonly reviewId: number; readonly orderId: number; readonly complainantId: number;
   readonly respondentId?: number; readonly reason: string; readonly status: string;
   readonly arbitrationResult?: string; readonly arbitrationComment?: string; readonly createdAt?: string; readonly handledAt?: string;
+  readonly evidenceFileIds?: string; readonly updatedAt?: string;
 }
 export interface DisputeReplySummary { readonly id: number; readonly disputeId: number; readonly replierId: number; readonly content: string; readonly createdAt?: string; }
 export interface DisputeSummary {
