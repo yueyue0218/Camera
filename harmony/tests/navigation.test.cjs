@@ -91,9 +91,9 @@ test('rapid repeated navigation is accepted only after the cooldown', () => {
   assert.equal(guard.accept(Number.NaN), false);
 });
 
-test('public profile login preserves the existing user identity and validates it', () => {
+test('guest public profile preserves the existing user identity and validates it', () => {
   const result = NavigationPolicy.resolve(AppRoute.PUBLIC_PROFILE, { userId: 12, userRole: 'PROVIDER' }, false);
-  assert.equal(result.route, AppRoute.LOGIN); assert.equal(result.param.returnRoute, AppRoute.PUBLIC_PROFILE);
+  assert.equal(result.route, AppRoute.PUBLIC_PROFILE); assert.equal(result.param.returnRoute, undefined);
   assert.equal(result.param.userId, 12); assert.equal(result.param.userRole, 'PROVIDER');
   assert.equal(NavigationPolicy.validPublicUserId({ userId: 0 }), undefined);
   assert.equal(NavigationPolicy.validPublicUserRole({ userRole: 'ADMIN' }), undefined);

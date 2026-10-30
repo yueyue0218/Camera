@@ -1,0 +1,56 @@
+const assert=require('node:assert/strict'),{test}=require('node:test'),fs=require('node:fs'),path=require('node:path');
+const ts=require(path.join(process.env.DEVECO_SDK_HOME,'default/openharmony/ets/build-tools/ets-loader/node_modules/typescript'));
+require.extensions['.ets']=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,f);
+const {MomentPublishController,MomentPublishAttempts}=require('../entry/src/main/ets/features/moments/MomentPublishController.ets');
+const {MomentOwnerAttempts}=require('../entry/src/main/ets/features/moments/MomentOwnerAttempts.ets');
+const {MomentFeedCache}=require('../entry/src/main/ets/features/moments/MomentFeedModels.ets');
+const image='data:image/png;base64,AAAA';
+const defer=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return{promise,resolve,reject}};
+function fixture(){let version=1,state;const identities=[],writes=[],cancels=[],published=[],cache=new MomentFeedCache();
+const api={currentSession(key){const d=defer();identities.push({key,...d});return d.promise},cancelCurrentSession(key){cancels.push(key)},createMoment(payload,key){const d=defer();writes.push({payload,key,...d});return d.promise},cancelMomentCreate(key){cancels.push(key)}};
+const reads=[];const c=new MomentPublishController(api,{getSessionVersion:()=>version,isAuthenticated:()=>true},cache,v=>state=v,v=>published.push(v));
+return{c,api,reads,identities,writes,cancels,published,cache,get state(){return state},change(){version++}};}
+async function open(f,id=1){const p=f.c.open();f.identities.at(-1).resolve({userId:id,role:'CUSTOMER',nickname:'普通测试用户'});await p;}
+function fill(f){f.c.updateTitle('今日记录');f.c.updateContent('仅本地测试');f.c.addImages([image],f.c.getViewVersion());}
+function result(extra={}){return{momentId:7,authorId:1,authorRole:'CUSTOMER',title:'今日记录',content:'仅本地测试',imageDataList:[image],likeCount:0,likedByCurrentUser:false,favoriteCount:0,favoritedByCurrentUser:false,status:'PUBLISHED',...extra}}
+test('publishing validates and snapshots 50/200 chars and real images, one POST only',async()=>{MomentPublishAttempts.shared=new MomentPublishAttempts();const f=fixture();await open(f);await f.c.submit();assert.equal(f.writes.length,0);f.c.updateTitle('题'.repeat(51));f.c.updateContent('字'.repeat(201));f.c.addImages([image],f.c.getViewVersion());assert.equal(f.state.title.length,50);assert.equal(f.state.content.length,200);const save=f.c.submit();await f.c.submit();assert.equal(f.writes.length,1);assert.equal(f.writes[0].payload.content.length,200);f.c.updateContent('changed');assert.equal(f.writes[0].payload.content.length,200);assert.equal(f.cache.hasPendingFavorite(1),true);f.writes[0].resolve(result());await save;assert.equal(f.published[0].momentId,7);assert.equal(f.cache.hasPendingFavorite(1),false)});
+test('image selection is limited to nine and a stale picker cannot add to a reopened draft',async()=>{MomentPublishAttempts.shared=new MomentPublishAttempts();const f=fixture();await open(f);const old=f.c.getViewVersion();f.c.close();await open(f);f.c.addImages([image],old);assert.equal(f.state.images.length,0);f.c.addImages(Array.from({length:10},(_,i)=>'data:image/png;base64,'+'A'.repeat(i+4)),f.c.getViewVersion());assert.equal(f.state.images.length,9);f.c.removeImage(0);assert.equal(f.state.images.length,8)});
+test('late success error and finally never alter a new account draft',async()=>{for(const failed of[false,true]){MomentPublishAttempts.shared=new MomentPublishAttempts();const f=fixture();await open(f);fill(f);const old=f.c.submit();f.change();f.c.close();await open(f,2);fill(f);const fresh=f.c.submit();if(failed)f.writes[0].reject({kind:'timeout'});else f.writes[0].resolve(result());await old;assert.equal(f.state.actorId,2);assert.equal(f.state.submitting,true);assert.equal(f.published.length,0);f.writes[1].resolve(result({authorId:2,momentId:8}));await fresh;assert.equal(f.published[0].momentId,8)}});
+test('unknown result survives close/reopen and never blindly reposts',async()=>{MomentPublishAttempts.shared=new MomentPublishAttempts();const f=fixture();await open(f);fill(f);const save=f.c.submit();f.writes[0].reject({kind:'timeout'});await save;assert.equal(f.state.uncertain,true);await f.c.submit();assert.equal(f.writes.length,1);f.c.close();await open(f);fill(f);await f.c.submit();assert.equal(f.writes.length,1);f.c.confirmVerifiedAbsent();assert.equal(f.state.uncertain,false)});
+test('close cancels only its own instance keys and a late success cannot report success',async()=>{MomentPublishAttempts.shared=new MomentPublishAttempts();const a=fixture(),b=fixture();await open(a,1);await open(b,2);assert.notEqual(a.identities[0].key,b.identities[0].key);fill(a);fill(b);const pa=a.c.submit(),pb=b.c.submit();a.c.close();assert.ok(a.cancels.includes(a.writes[0].key));assert.ok(!a.cancels.includes(b.writes[0].key));a.writes[0].resolve(result());await pa;assert.equal(a.published.length,0);b.writes[0].resolve(result({authorId:2,momentId:8}));await pb;assert.equal(b.published[0].momentId,8)});
+test('wrong author response never creates fake publish success',async()=>{MomentPublishAttempts.shared=new MomentPublishAttempts();const f=fixture();await open(f);fill(f);const save=f.c.submit();f.writes[0].resolve(result({authorId:99}));await save;assert.equal(f.published.length,0);assert.equal(f.state.uncertain,true)});
+
+test('large unadapted image data never reaches the POST payload',async()=>{MomentPublishAttempts.shared=new MomentPublishAttempts();const f=fixture();await open(f);f.c.updateTitle('记录');f.c.updateContent('正文');f.c.addImages(['data:image/jpeg;base64,'+'A'.repeat(300*1024)],f.c.getViewVersion());assert.equal(f.state.images.length,0);await f.c.submit();assert.equal(f.writes.length,0);assert.match(f.state.message,/照片|大小/)});
+test('a reopened same-account view reacts when an older pending publish settles',async()=>{for(const failed of[false,true]){MomentPublishAttempts.shared=new MomentPublishAttempts();const a=fixture(),b=fixture();await open(a);fill(a);const save=a.c.submit();a.c.close();await open(b);assert.equal(b.state.uncertain,true);assert.equal(b.state.canConfirmAbsent,false);if(failed)a.writes[0].reject({kind:'timeout'});else a.writes[0].resolve(result());await save;assert.equal(b.state.uncertain,failed);assert.equal(b.state.canConfirmAbsent,failed);}});
+
+test('identity changes while the same publish view is open clear its old draft and busy state',async()=>{MomentPublishAttempts.shared=new MomentPublishAttempts();const f=fixture();await open(f);fill(f);const save=f.c.submit();f.change();f.writes[0].resolve(result());await save;assert.equal(f.state.actorId,0);assert.equal(f.state.submitting,false);assert.equal(f.state.title,'');assert.equal(f.published.length,0);assert.match(f.state.message,/身份/);});
+
+async function openEdit(f,value=result(),actor={userId:1,role:'PROVIDER'}){
+ f.api.getMoment=(id,key)=>{const d=defer();f.reads.push({id,key,...d});return d.promise};
+ f.api.cancelMomentDetail=key=>f.cancels.push(key);
+ f.api.updateMoment=(id,payload,key)=>{const d=defer();f.writes.push({id,payload,key,...d});return d.promise};
+ f.api.cancelMomentUpdate=(id,key)=>f.cancels.push(key);
+ const p=f.c.open(value.momentId);f.identities.at(-1).resolve(actor);await new Promise(resolve=>setImmediate(resolve));
+ if(f.reads.length)f.reads.at(-1).resolve(value);await p;
+}
+test('editing preloads GET complete album and preserves mentions across real update',async()=>{
+ const f=fixture();await openEdit(f,result({imageDataList:[image,image,image,image,image],mentions:['原提及']}));
+ assert.equal(f.reads[0].id,7);assert.equal(f.state.editingId,7);assert.equal(f.state.images.length,5);
+ f.c.updateContent('修改正文');const save=f.c.submit();assert.equal(f.writes[0].id,7);assert.equal(f.writes[0].payload.imageDataList.length,5);assert.deepEqual(f.writes[0].payload.mentions,['原提及']);
+ f.writes[0].resolve(result({content:'修改正文'}));await save;assert.equal(f.published.length,1);
+});
+test('editing refuses foreign objects and never truncates an existing long body on load',async()=>{
+ MomentOwnerAttempts.shared=new MomentOwnerAttempts();MomentPublishAttempts.shared=new MomentPublishAttempts();const foreign=fixture();await openEdit(foreign,result({authorId:2}));assert.equal(foreign.state.canSubmit,false);await foreign.c.submit();assert.equal(foreign.writes.length,0);
+ const f=fixture();await openEdit(f,result({content:'字'.repeat(201)}));assert.equal(f.state.content.length,201);assert.equal(f.state.canSubmit,false);f.c.updateContent('字'.repeat(200));assert.equal(f.state.canSubmit,true);
+});
+test('an edit response for another moment cannot confirm success, and edits never replay blindly',async()=>{
+ MomentOwnerAttempts.shared=new MomentOwnerAttempts();MomentPublishAttempts.shared=new MomentPublishAttempts();const f=fixture();await openEdit(f);f.c.updateTitle('新标题');const save=f.c.submit();f.writes[0].resolve(result({momentId:8}));await save;assert.equal(f.published.length,0);assert.equal(f.state.uncertain,true);f.c.confirmVerifiedAbsent();await f.c.submit();assert.equal(f.writes.length,1);
+});
+test('late edit responses and finally cannot repaint a changed account draft',async()=>{
+ for(const failed of[false,true]){
+  MomentOwnerAttempts.shared=new MomentOwnerAttempts();MomentPublishAttempts.shared=new MomentPublishAttempts();const f=fixture();await openEdit(f);f.c.updateTitle('修改旧账号');const old=f.c.submit();f.change();f.c.close();await open(f,2);fill(f);const fresh=f.c.submit();
+  if(failed)f.writes[0].reject({kind:'timeout'});else f.writes[0].resolve(result());await old;
+  assert.equal(f.state.actorId,2);assert.equal(f.state.editingId,0);assert.equal(f.state.submitting,true);assert.equal(f.published.length,0);
+  f.writes[1].resolve(result({authorId:2,momentId:8}));await fresh;assert.equal(f.published[0].momentId,8);
+ }
+});

@@ -23,7 +23,7 @@ export class NavigationPolicy {
 
   static requiresAuthentication(route: AppRoute): boolean {
     return route === AppRoute.ORDER_ENGAGEMENT || route === AppRoute.PUBLISH || route === AppRoute.CONVERSATION_DETAIL || route === AppRoute.MESSAGE ||
-      route === AppRoute.ORDER || route === AppRoute.PROFILE || route === AppRoute.PUBLIC_PROFILE || route === AppRoute.NOTIFICATIONS || route === AppRoute.CREDIT || route === AppRoute.MOMENT_DETAIL;
+      route === AppRoute.ORDER || route === AppRoute.PROFILE || route === AppRoute.NOTIFICATIONS || route === AppRoute.CREDIT || route === AppRoute.MOMENT_DETAIL;
   }
 
   static resolve(route: AppRoute, param: NavigationRouteParam = EMPTY_PARAM,
@@ -32,7 +32,7 @@ export class NavigationPolicy {
       return {
         route: AppRoute.LOGIN,
         param: {
-          returnRoute: route, targetKind: param.targetKind, targetId: param.targetId, orderId: param.orderId,
+          returnRoute: route, demandId: param.demandId, serviceId: param.serviceId, targetKind: param.targetKind, targetId: param.targetId, orderId: param.orderId,
           conversationId: param.conversationId, momentId: param.momentId,
           userId: param.userId, userRole: param.userRole, initialTab: param.initialTab
         }

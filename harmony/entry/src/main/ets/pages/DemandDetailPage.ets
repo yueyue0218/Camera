@@ -1,8 +1,10 @@
+import { PublicationActions } from '../features/publish/PublicationActions';
+import { JournalText } from '../features/publish/JournalText';
+import { JournalBrief, JournalStyle, JournalHeading, JournalKicker, JournalTitle, JournalFacts, JournalPerson, JournalSection, JournalRow, JournalActions } from '../features/publish/JournalUI';
+import { PortraGallery } from '../common/components/PortraGallery';
 import { AppClient } from '../app/AppClient';
-import { PortraAvatar } from '../common/components/PortraAvatar';
 import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraLoading } from '../common/components/PortraLoading';
-import { PortraPageHeading } from '../common/components/PortraPageHeading';
 import { HallTextFormatter } from '../features/hall/HallUiModels';
 import { FollowAction } from '../features/user/FollowAction';
 import { ReportPanel } from '../features/user/ReportPanel';
@@ -12,7 +14,8 @@ import { PortraTheme } from '../theme/PortraTheme';
 
 @Component
 export struct DemandDetailPage {
-  @Prop demandId: number = 0;
+  @Prop @Watch('load') demandId: number = 0;
+  @Prop @Watch('onVisibleEpoch') visibleEpoch: number = 0;
   @State private loading: boolean = true;
   @State private demand: DemandSummary | null = null;
   @State private errorMessage: string = '';
@@ -27,12 +30,18 @@ export struct DemandDetailPage {
   @State private responsePrice: string = '';
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
+  onEdit?: (id: number) => void;
+  onOpenAuthor?: (id: number, role: string) => void;
   onBack?: () => void;
   onRequireLogin?: () => void;
   onOpenConversation?: (conversationId: number) => void;
 
   aboutToAppear(): void {
     this.load();
+  }
+
+  private onVisibleEpoch(): void {
+    if (this.visibleEpoch > 0) { this.load(); } else { this.requestVersion++; }
   }
 
   aboutToDisappear(): void {
@@ -44,6 +53,10 @@ export struct DemandDetailPage {
   private async load(): Promise<void> {
     const version = ++this.requestVersion;
     this.loading = true;
+    this.demand = null;
+    this.actionBusy = false;
+    this.responseMessage = '';
+    this.responsePrice = '';
     this.errorMessage = '';
     this.actionError = '';
     this.actionNotice = '';
@@ -98,6 +111,10 @@ export struct DemandDetailPage {
   }
 
   private async respond(): Promise<void> {
+    if (!this.appClient.sessionManager.isAuthenticated()) { this.onRequireLogin?.(); return; }
+    if (this.role.trim().toUpperCase() !== 'PROVIDER' || this.userId === this.demand?.customerId || this.demand?.status !== 'OPEN' || this.ownResponse !== null) {
+      this.actionError = '当前不能响应此需求'; return;
+    }
     if (this.actionBusy || !this.responseMessage.trim()) {
       this.actionError = '请先填写响应内容';
       return;
@@ -112,6 +129,8 @@ export struct DemandDetailPage {
         return;
       }
     }
+    const version = this.requestVersion;
+    const identity = this.appClient.sessionManager.getSessionVersion();
     this.actionBusy = true;
     this.actionError = '';
     try {
@@ -121,21 +140,28 @@ export struct DemandDetailPage {
         response.responseId <= 0) {
         throw new Error('响应结果缺少有效编号');
       }
+      if (version !== this.requestVersion || identity !== this.appClient.sessionManager.getSessionVersion()) { return; }
       this.ownResponse = response;
       this.actionNotice = response.status === 'PENDING_CUSTOMER_ACCEPT' ?
         '已发送响应，等待客户接受' : `响应状态：${response.status}`;
       this.responseMessage = '';
     } catch (error) {
+      if (version !== this.requestVersion || identity !== this.appClient.sessionManager.getSessionVersion()) { return; }
       this.actionError = (error as PortraError).message || '响应失败';
     } finally {
-      this.actionBusy = false;
+      if (version === this.requestVersion) { this.actionBusy = false; }
     }
   }
 
   private async accept(responseId: number): Promise<void> {
+    if (!this.appClient.sessionManager.isAuthenticated()) { this.onRequireLogin?.(); return; }
+    if (this.userId !== this.demand?.customerId || !this.responses.some((item: DemandResponseSummary) =>
+      item.responseId === responseId && item.status === 'PENDING_CUSTOMER_ACCEPT')) { this.actionError = '当前不能接受此响应'; return; }
     if (this.actionBusy) {
       return;
     }
+    const version = this.requestVersion;
+    const identity = this.appClient.sessionManager.getSessionVersion();
     this.actionBusy = true;
     this.actionError = '';
     try {
@@ -145,6 +171,7 @@ export struct DemandDetailPage {
         result.conversationId <= 0) {
         throw new Error('接受结果缺少有效会话');
       }
+      if (version !== this.requestVersion || identity !== this.appClient.sessionManager.getSessionVersion()) { return; }
       this.responses = this.responses.map((item: DemandResponseSummary) => item.responseId === responseId ?
         { responseId: item.responseId, demandId: item.demandId, providerId: item.providerId,
           providerProfileId: item.providerProfileId, message: item.message,
@@ -152,10 +179,36 @@ export struct DemandDetailPage {
           rejectReason: item.rejectReason, responseTime: item.responseTime } : item);
       this.onOpenConversation?.(result.conversationId);
     } catch (error) {
+      if (version !== this.requestVersion || identity !== this.appClient.sessionManager.getSessionVersion()) { return; }
       this.actionError = (error as PortraError).message || '接受失败';
     } finally {
-      this.actionBusy = false;
+      if (version === this.requestVersion) { this.actionBusy = false; }
     }
+  }
+
+  private readonly scroll: Scroller = new Scroller();
+  private async startChat(): Promise<void> {
+    if (this.actionBusy) { return; }
+    if (!this.appClient.sessionManager.isAuthenticated()) { this.onRequireLogin?.(); return; }
+    if (this.userId === this.demand?.customerId) { this.actionError = '这是你发布的需求，请在下方选择摄影师响应'; this.scroll.scrollEdge(Edge.Bottom); return; }
+    if (this.role.trim().toUpperCase() !== 'PROVIDER') { this.actionError = '仅摄影师可以响应此需求'; return; }
+    if (this.ownResponse?.status !== 'ACCEPTED') {
+      this.actionError = this.ownResponse ? '响应尚未被接受，接受后即可聊天' : '请先填写拍摄方案并发送响应，需求方接受后即可聊天';
+      this.scroll.scrollEdge(Edge.Bottom); return;
+    }
+    const version = this.requestVersion;
+    const identity = this.appClient.sessionManager.getSessionVersion();
+    this.actionBusy = true; this.actionError = '';
+    try {
+      const result = await this.appClient.apiService.openAcceptedDemandChat(this.ownResponse.responseId);
+      if (version !== this.requestVersion || identity !== this.appClient.sessionManager.getSessionVersion()) { return; }
+      if (!result || !Number.isSafeInteger(result.conversationId) || result.conversationId <= 0) { throw new Error('未返回有效会话'); }
+      this.onOpenConversation?.(result.conversationId);
+    } catch (error) {
+      if (version === this.requestVersion && identity === this.appClient.sessionManager.getSessionVersion()) {
+        this.actionError = (error as PortraError).message || '会话暂不可用';
+      }
+    } finally { if (version === this.requestVersion) { this.actionBusy = false; } }
   }
 
   @Builder
@@ -216,147 +269,53 @@ export struct DemandDetailPage {
     .padding({ top: 12, bottom: 24 })
   }
 
-  @Builder
-  private Fact(label: string, value: string) {
-    Column({ space: 5 }) {
-      Text(label).fontSize(11).fontColor(PortraTheme.secondaryText)
-      Text(value)
-        .fontSize(15)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(PortraTheme.primaryText)
-        .maxLines(2)
-    }
-    .width('48%')
-    .alignItems(HorizontalAlign.Start)
-    .padding({ top: 12, bottom: 12 })
-  }
-
   build() {
     Column() {
-      PortraPageHeading({ title: '需求详情', eyebrow: 'PORTRA / REQUEST', onBack: this.onBack })
-      if (this.loading) {
-        PortraLoading({ label: '正在加载需求' })
-      } else if (this.errorMessage.length > 0) {
-        PortraErrorView({ message: this.errorMessage, onRetry: () => this.load() })
-      } else if (this.demand !== null) {
-        Scroll() {
-          Column({ space: 18 }) {
-            Row({ space: 8 }) {
-              Text(this.demand.status === 'OPEN' ? '开放中' : '需求进展')
-                .fontSize(11)
-                .fontColor(PortraTheme.primary)
-                .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-                .backgroundColor(PortraTheme.primarySoft)
-                .borderRadius(6)
-              Text(`#${this.demandId}`)
-                .fontSize(11)
-                .fontColor(PortraTheme.mutedText)
-            }
-            .width('100%')
-
-            Text(HallTextFormatter.nonEmpty(this.demand.scene, '拍摄需求'))
-              .width('100%')
-              .fontSize(25)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(PortraTheme.primaryText)
-            Row({ space: 9 }) {
-              PortraAvatar({ displayName: this.demand.customerNickname ?? '', avatarSize: 32 })
-              Text(HallTextFormatter.nonEmpty(this.demand.customerNickname, '约拍用户'))
-                .fontSize(13)
-                .fontColor(PortraTheme.secondaryText)
-            }
-            .width('100%')
-
-            if (this.userId > 0 && this.demand.customerId !== undefined &&
-              this.userId !== this.demand.customerId) {
-              FollowAction({
-                targetUserId: this.demand.customerId,
-                targetRole: 'CUSTOMER',
-                currentUserId: this.userId
-              })
-            }
-
+      JournalHeading({ title: this.demand?.scene ?? '约拍需求', onBack: this.onBack })
+      if (this.loading) { PortraLoading({ label: '正在加载需求' }) }
+      else if (this.errorMessage) { PortraErrorView({ message: this.errorMessage, onRetry: () => this.load() }) }
+      else if (this.demand !== null) {
+        Scroll(this.scroll) {
+          Column() {
+            JournalKicker({ label: '约拍档案', right: 'REQUEST' })
             Column() {
-              Row() {
-                this.Fact('预算', HallTextFormatter.budget(this.demand.budgetMinCent, this.demand.budgetMaxCent))
-                this.Fact('拍摄城市', HallTextFormatter.city(this.demand.cityCode))
+              PortraGallery({ journal: true, moduleHeight: 304, fileIds: this.demand.referenceFileIds ?? [] })
+            }.width('100%').padding({ left: 15, right: 15 })
+            JournalTitle({ service: false, title: this.demand.scene ?? '未填写标题', subtitle: JournalText.decode(this.demand.description).story })
+            Column() {
+              JournalFacts({ service: false, city: this.demand.cityCode ?? '', middleLabel: '期望时间',
+                middle: this.demand.expectedDate || this.demand.timeDescription || '待沟通',
+                price: HallTextFormatter.budget(this.demand.budgetMinCent, this.demand.budgetMaxCent) })
+              JournalBrief({ styles: (this.demand.styleTags ?? []).join(' / '), place: this.demand.location ?? '',
+                people: JournalText.decode(this.demand.description).people, description: JournalText.decode(this.demand.description).story })
+              JournalPerson({ service: false, name: this.demand.customerNickname ?? '', avatar: this.demand.customerAvatarFileId ?? 0,
+                onOpen: () => { if ((this.demand?.customerId ?? 0) > 0) { this.onOpenAuthor?.(this.demand?.customerId ?? 0, 'CUSTOMER'); } } })
+              JournalSection({ title: '灵感参考', caption: 'REFERENCE' })
+              PortraGallery({ journal: true, thumbnails: true, fileIds: this.demand.referenceFileIds ?? [] })
+              Text('参考图片仅用于表达拍摄氛围，不代表摄影师作品或最终交付内容。').fontSize(10.5).lineHeight(18).fontColor(JournalStyle.muted).margin({ top: 12 })
+              JournalSection({ title: '约拍补充', caption: 'BEFORE WE SHOOT' })
+              Column() {
+                JournalRow({ label: '时间安排', value: this.demand.timeDescription ?? '' })
+                JournalRow({ label: '准备情况', value: '未说明，请与需求方沟通' })
+                JournalRow({ label: '备注', value: JournalText.decode(this.demand.description).negotiable ? '预算可根据拍摄方案再沟通' : '具体拍摄与报价以双方沟通为准' })
+              }.padding({ left: 14, right: 14 }).backgroundColor(JournalStyle.surface).borderRadius(15).border({ width: 1, color: JournalStyle.line })
+              this.ResponseActions()
+              if (this.userId > 0 && this.demand.customerId !== undefined && this.userId !== this.demand.customerId) {
+                FollowAction({ targetUserId: this.demand.customerId, targetRole: 'CUSTOMER', currentUserId: this.userId })
               }
-              Row() {
-                this.Fact('拍摄时间', HallTextFormatter.nonEmpty(this.demand.timeDescription,
-                  HallTextFormatter.nonEmpty(this.demand.expectedDate, '待沟通')))
-                this.Fact('具体地点', HallTextFormatter.nonEmpty(this.demand.location, '待沟通'))
-              }
-            }
-            .width('100%')
-            .padding({ left: 16, right: 16, top: 3, bottom: 3 })
-            .backgroundColor(PortraTheme.surface)
-            .borderRadius(8)
-            .border({ width: 1, color: PortraTheme.border })
-
-            Column({ space: 9 }) {
-              Text('需求描述').fontSize(17).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
-              Text(HallTextFormatter.nonEmpty(this.demand.description, '暂无需求描述'))
-                .fontSize(14)
-                .fontColor(PortraTheme.secondaryText)
-                .lineHeight(23)
-            }
-            .width('100%')
-            .alignItems(HorizontalAlign.Start)
-            .padding({ top: 8, bottom: 8 })
-
-            if ((this.demand.styleTags ?? []).length > 0) {
-              Column({ space: 10 }) {
-                Text('拍摄偏好').fontSize(17).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
-                Flex({ direction: FlexDirection.Row, wrap: FlexWrap.Wrap }) {
-                  ForEach((this.demand.styleTags ?? []).slice(0, 3), (tag: string) => {
-                    Text(tag)
-                      .fontSize(12)
-                      .fontColor(PortraTheme.primary)
-                      .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-                      .backgroundColor(PortraTheme.primarySoft)
-                      .borderRadius(6)
-                      .margin({ right: 8, bottom: 8 })
-                  })
-                }
-                .width('100%')
-              }
-              .width('100%')
-              .alignItems(HorizontalAlign.Start)
-            }
-
-            Text('参考风格')
-              .width('100%')
-              .fontSize(17)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(PortraTheme.primaryText)
-            Text((this.demand.referenceFileIds ?? []).length > 0 ?
-              '参考图片暂不可查看' : '暂无参考图片')
-              .width('100%')
-              .height(96)
-              .fontSize(13)
-              .fontColor(PortraTheme.secondaryText)
-              .textAlign(TextAlign.Center)
-              .backgroundColor(PortraTheme.pageBackgroundDeep)
-              .borderRadius(8)
-            this.ResponseActions()
-            ReportPanel({
-              targetType: 'DEMAND',
-              targetId: this.demandId,
-              ownerId: this.demand.customerId ?? 0,
-              currentUserId: this.userId,
-              onRequireLogin: this.onRequireLogin
-            })
-          }
-          .width('100%')
-          .padding({ left: 20, right: 20, top: 18, bottom: 28 })
-          .alignItems(HorizontalAlign.Start)
-        }
-        .layoutWeight(1)
-        .scrollBar(BarState.Off)
+              PublicationActions({ service: false, contentId: this.demandId,
+                ownerId: this.demand.customerId ?? 0, currentUserId: this.userId, role: this.role, status: this.demand.status ?? '',
+                onEdit: this.onEdit, onChanged: () => this.load() })
+              ReportPanel({ targetType: 'DEMAND', targetId: this.demandId, ownerId: this.demand.customerId ?? 0,
+                currentUserId: this.userId, onRequireLogin: this.onRequireLogin })
+              Text('Portra · find your frame.').fontSize(14).fontColor('#AFA8A1').padding({ top: 34, bottom: 28 })
+            }.width('100%').padding({ left: 17, right: 17 }).alignItems(HorizontalAlign.Start)
+          }.width('100%')
+        }.layoutWeight(1).scrollBar(BarState.Off)
+        JournalActions({ service: false, price: HallTextFormatter.budget(this.demand.budgetMinCent, this.demand.budgetMaxCent),
+          actionsEnabled: !this.actionBusy, notice: this.actionError, onChat: () => this.startChat(),
+          onStar: () => { this.actionError = '需求收藏暂未开放，当前未保存意向'; } })
       }
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor(PortraTheme.pageBackground)
+    }.width('100%').height('100%').backgroundColor(JournalStyle.paper)
   }
 }

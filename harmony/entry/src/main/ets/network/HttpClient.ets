@@ -6,6 +6,8 @@ import { ApiEnvelope } from '../model/ApiModels';
 import { AuthInterceptor } from './AuthInterceptor';
 import { ErrorMapper, PortraError } from './ErrorMapper';
 
+export interface UploadedImage { fileId: number; originalName: string; }
+
 export interface AuthenticationExpiredHandler {
   refreshSession(): Promise<boolean>;
 }
@@ -18,6 +20,15 @@ export class HttpClient implements AuthTokenController {
   private readonly requestScopes: Map<string, boolean> = new Map<string, boolean>();
   private sessionEpoch: number = 0;
   private tokenRevision: number = 0;
+  private readonly identityListeners: Set<() => void> = new Set<() => void>();
+
+  observeIdentity(listener: () => void): void { this.identityListeners.add(listener); }
+  unobserveIdentity(listener: () => void): void { this.identityListeners.delete(listener); }
+  getIdentityEpoch(): number { return this.sessionEpoch; }
+
+  getImage(path: string, requestKey: string): Promise<ArrayBuffer> {
+    return this.request<ArrayBuffer>(http.RequestMethod.GET, path, requestKey, true, undefined, true);
+  }
   // Keep even a failed recovery while requests sent with that token are pending.
   // A late 401 in the same wave must share its outcome, not rotate again.
   private readonly revisionUsers: Map<number, number> = new Map<number, number>();
@@ -47,6 +58,7 @@ export class HttpClient implements AuthTokenController {
 
   private invalidateSessionRequests(): void {
     this.sessionEpoch++;
+    this.identityListeners.forEach((listener: () => void) => listener());
     // Public GETs carry no account state. In particular, startup restore must
     // not cancel the hall feed. Pending refresh waiters are invalidated too.
     this.requestScopes.forEach((scoped: boolean, key: string) => {
@@ -54,6 +66,15 @@ export class HttpClient implements AuthTokenController {
         this.cancelRequest(key);
       }
     });
+  }
+
+  uploadImage(data: ArrayBuffer, bizType: string, mime: string, filename: string): Promise<UploadedImage> {
+    const parts: http.MultiFormData[] = [
+      { name: 'file', contentType: mime, remoteFileName: filename, data: data },
+      { name: 'bizType', contentType: 'text/plain', data: bizType },
+      { name: 'visibility', contentType: 'text/plain', data: 'PUBLIC' }
+    ];
+    return this.request<UploadedImage>(http.RequestMethod.POST, '/files/upload', 'files.upload', true, undefined, false, parts);
   }
 
   async get<T>(path: string, requestKey: string = path): Promise<T> {
@@ -105,7 +126,7 @@ export class HttpClient implements AuthTokenController {
   }
 
   private async request<T>(method: http.RequestMethod, path: string, requestKey: string,
-    authenticated: boolean, body?: Object): Promise<T> {
+    authenticated: boolean, body?: Object, binary: boolean = false, parts?: http.MultiFormData[]): Promise<T> {
     const profile = EnvironmentConfig.current();
     if (!EnvironmentConfig.isUsable(profile)) {
       throw ErrorMapper.config(`当前环境 ${profile.name} 没有可用的服务端地址。`);
@@ -133,7 +154,7 @@ export class HttpClient implements AuthTokenController {
         const authorization = authenticated ? this.authInterceptor.authorizationHeader() : '';
         try {
           const result = await this.requestOnce<T>(method, path, requestKey, requestVersion,
-            profile.baseUrl, authorization, body);
+            profile.baseUrl, authorization, body, binary, parts);
           this.assertCurrent(requestKey, requestVersion, epoch, scoped);
           return result;
         } catch (error) {
@@ -191,34 +212,34 @@ export class HttpClient implements AuthTokenController {
   }
 
   private async requestOnce<T>(method: http.RequestMethod, path: string, requestKey: string,
-    requestVersion: number, baseUrl: string, authorization: string, body?: Object): Promise<T> {
+    requestVersion: number, baseUrl: string, authorization: string, body?: Object,
+    binary: boolean = false, parts?: http.MultiFormData[]): Promise<T> {
     const request = http.createHttp();
     this.activeRequests.set(requestKey, request);
     const content = body === undefined ? undefined : JSON.stringify(body);
-    const options: http.HttpRequestOptions = authorization.length === 0
-      ? {
-        method: method,
-        header: { 'Content-Type': 'application/json' },
-        expectDataType: http.HttpDataType.STRING,
-        connectTimeout: 10000,
-        readTimeout: 15000,
-        maxRedirects: 0,
-        usingCache: false,
-        extraData: content
-      }
-      : {
-        method: method,
-        header: {
-          'Content-Type': 'application/json',
-          'Authorization': authorization
-        },
-        expectDataType: http.HttpDataType.STRING,
-        connectTimeout: 10000,
-        readTimeout: 15000,
-        maxRedirects: 0,
-        usingCache: false,
-        extraData: content
-      };
+    const headers: Record<string, string> = {
+      'Content-Type': parts === undefined ? 'application/json' : 'multipart/form-data'
+    };
+    if (authorization.length > 0) {
+      headers['Authorization'] = authorization;
+    }
+    const options: http.HttpRequestOptions = {
+      method: method,
+      header: headers,
+      expectDataType: binary ? http.HttpDataType.ARRAY_BUFFER : http.HttpDataType.STRING,
+      connectTimeout: 10000,
+      readTimeout: 15000,
+      maxLimit: binary ? 32 * 1024 * 1024 : 5 * 1024 * 1024,
+      maxRedirects: 0,
+      usingCache: false,
+      extraData: content
+    };
+    // Only provide the multipart field when this is actually an upload.
+    // Passing `multiFormDataList: undefined` crosses the native bridge as an
+    // invalid type and emits ParseMultiFormData errors for ordinary requests.
+    if (parts !== undefined) {
+      options.multiFormDataList = parts;
+    }
 
     let response: http.HttpResponse;
     try {
@@ -229,7 +250,8 @@ export class HttpClient implements AuthTokenController {
         throw ErrorMapper.stale();
       }
       request.destroy();
-      throw ErrorMapper.fromTransportCode((error as BusinessError)?.code);
+      const transportCode = (error as BusinessError)?.code ?? 0;
+      throw ErrorMapper.fromTransportCode(transportCode);
     }
     request.destroy();
     this.releaseRequest(requestKey, request);
@@ -240,6 +262,34 @@ export class HttpClient implements AuthTokenController {
 
     if (response.responseCode < 200 || response.responseCode >= 300) {
       throw ErrorMapper.fromHttpStatus(response.responseCode);
+    }
+
+    if (binary) {
+      const headers = response.header as Record<string, string>;
+      const type = Object.keys(headers).find((key: string) => key.toLowerCase() === 'content-type');
+      const mime = type === undefined ? '' : String(headers[type]).split(';')[0].trim().toLowerCase();
+      // FileAccessPolicy errors use the global HTTP-200 JSON envelope too.
+      if (mime === 'application/json' || mime.endsWith('+json')) {
+        let failure: ApiEnvelope<Object>;
+        try {
+          if (!(response.result instanceof ArrayBuffer) || response.result.byteLength > 65536) {
+            throw ErrorMapper.parse();
+          }
+          const encoded = Array.from(new Uint8Array(response.result))
+            .map((value: number) => '%' + value.toString(16).padStart(2, '0')).join('');
+          failure = JSON.parse(decodeURIComponent(encoded)) as ApiEnvelope<Object>;
+          if (failure === null || !Number.isInteger(failure.code) || failure.code === 200) {
+            throw ErrorMapper.parse();
+          }
+        } catch { throw ErrorMapper.parse(); }
+        throw ErrorMapper.fromBusinessCode(failure.code, '');
+      }
+      if (type === undefined || !String(headers[type]).toLowerCase().startsWith('image/') ||
+        !(response.result instanceof ArrayBuffer) || response.result.byteLength === 0 ||
+        response.result.byteLength > 32 * 1024 * 1024) {
+        throw ErrorMapper.parse();
+      }
+      return response.result as T;
     }
 
     let envelope: ApiEnvelope<T>;

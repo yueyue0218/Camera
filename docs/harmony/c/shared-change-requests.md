@@ -1,4 +1,18 @@
+## 2026-10-30 本人动态编辑/删除及确认卡片
+
+已获公共网络维护者授权，仅ApiService新增4方法；C统一详情本人三点菜单、共用表单真实PUT编辑、二次确认真实DELETE。287/287回归、assembleHap exit0/17.809秒；真实模拟器完成保存→服务端读回4张/Feed3张、取消删除保留、确认删除后作者DELETED/他人404/列表消失。确认卡片按反馈增加顶部留白、圆角和按钮间距。精确文件、命令和证据见[本轮交付](evidence/20261030-owner-actions/README.md)。用户本轮明确要求检查后立即推送合并，唯一目标integration/harmony-v1。
+
+## 2026-10-30 C-SHARED-09 已授权应用，原5项认证失败已修复
+
+仅修改 AppClient.ets、AuthSessionManager.ets 和 auth.test.cjs。失败后同身份版本恢复、并发过期共享真实清理结果，保留待持久化的轮转凭据并阻止退出后旧账号恢复；同步测试端口并新增8项边界回归。最终全套268/268（exit0），assembleHap exit0/16.620秒，最终包真实模拟器7项验收通过。精确命令、补丁、红绿与设备证据见[修复交付](proposals/shared-auth-regressions/fix-20261030/README.md)。本轮不宣称整个C模块或团队环境完整验收完成；原PR26以下记录按时点保留。
+
 # C 公共依赖交付状态
+
+## 2026-10-29最终：固定相册基线、同色补齐、下拉刷新及发布入口
+
+详情按同相册最高显示图片固定基线，短图以页面同色补齐，切图文字不动；删刷新键改真实下拉，发布按钮单独留足间距。新手机发布表单50/200字、1—9图；2个公共文件已明确授权，沿用现有认证。发布顶部安全区已修。最终构建exit0/15.720秒，包83F6B5B10040D04645C7851004D5D4C8D056678ED7650E19777827675CDD58C6已安装。
+
+全套260/255pass/5fail；独立集成基线认证10/5pass/5fail，五项名称完全相同，本轮无新增回归，不冒充全套通过。真实切图1741=1741、下拉服务端更新/恢复已验证；图库/设备POST仍未验收。[修改、命令、截图、剩余项](evidence/20261029-final-album-publish/README.md)。[本轮PR26](https://github.com/yueyue0218/Camera/pull/26)，唯一base integration/harmony-v1；用户已显式授权检查后推送/合并，实际合并状态以GitHub为准，main不操作。
 
 ## 2026-10-29最新：动态卡片、详情互动与举报身份修复
 
@@ -188,3 +202,10 @@ HTTPS获取远端成功，integration仍为`b258ec8`，所列举报/点赞/详�
 用户明确回复“已获公共网络维护者授权，应用补丁并接入验收”。唯一新增公共改动为ApiService.ets的47行适配，精确补丁保留在proposals/moment-api-like-detail.patch；不修改HttpClient/认证/DTO/公共导航/B表单。上文01/02“仍缺”的描述为授权前核查历史，当前以本段及表格为准。维护者独立PR/SHA仍无，此能力随现有C PR25提交。
 
 新增真实源码契约与C状态回归，全套134项127通过/7举报TODO，严格举报仍2通过/7失败；最终assembleHap退出0。真实本地API26已验证点赞/取消、完整五图、关闭重入/系统返回、Web下架后404及恢复重读、同进程后台清详情和同条举报草稿互斥。完整证据见[evidence](evidence/20261028-like-detail/README.md)。未解除03/04/05、成功切身份、HALL和团队环境/真机依赖。
+
+## C-SHARED-10：累计Feed容量/分页缩略图（待维护者）
+
+本轮C单次发布已有160KiB/图及1.5MiB总预算，但既有无分页listMoments仍不能保证累计响应在SDK默认5MiB内。请公共/后端维护者在backend social/service/MomentService.java与MomentController.java、MomentDto.java和harmony network/ApiService.ets提供GET /moments/feed?scope&page&size及listMomentFeed(scope,page,size,key?):Promise<PageResult<MomentSummary>>，每页响应预算≤2MiB，列表最多3张低体积缩略图；保留原GET /moments数组签名与GET /moments/{id}完整图片，不直接改HttpClient掩盖。验收：多账号连续9图动态、分页/去重/切身份、列表预算和完整详情一致。C本轮不擅改这些公共文件。
+
+## C-SHARED-11：本人动态编辑删除
+公共方法确实缺失，唯一目标ApiService.ets；签名、接入、兼容及验收见[可应用补丁与5项候选契约](proposals/moment-owner-actions/README.md)。等待对应维护者授权，C控制器/表单复用与回归继续推进。

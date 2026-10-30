@@ -31,6 +31,9 @@ export class ErrorMapper {
     if (status === 403) {
       return new PortraError(ErrorKind.HTTP, '当前账号没有权限执行此操作。', status);
     }
+    if (status === 413) {
+      return new PortraError(ErrorKind.HTTP, '图片超过服务器上传大小限制（HTTP 413），请选择较小的图片。', status);
+    }
     if (status === 404) {
       return new PortraError(ErrorKind.HTTP, '请求的内容不存在。', status);
     }

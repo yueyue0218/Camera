@@ -1,0 +1,69 @@
+✔ Asset Store keeps an environment-scoped, local, encrypted token record (5.2415ms)
+✔ Asset Store rejects cross-environment and empty credentials (0.9313ms)
+✔ restore accepts only a valid credential from the current environment (1.0569ms)
+✔ temporary refresh failure keeps the stored credential for a later retry (0.542ms)
+✔ storage failures never create an in-memory authenticated session (0.617ms)
+✔ application session restore deduplicates concurrency and retries after a transient failure (11.9682ms)
+✔ sign out clears local authentication even when secure deletion fails (0.7659ms)
+✔ concurrent expiration clears the credential once (1.607ms)
+✔ 401 and 40101 try refresh and expire a rejected session; 403 does not refresh (2.1294ms)
+✔ concurrent expiration waits for the same failed deletion result (6.1765ms)
+✔ an old expiration completion cannot expire a newer signed-in identity (1.4218ms)
+✔ concurrent expired GETs share one rotation and retry with the new bearer (1.7875ms)
+✔ a recovered POST PUT DELETE or PATCH is never automatically replayed (1.2457ms)
+✔ changing session invalidates the old account request (0.5418ms)
+✔ explicit restore retry persists an already rotated credential without sending the old refresh again (14.2365ms)
+✔ a lifecycle restore after failed logout deletion cannot restore the signed-out account (10.8297ms)
+✖ a retried restore expires and deletes a credential rejected by the server (13.2081ms)
+✖ a retry that finds no credential clears the preceding storage error (11.2807ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 16
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 860.2741
+
+✖ failing tests:
+
+test at harmony\tests\auth.test.cjs:505:1
+✖ a retried restore expires and deletes a credential rejected by the server (13.2081ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  'guest' !== 'expired'
+
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\auth.test.cjs:523:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'guest',
+    expected: 'expired',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at harmony\tests\auth.test.cjs:529:1
+✖ a retry that finds no credential clears the preceding storage error (11.2807ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + CredentialStoreError: Credential load failed.
+  +     at AssetCredentialStore.load (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\entry\src\main\ets\storage\AssetCredentialStore.ets:30:19) {
+  +   code: 24000001,
+  +   operation: 'load'
+  + }
+  - null
+
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\auth.test.cjs:540:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: Credential load failed.
+        at AssetCredentialStore.load (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\entry\src\main\ets\storage\AssetCredentialStore.ets:30:19),
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

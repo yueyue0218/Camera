@@ -42,6 +42,16 @@ export class PublicImagePolicy {
   }
 }
 
+/** Legacy service images may contain numeric IDs or file endpoint references. */
+export class FileImagePolicy {
+  static id(source: string): number {
+    const value = source.trim();
+    const match = value.match(/^(?:https:\/\/[^\s/@?#]+)?\/files\/(\d+)\/(?:thumbnail|medium|original|download)(?:[?#].*)?$/);
+    const candidate = /^\d+$/.test(value) ? Number(value) : (match === null ? 0 : Number(match[1]));
+    return Number.isSafeInteger(candidate) && candidate > 0 ? candidate : 0;
+  }
+}
+
 /**
  * Moment images are stored by the current backend as inline image data. Keep
  * that exceptional boundary opt-in and accept only a small set of image MIME

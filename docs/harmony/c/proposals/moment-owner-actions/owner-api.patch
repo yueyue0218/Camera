@@ -1,0 +1,29 @@
+diff --git a/harmony/entry/src/main/ets/network/ApiService.ets b/harmony/entry/src/main/ets/network/ApiService.ets
+index 47e2cf5..25150d7 100644
+--- a/harmony/entry/src/main/ets/network/ApiService.ets
++++ b/harmony/entry/src/main/ets/network/ApiService.ets
+@@ -31,0 +32,24 @@ export class ApiService implements NativeSessionApi {
++  async updateMoment(momentId: number, payload: CreateMomentPayload, requestKey?: string): Promise<MomentSummary> {
++    this.requireMomentId(momentId);
++    const result = await this.client.put<MomentSummary>(`/moments/${momentId}`, payload,
++      requestKey ?? `moments.${momentId}.update`);
++    return this.requireMomentResult(result, momentId);
++  }
++
++  async deleteMoment(momentId: number, requestKey?: string): Promise<void> {
++    this.requireMomentId(momentId);
++    const result = await this.client.delete<void>(`/moments/${momentId}`,
++      requestKey ?? `moments.${momentId}.delete`);
++    if (result !== null && result !== undefined) { throw ErrorMapper.parse(); }
++  }
++
++  cancelMomentUpdate(momentId: number, requestKey?: string): void {
++    this.requireMomentId(momentId);
++    this.client.cancelRequest(requestKey ?? `moments.${momentId}.update`);
++  }
++
++  cancelMomentDelete(momentId: number, requestKey?: string): void {
++    this.requireMomentId(momentId);
++    this.client.cancelRequest(requestKey ?? `moments.${momentId}.delete`);
++  }
++

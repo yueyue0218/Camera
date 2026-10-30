@@ -3,6 +3,7 @@ import { PortraImage } from './PortraImage';
 
 @Component
 export struct PortraAvatar {
+  @Prop fileId: number = 0;
   @Prop source: ResourceStr = '';
   @Prop displayName: string = '';
   @Prop avatarSize: number = 48;
@@ -10,6 +11,7 @@ export struct PortraAvatar {
   build() {
     PortraImage({
       source: this.source,
+      fileId: this.fileId,
       imageWidth: this.avatarSize,
       imageHeight: this.avatarSize,
       cornerRadius: this.avatarSize / 2,

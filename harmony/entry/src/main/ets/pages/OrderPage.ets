@@ -13,6 +13,7 @@ export struct OrderPage {
   @State private loading: boolean = true;
   @State private errorMessage: string = '';
   @State private orders: OrderSummary[] = [];
+  @State private role: string = '';
   @State private filter: number = 0;
   @State private selectedOrderId: number = 0;
   private readonly appClient: AppClient = AppClient.shared;
@@ -32,15 +33,23 @@ export struct OrderPage {
   aboutToDisappear(): void {
     this.requestVersion++;
     this.appClient.apiService.cancelOrders();
+    this.appClient.apiService.cancelCurrentSession('orders.identity');
   }
 
   private async load(): Promise<void> {
     const version = ++this.requestVersion;
+    const epoch = this.appClient.sessionManager.getSessionVersion();
     this.loading = true;
     this.errorMessage = '';
+    this.orders = [];
+    this.role = '';
     try {
-      const result = await this.appClient.apiService.listOrders();
-      if (version === this.requestVersion) {
+      const session = await this.appClient.apiService.currentSession('orders.identity');
+      if (version !== this.requestVersion || epoch !== this.appClient.sessionManager.getSessionVersion()) { return; }
+      if (session.role !== 'CUSTOMER' && session.role !== 'PROVIDER') { throw new Error('当前身份不能查看约拍订单'); }
+      this.role = session.role;
+      const result = await this.appClient.apiService.listOrders(session.role);
+      if (version === this.requestVersion && epoch === this.appClient.sessionManager.getSessionVersion()) {
         if (!Array.isArray(result)) {
           this.errorMessage = '订单数据格式异常';
         } else {
@@ -49,7 +58,7 @@ export struct OrderPage {
         }
       }
     } catch (error) {
-      if (version === this.requestVersion) {
+      if (version === this.requestVersion && epoch === this.appClient.sessionManager.getSessionVersion()) {
         this.errorMessage = (error as PortraError).message || '订单加载失败';
       }
     } finally {
@@ -101,7 +110,7 @@ export struct OrderPage {
 
   build() {
     Column() {
-      PortraPageHeading({ title: '我的订单', eyebrow: 'ORDERS / PORTRA', onBack: this.onBack })
+      PortraPageHeading({ title: this.role === 'PROVIDER' ? '摄影订单' : '我的订单', eyebrow: 'ORDERS / PORTRA', onBack: this.onBack })
       Row({ space: 8 }) {
         this.FilterTab('全部', 0)
         this.FilterTab('进行中', 1)

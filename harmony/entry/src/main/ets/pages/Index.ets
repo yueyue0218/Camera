@@ -12,16 +12,13 @@ import { LoginPage } from './LoginPage';
 import { DemandDetailPage } from './DemandDetailPage';
 import { ServiceDetailPage } from './ServiceDetailPage';
 import { ConversationDetailPage } from './ConversationDetailPage';
-import { MessagePage } from './MessagePage';
 import { OrderPage } from './OrderPage';
-import { ProfilePage } from './ProfilePage';
 import { PublicProfilePage } from './PublicProfilePage';
 import { PublishPage } from './PublishPage';
 import { PortraTheme } from '../theme/PortraTheme';
 import { PrivacyConsentPage } from '../privacy/PrivacyConsentPage';
 
 const EMPTY_ROUTE_PARAM: NavigationRouteParam = {};
-const PROFILE_LOGIN_PARAM: NavigationRouteParam = { returnRoute: AppRoute.PROFILE };
 
 enum ConsentGateState {
   CHECKING = 'CHECKING',
@@ -38,7 +35,13 @@ struct Index {
   private restorePromise?: Promise<void>;
   @State private consentGateState: ConsentGateState = ConsentGateState.CHECKING;
   @State private consentError: string = '';
+  @State private mainTab: number = 0;
+  @State private sessionEpoch: number = 0;
   @State private orderReloadEpoch: number = 0;
+  @State private detailVisibleEpoch: number = 0;
+  @State private detailVisibleRoute: string = '';
+  @State private detailVisibleId: number = 0;
+  private publishBackHandler?: () => boolean;
 
   aboutToAppear(): void {
     if (this.appClient.hasRequiredPrivacyConsent()) {
@@ -70,12 +73,16 @@ struct Index {
   private onPrivacyConsentWithdrawn(): void {
     this.appPathStack.clear();
     this.restorePromise = undefined;
+    this.mainTab = 0;
+    this.sessionEpoch++;
     this.consentError = '';
     this.consentGateState = ConsentGateState.REQUIRED;
   }
 
   private beginPostConsentBootstrap(): void {
-    const bootstrap = this.appClient.bootstrapAfterPrivacyConsent().catch(() => {
+    const bootstrap = this.appClient.bootstrapAfterPrivacyConsent().then(() => {
+      this.sessionEpoch++;
+    }).catch(() => {
       this.consentError = '设备信息初始化失败，登录功能暂时不可用';
     });
     this.restorePromise = bootstrap;
@@ -90,8 +97,7 @@ struct Index {
           onBack: () => this.appPathStack.pop(),
           onSuccess: () => this.completeLogin(param as NavigationRouteParam)
         });
-      } else if (name === AppRoute.HALL) {
-        this.AppShell((param as NavigationRouteParam).initialTab ?? 0);
+
       } else if (name === AppRoute.DEMAND_DETAIL) {
         this.DemandDetailDestination(param);
       } else if (name === AppRoute.SERVICE_DETAIL) {
@@ -99,11 +105,13 @@ struct Index {
       } else if (name === AppRoute.CONVERSATION_DETAIL) {
         this.ConversationDetailDestination(param);
       } else if (name === AppRoute.PUBLISH) {
-        PublishPage({
+        PublishPage({ demandId: (param as NavigationRouteParam).demandId ?? 0, serviceId: (param as NavigationRouteParam).serviceId ?? 0,
+          onBackHandler: (handler: (() => boolean) | undefined) => { this.publishBackHandler = handler; },
+          onServicePublished: (id: number) => { this.appPathStack.pop(); if ((param as NavigationRouteParam).returnRoute !== AppRoute.SERVICE_DETAIL) { this.pushRoute(AppRoute.SERVICE_DETAIL, { serviceId: id }); } },
           onBack: () => this.appPathStack.pop(),
           onPublished: (demandId: number) => {
             this.appPathStack.pop();
-            this.pushRoute(AppRoute.DEMAND_DETAIL, { demandId: demandId });
+            if ((param as NavigationRouteParam).returnRoute !== AppRoute.DEMAND_DETAIL) { this.pushRoute(AppRoute.DEMAND_DETAIL, { demandId: demandId }); }
           }
         });
       } else if (name === AppRoute.NOTIFICATIONS) {
@@ -126,60 +134,55 @@ struct Index {
           onBack: () => this.appPathStack.pop(),
           onRequireLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.MOMENT_DETAIL,
             momentId: (param as NavigationRouteParam).momentId }) });
-      } else if (name === AppRoute.MESSAGE) {
-        MessagePage({
-          onOpenMoment: (id: number) => this.openPage(AppRoute.MOMENT_DETAIL, { momentId: id }),
-          onOpenCredit: () => this.openPage(AppRoute.CREDIT), onOpenTarget: (target: NotificationTarget) => this.openNotificationTarget(target), onOpenOrders: () => this.openPage(AppRoute.ORDER),
-          onRequireLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.MESSAGE }),
-          onBack: () => this.appPathStack.pop(),
-          onOpenConversation: (conversationId: number) =>
-            this.openPage(AppRoute.CONVERSATION_DETAIL, { conversationId: conversationId })
-        });
       } else if (name === AppRoute.ORDER) {
         OrderPage({ reloadEpoch: this.orderReloadEpoch, onBack: () => this.appPathStack.pop(),
           onOpenEngagement: (id: number) => this.openPage(AppRoute.ORDER_ENGAGEMENT, { targetKind: 'order', targetId: id }) });
       } else if (name === AppRoute.PUBLIC_PROFILE) {
         this.PublicProfileDestination(param);
-      } else if (name === AppRoute.PROFILE) {
-        ProfilePage({
-          onBack: () => this.appPathStack.pop(),
-          onSignedOut: () => this.appPathStack.pop(),
-          onRequireLogin: () => {
-            this.appPathStack.pop();
-            this.appPathStack.pushPathByName(AppRoute.LOGIN, PROFILE_LOGIN_PARAM);
-          },
-          onOpenCredit: () => this.openPage(AppRoute.CREDIT),
-          onOpenOrders: () => this.openPage(AppRoute.ORDER),
-          onOpenMessages: () => this.openPage(AppRoute.MESSAGE),
-          onOpenPublish: () => this.openPage(AppRoute.PUBLISH),
-          onPrivacyConsentWithdrawn: () => this.onPrivacyConsentWithdrawn()
-        });
       } else {
         this.PlaceholderPage('页面不存在', '未找到对应的导航目标。');
       }
     }
     .hideTitleBar(true)
+    .onBackPressed(() => name === AppRoute.PUBLISH ? (this.publishBackHandler?.() ?? false) : false)
     .onShown(() => {
       if (name === AppRoute.ORDER) { this.orderReloadEpoch++; }
+      if (name === AppRoute.SERVICE_DETAIL || name === AppRoute.DEMAND_DETAIL) {
+        this.detailVisibleRoute = name;
+        this.detailVisibleId = name === AppRoute.SERVICE_DETAIL ? this.validServiceId(param) : this.validDemandId(param);
+        this.detailVisibleEpoch++;
+      }
     })
   }
 
   @Builder
-  AppShell(initialTab: number = 0) {
+  AppShell() {
     PortraAppShell({
-      initialTab: initialTab,
+      selectedTab: this.mainTab,
+      sessionEpoch: this.sessionEpoch,
+      onSignedOut: () => { this.sessionEpoch++; this.mainTab = 0; },
+      onRequireTabLogin: (tab: number) => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.HALL, initialTab: tab }),
+      onOpenTarget: (target: NotificationTarget) => this.openNotificationTarget(target),
       onOpenAuthor: (userId: number, role: string) => this.openPage(AppRoute.PUBLIC_PROFILE,
         { userId: userId, userRole: role }),
       onRequireMomentLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.HALL, initialTab: 1 }),
+      onEditDemand: (id: number) => this.openPage(AppRoute.PUBLISH, { demandId: id }),
+      onEditService: (id: number) => this.openPage(AppRoute.PUBLISH, { serviceId: id }),
+      onPrivacyConsentWithdrawn: () => this.onPrivacyConsentWithdrawn(),
       onOpenRoute: (route: AppRoute, id?: number) => {
         if (id === undefined) {
           this.openPage(route);
+        } else if (route === AppRoute.CONVERSATION_DETAIL) {
+          this.openPage(route, { conversationId: id });
+        } else if (route === AppRoute.MOMENT_DETAIL) {
+          this.openPage(route, { momentId: id });
         } else if (route === AppRoute.SERVICE_DETAIL) {
           this.openPage(route, { serviceId: id });
         } else {
           this.openPage(route, { demandId: id });
         }
-      }
+      },
+      onIdentityChanged: () => { this.sessionEpoch++; }
     })
   }
 
@@ -213,10 +216,13 @@ struct Index {
       this.PlaceholderPage('需求详情', '无效的需求编号');
     } else {
       DemandDetailPage({
+        visibleEpoch: this.detailVisibleRoute === AppRoute.DEMAND_DETAIL && this.detailVisibleId === this.validDemandId(param) ? this.detailVisibleEpoch : 0,
         demandId: this.validDemandId(param),
+        onEdit: (id: number) => this.openPage(AppRoute.PUBLISH, { demandId: id, returnRoute: AppRoute.DEMAND_DETAIL }),
         onBack: () => this.appPathStack.pop(),
         onRequireLogin: () => this.openLoginFor(AppRoute.DEMAND_DETAIL,
           { demandId: this.validDemandId(param) }),
+        onOpenAuthor: (id: number, role: string) => this.openPage(AppRoute.PUBLIC_PROFILE, { userId: id, userRole: role }),
         onOpenConversation: (conversationId: number) =>
           this.pushRoute(AppRoute.CONVERSATION_DETAIL, { conversationId: conversationId })
       });
@@ -229,10 +235,13 @@ struct Index {
       this.PlaceholderPage('摄影橱窗', '无效的橱窗编号');
     } else {
       ServiceDetailPage({
+        visibleEpoch: this.detailVisibleRoute === AppRoute.SERVICE_DETAIL && this.detailVisibleId === this.validServiceId(param) ? this.detailVisibleEpoch : 0,
         serviceId: this.validServiceId(param),
+        onEdit: (id: number) => this.openPage(AppRoute.PUBLISH, { serviceId: id, returnRoute: AppRoute.SERVICE_DETAIL }),
         onBack: () => this.appPathStack.pop(),
         onRequireLogin: () => this.openLoginFor(AppRoute.SERVICE_DETAIL,
           { serviceId: this.validServiceId(param) }),
+        onOpenAuthor: (id: number, role: string) => this.openPage(AppRoute.PUBLIC_PROFILE, { userId: id, userRole: role }),
         onOpenConversation: (conversationId: number) =>
           this.pushRoute(AppRoute.CONVERSATION_DETAIL, { conversationId: conversationId })
       });
@@ -245,7 +254,7 @@ struct Index {
       this.PlaceholderPage('约拍会话', '无效的会话编号');
     } else {
       ConversationDetailPage({ conversationId: this.validConversationId(param),
-        onBack: () => this.appPathStack.pop() });
+        onBack: () => { this.appPathStack.pop(); this.sessionEpoch++; } });
     }
   }
 
@@ -254,10 +263,13 @@ struct Index {
     if (this.validPublicUserId(param) === 0 || this.validPublicUserRole(param).length === 0) {
       this.PlaceholderPage('用户主页', '无效的用户身份');
     } else {
-      PublicProfilePage({ targetUserId: this.validPublicUserId(param), targetRole: this.validPublicUserRole(param),
+      PublicProfilePage({
+          onOpenMoment: (id: number) => this.openPage(AppRoute.MOMENT_DETAIL, { momentId: id }),
+          onOpenDemand: (id: number) => this.openPage(AppRoute.DEMAND_DETAIL, { demandId: id }),
+          onOpenService: (id: number) => this.openPage(AppRoute.SERVICE_DETAIL, { serviceId: id }), targetUserId: this.validPublicUserId(param), targetRole: this.validPublicUserRole(param),
         onBack: () => this.appPathStack.pop(), onRequireLogin: () => {
           this.appPathStack.pop();
-          this.openPage(AppRoute.PUBLIC_PROFILE, param as NavigationRouteParam);
+          this.openLoginFor(AppRoute.PUBLIC_PROFILE, param as NavigationRouteParam);
         } });
     }
   }
@@ -299,12 +311,13 @@ struct Index {
 
   private completeLogin(param: NavigationRouteParam): void {
     this.appPathStack.pop();
+    this.sessionEpoch++;
     const returnRoute = param.returnRoute;
-    if (returnRoute === AppRoute.DEMAND_DETAIL || returnRoute === AppRoute.SERVICE_DETAIL) {
+    if (returnRoute === AppRoute.HALL || returnRoute === AppRoute.MESSAGE || returnRoute === AppRoute.PROFILE) {
+      this.mainTab = returnRoute === AppRoute.MESSAGE ? 2 : returnRoute === AppRoute.PROFILE ? 3 : (param.initialTab ?? 0);
       return;
     }
-    const paths = this.appPathStack.getAllPathName();
-    if (returnRoute === AppRoute.HALL && paths.length > 0 && paths[paths.length - 1] === AppRoute.HALL) {
+    if (returnRoute === AppRoute.DEMAND_DETAIL || returnRoute === AppRoute.SERVICE_DETAIL) {
       return;
     }
     if (returnRoute !== undefined && returnRoute !== AppRoute.LOGIN) {
@@ -326,6 +339,11 @@ struct Index {
     }
     if (this.restorePromise !== undefined) {
       await this.restorePromise;
+    }
+    if (route === AppRoute.HALL || route === AppRoute.MESSAGE || route === AppRoute.PROFILE) {
+      this.mainTab = route === AppRoute.MESSAGE ? 2 : route === AppRoute.PROFILE ? 3 : (param.initialTab ?? 0);
+      this.appPathStack.clear();
+      return;
     }
     const resolution = NavigationPolicy.resolve(route, param, this.appClient.sessionManager.isAuthenticated());
     this.appPathStack.pushPathByName(resolution.route, resolution.param);

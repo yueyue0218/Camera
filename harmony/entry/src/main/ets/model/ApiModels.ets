@@ -1,3 +1,10 @@
+export interface CreateMomentPayload {
+  readonly title: string;
+  readonly content: string;
+  readonly imageDataList: string[];
+  readonly mentions?: string[];
+}
+
 /**
  * Minimal API models shared by the network layer and feature pages.
  * Field names follow the current Spring Boot DTOs; this is not mock data.
@@ -9,7 +16,10 @@ export interface PageResult<T> {
   readonly total: number;
 }
 
+export interface ContentModeration { readonly status: string; readonly reason?: string; }
+
 export interface DemandSummary {
+  readonly moderation?: ContentModeration;
   readonly demandId: number;
   readonly customerId?: number;
   readonly customerNickname?: string;
@@ -48,10 +58,13 @@ export interface DemandSummary {
 }
 
 export interface ServicePackageSummary {
+  readonly moderation?: ContentModeration;
   readonly serviceId: number;
   readonly providerId?: number;
   readonly photographerId?: number;
   readonly photographerNickname?: string;
+  readonly photographerAvatarFileId?: number;
+  readonly coverPortfolioId?: number;
   readonly photographerAvatarUrl?: string;
   readonly photographerAvatar?: string;
   readonly title?: string;
@@ -305,12 +318,21 @@ export interface SessionSummary {
   readonly userId: number;
   readonly nickname: string;
   readonly role: string;
-  readonly adminCapable: boolean;
-  readonly sessionId: string;
-  readonly deviceId: string;
-  readonly deviceName: string;
+  // These fields are supplied by /auth/session. When /users/me is used as
+  // a verified identity fallback, session metadata is deliberately absent.
+  readonly adminCapable?: boolean;
+  readonly sessionId?: string;
+  readonly deviceId?: string;
+  readonly deviceName?: string;
   readonly createdAt?: string;
   readonly expiresAt?: string;
+}
+
+export interface UpdateProfilePayload {
+  nickname: string; bio: string; role: string; avatarFileId?: number;
+  locationDisplay?: string;
+  locationVisible?: boolean;
+  birthdayVisible?: boolean;
 }
 
 export interface UserProfileSummary {
