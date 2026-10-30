@@ -268,6 +268,20 @@ class ReviewServiceTest {
     }
 
     @Test
+    void identicalFollowUpDoesNotSendAnotherNotification() {
+        UserContext.setUserId(CUSTOMER_ID);
+        ReviewResponse review = reviewService.create(COMPLETED_ORDER_ID, new ReviewCreateRequest(5, "第一次评价"));
+        ReviewResponse first = reviewService.followUp(review.reviewId(), new ReviewFollowUpRequest("补充评价"));
+        ReviewResponse repeated = reviewService.followUp(review.reviewId(), new ReviewFollowUpRequest("补充评价"));
+
+        assertThat(repeated.replyContent()).isEqualTo(first.replyContent());
+        assertThat(repeated.replyTime()).isEqualTo(first.replyTime());
+        assertThat(notificationRepository.findByUserIdOrderByCreatedAtDesc(PROVIDER_ID))
+                .extracting("type")
+                .containsExactlyInAnyOrder("REVIEW_RECEIVED", "REVIEW_FOLLOW_UP_RECEIVED");
+    }
+
+    @Test
     void reviewedUserCannotAddFollowUp() {
         UserContext.setUserId(CUSTOMER_ID);
         ReviewResponse review = reviewService.create(COMPLETED_ORDER_ID, new ReviewCreateRequest(5, "第一次评价"));

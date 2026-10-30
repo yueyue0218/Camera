@@ -56,7 +56,8 @@ public class PhotoAuthorizationService {
             Long operatorId,
             PhotoAuthorizationRequest request
     ) {
-        Order order = getOrder(orderId);
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Order not found"));
         ensureProvider(order, operatorId);
         ensureCompleted(order);
 
@@ -89,7 +90,7 @@ public class PhotoAuthorizationService {
 
     @Transactional
     public PhotoAuthorizationResponse approve(Long authorizationId, Long operatorId, String remark) {
-        PhotoAuthorization authorization = getAuthorization(authorizationId);
+        PhotoAuthorization authorization = getAuthorizationForUpdate(authorizationId);
         Order order = getOrder(authorization.getOrderId());
         ensureCustomer(order, operatorId);
         ensurePending(authorization);
@@ -104,7 +105,7 @@ public class PhotoAuthorizationService {
 
     @Transactional
     public PhotoAuthorizationResponse reject(Long authorizationId, Long operatorId, String remark) {
-        PhotoAuthorization authorization = getAuthorization(authorizationId);
+        PhotoAuthorization authorization = getAuthorizationForUpdate(authorizationId);
         Order order = getOrder(authorization.getOrderId());
         ensureCustomer(order, operatorId);
         ensurePending(authorization);
@@ -164,6 +165,11 @@ public class PhotoAuthorizationService {
 
     private PhotoAuthorization getAuthorization(Long authorizationId) {
         return photoAuthorizationRepository.findById(authorizationId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Photo authorization not found"));
+    }
+
+    private PhotoAuthorization getAuthorizationForUpdate(Long authorizationId) {
+        return photoAuthorizationRepository.findByIdForUpdate(authorizationId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Photo authorization not found"));
     }
 

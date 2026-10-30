@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class ReviewService {
@@ -125,13 +126,16 @@ public class ReviewService {
         Long currentUserId = requireCurrentUserId();
         validateFollowUpRequest(request);
 
-        Review review = reviewRepository.findById(reviewId)
+        Review review = reviewRepository.findByIdForUpdate(reviewId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Review not found"));
         if (!currentUserId.equals(review.getReviewerId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Only the original reviewer can add a follow-up review");
         }
         if (!Boolean.TRUE.equals(review.getIsVisible())) {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Hidden review cannot be followed up");
+        }
+        if (Objects.equals(review.getReplyContent(), request.content().trim())) {
+            return toResponse(review);
         }
         review.setReplyContent(request.content().trim());
         review.setReplyTime(LocalDateTime.now());
