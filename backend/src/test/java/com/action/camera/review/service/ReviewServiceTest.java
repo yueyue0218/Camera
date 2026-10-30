@@ -91,6 +91,23 @@ class ReviewServiceTest {
     }
 
     @Test
+    void authorCanSeeOwnHiddenReviewWithoutShowingItToTheOtherParticipant() {
+        UserContext.setUserId(CUSTOMER_ID);
+        ReviewResponse created = reviewService.create(
+                COMPLETED_ORDER_ID, new ReviewCreateRequest(4, "原评价"));
+        var review = reviewRepository.findById(created.reviewId()).orElseThrow();
+        review.setIsVisible(false);
+        reviewRepository.saveAndFlush(review);
+
+        assertThat(reviewService.listByOrder(COMPLETED_ORDER_ID))
+                .extracting(ReviewResponse::reviewId).contains(created.reviewId());
+
+        UserContext.setUserId(PROVIDER_ID);
+        assertThat(reviewService.listByOrder(COMPLETED_ORDER_ID))
+                .extracting(ReviewResponse::reviewId).doesNotContain(created.reviewId());
+    }
+
+    @Test
     void createReviewGeneratesCreditRecordAndNotification() {
         UserContext.setUserId(CUSTOMER_ID);
 

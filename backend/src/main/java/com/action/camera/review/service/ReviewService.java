@@ -191,7 +191,8 @@ public class ReviewService {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Only order participants can view order reviews");
         }
         return reviewRepository.findByOrderIdOrderByCreatedAtDesc(orderId).stream()
-                .filter(review -> isAdmin() || Boolean.TRUE.equals(review.getIsVisible()))
+                .filter(review -> isAdmin() || Boolean.TRUE.equals(review.getIsVisible())
+                        || currentUserId.equals(review.getReviewerId()))
                 .map(this::toResponse)
                 .toList();
     }
