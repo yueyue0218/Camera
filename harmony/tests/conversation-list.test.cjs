@@ -34,6 +34,23 @@ test('normal Chinese names and image/file previews are preserved', () => {
   assert.equal(ConversationListModel.preview([{ messageType: 'TEXT', content: 'online-check provider reply message' }]), null);
 });
 
+test('message list dates use compact familiar labels', () => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 14, 28);
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 20, 14);
+  assert.equal(ConversationListModel.timeLabel(today.toISOString()), '14:28');
+  assert.equal(ConversationListModel.timeLabel(yesterday.toISOString()), '昨天 20:14');
+  assert.equal(ConversationListModel.timeLabel('invalid'), '');
+});
+
+test('message list keeps search and long-press hide without row action buttons', () => {
+  const page = fs.readFileSync(path.join(sourceRoot, 'pages/MessagePage.ets'), 'utf8');
+  assert.match(page, /搜索联系人或最近消息/);
+  assert.match(page, /filteredConversations\(\)/);
+  assert.match(page, /LongPressGesture\(\)\.onAction\(\(\) =>\s*this\.confirmHide/);
+  assert.doesNotMatch(page, /Button\('查看'\)/);
+});
+
 test('memory list cannot be read with another token or account', () => {
   ConversationMemory.clear();
   const row = ConversationListModel.row(summary, { userId: 2, nickname: '周一' },

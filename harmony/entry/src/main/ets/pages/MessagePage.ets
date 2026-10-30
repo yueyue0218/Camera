@@ -7,7 +7,6 @@ import { PortraAvatar } from '../common/components/PortraAvatar';
 import { PortraEmptyView } from '../common/components/PortraEmptyView';
 import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraLoading } from '../common/components/PortraLoading';
-import { PortraPageHeading } from '../common/components/PortraPageHeading';
 import { ConversationListItem, ConversationListModel } from '../features/conversation/ConversationListModel';
 import { ConversationMemory } from '../features/conversation/ConversationMemory';
 import { MomentFeedLifecycle } from '../features/moments/MomentFeedLifecycle';
@@ -38,6 +37,7 @@ export struct MessagePage {
   @State private loading: boolean = true;
   @State private errorMessage: string = '';
   @State private conversations: ConversationListItem[] = [];
+  @State private searchQuery: string = '';
   @State private avatarImages: Map<number, image.PixelMap> = new Map<number, image.PixelMap>();
   @State private hidingConversationId: number = 0;
   private readonly appClient: AppClient = AppClient.shared;
@@ -60,6 +60,7 @@ export struct MessagePage {
   private avatarQueue: number[] = [];
   private avatarWorkers: number = 0;
   private avatarGeneration: number = 0;
+  private lastLongPressAt: number = 0;
   onBack?: () => void;
   onOpenMoment?: (id: number) => void;
   onOpenCredit?: () => void;
@@ -402,6 +403,21 @@ export struct MessagePage {
     }
   }
 
+  private confirmHide(conversationId: number): void {
+    if (this.hidingConversationId !== 0) return;
+    this.lastLongPressAt = Date.now();
+    AlertDialog.show({ title: '隐藏会话？', message: '隐藏后可通过与对方再次联系找回。',
+      primaryButton: { value: '取消', action: () => {} },
+      secondaryButton: { value: '隐藏', action: () => this.hideConversation(conversationId) } });
+  }
+
+  private filteredConversations(): ConversationListItem[] {
+    const query = this.searchQuery.trim().toLocaleLowerCase();
+    return query ? this.conversations.filter((item: ConversationListItem) =>
+      item.peerName.toLocaleLowerCase().includes(query) ||
+      item.preview.toLocaleLowerCase().includes(query)) : this.conversations;
+  }
+
   @Builder
   private Tab(label: string, index: number) {
     Column({ space: 9 }) {
@@ -422,15 +438,26 @@ export struct MessagePage {
   build() {
     Column() {
       if (this.selectedTab === 0) {
-      PortraPageHeading({ title: '消息', eyebrow: 'CONVERSATIONS', onBack: this.onBack })
-      Row({ space: 20 }) {
+      Text('消息').fontSize(30).fontWeight(FontWeight.Bold)
+        .fontColor(PortraTheme.primaryText).width('100%')
+        .padding({ left: 18, right: 18, top: 17, bottom: 13 })
+        .backgroundColor(PortraTheme.surface)
+      Row({ space: 10 }) {
+        Image($r('app.media.ic_search')).width(20).height(20).opacity(0.55)
+        TextInput({ text: this.searchQuery, placeholder: '搜索联系人或最近消息' })
+          .layoutWeight(1).height(42).fontSize(14)
+          .backgroundColor(Color.Transparent)
+          .onChange((value: string) => this.searchQuery = value)
+      }
+      .width('100%').height(46).padding({ left: 14, right: 12 })
+      .backgroundColor('#F1F0EE').borderRadius(11)
+      .margin({ left: 18, right: 18, bottom: 10 })
+      Row({ space: 16 }) {
         this.Tab('聊天', 0)
         this.Tab('通知', 1)
-      }
-      .width('100%')
-      .height(50)
-      .padding({ left: 14 })
-      .border({ width: { bottom: 1 }, color: PortraTheme.border })
+      }.width('100%').height(42).padding({ left: 14 })
+        .border({ width: { bottom: 1 }, color: '#EAE8E5' })
+        .backgroundColor(PortraTheme.surface)
       }
 
       if (this.selectedTab === 1 && this.activeTab) {
@@ -446,59 +473,50 @@ export struct MessagePage {
         PortraErrorView({ message: this.errorMessage, onRetry: () => this.load() })
       } else if (this.conversations.length === 0) {
         PortraEmptyView({ message: '还没有会话' })
+      } else if (this.filteredConversations().length === 0) {
+        Text('没有找到相关会话').fontSize(13).fontColor(PortraTheme.secondaryText)
+          .width('100%').textAlign(TextAlign.Center).padding({ top: 36 })
       } else {
         Scroll(this.listScroller) {
           Column({ space: 0 }) {
-            Row() {
-              Text('最近消息').fontSize(18).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
-              Blank()
-              Text(`${this.conversations.length} 个会话`)
-                .fontSize(12)
-                .fontColor(PortraTheme.secondaryText)
-            }
-            .width('100%')
-            .padding({ left: 20, right: 20, top: 20, bottom: 10 })
-
-            ForEach(this.conversations, (item: ConversationListItem) => {
+            ForEach(this.filteredConversations(), (item: ConversationListItem) => {
               Row({ space: 12 }) {
                 if (this.avatarImages.has(item.avatarFileId ?? 0)) {
                   Image(this.avatarImages.get(item.avatarFileId ?? 0) as image.PixelMap)
-                    .width(48).height(48).borderRadius(24).objectFit(ImageFit.Cover)
+                    .width(50).height(50).borderRadius(25).objectFit(ImageFit.Cover)
                 } else {
-                  PortraAvatar({ displayName: item.peerName, avatarSize: 48 })
+                  PortraAvatar({ displayName: item.peerName, avatarSize: 50 })
                 }
-                Column({ space: 5 }) {
-                  Text(item.peerName)
-                    .fontSize(15)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor(PortraTheme.primaryText)
+                Column({ space: 6 }) {
+                  Row({ space: 8 }) {
+                    Text(item.peerName)
+                      .fontSize(16).fontWeight(FontWeight.Bold)
+                      .fontColor(PortraTheme.primaryText)
+                      .layoutWeight(1).maxLines(1)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    Text(ConversationListModel.timeLabel(item.previewTime))
+                      .fontSize(11).fontColor(PortraTheme.mutedText)
+                  }.width('100%')
                   Text(item.preview)
-                    .fontSize(12)
+                    .fontSize(13)
                     .fontColor(PortraTheme.secondaryText)
                     .maxLines(1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                 }
                 .layoutWeight(1)
                 .alignItems(HorizontalAlign.Start)
-                .onClick(() => this.onOpenConversation?.(item.conversation.conversationId))
-                Column({ space: 6 }) {
-                  Text(ConversationListModel.timeLabel(item.previewTime))
-                    .fontSize(11)
-                    .fontColor(PortraTheme.mutedText)
-                  Button('查看').height(28).fontSize(11).backgroundColor(PortraTheme.primarySoft)
-                    .fontColor(PortraTheme.primary)
-                    .onClick(() => this.onOpenConversation?.(item.conversation.conversationId))
-                  Button(this.hidingConversationId === item.conversation.conversationId ? '隐藏中' : '隐藏')
-                    .height(28).fontSize(11).backgroundColor(PortraTheme.surface)
-                    .fontColor(PortraTheme.secondaryText).enabled(this.hidingConversationId === 0)
-                    .onClick(() => this.hideConversation(item.conversation.conversationId))
-                }
               }
               .width('100%')
-              .height(94)
-              .padding({ left: 20, right: 20 })
+              .height(78)
+              .padding({ left: 18, right: 18 })
               .backgroundColor(PortraTheme.surface)
-              Divider().color(PortraTheme.border).padding({ left: 80 })
+              .onClick(() => {
+                if (Date.now() - this.lastLongPressAt < 600) return;
+                this.onOpenConversation?.(item.conversation.conversationId);
+              })
+              .gesture(LongPressGesture().onAction(() =>
+                this.confirmHide(item.conversation.conversationId)))
+              Divider().color('#ECEBE8').padding({ left: 80, right: 18 })
             }, (item: ConversationListItem) => item.conversation.conversationId.toString())
 
           }
@@ -514,6 +532,6 @@ export struct MessagePage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(PortraTheme.pageBackground)
+    .backgroundColor(PortraTheme.surface)
   }
 }

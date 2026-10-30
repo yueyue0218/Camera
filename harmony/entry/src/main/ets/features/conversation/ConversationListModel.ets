@@ -54,8 +54,17 @@ export class ConversationListModel {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '';
     const now = new Date();
-    const sameDay = date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() &&
-      date.getDate() === now.getDate();
-    return sameDay ? value.slice(11, 16) : value.slice(5, 10);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const messageDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const daysAgo = Math.round((today.getTime() - messageDay.getTime()) / 86400000);
+    const time = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+    if (daysAgo === 0) return time;
+    if (daysAgo === 1) return `昨天 ${time}`;
+    if (daysAgo >= 2 && daysAgo < 7) {
+      const weekDays: string[] = ['日', '一', '二', '三', '四', '五', '六'];
+      return `周${weekDays[date.getDay()]}`;
+    }
+    const day = `${date.getMonth() + 1}月${date.getDate()}日`;
+    return date.getFullYear() === now.getFullYear() ? day : `${date.getFullYear()}年${day}`;
   }
 }
