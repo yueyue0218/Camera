@@ -10,6 +10,7 @@ import { NotificationApiBinding, ActivitySessionBinding } from '../features/noti
 @Component
 export struct NotificationPage {
   @State private snapshot: NotificationSnapshot = new NotificationSnapshot();
+  @State private lifecycleUnavailable: boolean = false;
   @State private filter: string = 'all';
   @State private expandedId: number = 0;
   private controller?: NotificationController;
@@ -26,23 +27,49 @@ export struct NotificationPage {
     this.controller = new NotificationController(new NotificationApiBinding(AppClient.shared.apiService), new ActivitySessionBinding(AppClient.shared.sessionManager),
       (state: NotificationSnapshot) => this.snapshot = state);
   }
-  aboutToDisappear(): void { this.lifecycle?.stop(); this.lifecycle = undefined; this.controller?.suspend(); }
+  aboutToDisappear(): void {
+    this.lifecycle?.stop();
+    this.lifecycle = undefined;
+    this.visible = false;
+    this.controller?.suspend();
+  }
+  /** Root-tab content has no NavDestination; standalone notifications do. */
+  private routeVisible(update?: uiObserver.NavDestinationInfo): boolean {
+    const navigation = this.queryNavigationInfo();
+    if (navigation === undefined) { throw new Error('Navigation unavailable'); }
+    let destination = this.queryNavDestinationInfo();
+    if (destination === undefined) { return navigation.pathStack.size() === 0; }
+    if (update?.navDestinationId === destination.navDestinationId) { destination = update; }
+    return destination.index === navigation.pathStack.size() - 1 &&
+      destination.state !== uiObserver.NavDestinationState.ON_HIDDEN && destination.state !== uiObserver.NavDestinationState.ON_WILL_HIDE &&
+      destination.state !== uiObserver.NavDestinationState.ON_DISAPPEAR && destination.state !== uiObserver.NavDestinationState.ON_WILL_DISAPPEAR;
+  }
+  private handleLifecycleUnavailable(): void {
+    this.lifecycle?.stop();
+    this.lifecycle = undefined;
+    this.visible = false;
+    this.controller?.suspend();
+    this.lifecycleUnavailable = true;
+    const failed = new NotificationSnapshot();
+    failed.error = '页面状态监听不可用，请点击重试。';
+    this.snapshot = failed;
+    console.error('[Portra][NotificationPage] lifecycle listener or navigation context unavailable');
+  }
   private observe(): void {
     if (this.lifecycle !== undefined) { return; }
     try {
-      this.lifecycle = new MomentFeedLifecycle(this.getUIContext(), (update?: uiObserver.NavDestinationInfo) => {
-        const navigation = this.queryNavigationInfo(); let destination = this.queryNavDestinationInfo();
-        if (navigation === undefined || destination === undefined) { throw new Error('Navigation unavailable'); }
-        if (update?.navDestinationId === destination.navDestinationId) { destination = update; }
-        return destination.index === navigation.pathStack.size() - 1 &&
-          destination.state !== uiObserver.NavDestinationState.ON_HIDDEN && destination.state !== uiObserver.NavDestinationState.ON_WILL_HIDE &&
-          destination.state !== uiObserver.NavDestinationState.ON_DISAPPEAR && destination.state !== uiObserver.NavDestinationState.ON_WILL_DISAPPEAR;
-      }, (visible: boolean) => {
-        if (this.visible === visible) { return; } this.visible = visible; this.expandedId = 0;
-        if (visible) { this.controller?.resume(); this.controller?.load(); } else { this.controller?.suspend(); }
-      }, () => { this.controller?.suspend(); this.snapshot.error = '页面状态监听不可用，请返回后重试。'; });
+      this.lifecycleUnavailable = false;
+      this.lifecycle = new MomentFeedLifecycle(this.getUIContext(),
+        (update?: uiObserver.NavDestinationInfo) => this.routeVisible(update),
+        (visible: boolean) => {
+          if (this.visible === visible) { return; }
+          this.visible = visible;
+          this.expandedId = 0;
+          if (visible) { this.controller?.resume(); this.controller?.load(); }
+          else { this.controller?.suspend(); }
+        }, () => this.handleLifecycleUnavailable());
       this.lifecycle.start();
-    } catch { this.snapshot.error = '页面状态监听不可用，请返回后重试。'; }
+    } catch { this.handleLifecycleUnavailable(); }
   }
   private label(filter: string): string {
     return filter === 'all' ? '全部' : filter === 'unread' ? '未读' : filter === 'order' ? '订单' :
@@ -143,9 +170,12 @@ export struct NotificationPage {
             Row() {
               Text(`已加载 ${this.snapshot.items.length} / ${this.snapshot.total} 条`).fontSize(11).fontColor(PortraTheme.secondaryText)
               Blank()
-              Button(this.snapshot.busy ? '处理中' : this.snapshot.uncertain ? '刷新核实' : '刷新')
+              Button(this.lifecycleUnavailable ? '重试监听' : this.snapshot.busy ? '处理中' : this.snapshot.uncertain ? '刷新核实' : '刷新')
                 .fontSize(11).height(32).fontColor(PortraTheme.primary).backgroundColor(Color.Transparent)
-                .enabled(!this.snapshot.busy).onClick(() => this.controller?.load())
+                .enabled(!this.snapshot.busy).onClick(() => {
+                  if (this.lifecycleUnavailable) { this.observe(); }
+                  else { this.controller?.load(); }
+                })
             }.width('100%')
             if (this.items().length === 0) {
               Text(this.filter === 'all' ? '暂无通知' : `暂无${this.label(this.filter)}通知`)
