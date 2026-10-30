@@ -43,6 +43,31 @@ test('only matching conversation is visible', () => {
   assert.deepEqual(events, [true, false]);
 });
 
+test('root message tab uses navigation and app visibility, not a missing destination signal', () => {
+  const page = fs.readFileSync(path.join(sourceRoot, 'pages/MessagePage.ets'), 'utf8');
+  assert.match(page, /new MomentFeedLifecycle\(this\.getUIContext\(\)/);
+  assert.match(page, /navigation\.pathStack\.size\(\) === 0/);
+  assert.match(page, /this\.rootVisible && this\.activeTab && this\.selectedTab === 0/);
+  assert.doesNotMatch(page, /ConversationVisibility\.subscribe\('list'/);
+});
+
+test('message list polling waits for the current refresh and refreshes peer avatar metadata', () => {
+  const page = fs.readFileSync(path.join(sourceRoot, 'pages/MessagePage.ets'), 'utf8');
+  assert.match(page, /if \(this\.remoteInFlight\) return;/);
+  assert.match(page, /if \(this\.remoteInFlight\) return;\s*this\.remoteInFlight = true;/);
+  assert.match(page, /if \(this\.remoteVersion === remoteVersion\) this\.remoteInFlight = false;/);
+  assert.match(page, /getUserBrief\(item\.otherUserId, peerRole/);
+  assert.match(page, /avatarFileId: brief \? brief\.avatarFileId : old\.avatarFileId/);
+});
+
+test('chat resolves both real avatar IDs and uses stable composer icons', () => {
+  const page = fs.readFileSync(path.join(sourceRoot, 'pages/ConversationDetailPage.ets'), 'utf8');
+  assert.match(page, /selfAvatarFileId = profile\.avatarFileId \?\? 0/);
+  assert.match(page, /peerAvatarFileId = brief\.avatarFileId \?\? 0/);
+  assert.match(page, /app\.media\.ic_chat_plus/);
+  assert.match(page, /app\.media\.ic_chat_send/);
+});
+
 const stored = new Map();
 const originalLoad = Module._load;
 Module._load = function(request, parent, isMain) {

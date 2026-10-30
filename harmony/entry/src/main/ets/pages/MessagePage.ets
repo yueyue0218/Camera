@@ -1,6 +1,7 @@
 import { NotificationTarget } from '../features/notifications/NotificationTargetResolver';
 import { NotificationPage } from './NotificationPage';
 import { image } from '@kit.ImageKit';
+import { uiObserver } from '@kit.ArkUI';
 import { AppClient } from '../app/AppClient';
 import { PortraAvatar } from '../common/components/PortraAvatar';
 import { PortraEmptyView } from '../common/components/PortraEmptyView';
@@ -9,8 +10,8 @@ import { PortraLoading } from '../common/components/PortraLoading';
 import { PortraPageHeading } from '../common/components/PortraPageHeading';
 import { ConversationListItem, ConversationListModel } from '../features/conversation/ConversationListModel';
 import { ConversationMemory } from '../features/conversation/ConversationMemory';
-import { ConversationVisibility } from '../features/conversation/ConversationVisibility';
-import { ConversationSummary } from '../model/ApiModels';
+import { MomentFeedLifecycle } from '../features/moments/MomentFeedLifecycle';
+import { ConversationSummary, UserBrief } from '../model/ApiModels';
 import { ErrorKind, PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
 
@@ -21,11 +22,13 @@ export struct MessagePage {
   private loadedSessionVersion: number = -1;
 
   private reloadWhenActive(): void {
-    if (this.activeTab) { this.load(); }
+    if (this.visible) this.load();
+    else this.loadedSessionVersion = -1;
   }
 
   private refreshTab(): void {
-    if (this.activeTab && this.loadedSessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
+    this.syncVisibility();
+    if (this.visible && this.loadedSessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
       this.load();
     }
   }
@@ -40,11 +43,15 @@ export struct MessagePage {
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
   private remoteVersion: number = 0;
+  private remoteInFlight: boolean = false;
+  private readonly briefRefreshedIds: Set<number> = new Set<number>();
   private accountId: number = 0;
   private activeToken: string = '';
   private refreshTimer: number = -1;
   private readonly listScroller: Scroller = new Scroller();
   private visible: boolean = false;
+  private rootVisible: boolean = false;
+  private lifecycle?: MomentFeedLifecycle;
   private restoreTimer: number = -1;
   private avatarToken: string = '';
   private avatarAccountId: number = 0;
@@ -62,11 +69,29 @@ export struct MessagePage {
   onOpenConversation?: (conversationId: number) => void;
 
   aboutToAppear(): void {
-    ConversationVisibility.subscribe('list', (visible: boolean) => this.setVisible(visible));
+    try {
+      this.lifecycle = new MomentFeedLifecycle(this.getUIContext(),
+        (update?: uiObserver.NavDestinationInfo) => this.routeVisible(update),
+        (visible: boolean) => { this.rootVisible = visible; this.syncVisibility(); },
+        () => {
+          this.rootVisible = false;
+          this.setVisible(false);
+          this.loading = false;
+          this.errorMessage = '消息暂时无法打开，请重试';
+        });
+      this.lifecycle.start();
+    } catch {
+      this.rootVisible = false;
+      this.setVisible(false);
+      this.loading = false;
+      this.errorMessage = '消息暂时无法打开，请重试';
+    }
   }
 
   aboutToDisappear(): void {
-    ConversationVisibility.unsubscribe('list');
+    this.lifecycle?.stop();
+    this.lifecycle = undefined;
+    this.rootVisible = false;
     this.setVisible(false);
     this.requestVersion++;
     this.remoteVersion++;
@@ -79,12 +104,31 @@ export struct MessagePage {
     }
   }
 
+  private routeVisible(update?: uiObserver.NavDestinationInfo): boolean {
+    const navigation = this.queryNavigationInfo();
+    if (navigation === undefined) throw new Error('Navigation unavailable');
+    let destination = this.queryNavDestinationInfo();
+    if (destination === undefined) return navigation.pathStack.size() === 0;
+    if (update?.navDestinationId === destination.navDestinationId) destination = update;
+    return destination.index === navigation.pathStack.size() - 1 &&
+      destination.state !== uiObserver.NavDestinationState.ON_HIDDEN &&
+      destination.state !== uiObserver.NavDestinationState.ON_WILL_HIDE &&
+      destination.state !== uiObserver.NavDestinationState.ON_DISAPPEAR &&
+      destination.state !== uiObserver.NavDestinationState.ON_WILL_DISAPPEAR;
+  }
+
+  private syncVisibility(): void {
+    this.setVisible(this.rootVisible && this.activeTab && this.selectedTab === 0);
+  }
+
   private setVisible(visible: boolean): void {
     if (this.visible === visible) return;
     this.visible = visible;
     if (visible) {
       const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
-      if (this.accountId > 0 && token === this.activeToken) {
+      if (this.loadedSessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
+        this.load();
+      } else if (this.accountId > 0 && token === this.activeToken) {
         this.conversations = ConversationMemory.read(token, this.accountId);
         this.resetAvatars(token, this.accountId);
         this.refresh();
@@ -97,6 +141,7 @@ export struct MessagePage {
       if (this.refreshTimer >= 0) clearInterval(this.refreshTimer);
       this.refreshTimer = -1;
       this.remoteVersion++;
+      this.remoteInFlight = false;
       this.appClient.apiService.cancelConversations();
       this.avatarQueue = [];
       this.avatarRequests.forEach((fileId: number) => this.appClient.apiService.cancelAvatarThumbnail(fileId));
@@ -114,6 +159,9 @@ export struct MessagePage {
   }
 
   private async load(): Promise<void> {
+    this.remoteVersion++;
+    this.remoteInFlight = false;
+    this.appClient.apiService.cancelConversations();
     this.loadedSessionVersion = this.appClient.sessionManager.getSessionVersion();
     const sessionVersion = this.loadedSessionVersion;
     const version = ++this.requestVersion;
@@ -174,6 +222,7 @@ export struct MessagePage {
       this.load();
       return;
     }
+    if (this.remoteInFlight) return;
     try {
       await this.loadRemote(this.requestVersion, token);
     } catch {
@@ -188,7 +237,10 @@ export struct MessagePage {
   }
 
   private async loadRemote(version: number, token: string): Promise<void> {
+    if (this.remoteInFlight) return;
+    this.remoteInFlight = true;
     const remoteVersion = ++this.remoteVersion;
+    try {
     const result = await this.appClient.apiService.listConversations();
     if (!Array.isArray(result)) throw new Error('会话数据格式异常');
     const current = ConversationMemory.read(token, this.accountId);
@@ -202,21 +254,30 @@ export struct MessagePage {
       while (cursor < summaries.length) {
         const item = summaries[cursor++];
         const old = cached.get(item.conversationId);
+        const needsBrief = !this.briefRefreshedIds.has(item.otherUserId);
+        let brief: UserBrief | null = null;
+        if (needsBrief) {
+          const peerRole = item.otherUserId === item.participantBId ? 'PROVIDER' : 'CUSTOMER';
+          brief = await this.appClient.apiService.getUserBrief(item.otherUserId, peerRole,
+            `conversations.list.brief.${item.conversationId}`).catch(() => null);
+          if (brief !== null && token === this.appClient.sessionManager.getSession()?.accessToken &&
+            this.accountId > 0) this.briefRefreshedIds.add(item.otherUserId);
+        }
         if (old && old.conversation.lastMessageTime === item.lastMessageTime) {
-          rows.push({ conversation: item, peerName: old.peerName, avatarFileId: old.avatarFileId,
+          rows.push({ conversation: item,
+            peerName: brief ? ConversationListModel.safeName(brief) : old.peerName,
+            avatarFileId: brief ? brief.avatarFileId : old.avatarFileId,
             preview: old.preview, previewTime: old.previewTime });
           continue;
         }
         try {
-          const peerRole = item.otherUserId === item.participantBId ? 'PROVIDER' : 'CUSTOMER';
-          const brief = old ? null : await this.appClient.apiService.getUserBrief(item.otherUserId, peerRole)
-            .catch(() => null);
           const messages = await this.appClient.apiService.listMessages(item.conversationId,
             `conversations.list.preview.${item.conversationId}`);
           const row = ConversationListModel.row(item, brief, messages);
           if (row !== null) rows.push(old ? {
-            conversation: row.conversation, peerName: old.peerName,
-            avatarFileId: old.avatarFileId, preview: row.preview, previewTime: row.previewTime
+            conversation: row.conversation, peerName: brief ? row.peerName : old.peerName,
+            avatarFileId: brief ? brief.avatarFileId : old.avatarFileId,
+            preview: row.preview, previewTime: row.previewTime
           } : row);
         } catch {
           if (old) rows.push({ conversation: item, peerName: old.peerName,
@@ -241,6 +302,9 @@ export struct MessagePage {
     this.errorMessage = '';
     this.loading = false;
     this.restoreScroll();
+    } finally {
+      if (this.remoteVersion === remoteVersion) this.remoteInFlight = false;
+    }
   }
 
   private resetAvatars(token: string, accountId: number): void {
@@ -252,6 +316,7 @@ export struct MessagePage {
     this.avatarImages.forEach((avatar: image.PixelMap) => avatar.release().catch(() => {}));
     this.avatarImages = new Map<number, image.PixelMap>();
     this.failedAvatars.clear();
+    this.briefRefreshedIds.clear();
     this.avatarToken = token;
     this.avatarAccountId = accountId;
   }
@@ -351,7 +416,7 @@ export struct MessagePage {
         .borderRadius(2)
     }
     .width(72)
-    .onClick(() => this.selectedTab = index)
+    .onClick(() => { this.selectedTab = index; this.syncVisibility(); })
   }
 
   build() {
@@ -369,7 +434,8 @@ export struct MessagePage {
       }
 
       if (this.selectedTab === 1 && this.activeTab) {
-        NotificationPage({ onBack: () => this.selectedTab = 0, onOpenMoment: this.onOpenMoment,
+        NotificationPage({ onBack: () => { this.selectedTab = 0; this.syncVisibility(); },
+          onOpenMoment: this.onOpenMoment,
           onOpenCredit: this.onOpenCredit, onOpenOrders: this.onOpenOrders, onOpenTarget: this.onOpenTarget, onRequireLogin: this.onRequireLogin })
           .layoutWeight(1)
       } else if (this.requiresLogin) {

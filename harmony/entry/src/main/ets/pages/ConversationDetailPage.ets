@@ -4,7 +4,6 @@ import { image } from '@kit.ImageKit';
 import { AppClient } from '../app/AppClient';
 import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraLoading } from '../common/components/PortraLoading';
-import { PortraPageHeading } from '../common/components/PortraPageHeading';
 import { PortraAvatar } from '../common/components/PortraAvatar';
 import { ConversationMemory } from '../features/conversation/ConversationMemory';
 import { ConversationDraftStore } from '../features/conversation/ConversationDraftStore';
@@ -29,9 +28,19 @@ import { ConversationSummary, DeliverySummary, MessageSummary, OrderStatusLogSum
 import { ErrorKind, PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
 
+export interface ConversationVisualPreview {
+  readonly peerName: string;
+  readonly userId: number;
+  readonly messages: MessageSummary[];
+  readonly quotes: QuoteSummary[];
+  readonly orders: OrderSummary[];
+  readonly deliveries: DeliverySummary[];
+}
+
 @Component
 export struct ConversationDetailPage {
   @Prop conversationId: number = 0;
+  @Prop previewState: ConversationVisualPreview | null = null;
   @State private loading: boolean = true;
   @State private busy: boolean = false;
   @State private errorMessage: string = '';
@@ -39,6 +48,9 @@ export struct ConversationDetailPage {
   @State private conversation: ConversationSummary | null = null;
   @State private userId: number = 0;
   @State private peerName: string = '聊天';
+  @State private peerAvatarFileId: number = 0;
+  @State private selfAvatarFileId: number = 0;
+  @State private selfName: string = '我';
   @State private messages: MessageSummary[] = [];
   @State private quotes: QuoteSummary[] = [];
   @State private orders: OrderSummary[] = [];
@@ -104,6 +116,17 @@ export struct ConversationDetailPage {
 
   aboutToAppear(): void {
     this.busy = false;
+    if (this.previewState !== null) {
+      this.visible = true;
+      this.loading = false;
+      this.peerName = this.previewState.peerName;
+      this.userId = this.previewState.userId;
+      this.messages = this.previewState.messages;
+      this.quotes = this.previewState.quotes;
+      this.orders = this.previewState.orders;
+      this.deliveries = this.previewState.deliveries;
+      return;
+    }
     this.onBackHandler?.(() => this.handleBack());
     this.appClient.fileImages.observe(this.identityChanged);
     ConversationVisibility.subscribe(`detail:${this.conversationId}`,
@@ -111,6 +134,7 @@ export struct ConversationDetailPage {
   }
 
   aboutToDisappear(): void {
+    if (this.previewState !== null) { this.visible = false; return; }
     this.onBackHandler?.(undefined);
     this.appClient.fileImages.unobserve(this.identityChanged);
     ConversationVisibility.unsubscribe(`detail:${this.conversationId}`);
@@ -221,6 +245,9 @@ export struct ConversationDetailPage {
     this.lastBusinessRefresh = 0;
     this.draft = '';
     this.peerName = '聊天';
+    this.peerAvatarFileId = 0;
+    this.selfAvatarFileId = 0;
+    this.selfName = '我';
     this.busy = false;
   }
 
@@ -276,20 +303,34 @@ export struct ConversationDetailPage {
       if (cached !== undefined) {
         this.conversation = cached.conversation;
         this.peerName = cached.peerName;
+        this.peerAvatarFileId = cached.avatarFileId ?? 0;
         this.showMessages(ConversationMemory.readMessages(token, session.userId, this.conversationId), true);
         this.loading = false;
       }
+      this.appClient.apiService.getMyProfile(`conversations.${this.conversationId}.selfProfile`)
+        .then((profile) => {
+          if (version === this.requestVersion && this.visible &&
+            token === this.appClient.sessionManager.getSession()?.accessToken &&
+            profile.id === this.userId) {
+            this.selfAvatarFileId = profile.avatarFileId ?? 0;
+            this.selfName = profile.nickname || '我';
+          }
+        }).catch(() => {});
       const conversations = await this.appClient.apiService.listConversations('conversations.detail.list');
       if (!this.visible || version !== this.requestVersion) return;
       const match = conversations.find((item: ConversationSummary) => item.conversationId === this.conversationId);
       if (match === undefined) {
         throw new Error('会话不存在或无权查看');
       }
-      if (cached === undefined || cached.peerName === 'Portra 用户') {
+      {
         const peerRole = match.otherUserId === match.participantBId ? 'PROVIDER' : 'CUSTOMER';
-        this.appClient.apiService.getUserBrief(match.otherUserId, peerRole).then((brief) => {
-          if (version === this.requestVersion && this.visible) {
+        this.appClient.apiService.getUserBrief(match.otherUserId, peerRole,
+          `conversations.${this.conversationId}.peerBrief`).then((brief) => {
+          if (version === this.requestVersion && this.visible &&
+            token === this.appClient.sessionManager.getSession()?.accessToken &&
+            brief.userId === match.otherUserId) {
             this.peerName = ConversationListModel.safeName(brief);
+            this.peerAvatarFileId = brief.avatarFileId ?? 0;
           }
         }).catch(() => {});
       }
@@ -717,7 +758,7 @@ export struct ConversationDetailPage {
       }
       Row({ space: 8 }) {
       if (item.senderId !== this.userId) {
-        PortraAvatar({ displayName: this.peerName, avatarSize: 34 })
+        PortraAvatar({ fileId: this.peerAvatarFileId, displayName: this.peerName, avatarSize: 34 })
       } else {
         Blank().layoutWeight(1)
       }
@@ -731,7 +772,7 @@ export struct ConversationDetailPage {
             onOpenGallery: () => this.onOpenGallery?.(item.order!.orderId),
             onOpenUpload: () => this.onOpenUpload?.(item.order!.orderId) })
         } else if (item.kind === TimelineKind.FULFILLMENT && item.event !== undefined) {
-          FulfillmentEventCard({ event: item.event,
+          FulfillmentEventCard({ event: item.event, thumbnails: this.mediaThumbs,
             onOpen: () => item.event!.openGallery ? this.onOpenGallery?.(item.event!.orderId) :
               this.onOpenOrder?.(item.event!.orderId) })
         } else if (item.message !== undefined) {
@@ -758,12 +799,12 @@ export struct ConversationDetailPage {
           }
         }
       }
-      .constraintSize({ maxWidth: '76%' })
+      .width('77%')
       .alignItems(item.senderId === this.userId ? HorizontalAlign.End : HorizontalAlign.Start)
       if (item.senderId !== this.userId) {
         Blank().layoutWeight(1)
       } else {
-        PortraAvatar({ displayName: '我', avatarSize: 34 })
+        PortraAvatar({ fileId: this.selfAvatarFileId, displayName: this.selfName, avatarSize: 34 })
       }
       }
       .width('100%').alignItems(VerticalAlign.Top)
@@ -773,29 +814,145 @@ export struct ConversationDetailPage {
           !this.failedImageIds.includes(message.fileId)) {
           this.loadMessageImage(message.fileId, 'thumbnail');
         }
+        item.event?.photoIds?.forEach((fileId: number) => this.loadMessageImage(fileId, 'thumbnail'));
       })
     }.width('100%')
+  }
+
+  @Builder
+  private MediaMenu() {
+    Column({ space: 14 }) {
+      Text('发送内容').fontSize(15).fontWeight(FontWeight.Bold)
+        .fontColor(PortraTheme.primaryText).width('100%')
+      Row({ space: 10 }) {
+        Button('▧\n照片').layoutWeight(1).height(82).fontSize(15)
+          .fontColor(PortraTheme.primary).backgroundColor('#F5F3F0').borderRadius(12)
+          .onClick(() => this.pickMedia('photo'))
+        Button('◎\n拍照').layoutWeight(1).height(82).fontSize(15)
+          .fontColor(PortraTheme.primary).backgroundColor('#F5F3F0').borderRadius(12)
+          .onClick(() => this.pickMedia('camera'))
+        Button('▤\n文件').layoutWeight(1).height(82).fontSize(15)
+          .fontColor(PortraTheme.primary).backgroundColor('#F5F3F0').borderRadius(12)
+          .onClick(() => this.pickMedia('file'))
+      }.width('100%')
+      if (this.orders.length > 0) {
+        Text('约拍').fontSize(11).fontColor(PortraTheme.mutedText).width('100%')
+        Button('▤    订单详情                                      ›')
+          .width('100%').height(46).fontSize(13).fontColor(PortraTheme.primaryText)
+          .backgroundColor(PortraTheme.surface)
+          .onClick(() => { this.mediaMenuOpen = false;
+            this.onOpenOrder?.(this.orders.slice().sort((a: OrderSummary, b: OrderSummary) =>
+              b.orderId - a.orderId)[0].orderId); })
+      }
+      Button('取消').width('100%').height(44).fontSize(13)
+        .fontColor(PortraTheme.primaryText).backgroundColor('#F4F1ED')
+        .borderRadius(11).onClick(() => this.mediaMenuOpen = false)
+    }.width('100%').padding({ left: 14, right: 14, top: 18, bottom: 18 })
+      .backgroundColor(PortraTheme.surface)
+  }
+
+  @Builder
+  private MediaPreview() {
+    Column() {
+      Row({ space: 10 }) {
+        Button('‹').width(36).height(40).fontSize(25)
+          .backgroundColor(Color.Transparent).fontColor(PortraTheme.primaryText)
+          .onClick(() => this.attachmentDraft = [])
+        Text('发送预览').fontSize(16).fontWeight(FontWeight.Bold)
+          .fontColor(PortraTheme.primaryText)
+      }.width('100%').height(58).padding({ left: 10, right: 14 })
+        .backgroundColor(PortraTheme.surface)
+      Scroll() {
+        Column({ space: 12 }) {
+          Row() {
+            Text(`${this.attachmentDraft.length} 项待发送`).fontSize(13).fontWeight(FontWeight.Bold)
+            Blank()
+            if (this.selectingAttachments) {
+              Button(`移除所选 ${this.selectedAttachmentUris.length} 张`).fontSize(11)
+                .enabled(this.selectedAttachmentUris.length > 0)
+                .onClick(() => {
+                  this.attachmentDraft = this.attachmentDraft.filter((file: SelectedMessageFile) =>
+                    !this.selectedAttachmentUris.includes(file.uri));
+                  this.selectedAttachmentUris = []; this.selectingAttachments = false;
+                })
+            }
+          }.width('100%')
+          ForEach(this.attachmentDraft, (file: SelectedMessageFile) => {
+            Stack({ alignContent: Alignment.TopEnd }) {
+              if (file.messageType === 'IMAGE') {
+                Image(file.uri).width('100%').height(210).objectFit(ImageFit.Contain)
+                  .backgroundColor('#EEE9E3').borderRadius(10)
+              } else {
+                Text(file.fileName).width('100%').height(70).fontSize(13)
+                  .fontColor(PortraTheme.primaryText)
+                  .padding(14).backgroundColor(PortraTheme.surface).borderRadius(10)
+              }
+              if (this.selectingAttachments && file.messageType === 'IMAGE') {
+                Text(this.selectedAttachmentUris.includes(file.uri) ? '✓' : '○')
+                  .width(30).height(30).fontSize(18).textAlign(TextAlign.Center)
+                  .fontColor(PortraTheme.white).backgroundColor('#1A48CA')
+                  .borderRadius(15).margin(8)
+              } else {
+                Button('×').width(34).height(34).fontSize(20)
+                  .onClick(() => this.attachmentDraft = this.attachmentDraft.filter(
+                    (item: SelectedMessageFile) => item.uri !== file.uri))
+              }
+            }.width('100%').height(file.messageType === 'IMAGE' ? 210 : 70)
+              .onClick(() => {
+                if (this.selectingAttachments && file.messageType === 'IMAGE' &&
+                  Date.now() - this.attachmentLongPressedAt >= 500) this.toggleAttachment(file.uri);
+              }).gesture(LongPressGesture().onAction(() => {
+                if (file.messageType === 'IMAGE') this.longPressAttachment(file.uri);
+              }))
+          }, (file: SelectedMessageFile) => file.uri)
+          Text('附言（选填）').fontSize(12).fontColor(PortraTheme.primaryText)
+            .width('100%')
+          TextArea({ text: this.draft, placeholder: '说点什么…' })
+            .height(96).fontSize(13).backgroundColor('#F1EFED').borderRadius(12)
+            .onChange((value: string) => this.changeDraft(value))
+        }.width('100%').alignItems(HorizontalAlign.Start)
+          .padding({ left: 14, right: 14, top: 16, bottom: 20 })
+      }.layoutWeight(1)
+      Row({ space: 10 }) {
+        Button('取消').layoutWeight(1).height(44).backgroundColor('#F2F0ED')
+          .fontColor(PortraTheme.primaryText).onClick(() => this.attachmentDraft = [])
+        Button('发送').layoutWeight(1).height(44).backgroundColor('#147AF4')
+          .enabled(this.attachmentDraft.length > 0).onClick(() => this.sendSelectedMedia())
+      }.width('100%').padding({ left: 14, right: 14, top: 10, bottom: 12 })
+        .backgroundColor(PortraTheme.surface)
+    }.width('100%').height('100%').backgroundColor('#F8F6F2')
   }
 
   build() {
     Stack() {
     Column() {
-      PortraPageHeading({ title: this.peerName, eyebrow: '', onBack: () => {
-        if (!this.handleBack()) this.onBack?.();
-      } })
+      Row({ space: 9 }) {
+        Button('‹').width(36).height(40).fontSize(25).fontColor(PortraTheme.primaryText)
+          .backgroundColor(Color.Transparent).onClick(() => {
+            if (!this.handleBack()) this.onBack?.();
+          })
+        PortraAvatar({ fileId: this.peerAvatarFileId, displayName: this.peerName, avatarSize: 36 })
+        Column({ space: 3 }) {
+          Text(this.peerName).fontSize(15).fontWeight(FontWeight.Bold)
+            .fontColor(PortraTheme.primaryText).maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text('拍摄沟通').fontSize(10).fontColor(PortraTheme.mutedText)
+        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+        if (this.orders.length > 0) {
+          Button('订单').height(32).fontSize(11).fontColor(PortraTheme.primary)
+            .backgroundColor(PortraTheme.primarySoft).borderRadius(16)
+            .onClick(() => this.onOpenOrder?.(this.orders[0].orderId))
+        }
+      }.width('100%').height(58).padding({ left: 8, right: 14 })
+        .backgroundColor(PortraTheme.surface)
+        .border({ width: { bottom: 1 }, color: '#E9E6DF' })
       if (this.loading) {
         PortraLoading({ label: '正在打开聊天' })
       } else if (this.errorMessage.length > 0) {
         PortraErrorView({ message: this.errorMessage, onRetry: () => this.initialize() })
       } else {
         Scroll(this.threadScroller) {
-          Column({ space: 12 }) {
-            Row() {
-              Text('消息').fontSize(17).fontWeight(FontWeight.Bold)
-              Blank()
-              Button('刷新').onClick(() => this.refreshContent())
-            }
-            .width('100%')
+          Column({ space: 14 }) {
             if (this.messages.length === 0 && this.quotes.length === 0 && this.orders.length === 0) {
               Text('从一句问候开始')
                 .fontSize(13).fontColor(PortraTheme.secondaryText)
@@ -820,17 +977,21 @@ export struct ConversationDetailPage {
                   .fontColor(PortraTheme.primary).onClick(() => this.onOpenReviews?.(order.orderId))
               }, (order: OrderSummary) => `reviews:${order.orderId}`)
           }
-          .width('100%').padding({ left: 16, right: 16, top: 16, bottom: 20 })
+          .width('100%').padding({ left: 11, right: 11, top: 12, bottom: 20 })
         }
-        .layoutWeight(1)
+        .layoutWeight(1).backgroundColor('#F3EFE9')
         if (this.currentTask() !== null) {
           Row({ space: 10 }) {
-            Text(this.currentTask()!.label).fontSize(12).fontColor(PortraTheme.primaryText)
+            Text(this.currentTask()!.label).fontSize(12).fontWeight(FontWeight.Medium)
+              .fontColor(PortraTheme.primaryText)
               .layoutWeight(1).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-            Button(this.currentTask()!.button).height(36).fontSize(12)
+            Button(`${this.currentTask()!.button} ›`).height(34).fontSize(11)
+              .fontColor(PortraTheme.primary).backgroundColor(PortraTheme.primarySoft)
+              .borderRadius(17)
               .onClick(() => this.openTask(this.currentTask()!))
-          }.width('100%').padding({ left: 16, right: 16, top: 8, bottom: 8 })
+          }.width('100%').padding({ left: 12, right: 12, top: 8, bottom: 8 })
             .backgroundColor(PortraTheme.surface)
+            .border({ width: { bottom: 1 }, color: '#EEE9E2' })
         }
         if (this.unreadBelow > 0) {
           Button(`${this.unreadBelow} 条新消息 ↓`).height(34)
@@ -848,100 +1009,33 @@ export struct ConversationDetailPage {
           Text(this.mediaNotice).fontSize(12).fontColor(PortraTheme.success)
             .width('100%').padding({ left: 16, bottom: 6 })
         }
-        if (this.attachmentDraft.length > 0) {
-          Column({ space: 8 }) {
-            Row() {
-              Text(`准备发送 ${this.attachmentDraft.length} 个文件`)
-                .fontSize(13).fontColor(PortraTheme.primaryText)
-              Blank()
-              if (this.selectingAttachments) {
-                Button('取消选择').fontSize(11).height(30).onClick(() => {
-                  this.selectingAttachments = false; this.selectedAttachmentUris = [];
-                })
-                Button(`移除 ${this.selectedAttachmentUris.length} 张`).fontSize(11).height(30)
-                  .enabled(this.selectedAttachmentUris.length > 0).onClick(() => {
-                    this.attachmentDraft = this.attachmentDraft.filter((file: SelectedMessageFile) =>
-                      !this.selectedAttachmentUris.includes(file.uri));
-                    this.selectedAttachmentUris = []; this.selectingAttachments = false;
-                  })
-              }
-            }.width('100%')
-            Scroll() {
-              Row({ space: 10 }) {
-                ForEach(this.attachmentDraft, (file: SelectedMessageFile) => {
-                  Column({ space: 5 }) {
-                    if (file.messageType === 'IMAGE') {
-                      Stack({ alignContent: Alignment.TopEnd }) {
-                        Image(file.uri).width(72).height(72).objectFit(ImageFit.Cover).borderRadius(5)
-                        if (this.selectingAttachments) {
-                          Text(this.selectedAttachmentUris.includes(file.uri) ? '✓' : '○')
-                            .fontSize(17).fontColor(PortraTheme.white)
-                            .backgroundColor('#66000000').margin(4)
-                        }
-                      }.width(72).height(72)
-                    } else {
-                      Text('文件').width(72).height(72).textAlign(TextAlign.Center)
-                        .backgroundColor(PortraTheme.pageBackgroundDeep)
-                    }
-                    if (!this.selectingAttachments || file.messageType !== 'IMAGE') {
-                      Button('移除').fontSize(11).height(28).onClick(() => this.attachmentDraft =
-                        this.attachmentDraft.filter((item: SelectedMessageFile) => item.uri !== file.uri))
-                    }
-                  }.onClick(() => {
-                    if (this.selectingAttachments && file.messageType === 'IMAGE' &&
-                      Date.now() - this.attachmentLongPressedAt >= 500) this.toggleAttachment(file.uri);
-                  }).gesture(LongPressGesture().onAction(() => {
-                    if (file.messageType === 'IMAGE') this.longPressAttachment(file.uri);
-                  }))
-                }, (file: SelectedMessageFile) => file.uri)
-              }
-            }.scrollable(ScrollDirection.Horizontal).height(112)
-            Row() {
-              Button('取消').layoutWeight(1).height(40).backgroundColor(PortraTheme.pageBackgroundDeep)
-                .fontColor(PortraTheme.primaryText).onClick(() => this.attachmentDraft = [])
-              Button('发送').layoutWeight(1).height(40).onClick(() => this.sendSelectedMedia())
-            }.width('100%')
-          }.width('100%').padding(12).backgroundColor(PortraTheme.surface)
-        }
-        if (this.mediaMenuOpen) {
-          Column({ space: 12 }) {
-            Text('发送内容').fontSize(12).fontColor(PortraTheme.secondaryText).width('100%')
-            Row({ space: 10 }) {
-              Button('照片').layoutWeight(1).height(48).onClick(() => this.pickMedia('photo'))
-              Button('拍照').layoutWeight(1).height(48).onClick(() => this.pickMedia('camera'))
-              Button('文件').layoutWeight(1).height(48).onClick(() => this.pickMedia('file'))
-            }.width('100%')
-            if (this.orders.length > 0) {
-              Divider().color(PortraTheme.border)
-              Button('订单详情  ›').width('100%').height(42)
-                .backgroundColor(PortraTheme.pageBackgroundDeep).fontColor(PortraTheme.primaryText)
-                .onClick(() => { this.mediaMenuOpen = false;
-                  this.onOpenOrder?.(this.orders.slice().sort((a: OrderSummary, b: OrderSummary) =>
-                    b.orderId - a.orderId)[0].orderId); })
-            }
-            Button('取消').height(38).backgroundColor(PortraTheme.surface)
-              .fontColor(PortraTheme.secondaryText).onClick(() => this.mediaMenuOpen = false)
-          }.width('100%').padding(16).backgroundColor(PortraTheme.surface)
-        }
-        Row({ space: 8 }) {
-          Button('+').width(42).height(42).fontSize(26).fontColor(PortraTheme.primary)
-            .backgroundColor(PortraTheme.surface).border({ width: 1, color: PortraTheme.border })
-            .borderRadius(21).onClick(() => this.mediaMenuOpen = !this.mediaMenuOpen)
-          TextInput({ text: this.draft, placeholder: '发送消息' })
-            .layoutWeight(1).height(46).backgroundColor(PortraTheme.pageBackground)
+        Row({ space: 9 }) {
+          Button() {
+            Image($r('app.media.ic_chat_plus')).width(24).height(24)
+          }.width(38).height(38)
+            .backgroundColor(PortraTheme.white).border({ width: 2, color: '#273348' })
+            .borderRadius(19).onClick(() => this.mediaMenuOpen = !this.mediaMenuOpen)
+          TextInput({ text: this.draft, placeholder: '发消息…' })
+            .layoutWeight(1).height(38).fontSize(13).backgroundColor('#F1EFED')
+            .borderRadius(19)
             .maxLength(4000).enterKeyType(EnterKeyType.Send)
             .onChange((value: string) => this.changeDraft(value))
             .onSubmit(() => this.send())
-          Button(this.busy ? '发送中' : '发送')
-            .width(76).height(46).borderRadius(8)
+          Button() {
+            Image($r('app.media.ic_chat_send')).width(22).height(22)
+          }.width(38).height(38).borderRadius(19)
+            .backgroundColor('#1A48CA')
+            .accessibilityText(this.busy ? '发送中' : '发送消息')
             .enabled(!this.busy && this.draft.trim().length > 0)
             .onClick(() => this.send())
         }
-        .width('100%').padding({ left: 16, right: 16, top: 10, bottom: 16 })
+        .width('100%').height(57).padding({ left: 11, right: 11, top: 7, bottom: 7 })
         .backgroundColor(PortraTheme.surface)
+        .border({ width: { top: 1 }, color: '#E9E5DF' })
       }
     }
-    .width('100%').height('100%').backgroundColor(PortraTheme.pageBackground)
+    .width('100%').height('100%').backgroundColor('#F3EFE9')
+    if (this.attachmentDraft.length > 0) this.MediaPreview()
     if (this.viewerFileId > 0 || this.viewerUri.length > 0) {
       Column() {
         Row() {
@@ -976,5 +1070,8 @@ export struct ConversationDetailPage {
       }.width('100%').height('100%').backgroundColor('#151515')
     }
     }.width('100%').height('100%')
+      .bindSheet(this.mediaMenuOpen, this.MediaMenu(), { height: SheetSize.FIT_CONTENT,
+        showClose: false, backgroundColor: PortraTheme.surface,
+        onWillDismiss: (action: DismissSheetAction) => { this.mediaMenuOpen = false; action.dismiss(); } })
   }
 }

@@ -4,6 +4,7 @@ import { PortraTheme } from '../../theme/PortraTheme';
 export struct PortraPageHeading {
   @Prop title: string = '';
   @Prop eyebrow: string = '';
+  @Prop compact: boolean = false;
   onBack?: () => void;
 
   build() {
@@ -26,7 +27,7 @@ export struct PortraPageHeading {
             .fontColor(PortraTheme.secondaryText)
         }
         Text(this.title)
-          .fontSize(22)
+          .fontSize(this.compact ? 16 : 22)
           .fontWeight(FontWeight.Bold)
           .fontColor(PortraTheme.primaryText)
           .maxLines(1)
@@ -36,8 +37,9 @@ export struct PortraPageHeading {
       .alignItems(HorizontalAlign.Start)
     }
     .width('100%')
-    .height(64)
+    .height(this.compact ? 58 : 64)
     .padding({ left: 12, right: 20 })
-    .backgroundColor(PortraTheme.pageBackground)
+    .backgroundColor(this.compact ? PortraTheme.surface : PortraTheme.pageBackground)
+    .border({ width: { bottom: this.compact ? 1 : 0 }, color: PortraTheme.border })
   }
 }

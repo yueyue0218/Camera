@@ -2,6 +2,7 @@ import { KeyboardAvoidMode } from '@kit.ArkUI';
 import { image } from '@kit.ImageKit';
 import { AppClient } from '../app/AppClient';
 import { PortraPageHeading } from '../common/components/PortraPageHeading';
+import { PortraAvatar } from '../common/components/PortraAvatar';
 import { AftercareDraftStore } from '../features/aftercare/AftercareDraftStore';
 import { AftercarePolicy } from '../features/aftercare/AftercarePolicy';
 import { ImageUpload } from '../network/ImageUpload';
@@ -358,18 +359,20 @@ export struct OrderReviewsPage {
   }
 
   @Builder private ReviewCard(review: ReviewSummary) {
-    Column({ space: 10 }) {
-      Row() {
-        Text(review.reviewerId === this.actorId ? '我写的评价' : '收到的评价')
-          .fontSize(14).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText).layoutWeight(1)
-        Text(`${review.rating} ★`).fontSize(16).fontColor(PortraTheme.primary)
+    Column({ space: 12 }) {
+      Row({ space: 9 }) {
+        PortraAvatar({ displayName: review.reviewerNickname ?? '约拍伙伴', avatarSize: 34 })
+        Column({ space: 3 }) {
+          Text(review.reviewerNickname ?? '约拍伙伴')
+            .fontSize(13).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
+          if (review.createdAt) Text(review.createdAt.replace('T', ' ').slice(0, 16))
+            .fontSize(10).fontColor(PortraTheme.mutedText)
+        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+        Text(`${review.rating} ★`).fontSize(13).fontColor(PortraTheme.primary)
       }.width('100%')
-      Text(review.targetUserNickname ?? '约拍伙伴').fontSize(12).fontColor(PortraTheme.secondaryText)
       if (review.isVisible === false) Text('这条评价已隐藏').fontSize(12)
         .fontColor(PortraTheme.mutedText)
       if (review.content) Text(review.content).fontSize(14).fontColor(PortraTheme.primaryText)
-      if (review.createdAt) Text(review.createdAt.replace('T', ' ').slice(0, 16))
-        .fontSize(11).fontColor(PortraTheme.mutedText)
       if (review.replyContent) {
         Text(`追评：${review.replyContent}`).fontSize(13).fontColor(PortraTheme.secondaryText)
       }
@@ -405,33 +408,44 @@ export struct OrderReviewsPage {
               .fontColor(PortraTheme.secondaryText).onClick(() => this.cancelId = item.complaintId)
           }
         }, (item: ReviewComplaintSummary) => item.complaintId.toString())
-    }.width('100%').alignItems(HorizontalAlign.Start).padding(16)
-      .backgroundColor(PortraTheme.surface).borderRadius(6)
+    }.width('100%').alignItems(HorizontalAlign.Start).padding(14)
+      .backgroundColor(PortraTheme.surface).borderRadius(14)
       .border({ width: 1, color: PortraTheme.border })
   }
 
   @Builder private Form() {
     Column({ space: 16 }) {
-      Text(this.mode === 'review' ? '评价这次约拍' : this.mode === 'followup' ? '写追评' : '投诉这条评价')
-        .fontSize(19).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
       if (this.mode === 'review') {
-        Text(this.actorId === this.order?.customerId ?
-          this.order?.providerNickname ?? '摄影师' : this.order?.customerNickname ?? '客户')
-          .fontSize(14).fontColor(PortraTheme.secondaryText)
+        Row({ space: 10 }) {
+          PortraAvatar({ displayName: this.actorId === this.order?.customerId ?
+            this.order?.providerNickname ?? '摄影师' : this.order?.customerNickname ?? '客户', avatarSize: 36 })
+          Column({ space: 3 }) {
+            Text(this.actorId === this.order?.customerId ?
+              this.order?.providerNickname ?? '摄影师' : this.order?.customerNickname ?? '客户')
+              .fontSize(13).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
+            Text('评价这次约拍').fontSize(11).fontColor(PortraTheme.mutedText)
+          }.alignItems(HorizontalAlign.Start)
+        }.width('100%').padding(14).backgroundColor(PortraTheme.surface).borderRadius(14)
+        Text('这次约拍怎么样？').fontSize(13).fontWeight(FontWeight.Bold)
+          .fontColor(PortraTheme.primaryText)
         Row({ space: 8 }) {
           ForEach([1, 2, 3, 4, 5], (value: number) => {
-            Text('★').fontSize(30).fontColor(value <= this.rating ? PortraTheme.primary : PortraTheme.mutedText)
-              .width(46).height(46).textAlign(TextAlign.Center).onClick(() => {
+            Text('★').fontSize(32).fontColor(value <= this.rating ? PortraTheme.primary : '#C9CBD3')
+              .layoutWeight(1).height(44).textAlign(TextAlign.Center).onClick(() => {
                 if (this.busy || this.uncertain) return;
                 this.rating = value;
                 AftercareDraftStore.write(this.actorId, this.orderId, 'rating', this.targetId, value.toString());
               })
           }, (value: number) => value.toString())
-        }
+        }.width('100%')
+      } else {
+        Text(this.mode === 'followup' ? '写追评' : '投诉这条评价')
+          .fontSize(16).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
       }
       TextArea({ text: this.content, placeholder: this.mode === 'complaint' ?
-        '请说明投诉原因' : this.mode === 'review' ? '写下你的感受（选填）' : '写下你的补充评价' })
+        '描述你遇到的问题…' : this.mode === 'review' ? '说说这次的拍摄感受（选填）' : '写下你的补充评价' })
         .height(140).maxLength(1000).enabled(!this.busy && !this.uncertain)
+        .backgroundColor('#F0EEEA').borderRadius(14)
         .onChange((value: string) => this.changeContent(value))
       Text(`${this.content.length}/1000`).fontSize(11).fontColor(PortraTheme.mutedText)
       if (this.mode === 'complaint') {
@@ -439,18 +453,18 @@ export struct OrderReviewsPage {
           .enabled(!this.busy && this.evidenceIds.length < 5).onClick(() => this.addEvidence())
         if (this.evidenceIds.length > 0) this.EvidenceStrip(this.evidenceIds, true)
       }
-      Button(this.busy ? '提交中' : '提交').height(48).enabled(!this.busy && !this.uncertain)
-        .onClick(() => this.submit())
       if (this.uncertain) Button('核对结果').height(44)
         .onClick(() => this.verify(this.mode, this.targetId, this.content.trim(), this.rating))
       if (this.error) Text(this.error).fontSize(12).fontColor(PortraTheme.danger)
-    }.width('100%').alignItems(HorizontalAlign.Start)
+    }.width('100%').alignItems(HorizontalAlign.Start).justifyContent(FlexAlign.Start)
   }
 
   build() {
     Stack() {
       Column() {
-        PortraPageHeading({ title: this.mode ? '评价' : '本次评价', eyebrow: '', onBack: () => this.back() })
+        PortraPageHeading({ title: this.mode === 'complaint' ? '投诉评价' :
+          this.mode === 'followup' ? '写追评' : this.mode ? '评价' : '本次评价',
+          eyebrow: '', compact: true, onBack: () => this.back() })
         if (this.loading) LoadingProgress().width(32).height(32).margin(24)
         else if (this.order === null) {
           Text(this.error || '暂时无法查看评价').fontColor(PortraTheme.danger).padding(20)
@@ -471,10 +485,20 @@ export struct OrderReviewsPage {
                 if (this.notice) Text(this.notice).fontColor(PortraTheme.success).fontSize(12)
                 if (this.error) Text(this.error).fontColor(PortraTheme.danger).fontSize(12)
               }
-            }.width('100%').alignItems(HorizontalAlign.Start).padding(18)
-          }.layoutWeight(1).scrollBar(BarState.Off)
+            }.width('100%').alignItems(HorizontalAlign.Start).justifyContent(FlexAlign.Start)
+              .padding({ left: 14, right: 14, top: 16, bottom: 24 })
+          }.layoutWeight(1).scrollBar(BarState.Off).align(Alignment.TopStart)
+          if (this.mode) {
+            Row() {
+              Button(this.busy ? '提交中' : this.mode === 'review' ? '提交评价' :
+                this.mode === 'followup' ? '提交追评' : '提交投诉')
+                .height(44).layoutWeight(1).backgroundColor('#147AF4').borderRadius(22)
+                .enabled(!this.busy && !this.uncertain).onClick(() => this.submit())
+            }.width('100%').padding({ left: 14, right: 14, top: 10, bottom: 12 })
+              .backgroundColor(PortraTheme.surface)
+          }
         }
-      }.width('100%').height('100%').backgroundColor(PortraTheme.pageBackground)
+      }.width('100%').height('100%').backgroundColor('#F8F6F2')
       if (this.discardPrompt || this.cancelId > 0) {
         Column() {
           Blank().layoutWeight(1)

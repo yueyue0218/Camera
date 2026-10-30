@@ -253,21 +253,22 @@ export struct DeliveryGalleryPage {
     if (this.isImage(file)) {
       Stack({ alignContent: Alignment.TopEnd }) {
         if (this.thumbs.has(file.fileId)) {
-          Image(this.thumbs.get(file.fileId)!).width('100%').height(154).objectFit(ImageFit.Cover)
+          Image(this.thumbs.get(file.fileId)!).width('100%').height(145).objectFit(ImageFit.Cover)
         } else {
-          Text('照片').fontSize(13).fontColor(PortraTheme.mutedText).width('100%').height(154)
+          Text('▧').fontSize(24).fontColor('#B6B4B1').width('100%').height(145)
             .textAlign(TextAlign.Center)
         }
         if (this.selecting) {
           Text(this.selectedFileIds.includes(file.fileId) ? '✓' : '○')
             .fontSize(19).fontColor(PortraTheme.white).textAlign(TextAlign.Center)
-            .width(32).height(32).borderRadius(16)
-            .backgroundColor(this.selectedFileIds.includes(file.fileId) ? PortraTheme.primary : '#66000000')
-            .margin(8)
+            .width(24).height(24).borderRadius(12)
+            .border({ width: 1, color: PortraTheme.white })
+            .backgroundColor(this.selectedFileIds.includes(file.fileId) ? '#147AF4' : '#66000000')
+            .margin(7)
         }
       }
-      .width('100%').height(154)
-      .backgroundColor(PortraTheme.pageBackgroundDeep).borderRadius(6)
+      .width('100%').height(145)
+      .backgroundColor('#EEE9E3').borderRadius(6)
       .onClick(() => this.tapPhoto(file.fileId))
       .gesture(LongPressGesture().onAction(() => this.longPressPhoto(file.fileId)))
     } else {
@@ -286,7 +287,7 @@ export struct DeliveryGalleryPage {
     Column({ space: 12 }) {
       Row() {
         Text(batch === this.deliveries[0] ? '最新上传' : `第${batch.deliveryRound}次上传`)
-          .fontSize(17).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
+          .fontSize(13).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
         Blank()
         Text(`${(batch.files ?? []).length} 个文件`).fontSize(12).fontColor(PortraTheme.secondaryText)
       }.width('100%')
@@ -296,8 +297,8 @@ export struct DeliveryGalleryPage {
             (file: DeliveryFileSummary) => {
             GridItem() { this.FileTile(file) }
           }, (file: DeliveryFileSummary) => file.fileId.toString())
-        }.columnsTemplate('1fr 1fr').columnsGap(8).rowsGap(8).width('100%')
-          .height(Math.ceil((batch.files ?? []).filter((file: DeliveryFileSummary) => this.isImage(file)).length / 2) * 162)
+        }.columnsTemplate('1fr 1fr 1fr').columnsGap(5).rowsGap(5).width('100%')
+          .height(Math.ceil((batch.files ?? []).filter((file: DeliveryFileSummary) => this.isImage(file)).length / 3) * 150)
       }
       ForEach((batch.files ?? []).filter((file: DeliveryFileSummary) => !this.isImage(file)),
         (file: DeliveryFileSummary) => { this.FileTile(file) },
@@ -309,14 +310,14 @@ export struct DeliveryGalleryPage {
   build() {
     Stack() {
       Column() {
-        PortraPageHeading({ title: '作品相册', eyebrow: '', onBack: this.onBack })
+        PortraPageHeading({ title: '作品相册', eyebrow: '', compact: true, onBack: this.onBack })
         if (this.loading) {
           PortraLoading({ label: '正在打开照片' })
         } else if (this.order === null) {
           PortraErrorView({ message: this.error || '作品暂时无法查看', onRetry: () => this.load() })
         } else {
           Scroll() {
-            Column({ space: 24 }) {
+            Column({ space: 16 }) {
               if (this.imageFiles().length > 0) {
                 Row() {
                   Blank()
@@ -336,8 +337,9 @@ export struct DeliveryGalleryPage {
               ForEach(this.deliveries, (batch: DeliverySummary) => {
                 this.Batch(batch)
               }, (batch: DeliverySummary) => batch.deliveryId.toString())
-            }.width('100%').padding({ left: 18, right: 18, top: 18, bottom: 28 })
-          }.layoutWeight(1).scrollBar(BarState.Off)
+            }.width('100%').justifyContent(FlexAlign.Start)
+              .padding({ left: 14, right: 14, top: 16, bottom: 28 })
+          }.layoutWeight(1).scrollBar(BarState.Off).align(Alignment.TopStart)
           if (this.notice) Text(this.notice).fontSize(12).fontColor(PortraTheme.success)
           if (this.error) Text(this.error).fontSize(12).fontColor(PortraTheme.danger)
           if (this.downloadingId > 0) Text(`正在下载 ${this.downloadProgress}%`)
@@ -358,7 +360,7 @@ export struct DeliveryGalleryPage {
               .padding({ left: 18, right: 18, bottom: 16 })
           }
         }
-      }.width('100%').height('100%').backgroundColor(PortraTheme.pageBackground)
+      }.width('100%').height('100%').backgroundColor('#F8F6F2')
       if (this.viewerIndex >= 0) {
         Column() {
           Row() {

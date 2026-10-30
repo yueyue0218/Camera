@@ -28,8 +28,8 @@ export struct MessageMediaBubble {
             .fontSize(12).fontColor(PortraTheme.secondaryText)
         }
       }
-      .width(190).height(190).justifyContent(FlexAlign.Center)
-      .backgroundColor(PortraTheme.pageBackgroundDeep).borderRadius(8)
+      .width(218).height(210).justifyContent(FlexAlign.Center)
+      .backgroundColor('#EEE9E3').borderRadius(12)
       .onClick(() => this.onOpen?.())
     } else {
       Row({ space: 12 }) {
@@ -43,8 +43,8 @@ export struct MessageMediaBubble {
             .fontSize(11).fontColor(PortraTheme.secondaryText)
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       }
-      .width(220).padding(12).backgroundColor(PortraTheme.surface).borderRadius(8)
-      .border({ width: 1, color: PortraTheme.border }).onClick(() => this.onSave?.())
+      .width(235).padding(12).backgroundColor(PortraTheme.surface).borderRadius(14)
+      .border({ width: 1, color: '#E7E2DA' }).onClick(() => this.onSave?.())
     }
   }
 }

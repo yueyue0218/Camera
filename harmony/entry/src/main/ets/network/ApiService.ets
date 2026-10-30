@@ -373,8 +373,8 @@ export class ApiService implements NativeSessionApi {
   listPublicServices(userId: number, page: number, key: string): Promise<PageResult<ServicePackageSummary>> {
     return this.client.getPublic<PageResult<ServicePackageSummary>>(`/service-packages/by-user/${userId}?page=${this.safePage(page)}&size=12`, key);
   }
-  getMyProfile(): Promise<UserProfileSummary> {
-    return this.client.get<UserProfileSummary>('/users/me', 'users.me');
+  getMyProfile(requestKey: string = 'users.me'): Promise<UserProfileSummary> {
+    return this.client.get<UserProfileSummary>('/users/me', requestKey);
   }
 
   switchRole(role: string): Promise<SwitchRoleResult> {
@@ -547,9 +547,10 @@ export class ApiService implements NativeSessionApi {
     this.client.cancelRequest(requestKey);
   }
 
-  getUserBrief(userId: number, role: string): Promise<UserBrief> {
+  getUserBrief(userId: number, role: string,
+    requestKey: string = `users.${userId}.brief`): Promise<UserBrief> {
     const suffix = role === 'PROVIDER' ? '?role=PROVIDER' : '?role=CUSTOMER';
-    return this.client.get<UserBrief>(`/users/${userId}/brief${suffix}`, `users.${userId}.brief`);
+    return this.client.get<UserBrief>(`/users/${userId}/brief${suffix}`, requestKey);
   }
 
   getAvatarThumbnail(fileId: number): Promise<ArrayBuffer> {

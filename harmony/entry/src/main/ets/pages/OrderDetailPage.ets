@@ -143,40 +143,56 @@ export struct OrderDetailPage {
     }.width('100%')
   }
 
+  @Builder
+  private Action(icon: string, label: string, onOpen: () => void) {
+    Row({ space: 11 }) {
+      Text(icon).width(34).height(34).fontSize(17).textAlign(TextAlign.Center)
+        .fontColor(PortraTheme.primary).backgroundColor('#EDF2FF').borderRadius(10)
+      Text(label).fontSize(13).fontWeight(FontWeight.Medium)
+        .fontColor(PortraTheme.primaryText).layoutWeight(1)
+      Text('›').fontSize(20).fontColor(PortraTheme.mutedText)
+    }.width('100%').height(52).onClick(onOpen)
+  }
+
   build() {
     Stack({ alignContent: Alignment.Bottom }) {
       Column() {
-      PortraPageHeading({ title: '订单详情', eyebrow: '', onBack: this.onBack })
+      PortraPageHeading({ title: '订单详情', eyebrow: '', compact: true, onBack: this.onBack })
       if (this.loading) {
         PortraLoading({ label: '正在打开订单' })
       } else if (this.order === null) {
         PortraErrorView({ message: this.errorMessage || '订单暂时无法查看', onRetry: () => this.load() })
       } else {
         Scroll() {
-          Column({ space: 18 }) {
+          Column({ space: 16 }) {
             Column({ space: 6 }) {
-              Text(OrderWorkflow.status(this.order!.status)).fontSize(24).fontWeight(FontWeight.Bold)
+              Text(OrderWorkflow.status(this.order!.status)).fontSize(21).fontWeight(FontWeight.Bold)
                 .fontColor(PortraTheme.primaryText)
               Text(OrderWorkflow.task(this.order!, this.userId)).fontSize(14).fontColor(PortraTheme.secondaryText)
             }.width('100%').alignItems(HorizontalAlign.Start)
-            Divider().color(PortraTheme.border)
-            Text('约拍信息').fontSize(17).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
-            this.Detail('拍摄时间', QuoteWorkflow.dateInput(this.order!.shootStartTime ?? ''))
-            this.Detail('拍摄地点', this.order!.shootLocation ?? '待更新')
-            this.Detail('约拍费用', OrderWorkflow.money(this.order!.amountCent))
-            if (OrderWorkflow.hasGallery(this.order!)) {
-              Button('查看照片').height(46).width('100%').onClick(() => this.onOpenGallery?.())
-            }
-            if (this.order!.status === 'COMPLETED') {
-              Button('展示授权').height(44).width('100%').backgroundColor(PortraTheme.surface)
-                .fontColor(PortraTheme.primary).onClick(() => this.onOpenAuthorization?.())
-            }
-            if (OrderWorkflow.canUpload(this.order!, this.userId)) {
-              Button(this.order!.status === 'REWORK_REQUIRED' ? '重新上传' : '上传照片')
-                .height(46).width('100%').onClick(() => this.onOpenUpload?.())
-            }
-            Divider().color(PortraTheme.border)
-            Text('订单进度').fontSize(17).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
+            Row({ space: 12 }) {
+              Text('▧').width(68).height(76).fontSize(28).textAlign(TextAlign.Center)
+                .fontColor('#777F93').backgroundColor('#EDEAE5').borderRadius(10)
+              Column({ space: 6 }) {
+                Text('本次约拍').fontSize(16).fontWeight(FontWeight.Bold)
+                  .fontColor(PortraTheme.primaryText)
+                Text(this.order!.shootLocation ?? '约拍地点待确认').fontSize(11)
+                  .fontColor(PortraTheme.secondaryText).maxLines(1)
+                Text(OrderWorkflow.money(this.order!.amountCent)).fontSize(21)
+                  .fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
+              }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+            }.width('100%').padding(14)
+              .backgroundColor(PortraTheme.surface).borderRadius(14)
+            Column({ space: 14 }) {
+              this.Detail('拍摄时间', QuoteWorkflow.dateInput(this.order!.shootStartTime ?? ''))
+              this.Detail('拍摄地点', this.order!.shootLocation ?? '待更新')
+              this.Detail('对方', this.userId === this.order!.customerId ?
+                this.order!.providerNickname ?? '摄影师' : this.order!.customerNickname ?? '客户')
+            }.width('100%').alignItems(HorizontalAlign.Start).padding(14)
+              .backgroundColor(PortraTheme.surface).borderRadius(14)
+            Text('订单进度').fontSize(14).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
+              .width('100%')
+            Column({ space: 4 }) {
             ForEach(this.logs, (log: OrderStatusLogSummary) => {
               Row({ space: 12 }) {
                 Column({ space: 2 }) {
@@ -190,22 +206,41 @@ export struct OrderDetailPage {
                 }.alignItems(HorizontalAlign.Start)
               }.width('100%')
             })
-            if (this.order!.status === 'COMPLETED' || this.order!.status === 'REFUNDED') {
-              Button('评价').height(44).backgroundColor(PortraTheme.surface)
-                .fontColor(PortraTheme.primary).onClick(() => this.onOpenReviews?.())
-            }
-            if (this.order!.conversationId !== undefined && this.order!.conversationId! > 0) {
-              Button('返回聊天').height(44).backgroundColor(PortraTheme.surface)
-                .fontColor(PortraTheme.primary).onClick(() =>
-                  this.onOpenConversation?.(this.order!.conversationId!))
+            }.width('100%').alignItems(HorizontalAlign.Start).padding(14)
+              .backgroundColor(PortraTheme.surface).borderRadius(14)
+            if ((this.order!.conversationId ?? 0) > 0 || OrderWorkflow.hasGallery(this.order!) ||
+              OrderWorkflow.canUpload(this.order!, this.userId) ||
+              this.order!.status === 'COMPLETED' || this.order!.status === 'REFUNDED') {
+              Text('相关内容').fontSize(14).fontWeight(FontWeight.Bold)
+                .fontColor(PortraTheme.primaryText)
+              Column() {
+                if (this.order!.conversationId !== undefined && this.order!.conversationId! > 0) {
+                  this.Action('☏', '返回聊天', () =>
+                    this.onOpenConversation?.(this.order!.conversationId!))
+                }
+                if (OrderWorkflow.hasGallery(this.order!)) {
+                  this.Action('▧', '查看照片', () => this.onOpenGallery?.())
+                }
+                if (OrderWorkflow.canUpload(this.order!, this.userId)) {
+                  this.Action('↑', this.order!.status === 'REWORK_REQUIRED' ? '重新上传' : '上传照片',
+                    () => this.onOpenUpload?.())
+                }
+                if (this.order!.status === 'COMPLETED') {
+                  this.Action('▧', '展示授权', () => this.onOpenAuthorization?.())
+                }
+                if (this.order!.status === 'COMPLETED' || this.order!.status === 'REFUNDED') {
+                  this.Action('☆', '评价', () => this.onOpenReviews?.())
+                }
+              }.width('100%').padding({ left: 14, right: 14 })
+                .backgroundColor(PortraTheme.surface).borderRadius(14)
             }
             if (OrderWorkflow.canCancel(this.order!, this.userId) && !this.paymentUncertain) {
               Button('取消约拍').height(44).backgroundColor(PortraTheme.surface)
                 .fontColor(PortraTheme.danger).enabled(!this.busy).onClick(() => this.showCancel = true)
             }
-          }.width('100%').alignItems(HorizontalAlign.Start)
-            .padding({ left: 20, right: 20, top: 20, bottom: 30 })
-        }.layoutWeight(1).scrollBar(BarState.Off)
+          }.width('100%').alignItems(HorizontalAlign.Start).justifyContent(FlexAlign.Start)
+            .padding({ left: 14, right: 14, top: 16, bottom: 30 })
+        }.layoutWeight(1).scrollBar(BarState.Off).align(Alignment.TopStart)
         if (this.notice) Text(this.notice).fontSize(12).fontColor(PortraTheme.primary)
           .padding({ left: 20, right: 20 })
         if (this.errorMessage) Text(this.errorMessage).fontSize(12).fontColor(PortraTheme.danger)
@@ -222,7 +257,7 @@ export struct OrderDetailPage {
           }.width('100%').padding({ left: 20, right: 20, top: 10, bottom: 16 })
         }
       }
-      }.width('100%').height('100%').backgroundColor(PortraTheme.pageBackground)
+      }.width('100%').height('100%').backgroundColor('#F8F6F2')
       if (this.showPay && this.order !== null) {
         Column() {
           Blank().layoutWeight(1)

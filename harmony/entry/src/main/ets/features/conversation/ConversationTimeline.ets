@@ -12,6 +12,7 @@ export interface FulfillmentEvent {
   readonly title: string;
   readonly detail: string;
   readonly openGallery: boolean;
+  readonly photoIds?: number[];
 }
 
 export interface ConversationTimelineItem {
@@ -59,7 +60,9 @@ export class ConversationTimeline {
       items.push({ key: `delivery:${batch.deliveryId}`, kind: TimelineKind.FULFILLMENT,
         createdAt: batch.uploadTime ?? '', senderId: order.providerUserId ?? 0,
         event: { orderId: order.orderId, title: batch.deliveryRound > 1 ? '返修作品已上传' : '作品已上传',
-          detail: `${imageCount} 张照片`, openGallery: true } });
+          detail: `${imageCount} 张照片`, openGallery: true,
+          photoIds: (batch.files ?? []).filter(file => file.fileType === 'IMAGE')
+            .slice(0, 3).map(file => file.fileId) } });
     });
     const knownLogs = new Set<number>();
     logs.forEach((log: OrderStatusLogSummary) => {

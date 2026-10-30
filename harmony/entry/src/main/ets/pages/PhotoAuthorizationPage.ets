@@ -365,19 +365,26 @@ export struct PhotoAuthorizationPage {
   @Builder private Photo(fileId: number, selectable: boolean) {
     Stack({ alignContent: Alignment.Center }) {
       if (this.thumbnails.has(fileId)) {
-        Image(this.thumbnails.get(fileId)!).width('100%').height(124).objectFit(ImageFit.Contain)
+        Image(this.thumbnails.get(fileId)!).width('100%').height('100%').objectFit(ImageFit.Cover)
       } else {
-        Text('照片').fontSize(12).fontColor(PortraTheme.mutedText)
+        Text('▧').fontSize(24).fontColor('#B6B4B1')
       }
       if (selectable && this.selecting) {
-        Text(this.available().some((file: DeliveryFileSummary) => file.fileId === fileId) ?
-          this.selected.includes(fileId) ? '已选择' : '选择' : '已申请')
-          .fontSize(12).fontColor(PortraTheme.white)
-          .padding(6).backgroundColor(this.selected.includes(fileId) ? PortraTheme.primary : '#66000000')
-          .align(Alignment.TopEnd)
+        if (this.available().some((file: DeliveryFileSummary) => file.fileId === fileId)) {
+          Text(this.selected.includes(fileId) ? '✓' : '')
+            .fontSize(13).textAlign(TextAlign.Center).fontColor(PortraTheme.white)
+            .width(24).height(24)
+            .backgroundColor(this.selected.includes(fileId) ? '#147AF4' : '#77000000')
+            .border({ width: 1, color: PortraTheme.white }).borderRadius(12)
+            .align(Alignment.TopEnd).margin(7)
+        } else {
+          Text('已申请').fontSize(10).fontColor(PortraTheme.white)
+            .padding(4).backgroundColor('#88000000').borderRadius(5)
+            .align(Alignment.TopEnd).margin(7)
+        }
       }
-    }.width('48%').height(132).backgroundColor(PortraTheme.pageBackgroundDeep)
-      .borderRadius(6).onClick(() => this.tapPhoto(fileId, selectable))
+    }.width('32%').aspectRatio(0.75).backgroundColor('#EEE9E3')
+      .borderRadius(6).margin({ bottom: 6 }).onClick(() => this.tapPhoto(fileId, selectable))
       .gesture(LongPressGesture().onAction(() => this.longPressPhoto(fileId, selectable)))
   }
 
@@ -395,51 +402,69 @@ export struct PhotoAuthorizationPage {
   }
 
   @Builder private AuthorizationDetail(item: PhotoAuthorizationSummary) {
-    Column({ space: 15 }) {
-      Text(AftercarePolicy.authorizationStatus(item, this.actorId))
-        .fontSize(18).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
+    Column({ space: 16 }) {
+      Row({ space: 10 }) {
+        Text('摄').width(36).height(36).fontSize(14).fontColor(PortraTheme.white)
+          .textAlign(TextAlign.Center).backgroundColor('#67748E').borderRadius(18)
+        Column({ space: 3 }) {
+          Text('摄影师').fontSize(13).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
+          Text('申请展示作品').fontSize(11).fontColor(PortraTheme.mutedText)
+        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+        Text(AftercarePolicy.authorizationStatus(item, this.actorId)).fontSize(11)
+          .fontColor(PortraTheme.primary).padding({ left: 8, right: 8, top: 5, bottom: 5 })
+          .backgroundColor(PortraTheme.primarySoft).borderRadius(12)
+      }.width('100%').padding(12).backgroundColor(PortraTheme.surface).borderRadius(12)
+      Text('申请用途').fontSize(12).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
       Text(item.photoUsageScope === 'PORTFOLIO_DISPLAY' ?
-        '用于摄影师作品集展示' : '使用用途暂时无法确认')
-        .fontSize(14).fontColor(PortraTheme.secondaryText)
-      if (item.remark) Text(item.remark).fontSize(13).fontColor(PortraTheme.secondaryText)
+        '用于个人作品集展示' : '使用用途暂时无法确认')
+        .fontSize(13).fontColor(PortraTheme.primaryText).width('100%')
+        .padding(14).backgroundColor(PortraTheme.surface).borderRadius(12)
+      Text(`申请展示的照片 · ${item.files.length} 张`)
+        .fontSize(13).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
       this.PhotoGrid(item.files.map(file => ({ fileId: file.fileId, fileName: file.fileName,
         fileType: file.fileType } as DeliveryFileSummary)), false)
-      if (AftercarePolicy.canDecide(item, this.actorId)) {
-        if (this.rejecting) {
-          TextArea({ text: this.decisionRemark, placeholder: '请写下拒绝原因' })
-            .height(92).maxLength(500).enabled(!this.busy && !this.uncertain)
-            .onChange((value: string) => {
-              this.decisionRemark = value;
-              AftercareDraftStore.write(this.actorId, this.orderId, 'authreject', item.id, value);
-            })
-        }
-        if (this.approving) Text('确认同意展示这些照片？').fontSize(13)
-          .fontColor(PortraTheme.primaryText)
-        Row({ space: 12 }) {
-          Button(this.rejecting || this.approving ? '返回' : '拒绝').layoutWeight(1).height(46)
-            .backgroundColor(PortraTheme.surface).fontColor(PortraTheme.danger)
-            .enabled(!this.busy && !this.uncertain)
-            .onClick(() => {
-              if (this.rejecting || this.approving) { this.rejecting = false; this.approving = false; }
-              else this.rejecting = true;
-            })
-          Button(this.rejecting ? '确认拒绝' : this.approving ? '确认同意' : '同意展示')
-            .layoutWeight(1).height(46)
-            .enabled(!this.busy && !this.uncertain)
-            .onClick(() => {
-              if (this.rejecting) this.decide(false);
-              else if (this.approving) this.decide(true);
-              else this.approving = true;
-            })
-        }.width('100%')
+      if (item.remark) {
+        Text('补充说明').fontSize(12).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
+        Text(item.remark).fontSize(13).fontColor(PortraTheme.secondaryText)
       }
-    }.width('100%').alignItems(HorizontalAlign.Start)
+      if (this.rejecting) {
+        TextArea({ text: this.decisionRemark, placeholder: '请写下拒绝原因' })
+          .height(92).maxLength(500).enabled(!this.busy && !this.uncertain)
+          .onChange((value: string) => {
+            this.decisionRemark = value;
+            AftercareDraftStore.write(this.actorId, this.orderId, 'authreject', item.id, value);
+          })
+      }
+      if (this.approving) Text('确认同意展示这些照片？').fontSize(13)
+        .fontColor(PortraTheme.primaryText)
+    }.width('100%').alignItems(HorizontalAlign.Start).justifyContent(FlexAlign.Start)
+  }
+
+  @Builder private DecisionActions(item: PhotoAuthorizationSummary) {
+    Row({ space: 9 }) {
+      Button(this.rejecting || this.approving ? '返回' : '拒绝').layoutWeight(1).height(44)
+        .backgroundColor('#F2F0ED').fontColor(PortraTheme.danger).borderRadius(22)
+        .enabled(!this.busy && !this.uncertain)
+        .onClick(() => {
+          if (this.rejecting || this.approving) { this.rejecting = false; this.approving = false; }
+          else this.rejecting = true;
+        })
+      Button(this.rejecting ? '确认拒绝' : this.approving ? '确认同意' : '同意展示')
+        .layoutWeight(1).height(44).backgroundColor('#147AF4').borderRadius(22)
+        .enabled(!this.busy && !this.uncertain)
+        .onClick(() => {
+          if (this.rejecting) this.decide(false);
+          else if (this.approving) this.decide(true);
+          else this.approving = true;
+        })
+    }.width('100%').padding({ left: 14, right: 14, top: 10, bottom: 12 })
+      .backgroundColor(PortraTheme.surface)
   }
 
   build() {
     Stack() {
       Column() {
-        PortraPageHeading({ title: this.detailId > 0 ? '展示申请' : '展示授权', eyebrow: '',
+        PortraPageHeading({ title: this.detailId > 0 ? '展示申请' : '展示授权', eyebrow: '', compact: true,
           onBack: () => this.back() })
         if (this.loading) {
           LoadingProgress().width(32).height(32).margin(24)
@@ -448,35 +473,30 @@ export struct PhotoAuthorizationPage {
           Button('重试').onClick(() => this.load())
         } else {
           Scroll() {
-            Column({ space: 18 }) {
+            Column({ space: 16 }) {
               if (this.detailId > 0 && this.currentAuthorization() !== undefined) {
                 this.AuthorizationDetail(this.currentAuthorization()!)
               } else if (this.confirming) {
-                Text('确认申请').fontSize(18).fontWeight(FontWeight.Bold)
-                Text('用于摄影师作品集展示').fontSize(14).fontColor(PortraTheme.secondaryText)
+                Text(`已选择 ${this.selected.length} 张照片`).fontSize(13).fontWeight(FontWeight.Bold)
                 this.PhotoGrid(this.available().filter((file: DeliveryFileSummary) =>
                   this.selected.includes(file.fileId)), false)
+                Text('申请用途').fontSize(12).fontWeight(FontWeight.Bold)
+                Text('用于个人作品集展示').width('100%').fontSize(13)
+                  .padding(14).backgroundColor(PortraTheme.surface).borderRadius(12)
+                Text('补充说明（选填）').fontSize(12).fontWeight(FontWeight.Bold)
                 TextArea({ text: this.remark, placeholder: '备注（选填）' })
-                  .height(90).maxLength(500).enabled(!this.busy && !this.uncertain)
+                  .height(112).maxLength(500).enabled(!this.busy && !this.uncertain)
+                  .backgroundColor('#F0EEEA').borderRadius(12)
                   .onChange((value: string) => {
                     this.remark = value;
                     AftercareDraftStore.write(this.actorId, this.orderId, 'authremark', 0, value);
                   })
-                Button('提交申请').height(48).enabled(!this.busy && !this.uncertain)
-                  .onClick(() => this.requestAuthorization())
-                Button('返回选图').height(44).backgroundColor(PortraTheme.surface)
-                  .fontColor(PortraTheme.primary).onClick(() => this.confirming = false)
               } else {
                 if (this.order!.status === 'COMPLETED' && this.allFiles().length > 0) {
-                  Text('本次作品').fontSize(17).fontWeight(FontWeight.Bold)
+                  Text(`本次作品 · ${this.allFiles().length} 张`).fontSize(13).fontWeight(FontWeight.Bold)
                   this.PhotoGrid(this.allFiles(), AftercarePolicy.authorizable(this.order!, this.actorId))
-                  if (AftercarePolicy.authorizable(this.order!, this.actorId) && this.available().length > 0) {
-                    Button(this.selecting ? `已选 ${this.selected.length} 张 · 下一步` : '选择照片')
-                      .height(48).enabled(!this.selecting || this.selected.length > 0)
-                      .onClick(() => this.selecting ? this.confirming = true : this.selecting = true)
-                  }
                 }
-                Text('申请记录').fontSize(17).fontWeight(FontWeight.Bold)
+                Text('申请记录').fontSize(13).fontWeight(FontWeight.Bold)
                 if (this.authorizations.length === 0) Text('暂无申请').fontColor(PortraTheme.mutedText)
                 ForEach(this.authorizations, (item: PhotoAuthorizationSummary) => {
                   Column({ space: 6 }) {
@@ -493,10 +513,33 @@ export struct PhotoAuthorizationPage {
               if (this.error) Text(this.error).fontColor(PortraTheme.danger).fontSize(12)
               if (this.uncertain) Button('核对结果').onClick(() => this.detailId > 0 ?
                 this.reconcileDecision(this.detailId) : this.reconcileRequest(this.selected))
-            }.width('100%').alignItems(HorizontalAlign.Start).padding(18)
-          }.layoutWeight(1).scrollBar(BarState.Off)
+            }.width('100%').alignItems(HorizontalAlign.Start).justifyContent(FlexAlign.Start)
+              .padding({ left: 14, right: 14, top: 16, bottom: 24 })
+          }.layoutWeight(1).scrollBar(BarState.Off).align(Alignment.TopStart)
+          if (this.detailId > 0 && this.currentAuthorization() !== undefined &&
+            AftercarePolicy.canDecide(this.currentAuthorization()!, this.actorId)) {
+            this.DecisionActions(this.currentAuthorization()!)
+          } else if (this.confirming) {
+            Row({ space: 9 }) {
+              Button('返回').layoutWeight(1).height(44).backgroundColor('#F2F0ED')
+                .fontColor(PortraTheme.primaryText).onClick(() => this.confirming = false)
+              Button('发送申请').layoutWeight(1).height(44).backgroundColor('#147AF4')
+                .enabled(!this.busy && !this.uncertain).onClick(() => this.requestAuthorization())
+            }.width('100%').padding(12).backgroundColor(PortraTheme.surface)
+          } else if (this.order!.status === 'COMPLETED' &&
+            AftercarePolicy.authorizable(this.order!, this.actorId) && this.available().length > 0) {
+            Row({ space: 9 }) {
+              if (this.selecting) Text(`已选 ${this.selected.length} 张`).fontSize(12)
+                .fontWeight(FontWeight.Bold).layoutWeight(1)
+              Button(this.selecting ? '下一步' : '选择照片')
+                .height(44).layoutWeight(this.selecting ? 1 : 2)
+                .backgroundColor('#147AF4').borderRadius(22)
+                .enabled(!this.selecting || this.selected.length > 0)
+                .onClick(() => this.selecting ? this.confirming = true : this.selecting = true)
+            }.width('100%').padding(12).backgroundColor(PortraTheme.surface)
+          }
         }
-      }.width('100%').height('100%').backgroundColor(PortraTheme.pageBackground)
+      }.width('100%').height('100%').backgroundColor('#F8F6F2')
       if (this.viewerId > 0) {
         Column() {
           Button('返回').alignSelf(ItemAlign.Start).onClick(() => this.viewerId = 0)

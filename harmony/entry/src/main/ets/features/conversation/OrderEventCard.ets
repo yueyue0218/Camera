@@ -15,35 +15,23 @@ export struct OrderEventCard {
   build() {
     Column({ space: 9 }) {
       Row() {
-        Text('约拍订单').fontSize(14).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
+        Text('约拍订单').fontSize(13).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
         Blank()
         Text(OrderWorkflow.status(this.order.status)).fontSize(12)
           .fontColor(this.order.status === 'PENDING_PAYMENT' ? PortraTheme.attention :
             this.order.status === 'COMPLETED' ? PortraTheme.success : PortraTheme.secondaryText)
+          .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+          .backgroundColor(PortraTheme.primarySoft).borderRadius(12)
       }.width('100%')
-      Text(OrderWorkflow.money(this.order.amountCent)).fontSize(22).fontWeight(FontWeight.Bold)
-        .fontColor(PortraTheme.primaryText)
-      Text(QuoteWorkflow.dateInput(this.order.shootStartTime ?? ''))
-        .fontSize(12).fontColor(PortraTheme.secondaryText)
-      Divider().color(PortraTheme.border)
-      Row({ space: 10 }) {
-        Button('查看订单').height(42).backgroundColor(PortraTheme.pageBackgroundDeep)
-          .fontColor(PortraTheme.primaryText).onClick(() => this.onOpen?.())
-        if (OrderWorkflow.canPay(this.order, this.userId)) {
-          Button('确认支付').height(42).backgroundColor(PortraTheme.primary)
-            .onClick(() => this.onPay?.())
-        } else if (OrderWorkflow.canUpload(this.order, this.userId)) {
-          Button(this.order.status === 'REWORK_REQUIRED' ? '重新上传' : '上传照片')
-            .height(42).backgroundColor(PortraTheme.primary)
-            .onClick(() => this.onOpenUpload?.())
-        } else if (OrderWorkflow.hasGallery(this.order)) {
-          Button('查看照片').height(42).backgroundColor(PortraTheme.primary)
-            .onClick(() => this.onOpenGallery?.())
-        }
-      }
+      Text(`${this.order.shootLocation ?? '约拍'} · ${OrderWorkflow.money(this.order.amountCent)} · ${QuoteWorkflow.dateInput(this.order.shootStartTime ?? '')}`)
+        .fontSize(12).fontColor(PortraTheme.secondaryText).maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+      Button('查看订单 ›').width('100%').height(36).fontSize(12)
+        .backgroundColor('#F2F3F5').fontColor(PortraTheme.primary)
+        .borderRadius(8).onClick(() => this.onOpen?.())
     }
-    .width('100%').alignItems(HorizontalAlign.Start).padding(14)
-    .backgroundColor(PortraTheme.surface).borderRadius(8)
-    .border({ width: 1, color: PortraTheme.border })
+    .width('100%').constraintSize({ maxWidth: 275 }).alignItems(HorizontalAlign.Start).padding(13)
+    .backgroundColor(PortraTheme.surface).borderRadius(16)
+    .border({ width: 1, color: '#ECE9E3' })
   }
 }
