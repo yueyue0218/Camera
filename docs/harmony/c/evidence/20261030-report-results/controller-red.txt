@@ -1,0 +1,190 @@
+✖ own report detail reads session first and exact report ID; strips internal fields (3.6624ms)
+✖ own list never displays another reporter and exact missing ID does not fall back (1.0721ms)
+✖ invalid report IDs do not request; guest only gets login prompt (0.5501ms)
+✖ same load shares the in-flight read while changing target cancels old result (0.4656ms)
+✖ hidden or switched identity invalidates old success, catch and finally (0.4864ms)
+✖ identity changes without explicit suspend are detected before load/tap/response (0.4332ms)
+✖ independent report instances only cancel their own read and unused create keys (0.4971ms)
+✖ pending, safe action, recorded follow-up, malformed feedback and legacy have distinct meaning (0.504ms)
+✖ malformed arrays, duplicate IDs, nonnumeric target and failed read stay empty with retryable error (0.4859ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 0
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 465.4965
+
+✖ failing tests:
+
+test at harmony\tests\report-result-behavior.test.cjs:15:1
+✖ own report detail reads session first and exact report ID; strips internal fields (3.6624ms)
+  Error: Cannot find module '../entry/src/main/ets/features/report/ReportResultController.ets'
+  Require stack:
+  - C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)
+      at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)
+      at Module._load (node:internal/modules/cjs/loader:1242:25)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+      at Module.require (node:internal/modules/cjs/loader:1556:12)
+      at require (node:internal/modules/helpers:152:16)
+      at load (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:5:16)
+      at fixture (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:9:51)
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:15:108) {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: [ 'C:\\Users\\LiXiaozhou\\.codex\\worktrees\\harmony-c-ui-polish\\Camera\\harmony\\tests\\report-result-behavior.test.cjs' ]
+  }
+
+test at harmony\tests\report-result-behavior.test.cjs:16:1
+✖ own list never displays another reporter and exact missing ID does not fall back (1.0721ms)
+  Error: Cannot find module '../entry/src/main/ets/features/report/ReportResultController.ets'
+  Require stack:
+  - C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)
+      at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)
+      at Module._load (node:internal/modules/cjs/loader:1242:25)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+      at Module.require (node:internal/modules/cjs/loader:1556:12)
+      at require (node:internal/modules/helpers:152:16)
+      at load (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:5:16)
+      at fixture (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:9:51)
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:16:107) {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: [ 'C:\\Users\\LiXiaozhou\\.codex\\worktrees\\harmony-c-ui-polish\\Camera\\harmony\\tests\\report-result-behavior.test.cjs' ]
+  }
+
+test at harmony\tests\report-result-behavior.test.cjs:17:1
+✖ invalid report IDs do not request; guest only gets login prompt (0.5501ms)
+  Error: Cannot find module '../entry/src/main/ets/features/report/ReportResultController.ets'
+  Require stack:
+  - C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)
+      at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)
+      at Module._load (node:internal/modules/cjs/loader:1242:25)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+      at Module.require (node:internal/modules/cjs/loader:1556:12)
+      at require (node:internal/modules/helpers:152:16)
+      at load (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:5:16)
+      at fixture (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:9:51)
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:17:90) {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: [ 'C:\\Users\\LiXiaozhou\\.codex\\worktrees\\harmony-c-ui-polish\\Camera\\harmony\\tests\\report-result-behavior.test.cjs' ]
+  }
+
+test at harmony\tests\report-result-behavior.test.cjs:18:1
+✖ same load shares the in-flight read while changing target cancels old result (0.4656ms)
+  Error: Cannot find module '../entry/src/main/ets/features/report/ReportResultController.ets'
+  Require stack:
+  - C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)
+      at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)
+      at Module._load (node:internal/modules/cjs/loader:1242:25)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+      at Module.require (node:internal/modules/cjs/loader:1556:12)
+      at require (node:internal/modules/helpers:152:16)
+      at load (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:5:16)
+      at fixture (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:9:51)
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:18:103) {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: [ 'C:\\Users\\LiXiaozhou\\.codex\\worktrees\\harmony-c-ui-polish\\Camera\\harmony\\tests\\report-result-behavior.test.cjs' ]
+  }
+
+test at harmony\tests\report-result-behavior.test.cjs:19:1
+✖ hidden or switched identity invalidates old success, catch and finally (0.4864ms)
+  Error: Cannot find module '../entry/src/main/ets/features/report/ReportResultController.ets'
+  Require stack:
+  - C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)
+      at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)
+      at Module._load (node:internal/modules/cjs/loader:1242:25)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+      at Module.require (node:internal/modules/cjs/loader:1556:12)
+      at require (node:internal/modules/helpers:152:16)
+      at load (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:5:16)
+      at fixture (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:9:51)
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:19:131) {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: [ 'C:\\Users\\LiXiaozhou\\.codex\\worktrees\\harmony-c-ui-polish\\Camera\\harmony\\tests\\report-result-behavior.test.cjs' ]
+  }
+
+test at harmony\tests\report-result-behavior.test.cjs:20:1
+✖ identity changes without explicit suspend are detected before load/tap/response (0.4332ms)
+  Error: Cannot find module '../entry/src/main/ets/features/report/ReportResultController.ets'
+  Require stack:
+  - C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)
+      at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)
+      at Module._load (node:internal/modules/cjs/loader:1242:25)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+      at Module.require (node:internal/modules/cjs/loader:1556:12)
+      at require (node:internal/modules/helpers:152:16)
+      at load (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:5:16)
+      at fixture (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:9:51)
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:20:106) {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: [ 'C:\\Users\\LiXiaozhou\\.codex\\worktrees\\harmony-c-ui-polish\\Camera\\harmony\\tests\\report-result-behavior.test.cjs' ]
+  }
+
+test at harmony\tests\report-result-behavior.test.cjs:21:1
+✖ independent report instances only cancel their own read and unused create keys (0.4971ms)
+  Error: Cannot find module '../entry/src/main/ets/features/report/ReportResultController.ets'
+  Require stack:
+  - C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)
+      at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)
+      at Module._load (node:internal/modules/cjs/loader:1242:25)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+      at Module.require (node:internal/modules/cjs/loader:1556:12)
+      at require (node:internal/modules/helpers:152:16)
+      at load (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:5:16)
+      at fixture (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:9:51)
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:21:105) {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: [ 'C:\\Users\\LiXiaozhou\\.codex\\worktrees\\harmony-c-ui-polish\\Camera\\harmony\\tests\\report-result-behavior.test.cjs' ]
+  }
+
+test at harmony\tests\report-result-behavior.test.cjs:22:1
+✖ pending, safe action, recorded follow-up, malformed feedback and legacy have distinct meaning (0.504ms)
+  Error: Cannot find module '../entry/src/main/ets/features/report/ReportResultController.ets'
+  Require stack:
+  - C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)
+      at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)
+      at Module._load (node:internal/modules/cjs/loader:1242:25)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+      at Module.require (node:internal/modules/cjs/loader:1556:12)
+      at require (node:internal/modules/helpers:152:16)
+      at load (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:5:16)
+      at fixture (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:9:51)
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:29:53) {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: [ 'C:\\Users\\LiXiaozhou\\.codex\\worktrees\\harmony-c-ui-polish\\Camera\\harmony\\tests\\report-result-behavior.test.cjs' ]
+  }
+
+test at harmony\tests\report-result-behavior.test.cjs:30:1
+✖ malformed arrays, duplicate IDs, nonnumeric target and failed read stay empty with retryable error (0.4859ms)
+  Error: Cannot find module '../entry/src/main/ets/features/report/ReportResultController.ets'
+  Require stack:
+  - C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)
+      at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)
+      at Module._load (node:internal/modules/cjs/loader:1242:25)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+      at Module.require (node:internal/modules/cjs/loader:1556:12)
+      at require (node:internal/modules/helpers:152:16)
+      at load (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:5:16)
+      at fixture (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:9:51)
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\report-result-behavior.test.cjs:30:191) {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: [ 'C:\\Users\\LiXiaozhou\\.codex\\worktrees\\harmony-c-ui-polish\\Camera\\harmony\\tests\\report-result-behavior.test.cjs' ]
+  }

@@ -1,0 +1,13 @@
+--- a/harmony/entry/src/main/ets/model/ApiModels.ets
++++ b/harmony/entry/src/main/ets/model/ApiModels.ets
+@@ -413,6 +413,10 @@
+ }
+ 
+ export interface ReportSummary {
++  readonly resolution?: string;
++  readonly publicOutcome?: string;
++  readonly publicMessage?: string;
++  readonly followUpRecorded?: boolean;
+   readonly reportId: number;
+   readonly reporterId: number;
+   readonly targetType: string;

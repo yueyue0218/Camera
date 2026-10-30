@@ -499,6 +499,10 @@ export interface CreateReportPayload {
 }
 
 export interface ReportSummary {
+  readonly resolution?: string;
+  readonly publicOutcome?: string;
+  readonly publicMessage?: string;
+  readonly followUpRecorded?: boolean;
   readonly reportId: number;
   readonly reporterId: number;
   readonly targetType: string;

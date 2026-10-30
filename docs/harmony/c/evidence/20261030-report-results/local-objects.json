@@ -1,0 +1,13 @@
+{
+  "origin": "http://127.0.0.1:18090",
+  "database": "portra_c_report_result_20261030",
+  "administratorCreated": false,
+  "reporterId": 1,
+  "ownerId": 2,
+  "historyMomentId": 1,
+  "nativeReportTargetMomentId": 2,
+  "httpReportId": 1,
+  "status": "PENDING",
+  "publicOutcome": "PENDING",
+  "otherAccountOwnListEmpty": true
+}
