@@ -49,7 +49,7 @@ export class EngagementPolicy {
     if (content.trim().length === 0) { return '请填写内容，不能只包含空白字符。'; }
     if (content.trim().length > EngagementPolicy.maxLength(mode,reason)) { return '内容不能超过 200 字。'; }
     if (mode === 'review' && (!Number.isInteger(rating) || rating < 1 || rating > 5)) { return '请选择 1 至 5 星评分。'; }
-    if (mode === 'complaint' && !EngagementPolicy.complaintReasons.includes(reason)) { return '请选择申诉原因。'; }
+    if (mode === 'complaint' && !EngagementPolicy.complaintReasons.includes(reason)) { return '请选择投诉原因。'; }
     return '';
   }
   static canReview(order: OrderEngagementSummary, actor: number, reviews: ReviewSummary[]): boolean {
@@ -115,8 +115,8 @@ export class EngagementController {
     let orderId=0; let targetReview: ReviewSummary | undefined; let targetComplaint: ReviewComplaintSummary | undefined;
     try {
       if(kind==='review') {const item=await this.api.getReview(id,this.requestKey(`target.${epoch}`));if(item.reviewId!==id){throw new Error('评价对象不一致');}orderId=item.orderId;targetReview=item;}
-      else if(kind==='complaint'){const item=await this.api.getReviewComplaint(id,this.requestKey(`target.${epoch}`));if(item.complaintId!==id){throw new Error('申诉对象不一致');}orderId=item.orderId;targetComplaint=item;}
-      else if(kind==='dispute'){const item=await this.api.getDispute(id,this.requestKey(`target.${epoch}`));if(item.id!==id){throw new Error('订单申诉对象不一致');}orderId=item.orderId;}
+      else if(kind==='complaint'){const item=await this.api.getReviewComplaint(id,this.requestKey(`target.${epoch}`));if(item.complaintId!==id){throw new Error('投诉对象不一致');}orderId=item.orderId;targetComplaint=item;}
+      else if(kind==='dispute'){const item=await this.api.getDispute(id,this.requestKey(`target.${epoch}`));if(item.id!==id){throw new Error('订单投诉对象不一致');}orderId=item.orderId;}
       else {throw new Error('暂不支持此通知对象');}
       if(!this.current(epoch,version)){return;}
       if(!Number.isSafeInteger(orderId)||orderId<=0||(expectedOrderId>0&&expectedOrderId!==orderId)){throw new Error('关联订单信息不一致');}
@@ -146,22 +146,22 @@ export class EngagementController {
       }
       if(targetComplaint!==undefined) {
         if(targetComplaint.orderId!==orderId||!Number.isSafeInteger(targetComplaint.reviewId)||targetComplaint.reviewId<=0||
-          ![targetComplaint.complainantId,targetComplaint.respondentId].includes(actor.userId)){throw new Error('无权查看这条申诉');}
+          ![targetComplaint.complainantId,targetComplaint.respondentId].includes(actor.userId)){throw new Error('无权查看这条投诉');}
         this.state.complaints.push(targetComplaint);
       }
       try {
         const disputes=await this.api.listOrderDisputes(orderId,this.requestKey(`disputes.${epoch}`));if(!this.current(epoch,version)){return;}
-        if(!Array.isArray(disputes)||disputes.some((d: DisputeSummary)=>d.orderId!==orderId||!Number.isSafeInteger(d.id)||d.id<=0)){throw new Error('订单申诉数据异常');}
+        if(!Array.isArray(disputes)||disputes.some((d: DisputeSummary)=>d.orderId!==orderId||!Number.isSafeInteger(d.id)||d.id<=0)){throw new Error('订单投诉数据异常');}
         this.state.disputes=disputes;
         for(const review of reviews){
           const list=await this.api.listReviewComplaints(review.reviewId,this.requestKey(`complaints.${epoch}.${review.reviewId}`));
           if(!this.current(epoch,version)){return;}
-          if(!Array.isArray(list)||list.some((r: ReviewComplaintSummary)=>r.orderId!==orderId||r.reviewId!==review.reviewId||!Number.isSafeInteger(r.complaintId)||r.complaintId<=0)){throw new Error('评价申诉数据异常');}
+          if(!Array.isArray(list)||list.some((r: ReviewComplaintSummary)=>r.orderId!==orderId||r.reviewId!==review.reviewId||!Number.isSafeInteger(r.complaintId)||r.complaintId<=0)){throw new Error('评价投诉数据异常');}
           list.forEach((item:ReviewComplaintSummary)=>{
             if(!this.state.complaints.some((r:ReviewComplaintSummary)=>r.complaintId===item.complaintId)){this.state.complaints.push(item);}
           });
         }
-      }catch(error){if(this.current(epoch,version)){this.state.recordsError='申诉记录暂时加载失败，请刷新后再操作。';}}
+      }catch(error){if(this.current(epoch,version)){this.state.recordsError='投诉记录暂时加载失败，请刷新后再操作。';}}
     }catch(error){if(this.current(epoch,version)){this.state.error=(error as Error).message||'订单评价暂时打不开';}}
     finally {if(this.current(epoch,version)){this.state.loading=false;this.publish();}}
   }
@@ -215,7 +215,7 @@ export class EngagementController {
     try {
       await this.send(command);if(this.pending.get(key)===command){this.pending.delete(key);}
       if(!this.current(epoch,version)){return;}
-      this.state.form=new EngagementForm();this.state.message=command.mode==='review'?'评价已提交':command.mode==='followup'?'追评已提交':command.mode==='complaint'?'评价申诉已提交':command.mode==='dispute'?'订单申诉已提交':'申诉回复已提交';
+      this.state.form=new EngagementForm();this.state.message=command.mode==='review'?'评价已提交':command.mode==='followup'?'追评已提交':command.mode==='complaint'?'评价投诉已提交':command.mode==='dispute'?'订单投诉已提交':'投诉回复已提交';
       this.publish();await this.load(command.orderId);
     }catch(error){
       const mapped=error as FormFailure;
@@ -234,11 +234,11 @@ export class EngagementController {
         (c.mode==='followup'&&(r.reviewId!==c.targetId||r.replyContent!==c.content))){throw new Error('评价响应异常');}
     }else if(c.mode==='complaint'){
       const r=await this.api.createReviewComplaint(c.targetId,{reason:`${c.reason}：${c.content}`,evidenceFileIds:''},c.key);
-      if(!r||!Number.isSafeInteger(r.complaintId)||r.complaintId<=0||r.reviewId!==c.targetId||r.orderId!==c.orderId||r.complainantId!==c.actorId){throw new Error('申诉响应异常');}
+      if(!r||!Number.isSafeInteger(r.complaintId)||r.complaintId<=0||r.reviewId!==c.targetId||r.orderId!==c.orderId||r.complainantId!==c.actorId){throw new Error('投诉响应异常');}
     }else {
       const r=c.mode==='dispute'?await this.api.createDispute(c.targetId,{reason:c.content},c.key):await this.api.replyDispute(c.targetId,{content:c.content},c.key);
       if(!r||!Number.isSafeInteger(r.id)||r.id<=0||r.orderId!==c.orderId||(c.mode==='dispute'&&r.initiatorId!==c.actorId)||
-        (c.mode==='reply'&&(r.id!==c.targetId||!r.replies?.some((reply: DisputeReplySummary)=>reply.replierId===c.actorId&&reply.content===c.content)))){throw new Error('订单申诉响应异常');}
+        (c.mode==='reply'&&(r.id!==c.targetId||!r.replies?.some((reply: DisputeReplySummary)=>reply.replierId===c.actorId&&reply.content===c.content)))){throw new Error('订单投诉响应异常');}
     }
   }
   async verify(): Promise<void> {

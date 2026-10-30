@@ -38,7 +38,11 @@ export class NotificationFormat {
   static label(item: NotificationSummary): string {
     const category = NotificationFormat.category(item);
     if(category==='report'){return '举报';}if(category==='moderation'){return '平台处理';}
-    return category === 'appeal' ? '申诉' : category === 'order' ? '订单' : category === 'review' ? '评价' :
+    if(category==='appeal') {
+      const type = `${item.type} ${item.eventType ?? ''} ${item.relatedType ?? ''}`.toUpperCase();
+      return type.includes('REVIEW_COMPLAINT') ? '评价投诉' : '订单投诉';
+    }
+    return category === 'order' ? '订单' : category === 'review' ? '评价' :
       category === 'dynamic' ? '动态' : item.type.includes('CREDIT') ? '信用' : '通知';
   }
   static time(value?: string): string { return value ? value.replace('T', ' ').slice(0, 16) : '时间未知'; }

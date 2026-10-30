@@ -46,7 +46,7 @@ export struct NotificationPage {
   }
   private label(filter: string): string {
     return filter === 'all' ? '全部' : filter === 'unread' ? '未读' : filter === 'order' ? '订单' :
-      filter === 'appeal' ? '申诉' : filter === 'review' ? '评价' : filter === 'report' ? '举报' : filter === 'moderation' ? '平台处理' : '动态';
+      filter === 'appeal' ? '投诉' : filter === 'review' ? '评价' : filter === 'report' ? '举报' : filter === 'moderation' ? '平台处理' : '动态';
   }
   private count(filter: string): number {
     return this.snapshot.items.filter((item: NotificationSummary) => filter === 'all' ||
