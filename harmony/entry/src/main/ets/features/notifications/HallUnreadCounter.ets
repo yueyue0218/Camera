@@ -1,20 +1,14 @@
-/** Home notification badge: authoritative server count, never inferred from list length. */
-export interface HallUnreadApi {
-  unreadNotificationCount(requestKey: string): Promise<number>;
-  cancelNotificationRequests(requestKeys: string[]): void;
-}
+import { ApiService } from '../../network/ApiService';
+import { AuthSessionManager } from '../../auth/AuthSessionManager';
 
-export interface HallUnreadSession {
-  getSessionVersion(): number;
-  isAuthenticated(): boolean;
-}
+/** Home notification badge: authoritative server count, never inferred from list length. */
 
 let nextHallUnreadInstance: number = 0;
 
 export class HallUnreadCounter {
   private readonly key: string = `hall.notifications.unread.${++nextHallUnreadInstance}`;
-  private readonly api: HallUnreadApi;
-  private readonly session: HallUnreadSession;
+  private readonly api: ApiService;
+  private readonly session: AuthSessionManager;
   private readonly changed: (count: number, arrivalEpoch: number) => void;
   private timer: number = -1;
   private running: boolean = false;
@@ -25,7 +19,7 @@ export class HallUnreadCounter {
   private unread: number = 0;
   private arrivalEpoch: number = 0;
 
-  constructor(api: HallUnreadApi, session: HallUnreadSession,
+  constructor(api: ApiService, session: AuthSessionManager,
     changed: (count: number, arrivalEpoch: number) => void) {
     this.api = api;
     this.session = session;
