@@ -1,0 +1,62 @@
+{
+  "base": "7a09a4821c67f74e03bc91bdb0428635dd5518e2",
+  "ownerAuthorization": "User explicitly confirmed public maintainer authorization to apply Shell search entry",
+  "applied": true,
+  "installed": true,
+  "scope": {
+    "PROVIDER": "demands only",
+    "CUSTOMER": "service packages only",
+    "manualCategorySwitch": false,
+    "guest": "normal existing login required"
+  },
+  "tests": {
+    "passed": 234,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 0,
+    "exitCode": 0
+  },
+  "build": {
+    "exitCode": 0,
+    "duration": "19 s 151 ms",
+    "hapSha256": "a37689a36a8c15c0b3a17ef177d85a9830ac106d70e478251ccbeab7fd6a333c"
+  },
+  "files": [
+    {
+      "file": "harmony/entry/src/main/ets/features/shell/PortraAppShell.ets",
+      "ownerBoundary": true,
+      "sha256": "6e00a6b20c48a73b46b43c023ffbb66ffe66fa6e5b0b5e210a9592925cb1bb0f"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/features/search/HallSearchController.ets",
+      "ownerBoundary": false,
+      "sha256": "396d6c1d0e95d695473b7acc769ee1c896716fe10a4964d0d767575aeb4001c7"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/features/search/HallSearchApiBinding.ets",
+      "ownerBoundary": false,
+      "sha256": "56bef5d355352237ff6e790166d1ad3f2b97abeda3492744682b643f27de4f03"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/features/search/HallSearchPanel.ets",
+      "ownerBoundary": false,
+      "sha256": "7341d19f9ec4687eedd3851bfca71df5c05c67ca7eb20e23bcf0cad30552c2bb"
+    },
+    {
+      "file": "harmony/tests/hall-search-behavior.test.cjs",
+      "ownerBoundary": false,
+      "sha256": "96ad9ab0abaa70413f5ecbdbd7107aad87241f6c572cd6d097911ddc97dbb268"
+    },
+    {
+      "file": "harmony/tests/hall-header-search-binding.test.cjs",
+      "ownerBoundary": false,
+      "sha256": "b16077bc474d64d1dc018c96585acb78c4042bc5d16637bcd781314c38bb0f0e"
+    },
+    {
+      "file": "harmony/tests/hall-search-observer.test.cjs",
+      "ownerBoundary": false,
+      "sha256": "f3ed04898073c292316b660c736744a9964b60282e805f1f7608201a08cf62f3"
+    }
+  ],
+  "shellPatchSha256": "1695fbaf28b92ce729e351804df80a188d4f3fc96c6b5dff468d419da22a857c"
+}

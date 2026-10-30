@@ -48,6 +48,8 @@ export struct HallPage {
     this.demandPage = 0;
     this.serviceHasMore = false;
     this.demandHasMore = false;
+    this.serviceLoadingMore = false;
+    this.demandLoadingMore = false;
     this.serviceState = HallContentState.LOADING;
     this.demandState = HallContentState.LOADING;
     this.serviceError = '';
@@ -82,11 +84,11 @@ export struct HallPage {
       this.serviceHasMore = HallDataPolicy.hasMore(this.serviceItems.length, result.total);
       this.serviceState = this.serviceItems.length === 0 ? HallContentState.EMPTY : HallContentState.CONTENT;
     } catch (error) {
-      if (version !== this.loadVersion || this.isStale(error)) {
+      if (version !== this.loadVersion) {
         return;
       }
       this.serviceState = HallContentState.ERROR;
-      this.serviceError = this.messageFor(error);
+      this.serviceError = this.isStale(error) ? '加载已中断，请重试。' : this.messageFor(error);
     } finally {
       if (version === this.loadVersion) {
         this.serviceLoadingMore = false;
@@ -120,11 +122,11 @@ export struct HallPage {
       this.demandHasMore = HallDataPolicy.hasMore(this.demandItems.length, result.total);
       this.demandState = this.demandItems.length === 0 ? HallContentState.EMPTY : HallContentState.CONTENT;
     } catch (error) {
-      if (version !== this.loadVersion || this.isStale(error)) {
+      if (version !== this.loadVersion) {
         return;
       }
       this.demandState = HallContentState.ERROR;
-      this.demandError = this.messageFor(error);
+      this.demandError = this.isStale(error) ? '加载已中断，请重试。' : this.messageFor(error);
     } finally {
       if (version === this.loadVersion) {
         this.demandLoadingMore = false;

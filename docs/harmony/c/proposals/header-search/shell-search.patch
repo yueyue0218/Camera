@@ -1,0 +1,43 @@
+diff --git a/harmony/entry/src/main/ets/features/shell/PortraAppShell.ets b/harmony/entry/src/main/ets/features/shell/PortraAppShell.ets
+index 2685b77..ec7702b 100644
+--- a/harmony/entry/src/main/ets/features/shell/PortraAppShell.ets
++++ b/harmony/entry/src/main/ets/features/shell/PortraAppShell.ets
+@@ -0,0 +1,2 @@
++import { uiObserver } from '@kit.ArkUI';
++import { HallSearchPanel } from '../search/HallSearchPanel';
+@@ -19,6 +21,15 @@ export struct PortraAppShell {
+-  private showPending(message: string): void {
+-    try {
+-      this.getUIContext().getPromptAction().showToast({ message: message, duration: 1600 });
+-    } catch {
+-      // A missing UI context must not turn a placeholder entry into an app crash.
+-    }
++  @State private searchOpen: boolean = false;
++
++  private searchRouteVisible(update?: uiObserver.NavDestinationInfo): boolean {
++    const navigation = this.queryNavigationInfo(); let destination = this.queryNavDestinationInfo();
++    if (navigation === undefined) { throw new Error('Navigation unavailable'); }
++    if (destination === undefined) { return navigation.pathStack.size() === 0; }
++    if (update?.navDestinationId === destination.navDestinationId) { destination = update; }
++    return destination.index === navigation.pathStack.size() - 1 &&
++      destination.state !== uiObserver.NavDestinationState.ON_HIDDEN && destination.state !== uiObserver.NavDestinationState.ON_WILL_HIDE &&
++      destination.state !== uiObserver.NavDestinationState.ON_DISAPPEAR && destination.state !== uiObserver.NavDestinationState.ON_WILL_DISAPPEAR;
++  }
++  private openSearch(): void { this.searchOpen = true; }
++  private openSearchResult(route: AppRoute, id: number): void {
++    this.searchOpen = false;
++    this.onOpenRoute?.(route, id);
+@@ -43 +54 @@ export struct PortraAppShell {
+-          onSearch: () => this.showPending('搜索功能将在后续业务接入'),
++          onSearch: () => this.openSearch(),
+@@ -60,0 +72,10 @@ export struct PortraAppShell {
++    .bindSheet(this.searchOpen, this.SearchBody(), { height: SheetSize.LARGE, showClose: false,
++      backgroundColor: PortraTheme.surface, keyboardAvoidMode: SheetKeyboardAvoidMode.RESIZE_ONLY,
++      onWillDismiss: (action: DismissSheetAction) => { this.searchOpen = false; action.dismiss(); } })
++  }
++  @Builder
++  private SearchBody() {
++    HallSearchPanel({ routeVisible: (update?: uiObserver.NavDestinationInfo) => this.searchRouteVisible(update),
++      onRequireLogin: () => { this.searchOpen = false; this.onOpenRoute?.(AppRoute.LOGIN); }, onClose: () => this.searchOpen = false,
++      onOpenService: (id: number) => this.openSearchResult(AppRoute.SERVICE_DETAIL, id),
++      onOpenDemand: (id: number) => this.openSearchResult(AppRoute.DEMAND_DETAIL, id) })

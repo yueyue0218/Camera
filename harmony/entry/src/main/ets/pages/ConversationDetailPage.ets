@@ -27,16 +27,24 @@ export struct ConversationDetailPage {
   @State private quoteService: string = '';
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
+  private sessionVersion: number = -1;
   private contentVersion: number = 0;
   private refreshTimer: number = -1;
+  private active: boolean = false;
   onBack?: () => void;
 
   aboutToAppear(): void {
+    this.active = true;
+    if (this.refreshTimer >= 0) {
+      clearInterval(this.refreshTimer);
+    }
+    this.busy = false;
     this.initialize();
     this.refreshTimer = setInterval(() => this.refreshContent(), 5000);
   }
 
   aboutToDisappear(): void {
+    this.active = false;
     this.requestVersion++;
     if (this.refreshTimer >= 0) {
       clearInterval(this.refreshTimer);
@@ -49,18 +57,32 @@ export struct ConversationDetailPage {
 
   private async initialize(): Promise<void> {
     const version = ++this.requestVersion;
+    this.sessionVersion = this.appClient.sessionManager.getSessionVersion();
     this.loading = true;
     this.errorMessage = '';
+    this.messages = [];
+    this.quotes = [];
+    this.conversation = null;
+    this.userId = 0;
     try {
       const session = await this.appClient.apiService.currentSession();
+      if (!this.isCurrent(version)) {
+        return;
+      }
       const conversations = await this.appClient.apiService.listConversations('conversations.detail.list');
+      if (!this.isCurrent(version)) {
+        return;
+      }
       const match = conversations.find((item: ConversationSummary) => item.conversationId === this.conversationId);
       if (match === undefined) {
         throw new Error('会话不存在或无权查看');
       }
       const messages = await this.appClient.apiService.listMessages(this.conversationId);
+      if (!this.isCurrent(version)) {
+        return;
+      }
       const quotes = await this.appClient.apiService.listQuotes(this.conversationId);
-      if (version === this.requestVersion) {
+      if (this.isCurrent(version)) {
         this.userId = session.userId;
         this.conversation = match;
         this.messages = Array.isArray(messages) ? messages : [];
@@ -78,6 +100,22 @@ export struct ConversationDetailPage {
   }
 
   private async refreshContent(): Promise<void> {
+    if (!this.active) {
+      return;
+    }
+    if (!this.isCurrent(this.requestVersion)) {
+      if (this.refreshTimer >= 0) {
+        clearInterval(this.refreshTimer);
+        this.refreshTimer = -1;
+      }
+      this.messages = [];
+      this.quotes = [];
+      this.conversation = null;
+      this.userId = 0;
+      this.loading = false;
+      this.errorMessage = '账号状态已变化，请返回后重新打开会话';
+      return;
+    }
     if (this.loading || this.busy || this.conversation === null) {
       return;
     }
@@ -85,8 +123,11 @@ export struct ConversationDetailPage {
     const contentVersion = ++this.contentVersion;
     try {
       const messages = await this.appClient.apiService.listMessages(this.conversationId);
+      if (!this.isCurrent(version)) {
+        return;
+      }
       const quotes = await this.appClient.apiService.listQuotes(this.conversationId);
-      if (version === this.requestVersion && contentVersion === this.contentVersion && !this.busy) {
+      if (this.isCurrent(version) && contentVersion === this.contentVersion && !this.busy) {
         this.messages = Array.isArray(messages) ? messages : this.messages;
         this.quotes = Array.isArray(quotes) ? quotes : this.quotes;
       }
@@ -97,14 +138,18 @@ export struct ConversationDetailPage {
 
   private async send(): Promise<void> {
     const content = this.draft.trim();
-    if (this.busy || !content) {
+    if (this.busy || !content || !this.isCurrent(this.requestVersion)) {
       return;
     }
+    const version = this.requestVersion;
     this.busy = true;
     this.contentVersion++;
     this.actionError = '';
     try {
       const sent = await this.appClient.apiService.sendMessage(this.conversationId, content);
+      if (!this.isCurrent(version)) {
+        return;
+      }
       if (sent === null || sent.conversationId !== this.conversationId || !Number.isSafeInteger(sent.messageId) ||
         sent.messageId <= 0 || sent.messageType !== 'TEXT') {
         throw new Error('发送结果缺少有效消息编号');
@@ -112,9 +157,14 @@ export struct ConversationDetailPage {
       this.messages = [...this.messages.filter((item: MessageSummary) => item.messageId !== sent.messageId), sent];
       this.draft = '';
     } catch (error) {
+      if (!this.isCurrent(version)) {
+        return;
+      }
       this.actionError = (error as PortraError).message || '发送失败，内容已保留';
     } finally {
-      this.busy = false;
+      if (version === this.requestVersion) {
+        this.busy = false;
+      }
     }
   }
 
@@ -127,7 +177,7 @@ export struct ConversationDetailPage {
   }
 
   private async createQuote(): Promise<void> {
-    if (this.busy) {
+    if (this.busy || !this.isCurrent(this.requestVersion)) {
       return;
     }
     const start = this.normalizedDateTime(this.quoteStart);
@@ -146,11 +196,15 @@ export struct ConversationDetailPage {
       shootStartTime: start, shootEndTime: end, deliveryDeadline: delivery,
       location: this.quoteLocation.trim(), serviceContent: this.quoteService.trim()
     };
+    const version = this.requestVersion;
     this.busy = true;
     this.contentVersion++;
     this.actionError = '';
     try {
       const quote = await this.appClient.apiService.createQuote(payload);
+      if (!this.isCurrent(version)) {
+        return;
+      }
       if (quote === null || quote.conversationId !== this.conversationId ||
         !Number.isSafeInteger(quote.quotationId) || quote.quotationId <= 0) {
         throw new Error('约定结果缺少有效编号');
@@ -158,36 +212,59 @@ export struct ConversationDetailPage {
       this.quotes = [quote, ...this.quotes];
       this.showQuoteForm = false;
     } catch (error) {
+      if (!this.isCurrent(version)) {
+        return;
+      }
       this.actionError = (error as PortraError).message || '提交约定失败';
     } finally {
-      this.busy = false;
+      if (version === this.requestVersion) {
+        this.busy = false;
+      }
     }
   }
 
   private async confirmQuote(quoteId: number): Promise<void> {
-    if (this.busy) {
+    if (this.busy || !this.isCurrent(this.requestVersion)) {
       return;
     }
+    const version = this.requestVersion;
     this.busy = true;
     this.contentVersion++;
     this.actionError = '';
     try {
       const result = await this.appClient.apiService.confirmQuote(quoteId);
+      if (!this.isCurrent(version)) {
+        return;
+      }
       if (result === null || result.quotationId !== quoteId || result.quotationStatus !== 'CONFIRMED' ||
         !Number.isSafeInteger(result.orderId) || result.orderId <= 0) {
         throw new Error('确认结果缺少有效订单');
       }
       await this.refreshAfterAction();
     } catch (error) {
+      if (!this.isCurrent(version)) {
+        return;
+      }
       this.actionError = (error as PortraError).message || '确认失败';
     } finally {
-      this.busy = false;
+      if (version === this.requestVersion) {
+        this.busy = false;
+      }
     }
   }
 
   private async refreshAfterAction(): Promise<void> {
+    const version = this.requestVersion;
     const result = await this.appClient.apiService.listQuotes(this.conversationId);
+    if (!this.isCurrent(version)) {
+      return;
+    }
     this.quotes = Array.isArray(result) ? result : this.quotes;
+  }
+
+  private isCurrent(version: number): boolean {
+    return this.active && version === this.requestVersion &&
+      this.sessionVersion === this.appClient.sessionManager.getSessionVersion();
   }
 
   @Builder

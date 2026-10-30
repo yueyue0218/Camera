@@ -57,21 +57,26 @@ export struct ProfilePage {
   private readonly appClient: AppClient = AppClient.shared;
   private loadVersion: number = 0;
   private cancellationRequestVersion: number = 0;
+  private roleSwitchVersion: number = 0;
   onBack?: () => void;
   onSignedOut?: () => void;
   onRequireLogin?: () => void;
+  onOpenCredit?: () => void;
   onOpenOrders?: () => void;
   onOpenMessages?: () => void;
   onOpenPublish?: () => void;
   onPrivacyConsentWithdrawn?: () => void;
 
   aboutToAppear(): void {
+    this.signingOut = false;
+    this.switchingRole = false;
     this.load();
   }
 
   aboutToDisappear(): void {
     this.loadVersion++;
     this.cancellationRequestVersion++;
+    this.roleSwitchVersion++;
     this.appClient.apiService.cancelCurrentSession();
     this.appClient.apiService.cancelUserSystemRequests(this.userId);
     this.appClient.apiService.cancelAccountCancellationRequests();
@@ -79,6 +84,7 @@ export struct ProfilePage {
 
   private async load(): Promise<void> {
     const version = ++this.loadVersion;
+    const sessionVersion = this.appClient.sessionManager.getSessionVersion();
     this.loading = true;
     this.errorMessage = '';
     this.requiresLogin = false;
@@ -91,13 +97,16 @@ export struct ProfilePage {
     this.favorites = [];
     this.followers = [];
     this.following = [];
+    this.loadingMoreMoments = false;
+    this.loadingMoreFavorites = false;
     this.momentPage = 1;
     this.momentTotal = 0;
     this.favoritePage = 1;
     this.favoriteTotal = 0;
     try {
       const profile: UserProfileSummary = await this.appClient.apiService.getMyProfile();
-      if (version !== this.loadVersion) {
+      if (version !== this.loadVersion ||
+        sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
         return;
       }
       if (profile === null || !Number.isSafeInteger(profile.id) || profile.id <= 0 ||
@@ -110,7 +119,8 @@ export struct ProfilePage {
       this.nickname = this.profileNickname(profile);
 
       const momentPage = await this.appClient.apiService.listProfileMoments(profile.id, profile.currentRole, 1, 4);
-      if (version !== this.loadVersion) {
+      if (version !== this.loadVersion ||
+        sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
         return;
       }
       if (!Array.isArray(momentPage.records) || !Number.isSafeInteger(momentPage.total) || momentPage.total < 0 ||
@@ -121,7 +131,8 @@ export struct ProfilePage {
       this.momentTotal = momentPage.total;
 
       const favoritePage = await this.appClient.apiService.listFavoriteMoments(1, 4);
-      if (version !== this.loadVersion) {
+      if (version !== this.loadVersion ||
+        sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
         return;
       }
       if (!Array.isArray(favoritePage.records) || !Number.isSafeInteger(favoritePage.total) || favoritePage.total < 0 ||
@@ -132,23 +143,27 @@ export struct ProfilePage {
       this.favoriteTotal = favoritePage.total;
 
       const followers = await this.appClient.apiService.listFollowers(profile.id, profile.currentRole);
-      if (version !== this.loadVersion) {
+      if (version !== this.loadVersion ||
+        sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
         return;
       }
       this.followers = this.validSocialUsers(followers);
 
       const customerFollowing = await this.appClient.apiService.listFollowing(profile.id, 'CUSTOMER');
-      if (version !== this.loadVersion) {
+      if (version !== this.loadVersion ||
+        sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
         return;
       }
       const providerFollowing = await this.appClient.apiService.listFollowing(profile.id, 'PROVIDER');
-      if (version !== this.loadVersion) {
+      if (version !== this.loadVersion ||
+        sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
         return;
       }
       this.following = this.mergeSocialUsers(
         this.validSocialUsers(customerFollowing), this.validSocialUsers(providerFollowing));
     } catch (error) {
-      if (version === this.loadVersion) {
+      if (version === this.loadVersion &&
+        sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
         const mapped = error as PortraError;
         this.requiresLogin = mapped.httpStatus === 401 || mapped.businessCode === 40101;
         this.errorMessage = mapped.message || '资料加载失败，请稍后重试';
@@ -156,6 +171,18 @@ export struct ProfilePage {
     } finally {
       if (version === this.loadVersion) {
         this.loading = false;
+        if (sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
+          this.profile = null;
+          this.moments = [];
+          this.favorites = [];
+          this.followers = [];
+          this.following = [];
+          this.nickname = '';
+          this.role = '';
+          this.userId = 0;
+          this.requiresLogin = !this.appClient.sessionManager.isAuthenticated();
+          this.errorMessage = '账号状态已变化，请重新读取资料';
+        }
       }
     }
   }
@@ -200,9 +227,15 @@ export struct ProfilePage {
     }
     this.loadingMoreMoments = true;
     this.errorMessage = '';
+    const version = this.loadVersion;
+    const sessionVersion = this.appClient.sessionManager.getSessionVersion();
     const nextPage = this.momentPage + 1;
     try {
       const result = await this.appClient.apiService.listProfileMoments(this.userId, this.role, nextPage, 4);
+      if (version !== this.loadVersion ||
+        sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
+        return;
+      }
       if (!Array.isArray(result.records) ||
         result.records.some((item: MomentSummary) => !MomentFeedFormatter.isValid(item))) {
         throw new Error('用户动态格式异常');
@@ -211,9 +244,15 @@ export struct ProfilePage {
       this.momentPage = nextPage;
       this.momentTotal = result.total;
     } catch (error) {
+      if (version !== this.loadVersion ||
+        sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
+        return;
+      }
       this.errorMessage = (error as PortraError).message || '更多动态加载失败';
     } finally {
-      this.loadingMoreMoments = false;
+      if (version === this.loadVersion) {
+        this.loadingMoreMoments = false;
+      }
     }
   }
 
@@ -223,9 +262,15 @@ export struct ProfilePage {
     }
     this.loadingMoreFavorites = true;
     this.errorMessage = '';
+    const version = this.loadVersion;
+    const sessionVersion = this.appClient.sessionManager.getSessionVersion();
     const nextPage = this.favoritePage + 1;
     try {
       const result = await this.appClient.apiService.listFavoriteMoments(nextPage, 4);
+      if (version !== this.loadVersion ||
+        sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
+        return;
+      }
       if (!Array.isArray(result.records) ||
         result.records.some((item: MomentSummary) => !MomentFeedFormatter.isValid(item))) {
         throw new Error('收藏列表格式异常');
@@ -234,9 +279,15 @@ export struct ProfilePage {
       this.favoritePage = nextPage;
       this.favoriteTotal = result.total;
     } catch (error) {
+      if (version !== this.loadVersion ||
+        sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
+        return;
+      }
       this.errorMessage = (error as PortraError).message || '更多收藏加载失败';
     } finally {
-      this.loadingMoreFavorites = false;
+      if (version === this.loadVersion) {
+        this.loadingMoreFavorites = false;
+      }
     }
   }
 
@@ -245,19 +296,41 @@ export struct ProfilePage {
       return;
     }
     const targetRole = this.role === 'PROVIDER' ? 'CUSTOMER' : 'PROVIDER';
+    const roleOperation = ++this.roleSwitchVersion;
+    const version = this.loadVersion;
+    let sessionVersion = this.appClient.sessionManager.getSessionVersion();
     this.switchingRole = true;
     this.errorMessage = '';
     try {
       const result = await this.appClient.apiService.switchRole(targetRole);
+      if (version !== this.loadVersion ||
+        sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
+        return;
+      }
       if (result === null || result.id !== this.userId || result.currentRole !== targetRole) {
         throw new Error('角色切换结果异常');
       }
-      this.appClient.sessionManager.notifyIdentityChanged();
+      if (!await this.appClient.sessionManager.notifyIdentityChanged()) {
+        return;
+      }
+      // notifyIdentityChanged advances exactly one generation. Do not load for
+      // another account if it changed again while this continuation was queued.
+      if (version !== this.loadVersion ||
+        this.appClient.sessionManager.getSessionVersion() !== sessionVersion + 1) {
+        return;
+      }
+      sessionVersion = this.appClient.sessionManager.getSessionVersion();
       await this.load();
     } catch (error) {
+      if (roleOperation !== this.roleSwitchVersion ||
+        sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
+        return;
+      }
       this.errorMessage = (error as PortraError).message || '角色切换失败';
     } finally {
-      this.switchingRole = false;
+      if (roleOperation === this.roleSwitchVersion) {
+        this.switchingRole = false;
+      }
     }
   }
 
@@ -276,12 +349,20 @@ export struct ProfilePage {
       return;
     }
     this.signingOut = true;
+    this.roleSwitchVersion++;
+    const viewVersion = ++this.loadVersion;
     this.profile = null;
     this.moments = [];
     this.favorites = [];
     this.followers = [];
     this.following = [];
-    const cleared = await this.appClient.sessionManager.signOut();
+    const signingOut = this.appClient.sessionManager.signOut();
+    const sessionVersion = this.appClient.sessionManager.getSessionVersion();
+    const cleared = await signingOut;
+    if (viewVersion !== this.loadVersion ||
+      sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
+      return;
+    }
     if (cleared) {
       this.onSignedOut?.();
       return;
@@ -961,6 +1042,8 @@ export struct ProfilePage {
               this.MenuRow('我的订单', '查看合作进度', () => this.onOpenOrders?.())
               Divider().color(PortraTheme.border).padding({ left: 18, right: 18 })
               this.MenuRow('消息', '与约拍对象保持联系', () => this.onOpenMessages?.())
+                Divider().color(PortraTheme.border).padding({ left: 18, right: 18 })
+                this.MenuRow('信用分', '查看合作表现与分数变化', () => this.onOpenCredit?.())
               if (this.role === 'CUSTOMER') {
                 Divider().color(PortraTheme.border).padding({ left: 18, right: 18 })
                 this.MenuRow('发布需求', '记录新的拍摄想法', () => this.onOpenPublish?.())

@@ -1,3 +1,8 @@
+import { OrderEngagementPage } from './OrderEngagementPage';
+import { NotificationTarget } from '../features/notifications/NotificationTargetResolver';
+import { NotificationPage } from './NotificationPage';
+import { CreditPage } from './CreditPage';
+import { NotificationMomentPage } from './NotificationMomentPage';
 import { AppClient } from '../app/AppClient';
 import { PortraEmptyView } from '../common/components/PortraEmptyView';
 import { PortraAppShell } from '../features/shell/PortraAppShell';
@@ -10,6 +15,7 @@ import { ConversationDetailPage } from './ConversationDetailPage';
 import { MessagePage } from './MessagePage';
 import { OrderPage } from './OrderPage';
 import { ProfilePage } from './ProfilePage';
+import { PublicProfilePage } from './PublicProfilePage';
 import { PublishPage } from './PublishPage';
 import { PortraTheme } from '../theme/PortraTheme';
 import { PrivacyConsentPage } from '../privacy/PrivacyConsentPage';
@@ -32,6 +38,7 @@ struct Index {
   private restorePromise?: Promise<void>;
   @State private consentGateState: ConsentGateState = ConsentGateState.CHECKING;
   @State private consentError: string = '';
+  @State private orderReloadEpoch: number = 0;
 
   aboutToAppear(): void {
     if (this.appClient.hasRequiredPrivacyConsent()) {
@@ -84,7 +91,7 @@ struct Index {
           onSuccess: () => this.completeLogin(param as NavigationRouteParam)
         });
       } else if (name === AppRoute.HALL) {
-        this.AppShell();
+        this.AppShell((param as NavigationRouteParam).initialTab ?? 0);
       } else if (name === AppRoute.DEMAND_DETAIL) {
         this.DemandDetailDestination(param);
       } else if (name === AppRoute.SERVICE_DETAIL) {
@@ -99,14 +106,40 @@ struct Index {
             this.pushRoute(AppRoute.DEMAND_DETAIL, { demandId: demandId });
           }
         });
+      } else if (name === AppRoute.NOTIFICATIONS) {
+        NotificationPage({ onBack: () => this.appPathStack.pop(),
+          onRequireLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.NOTIFICATIONS }),
+          onOpenMoment: (id: number) => this.openPage(AppRoute.MOMENT_DETAIL, { momentId: id }),
+          onOpenCredit: () => this.openPage(AppRoute.CREDIT), onOpenTarget: (target: NotificationTarget) => this.openNotificationTarget(target), onOpenOrders: () => this.openPage(AppRoute.ORDER) });
+      } else if (name === AppRoute.ORDER_ENGAGEMENT) {
+        OrderEngagementPage({ targetKind: (param as NavigationRouteParam).targetKind ?? 'order',
+          targetId: (param as NavigationRouteParam).targetId ?? 0, expectedOrderId: (param as NavigationRouteParam).orderId ?? 0,
+          onBack: () => this.appPathStack.pop(),
+          onRequireLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.ORDER_ENGAGEMENT,
+            targetKind: (param as NavigationRouteParam).targetKind, targetId: (param as NavigationRouteParam).targetId,
+            orderId: (param as NavigationRouteParam).orderId }) });
+      } else if (name === AppRoute.CREDIT) {
+        CreditPage({ onBack: () => this.appPathStack.pop(),
+          onRequireLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.CREDIT }) });
+      } else if (name === AppRoute.MOMENT_DETAIL) {
+        NotificationMomentPage({ momentId: (param as NavigationRouteParam).momentId ?? 0,
+          onBack: () => this.appPathStack.pop(),
+          onRequireLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.MOMENT_DETAIL,
+            momentId: (param as NavigationRouteParam).momentId }) });
       } else if (name === AppRoute.MESSAGE) {
         MessagePage({
+          onOpenMoment: (id: number) => this.openPage(AppRoute.MOMENT_DETAIL, { momentId: id }),
+          onOpenCredit: () => this.openPage(AppRoute.CREDIT), onOpenTarget: (target: NotificationTarget) => this.openNotificationTarget(target), onOpenOrders: () => this.openPage(AppRoute.ORDER),
+          onRequireLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.MESSAGE }),
           onBack: () => this.appPathStack.pop(),
           onOpenConversation: (conversationId: number) =>
             this.openPage(AppRoute.CONVERSATION_DETAIL, { conversationId: conversationId })
         });
       } else if (name === AppRoute.ORDER) {
-        OrderPage({ onBack: () => this.appPathStack.pop() });
+        OrderPage({ reloadEpoch: this.orderReloadEpoch, onBack: () => this.appPathStack.pop(),
+          onOpenEngagement: (id: number) => this.openPage(AppRoute.ORDER_ENGAGEMENT, { targetKind: 'order', targetId: id }) });
+      } else if (name === AppRoute.PUBLIC_PROFILE) {
+        this.PublicProfileDestination(param);
       } else if (name === AppRoute.PROFILE) {
         ProfilePage({
           onBack: () => this.appPathStack.pop(),
@@ -115,6 +148,7 @@ struct Index {
             this.appPathStack.pop();
             this.appPathStack.pushPathByName(AppRoute.LOGIN, PROFILE_LOGIN_PARAM);
           },
+          onOpenCredit: () => this.openPage(AppRoute.CREDIT),
           onOpenOrders: () => this.openPage(AppRoute.ORDER),
           onOpenMessages: () => this.openPage(AppRoute.MESSAGE),
           onOpenPublish: () => this.openPage(AppRoute.PUBLISH),
@@ -125,11 +159,18 @@ struct Index {
       }
     }
     .hideTitleBar(true)
+    .onShown(() => {
+      if (name === AppRoute.ORDER) { this.orderReloadEpoch++; }
+    })
   }
 
   @Builder
-  AppShell() {
+  AppShell(initialTab: number = 0) {
     PortraAppShell({
+      initialTab: initialTab,
+      onOpenAuthor: (userId: number, role: string) => this.openPage(AppRoute.PUBLIC_PROFILE,
+        { userId: userId, userRole: role }),
+      onRequireMomentLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.HALL, initialTab: 1 }),
       onOpenRoute: (route: AppRoute, id?: number) => {
         if (id === undefined) {
           this.openPage(route);
@@ -208,6 +249,27 @@ struct Index {
     }
   }
 
+  @Builder
+  PublicProfileDestination(param: Object) {
+    if (this.validPublicUserId(param) === 0 || this.validPublicUserRole(param).length === 0) {
+      this.PlaceholderPage('用户主页', '无效的用户身份');
+    } else {
+      PublicProfilePage({ targetUserId: this.validPublicUserId(param), targetRole: this.validPublicUserRole(param),
+        onBack: () => this.appPathStack.pop(), onRequireLogin: () => {
+          this.appPathStack.pop();
+          this.openPage(AppRoute.PUBLIC_PROFILE, param as NavigationRouteParam);
+        } });
+    }
+  }
+
+  private validPublicUserId(param: Object): number {
+    return NavigationPolicy.validPublicUserId(param as NavigationRouteParam) ?? 0;
+  }
+
+  private validPublicUserRole(param: Object): string {
+    return NavigationPolicy.validPublicUserRole(param as NavigationRouteParam) ?? '';
+  }
+
   private validDemandId(param: Object): number {
     return NavigationPolicy.validDemandId(param as NavigationRouteParam) ?? 0;
   }
@@ -220,13 +282,17 @@ struct Index {
     return NavigationPolicy.validConversationId(param as NavigationRouteParam) ?? 0;
   }
 
+  private openNotificationTarget(target: NotificationTarget): void {
+    this.openPage(AppRoute.ORDER_ENGAGEMENT, { targetKind: target.kind, targetId: target.id, orderId: target.orderId });
+  }
   private pushRoute(route: AppRoute, param: NavigationRouteParam): void {
     this.appPathStack.pushPathByName(route, param);
   }
 
   private openLoginFor(route: AppRoute, param: NavigationRouteParam): void {
     const loginParam: NavigationRouteParam = {
-      returnRoute: route, demandId: param.demandId, serviceId: param.serviceId
+      returnRoute: route, targetKind: param.targetKind, targetId: param.targetId, orderId: param.orderId, momentId: param.momentId, demandId: param.demandId, serviceId: param.serviceId,
+      userId: param.userId, userRole: param.userRole, initialTab: param.initialTab
     };
     this.pushRoute(AppRoute.LOGIN, loginParam);
   }
@@ -237,11 +303,18 @@ struct Index {
     if (returnRoute === AppRoute.DEMAND_DETAIL || returnRoute === AppRoute.SERVICE_DETAIL) {
       return;
     }
+    const paths = this.appPathStack.getAllPathName();
+    if (returnRoute === AppRoute.HALL && paths.length > 0 && paths[paths.length - 1] === AppRoute.HALL) {
+      return;
+    }
     if (returnRoute !== undefined && returnRoute !== AppRoute.LOGIN) {
       const returnParam: NavigationRouteParam = {
+        targetKind: param.targetKind, targetId: param.targetId, orderId: param.orderId,
+        momentId: param.momentId,
         demandId: param.demandId,
         serviceId: param.serviceId,
-        conversationId: param.conversationId
+        conversationId: param.conversationId,
+        userId: param.userId, userRole: param.userRole, initialTab: param.initialTab
       };
       this.pushRoute(returnRoute, returnParam);
     }

@@ -63,21 +63,25 @@ export struct ServiceDetailPage {
   }
 
   private async restorePrivateState(version: number): Promise<void> {
+    const sessionVersion = this.appClient.sessionManager.getSessionVersion();
     try {
       const session = await this.appClient.apiService.currentSession();
-      if (version !== this.requestVersion) {
+      if (version !== this.requestVersion ||
+        sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
         return;
       }
       this.userId = session.userId;
       this.role = session.role.trim().toUpperCase();
       if (this.role === 'CUSTOMER') {
         const interests = await this.appClient.apiService.listServicePackageInterests(1, 100);
-        if (version === this.requestVersion && Array.isArray(interests.records)) {
+        if (version === this.requestVersion &&
+          sessionVersion === this.appClient.sessionManager.getSessionVersion() && Array.isArray(interests.records)) {
           this.interested = interests.records.some((item: ServicePackageSummary) => item.serviceId === this.serviceId);
         }
       }
     } catch (error) {
-      if (version === this.requestVersion) {
+      if (version === this.requestVersion &&
+        sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
         this.actionError = (error as PortraError).message || '个人操作状态暂不可用';
       }
     }

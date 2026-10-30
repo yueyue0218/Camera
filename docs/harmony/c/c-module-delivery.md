@@ -1,13 +1,139 @@
+# C 模块交付与真实验收记录
+
+## 2026-10-29最新：动态卡片、详情互动与举报身份修复
+
+米白页面仅图片区域黑底；点图独立详情、小箭头切图、头像昵称可点。减弱粗蓝边/重印章，删“约拍记录”；爱心/书签只图标+数量、无加载动效，详情也可收藏/取消。返回后二次点图锁与失败核实隐藏锁已修；举报身份实例key，真实刷新/前后台/详情作者返回正常。Mate90Pro API26当前包SHA 87424F5F9AA09D596F71D7A44D766767232B7562BC5F1A2CFB5CD529840BD8CE。
+
+公共b42b2a8已快进复用，C相关64/64通过、assembleHap exit0/21.306秒；全套245仅240通过，5项公共auth旧回归失败，见[C-SHARED-09交接](proposals/shared-auth-regressions/README.md)。[修改文件、真实证据与命令](evidence/20261029-feed-card/README.md)。PR25已由外部18:07:56合并，本轮没有合并操作；后续只交Draft，不改main。不宣称全套或完整发布验收完成，以下旧Draft/旧预览状态按时点保留。
+
+## 2026-10-29：动态卡片及黑底全屏图片预览，待用户审阅
+
+C卡片按Web手机布局迁移，图标+计数，选中红/金，收藏响应保留三张预览；图片进入既有独立MomentDetail全页，去底部弹层/可见“查看详情”“查看作者主页”“上一张”按钮，头像及真实昵称为入口，黑底等比自适应及中央小箭头。仅C文件，公共/B/D/后端/Web未改。237/237、assembleHap exit0，已安装并在当前Mate 90 Pro API26真实点图打开5图详情。按用户要求停在预览等审阅；本轮开关颜色、取消与作者/切图行为完整设备复核尚未完成，不宣称完整验收。逐项边界、实际命令/失败/哈希和截图见[预览证据](evidence/20261029-feed-card/README.md)。原Draft PR25未合并，本轮预览尚未提交推送。
+
+## 2026-10-29：大厅搜索按当前身份接通
+
+已获公共维护者明确授权，仅新增公共Shell搜索接线，铃铛沿用NOTIFICATIONS。**摄影师PROVIDER只搜需求，客户CUSTOMER只搜摄影橱窗；搜索中没有分类按钮或手动范围选择。** 游客先正常登录，开页/查询/分页/前台恢复读取真实currentSession，切身份清旧查询/结果，旧响应和结果点击均有会话保护。C独立控制器/名义委托/呈现及3份回归，复用已有列表API、卡片和详情，不改公共网络/DTO/认证/主题或A/B/D页。
+
+正式234/234、0fail/skip/TODO，18项独立相关复核；assembleHap exit0/19.151秒，HAP SHA256 **A37689A36A8C15C0B3A17EF177D85A9830AC106D70E478251CCBEAB7FD6A333C**。同一普通测试用户真实PROVIDER→CUSTOMER切换后，搜索分别命中需求1/橱窗6条并能进详情；无结果、键盘、真实Home恢复清理、右上铃铛通知均有[模拟器证据](evidence/20261029-header-search/README.md)。[唯一公共补丁/文件SHA](proposals/header-search/README.md)。保持原Draft PR25/base integration/harmony-v1，未合并；本地H2/unsigned不代表团队外部发布验收。
+
+## 前期记录（当前状态以本段为准）
+
+最终补充：模拟器订单通知38→order6、纠纷通知52→dispute2/order7，追评45→review3/order2、评价申诉48→complaint2/review4/order2均实际验证；最终包200字键盘及真实系统Home恢复旧草稿清理通过，见[精确目标证据](evidence/20261029-engagement/native-routing-verification.json)。
+
+<!-- ENGAGEMENT-MOBILE-20261029 -->
+## 2026-10-29：200字手机弹窗与精确业务通知已接入
+
+用户明确确认“已获公共、B、D维护者授权，应用并验收”，本轮9个边界文件已正式应用，不再等待此授权。起点31986688d74833dd5b64a09fca24bb7fd18cd899；fetch后integration仍b258ec8114ac1ff8f360099155f5d284f1247c41，没有另外可复用的公共修复提交。公共依赖随[Draft PR25](https://github.com/yueyue0218/Camera/pull/25)的本轮授权补丁交付，唯一base不变，无自动合并。
+
+按原Web OrdersPage/ReportDialog迁移评价、追评、评价申诉、订单申诉/回复、共享举报、记录及放弃确认。正文/补充说明统一**最多200字**；原举报原因固定单选，保留旧调用兼容。米白/深蓝、浅色说明、星级/单选、可滚内容和固定底部按钮，键盘缩小时继续可操作；没有迁移Web本地假成功回退。
+
+真实GET订单/评价/评价申诉/订单纠纷，真实POST五种业务表单；唯一认证HttpClient与名义委托，无新认证/网络层。通知按typed ID精确读取对应对象并关联订单，坏metadata/类型冲突/非法ID不跳错误对象。D订单页回调可选、无回调保留旧展开；真实NavDestination.onShown刷新保留的列表。举报仍唯一ReportPanel/Store，呈现单独抽出；关闭清草稿、unknown防重保留，超时只核实。
+
+| 修改分组 | 真实文件（源文件相对harmony/entry/src/main/ets；测试为仓库相对路径） |
+| --- | --- |
+| 已授权公共/B/D文件 | `model/ApiModels.ets`、`network/ApiService.ets`、`model/NavigationModels.ets`、`navigation/NavigationPolicy.ets`、`pages/Index.ets`、`pages/MessagePage.ets`、`pages/OrderPage.ets`、`features/user/ReportPanel.ets`、`features/user/ReportDialogBody.ets` |
+| C实现 | `features/engagement/EngagementController.ets`、`features/engagement/EngagementDialogs.ets`、`features/engagement/EngagementApiBinding.ets`、`features/notifications/NotificationTargetResolver.ets`、`pages/OrderEngagementPage.ets`、`pages/NotificationPage.ets` |
+| 行为回归 | `harmony/tests/engagement-behavior.test.cjs`、`harmony/tests/engagement-api.test.cjs`、`harmony/tests/notification-target.test.cjs`、`harmony/tests/moment-report-contract.test.cjs`、`harmony/tests/navigation.test.cjs` |
+
+正式**216/216、0fail/skip/TODO、exit0**；assembleHap **exit0、1分9.971秒**；最终HAP SHA256 **96853387CA72C675BB6A2B6158022A08191ACA807294BF4973C466C0AC9AF5F2**，实际安装并完成举报取消/超时/同reportId核实。相关举报独立26/26通过；设备发现的按钮初始禁用冻结、取消残留、返回旧订单状态均有RED/GREEN，未靠Node冒充导航。具体[文件清单与补丁](proposals/engagement-mobile/README.md)、[模拟器截图、业务记录、命令和退出码](evidence/20261029-engagement/README.md)。
+
+初轮真实原生完成评价/追评/评价申诉/订单申诉；恢复新隔离库后完成原生对方申诉回复、举报与精确追评/评价申诉通知。不同内存库和包来源分别记录。未修改Web/后端、共享配置、主题、认证、A页面，主工作区三份未提交frontend SHA保持。保留原Feed/缓存/筛选/收藏并发、点赞/完整详情、作者与root/HALL生命周期及既有Web闭环成果。
+
+本轮设备按用户要求只验模拟器。**举报处理结果自动通知仍缺后端事件**，不能宣称能从不存在的通知跳转；准确交接见shared-change-requests。关注角色解析、其他Web深链、系统推送/实时角标未扩展。团队原生测试环境/部署SHA/合法后台与发布签名升级仍未验证，本地H2与unsigned不代表完整发布验收；实体设备不列本轮条件。
+
+## 先前阶段记录（按原时点保留，当前状态以上为准）
+
+<!-- WEB-UI-MIGRATION-20261028 -->
+更新：2026-10-28，新增用户明确要求的Web风格原生通知/信用迁移。**已接入真实通知，替换占位；本人信用与动态风格迁移已安装并完成隔离本地验收。** 公共、B、D维护者9文件本轮已明确获授权，原公共边界不再作为这部分阻塞；其余边界保留。
+
+基线c37eb7a，分支feature/harmony-c-ui-polish，唯一base integration/harmony-v1，[PR25](https://github.com/yueyue0218/Camera/pull/25)继续Draft。保留先前Feed/筛选/缓存/收藏并发、点赞/全图详情、举报可靠性和root/HALL生命周期成果。主工作区三份frontend未提交修改未覆盖。
+
+新增C文件：features/notifications/NotificationController.ets、ActivityApiBindings.ets；features/credit/CreditController.ets；pages/NotificationPage.ets、CreditPage.ets、NotificationMomentPage.ets。C MomentFeedPage仅调整Web风格标题/留白。获授权公共文件：HttpClient、ApiModels、ApiService、NavigationModels、NavigationPolicy、Index、PortraAppShell；D MessagePage替换通知标签占位并去双标题；B ProfilePage增加可选信用入口，旧调用兼容。新增notification-credit-api/behavior、notification-moment-binding三测试，更新moment-entry-routing/navigation两测试。
+
+通知真实GET零基分页/count、PATCH单条/全部已读，明确已加载/总数；按实例key隔离，旧响应/异常/finally及tap前账号变化防护，写入不明要求GET核实。信用真实GET概览和本人records：可空分数不造80，缺失比率不造0%，后台/导航隐藏清旧视图；正常恢复按当前会话读取。作者/用户体系、认证/安全存储/TLS、共享主题、Web/后端源码和共享配置无新增修改。
+
+实际[最终三页、行为和环境证据](evidence/20261028-web-ui/README.md)：本机H2 portra_c_final_20261028，127.0.0.1:18090，官方API26模拟器，实际反向转发。普通用户2正常点赞/关注生成actor1的通知2、3；原生2→1→0已读，真实动态3详情、前台恢复；信用真实80/待积累/空记录、评分说明、普通角色成功切换后重读。独立普通只读会话核对后台0未读、两记录已读、信用80/记录0、他人私有records40301；没有直写通知或补示例信用记录。配图仅复用仓库现有Web素材到此本地测试动态，无正式内容操作。
+
+正式命令：harmony目录DEVECO_SDK_HOME设置现有SDK，PowerShell展开tests/*.test.cjs后node --test：**exit0，185/185，0fail/skip/TODO**；独立相关36/36。PORTRA_BASE_URL=http://127.0.0.1:18090，hvigorw.bat assembleHap --no-daemon -p product=dev：**exit0，18.149秒，33tasks（17执行16up-to-date）**；hdc install -r、aa start均0。最终unsigned SHA256 **5B111863BB9ED0A573F97C245C33E3AD716C2B3B26596828E50F9E10EA7EE318**，仅当前进程配置地址。候选/正式首次失败、IME/目录锁/工具点击误滚动与纠正详见证据，不冒充通过。
+
+维护者补丁随本PR交付：[已授权最终差异及精确签名](proposals/web-ui-migration/README.md)。当前为通知分类/正文/已读及本人信用原生迁移，不包含Web全部业务、通知聚合折叠、系统推送或实时全局角标。仅刷新/重进/前台恢复读取。本轮以模拟器为准；团队外部原生短信环境/后端部署SHA及合法Web管理、发布签名升级仍未验证，不能据本地H2/unsigned声称完整C发布验收完成。
+
+## 此前阶段记录（保留原时点，以顶部本轮状态为准）
+<!-- FINAL-20261028 -->
+更新：2026-10-28。**C 剩余授权实现和隔离本地验收已补齐；外部团队环境、实体设备及签名验收尚未完成，PR #25 保持 Draft，不自动合并。** 以下为最新结论；历史“未授权”“7 TODO”“无 HALL 入口”“缺普通双角色账号”已由本轮授权、实现与本地夹具验证更新，不能继续列为代码阻塞。
+
+### 实际基线、授权及文件边界
+
+工作区为既有 C 独立 worktree，分支 feature/harmony-c-ui-polish，起点 60b6b02ff81997e07c22738247375c89b99f484f；fetch 后 integration/harmony-v1 仍 b258ec8114ac1ff8f360099155f5d284f1247c41。唯一 PR base 不变：[Draft PR #25](https://github.com/yueyue0218/Camera/pull/25)。未发现另外可复用的公共修复 PR；公共依赖随本 PR 的已授权补丁交付，不虚构维护者提交。
+
+用户明确确认 B 和公共维护者授权整包应用（举报组件/网络实例隔离、B 只读公开主页、作者导航、动态正常登录返回 HALL 的动态标签），并另行允许**全新隔离 H2 普通 CUSTOMER/PROVIDER 双角色夹具**。此前认证两行与点赞/详情授权继续有效。未创建新的管理员、改既有账号、修改角色校验、公共 DTO、认证/HttpClient、A/D 页面、Web/后端源码或共享配置。首发继续使用现有 Web 后台。原主工作区 frontend 三份未提交修改完整保留，main 未修改。
+
+| 本轮修改文件（相对仓库） | 实际行为 |
+| --- | --- |
+| harmony/entry/src/main/ets/features/user/ReportPanel.ets | 共用一套表单；对象/会话/actor/实例版本同时守卫 success、catch、finally；换对象清表单，身份变化冻结旧草稿，重新进入才恢复操作 |
+| harmony/entry/src/main/ets/features/user/ReportSubmissionStore.ets（新增） | 仅内存 pending/unknown/confirmed；同账号同目标的未知结果跨组件及角色版本保留，其他账号隔离；不自动重发，不把历史同原因记录认作本次成功 |
+| harmony/entry/src/main/ets/network/ApiService.ets | 举报创建/查询/取消及公开资料/动态查询新增可选 requestKey；默认参数兼容 A/B/C，关闭实例只取消自己的 key；沿用唯一认证 HttpClient |
+| harmony/entry/src/main/ets/pages/PublicProfilePage.ets（新增） | B 只读公开主页，真实昵称/简介/计数和最多首批12条当前角色动态；请求/取消按实例隔离；复用已有用户体系，无编辑或管理能力 |
+| harmony/entry/src/main/ets/model/NavigationModels.ets、navigation/NavigationPolicy.ets | PUBLIC_PROFILE 及真实 userId/userRole 参数；保护需登录接口，保留正常登录返回参数；无管理员入口 |
+| harmony/entry/src/main/ets/pages/Index.ets、features/shell/PortraAppShell.ets | 作者入口接共享 B 页面；动态去登录成功进入既有 HALL(tab1)，已有栈顶 HALL 时复用，避免重复叠栈；其余目标不变 |
+| harmony/entry/src/main/ets/features/moments/MomentCard.ets、MomentDetailPanel.ets、pages/MomentFeedPage.ets | 可选作者回调和真实 DTO 身份保护；旧 B 卡片调用/default 属性兼容；保留 Feed/筛选/缓存/收藏并发、点赞及完整详情；临时原生审计日志已移除 |
+| harmony/tests/moment-report-contract.test.cjs、moment-public-profile.test.cjs（新增）、moment-entry-routing.test.cjs（新增）、moment-feed-behavior.test.cjs、navigation.test.cjs | 真实源行为回归，旧要求不弱化；未知结果跨角色4项及重复 HALL 3项均先失败再修复通过 |
+| docs/harmony/c/ 三份交付文档、proposals/remaining-owner-bundle/、evidence/20261028-final/ | 授权后最终补丁/逐文件摘要、真实设备路径及跨端证据，历史失败保留 |
+
+### 关键依赖与真实结果
+
+| 依赖 | 最新事实 |
+| --- | --- |
+| C-SHARED-07 生命周期 | root(stack0) 和正常业务 HALL(stack1) **各自**实际执行动态→我的→成功切角色→返回、动态→我的→退出→返回、真实系统 Home→恢复；旧举报草稿/列表清除、正确重新读取/游客提示。原生 UIObserver/Application 事件日志及截图齐全，不以 Node 手调代替 |
+| C-SHARED-03/04 举报 | 已授权应用共享修复；严格24/24。设备正常提交一次 report2，真实 Web 查到同一记录并处理；另一新库实际 DB 写入 report1 后延迟18s，客户端15s超时，关闭重开/同账号切角色后仍禁重发，正常查询显示真实 #1。普通只读观察器确认全库只有1条举报 |
+| C-SHARED-01/02 点赞/详情 | 前提交 60b6b02 已完成真实 PUT/DELETE 服务器状态/计数、GET 全5图对比 Feed3图；保留 [上一轮真实证据](evidence/20261028-like-detail/README.md)，无假总数或预览扩充 |
+| C-SHARED-05 作者 | 从真实动态角色+ID进入共享 B 公开主页，正常接口得到真实昵称及近期动态；返回位置沿用 Navigation；不另建用户体系 |
+| 本地跨端闭环 | 保留原库 portra_c_admin_20261027，新增专用 moment2，原生举报 **reportId2**→现有 Web 同ID PENDING→下架→原生刷新缺失该对象→Web 独立合法恢复→原生刷新可见。只读核对原 report2=RESOLVED；未再次 resolve 原 report1 或 report2 |
+
+[本轮设备、跨端及环境证据](evidence/20261028-final/README.md)。root/HALL 原生事件观测使用只增加 C 安全日志的临时包；日志只含 route/visible/stack/logicalVersion/requestKey。已精确恢复正式 C 源，最终包无该日志；最终包另外实际通过正常登录、超时核实和成功切角色再核实。Node 仅证明处理逻辑与跨实例隔离，不计为设备事件证据。
+
+### 实际命令、退出码及产物
+
+以下在 harmony 目录运行，NODE_HOME/DEVECO_SDK_HOME 使用本机已有 DevEco 工具，地址仅当前进程配置，无共享配置变动。
+
+| 命令 | 退出码与结果 |
+| --- | --- |
+| git fetch origin --prune（HTTPS rewrite）；gh pr view 25 | 0；integration 基线、Draft/base/head 已核对 |
+| $testFiles=Get-ChildItem ./tests -Filter '*.test.cjs' …；node --test $testFiles | **0；162/162，0 fail、0 skipped、0 TODO** |
+| PORTRA_REQUIRE_SHARED_REPORTS=1；node --test tests/moment-report-contract.test.cjs | **0；24/24，0 TODO**；覆盖切对象/关表单/账号变化、旧异常/finally、真实 HttpClient 实例 key、未知结果与核实 |
+| 独立审查运行 report/public-profile/entry-routing/navigation/user-system 对应五文件 | 0；46/46，无剩余 P1/P2 |
+| PORTRA_BASE_URL=http://127.0.0.1:18090；hvigorw.bat assembleHap --no-daemon -p product=dev | **0；16.896秒，33 tasks：17 executed/16 up-to-date**；最终正式包 |
+| hdc install -r entry-dev-unsigned.hap；aa start | 0/0；官方 API26 模拟器安装/启动成功；unsigned 不等于实体签名包 |
+| 正常短信只读观察器 GET /reports/my | 0；原库 report2=RESOLVED，新库 report1=PENDING 且 totalReports=1；未代替原生写入 |
+
+最终 dev HAP SHA256：F1F1447BAF3CA072EC675E0E9200CC95832DB753958503A3670499D91AA9E5FF。BuildProfile origin=127.0.0.1:18090，hdc 反向转发已实际配置，非仅编译的不可达 localhost 包。签名仍未配置，包/原始日志/验证码/凭据不提交。
+
+本轮失败也保留：临时观察构建曾因 ResourceStr 不能直接赋 string 而 exit1，修正临时类型后观察包 exit0；第一次正式回归前恢复路径多写一层 harmony，临时日志未移除导致模块未找到，纠正路径后162全过。采集工具把输出数组当单字符串产生一次错误断言，实际 UI 重新断言通过；输入法尚未挂载、Profile滚动边界及启动过渡采集各有中止，均未重复举报/自动重发，未算通过。
+
+### 地址来源与剩余验收边界
+
+| 地址/设备 | 发现来源 / 本轮可连通 | 团队确认用于测试 |
+| --- | --- | --- |
+| https://47.76.106.57；/login/admin、/admin/reports、/admin/feed | GitHub staging变量、仓库文档/现有Web路由；本轮TLS正常、根页200 | 用户此前授权专用测试内容，但当前原生短信/管理员合法访问及后端部署SHA仍未获团队确认，不将本地结果写为staging通过 |
+| http://127.0.0.1:18088；Web http://127.0.0.1:15173 | 既有本机隔离服务配置，H2 portra_c_admin_20261027；真实原生及Web闭环可达 | 本地隔离验收已获授权；不是团队部署环境 |
+| http://127.0.0.1:18090 | 本轮新隔离 fixture/smoke/H2 portra_c_final_20261028，普通双角色1；正常随机短信，真实请求/事务；仅回环绑定 | 用户明确允许此本地夹具；无 ADMIN，无既有账号变更，响应延迟仅专用测试进程 |
+| Portra_C_API26；127.0.0.1:5555 | 官方 SDK26、HarmonyOS7.0.0.107，hdc Connected；本轮实际运行 | 已授权控制；没有连接实体设备，签名未配置 |
+
+剩余必须单列：团队原生短信可用环境/部署SHA及现有合法 Web 管理访问；在该环境复测同 reportId 闭环；实体设备、合法签名和升级安装、运营商短信/实际网络。未知举报防重目前仅进程内存，杀进程/重装不承诺 exactly-once；后端未提供请求幂等键，不能声称进程重启后仍能识别所有未决写入。没有未经实现的实时推送，内容可见性以刷新/重进真实请求为准。上述外部/发布验收未完成前，不称完整 C 模块已完成。
+
+<!-- HISTORICAL-RECORDS -->
+## 历史阶段记录（以下状态和计数保留原时点，以本页顶部最新结论为准）
+
 # C 模块阶段性交付与续推记录
 
-更新：2026-10-27（北京时间）。从已有阶段性交付继续，补充原生事件接线、环境恢复、真实模拟器回归、C行复用修复及获明确授权的安全存储两行修复。下文保留各轮历史结果，最新验证见末尾C-AUTH-01。**完整 C 模块仍未完成，PR #25 保持 Draft，不自动合并。**
+更新：2026-10-28（北京时间）。在原阶段交付上继续；最新点赞/详情、测试构建及设备证据见末尾2026-10-28记录。**完整C仍未验收完成，PR25保持Draft，不自动合并。**
 
 ## 基线与边界
 
 - 本轮从已有 C 提交 `5e0402af15d92de80cca1f8beb739831deef16d8` 继续；fetch 后 `origin/integration/harmony-v1` 仍为 `b258ec8114ac1ff8f360099155f5d284f1247c41`，无新的公共修复提交。
 - 工作分支 `feature/harmony-c-ui-polish`，复用 C 独立工作区；[PR #25](https://github.com/yueyue0218/Camera/pull/25) 的唯一 base 为 integration/harmony-v1。
-- 已核查所有远端分支、开放及历史鸿蒙 PR、PR25 评论/审查；未发现所需举报/点赞/详情接口修复，关联维护者提交/PR仍无。唯一新增授权是用户确认公共认证维护者允许C-AUTH-01两行修复，随本PR提交。历史 #8/#9 已合并，#24 为初始基线草稿，不能视为本轮依赖。
-- 原主工作区未提交文件原样保留；未修改 main、公共网络/DTO/全局导航/EntryAbility、B ReportPanel、A/B/D 页面、Web或后端源码/共享配置。公共认证唯一改动为获授权的AssetCredentialStore.load/clear各一行true；没有修改认证流程或加密强度。
+- 已核查所有远端分支、开放及历史鸿蒙 PR、PR25 评论/审查；没有所需依赖的单独维护者修复PR。用户随后明确确认C-AUTH-01两行存储修复和C-SHARED-01/02公共点赞/详情适配授权，两者随本PR提交；举报及其他公共文件未获授权。历史 #8/#9 已合并，#24 为初始基线草稿，不能视为本轮依赖。
+- 原主工作区未提交文件原样保留；未修改 main、公共DTO/全局导航/EntryAbility、B ReportPanel、A/B/D 页面、Web或后端源码/共享配置。公共认证唯一改动为获授权的AssetCredentialStore.load/clear各一行true；公共网络唯一新增为本轮获授权的ApiService点赞/详情47行。没有修改认证流程、HttpClient或加密强度。
 - SDK 26 和原依赖沿用，未升级或修改签名/TLS。首发沿用 Web 管理，不新增鸿蒙管理 UI/API。
 
 ## 本轮文件与真实行为
@@ -167,7 +293,7 @@ C 页面在根 Column 的 onAppear 注册局部原生事件，不只依赖组件
 | --- | --- |
 | C-SHARED-07 | 官方 API26 模拟器 root 有效会话前台恢复、旧举报草稿清理、个人页返回及退出返回已验证；成功切身份缺合法双角色账号，HALL 缺正常 UI 入口。渲染旧 DTO 的真实失败已最小修复并在设备转绿，详见下文 |
 | C-SHARED-03/04 | B/公共维护者尚未授权/提供修复；7项严格用例失败。shared-change-requests含精确兼容签名、插入位置与跨实例取消验收 |
-| C-SHARED-01/02 | 公共ApiService点赞/详情方法仍缺；本地后端真实接口已测，不等于鸿蒙已接。未新增假按钮或完整相册 |
+| C-SHARED-01/02 | 2026-10-28获公共维护者授权，ApiService真实PUT/DELETE/GET及C入口已实现；本地原生点赞/取消、完整5图及Web下架/恢复详情可见性均通过，staging/真机仍未验 |
 | C-SHARED-05/06 | B公开主页入口/真实作者资料待对齐；新增本地模拟器 C 收藏→B 收藏卡片→返回→取消收藏→B 空列表联动证据，保留原只读调用 |
 | 签名/设备 | IDE、镜像、连接、staging及dev unsigned包安装/启动均已有实证；root部分路径与本地原生跨端闭环已通过。C-AUTH-01获授权修复后，本地API26冷启动/同包覆盖恢复及退出清理通过。成功切身份/HALL、实体设备、同签名升级和发布签名仍未验 |
 | staging普通测试身份 | Web普通测试账号已合法登录并创建专用对象；原生短信登录与temp-staging代码契约不匹配，需维护者提供现有原生可用测试环境/认证方案，不能拿Web cookie替代 |
@@ -266,3 +392,32 @@ C 页面在根 Column 的 onAppear 注册局部原生事件，不只依赖组件
 最终构建：进程`PORTRA_BASE_URL=http://127.0.0.1:18088`，harmony目录执行`hvigorw.bat assembleHap --no-daemon -p product=dev`，**退出0，15.412秒，33 tasks（17执行/16 up-to-date）**。最终HAP SHA256 **`318E4AF5BC3F8D1C8877398F928F9BFC7B9EA134303687DE5D58A9C7BC94675B`**，无临时诊断；install/start退出均0。覆盖后首帧尚无入口的UI断言曾退出1，重新实际读取大厅再点击通过，记录为采集时序而非隐藏失败。全部[设备截图、UI树及边界](evidence/20261027-auth/README.md)。
 
 C-AUTH-01已解除本地API26恢复/清理缺口；同签名版本升级、实体设备、发布签名、锁屏访问控制、长时间令牌过期与staging仍未验收。跨环境不互删是实际源码契约证据，未冒称双环境设备实测。其他公共文件边界不变；C-SHARED-01/02/03/04/05、成功切身份、HALL真实入口与外部完整验收仍未完成，PR25保持Draft。
+
+
+## 2026-10-28：点赞与详情真实接入和验收
+
+起点5625ce0，复用C独立工作区/原分支。fetch后integration仍b258ec8，原公共方法确实缺失；先准备可审阅补丁和8项实际ApiService/HttpClient契约（原实现失败、内存候选通过），再获用户明确确认的公共网络维护者授权后应用。此次公共例外仅ApiService.ets的47行新增；B表单、公共认证/DTO/导航、Web和后端均无新改动。
+
+| 文件 | 本轮真实改动 |
+| --- | --- |
+| network/ApiService.ets | getMoment、likeMoment、unlikeMoment及精确key取消；真实GET/PUT/DELETE，沿用唯一认证HttpClient和错误映射，校验对象/状态/计数，旧调用不变 |
+| features/moments/MomentInteractions.ets | C详情和点赞状态；实例/账号/目标/视图保护，旧success/catch/finally失效；结果不明标记按会话保留，真实GET核实后才恢复动作 |
+| features/moments/MomentInteractionBindings.ets | ArkTS名义接口适配，纯委托共享ApiService/AuthSessionManager，无第二套网络或认证 |
+| features/moments/MomentDetailPanel.ets | 本页sheet展示真实全文和完整相册，等比图片、上/下一张、加载/失败/重读、详情点赞；关闭及系统Back保留原列表 |
+| pages/MomentFeedPage.ets、MomentCard.ets | 接入真实按钮及sheet，C/B可选回调和默认只读兼容；同对象举报草稿互斥，隐藏/后台/账号变化清详情 |
+| features/moments/MomentFeedModels.ets | 复用现有跨实例写屏障，新增写revision/不明点赞标记；先GET后写的旧成功和旧失败均失效，最多一次GET补读，无轮询/写重放 |
+| tests/moment-api-contract.test.cjs、moment-interactions.test.cjs、moment-feed-behavior.test.cjs | 公共契约、C状态、Feed接线与边界回归；未削弱其他模块或共享举报要求 |
+
+以上源路径以harmony/entry/src/main/ets为前缀，测试以harmony为前缀。完整方案和检查项见[续推计划](2026-10-28-like-detail-plan.md)。
+
+最终全套 node --test harmony/tests/*.test.cjs：**exit0，134项127通过、7执行TODO、0跳过**。相关两个C逻辑文件45/45通过，独立审查也重跑；公共适配8/8通过。共享举报严格命令仍**exit1、2过7失败**。原生成功提交不能代替共享举报可靠性。
+
+构建命令为harmony目录内、进程PORTRA_BASE_URL=http://127.0.0.1:18088，hvigorw.bat assembleHap --no-daemon -p product=dev。前3次exit1（ArkTS结构/对象类型限制），分别74.766s/16.181s/16.486s；以C显式implements委托适配后，最终**exit0、24.445秒、33tasks（17执行/16 up-to-date）**。最终unsigned HAP SHA256 **6BBF07CB67229B1484E7DDD2ECBC0B54E6DEC7A32EC59ED7F74E05A7FCE5899E**，安装/启动均exit0，无诊断代码，包不提交。
+
+原隔离H2 portra_c_admin_20261027仍运行，后端18088/Web15173仅loopback，设备18088映射原端口；配置来源及可连通实证明确，为用户授权本地环境，非团队确认staging。只处理原测试moment1。原生账号3正常随机短信登录；Feed真实点赞0→1，另一普通作者2只读GET确认服务器1；原生详情真实取消1→0，服务器及Feed都为0。详情按真实GET显示1/5至5/5，Feed仍是预览3张；关闭第五张再进入从1/5开始，系统Back只关sheet。
+
+Web动态管理正常登录原本地管理员，对同一测试对象独立下架；鸿蒙未刷新卡片重进详情，真实404且旧相册/卡片清空。Web独立恢复后鸿蒙错误页重新GET，恢复同一对象完整5图，随后Feed刷新可见。没有二次resolve或新举报。真实系统桌面→前台同PID19730，旧详情清除并重读Feed；先前Home立即start未观察桌面的采集断言exit1保留说明，不计通过。未提交举报草稿打开时，实际点击同条点赞/详情无动作，草稿保留，后正常关闭。
+
+独立审查发现并先RED后GREEN修复了404标记残留、顶部核实绕过举报守卫、先GET后写清不明状态及旧404错误时序；最终复核无Critical/Important。全部实际截图、UI树、服务器0/1/0计数、命令/退出码和边界见[本轮证据](evidence/20261028-like-detail/README.md)。
+
+本轮解除C-SHARED-01/02在本地API26的实现与验收缺口；03/04举报7项、05作者主页、合法双身份成功切换、HALL正常入口、团队环境原生/管理员和部署SHA、真机及发布签名仍未完成。长Feed/大图性能、运营商短信和设备制造超时/多实例争用未专项实测，不能将逻辑测试声称为设备验收。PR25保持Draft，唯一base integration/harmony-v1，未自动合并。

@@ -15,10 +15,8 @@ class SessionExpiredHandler implements AuthenticationExpiredHandler {
     this.sessionManager = sessionManager;
   }
 
-  async onExpired(): Promise<void> {
-    if (this.sessionManager !== undefined) {
-      await this.sessionManager.markExpired();
-    }
+  async refreshSession(): Promise<boolean> {
+    return this.sessionManager === undefined ? false : this.sessionManager.refreshAccessToken();
   }
 }
 
@@ -29,6 +27,7 @@ export class AppClient {
   readonly sessionManager: AuthSessionManager;
   readonly apiService: ApiService;
   private restorePromise?: Promise<void>;
+  private restoreStarted: boolean = false;
   private deviceId: string = '';
   private abilityContext?: common.UIAbilityContext;
 
@@ -85,6 +84,10 @@ export class AppClient {
     if (this.restorePromise !== undefined) {
       return this.restorePromise;
     }
+    if (this.restoreStarted || this.sessionManager.isAuthenticated()) {
+      return Promise.resolve();
+    }
+    this.restoreStarted = true;
 
     const version = this.sessionManager.beginRestore();
     const restore = this.restoreAndRelease(version);

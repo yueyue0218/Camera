@@ -1,3 +1,5 @@
+import { OrderEngagementSummary, ReviewSummary, ReviewComplaintSummary, DisputeSummary, CreateReviewPayload, ReviewTextPayload, CreateReviewComplaintPayload, DisputeReasonPayload } from '../model/ApiModels';
+import { NotificationSummary, CreditSummary, CreditRecordSummary } from '../model/ApiModels';
 import { NativeSessionApi } from '../auth/NativeSessionApi';
 import { AcceptedDemandResponse, AccountCancellationPayload, AccountCancellationSummary,
   ConfirmQuoteResult, ConversationSummary, CreateDemandPayload,
@@ -172,7 +174,54 @@ export class ApiService implements NativeSessionApi {
     this.client.cancelRequest(requestKey);
   }
 
-  listProfileMoments(authorId: number, authorRole: string, page: number = 1, size: number = 12):
+  async getMoment(momentId: number, requestKey: string = 'moments.detail'): Promise<MomentSummary> {
+    this.requireMomentId(momentId);
+    const result = await this.client.get<MomentSummary>(`/moments/${momentId}`, requestKey);
+    return this.requireMomentResult(result, momentId);
+  }
+
+  cancelMomentDetail(requestKey: string = 'moments.detail'): void {
+    this.client.cancelRequest(requestKey);
+  }
+
+  async likeMoment(momentId: number, requestKey?: string): Promise<MomentSummary> {
+    this.requireMomentId(momentId);
+    const result = await this.client.put<MomentSummary>(`/moments/${momentId}/like`, undefined,
+      requestKey ?? `moments.${momentId}.like`);
+    return this.requireMomentResult(result, momentId, true);
+  }
+
+  async unlikeMoment(momentId: number, requestKey?: string): Promise<MomentSummary> {
+    this.requireMomentId(momentId);
+    const result = await this.client.delete<MomentSummary>(`/moments/${momentId}/like`,
+      requestKey ?? `moments.${momentId}.like`);
+    return this.requireMomentResult(result, momentId, false);
+  }
+
+  cancelMomentLike(momentId: number, requestKey?: string): void {
+    this.requireMomentId(momentId);
+    this.client.cancelRequest(requestKey ?? `moments.${momentId}.like`);
+  }
+
+  private requireMomentId(momentId: number): void {
+    if (!Number.isSafeInteger(momentId) || momentId <= 0) {
+      throw ErrorMapper.parse();
+    }
+  }
+
+  private requireMomentResult(result: MomentSummary, momentId: number, expectedLiked?: boolean): MomentSummary {
+    if (result === null || result === undefined || result.momentId !== momentId ||
+      !Number.isSafeInteger(result.likeCount) || result.likeCount < 0 ||
+      !Number.isSafeInteger(result.favoriteCount) || result.favoriteCount < 0 ||
+      typeof result.likedByCurrentUser !== 'boolean' || typeof result.favoritedByCurrentUser !== 'boolean' ||
+      (expectedLiked !== undefined && result.likedByCurrentUser !== expectedLiked)) {
+      throw ErrorMapper.parse();
+    }
+    return result;
+  }
+
+
+  listProfileMoments(authorId: number, authorRole: string, page: number = 1, size: number = 12, requestKey?: string):
     Promise<ProfileMomentPage> {
     const role = this.requireIdentityRole(authorRole);
     if (!Number.isSafeInteger(authorId) || authorId <= 0) {
@@ -180,7 +229,7 @@ export class ApiService implements NativeSessionApi {
     }
     return this.client.get<ProfileMomentPage>(
       `/moments/profile?authorId=${authorId}&authorRole=${role}&page=${this.safePage(page)}&size=${this.safeSize(size)}`,
-      `moments.profile.${authorId}.${role}`);
+      requestKey ?? `moments.profile.${authorId}.${role}`);
   }
 
   listFavoriteMoments(page: number = 1, size: number = 12): Promise<PageResult<MomentSummary>> {
@@ -213,13 +262,18 @@ export class ApiService implements NativeSessionApi {
     return this.client.post<SwitchRoleResult>('/users/me/role', payload, 'users.me.role');
   }
 
-  getPublicProfile(userId: number, role: string): Promise<PublicUserProfile> {
+  getPublicProfile(userId: number, role: string, requestKey?: string): Promise<PublicUserProfile> {
     const normalizedRole = this.requireIdentityRole(role);
     if (!Number.isSafeInteger(userId) || userId <= 0) {
       return Promise.reject(ErrorMapper.parse());
     }
     return this.client.get<PublicUserProfile>(
-      `/users/${userId}/public-profile?role=${normalizedRole}`, `users.${userId}.${normalizedRole}.profile`);
+      `/users/${userId}/public-profile?role=${normalizedRole}`, requestKey ?? `users.${userId}.${normalizedRole}.profile`);
+  }
+
+  cancelPublicProfile(profileRequestKey: string, momentsRequestKey: string): void {
+    this.client.cancelRequest(profileRequestKey);
+    this.client.cancelRequest(momentsRequestKey);
   }
 
   listFollowers(userId: number, role: string): Promise<SocialUserBrief[]> {
@@ -294,8 +348,8 @@ export class ApiService implements NativeSessionApi {
     this.client.cancelRequest('auth.sms.verify');
   }
 
-  async currentSession(): Promise<SessionSummary> {
-    const response = await this.client.get<SessionSummary>('/auth/session', 'auth.session');
+  async currentSession(requestKey: string = 'auth.session'): Promise<SessionSummary> {
+    const response = await this.client.get<SessionSummary>('/auth/session', requestKey);
     if (response === null || !Number.isSafeInteger(response.userId) || response.userId <= 0 ||
       typeof response.nickname !== 'string' || typeof response.role !== 'string') {
       throw ErrorMapper.parse();
@@ -303,8 +357,40 @@ export class ApiService implements NativeSessionApi {
     return response;
   }
 
-  cancelCurrentSession(): void {
-    this.client.cancelRequest('auth.session');
+  cancelCurrentSession(requestKey: string = 'auth.session'): void {
+    this.client.cancelRequest(requestKey);
+  }
+
+  listNotifications(page: number = 0, size: number = 20, requestKey: string = 'notifications.list'):
+    Promise<PageResult<NotificationSummary>> {
+    if (!Number.isSafeInteger(page) || page < 0 || !Number.isSafeInteger(size) || size < 1 || size > 100) {
+      return Promise.reject(ErrorMapper.parse());
+    }
+    return this.client.get<PageResult<NotificationSummary>>('/notifications?page=' + page + '&size=' + size, requestKey);
+  }
+  unreadNotificationCount(requestKey: string = 'notifications.unread'): Promise<number> {
+    return this.client.get<number>('/notifications/unread-count', requestKey);
+  }
+  markNotificationRead(id: number, requestKey: string = 'notifications.read'): Promise<NotificationSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.patch<NotificationSummary>('/notifications/' + id + '/read', undefined, requestKey);
+  }
+  markAllNotificationsRead(requestKey: string = 'notifications.readAll'): Promise<NotificationSummary[]> {
+    return this.client.patch<NotificationSummary[]>('/notifications/read-all', undefined, requestKey);
+  }
+  cancelNotificationRequests(requestKeys: string[]): void {
+    requestKeys.forEach((key: string) => this.client.cancelRequest(key));
+  }
+  getCreditSummary(id: number, requestKey: string = 'credit.summary'): Promise<CreditSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.get<CreditSummary>('/users/' + id + '/credit', requestKey);
+  }
+  listCreditRecords(id: number, requestKey: string = 'credit.records'): Promise<CreditRecordSummary[]> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.get<CreditRecordSummary[]>('/users/' + id + '/credit-records', requestKey);
+  }
+  cancelCreditRequests(requestKeys: string[]): void {
+    requestKeys.forEach((key: string) => this.client.cancelRequest(key));
   }
 
   listConversations(requestKey: string = 'conversations.list'): Promise<ConversationSummary[]> {
@@ -358,6 +444,56 @@ export class ApiService implements NativeSessionApi {
     this.client.cancelRequest(`conversations.${conversationId}.createQuote`);
   }
 
+  getOrder(id: number, requestKey: string = 'engagement.getOrder'): Promise<OrderEngagementSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.get<OrderEngagementSummary>(`/orders/${id}`, requestKey);
+  }
+  listOrderReviews(id: number, requestKey: string = 'engagement.listOrderReviews'): Promise<ReviewSummary[]> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.get<ReviewSummary[]>(`/orders/${id}/reviews`, requestKey);
+  }
+  getReview(id: number, requestKey: string = 'engagement.getReview'): Promise<ReviewSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.get<ReviewSummary>(`/reviews/${id}`, requestKey);
+  }
+  listReviewComplaints(id: number, requestKey: string = 'engagement.listReviewComplaints'): Promise<ReviewComplaintSummary[]> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.get<ReviewComplaintSummary[]>(`/reviews/${id}/complaints`, requestKey);
+  }
+  getReviewComplaint(id: number, requestKey: string = 'engagement.getReviewComplaint'): Promise<ReviewComplaintSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.get<ReviewComplaintSummary>(`/reviews/complaints/${id}`, requestKey);
+  }
+  listOrderDisputes(id: number, requestKey: string = 'engagement.listOrderDisputes'): Promise<DisputeSummary[]> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.get<DisputeSummary[]>(`/orders/${id}/disputes`, requestKey);
+  }
+  getDispute(id: number, requestKey: string = 'engagement.getDispute'): Promise<DisputeSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.get<DisputeSummary>(`/disputes/${id}`, requestKey);
+  }
+  createReview(id: number, payload: CreateReviewPayload, requestKey: string = 'engagement.createReview'): Promise<ReviewSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.post<ReviewSummary>(`/orders/${id}/reviews`, payload, requestKey);
+  }
+  followUpReview(id: number, payload: ReviewTextPayload, requestKey: string = 'engagement.followUpReview'): Promise<ReviewSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.post<ReviewSummary>(`/reviews/${id}/follow-up`, payload, requestKey);
+  }
+  createReviewComplaint(id: number, payload: CreateReviewComplaintPayload, requestKey: string = 'engagement.createReviewComplaint'): Promise<ReviewComplaintSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.post<ReviewComplaintSummary>(`/reviews/${id}/complaints`, payload, requestKey);
+  }
+  createDispute(id: number, payload: DisputeReasonPayload, requestKey: string = 'engagement.createDispute'): Promise<DisputeSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.post<DisputeSummary>(`/orders/${id}/disputes`, payload, requestKey);
+  }
+  replyDispute(id: number, payload: ReviewTextPayload, requestKey: string = 'engagement.replyDispute'): Promise<DisputeSummary> {
+    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
+    return this.client.post<DisputeSummary>(`/disputes/${id}/replies`, payload, requestKey);
+  }
+  cancelEngagementRequests(keys: string[]): void { keys.forEach((key: string) => this.client.cancelRequest(key)); }
+
   listOrders(): Promise<OrderSummary[]> {
     return this.client.get<OrderSummary[]>('/orders', 'orders.list');
   }
@@ -366,17 +502,17 @@ export class ApiService implements NativeSessionApi {
     this.client.cancelRequest('orders.list');
   }
 
-  createReport(payload: CreateReportPayload): Promise<ReportSummary> {
-    return this.client.post<ReportSummary>('/reports', payload, 'reports.create');
+  createReport(payload: CreateReportPayload, requestKey: string = 'reports.create'): Promise<ReportSummary> {
+    return this.client.post<ReportSummary>('/reports', payload, requestKey);
   }
 
-  listMyReports(): Promise<ReportSummary[]> {
-    return this.client.get<ReportSummary[]>('/reports/my', 'reports.my');
+  listMyReports(requestKey: string = 'reports.my'): Promise<ReportSummary[]> {
+    return this.client.get<ReportSummary[]>('/reports/my', requestKey);
   }
 
-  cancelReports(): void {
-    this.client.cancelRequest('reports.create');
-    this.client.cancelRequest('reports.my');
+  cancelReports(createRequestKey: string = 'reports.create', myRequestKey: string = 'reports.my'): void {
+    this.client.cancelRequest(createRequestKey);
+    this.client.cancelRequest(myRequestKey);
   }
 
   getAccountCancellation(): Promise<AccountCancellationSummary> {

@@ -78,6 +78,11 @@ export class ErrorMapper {
     return new PortraError(ErrorKind.STALE, '请求已被更新，忽略旧响应。');
   }
 
+  static writeNotRetried(): PortraError {
+    return new PortraError(ErrorKind.BUSINESS,
+      '登录凭据已更新，本次操作未自动重试，请确认结果后手动重试。');
+  }
+
   static isStale(error: PortraError): boolean {
     return error.kind === ErrorKind.STALE;
   }

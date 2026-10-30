@@ -1,0 +1,169 @@
+{
+  "baseCommit": "c37eb7a92b118134648cd5d53e6496c6b1a10b3c",
+  "appliedToWorkingTree": true,
+  "installedOnEmulator": true,
+  "patchSha256": "849ae5d672c4818405479b33a1be5ca946deea53b91dc22cc707ebb95996f857",
+  "files": [
+    {
+      "file": "harmony/entry/src/main/ets/network/HttpClient.ets",
+      "ownerApprovalRequired": true,
+      "baseSha256": "46c8b50262be772fbb3f68f63465a8cef90e410e65d58564d7a76536cb3c6fc3",
+      "candidateSha256": "020c0fa2b2c538f0d9d12954fe10d4c35d2328fa07d5f208a150816b6dd4ae1b",
+      "baseGitBlobSha256": "de677bfcb0a34ed0335ea111dcdfebec6ca82c2d8fe659dea17ffffbd95dbad4",
+      "appliedSha256": "ad8ac9fd43a059fdf038aba2a9d8854a4e2580218f1f9dbd46c58f1566b31722"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/model/ApiModels.ets",
+      "ownerApprovalRequired": true,
+      "baseSha256": "0746cdebacb5bcfd49af512b887b8d749a362531c3f62c115ac0d97d5f5c3a5e",
+      "candidateSha256": "7eb8d4f8094caaf16b7c7b522d3c8f73459db7c6fcec62b2bc42fdbdad045d9d",
+      "baseGitBlobSha256": "5361db4a472abb334ebab7219dea5e64172002ec7239ca502a760304307a19f9",
+      "appliedSha256": "b353789393b74ef843242a4ab91def207e15dff9c0c0090365ef4661321babf7"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/network/ApiService.ets",
+      "ownerApprovalRequired": true,
+      "baseSha256": "cfec1bb9f47dfecf023409dc076906f2d631df99813fd4fe82cdabd54d81d792",
+      "candidateSha256": "002e70644bb44bcc4753285baee4b0e2f502e3674f32a00c194f5d56590e45b7",
+      "baseGitBlobSha256": "bca90c0aec51d3d853fbe7a95aa7d87f7ceadf020ce6652094f7da29ce363bfe",
+      "appliedSha256": "859ecf80204140015f03adfee7e2a3c7e49e892d501200683b6056dbfa42f2fa"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/model/NavigationModels.ets",
+      "ownerApprovalRequired": true,
+      "baseSha256": "8d6529bb2fe3246c882f99556da4fed792c610b8ba6c2ed8ad40caddeee3e906",
+      "candidateSha256": "6d35393f4f60702557ccc03cd6b0c859cb7e40faa07b0e1aac61d20fe2cf0204",
+      "baseGitBlobSha256": "526d0553198c98dab99900aa2f505fcc8e3b3ab0df9facf9f58c0e76127b6474",
+      "appliedSha256": "4f08ed82081ceee6bf4320909409250e8dc22bbb1d2848149aa5e0e365f311a1"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/navigation/NavigationPolicy.ets",
+      "ownerApprovalRequired": true,
+      "baseSha256": "02f844b2361a5a9d57914c252a1849c33452b8f1eb2340f6baf7c3247ba83724",
+      "candidateSha256": "f4dacaeed2cb42be663a4649b81404f064750c9b93667290ec4490214b10713b",
+      "baseGitBlobSha256": "9606fe8a38b94064d4a48905db95c98d1e06101a53ed8d81d6657f30e0bbb2da",
+      "appliedSha256": "efeb6187a99262590b7dc862e1d9d0e66a2b262f91c8141c8144472b78d5fdcc"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/pages/Index.ets",
+      "ownerApprovalRequired": true,
+      "baseSha256": "18e502c9636264588190fca1fb9edc62e7551bb1e77e2e913ad44017e4727dd5",
+      "candidateSha256": "708cfad4189d1297c7afd79a090c3e9e435a2402181920057849d83f04602377",
+      "baseGitBlobSha256": "ee12065df5e99567058d1a689b7f5db8443e670b07c6979c6a4b8b938f12ab6e",
+      "appliedSha256": "6bcc1ec62d528cc5c39004272d7a2c353e2784f8e3c88909da96a8c306bed9dc"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/features/shell/PortraAppShell.ets",
+      "ownerApprovalRequired": true,
+      "baseSha256": "cc2515b379128713d4bf0c3e311abd5e736ee545536384b9bb8f15d5d90292ad",
+      "candidateSha256": "9342e18f87a978125ae2fe815acf166a248af67198c9a71b1a7cee8cb147e152",
+      "baseGitBlobSha256": "3f3d1985a9b5f85997bc14f55c7fe09fd14d82a8b3a58c987fd3ce3565b3f0cd",
+      "appliedSha256": "9342e18f87a978125ae2fe815acf166a248af67198c9a71b1a7cee8cb147e152"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/pages/MessagePage.ets",
+      "ownerApprovalRequired": true,
+      "baseSha256": "3b489d8486defc7352ac3a12c962a22928b2a9ff090733b4baeda3d9b1704abc",
+      "candidateSha256": "617f6640e6f06b443cddc4706f28c3d1b51abae57b672fabdb2ab583e32a3600",
+      "baseGitBlobSha256": "24067d210541b5513080d13ae25d88583b4da168e7f8a62c3065659bcc4f89ba",
+      "appliedSha256": "51acf55da4c11909239d8fd725b7d577630b01de17c8dfc0a31dcd9dba127236"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/pages/ProfilePage.ets",
+      "ownerApprovalRequired": true,
+      "baseSha256": "0510ab4b8899a1735228e3a874dde7b563476fa48a52e3277d8471389a4ae38d",
+      "candidateSha256": "e3fb87ad81a817a2d10fcc51a597d516a7d65ad1c6891b15a978a6e902ac70cf",
+      "baseGitBlobSha256": "860785952efab97a839d04d8bf56b3da664813e31f66453c77b67b052e8dd4a5",
+      "appliedSha256": "f805e28f8c5335e34f6e506124730d6c6bbfcdbfc79f460b7f45068cb503a742"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/features/notifications/NotificationController.ets",
+      "ownerApprovalRequired": false,
+      "baseSha256": null,
+      "candidateSha256": "0a34a1d21f6ce2fd0350bcf787d1e9304eacb00614c5d9855da3106e40ca1348",
+      "baseGitBlobSha256": null,
+      "appliedSha256": "92044ae523be849b7a16193e22e4c965b919d039c241ec6979d2762a9ec2841f"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/features/notifications/ActivityApiBindings.ets",
+      "ownerApprovalRequired": false,
+      "baseSha256": null,
+      "candidateSha256": "e27090e938b7380b6d20ff1345740c65f2edb74516672a42e136a5f1b841d7a2",
+      "baseGitBlobSha256": null,
+      "appliedSha256": "2a3634e84685bd5ab8ee027733edcbd113b0da19bdbc113d6acd3f41cdb3d48c"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/features/credit/CreditController.ets",
+      "ownerApprovalRequired": false,
+      "baseSha256": null,
+      "candidateSha256": "511bcd06e023dfee8c9640664f43c4cf3847867ed0c1975c239f4a555170bcd7",
+      "baseGitBlobSha256": null,
+      "appliedSha256": "e512fd0bc52385877913e196783a65a4ea544143007e707ee3d25b735d3220d0"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/pages/NotificationPage.ets",
+      "ownerApprovalRequired": false,
+      "baseSha256": null,
+      "candidateSha256": "68212c9e7e77f4b2b4c80fa5ed0a12050af0c56628975201c76e6e3371666195",
+      "baseGitBlobSha256": null,
+      "appliedSha256": "703baaf0cf4dcb4a150992973f8d6b060e2bb4a76fe6e7712eebc5202d1e11d4"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/pages/CreditPage.ets",
+      "ownerApprovalRequired": false,
+      "baseSha256": null,
+      "candidateSha256": "179d7442b6c20b4cfeaef19bf956c7d170bb2751873e8e1f1be039384b7c17a0",
+      "baseGitBlobSha256": null,
+      "appliedSha256": "549540357d97de880e80fae87faf7e848a3f368d694220b6e1ee944443a86592"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/pages/NotificationMomentPage.ets",
+      "ownerApprovalRequired": false,
+      "baseSha256": null,
+      "candidateSha256": "e60558a61250906f671eb8a3f52eab515c1119e0c92cf549f5001916a5afd733",
+      "baseGitBlobSha256": null,
+      "appliedSha256": "8e694c3ac7bf5267971337413af7326dc3208b7ceb1f9843dc2ea5203493ade4"
+    },
+    {
+      "file": "harmony/tests/notification-credit-behavior.test.cjs",
+      "ownerApprovalRequired": false,
+      "baseSha256": null,
+      "candidateSha256": "a5bacdead2fe73b1aff598b9ecb1a2d0b4677b1e718b7a4d6a8ecb5e521badcf",
+      "baseGitBlobSha256": null,
+      "appliedSha256": "21f97f59d265a33b522684296eebe198b900e821be3c7b7bd51a39c1e029ac9f"
+    },
+    {
+      "file": "harmony/tests/notification-credit-api.test.cjs",
+      "ownerApprovalRequired": false,
+      "baseSha256": null,
+      "candidateSha256": "fb3feae15b8a26a9919224a33d73c9c3f9bc656dd3e72f9877e9089d32d9f330",
+      "baseGitBlobSha256": null,
+      "appliedSha256": "24003e5618302ebe369bb2986078f29a8edf6e0007c06ab4a399167dc2d335f9"
+    },
+    {
+      "file": "harmony/tests/notification-moment-binding.test.cjs",
+      "ownerApprovalRequired": false,
+      "baseSha256": null,
+      "candidateSha256": "3b4cb2b96a579511bef6daebb27dc3f46020cebeddf9260eee6e8c30acc6e26e",
+      "baseGitBlobSha256": null,
+      "appliedSha256": "20753ff0c225c11e09d59e6839f2dab91199c117fe4a319cf0b9a08d2d420d77"
+    },
+    {
+      "file": "harmony/tests/moment-entry-routing.test.cjs",
+      "ownerApprovalRequired": false,
+      "baseSha256": "a51e6b2181f96a2adcca29c6a37ce8dd503248409eca07d9b8d130b4841103b1",
+      "candidateSha256": "989d8f16255f88337e8ca38ca4d6efe84dd94fbf4d210592133ab6e25f987fbc",
+      "baseGitBlobSha256": "a51e6b2181f96a2adcca29c6a37ce8dd503248409eca07d9b8d130b4841103b1",
+      "appliedSha256": "7c9c99e2351122fb12a80cfe95a3010c493bc09752212612429edface64d8fd3"
+    },
+    {
+      "file": "harmony/tests/navigation.test.cjs",
+      "ownerApprovalRequired": false,
+      "baseSha256": "3179beff8c1d1156d243528f00865e018addf8c6a923fba3ace94313929a79bb",
+      "candidateSha256": "99842891d34799f52acb108b236642602ee8b5a65a6999da2c8631e392ec23cb",
+      "baseGitBlobSha256": "5796060640c27a51fb1e45139371ad695cfa26c04a5370627198f23633c5d08d",
+      "appliedSha256": "99842891d34799f52acb108b236642602ee8b5a65a6999da2c8631e392ec23cb"
+    }
+  ],
+  "authorization": "User explicitly confirmed public, B and D maintainer approval in this chat on 2026-10-28"
+}

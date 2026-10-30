@@ -32,6 +32,8 @@ export struct LoginPage {
 
   aboutToAppear(): void {
     this.requestVersion++;
+    this.sendingCode = false;
+    this.signingIn = false;
   }
 
   aboutToDisappear(): void {
@@ -78,18 +80,21 @@ export struct LoginPage {
       return;
     }
     const version = this.requestVersion;
+    const sessionVersion = this.appClient.sessionManager.getSessionVersion();
     this.errorMessage = '';
     this.notice = '';
     this.sendingCode = true;
     try {
       await this.appClient.apiService.sendLoginCode(normalizedPhone, deviceId);
-      if (version !== this.requestVersion) {
+      if (version !== this.requestVersion ||
+        sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
         return;
       }
       this.notice = '验证码已发送';
       this.startCooldown();
     } catch (error) {
-      if (version === this.requestVersion) {
+      if (version === this.requestVersion &&
+        sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
         const mapped = error as PortraError;
         this.errorMessage = mapped.businessCode === 50001 ? '验证码暂时无法发送，请稍后重试' :
           (mapped.message || '发送失败，请稍后重试');
@@ -123,15 +128,20 @@ export struct LoginPage {
       return;
     }
     const version = this.requestVersion;
+    const sessionVersion = this.appClient.sessionManager.getSessionVersion();
     this.errorMessage = '';
     this.signingIn = true;
     try {
       const response = await this.appClient.apiService.verifyLoginCode(normalizedPhone, this.code, deviceId);
-      if (version !== this.requestVersion) {
+      if (version !== this.requestVersion ||
+        sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
         return;
       }
-      const saved = await this.appClient.sessionManager.signIn(response.accessToken, response.refreshToken);
-      if (version !== this.requestVersion) {
+      const signingIn = this.appClient.sessionManager.signIn(response.accessToken, response.refreshToken);
+      const signedInVersion = this.appClient.sessionManager.getSessionVersion();
+      const saved = await signingIn;
+      if (version !== this.requestVersion ||
+        signedInVersion !== this.appClient.sessionManager.getSessionVersion()) {
         return;
       }
       if (!saved) {
@@ -141,7 +151,8 @@ export struct LoginPage {
       this.code = '';
       this.onSuccess?.();
     } catch (error) {
-      if (version === this.requestVersion) {
+      if (version === this.requestVersion &&
+        sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
         const mapped = error as PortraError;
         this.errorMessage = mapped.businessCode === 40002 ? '验证码错误或已过期，请重新获取' :
           (mapped.message || '登录失败，请稍后重试');

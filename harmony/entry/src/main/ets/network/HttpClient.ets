@@ -7,7 +7,7 @@ import { AuthInterceptor } from './AuthInterceptor';
 import { ErrorMapper, PortraError } from './ErrorMapper';
 
 export interface AuthenticationExpiredHandler {
-  onExpired(): Promise<void>;
+  refreshSession(): Promise<boolean>;
 }
 
 export class HttpClient implements AuthTokenController {
@@ -15,6 +15,13 @@ export class HttpClient implements AuthTokenController {
   private readonly authenticationExpiredHandler?: AuthenticationExpiredHandler;
   private readonly requestVersions: Map<string, number> = new Map<string, number>();
   private readonly activeRequests: Map<string, http.HttpRequest> = new Map<string, http.HttpRequest>();
+  private readonly requestScopes: Map<string, boolean> = new Map<string, boolean>();
+  private sessionEpoch: number = 0;
+  private tokenRevision: number = 0;
+  // Keep even a failed recovery while requests sent with that token are pending.
+  // A late 401 in the same wave must share its outcome, not rotate again.
+  private readonly revisionUsers: Map<number, number> = new Map<number, number>();
+  private readonly recoveries: Map<number, Promise<boolean>> = new Map<number, Promise<boolean>>();
 
   constructor(authInterceptor: AuthInterceptor = new AuthInterceptor(),
     authenticationExpiredHandler?: AuthenticationExpiredHandler) {
@@ -23,13 +30,30 @@ export class HttpClient implements AuthTokenController {
   }
 
   setAccessToken(token: string): void {
-    this.cancelAllRequests();
-    this.authInterceptor.setAccessToken(token);
+    this.invalidateSessionRequests();
+    this.replaceAccessToken(token);
   }
 
   clearAccessToken(): void {
-    this.cancelAllRequests();
+    this.invalidateSessionRequests();
+    this.tokenRevision++;
     this.authInterceptor.clearAccessToken();
+  }
+
+  replaceAccessToken(token: string): void {
+    this.tokenRevision++;
+    this.authInterceptor.setAccessToken(token);
+  }
+
+  private invalidateSessionRequests(): void {
+    this.sessionEpoch++;
+    // Public GETs carry no account state. In particular, startup restore must
+    // not cancel the hall feed. Pending refresh waiters are invalidated too.
+    this.requestScopes.forEach((scoped: boolean, key: string) => {
+      if (scoped) {
+        this.cancelRequest(key);
+      }
+    });
   }
 
   async get<T>(path: string, requestKey: string = path): Promise<T> {
@@ -56,8 +80,12 @@ export class HttpClient implements AuthTokenController {
     return this.request<T>(http.RequestMethod.PUT, path, requestKey, true, body);
   }
 
+  async patch<T>(path: string, body?: Object, requestKey: string = path): Promise<T> {
+    return this.request<T>(http.RequestMethod.PATCH, path, requestKey, true, body);
+  }
+
   cancelAllRequests(): void {
-    this.activeRequests.forEach((_request: http.HttpRequest, key: string) => {
+    this.requestScopes.forEach((_scoped: boolean, key: string) => {
       this.cancelRequest(key);
     });
   }
@@ -68,6 +96,7 @@ export class HttpClient implements AuthTokenController {
    */
   cancelRequest(requestKey: string): void {
     this.bumpRequestVersion(requestKey);
+    this.requestScopes.delete(requestKey);
     const activeRequest = this.activeRequests.get(requestKey);
     if (activeRequest !== undefined) {
       activeRequest.destroy();
@@ -85,9 +114,86 @@ export class HttpClient implements AuthTokenController {
     if (!path.startsWith('/') || path.startsWith('//') || /[\\\s#]/.test(path)) {
       throw ErrorMapper.config('接口必须使用以单个 / 开头的相对路径。');
     }
+    const requestVersion = this.beginRequest(requestKey);
+    const epoch = this.sessionEpoch;
+    // Logout captures the old bearer before local sign-out, but cannot mutate
+    // local session state or renew. Allow that best-effort revocation to finish.
+    const logout = path === '/auth/native/logout';
+    const scoped = !(method === http.RequestMethod.GET && !authenticated) && !logout;
+    this.requestScopes.set(requestKey, scoped);
+    const startingRevision = this.tokenRevision;
+    const recoveryEligible = authenticated && !logout;
+    if (recoveryEligible) {
+      this.revisionUsers.set(startingRevision, (this.revisionUsers.get(startingRevision) ?? 0) + 1);
+    }
+    try {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        this.assertCurrent(requestKey, requestVersion, epoch, scoped);
+        const revision = this.tokenRevision;
+        const authorization = authenticated ? this.authInterceptor.authorizationHeader() : '';
+        try {
+          const result = await this.requestOnce<T>(method, path, requestKey, requestVersion,
+            profile.baseUrl, authorization, body);
+          this.assertCurrent(requestKey, requestVersion, epoch, scoped);
+          return result;
+        } catch (error) {
+          this.assertCurrent(requestKey, requestVersion, epoch, scoped);
+          const mapped = error as PortraError;
+          if (attempt > 0 || !authenticated || logout || authorization.length === 0 ||
+            !ErrorMapper.isAuthenticationExpired(mapped)) {
+            throw this.normalizeThrownError(error);
+          }
+          let recovered = revision !== this.tokenRevision;
+          if (!recovered && this.authenticationExpiredHandler !== undefined) {
+            try {
+              recovered = await this.recoverSession(revision);
+            } catch (refreshError) {
+              this.assertCurrent(requestKey, requestVersion, epoch, scoped);
+              throw this.normalizeThrownError(refreshError);
+            }
+          }
+          this.assertCurrent(requestKey, requestVersion, epoch, scoped);
+          if (!recovered) {
+            throw this.normalizeThrownError(error);
+          }
+          if (method !== http.RequestMethod.GET) {
+            // POST/PUT/DELETE may already have side effects. Never replay them.
+            throw ErrorMapper.writeNotRetried();
+          }
+        }
+      }
+      throw ErrorMapper.stale();
+    } finally {
+      if (recoveryEligible) {
+        const remaining = (this.revisionUsers.get(startingRevision) ?? 1) - 1;
+        if (remaining === 0) {
+          this.revisionUsers.delete(startingRevision);
+          this.recoveries.delete(startingRevision);
+        } else {
+          this.revisionUsers.set(startingRevision, remaining);
+        }
+      }
+      if (this.isCurrentRequest(requestKey, requestVersion)) {
+        this.requestScopes.delete(requestKey);
+      }
+    }
+  }
+
+  private recoverSession(revision: number): Promise<boolean> {
+    const existing = this.recoveries.get(revision);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const recovery = this.authenticationExpiredHandler === undefined ? Promise.resolve(false) :
+      this.authenticationExpiredHandler.refreshSession();
+    this.recoveries.set(revision, recovery);
+    return recovery;
+  }
+
+  private async requestOnce<T>(method: http.RequestMethod, path: string, requestKey: string,
+    requestVersion: number, baseUrl: string, authorization: string, body?: Object): Promise<T> {
     const request = http.createHttp();
-    const requestVersion = this.beginRequest(requestKey, request);
-    const authorization = authenticated ? this.authInterceptor.authorizationHeader() : '';
+    this.activeRequests.set(requestKey, request);
     const content = body === undefined ? undefined : JSON.stringify(body);
     const options: http.HttpRequestOptions = authorization.length === 0
       ? {
@@ -116,7 +222,7 @@ export class HttpClient implements AuthTokenController {
 
     let response: http.HttpResponse;
     try {
-      response = await request.request(this.buildUrl(profile.baseUrl, path), options);
+      response = await request.request(this.buildUrl(baseUrl, path), options);
     } catch (error) {
       this.releaseRequest(requestKey, request);
       if (!this.isCurrentRequest(requestKey, requestVersion)) {
@@ -133,9 +239,7 @@ export class HttpClient implements AuthTokenController {
     }
 
     if (response.responseCode < 200 || response.responseCode >= 300) {
-      const mappedError = ErrorMapper.fromHttpStatus(response.responseCode);
-      await this.handleAuthenticationExpired(mappedError);
-      throw mappedError;
+      throw ErrorMapper.fromHttpStatus(response.responseCode);
     }
 
     let envelope: ApiEnvelope<T>;
@@ -154,9 +258,7 @@ export class HttpClient implements AuthTokenController {
     }
 
     if (envelope.code !== 200) {
-      const mappedError = ErrorMapper.fromBusinessCode(envelope.code, envelope.message);
-      await this.handleAuthenticationExpired(mappedError);
-      throw mappedError;
+      throw ErrorMapper.fromBusinessCode(envelope.code, envelope.message);
     }
 
     if (!this.isCurrentRequest(requestKey, requestVersion)) {
@@ -165,14 +267,14 @@ export class HttpClient implements AuthTokenController {
     return envelope.data;
   }
 
-  private beginRequest(requestKey: string, request: http.HttpRequest): number {
+  private beginRequest(requestKey: string): number {
     const previousRequest = this.activeRequests.get(requestKey);
     if (previousRequest !== undefined) {
       previousRequest.destroy();
+      this.activeRequests.delete(requestKey);
     }
 
     const requestVersion = this.bumpRequestVersion(requestKey);
-    this.activeRequests.set(requestKey, request);
     return requestVersion;
   }
 
@@ -201,9 +303,13 @@ export class HttpClient implements AuthTokenController {
     return `${normalizedBaseUrl}${normalizedPath}`;
   }
 
-  private async handleAuthenticationExpired(error: PortraError): Promise<void> {
-    if (this.authenticationExpiredHandler !== undefined && ErrorMapper.isAuthenticationExpired(error)) {
-      await this.authenticationExpiredHandler.onExpired();
+  private assertCurrent(requestKey: string, version: number, epoch: number, scoped: boolean): void {
+    if (!this.isCurrentRequest(requestKey, version) || (scoped && epoch !== this.sessionEpoch)) {
+      throw ErrorMapper.stale();
     }
+  }
+
+  private normalizeThrownError(error: Object): Error {
+    return error instanceof Error ? error : new Error(String(error));
   }
 }

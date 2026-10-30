@@ -6,6 +6,7 @@ import com.action.camera.auth.domain.SmsDeliveryStatus;
 import com.action.camera.auth.domain.SmsPurpose;
 import com.action.camera.auth.repository.SmsChallengeRepository;
 import com.action.camera.auth.sms.SmsDeliveryReceipt;
+import com.action.camera.auth.sms.SmsCloudVerifier;
 import com.action.camera.auth.sms.SmsMessage;
 import com.action.camera.auth.sms.SmsSender;
 import com.action.camera.common.ErrorCode;
@@ -17,12 +18,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.util.Optional;
+import java.util.List;
 
 @Service
 public class PhoneSmsService {
 
     private static final String RATE_LIMIT_MESSAGE = "请求过于频繁，请稍后再试";
+    private static final List<SmsDeliveryStatus> RESERVED_OR_SENT =
+            List.of(SmsDeliveryStatus.PENDING, SmsDeliveryStatus.SENT);
+    private static final List<SmsDeliveryStatus> FAILED = List.of(SmsDeliveryStatus.FAILED);
 
     private final SmsChallengeRepository challengeRepository;
     private final SmsSender smsSender;
@@ -71,13 +75,21 @@ public class PhoneSmsService {
         String phoneHash = phoneIdentityCodec.lookupHash(phone);
         String safeIp = requireContextValue(requestIp, 45, "请求来源无效");
         String safeDeviceId = requireContextValue(deviceId, 128, "设备标识不能为空");
+        if (!SmsSendConcurrencyGuard.acquireUntilTransactionCompletion(phoneHash, safeIp, safeDeviceId)) {
+            throw rateLimited("IN_FLIGHT");
+        }
         LocalDateTime now = LocalDateTime.now(clock);
 
-        Optional<SmsChallenge> latest = challengeRepository
-                .findFirstByPhoneHashAndPurposeOrderByCreatedAtDesc(phoneHash, purpose);
-        if (latest.isPresent()
-                && latest.get().getCreatedAt().isAfter(now.minus(properties.getResendCooldown()))) {
-            throw rateLimited();
+        // Retain the database row lock used by existing verification/send flows.
+        challengeRepository.findFirstByPhoneHashAndPurposeOrderByCreatedAtDesc(phoneHash, purpose);
+        // A newer FAILED row must not hide a recent successful send.
+        if (challengeRepository.existsByPhoneHashAndPurposeAndDeliveryStatusInAndCreatedAtAfter(
+                phoneHash, purpose, RESERVED_OR_SENT, now.minus(properties.getResendCooldown()))) {
+            throw rateLimited("SEND_COOLDOWN");
+        }
+        if (challengeRepository.existsByPhoneHashAndPurposeAndDeliveryStatusInAndCreatedAtAfter(
+                phoneHash, purpose, FAILED, now.minusSeconds(10))) {
+            throw rateLimited("FAILURE_BACKOFF");
         }
 
         enforceRateLimits(phoneHash, safeIp, safeDeviceId, now);
@@ -130,7 +142,15 @@ public class PhoneSmsService {
             throw new SmsCodeInvalidException();
         }
 
-        if (!codeHasher.matches(phone, purpose, code, challenge.getCodeHash())) {
+        boolean verified;
+        if (smsSender instanceof SmsCloudVerifier cloudVerifier) {
+            // The provider generated this code; the local challenge still enforces expiry,
+            // attempt count, and one-time consumption in our application.
+            verified = cloudVerifier.verifyCode(phone, code);
+        } else {
+            verified = codeHasher.matches(phone, purpose, code, challenge.getCodeHash());
+        }
+        if (!verified) {
             challenge.setAttemptCount(challenge.getAttemptCount() + 1);
             challenge.setLastAttemptAt(now);
             challengeRepository.saveAndFlush(challenge);
@@ -146,19 +166,32 @@ public class PhoneSmsService {
     private void enforceRateLimits(String phoneHash, String requestIp, String deviceId, LocalDateTime now) {
         LocalDateTime hourAgo = now.minusHours(1);
         LocalDateTime dayAgo = now.minusHours(24);
-        if (challengeRepository.countByPhoneHashAndCreatedAtAfter(phoneHash, hourAgo)
-                >= properties.getPhoneHourlyLimit()
-                || challengeRepository.countByPhoneHashAndCreatedAtAfter(phoneHash, dayAgo)
-                >= properties.getPhoneDailyLimit()
-                || challengeRepository.countByRequestIpAndCreatedAtAfter(requestIp, hourAgo)
-                >= properties.getIpHourlyLimit()
-                || challengeRepository.countByRequestIpAndCreatedAtAfter(requestIp, dayAgo)
-                >= properties.getIpDailyLimit()
-                || challengeRepository.countByDeviceIdAndCreatedAtAfter(deviceId, hourAgo)
-                >= properties.getDeviceHourlyLimit()
-                || challengeRepository.countByDeviceIdAndCreatedAtAfter(deviceId, dayAgo)
-                >= properties.getDeviceDailyLimit()) {
-            throw rateLimited();
+        checkLimit(challengeRepository.countByPhoneHashAndDeliveryStatusInAndCreatedAtAfter(phoneHash, RESERVED_OR_SENT, hourAgo),
+                properties.getPhoneHourlyLimit(), "PHONE_HOURLY");
+        checkLimit(challengeRepository.countByPhoneHashAndDeliveryStatusInAndCreatedAtAfter(phoneHash, RESERVED_OR_SENT, dayAgo),
+                properties.getPhoneDailyLimit(), "PHONE_DAILY");
+        checkLimit(challengeRepository.countByRequestIpAndDeliveryStatusInAndCreatedAtAfter(requestIp, RESERVED_OR_SENT, hourAgo),
+                properties.getIpHourlyLimit(), "IP_HOURLY");
+        checkLimit(challengeRepository.countByRequestIpAndDeliveryStatusInAndCreatedAtAfter(requestIp, RESERVED_OR_SENT, dayAgo),
+                properties.getIpDailyLimit(), "IP_DAILY");
+        checkLimit(challengeRepository.countByDeviceIdAndDeliveryStatusInAndCreatedAtAfter(deviceId, RESERVED_OR_SENT, hourAgo),
+                properties.getDeviceHourlyLimit(), "DEVICE_HOURLY");
+        checkLimit(challengeRepository.countByDeviceIdAndDeliveryStatusInAndCreatedAtAfter(deviceId, RESERVED_OR_SENT, dayAgo),
+                properties.getDeviceDailyLimit(), "DEVICE_DAILY");
+
+        // Failures have a separate rolling minute budget, never an hour/day penalty.
+        LocalDateTime failureWindow = now.minusMinutes(1);
+        checkLimit(challengeRepository.countByPhoneHashAndDeliveryStatusInAndCreatedAtAfter(phoneHash, FAILED, failureWindow),
+                properties.getPhoneHourlyLimit(), "PHONE_FAILURE_BURST");
+        checkLimit(challengeRepository.countByRequestIpAndDeliveryStatusInAndCreatedAtAfter(requestIp, FAILED, failureWindow),
+                properties.getIpHourlyLimit(), "IP_FAILURE_BURST");
+        checkLimit(challengeRepository.countByDeviceIdAndDeliveryStatusInAndCreatedAtAfter(deviceId, FAILED, failureWindow),
+                properties.getDeviceHourlyLimit(), "DEVICE_FAILURE_BURST");
+    }
+
+    private void checkLimit(long count, long limit, String rule) {
+        if (count >= limit) {
+            throw rateLimited(rule);
         }
     }
 
@@ -169,7 +202,8 @@ public class PhoneSmsService {
         return value.trim();
     }
 
-    private BusinessException rateLimited() {
+    private BusinessException rateLimited(String rule) {
+        org.slf4j.LoggerFactory.getLogger(PhoneSmsService.class).info("SMS_RATE_LIMIT rule={}", rule);
         return new BusinessException(ErrorCode.VALIDATION_ERROR, RATE_LIMIT_MESSAGE);
     }
 }

@@ -1,0 +1,63 @@
+{
+  "baseCommit": "60b6b02ff81997e07c22738247375c89b99f484f",
+  "appliedToProduction": true,
+  "authorization": "User explicitly confirmed B and public maintainer approval in this chat on 2026-10-28",
+  "patchSha256": "95ce62f222c31e6f6f80a0a6f3c93f30fb237023c279161d3a0e9dfbc3d8f8ca",
+  "files": [
+    {
+      "file": "harmony/entry/src/main/ets/features/user/ReportPanel.ets",
+      "baseSha256": "e7d6a1bd516ccc3ea82861b753789951c6ab739534b0e6c113ef5de6703dd544",
+      "appliedSha256": "a005ad0a39bde84bb4b92a25913d566dcc9013efa1de6c97cad429fa1188450d"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/features/user/ReportSubmissionStore.ets",
+      "baseSha256": null,
+      "appliedSha256": "baebfa849f14438ddb5ff2bc25ade6e2ce25a0ff56d5444da85fba2dce86e62c"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/network/ApiService.ets",
+      "baseSha256": "af1990fba7184b51a5a32d45b3159d98dfa8c0c32ea92cbd298237f5f077fa01",
+      "appliedSha256": "cfec1bb9f47dfecf023409dc076906f2d631df99813fd4fe82cdabd54d81d792"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/pages/PublicProfilePage.ets",
+      "baseSha256": null,
+      "appliedSha256": "9e6f40641e3d1cd4b1d7fc8032513ec9bb361993e3d1e1b69b43411d3aceb013"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/model/NavigationModels.ets",
+      "baseSha256": "dadff6de1afc82547fd1e8fed33300d9eed729fd6567c38daa346164da695e2d",
+      "appliedSha256": "8d6529bb2fe3246c882f99556da4fed792c610b8ba6c2ed8ad40caddeee3e906"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/navigation/NavigationPolicy.ets",
+      "baseSha256": "eb0ab21a437177b2286f89e112b4260744eeea8c5e47f67b700dea33d56827bd",
+      "appliedSha256": "02f844b2361a5a9d57914c252a1849c33452b8f1eb2340f6baf7c3247ba83724"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/pages/Index.ets",
+      "baseSha256": "ff4aaaa83b06cc52572d9f7ac105b417d6cfca046c8aec9317a2f2605293e044",
+      "appliedSha256": "18e502c9636264588190fca1fb9edc62e7551bb1e77e2e913ad44017e4727dd5"
+    },
+    {
+      "file": "harmony/entry/src/main/ets/features/shell/PortraAppShell.ets",
+      "baseSha256": "6b6922a30f9f8ca81d92908d3b366e6820c74dd0dc1de6ac20130a62f67e96e8",
+      "appliedSha256": "cc2515b379128713d4bf0c3e311abd5e736ee545536384b9bb8f15d5d90292ad"
+    },
+    {
+      "file": "harmony/tests/moment-report-contract.test.cjs",
+      "baseSha256": "fa91e6931360aa327021df8eb6ee87c7b802e6e48299d1f07f223ed6e795495a",
+      "appliedSha256": "6d5c53faa8ba933c38413b0512d3ef20185380425a28ae05dbc56d2adf028a23"
+    },
+    {
+      "file": "harmony/tests/moment-public-profile.test.cjs",
+      "baseSha256": null,
+      "appliedSha256": "d7a66d0ff313233fd71e0ddacb7f8ff186fb99700de799e3b9f93fe46877cb37"
+    },
+    {
+      "file": "harmony/tests/navigation.test.cjs",
+      "baseSha256": "5264d0f3862ebd9308ab4fab8673049aeb30ef2c57143dc5603be35faf180dee",
+      "appliedSha256": "3179beff8c1d1156d243528f00865e018addf8c6a923fba3ace94313929a79bb"
+    }
+  ]
+}

@@ -1,12 +1,73 @@
+# C 公共依赖交付状态
+
+## 2026-10-29最新：动态卡片、详情互动与举报身份修复
+
+米白页面仅图片区域黑底；点图独立详情、小箭头切图、头像昵称可点。减弱粗蓝边/重印章，删“约拍记录”；爱心/书签只图标+数量、无加载动效，详情也可收藏/取消。返回后二次点图锁与失败核实隐藏锁已修；举报身份实例key，真实刷新/前后台/详情作者返回正常。Mate90Pro API26当前包SHA 87424F5F9AA09D596F71D7A44D766767232B7562BC5F1A2CFB5CD529840BD8CE。
+
+公共b42b2a8已快进复用，C相关64/64通过、assembleHap exit0/21.306秒；全套245仅240通过，5项公共auth旧回归失败，见[C-SHARED-09交接](proposals/shared-auth-regressions/README.md)。[修改文件、真实证据与命令](evidence/20261029-feed-card/README.md)。PR25已由外部18:07:56合并，本轮没有合并操作；后续只交Draft，不改main。不宣称全套或完整发布验收完成，以下旧Draft/旧预览状态按时点保留。
+
+## 2026-10-29：动态卡片及黑底全屏图片预览，待用户审阅
+
+C卡片按Web手机布局迁移，图标+计数，选中红/金，收藏响应保留三张预览；图片进入既有独立MomentDetail全页，去底部弹层/可见“查看详情”“查看作者主页”“上一张”按钮，头像及真实昵称为入口，黑底等比自适应及中央小箭头。仅C文件，公共/B/D/后端/Web未改。237/237、assembleHap exit0，已安装并在当前Mate 90 Pro API26真实点图打开5图详情。按用户要求停在预览等审阅；本轮开关颜色、取消与作者/切图行为完整设备复核尚未完成，不宣称完整验收。逐项边界、实际命令/失败/哈希和截图见[预览证据](evidence/20261029-feed-card/README.md)。原Draft PR25未合并，本轮预览尚未提交推送。
+
+## 2026-10-29：大厅搜索按当前身份接通
+
+已获公共维护者明确授权，仅新增公共Shell搜索接线，铃铛沿用NOTIFICATIONS。**摄影师PROVIDER只搜需求，客户CUSTOMER只搜摄影橱窗；搜索中没有分类按钮或手动范围选择。** 游客先正常登录，开页/查询/分页/前台恢复读取真实currentSession，切身份清旧查询/结果，旧响应和结果点击均有会话保护。C独立控制器/名义委托/呈现及3份回归，复用已有列表API、卡片和详情，不改公共网络/DTO/认证/主题或A/B/D页。
+
+正式234/234、0fail/skip/TODO，18项独立相关复核；assembleHap exit0/19.151秒，HAP SHA256 **A37689A36A8C15C0B3A17EF177D85A9830AC106D70E478251CCBEAB7FD6A333C**。同一普通测试用户真实PROVIDER→CUSTOMER切换后，搜索分别命中需求1/橱窗6条并能进详情；无结果、键盘、真实Home恢复清理、右上铃铛通知均有[模拟器证据](evidence/20261029-header-search/README.md)。[唯一公共补丁/文件SHA](proposals/header-search/README.md)。保持原Draft PR25/base integration/harmony-v1，未合并；本地H2/unsigned不代表团队外部发布验收。
+
+## 前期记录（当前状态以本段为准）
+
+最终补充：模拟器订单通知38→order6、纠纷通知52→dispute2/order7，追评45→review3/order2、评价申诉48→complaint2/review4/order2均实际验证；最终包200字键盘及真实系统Home恢复旧草稿清理通过，见[精确目标证据](evidence/20261029-engagement/native-routing-verification.json)。
+
+## 2026-10-29最新：本轮9文件授权已应用，C-SHARED-08部分解除
+
+已获公共、B、D维护者授权，真实ApiService用户态GET/POST、DTO、ORDER_ENGAGEMENT路由/登录返回、Index、D Message/Order及B ReportPanel/ReportDialogBody正式应用。订单/评价/评价申诉/订单纠纷按独立typed ID读取并聚焦；模拟器追评review3/order2、申诉complaint2/review4/order2已验证，未把列表落点当精确目标。详情/表单会话与实例保护、200字、取消清理和unknown防重均接入；216/216和构建exit0。[最终签名/补丁](proposals/engagement-mobile/README.md)、[真实证据](evidence/20261029-engagement/README.md)。维护者独立PR无，公共改动随现C Draft PR25交付。
+
+仍缺 **REPORT结果通知**：核对backend/src/main/java/com/action/camera/report/service/ReportService.java的resolve没有创建通知。请后端维护者在一次合法成功处理事务提交后通过既有NotificationService.createNotification(NotificationCreateRequest)向reporter生成REPORT_RESOLVED，relatedType=REPORT、relatedId=reportId，metadata至少reportId，正文仅本人可见的处理结果；用dedupeKey防重复，同report不重复resolve。C只复用GET /reports/my（ApiService.listMyReports(key?)），ReportSummary已有resolution/adminComment；后端事件就绪后C再按reportId给本人结果落点，无需ADMIN接口。兼容既有resolve调用及通知DTO，不造GET /reports/{id}。验收：测试举报→既有Web合法处理一次→同ID结果通知→原生本人结果，403/账号切换/跨实例取消；未获后端授权，本轮不改它。关注通知仍缺可靠角色，不能猜用户身份；其他深链/推送不扩大范围。团队原生环境/SHA/合法后台及签名升级另待，实体设备不列本轮条件。
+
+## 历史交接（以下缺口以新段落更新为准）
+
+## 2026-10-29：C-SHARED-08 通知精确业务跳转待接入
+
+已核查后端已有订单/评价/评价申诉/订单纠纷的对象ID与用户态GET；鸿蒙当前仍只进订单列表，未精确定位。举报处理后端当前未创建结果通知，不能承诺能从该通知跳转。精确目标文件、建议签名、ID语义、兼容及模拟器用例见[维护者交接](proposals/notification-deep-links/README.md)。086a752没有把这些标为完成。实体设备按用户要求不列本轮条件。
+
+<!-- WEB-UI-MIGRATION-20261028 -->
+本轮Web风格迁移已获公共、B、D维护者明确授权并实际应用：HttpClient.patch，通知/信用DTO和ApiService方法，currentSession可选实例key，三受保护原生路由、Hall通知入口、D消息通知标签和B本人信用入口。没有认证旁路、共享主题变更或第二网络层。
+
+原通知占位与信用原生缺失已在本地解除。正式185/185、构建exit0，真实通知2→1→0及本人信用/切角色/前台行为证据齐全。[最终接口/兼容清单](proposals/web-ui-migration/README.md)、[真实验收](evidence/20261028-web-ui/README.md)。旧C-SHARED-01至07成果继续保留。
+
+未实现范围如实保留：Web其他业务深链、动态通知聚合、原生系统推送/全局实时角标、他人私有信用历史；不执行任意navigationPath URL。实体设备按用户要求不列本轮条件；待外部交接仍为团队原生环境/SHA/合法后台和发布签名条件，不能再把“通知后端不存在”或“未获这9文件授权”列作当前原因。
+
+## 此前阶段记录（保留原时点，以顶部本轮状态为准）
+<!-- FINAL-20261028 -->
+更新：2026-10-28，**本轮共享授权包已实际应用，不再等待代码授权或候选接入**。用户明确确认 B/公共维护者整包授权及新隔离普通双角色 H2 夹具授权；原认证两行和点赞/详情授权继续有效。integration 最新仍 b258ec8，没有另外已更新的公共修复 PR，补丁随 [Draft PR #25](https://github.com/yueyue0218/Camera/pull/25) 交付。
+
+| 编号 | 最新状态 / 精确实现 |
+| --- | --- |
+| C-SHARED-01/02 | 已接入真实 ApiService.likeMoment/unlikeMoment/getMoment 及对应实例取消；60b6b02 已有本地设备点赞/全5图详情证据 |
+| C-SHARED-03 | B ReportPanel + ReportSubmissionStore 已授权应用；提交时捕获对象/actor/逻辑会话/实例generation，response/catch/finally均隔离；目标/身份变化清草稿。unknown 同账号同目标跨角色版本仍禁重复，其他账号不泄露 |
+| C-SHARED-04 | ApiService.createReport(payload,key?)、listMyReports(key?)、cancelReports(createKey?,myKey?)，缺省行为保持兼容；每实例精确key。真实 HttpClient回归和设备超时/核实已验证 |
+| C-SHARED-05 | B PublicProfilePage 复用既有 getPublicProfile(id,role,key?)、listProfileMoments(id,role,page,size,key?)、cancelPublicProfile(profileKey,momentsKey)，C仅可选作者回调；公共 PUBLIC_PROFILE 路由/参数已授权接线 |
+| C-SHARED-07 | C局部真实 UIObserver/Application 信号覆盖root与HALL；Index/Shell动态正常登录→现有Hall(tab1)已授权，重登复用栈顶Hall。两条实际路径的成功切角色/退出/前台恢复均已实测 |
+| C-AUTH-01 | 既有5625ce0已修load/clear加密属性，冷启动/覆盖恢复和退出清理证据保留 |
+
+最终全套162/162、严格举报24/24，均0 TODO；assembleHap exit0。最终逐文件补丁/兼容说明见[授权包](proposals/remaining-owner-bundle/README.md)，[本轮设备、跨端及环境证据](evidence/20261028-final/README.md)，完整命令及限制见[delivery](c-module-delivery.md)。A/B/C旧方法和B卡片默认调用保留，未新增第二套表单/请求/用户体系。
+
+**仍需外部交接的只有真实部署与发布验收条件**：可用原生短信测试环境及后端部署SHA、现有合法管理员入口；实体设备授权/签名条件。候选来源 https://47.76.106.57 来自GitHub staging变量及仓库配置，TLS可连通，但“可连通”不等于“已确认允许原生测试”。本地18088/15173和18090为用户授权隔离环境，结果单独记录。当前不申请提权、重置密码或共享配置变更；没有新的缺失方法需要C旁路实现。后端未提供举报幂等请求ID，进程重启后的未知写入去重不作承诺，可作为后续公共能力而不是虚构已支持。
+
+<!-- HISTORICAL-RECORDS -->
+## 历史阶段记录（以下状态和计数保留原时点，以本页顶部最新结论为准）
+
 # C 公共依赖与交接
 
-核查基线：`b258ec8114ac1ff8f360099155f5d284f1247c41`。更新：2026-10-27。
-以下均为交接需求，未替维护者实现；没有擅自修改公共或 B 文件。
+核查基线：`b258ec8114ac1ff8f360099155f5d284f1247c41`。更新：2026-10-28。
+以下按项标记真实状态。C-AUTH-01及C-SHARED-01/02已获用户明确确认的对应维护者授权并实现；其余公共/B文件仍只读，未扩大授权。
 
 | ID / 优先级 | 当前缺口、目标文件 / 维护者 | 建议契约 / 生命周期 | 调用方、验收 / 状态 |
 | --- | --- | --- | --- |
-| C-SHARED-01 / P1 | network/ApiService.ets 缺少点赞方法；后端 MomentController 已有 PUT/DELETE。公共网络维护者/协调人 | `likeMoment(momentId: number): Promise<MomentSummary>`、`unlikeMoment(...)`；PUT/DELETE `/moments/{id}/like`，正安全整数校验，沿用认证和统一错误；按对象/实例隔离 key 并提供取消；禁止 toggle 自动重放 | MomentFeedPage；以返回 ID/布尔值/计数为准，离页/身份变化丢弃结果。**阻塞**：尚无维护者提交，页面维持真实点赞计数只读 |
-| C-SHARED-02 / P1 | network/ApiService.ets 缺少详情，后端 GET `/moments/{id}` 已有；公共网络维护者/协调人 | `getMoment(momentId: number, requestKey?: string): Promise<MomentSummary>`，匹配 ID 校验；`cancelMomentDetail(requestKey?: string)`；隔离在途实例与旧结果 | C 详情/完整多图预览；每次重进重新校验可见性，不能把 Feed 三张预览当完整图片。**阻塞**：尚无适配，未创建假详情入口 |
+| C-SHARED-01 / P1 | network/ApiService.ets；已获公共网络维护者授权，新增真实likeMoment/unlikeMoment/cancelMomentLike | PUT/DELETE `/moments/{id}/like`，沿用认证及错误映射，正安全ID/返回对象状态计数校验，兼容默认key，可按实例取消 | **已实现并本地原生验收**：Feed点赞0→1、详情取消1→0，服务器另一普通会话核对；旧响应与结果不明保护已回归。staging/真机未验 |
+| C-SHARED-02 / P1 | network/ApiService.ets；已获授权新增getMoment/cancelMomentDetail，C内详情弹层接入 | 真实GET `/moments/{id}`，每次重进重新读取；详情完整图片权威，Feed仍仅3张预览，关闭/会话/后台失效 | **已实现并本地原生验收**：1/5→5/5，关闭重入及系统Back；Web下架详情404清旧卡片，独立恢复后重读可见。staging/真机未验 |
 | C-SHARED-03 / P1 | features/user/ReportPanel.ets 属 B，未移交；只校验 status 非空，缺目标/会话/离页版本保护；取消后仍可能处理旧提交。B/协调人 | 状态仅接受 PENDING/RESOLVED；提交前捕获 targetType/targetId/sessionVersion/generation，响应/异常/finally 均检查；目标变化重置 submitted/error 与输入策略；超时/取消提示结果待确认并用现有 listMyReports 核实，不能盲重发。确认后由 B 修复或明确移交 | C 仅复用；同页最多一个表单，举报期间同条收藏互斥。普通提交的本地原生＋Web闭环已通过；共享可靠性仍有7项严格失败，不宣称组件已全面完善 |
 | C-SHARED-04 / P1 | ApiService.createReport/listMyReports/cancelReports 固定 reports.create/reports.my；ReportPanel.aboutToDisappear 调 cancelReports。A 详情页、C Feed 可在导航栈同时存在，离开任一实例会取消另一个的提交；HttpClient 同 key 替换也会使旧请求失效。公共维护者 + B | createReport/listMyReports 增加可选 requestKey（保留现有默认参数兼容），取消方法接收同一 key；ReportPanel 为每个实例/对象持有唯一 key，只取消自己；取消不代表服务端未写入，需核实记录 | 关闭 Feed 举报不应取消 A/B 举报；导航覆盖下层页面与快速换目标回归。**待整合**：基于现有调用链与 HttpClient 同 key 策略确认，C 未改底座 |
 | C-SHARED-05 / P2 | MomentSummary 无真实作者昵称/头像；公开用户资料 API 已有，公共主页导航入口未给 C；B/协调人 | 复用 B 的真实资料/公开主页回调契约，明确 role、userId 和会话失效；不新增假资料或第二套主页 | MomentCard 当前显示真实角色 + ID、确定性 Avatar 回退。**待对齐**：不阻塞只读卡片 |
@@ -120,3 +181,10 @@ HTTPS获取远端成功，integration仍为`b258ec8`，所列举报/点赞/详�
 精确目标：load和clear的ALIAS查询各增加一行true，保持现有签名/环境别名/加密强度/A/B/C调用兼容。**用户已明确确认获公共认证维护者授权，两行补丁已应用；其他公共文件仍未授权。** [补丁与实际源码回归](proposals/README.md)、[真实设备证据](evidence/20261027-auth/README.md)。原实现严格2失败、内存候选2通过、适用性检查0；应用后两项无条件通过，认证12/12，全套107项100过/7既有举报TODO，退出均0。原公共auth.test.cjs的alias-only替身未覆盖分区语义，新C契约补足边界而未修改原公共测试。
 
 授权后API26设备已验证真实恢复已有凭据、冷启动及同一unsigned产物覆盖安装；正常退出后加密属性记录NOT_FOUND，重启为游客。临时C诊断已撤回，无诊断最终包再次正常短信登录、冷启动恢复、覆盖恢复及退出冷启动游客均通过。不同环境不互删由真实源码契约覆盖。实体设备、同签名版本升级、锁屏及长时间过期恢复仍未实测；无现存证据要求扩大双分区读写。不得把false解释为SECRET明文或降低加密。
+
+
+### 2026-10-28：C-SHARED-01/02获授权并接入
+
+用户明确回复“已获公共网络维护者授权，应用补丁并接入验收”。唯一新增公共改动为ApiService.ets的47行适配，精确补丁保留在proposals/moment-api-like-detail.patch；不修改HttpClient/认证/DTO/公共导航/B表单。上文01/02“仍缺”的描述为授权前核查历史，当前以本段及表格为准。维护者独立PR/SHA仍无，此能力随现有C PR25提交。
+
+新增真实源码契约与C状态回归，全套134项127通过/7举报TODO，严格举报仍2通过/7失败；最终assembleHap退出0。真实本地API26已验证点赞/取消、完整五图、关闭重入/系统返回、Web下架后404及恢复重读、同进程后台清详情和同条举报草稿互斥。完整证据见[evidence](evidence/20261028-like-detail/README.md)。未解除03/04/05、成功切身份、HALL和团队环境/真机依赖。

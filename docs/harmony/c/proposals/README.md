@@ -33,3 +33,10 @@ node --test harmony/tests/*.test.cjs
 两项契约现为无条件测试，直接执行真实生产源码，不再使用内存替换或TODO开关。认证相关12/12通过；全套107项100通过、7项既有共享举报TODO，均退出0。测试覆盖保存后读取、清除真实加密分区、重复清除和其他环境资产隔离。
 
 官方API26模拟器已通过已有凭据恢复、force-stop/start、同一未签名产物覆盖安装、正常退出及退出后冷启动游客；退出后临时只查ATTRIBUTES确认加密记录NOT_FOUND。临时C诊断已移除，最终构建与真实恢复详见[设备证据](../evidence/20261027-auth/README.md)。实体设备、发布签名及同签名升级仍未验证；本地结果不能替代staging。
+
+
+## C-SHARED-01/02：点赞及详情适配（2026-10-28已授权应用）
+
+[精确补丁](moment-api-like-detail.patch)新增47行到ApiService，getMoment/likeMoment/unlikeMoment及对应取消按实例key隔离。用户已确认公共网络维护者授权；该补丁已应用，不再等待。契约测试现为harmony/tests/moment-api-contract.test.cjs，直接执行真实生产源码，无内存替换或TODO。8/8通过；全套134项127过7既有举报TODO。命令为`node --test harmony/tests/moment-api-contract.test.cjs`；已应用状态检查`git apply --reverse --check docs/harmony/c/proposals/moment-api-like-detail.patch`。
+
+C接入与本地原生真实GET/PUT/DELETE、完整5图、下架404及恢复重读已验证，见[证据](../evidence/20261028-like-detail/README.md)。该授权不覆盖共享举报、其他公共文件或B表单。

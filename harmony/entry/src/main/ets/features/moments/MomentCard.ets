@@ -1,16 +1,23 @@
-import { PortraAvatar } from '../../common/components/PortraAvatar';
+import { MomentAuthor } from './MomentAuthor';
 import { PortraImage } from '../../common/components/PortraImage';
 import { MomentSummary } from '../../model/ApiModels';
-import { PortraTheme } from '../../theme/PortraTheme';
 import { MomentFeedFormatter } from './MomentFeedModels';
+import { MomentActionButton } from './MomentActionButton';
 
+// Web MomentCard / feed.css mobile layout, with native touch targets.
 @Component
 export struct MomentCard {
   @Prop item: MomentSummary;
   @Prop favoriteBusy: boolean = false;
+  @Prop detailDisabled: boolean = false;
   @Prop interactionsDisabled: boolean = false;
   @Prop reportAllowed: boolean = false;
+  @Prop likeBusy: boolean = false;
+  @Prop likeUncertain: boolean = false;
   onToggleFavorite?: (item: MomentSummary) => void;
+  onToggleLike?: (item: MomentSummary) => void;
+  onOpenDetail?: (item: MomentSummary) => void;
+  onOpenAuthor?: (item: MomentSummary) => void;
   onRequestReport?: (item: MomentSummary) => void;
 
   private imageSource(): string {
@@ -23,138 +30,81 @@ export struct MomentCard {
   }
 
   build() {
-    Column({ space: PortraTheme.spacingMd }) {
-      Row({ space: PortraTheme.spacingMd }) {
-        PortraAvatar({ displayName: MomentFeedFormatter.author(this.item), avatarSize: 40 })
-        Column({ space: 3 }) {
-          Text(MomentFeedFormatter.author(this.item))
-            .fontSize(PortraTheme.fontBody)
+    Column() {
+      Column({ space: 8 }) {
+        Row() {
+          Text(`No. ${this.item.momentId.toString().padStart(6, '0')}`)
+            .fontSize(10).letterSpacing(1).fontColor('#67615A')
+          Blank()
+          Text('PORTRA FILE')
+            .fontSize(10).letterSpacing(1).fontWeight(FontWeight.Bold).fontColor('#2864C5')
             .fontWeight(FontWeight.Medium)
-            .fontColor(PortraTheme.primaryText)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-          Text(MomentFeedFormatter.time(this.item.createdAt))
-            .fontSize(PortraTheme.fontCaption)
-            .fontColor(PortraTheme.mutedText)
-        }
-        .layoutWeight(1)
-        .alignItems(HorizontalAlign.Start)
-        Text(`No. ${this.item.momentId}`)
-          .fontSize(PortraTheme.fontCaption)
-          .fontColor(PortraTheme.mutedText)
+        }.width('100%')
+        MomentAuthor({ item: this.item,
+          disabled: this.interactionsDisabled || this.likeBusy || this.favoriteBusy, onOpenAuthor: this.onOpenAuthor })
       }
-      .width('100%')
+      .width('100%').padding({ left: 14, right: 14, top: 12, bottom: 10 })
+      .alignItems(HorizontalAlign.Start).backgroundColor('#FBF7EF')
+      .border({ width: { bottom: 1 }, color: '#E8E2DB' })
 
-      Text(MomentFeedFormatter.title(this.item))
-        .width('100%')
-        .fontSize(PortraTheme.fontTitle)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(PortraTheme.primaryText)
-        .maxLines(2)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
+      Column({ space: 10 }) {
+        Text(MomentFeedFormatter.title(this.item))
+          .width('100%').fontSize(20).fontWeight(FontWeight.Bold).fontColor('#242529')
+          .maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
+          .onClick(() => { if (!this.detailDisabled && !this.likeBusy && !this.favoriteBusy) { this.onOpenDetail?.(this.item); } })
+        Text(MomentFeedFormatter.content(this.item))
+          .width('100%').fontSize(14).fontColor('#4D4943').lineHeight(22)
+          .maxLines(3).textOverflow({ overflow: TextOverflow.Ellipsis })
 
-      Text(MomentFeedFormatter.content(this.item))
-        .width('100%')
-        .fontSize(PortraTheme.fontBody)
-        .fontColor(PortraTheme.secondaryText)
-        .lineHeight(21)
-        .maxLines(5)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-      if (this.imageSource().length > 0) {
         Stack({ alignContent: Alignment.BottomEnd }) {
-          PortraImage({
-            source: this.imageSource(),
-            imageWidth: '100%',
-            imageHeight: 210,
-            cornerRadius: PortraTheme.radiusMd,
-            fallbackText: '动态图片暂不可用',
-            contentDescription: `${MomentFeedFormatter.title(this.item)}图片`,
-            allowInlineData: true
-          })
+          if (this.imageSource().length > 0) {
+            PortraImage({ source: this.imageSource(), imageWidth: '100%', imageHeight: '100%',
+              cornerRadius: 8, fallbackText: '动态图片暂不可用',
+              contentDescription: `${MomentFeedFormatter.title(this.item)}图片`, allowInlineData: true })
+          } else {
+            Column({ space: 8 }) {
+              Text('PORTRA FILE').fontSize(10).letterSpacing(2).fontColor('#B8B6AE')
+              Text('暂无图片').fontSize(15).fontColor('#E8E5DD')
+            }.width('100%').height('100%').justifyContent(FlexAlign.Center)
+          }
           if (this.imageCount() > 1) {
             Text(`预览 ${this.imageCount()} 张`)
-              .fontSize(PortraTheme.fontCaption)
-              .fontColor(PortraTheme.white)
-              .padding({ left: 9, right: 9, top: 5, bottom: 5 })
-              .margin(10)
-              .backgroundColor('#88242529')
-              .borderRadius(PortraTheme.radiusPill)
+              .fontSize(11).fontColor(Color.White).padding(7).margin(10)
+              .backgroundColor('#AA242529').borderRadius(4)
           }
         }
-        .width('100%')
-        .height(210)
-      }
+        .width('100%').aspectRatio(4 / 3).backgroundColor('#0E0F0C').borderRadius(8).clip(true)
+        .accessibilityText(`打开动态 ${this.item.momentId} 的全屏图片`)
+        .onClick(() => { if (!this.detailDisabled && !this.likeBusy && !this.favoriteBusy) { this.onOpenDetail?.(this.item); } })
 
-      if (MomentFeedFormatter.mentions(this.item).length > 0) {
-        Text(MomentFeedFormatter.mentions(this.item))
-          .width('100%')
-          .fontSize(PortraTheme.fontBodySmall)
-          .fontColor(PortraTheme.primary)
-          .maxLines(2)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-      }
-
-      Row({ space: PortraTheme.spacingSm }) {
-        Text(`喜欢 ${this.item.likeCount}`)
-          .fontSize(PortraTheme.fontBodySmall)
-          .fontColor(this.item.likedByCurrentUser ? PortraTheme.danger : PortraTheme.secondaryText)
-          .layoutWeight(1)
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .accessibilityText(`喜欢 ${this.item.likeCount}`)
-        if (this.onToggleFavorite !== undefined) {
-          Button(this.favoriteBusy ? '处理中' :
-            `${this.item.favoritedByCurrentUser ? '已收藏' : '收藏'} ${this.item.favoriteCount}`)
-            .constraintSize({ minHeight: 36 })
-            .layoutWeight(1)
-            .fontSize(PortraTheme.fontBodySmall)
-            .fontColor(this.item.favoritedByCurrentUser ? PortraTheme.primary : PortraTheme.secondaryText)
-            .backgroundColor(this.item.favoritedByCurrentUser ? PortraTheme.primarySoft : Color.Transparent)
-            .borderRadius(PortraTheme.radiusPill)
-            .enabled(!this.favoriteBusy && !this.interactionsDisabled)
-            .accessibilityText(`${this.item.favoritedByCurrentUser ? '取消收藏' : '收藏'}动态 ${this.item.momentId}，${this.item.favoriteCount} 次收藏${this.favoriteBusy ? '，处理中' : ''}`)
-            .onClick(() => this.onToggleFavorite?.(this.item))
-        } else {
-          Text(`收藏 ${this.item.favoriteCount}`)
-            .layoutWeight(1)
-            .maxLines(1)
+        if (MomentFeedFormatter.mentions(this.item).length > 0) {
+          Text(MomentFeedFormatter.mentions(this.item))
+            .width('100%').fontSize(12).fontColor('#1746C5').maxLines(2)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .fontSize(PortraTheme.fontBodySmall)
-            .fontColor(this.item.favoritedByCurrentUser ? PortraTheme.primary : PortraTheme.secondaryText)
         }
+        Row({ space: 14 }) {
+          MomentActionButton({ action: 'like', selected: this.item.likedByCurrentUser, count: this.item.likeCount,
+            momentId: this.item.momentId, busy: this.likeBusy,
+            disabled: this.likeUncertain || this.interactionsDisabled, interactive: this.onToggleLike !== undefined,
+            onToggle: () => this.onToggleLike?.(this.item) })
+          MomentActionButton({ action: 'favorite', selected: this.item.favoritedByCurrentUser,
+            count: this.item.favoriteCount, momentId: this.item.momentId, busy: this.favoriteBusy,
+            disabled: this.interactionsDisabled, interactive: this.onToggleFavorite !== undefined,
+            onToggle: () => this.onToggleFavorite?.(this.item) })
+          Blank()
+          if (this.reportAllowed && this.onRequestReport !== undefined) {
+            Button('举报').constraintSize({ minHeight: 44, minWidth: 44 })
+              .padding({ left: 6, right: 6 }).fontSize(12).fontColor('#67615A')
+              .backgroundColor(Color.Transparent).enabled(!this.interactionsDisabled)
+              .accessibilityText(`举报动态 ${this.item.momentId}`)
+              .onClick(() => this.onRequestReport?.(this.item))
+          }
+        }.width('100%')
       }
-      .width('100%')
-      .padding({ top: PortraTheme.spacingSm })
-      .border({ width: { top: 1 }, color: PortraTheme.border })
-
-      Row({ space: PortraTheme.spacingSm }) {
-        Text(this.item.authorRole === 'PROVIDER' ? '摄影师动态' : '约拍记录')
-          .fontSize(PortraTheme.fontCaption)
-          .fontColor(PortraTheme.secondaryText)
-          .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-          .backgroundColor(PortraTheme.primarySoft)
-          .borderRadius(PortraTheme.radiusPill)
-        Blank()
-        if (this.reportAllowed && this.onRequestReport !== undefined) {
-          Button('举报')
-            .constraintSize({ minHeight: 36 })
-            .fontSize(PortraTheme.fontBodySmall)
-            .fontColor(PortraTheme.secondaryText)
-            .backgroundColor(Color.Transparent)
-            .enabled(!this.interactionsDisabled)
-            .accessibilityText(`举报动态 ${this.item.momentId}`)
-            .onClick(() => this.onRequestReport?.(this.item))
-        }
-      }
-      .width('100%')
+      .width('100%').padding({ left: 15, right: 15, top: 12, bottom: 8 })
+      .alignItems(HorizontalAlign.Start)
     }
-    .width('100%')
-    .padding(PortraTheme.spacingLg)
-    .alignItems(HorizontalAlign.Start)
-    .backgroundColor(PortraTheme.surface)
-    .borderRadius(PortraTheme.radiusLg)
-    .border({ width: 1, color: PortraTheme.border })
-    .shadow({ radius: 10, color: '#10512D2A', offsetY: 4 })
+    .width('100%').alignItems(HorizontalAlign.Start).backgroundColor('#FBF7EF')
+    .borderRadius(14).clip(true).border({ width: 1, color: '#E5DDD2' })
   }
 }
