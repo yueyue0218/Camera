@@ -1,3 +1,9 @@
+## 2026-10-30 动态真实作者头像补齐
+
+基于远端 C 最新 ca3b231 快进开发，保留队友所有提交。核对后端 PublicProfileResponse 和既有 GET /users/{userId}/public-profile?role={role}：昵称已接真实 nickname，头像此前未向 PortraAvatar 传入 avatarFileId，现已补齐。列表 MomentCard、详情 MomentDetailPanel 共用 MomentAuthor，头像沿用 PortraAvatar → PortraImage → FileImageService 的真实 GET /files/{fileId}/thumbnail，不新增网络/DTO/公共文件。头像和昵称仍可打开对应作者主页。未设置头像/无效文件ID沿用现有回退，不虚构头像；切作者、切账号、退出、组件关闭后不展示旧身份。
+
+修改：MomentAuthor.ets；新增 moment-author.test.cjs；本交付记录。新增6项作者行为回归，全套 `node --test harmony/tests/*.test.cjs` **502/502通过，exit0，10.614秒**（DEVECO_SDK_HOME为现有DevEco SDK）。`hvigorw.bat assembleHap --no-daemon -p product=staging` **exit0，45.519秒**；进程环境 PORTRA_ENVIRONMENT=staging、PORTRA_BASE_URL=https://47.76.106.57。构建保留既有弃用/未配置签名警告。仅代码链路、行为回归及构建已验证，本轮未完成真实服务器登录后的作者图片设备对照，不把测试替身或构建结果作为线上验收证据。
+
 ## 2026-10-30 C工作分支统一版本
 
 本次按用户要求将已发布举报与队友最新C核心正常合并，原4646725、举报PR29及原C本地源988bbef全部保留在历史中，未强推/覆盖队友代码。动态、通知、信用、评价申诉与最新举报均保留。合并版鸿蒙421/421，后端848项中846通过/2原有跳过，staging HAP构建成功。仅同步C工作分支，未把队友功能自动合入集成分支，也未替换正在体验的模拟器。[安全保留证明与日志](evidence/20261030-report-results/c-work-branch-sync.md)。
