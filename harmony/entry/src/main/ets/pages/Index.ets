@@ -6,6 +6,7 @@ import { NotificationMomentPage } from './NotificationMomentPage';
 import { AppClient } from '../app/AppClient';
 import { PortraEmptyView } from '../common/components/PortraEmptyView';
 import { PortraAppShell } from '../features/shell/PortraAppShell';
+import { ConversationVisibility } from '../features/conversation/ConversationVisibility';
 import { AppRoute, NavigationRouteParam } from '../model/NavigationModels';
 import { NavigationClickGuard, NavigationPolicy } from '../navigation/NavigationPolicy';
 import { LoginPage } from './LoginPage';
@@ -14,6 +15,12 @@ import { ServiceDetailPage } from './ServiceDetailPage';
 import { ConversationDetailPage } from './ConversationDetailPage';
 import { OrderPage } from './OrderPage';
 import { PublicProfilePage } from './PublicProfilePage';
+import { OrderDetailPage } from './OrderDetailPage';
+import { DeliveryGalleryPage } from './DeliveryGalleryPage';
+import { DeliveryUploadPage } from './DeliveryUploadPage';
+import { QuoteDetailPage } from './QuoteDetailPage';
+import { QuoteFormPage } from './QuoteFormPage';
+import { ProfilePage } from './ProfilePage';
 import { PublishPage } from './PublishPage';
 import { PortraTheme } from '../theme/PortraTheme';
 import { PrivacyConsentPage } from '../privacy/PrivacyConsentPage';
@@ -104,6 +111,16 @@ struct Index {
         this.ServiceDetailDestination(param);
       } else if (name === AppRoute.CONVERSATION_DETAIL) {
         this.ConversationDetailDestination(param);
+      } else if (name === AppRoute.QUOTE_FORM) {
+        this.QuoteFormDestination(param);
+      } else if (name === AppRoute.QUOTE_DETAIL) {
+        this.QuoteDetailDestination(param);
+      } else if (name === AppRoute.ORDER_DETAIL) {
+        this.OrderDetailDestination(param);
+      } else if (name === AppRoute.DELIVERY_GALLERY) {
+        this.DeliveryGalleryDestination(param);
+      } else if (name === AppRoute.DELIVERY_UPLOAD) {
+        this.DeliveryUploadDestination(param);
       } else if (name === AppRoute.PUBLISH) {
         PublishPage({ demandId: (param as NavigationRouteParam).demandId ?? 0, serviceId: (param as NavigationRouteParam).serviceId ?? 0,
           onBackHandler: (handler: (() => boolean) | undefined) => { this.publishBackHandler = handler; },
@@ -136,9 +153,21 @@ struct Index {
             momentId: (param as NavigationRouteParam).momentId }) });
       } else if (name === AppRoute.ORDER) {
         OrderPage({ reloadEpoch: this.orderReloadEpoch, onBack: () => this.appPathStack.pop(),
-          onOpenEngagement: (id: number) => this.openPage(AppRoute.ORDER_ENGAGEMENT, { targetKind: 'order', targetId: id }) });
+          onOpenOrder: (orderId: number) => this.openPage(AppRoute.ORDER_DETAIL, { orderId: orderId }) });
       } else if (name === AppRoute.PUBLIC_PROFILE) {
         this.PublicProfileDestination(param);
+      } else if (name === AppRoute.PROFILE) {
+        ProfilePage({
+          onBack: () => this.appPathStack.pop(),
+          onSignedOut: () => this.appPathStack.pop(),
+          onRequireLogin: () => {
+            this.appPathStack.pop();
+            this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.PROFILE });
+          },
+          onOpenOrders: () => this.openPage(AppRoute.ORDER),
+          onOpenMessages: () => this.openPage(AppRoute.MESSAGE),
+          onOpenPublish: () => this.openPage(AppRoute.PUBLISH)
+        });
       } else {
         this.PlaceholderPage('页面不存在', '未找到对应的导航目标。');
       }
@@ -146,6 +175,7 @@ struct Index {
     .hideTitleBar(true)
     .onBackPressed(() => name === AppRoute.PUBLISH ? (this.publishBackHandler?.() ?? false) : false)
     .onShown(() => {
+      ConversationVisibility.show(name, param as NavigationRouteParam);
       if (name === AppRoute.ORDER) { this.orderReloadEpoch++; }
       if (name === AppRoute.SERVICE_DETAIL || name === AppRoute.DEMAND_DETAIL) {
         this.detailVisibleRoute = name;
@@ -153,6 +183,7 @@ struct Index {
         this.detailVisibleEpoch++;
       }
     })
+    .onHidden(() => ConversationVisibility.hide(name, param as NavigationRouteParam))
   }
 
   @Builder
@@ -254,7 +285,19 @@ struct Index {
       this.PlaceholderPage('约拍会话', '无效的会话编号');
     } else {
       ConversationDetailPage({ conversationId: this.validConversationId(param),
-        onBack: () => { this.appPathStack.pop(); this.sessionEpoch++; } });
+        onBack: () => { this.appPathStack.pop(); this.sessionEpoch++; },
+        onCreateQuote: () => this.openPage(AppRoute.QUOTE_FORM,
+          { conversationId: this.validConversationId(param) }),
+        onOpenQuote: (quoteId: number) => this.openPage(AppRoute.QUOTE_DETAIL,
+          { conversationId: this.validConversationId(param), quoteId: quoteId }),
+        onOpenOrder: (orderId: number) => this.openPage(AppRoute.ORDER_DETAIL,
+          { orderId: orderId, conversationId: this.validConversationId(param) }),
+        onPayOrder: (orderId: number) => this.openPage(AppRoute.ORDER_DETAIL,
+          { orderId: orderId, conversationId: this.validConversationId(param), openPayment: true }),
+        onOpenGallery: (orderId: number) => this.openPage(AppRoute.DELIVERY_GALLERY,
+          { orderId: orderId }),
+        onOpenUpload: (orderId: number) => this.openPage(AppRoute.DELIVERY_UPLOAD,
+          { orderId: orderId }) });
     }
   }
 
@@ -274,12 +317,103 @@ struct Index {
     }
   }
 
+  @Builder
+  QuoteFormDestination(param: Object) {
+    if (!this.validConversationId(param) ||
+      ((param as NavigationRouteParam).quoteId !== undefined &&
+        !NavigationPolicy.validQuoteId(param as NavigationRouteParam))) {
+      this.PlaceholderPage('报价', '无法打开这份报价');
+    } else {
+      QuoteFormPage({ conversationId: this.validConversationId(param),
+        quoteId: (param as NavigationRouteParam).quoteId ?? 0,
+        onBack: () => this.appPathStack.pop(),
+        onSaved: () => {
+          this.appPathStack.pop();
+          if ((param as NavigationRouteParam).quoteId !== undefined) this.appPathStack.pop();
+        } });
+    }
+  }
+
   private validPublicUserId(param: Object): number {
     return NavigationPolicy.validPublicUserId(param as NavigationRouteParam) ?? 0;
   }
 
   private validPublicUserRole(param: Object): string {
     return NavigationPolicy.validPublicUserRole(param as NavigationRouteParam) ?? '';
+  }
+
+  @Builder
+  QuoteDetailDestination(param: Object) {
+    if (!this.validConversationId(param) || !NavigationPolicy.validQuoteId(param as NavigationRouteParam)) {
+      this.PlaceholderPage('报价', '无法打开这份报价');
+    } else {
+      QuoteDetailPage({ conversationId: this.validConversationId(param),
+        quoteId: (param as NavigationRouteParam).quoteId!,
+        onBack: () => this.appPathStack.pop(),
+        onEdit: () => this.openPage(AppRoute.QUOTE_FORM, param as NavigationRouteParam),
+        onConfirmed: () => this.appPathStack.pop(),
+        onOpenOrder: (orderId: number) => this.openPage(AppRoute.ORDER_DETAIL,
+          { orderId: orderId, conversationId: this.validConversationId(param) }) });
+    }
+  }
+
+  @Builder
+  OrderDetailDestination(param: Object) {
+    if (!NavigationPolicy.validOrderId(param as NavigationRouteParam)) {
+      this.PlaceholderPage('订单', '无法打开这笔订单');
+    } else {
+      OrderDetailPage({ orderId: (param as NavigationRouteParam).orderId!,
+        openPayment: (param as NavigationRouteParam).openPayment === true,
+        onBack: () => this.appPathStack.pop(),
+        onOpenEngagement: () => this.openPage(AppRoute.ORDER_ENGAGEMENT,
+          { targetKind: 'order', targetId: (param as NavigationRouteParam).orderId!,
+            orderId: (param as NavigationRouteParam).orderId! }),
+        onOpenConversation: (conversationId: number) => {
+          this.returnToConversation(conversationId);
+        },
+        onOpenGallery: () => this.openPage(AppRoute.DELIVERY_GALLERY,
+          { orderId: (param as NavigationRouteParam).orderId! }),
+        onOpenUpload: () => this.openPage(AppRoute.DELIVERY_UPLOAD,
+          { orderId: (param as NavigationRouteParam).orderId! }) });
+    }
+  }
+
+  @Builder
+  DeliveryGalleryDestination(param: Object) {
+    if (!NavigationPolicy.validOrderId(param as NavigationRouteParam)) {
+      this.PlaceholderPage('作品相册', '无法打开这次约拍的照片');
+    } else {
+      DeliveryGalleryPage({ orderId: (param as NavigationRouteParam).orderId!,
+        onBack: () => this.appPathStack.pop(),
+        onOpenUpload: () => this.openPage(AppRoute.DELIVERY_UPLOAD,
+          { orderId: (param as NavigationRouteParam).orderId! }) });
+    }
+  }
+
+  @Builder
+  DeliveryUploadDestination(param: Object) {
+    if (!NavigationPolicy.validOrderId(param as NavigationRouteParam)) {
+      this.PlaceholderPage('上传照片', '无法打开这次约拍');
+    } else {
+      DeliveryUploadPage({ orderId: (param as NavigationRouteParam).orderId!,
+        onBack: () => this.appPathStack.pop(),
+        onUploaded: () => {
+          this.appPathStack.pop();
+          this.openGallery((param as NavigationRouteParam).orderId!);
+        } });
+    }
+  }
+
+  private openGallery(orderId: number): void {
+    const names = this.appPathStack.getAllPathName();
+    for (let index = names.length - 1; index >= 0; index--) {
+      const routeParam = this.appPathStack.getParamByIndex(index) as NavigationRouteParam | undefined;
+      if (names[index] === AppRoute.DELIVERY_GALLERY && routeParam?.orderId === orderId) {
+        this.appPathStack.popToIndex(index);
+        return;
+      }
+    }
+    this.openPage(AppRoute.DELIVERY_GALLERY, { orderId: orderId });
   }
 
   private validDemandId(param: Object): number {
@@ -301,10 +435,24 @@ struct Index {
     this.appPathStack.pushPathByName(route, param);
   }
 
+  private returnToConversation(conversationId: number): void {
+    const index = NavigationPolicy.conversationPathIndex(this.appPathStack.getAllPathName(),
+      (pathIndex: number) => this.appPathStack.getParamByIndex(pathIndex) as NavigationRouteParam | undefined,
+      conversationId);
+    if (index >= 0) {
+      this.appPathStack.popToIndex(index);
+      return;
+    }
+    this.openPage(AppRoute.CONVERSATION_DETAIL, { conversationId: conversationId });
+  }
+
   private openLoginFor(route: AppRoute, param: NavigationRouteParam): void {
     const loginParam: NavigationRouteParam = {
-      returnRoute: route, targetKind: param.targetKind, targetId: param.targetId, orderId: param.orderId, momentId: param.momentId, demandId: param.demandId, serviceId: param.serviceId,
-      userId: param.userId, userRole: param.userRole, initialTab: param.initialTab
+      returnRoute: route, targetKind: param.targetKind, targetId: param.targetId,
+      orderId: param.orderId, momentId: param.momentId, demandId: param.demandId,
+      serviceId: param.serviceId, userId: param.userId, userRole: param.userRole,
+      initialTab: param.initialTab, conversationId: param.conversationId,
+      quoteId: param.quoteId, deliveryId: param.deliveryId, openPayment: param.openPayment
     };
     this.pushRoute(AppRoute.LOGIN, loginParam);
   }
@@ -327,7 +475,8 @@ struct Index {
         demandId: param.demandId,
         serviceId: param.serviceId,
         conversationId: param.conversationId,
-        userId: param.userId, userRole: param.userRole, initialTab: param.initialTab
+        userId: param.userId, userRole: param.userRole, initialTab: param.initialTab,
+        quoteId: param.quoteId, deliveryId: param.deliveryId, openPayment: param.openPayment
       };
       this.pushRoute(returnRoute, returnParam);
     }

@@ -30,12 +30,13 @@ test('core pages preserve server-authoritative role and state transitions', () =
   const service = source('ServiceDetailPage.ets');
   const publish = source('PublishPage.ets');
   const conversation = source('ConversationDetailPage.ets');
+  const api = fs.readFileSync(path.resolve(__dirname, '../entry/src/main/ets/network/ApiService.ets'), 'utf8');
   assert.match(demand, /listMyDemandResponses\(\)/);
   assert.match(demand, /result\.responseStatus !== 'ACCEPTED'/);
   assert.match(service, /listServicePackageInterests/);
   assert.match(service, /addServicePackageInterest/);
   assert.match(service, /cancelServicePackageInterest/);
   assert.match(publish, /this\.role !== 'CUSTOMER'/);
-  assert.match(conversation, /result\.quotationStatus !== 'CONFIRMED'/);
+  assert.match(api, /result\.quotationStatus !== 'CONFIRMED'/);
   assert.doesNotMatch(conversation, /付款成功|支付成功/);
 });

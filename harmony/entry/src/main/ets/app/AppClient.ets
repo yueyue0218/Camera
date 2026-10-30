@@ -8,6 +8,8 @@ import { AuthenticationExpiredHandler, HttpClient } from '../network/HttpClient'
 import { AssetCredentialStore } from '../storage/AssetCredentialStore';
 import { DeviceIdentityStore } from '../storage/DeviceIdentityStore';
 import { PrivacyConsentStore } from '../privacy/PrivacyConsentStore';
+import { ConversationDraftStore } from '../features/conversation/ConversationDraftStore';
+import { QuoteDraftStore } from '../features/conversation/QuoteDraftStore';
 
 class SessionExpiredHandler implements AuthenticationExpiredHandler {
   private sessionManager?: AuthSessionManager;
@@ -71,6 +73,8 @@ export class AppClient {
     if (!PrivacyConsentStore.hasCurrentConsent(context)) {
       return Promise.reject(new Error('Current privacy consent is required'));
     }
+    ConversationDraftStore.configure(context);
+    QuoteDraftStore.configure(context);
     if (this.deviceId.length === 0) {
       this.setDeviceId(DeviceIdentityStore.getOrCreate(context));
     }

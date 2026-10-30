@@ -23,11 +23,12 @@ test('all planned destinations have one stable route name', () => {
   assert.deepEqual(NavigationPolicy.routes, [
     AppRoute.ORDER_ENGAGEMENT,
     AppRoute.LOGIN, AppRoute.HALL, AppRoute.DEMAND_DETAIL, AppRoute.SERVICE_DETAIL,
-    AppRoute.CONVERSATION_DETAIL, AppRoute.PUBLISH,
+    AppRoute.CONVERSATION_DETAIL, AppRoute.QUOTE_FORM, AppRoute.QUOTE_DETAIL, AppRoute.ORDER_DETAIL,
+    AppRoute.DELIVERY_GALLERY, AppRoute.DELIVERY_UPLOAD, AppRoute.PUBLISH,
     AppRoute.MESSAGE, AppRoute.ORDER, AppRoute.PROFILE, AppRoute.PUBLIC_PROFILE,
     AppRoute.NOTIFICATIONS, AppRoute.CREDIT, AppRoute.MOMENT_DETAIL
   ]);
-  assert.equal(new Set(NavigationPolicy.routes).size, 14);
+  assert.equal(new Set(NavigationPolicy.routes).size, 19);
 });
 
 test('hall, public details and login remain public', () => {
@@ -40,6 +41,8 @@ test('hall, public details and login remain public', () => {
 
 test('protected guest destinations redirect to login and preserve the target', () => {
   for (const route of [AppRoute.PUBLISH, AppRoute.MESSAGE, AppRoute.CONVERSATION_DETAIL,
+    AppRoute.QUOTE_FORM, AppRoute.QUOTE_DETAIL, AppRoute.ORDER_DETAIL,
+    AppRoute.DELIVERY_GALLERY, AppRoute.DELIVERY_UPLOAD,
     AppRoute.ORDER, AppRoute.PROFILE]) {
     const result = NavigationPolicy.resolve(route, {}, false);
     assert.equal(result.route, AppRoute.LOGIN);
@@ -50,6 +53,8 @@ test('protected guest destinations redirect to login and preserve the target', (
 
 test('authenticated sessions can enter protected destinations', () => {
   for (const route of [AppRoute.PUBLISH, AppRoute.MESSAGE, AppRoute.CONVERSATION_DETAIL,
+    AppRoute.QUOTE_FORM, AppRoute.QUOTE_DETAIL, AppRoute.ORDER_DETAIL,
+    AppRoute.DELIVERY_GALLERY, AppRoute.DELIVERY_UPLOAD,
     AppRoute.ORDER, AppRoute.PROFILE]) {
     const result = NavigationPolicy.resolve(route, {}, true);
     assert.equal(result.route, route);
@@ -73,6 +78,26 @@ test('service and conversation details reject invalid IDs and preserve conversat
   assert.equal(NavigationPolicy.validConversationId({ conversationId: -1 }), undefined);
   const result = NavigationPolicy.resolve(AppRoute.CONVERSATION_DETAIL, { conversationId: 42 }, false);
   assert.equal(result.param.conversationId, 42);
+});
+
+test('quote and order targets preserve real IDs through login', () => {
+  assert.equal(NavigationPolicy.validQuoteId({ quoteId: 22 }), 22);
+  assert.equal(NavigationPolicy.validOrderId({ orderId: 35 }), 35);
+  assert.equal(NavigationPolicy.validOrderId({ orderId: -1 }), undefined);
+  const route = NavigationPolicy.resolve(AppRoute.QUOTE_DETAIL,
+    { conversationId: 8, quoteId: 22 }, false);
+  assert.equal(route.param.conversationId, 8);
+  assert.equal(route.param.quoteId, 22);
+});
+
+test('returning from an order targets the matching existing conversation', () => {
+  const names = [AppRoute.MESSAGE, AppRoute.CONVERSATION_DETAIL, AppRoute.QUOTE_DETAIL,
+    AppRoute.CONVERSATION_DETAIL, AppRoute.ORDER_DETAIL];
+  const params = [{}, { conversationId: 7 }, { quoteId: 9 }, { conversationId: 8 }, { orderId: 4 }];
+  const paramAt = (index) => params[index];
+  assert.equal(NavigationPolicy.conversationPathIndex(names, paramAt, 7), 1);
+  assert.equal(NavigationPolicy.conversationPathIndex(names, paramAt, 8), 3);
+  assert.equal(NavigationPolicy.conversationPathIndex(names, paramAt, 9), -1);
 });
 
 test('route labels and direct login description are deterministic', () => {

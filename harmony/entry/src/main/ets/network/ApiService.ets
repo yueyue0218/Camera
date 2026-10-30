@@ -6,13 +6,16 @@ import { AcceptedDemandResponse, AccountCancellationPayload, AccountCancellation
   ConfirmQuoteResult, ConversationSummary, CreateDemandPayload,
   CreateDemandResponsePayload, CreateQuotePayload, CreateReportPayload, CreateServicePackagePayload,
   CreateServicePackageResult,
-  DemandListQuery, DemandResponseSummary, DemandSummary, MessageSummary, NativeRefreshRequest, NativeSessionResponse,
-  FollowState, MomentSummary, OrderSummary, PageResult, ProfileMomentPage, PublicUserProfile, QuoteSummary,
+  DemandListQuery, DemandResponseSummary, DemandSummary, DeliverySummary, MessageSummary, NativeRefreshRequest,
+  NativeSessionResponse,
+  FollowState, MockPaymentPayload, MomentSummary, OrderStatusLogSummary, OrderSummary, PageResult, PaymentResult,
+  ProfileMomentPage, PublicUserProfile, QuoteSummary, RejectQuotePayload, RejectQuoteResult,
   ReportSummary, SendSmsCodeRequest, ServicePackageDetail, ServicePackageInterest, ServicePackageListQuery,
   ServicePackageSummary, SocialUserBrief, SwitchRolePayload, SwitchRoleResult, UserProfileSummary,
   SendTextMessagePayload, SessionSummary, StartServiceChatPayload, StartServiceChatResult,
-  VerifyNativeSmsCodeRequest } from '../model/ApiModels';
+  OrderTransitionPayload, ReworkPayload, StatusTransitionResult, VerifyNativeSmsCodeRequest } from '../model/ApiModels';
 import { UpdateProfilePayload } from '../model/ApiModels';
+import { UserBrief } from '../model/ApiModels';
 import { ErrorMapper, PortraError } from './ErrorMapper';
 import { UploadedImage, HttpClient } from './HttpClient';
 
@@ -519,6 +522,20 @@ export class ApiService implements NativeSessionApi {
     this.client.cancelRequest(requestKey);
   }
 
+  getUserBrief(userId: number, role: string): Promise<UserBrief> {
+    const suffix = role === 'PROVIDER' ? '?role=PROVIDER' : '?role=CUSTOMER';
+    return this.client.get<UserBrief>(`/users/${userId}/brief${suffix}`, `users.${userId}.brief`);
+  }
+
+  getAvatarThumbnail(fileId: number): Promise<ArrayBuffer> {
+    if (!Number.isSafeInteger(fileId) || fileId <= 0) return Promise.reject(ErrorMapper.parse());
+    return this.client.getBinary(`/files/${fileId}/thumbnail`, `avatar.${fileId}`);
+  }
+
+  cancelAvatarThumbnail(fileId: number): void {
+    this.client.cancelRequest(`avatar.${fileId}`);
+  }
+
   hideConversation(conversationId: number): Promise<void> {
     if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
       return Promise.reject(ErrorMapper.parse());
@@ -530,9 +547,10 @@ export class ApiService implements NativeSessionApi {
     this.client.cancelRequest(`conversations.${conversationId}.hide`);
   }
 
-  listMessages(conversationId: number): Promise<MessageSummary[]> {
+  listMessages(conversationId: number,
+    requestKey: string = `conversations.${conversationId}.messages`): Promise<MessageSummary[]> {
     return this.client.get<MessageSummary[]>(`/conversations/${conversationId}/messages`,
-      `conversations.${conversationId}.messages`);
+      requestKey);
   }
 
   sendMessage(conversationId: number, content: string): Promise<MessageSummary> {
@@ -546,13 +564,36 @@ export class ApiService implements NativeSessionApi {
       `conversations.${conversationId}.quotes`);
   }
 
-  createQuote(payload: CreateQuotePayload): Promise<QuoteSummary> {
-    return this.client.post<QuoteSummary>('/quotations', payload, `conversations.${payload.conversationId}.createQuote`);
+  async createQuote(payload: CreateQuotePayload): Promise<QuoteSummary> {
+    const result = await this.client.post<QuoteSummary>('/quotations', payload,
+      `conversations.${payload.conversationId}.createQuote`);
+    return this.requireQuote(result, payload.conversationId);
   }
 
-  confirmQuote(quoteId: number): Promise<ConfirmQuoteResult> {
-    return this.client.post<ConfirmQuoteResult>(`/quotations/${quoteId}/confirm`,
+  async updateQuote(quoteId: number, payload: CreateQuotePayload): Promise<QuoteSummary> {
+    const result = await this.client.put<QuoteSummary>(`/quotations/${quoteId}`, payload,
+      `quotations.${quoteId}.update`);
+    const quote = this.requireQuote(result, payload.conversationId);
+    if (quote.quotationId !== quoteId) throw ErrorMapper.parse();
+    return quote;
+  }
+
+  async rejectQuote(quoteId: number, reason: string): Promise<RejectQuoteResult> {
+    const payload: RejectQuotePayload = { rejectReason: reason };
+    const result = await this.client.post<RejectQuoteResult>(`/quotations/${quoteId}/reject`,
+      payload, `quotations.${quoteId}.reject`);
+    if (result === null || result.quotationId !== quoteId || result.quotationStatus !== 'REJECTED') {
+      throw ErrorMapper.parse();
+    }
+    return result;
+  }
+
+  async confirmQuote(quoteId: number): Promise<ConfirmQuoteResult> {
+    const result = await this.client.post<ConfirmQuoteResult>(`/quotations/${quoteId}/confirm`,
       undefined, `quotations.${quoteId}.confirm`);
+    if (result === null || result.quotationId !== quoteId || !Number.isSafeInteger(result.orderId) ||
+      result.orderId <= 0 || result.quotationStatus !== 'CONFIRMED') throw ErrorMapper.parse();
+    return result;
   }
 
   cancelConversationDetail(conversationId: number): void {
@@ -562,7 +603,7 @@ export class ApiService implements NativeSessionApi {
     this.client.cancelRequest(`conversations.${conversationId}.createQuote`);
   }
 
-  getOrder(id: number, requestKey: string = 'engagement.getOrder'): Promise<OrderEngagementSummary> {
+  getOrder(id: number, requestKey: string = `orders.${id}.detail`): Promise<OrderEngagementSummary> {
     if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
     return this.client.get<OrderEngagementSummary>(`/orders/${id}`, requestKey);
   }
@@ -615,6 +656,60 @@ export class ApiService implements NativeSessionApi {
   listOrders(role?: string, requestKey: string = 'orders.list'): Promise<OrderSummary[]> {
     const path = role === undefined ? '/orders' : `/orders?role=${this.requireIdentityRole(role)}`;
     return this.client.get<OrderSummary[]>(path, requestKey);
+  }
+
+  getOrderStatusLogs(orderId: number): Promise<OrderStatusLogSummary[]> {
+    return this.client.get<OrderStatusLogSummary[]>(`/orders/${orderId}/status-logs`, `orders.${orderId}.logs`);
+  }
+
+  listDeliveries(orderId: number): Promise<DeliverySummary[]> {
+    return this.client.get<DeliverySummary[]>(`/orders/${orderId}/deliveries`, `orders.${orderId}.deliveries`);
+  }
+
+  getDeliveryImage(fileId: number, variant: 'thumbnail' | 'medium'): Promise<ArrayBuffer> {
+    if (!Number.isSafeInteger(fileId) || fileId <= 0) return Promise.reject(ErrorMapper.parse());
+    return this.client.getBinary(`/files/${fileId}/${variant}`, `delivery.${fileId}.${variant}`,
+      variant === 'thumbnail' ? 2 * 1024 * 1024 : 12 * 1024 * 1024);
+  }
+
+  cancelDeliveryImage(fileId: number, variant: 'thumbnail' | 'medium'): void {
+    this.client.cancelRequest(`delivery.${fileId}.${variant}`);
+  }
+
+  cancelOrder(orderId: number): Promise<StatusTransitionResult> {
+    return this.client.post<StatusTransitionResult>(`/orders/${orderId}/cancel`, undefined,
+      `orders.${orderId}.cancel`);
+  }
+
+  requestRework(orderId: number, reason: string): Promise<StatusTransitionResult> {
+    const payload: ReworkPayload = { reason: reason };
+    return this.client.post<StatusTransitionResult>(`/orders/${orderId}/request-rework`, payload,
+      `orders.${orderId}.rework`);
+  }
+
+  confirmReceipt(orderId: number): Promise<StatusTransitionResult> {
+    const payload: OrderTransitionPayload = { targetStatus: 'COMPLETED', reason: '客户确认收片' };
+    return this.client.post<StatusTransitionResult>(`/orders/${orderId}/status-transitions`,
+      payload, `orders.${orderId}.receipt`);
+  }
+
+  async mockPay(orderId: number, amountCent: number): Promise<PaymentResult> {
+    const payload: MockPaymentPayload = { payMethod: 'MOCK_PAY', amountCent: amountCent };
+    const result = await this.client.post<PaymentResult>(`/orders/${orderId}/payments`,
+      payload, `orders.${orderId}.pay`);
+    return this.requirePayment(result, orderId, amountCent);
+  }
+
+  async getPayment(orderId: number): Promise<PaymentResult> {
+    const result = await this.client.get<PaymentResult>(`/orders/${orderId}/payments`, `orders.${orderId}.payment`);
+    return this.requirePayment(result, orderId);
+  }
+
+  cancelOrderDetail(orderId: number): void {
+    this.client.cancelRequest(`orders.${orderId}.detail`);
+    this.client.cancelRequest(`orders.${orderId}.logs`);
+    this.client.cancelRequest(`orders.${orderId}.payment`);
+    this.client.cancelRequest(`orders.${orderId}.deliveries`);
   }
 
   cancelOrders(): void {
@@ -671,6 +766,22 @@ export class ApiService implements NativeSessionApi {
       throw ErrorMapper.parse();
     }
     return response;
+  }
+
+  private requireQuote(quote: QuoteSummary, conversationId: number): QuoteSummary {
+    if (quote === null || !Number.isSafeInteger(quote.quotationId) || quote.quotationId <= 0 ||
+      quote.conversationId !== conversationId || !Number.isSafeInteger(quote.amountCent) ||
+      quote.amountCent <= 0) throw ErrorMapper.parse();
+    return quote;
+  }
+
+  private requirePayment(payment: PaymentResult, orderId: number, amountCent?: number): PaymentResult {
+    if (payment === null || !Number.isSafeInteger(payment.paymentId) || payment.paymentId <= 0 ||
+      payment.orderId !== orderId || !Number.isSafeInteger(payment.amountCent) ||
+      payment.amountCent < 0 || (amountCent !== undefined && payment.amountCent !== amountCent)) {
+      throw ErrorMapper.parse();
+    }
+    return payment;
   }
 
   private safePage(value: number): number {

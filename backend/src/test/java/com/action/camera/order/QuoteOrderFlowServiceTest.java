@@ -4,6 +4,7 @@ import com.action.camera.application.OrderDisplayService;
 import com.action.camera.application.UserDisplayService;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.delivery.repository.DeliveryRepository;
+import com.action.camera.domain.User;
 import com.action.camera.message.entity.Quote;
 import com.action.camera.message.enums.QuoteStatus;
 import com.action.camera.message.model.CreateQuoteCommand;
@@ -20,6 +21,7 @@ import com.action.camera.order.repository.OrderRepository;
 import com.action.camera.order.repository.OrderStatusLogRepository;
 import com.action.camera.order.repository.PaymentRecordRepository;
 import com.action.camera.order.service.OrderService;
+import com.action.camera.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,6 +48,7 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -84,6 +87,9 @@ class QuoteOrderFlowServiceTest {
     @Mock
     private OrderDisplayService orderDisplayService;
 
+    @Mock
+    private UserRepository userRepository;
+
     private QuoteService quoteService;
 
     private OrderService orderService;
@@ -96,8 +102,11 @@ class QuoteOrderFlowServiceTest {
                 orderStatusLogRepository,
                 deliveryRepository,
                 userDisplayService,
-                orderDisplayService
+                orderDisplayService,
+                userRepository
         );
+        lenient().when(userRepository.findByIdForUpdate(PROVIDER_USER_ID))
+                .thenReturn(Optional.of(new User()));
         ReflectionTestUtils.setField(orderService, "conversationRepository", conversationRepository);
         quoteService = new QuoteService(quoteRepository, conversationRepository, orderService);
     }
@@ -243,12 +252,12 @@ class QuoteOrderFlowServiceTest {
         Quote quote = pendingQuote();
         quote.setExpireTime(LocalDateTime.now().minusMinutes(1));
         when(quoteRepository.findByIdForUpdate(QUOTE_ID)).thenReturn(Optional.of(quote));
-        when(quoteRepository.save(any(Quote.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         assertThrows(BusinessException.class,
                 () -> quoteService.confirmQuote(QUOTE_ID, CUSTOMER_ID, "确认已过期报价"));
 
-        assertEquals(QuoteStatus.EXPIRED, quote.getStatus());
+        assertEquals(QuoteStatus.PENDING_CONFIRM, quote.getStatus());
+        verify(quoteRepository, never()).save(any(Quote.class));
         verify(orderRepository, never()).save(any(Order.class));
     }
 
@@ -441,7 +450,7 @@ class QuoteOrderFlowServiceTest {
     @Test
     void customerCanCancelPendingPaymentOrderWithoutRefund() {
         Order order = pendingPaymentOrder();
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderStatusLogRepository.save(any(OrderStatusLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -470,7 +479,7 @@ class QuoteOrderFlowServiceTest {
         order.setStatus(OrderStatus.PAID_PENDING_SHOOT);
         order.setEscrowStatus(EscrowStatus.HELD);
         PaymentRecord paymentRecord = paidPaymentRecord();
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
         when(paymentRecordRepository.findByOrderId(ORDER_ID)).thenReturn(Optional.of(paymentRecord));
         when(paymentRecordRepository.save(any(PaymentRecord.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -504,7 +513,7 @@ class QuoteOrderFlowServiceTest {
         Order order = pendingPaymentOrder();
         order.setStatus(OrderStatus.PAID_PENDING_SHOOT);
         order.setEscrowStatus(EscrowStatus.HELD);
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
 
         assertThrows(BusinessException.class,
                 () -> orderService.cancelOrder(
@@ -523,7 +532,7 @@ class QuoteOrderFlowServiceTest {
     @Test
     void illegalStatusTransitionIsBlocked() {
         Order order = pendingPaymentOrder();
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
 
         assertThrows(BusinessException.class,
                 () -> orderService.changeStatus(ORDER_ID, CUSTOMER_ID, OrderStatus.COMPLETED, "不能直接完成"));
@@ -537,7 +546,7 @@ class QuoteOrderFlowServiceTest {
     void manualShootingStatusTransitionIsBlocked() {
         Order order = pendingPaymentOrder();
         order.setStatus(OrderStatus.PAID_PENDING_SHOOT);
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
 
         assertThrows(BusinessException.class,
                 () -> orderService.changeStatus(ORDER_ID, PROVIDER_USER_ID, OrderStatus.SHOOTING, "开始拍摄"));

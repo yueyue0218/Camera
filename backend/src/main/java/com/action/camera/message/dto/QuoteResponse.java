@@ -28,6 +28,10 @@ public class QuoteResponse {
     private QuoteStatus status;
     private LocalDateTime createdAt;
     private LocalDateTime expireTime;
+    private String terms;
+    private String contractTerms;
+    private String safetyNoticeVersion;
+    private String remark;
 
     public static QuoteResponse from(Quote quote) {
         return new QuoteResponse(
@@ -47,7 +51,11 @@ public class QuoteResponse {
                 quote.getPhotoUsageScope(),
                 quote.getStatus(),
                 quote.getCreatedAt(),
-                quote.getExpireTime()
+                quote.getExpireTime(),
+                quote.getTerms(),
+                quote.getContractTerms(),
+                quote.getSafetyNoticeVersion(),
+                quote.getRemark()
         );
     }
 }
