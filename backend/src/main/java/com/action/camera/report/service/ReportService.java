@@ -18,6 +18,9 @@ import com.action.camera.report.dto.ReportResolveRequest;
 import com.action.camera.report.dto.ReportResponse;
 import com.action.camera.report.repository.ReportRepository;
 import com.action.camera.review.service.ReviewModerationService;
+import com.action.camera.notification.dto.NotificationCreateRequest;
+import com.action.camera.notification.service.NotificationService;
+import java.util.UUID;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
@@ -40,6 +43,7 @@ public class ReportService {
     private final AdminUserService adminUserService;
     private final ReviewModerationService reviewModerationService;
     private final AdminAuditService adminAuditService;
+    private final NotificationService notificationService;
 
     public ReportService(ReportRepository reportRepository,
                          ReportTargetValidator targetValidator,
@@ -47,7 +51,7 @@ public class ReportService {
                          ContentModerationService contentModerationService,
                          AdminUserService adminUserService,
                          ReviewModerationService reviewModerationService,
-                         AdminAuditService adminAuditService) {
+                         AdminAuditService adminAuditService, NotificationService notificationService) {
         this.reportRepository = reportRepository;
         this.targetValidator = targetValidator;
         this.adminPermissionService = adminPermissionService;
@@ -55,6 +59,7 @@ public class ReportService {
         this.adminUserService = adminUserService;
         this.reviewModerationService = reviewModerationService;
         this.adminAuditService = adminAuditService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -76,7 +81,7 @@ public class ReportService {
             Report saved = reportRepository.save(Report.create(
                     reporterId, targetType, request.targetId(), reason, description, LocalDateTime.now()));
             reportRepository.flush();
-            return toResponse(saved);
+            return toPublicResponse(saved);
         } catch (DataIntegrityViolationException exception) {
             throw new BusinessException(ErrorCode.DUPLICATE_OPERATION, "Pending report already exists");
         }
@@ -86,7 +91,7 @@ public class ReportService {
     public List<ReportResponse> listMine() {
         Long reporterId = requireCurrentUser();
         return reportRepository.findByReporterIdOrderByCreatedAtDesc(reporterId).stream()
-                .map(this::toResponse)
+                .map(this::toPublicResponse)
                 .toList();
     }
 
@@ -152,13 +157,58 @@ public class ReportService {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Report has already been resolved");
         }
         validateCompatibility(report.getTargetType(), resolution);
-        mutateTarget(report, resolution, adminId, comment);
+        Long ownerId = resolution == ReportResolution.IGNORE || resolution == ReportResolution.RESTORE ? null
+                : targetValidator.targetOwnerId(report.getTargetType(), report.getTargetId());
+        if (resolution != ReportResolution.IGNORE && resolution != ReportResolution.RESTORE && (ownerId == null || ownerId <= 0)) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "Target owner not found");
+        }
+        mutateTarget(report, resolution, adminId, resolution == ReportResolution.RESTORE ? publicMessage(resolution) :
+                resolution == ReportResolution.IGNORE ? publicMessage(resolution) : targetMessage(resolution));
         report.resolve(adminId, resolution, comment, LocalDateTime.now());
+        report.recordPublicFeedback(publicMessage(resolution), resolution == ReportResolution.IGNORE);
         Report saved = reportRepository.save(report);
         adminAuditService.record(
                 "REPORT", report.getId(), adminId, "RESOLVE",
                 truncateAuditReason(resolution.name() + ": " + comment));
+        publishResult(saved, resolution, ownerId);
         return toResponse(saved);
+    }
+    private String publicMessage(ReportResolution resolution) {
+        return switch (resolution) {
+            case IGNORE -> "感谢你的反馈，你的举报我们已收到并记录，后续会重点关注相关情况。";
+            case TAKE_DOWN -> "平台已完成核查，相关内容已下架，感谢你对社区秩序的维护。";
+            case REVIEW_HIDDEN -> "平台已完成核查，相关评价已隐藏，感谢你的反馈。";
+            case RESTRICT_USER -> "平台已完成核查，相关账号已按规则限制使用，感谢你的反馈。";
+            case RESTORE -> "平台已完成复核，相关内容已恢复展示。";
+        };
+    }
+    private String targetMessage(ReportResolution resolution) {
+        return switch (resolution) {
+            case TAKE_DOWN -> "平台已完成审核，你发布的相关内容已被下架。";
+            case REVIEW_HIDDEN -> "平台已完成审核，你发布的相关评价已被隐藏。";
+            case RESTRICT_USER -> "平台已完成审核，你的账号已按规则限制使用。";
+            default -> throw new BusinessException(ErrorCode.VALIDATION_ERROR);
+        };
+    }
+    private String outcome(Report report) {
+        if (report.getStatus() == ReportStatus.PENDING) { return "PENDING"; }
+        if (report.getPublicMessage() == null || report.getResolution() == ReportResolution.RESTORE) { return "LEGACY"; }
+        return report.isFollowUpRequired() ? "FOLLOW_UP" : "ACTION_TAKEN";
+    }
+    private void publishResult(Report report, ReportResolution resolution, Long ownerId) {
+        notificationService.createNotification(new NotificationCreateRequest(
+                report.getReporterId(), null, "举报处理反馈", report.getPublicMessage(),
+                "REPORT_RESOLVED", "REPORT_RESOLVED", "REPORT", report.getId(), "REPORT", report.getId(),
+                "REPORT", report.getId(), "report:resolved:" + report.getId(),
+                "{\"reportId\":" + report.getId() + ",\"publicOutcome\":\"" + outcome(report) + "\"}"));
+        if (ownerId == null) { return; }
+        String type = report.getTargetType().name();
+        notificationService.createNotification(new NotificationCreateRequest(
+                ownerId, null, "平台处理通知", targetMessage(resolution), "MODERATION_RESULT", "MODERATION_RESULT",
+                type, report.getTargetId(), type, report.getTargetId(), type, report.getTargetId(),
+                "moderation:" + UUID.randomUUID(),
+                "{\"action\":\"" + resolution.name() + "\",\"targetType\":\"" + type +
+                        "\",\"targetId\":" + report.getTargetId() + "}"));
     }
 
     private void mutateTarget(Report report, ReportResolution resolution, Long adminId, String reason) {
@@ -177,7 +227,7 @@ public class ReportService {
             }
             case USER -> adminUserService.changeStatus(report.getTargetId(), "DISABLED", reason);
             case REVIEW -> reviewModerationService.hideForGovernance(
-                    report.getTargetId(), adminId, "REPORT", report.getId(), reason);
+                    report.getTargetId(), adminId, "MODERATION_REVIEW", report.getTargetId(), reason);
         }
     }
 
@@ -220,7 +270,14 @@ public class ReportService {
                 report.getId(), report.getReporterId(), report.getTargetType().name(), report.getTargetId(),
                 report.getReason(), report.getDescription(), report.getStatus().name(), report.getAdminId(),
                 report.getResolution() == null ? null : report.getResolution().name(), report.getAdminComment(),
-                report.getCreatedAt(), report.getResolvedAt());
+                report.getCreatedAt(), report.getResolvedAt(), outcome(report), report.getPublicMessage(), report.isFollowUpRequired());
+    }
+
+    private ReportResponse toPublicResponse(Report report) {
+        return new ReportResponse(report.getId(), report.getReporterId(), report.getTargetType().name(), report.getTargetId(),
+                report.getReason(), report.getDescription(), report.getStatus().name(), null,
+                report.getResolution() == null ? null : report.getResolution().name(), null,
+                report.getCreatedAt(), report.getResolvedAt(), outcome(report), report.getPublicMessage(), report.isFollowUpRequired());
     }
 
     private Long requireCurrentUser() {
