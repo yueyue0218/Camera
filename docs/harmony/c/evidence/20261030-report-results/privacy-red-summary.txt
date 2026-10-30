@@ -1,0 +1,5 @@
+[ERROR] Tests run: 17, Failures: 2, Errors: 0, Skipped: 0, Time elapsed: 6.459 s <<< FAILURE! -- in com.action.camera.report.ReportServiceTest
+[ERROR] Tests run: 17, Failures: 2, Errors: 0, Skipped: 0
+[INFO] BUILD FAILURE
+[INFO] Total time:  42.389 s
+[INFO] Finished at: 2026-10-30T13:28:20+08:00

@@ -1,3 +1,5 @@
+import { ReportResultView } from '../features/report/ReportResultView';
+import { ReportResultNavigation } from '../features/report/ReportResultNavigation';
 import { uiObserver } from '@kit.ArkUI';
 import { AppClient } from '../app/AppClient';
 import { EngagementController, EngagementSnapshot, EngagementPolicy } from '../features/engagement/EngagementController';
@@ -18,6 +20,7 @@ export struct OrderEngagementPage {
   private controller?: EngagementController; private lifecycle?: MomentFeedLifecycle;
   private visible: boolean = false; private focusOpened: boolean = false;
   aboutToAppear(): void {
+    if(ReportResultNavigation.isReport(this.targetKind)){return;}
     this.controller=new EngagementController(new EngagementApiBinding(AppClient.shared.apiService),new ActivitySessionBinding(AppClient.shared.sessionManager),
       (value: EngagementSnapshot)=>{
         this.state=value;
@@ -165,6 +168,9 @@ export struct OrderEngagementPage {
     }
   }
   build() {
+    if(ReportResultNavigation.isReport(this.targetKind)) {
+      ReportResultView({reportId:ReportResultNavigation.id(this.targetKind,this.targetId),onBack:this.onBack,onRequireLogin:this.onRequireLogin})
+    } else {
     Column() {
       Row({space:10}) {
         Button('‹').width(44).height(44).padding(0).fontSize(30).fontColor(PortraTheme.primaryText).backgroundColor(Color.Transparent).onClick(()=>this.onBack?.())
@@ -195,5 +201,6 @@ export struct OrderEngagementPage {
       .bindSheet(this.sheetOpen,this.SheetBody(),{height:SheetSize.LARGE,showClose:false,backgroundColor:PortraTheme.surface,
         keyboardAvoidMode:SheetKeyboardAvoidMode.RESIZE_ONLY,
         onWillDismiss:(action:DismissSheetAction)=>{if(!this.state.form.mode||this.controller?.requestClose()){this.sheetOpen=false;action.dismiss();}}})
+    }
   }
 }

@@ -1,0 +1,20 @@
+{
+  "origin": "http://127.0.0.1:18090",
+  "database": "portra_c_report_result_20261030",
+  "rows": [
+    {
+      "reportId": 2,
+      "targetId": 2,
+      "status": "PENDING",
+      "publicOutcome": "PENDING",
+      "description": "C-report-native-20261030"
+    },
+    {
+      "reportId": 1,
+      "targetId": 1,
+      "status": "PENDING",
+      "publicOutcome": "PENDING",
+      "description": "仅用于本地举报进度读取验收。"
+    }
+  ]
+}
