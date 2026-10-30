@@ -83,6 +83,17 @@ export class HttpClient implements AuthTokenController {
     return this.request<UploadedImage>(http.RequestMethod.POST, '/files/upload', 'files.upload', true, undefined, false, parts);
   }
 
+  uploadMessageAttachment(data: ArrayBuffer, mime: string, filename: string,
+    requestKey: string): Promise<UploadedImage> {
+    const parts: http.MultiFormData[] = [
+      { name: 'file', contentType: mime, remoteFileName: filename, data: data },
+      { name: 'bizType', contentType: 'text/plain', data: 'MESSAGE_ATTACHMENT' },
+      { name: 'visibility', contentType: 'text/plain', data: 'PRIVATE' }
+    ];
+    return this.request<UploadedImage>(http.RequestMethod.POST, '/files/upload', requestKey,
+      true, undefined, false, parts);
+  }
+
   async get<T>(path: string, requestKey: string = path): Promise<T> {
     return this.request<T>(http.RequestMethod.GET, path, requestKey, true);
   }
@@ -252,7 +263,7 @@ export class HttpClient implements AuthTokenController {
       header: headers,
       expectDataType: binary ? http.HttpDataType.ARRAY_BUFFER : http.HttpDataType.STRING,
       connectTimeout: 10000,
-      readTimeout: 15000,
+      readTimeout: parts === undefined ? 15000 : 60000,
       maxLimit: binary ? 32 * 1024 * 1024 : 5 * 1024 * 1024,
       maxRedirects: 0,
       usingCache: false,

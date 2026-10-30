@@ -23,6 +23,7 @@ export interface ConversationTimelineItem {
   readonly quote?: QuoteSummary;
   readonly order?: OrderSummary;
   readonly event?: FulfillmentEvent;
+  readonly timeLabel?: string;
 }
 
 /** One stable chronological stream; no synthetic backend events. */
@@ -88,13 +89,34 @@ export class ConversationTimeline {
       items.push({ key: key, kind: TimelineKind.MESSAGE,
         createdAt: message.createdAt ?? '', senderId: message.senderId, message: message });
     });
-    return items.sort((left: ConversationTimelineItem, right: ConversationTimelineItem) => {
+    const ordered = items.sort((left: ConversationTimelineItem, right: ConversationTimelineItem) => {
       const a = Date.parse(left.createdAt);
       const b = Date.parse(right.createdAt);
       if (Number.isNaN(a) && Number.isNaN(b)) return left.key.localeCompare(right.key);
       if (Number.isNaN(a)) return 1;
       if (Number.isNaN(b)) return -1;
-      return a - b || left.key.localeCompare(right.key);
+      if (a !== b) return a - b;
+      if (left.message !== undefined && right.message !== undefined) {
+        const leftId = left.message.messageId;
+        const rightId = right.message.messageId;
+        if (leftId > 0 && rightId < 0) return -1;
+        if (leftId < 0 && rightId > 0) return 1;
+        return leftId > 0 ? leftId - rightId : rightId - leftId;
+      }
+      return left.key.localeCompare(right.key);
+    });
+    let previousTime = 0;
+    let previousDay = '';
+    return ordered.map((item: ConversationTimelineItem) => {
+      const time = Date.parse(item.createdAt);
+      if (Number.isNaN(time)) return item;
+      const day = item.createdAt.slice(0, 10);
+      const show = previousTime === 0 || day !== previousDay || time - previousTime >= 5 * 60 * 1000;
+      previousTime = time;
+      previousDay = day;
+      return show ? { key: item.key, kind: item.kind, createdAt: item.createdAt,
+        senderId: item.senderId, message: item.message, quote: item.quote, order: item.order,
+        event: item.event, timeLabel: `${item.createdAt.slice(5, 10)} ${item.createdAt.slice(11, 16)}` } : item;
     });
   }
 }

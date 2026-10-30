@@ -12,6 +12,8 @@ export struct DeliveryUploadPage {
   @State private order: OrderSummary | null = null;
   @State private userId: number = 0;
   @State private selected: SelectedDeliveryFile[] = [];
+  @State private selectingPhotos: boolean = false;
+  @State private selectedUris: string[] = [];
   @State private busy: boolean = false;
   @State private progress: number = 0;
   @State private uncertain: boolean = false;
@@ -20,6 +22,7 @@ export struct DeliveryUploadPage {
   private readonly api = AppClient.shared.apiService;
   private readonly transfer = new DeliveryTransfer();
   private previousIds: Set<number> = new Set<number>();
+  private lastLongPressAt: number = 0;
   onBack?: () => void;
   onUploaded?: () => void;
 
@@ -49,6 +52,18 @@ export struct DeliveryUploadPage {
     }
     this.selected = [...this.selected, ...added];
     this.error = '';
+  }
+
+  private togglePhoto(uri: string): void {
+    this.selectedUris = this.selectedUris.includes(uri) ?
+      this.selectedUris.filter((item: string) => item !== uri) : [...this.selectedUris, uri];
+  }
+
+  private longPressPhoto(uri: string): void {
+    if (this.busy || this.uncertain) return;
+    this.lastLongPressAt = Date.now();
+    this.selectingPhotos = true;
+    if (!this.selectedUris.includes(uri)) this.togglePhoto(uri);
   }
 
   private async pickPhotos(): Promise<void> {
@@ -131,6 +146,21 @@ export struct DeliveryUploadPage {
                 .fontColor(PortraTheme.primary).enabled(!this.busy && !this.uncertain && this.selected.length < 20)
                 .onClick(() => this.pickZip())
             }.width('100%')
+            if (this.selectingPhotos) {
+              Row() {
+                Button('取消选择').height(36).backgroundColor(PortraTheme.surface)
+                  .fontColor(PortraTheme.secondaryText).onClick(() => {
+                    this.selectingPhotos = false; this.selectedUris = [];
+                  })
+                Blank()
+                Button(`移除所选 ${this.selectedUris.length} 张`).height(36)
+                  .enabled(this.selectedUris.length > 0).onClick(() => {
+                    this.selected = this.selected.filter((file: SelectedDeliveryFile) =>
+                      !this.selectedUris.includes(file.uri));
+                    this.selectedUris = []; this.selectingPhotos = false;
+                  })
+              }.width('100%')
+            }
             ForEach(this.selected, (file: SelectedDeliveryFile) => {
               Row({ space: 10 }) {
                 if (file.mimeType.startsWith('image/')) {
@@ -141,9 +171,21 @@ export struct DeliveryUploadPage {
                 }
                 Text(file.fileName).fontSize(13).fontColor(PortraTheme.primaryText)
                   .layoutWeight(1).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-                Button('移除').enabled(!this.busy && !this.uncertain).onClick(() =>
-                  this.selected = this.selected.filter((item: SelectedDeliveryFile) => item.uri !== file.uri))
+                if (file.mimeType.startsWith('image/') && this.selectingPhotos) {
+                  Text(this.selectedUris.includes(file.uri) ? '✓' : '○')
+                    .fontSize(19).fontColor(PortraTheme.primary)
+                } else {
+                  Button('移除').enabled(!this.busy && !this.uncertain).onClick(() =>
+                    this.selected = this.selected.filter((item: SelectedDeliveryFile) => item.uri !== file.uri))
+                }
               }.width('100%').padding(8).backgroundColor(PortraTheme.surface).borderRadius(6)
+                .onClick(() => {
+                  if (this.selectingPhotos && file.mimeType.startsWith('image/') &&
+                    Date.now() - this.lastLongPressAt >= 500) this.togglePhoto(file.uri);
+                })
+                .gesture(LongPressGesture().onAction(() => {
+                  if (file.mimeType.startsWith('image/')) this.longPressPhoto(file.uri);
+                }))
             }, (file: SelectedDeliveryFile) => file.uri)
             if (this.busy) Text(`正在上传 ${this.progress}%`).fontSize(13).fontColor(PortraTheme.primary)
             if (this.error) Text(this.error).fontSize(12).fontColor(PortraTheme.danger)

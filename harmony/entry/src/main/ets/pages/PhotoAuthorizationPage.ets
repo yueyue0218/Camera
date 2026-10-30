@@ -50,6 +50,7 @@ export struct PhotoAuthorizationPage {
   private previousKeyboardAvoidMode?: KeyboardAvoidMode;
   private thumbnailQueue: number[] = [];
   private thumbnailCursor: number = 0;
+  private longPressedAt: number = 0;
   private readonly api = AppClient.shared.apiService;
   onBack?: () => void;
   onBackHandler?: (handler: (() => boolean) | undefined) => void;
@@ -236,10 +237,24 @@ export struct PhotoAuthorizationPage {
   }
 
   private toggle(fileId: number): void {
-    if (!this.available().some((file: DeliveryFileSummary) => file.fileId === fileId)) return;
+    if (this.order === null || !AftercarePolicy.authorizable(this.order, this.actorId) ||
+      !this.available().some((file: DeliveryFileSummary) => file.fileId === fileId)) return;
     this.selected = this.selected.includes(fileId) ? this.selected.filter((id: number) => id !== fileId) :
       [...this.selected, fileId];
     this.saveSelection();
+  }
+
+  private tapPhoto(fileId: number, selectable: boolean): void {
+    if (Date.now() - this.longPressedAt < 500) return;
+    if (selectable && this.selecting) this.toggle(fileId);
+    else this.openViewer(fileId);
+  }
+
+  private longPressPhoto(fileId: number, selectable: boolean): void {
+    if (!selectable || !this.available().some((file: DeliveryFileSummary) => file.fileId === fileId)) return;
+    this.longPressedAt = Date.now();
+    this.selecting = true;
+    if (!this.selected.includes(fileId)) this.toggle(fileId);
   }
 
   private async requestAuthorization(): Promise<void> {
@@ -362,7 +377,8 @@ export struct PhotoAuthorizationPage {
           .align(Alignment.TopEnd)
       }
     }.width('48%').height(132).backgroundColor(PortraTheme.pageBackgroundDeep)
-      .borderRadius(6).onClick(() => selectable && this.selecting ? this.toggle(fileId) : this.openViewer(fileId))
+      .borderRadius(6).onClick(() => this.tapPhoto(fileId, selectable))
+      .gesture(LongPressGesture().onAction(() => this.longPressPhoto(fileId, selectable)))
   }
 
   private openViewer(fileId: number): void {
@@ -453,7 +469,7 @@ export struct PhotoAuthorizationPage {
               } else {
                 if (this.order!.status === 'COMPLETED' && this.allFiles().length > 0) {
                   Text('本次作品').fontSize(17).fontWeight(FontWeight.Bold)
-                  this.PhotoGrid(this.allFiles(), true)
+                  this.PhotoGrid(this.allFiles(), AftercarePolicy.authorizable(this.order!, this.actorId))
                   if (AftercarePolicy.authorizable(this.order!, this.actorId) && this.available().length > 0) {
                     Button(this.selecting ? `已选 ${this.selected.length} 张 · 下一步` : '选择照片')
                       .height(48).enabled(!this.selecting || this.selected.length > 0)

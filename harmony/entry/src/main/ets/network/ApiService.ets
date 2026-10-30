@@ -584,6 +584,27 @@ export class ApiService implements NativeSessionApi {
       payload, `conversations.${conversationId}.send`);
   }
 
+  uploadMessageAttachment(data: ArrayBuffer, mime: string, filename: string,
+    requestKey: string): Promise<number> {
+    return this.client.uploadMessageAttachment(data, mime, filename, requestKey).then(result => {
+      if (!Number.isSafeInteger(result.fileId) || result.fileId <= 0) throw ErrorMapper.parse();
+      return result.fileId;
+    });
+  }
+
+  sendAttachment(conversationId: number, fileId: number, content: string,
+    requestKey: string): Promise<MessageSummary> {
+    const payload: SendTextMessagePayload = { messageType: 'FILE', fileId: fileId, content: content };
+    return this.client.post<MessageSummary>(`/conversations/${conversationId}/messages`, payload, requestKey);
+  }
+
+  getMessageImage(fileId: number, variant: 'thumbnail' | 'medium', requestKey: string): Promise<ArrayBuffer> {
+    return this.client.getBinary(`/files/${fileId}/${variant}`, requestKey, variant === 'thumbnail' ?
+      4 * 1024 * 1024 : 16 * 1024 * 1024);
+  }
+
+  cancelMessageMedia(requestKey: string): void { this.client.cancelRequest(requestKey); }
+
   listQuotes(conversationId: number): Promise<QuoteSummary[]> {
     return this.client.get<QuoteSummary[]>(`/conversations/${conversationId}/quotations`,
       `conversations.${conversationId}.quotes`);

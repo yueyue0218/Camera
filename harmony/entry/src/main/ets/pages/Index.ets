@@ -59,6 +59,7 @@ struct Index {
   @State private detailVisibleId: number = 0;
   private publishBackHandler?: () => boolean;
   private aftercareBackHandler?: () => boolean;
+  private conversationBackHandler?: () => boolean;
 
   aboutToAppear(): void {
     this.appClient.observePrivacyRestriction(this.privacyRestricted);
@@ -198,7 +199,8 @@ struct Index {
       }
     }
     .hideTitleBar(true)
-    .onBackPressed(() => name === AppRoute.PUBLISH ? (this.publishBackHandler?.() ?? false) :
+    .onBackPressed(() => name === AppRoute.CONVERSATION_DETAIL ? (this.conversationBackHandler?.() ?? false) :
+      name === AppRoute.PUBLISH ? (this.publishBackHandler?.() ?? false) :
       name === AppRoute.PHOTO_AUTHORIZATION || name === AppRoute.ORDER_REVIEWS ?
         (this.aftercareBackHandler?.() ?? false) : false)
     .onShown(() => {
@@ -312,6 +314,7 @@ struct Index {
       this.PlaceholderPage('约拍会话', '无效的会话编号');
     } else {
       ConversationDetailPage({ conversationId: this.validConversationId(param),
+        onBackHandler: (handler: (() => boolean) | undefined) => this.conversationBackHandler = handler,
         onBack: () => { this.appPathStack.pop(); this.sessionEpoch++; },
         onCreateQuote: () => this.openPage(AppRoute.QUOTE_FORM,
           { conversationId: this.validConversationId(param) }),

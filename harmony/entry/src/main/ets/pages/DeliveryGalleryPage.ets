@@ -25,6 +25,9 @@ export struct DeliveryGalleryPage {
   @State private reworkReason: string = '';
   @State private userId: number = 0;
   @State private viewerIndex: number = -1;
+  @State private selecting: boolean = false;
+  @State private selectedFileIds: number[] = [];
+  @State private savingSelected: boolean = false;
   @State private reworkOpen: boolean = false;
   @State private reworkDiscard: boolean = false;
   @State private receiptOpen: boolean = false;
@@ -36,6 +39,7 @@ export struct DeliveryGalleryPage {
   private readonly transfer = new DeliveryTransfer();
   private generation: number = 0;
   private readonly requested: Set<number> = new Set<number>();
+  private longPressedAt: number = 0;
   onBack?: () => void;
   onOpenUpload?: () => void;
 
@@ -148,6 +152,36 @@ export struct DeliveryGalleryPage {
     this.loadImage(fileId, 'medium', this.generation);
   }
 
+  private togglePhoto(fileId: number): void {
+    this.selectedFileIds = this.selectedFileIds.includes(fileId) ?
+      this.selectedFileIds.filter((id: number) => id !== fileId) : [...this.selectedFileIds, fileId];
+  }
+
+  private tapPhoto(fileId: number): void {
+    if (Date.now() - this.longPressedAt < 500) return;
+    if (this.selecting) this.togglePhoto(fileId);
+    else this.openViewer(fileId);
+  }
+
+  private longPressPhoto(fileId: number): void {
+    this.longPressedAt = Date.now();
+    if (!this.selecting) this.selecting = true;
+    if (!this.selectedFileIds.includes(fileId)) this.togglePhoto(fileId);
+  }
+
+  private async saveSelected(): Promise<void> {
+    if (this.savingSelected || this.selectedFileIds.length === 0) return;
+    this.savingSelected = true;
+    const files = this.imageFiles().filter((file: DeliveryFileSummary) =>
+      this.selectedFileIds.includes(file.fileId));
+    let complete = true;
+    for (const file of files) {
+      if (!await this.download(file)) { complete = false; break; }
+    }
+    if (complete) { this.selecting = false; this.selectedFileIds = []; }
+    this.savingSelected = false;
+  }
+
   private viewerFile(): DeliveryFileSummary | undefined {
     return this.imageFiles()[this.viewerIndex];
   }
@@ -157,20 +191,22 @@ export struct DeliveryGalleryPage {
     else this.reworkOpen = false;
   }
 
-  private async download(file: DeliveryFileSummary): Promise<void> {
+  private async download(file: DeliveryFileSummary): Promise<boolean> {
     const token = AppClient.shared.sessionManager.getSession()?.accessToken ?? '';
-    if (!token || this.downloadingId !== 0) return;
+    if (!token || this.downloadingId !== 0) return false;
     this.downloadingId = file.fileId;
     this.downloadProgress = 0;
     this.error = '';
     try {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
       const fallback = this.isImage(file) ? `作品-${file.fileId}.jpg` : `作品-${file.fileId}.zip`;
-      await this.transfer.download(context, file.fileId, file.fileName ?? fallback, token,
+      const saved = await this.transfer.download(context, file.fileId, file.fileName ?? fallback, token,
         (percent: number) => this.downloadProgress = percent);
-      this.notice = '已保存作品';
+      if (saved) this.notice = '已保存作品';
+      return saved;
     } catch (error) {
       this.error = (error as Error).message || '下载未完成，请重试';
+      return false;
     } finally { this.downloadingId = 0; }
   }
 
@@ -215,16 +251,25 @@ export struct DeliveryGalleryPage {
   @Builder
   private FileTile(file: DeliveryFileSummary) {
     if (this.isImage(file)) {
-      Column() {
+      Stack({ alignContent: Alignment.TopEnd }) {
         if (this.thumbs.has(file.fileId)) {
           Image(this.thumbs.get(file.fileId)!).width('100%').height(154).objectFit(ImageFit.Cover)
         } else {
-          Text('照片').fontSize(13).fontColor(PortraTheme.mutedText)
+          Text('照片').fontSize(13).fontColor(PortraTheme.mutedText).width('100%').height(154)
+            .textAlign(TextAlign.Center)
+        }
+        if (this.selecting) {
+          Text(this.selectedFileIds.includes(file.fileId) ? '✓' : '○')
+            .fontSize(19).fontColor(PortraTheme.white).textAlign(TextAlign.Center)
+            .width(32).height(32).borderRadius(16)
+            .backgroundColor(this.selectedFileIds.includes(file.fileId) ? PortraTheme.primary : '#66000000')
+            .margin(8)
         }
       }
-      .width('100%').height(154).justifyContent(FlexAlign.Center)
+      .width('100%').height(154)
       .backgroundColor(PortraTheme.pageBackgroundDeep).borderRadius(6)
-      .onClick(() => this.openViewer(file.fileId))
+      .onClick(() => this.tapPhoto(file.fileId))
+      .gesture(LongPressGesture().onAction(() => this.longPressPhoto(file.fileId)))
     } else {
       Row({ space: 10 }) {
         Text('ZIP').fontSize(12).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primary)
@@ -272,6 +317,14 @@ export struct DeliveryGalleryPage {
         } else {
           Scroll() {
             Column({ space: 24 }) {
+              if (this.imageFiles().length > 0) {
+                Row() {
+                  Blank()
+                  Button(this.selecting ? '取消选择' : '选择照片').height(36)
+                    .backgroundColor(PortraTheme.surface).fontColor(PortraTheme.primary)
+                    .onClick(() => { this.selecting = !this.selecting; this.selectedFileIds = []; })
+                }.width('100%')
+              }
               if (this.order!.status === 'REWORK_REQUIRED' && this.reworkReason) {
                 Column({ space: 6 }) {
                   Text('返修要求').fontSize(16).fontWeight(FontWeight.Bold)
@@ -289,6 +342,11 @@ export struct DeliveryGalleryPage {
           if (this.error) Text(this.error).fontSize(12).fontColor(PortraTheme.danger)
           if (this.downloadingId > 0) Text(`正在下载 ${this.downloadProgress}%`)
             .fontSize(12).fontColor(PortraTheme.primary)
+          if (this.selecting && this.selectedFileIds.length > 0) {
+            Button(`保存所选 ${this.selectedFileIds.length} 张`).height(44)
+              .enabled(!this.savingSelected && this.downloadingId === 0)
+              .onClick(() => this.saveSelected())
+          }
           if (OrderWorkflow.canReviewDelivery(this.order!, this.userId)) {
             Row({ space: 12 }) {
               Button('申请返修').layoutWeight(1).height(48).backgroundColor(PortraTheme.surface)

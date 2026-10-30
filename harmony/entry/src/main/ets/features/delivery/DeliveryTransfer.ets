@@ -113,7 +113,7 @@ export class DeliveryTransfer {
   }
 
   async download(context: common.UIAbilityContext, fileId: number, fileName: string,
-    accessToken: string, onProgress: (percent: number) => void): Promise<void> {
+    accessToken: string, onProgress: (percent: number) => void): Promise<boolean> {
     const profile = EnvironmentConfig.current();
     if (!EnvironmentConfig.isUsable(profile) || !Number.isSafeInteger(fileId) || fileId <= 0 || !accessToken) {
       throw new Error('暂时无法下载作品');
@@ -150,7 +150,9 @@ export class DeliveryTransfer {
       const options = new picker.DocumentSaveOptions();
       options.newFileNames = [fileName.replace(/[\\/]/g, '_')];
       const targets = await new picker.DocumentViewPicker(context).save(options);
-      if (targets.length > 0) fileIo.copyFileSync(cachePath, targets[0]);
+      if (targets.length === 0) return false;
+      fileIo.copyFileSync(cachePath, targets[0]);
+      return true;
     } finally {
       this.task = undefined;
       if (task !== undefined) request.agent.remove(task.tid).catch(() => {});

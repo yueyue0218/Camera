@@ -240,6 +240,10 @@ export interface MessageSummary {
   readonly messageType: string;
   readonly content?: string;
   readonly fileName?: string;
+  readonly fileId?: number;
+  readonly mimeType?: string;
+  readonly size?: number;
+  readonly localUri?: string;
   readonly createdAt?: string;
   readonly quotationId?: number;
   readonly orderId?: number;
@@ -249,6 +253,7 @@ export interface MessageSummary {
 export interface SendTextMessagePayload {
   readonly messageType: string;
   readonly content: string;
+  readonly fileId?: number;
 }
 
 export interface StartServiceChatPayload {
