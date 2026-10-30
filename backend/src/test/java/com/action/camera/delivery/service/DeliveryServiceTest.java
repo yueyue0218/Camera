@@ -12,7 +12,6 @@ import com.action.camera.delivery.entity.Delivery;
 import com.action.camera.delivery.entity.DeliveryFile;
 import com.action.camera.delivery.port.OrderQueryPort;
 import com.action.camera.delivery.port.OrderSnapshot;
-import com.action.camera.delivery.port.OrderStatusPort;
 import com.action.camera.delivery.repository.DeliveryFileRepository;
 import com.action.camera.delivery.repository.DeliveryRepository;
 import com.action.camera.dto.FileUploadResponse;
@@ -69,9 +68,6 @@ class DeliveryServiceTest {
     private OrderQueryPort orderQueryPort;
 
     @Mock
-    private OrderStatusPort orderStatusPort;
-
-    @Mock
     private OrderService orderService;
 
     @Mock
@@ -93,7 +89,6 @@ class DeliveryServiceTest {
                 fileService,
                 fileRepository,
                 orderQueryPort,
-                orderStatusPort,
                 orderService,
                 txTemplate,
                 userDisplayService,
@@ -126,13 +121,10 @@ class DeliveryServiceTest {
                     assertThat(file.getFileType()).isEqualTo("IMAGE");
                     assertThat(file.getSortOrder()).isZero();
                 });
-        InOrder inOrder = inOrder(orderQueryPort, orderService, fileService, deliveryRepository,
-                deliveryFileRepository);
-        inOrder.verify(orderQueryPort).getOrderSnapshot(ORDER_ID);
-        inOrder.verify(orderService).syncTimelineStatusIfDue(ORDER_ID);
-        inOrder.verify(orderQueryPort).getOrderSnapshot(ORDER_ID);
-        inOrder.verify(deliveryRepository).findByOrderIdOrderByUploadTimeDesc(ORDER_ID);
+        InOrder inOrder = inOrder(orderService, fileService, deliveryRepository, deliveryFileRepository);
         inOrder.verify(fileService).upload(any(), eq(PROVIDER_ID), eq("DELIVERY"), eq("PRIVATE"));
+        inOrder.verify(orderService).lockForDeliveryUpload(ORDER_ID, PROVIDER_ID);
+        inOrder.verify(deliveryRepository).findByOrderIdOrderByUploadTimeDesc(ORDER_ID);
         inOrder.verify(deliveryRepository).save(any(Delivery.class));
         inOrder.verify(deliveryFileRepository).save(any(DeliveryFile.class));
         inOrder.verify(orderService).markDeliveryUploaded(ORDER_ID, PROVIDER_ID, "服务方上传交付文件");
@@ -141,7 +133,6 @@ class DeliveryServiceTest {
                 PROVIDER_ID,
                 "服务方上传交付文件"
         );
-        verify(orderStatusPort, never()).changeStatus(any(), any(), any(), any());
     }
 
     @Test
@@ -153,17 +144,13 @@ class DeliveryServiceTest {
         DeliveryUploadResponse response = deliveryService.upload(ORDER_ID, file(), "返修交付");
 
         assertThat(response.getOrderStatus()).isEqualTo("DELIVERED_PENDING_CONFIRM");
-        InOrder inOrder = inOrder(orderQueryPort, orderService, fileService, deliveryRepository,
-                deliveryFileRepository);
-        inOrder.verify(orderQueryPort).getOrderSnapshot(ORDER_ID);
-        inOrder.verify(orderService).syncTimelineStatusIfDue(ORDER_ID);
-        inOrder.verify(orderQueryPort).getOrderSnapshot(ORDER_ID);
-        inOrder.verify(deliveryRepository).findByOrderIdOrderByUploadTimeDesc(ORDER_ID);
+        InOrder inOrder = inOrder(orderService, fileService, deliveryRepository, deliveryFileRepository);
         inOrder.verify(fileService).upload(any(), eq(PROVIDER_ID), eq("DELIVERY"), eq("PRIVATE"));
+        inOrder.verify(orderService).lockForDeliveryUpload(ORDER_ID, PROVIDER_ID);
+        inOrder.verify(deliveryRepository).findByOrderIdOrderByUploadTimeDesc(ORDER_ID);
         inOrder.verify(deliveryRepository).save(any(Delivery.class));
         inOrder.verify(deliveryFileRepository).save(any(DeliveryFile.class));
         inOrder.verify(orderService).completeReworkDelivery(ORDER_ID, PROVIDER_ID, "服务方上传交付文件");
-        verify(orderStatusPort, never()).changeStatus(ORDER_ID, "PENDING_DELIVERY", PROVIDER_ID, "服务方开始返修交付");
     }
 
     @Test
@@ -173,6 +160,7 @@ class DeliveryServiceTest {
         previousDelivery.setId(8000L);
         previousDelivery.setOrderId(ORDER_ID);
         previousDelivery.setDeliveryRound(1);
+        previousDelivery.setIsLatest(true);
         when(deliveryRepository.findByOrderIdOrderByUploadTimeDesc(ORDER_ID)).thenReturn(List.of(previousDelivery));
         when(orderService.completeReworkDelivery(ORDER_ID, PROVIDER_ID, "服务方上传交付文件"))
                 .thenReturn(completedOrder());
@@ -181,8 +169,9 @@ class DeliveryServiceTest {
 
         assertThat(response.getDeliveryRound()).isEqualTo(2);
         ArgumentCaptor<Delivery> deliveryCaptor = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveryRepository).save(deliveryCaptor.capture());
-        assertThat(deliveryCaptor.getValue().getDeliveryRound()).isEqualTo(2);
+        verify(deliveryRepository, times(2)).save(deliveryCaptor.capture());
+        assertThat(previousDelivery.getIsLatest()).isFalse();
+        assertThat(deliveryCaptor.getAllValues().get(1).getDeliveryRound()).isEqualTo(2);
     }
 
     @Test
@@ -196,7 +185,6 @@ class DeliveryServiceTest {
         verify(orderService).syncTimelineStatusIfDue(ORDER_ID);
         verify(fileService, never()).upload(any(), any(), any(), any());
         verify(orderService, never()).markDeliveryUploaded(any(), any(), any());
-        verify(orderStatusPort, never()).changeStatus(any(), any(), any(), any());
     }
 
     @Test
@@ -204,24 +192,15 @@ class DeliveryServiceTest {
         when(orderQueryPort.getOrderSnapshot(ORDER_ID))
                 .thenReturn(snapshot("SHOOTING"))
                 .thenReturn(snapshot("PENDING_DELIVERY"));
-        prepareDeliveryPersistence();
+        prepareDeliveryPersistence("PENDING_DELIVERY");
         when(orderService.markDeliveryUploaded(ORDER_ID, PROVIDER_ID, "服务方上传交付文件"))
                 .thenReturn(deliveredOrder());
 
         DeliveryUploadResponse response = deliveryService.upload(ORDER_ID, file(), "拍摄结束后交付");
 
         assertThat(response.getOrderStatus()).isEqualTo("DELIVERED_PENDING_CONFIRM");
-        InOrder inOrder = inOrder(orderQueryPort, orderService, fileService, deliveryRepository,
-                deliveryFileRepository);
-        inOrder.verify(orderQueryPort).getOrderSnapshot(ORDER_ID);
-        inOrder.verify(orderService).syncTimelineStatusIfDue(ORDER_ID);
-        inOrder.verify(orderQueryPort).getOrderSnapshot(ORDER_ID);
-        inOrder.verify(deliveryRepository).findByOrderIdOrderByUploadTimeDesc(ORDER_ID);
-        inOrder.verify(fileService).upload(any(), eq(PROVIDER_ID), eq("DELIVERY"), eq("PRIVATE"));
-        inOrder.verify(deliveryRepository).save(any(Delivery.class));
-        inOrder.verify(deliveryFileRepository).save(any(DeliveryFile.class));
-        inOrder.verify(orderService).markDeliveryUploaded(ORDER_ID, PROVIDER_ID, "服务方上传交付文件");
-        verify(orderStatusPort, never()).changeStatus(any(), any(), any(), any());
+        verify(orderService).lockForDeliveryUpload(ORDER_ID, PROVIDER_ID);
+        verify(orderService).markDeliveryUploaded(ORDER_ID, PROVIDER_ID, "服务方上传交付文件");
     }
 
     @Test
@@ -314,11 +293,10 @@ class DeliveryServiceTest {
         verify(orderService).syncTimelineStatusIfDue(ORDER_ID);
         verify(fileService, never()).upload(any(), any(), any(), any());
         verify(orderService, never()).markDeliveryUploaded(any(), any(), any());
-        verify(orderStatusPort, never()).changeStatus(any(), any(), any(), any());
     }
 
     @Test
-    void reworkRequiredUploadRollsBackDeliveryRecordWhenOrderStatusUpdateFails() {
+    void reworkRequiredUploadRollsBackTransactionAndCleansFilesWhenOrderStatusUpdateFails() {
         prepareUpload("REWORK_REQUIRED");
         when(orderService.completeReworkDelivery(ORDER_ID, PROVIDER_ID, "服务方上传交付文件"))
                 .thenThrow(new IllegalStateException("order status failed"));
@@ -326,8 +304,8 @@ class DeliveryServiceTest {
         org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
                 () -> deliveryService.upload(ORDER_ID, file(), "返修交付"));
 
-        verify(deliveryFileRepository).deleteByDeliveryId(9001L);
-        verify(deliveryRepository).deleteById(9001L);
+        verify(deliveryFileRepository, never()).deleteByDeliveryId(9001L);
+        verify(deliveryRepository, never()).deleteById(9001L);
         verify(fileService).deleteUploadedFileQuietly(FILE_ID);
     }
 
@@ -340,7 +318,7 @@ class DeliveryServiceTest {
         if (!"PENDING_DELIVERY".equals(orderStatus) && !"REWORK_REQUIRED".equals(orderStatus)) {
             return;
         }
-        prepareDeliveryPersistence(uploadedFiles);
+        prepareDeliveryPersistence(orderStatus, uploadedFiles);
     }
 
     private OrderSnapshot snapshot(String orderStatus) {
@@ -354,7 +332,7 @@ class DeliveryServiceTest {
         );
     }
 
-    private void prepareDeliveryPersistence(FileUploadResponse... uploadedFiles) {
+    private void prepareDeliveryPersistence(String status, FileUploadResponse... uploadedFiles) {
         if (uploadedFiles == null || uploadedFiles.length == 0) {
             uploadedFiles = new FileUploadResponse[] { new FileUploadResponse(FILE_ID, "delivery.jpg") };
         }
@@ -363,6 +341,10 @@ class DeliveryServiceTest {
             TransactionCallback<?> callback = invocation.getArgument(0);
             return callback.doInTransaction(null);
         });
+        Order locked = new Order();
+        locked.setId(ORDER_ID);
+        locked.setStatus(OrderStatus.valueOf(status));
+        when(orderService.lockForDeliveryUpload(ORDER_ID, PROVIDER_ID)).thenReturn(locked);
         final int[] uploadIndex = {0};
         when(fileService.upload(any(), eq(PROVIDER_ID), eq("DELIVERY"), eq("PRIVATE")))
                 .thenAnswer(invocation -> responses[Math.min(uploadIndex[0]++, responses.length - 1)]);

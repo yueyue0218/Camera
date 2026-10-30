@@ -242,7 +242,7 @@ public class OrderService {
 
     @Transactional
     public Order requestRework(Long orderId, Long customerId, String reason) {
-        Order order = getOrderOrThrow(orderId);
+        Order order = getOrderForUpdateOrThrow(orderId);
         if (!Objects.equals(order.getCustomerId(), customerId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Only the customer can request rework");
         }
@@ -260,7 +260,7 @@ public class OrderService {
 
     @Transactional
     public Order completeReworkDelivery(Long orderId, Long providerId, String reason) {
-        Order order = getOrderOrThrow(orderId);
+        Order order = getOrderForUpdateOrThrow(orderId);
         if (!Objects.equals(order.getProviderUserId(), providerId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Only the provider can upload rework delivery");
         }
@@ -290,7 +290,7 @@ public class OrderService {
 
     @Transactional
     public Order markDeliveryUploaded(Long orderId, Long providerId, String reason) {
-        Order order = getOrderOrThrow(orderId);
+        Order order = getOrderForUpdateOrThrow(orderId);
         if (!Objects.equals(order.getProviderUserId(), providerId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Only the provider can upload delivery");
         }
@@ -307,6 +307,18 @@ public class OrderService {
                 "PROVIDER",
                 reason
         );
+    }
+
+    @Transactional
+    public Order lockForDeliveryUpload(Long orderId, Long providerId) {
+        Order order = getOrderForUpdateOrThrow(orderId);
+        if (!Objects.equals(order.getProviderUserId(), providerId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only the provider can upload delivery");
+        }
+        if (order.getStatus() != OrderStatus.PENDING_DELIVERY && order.getStatus() != OrderStatus.REWORK_REQUIRED) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Order status does not allow delivery upload");
+        }
+        return order;
     }
 
     @Transactional
