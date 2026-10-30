@@ -71,6 +71,13 @@ function page(role='CUSTOMER') {
   return p;
 }
 
+test('detail action bar gives the favorite star a readable icon and full touch target', () => {
+  const source = fs.readFileSync(path.join(root, 'features/publish/JournalUI.ets'), 'utf8');
+  assert.match(source, /Text\(this\.selected \? '★' : '☆'\)/);
+  assert.match(source, /\.fontSize\(28\)/);
+  assert.match(source, /\.width\(48\)\.height\(48\)/);
+});
+
 test('description round-trips, remains readable, preserves legacy prose and never duplicates metadata',()=>{
   const text=JournalText.encode('正文','介绍','第一行\n第二行','2 人',true);
   const d=JournalText.decode(text);
@@ -185,12 +192,13 @@ test('accepted-chat adapter verifies server snapshot and identity before posting
   snapshot={...snapshot,responseStatus:'ACCEPTED'};client.get=async()=>{id++;return snapshot};await assert.rejects(api.openAcceptedDemandChat(3));
 });
 
-test('four-page UI includes native cover, dynamic titles, 28vp SVG intention star and both role entry wiring',()=>{
+test('four-page UI includes native cover, dynamic titles, readable borderless star and both role entry wiring',()=>{
   const read=p=>fs.readFileSync(path.join(root,p),'utf8');
   const service=read('pages/ServiceDetailPage.ets'),demand=read('pages/DemandDetailPage.ets'),publish=read('pages/PublishPage.ets');
   assert.match(service,/title: this.detail\?\.title/);assert.match(demand,/title: this.demand\?\.scene/);
   for(const s of [service,demand]) assert.match(s,/journal: true, moduleHeight: 304/);
-  const ui=read('features/publish/JournalUI.ets');assert.match(read('../resources/base/media/intention_star_selected.svg'), /#F5C522/i);assert.match(ui,/width\(28\)\.height\(28\)/);assert.match(ui,/width\(48\)\.height\(48\)/);
+  const ui=read('features/publish/JournalUI.ets');assert.match(ui,/#F5C522/);assert.match(ui,/Text\(this.selected \? '★' : '☆'\)/);
+  assert.match(ui,/\.width\(48\)\.height\(48\).*backgroundColor\(Color.Transparent\)/);
   assert.ok(ui.indexOf('onStar?.()')<ui.indexOf('onChat?.()'));
   assert.match(demand,/onStar: \(\) => this\.toggleInterest\(\)/);
   assert.match(demand,/selected: this\.interested/);
