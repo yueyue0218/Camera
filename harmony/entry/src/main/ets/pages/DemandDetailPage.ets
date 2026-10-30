@@ -8,6 +8,7 @@ import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraLoading } from '../common/components/PortraLoading';
 import { HallTextFormatter } from '../features/hall/HallUiModels';
 import { FollowAction } from '../features/user/FollowAction';
+import { ContentChanges } from '../features/user/ContentChanges';
 import { ReportPanel } from '../features/user/ReportPanel';
 import { DemandResponseSummary, DemandSummary } from '../model/ApiModels';
 import { PortraError } from '../network/ErrorMapper';
@@ -23,6 +24,9 @@ export struct DemandDetailPage {
   @State private actionError: string = '';
   @State private actionNotice: string = '';
   @State private actionBusy: boolean = false;
+  @State private interestBusy: boolean = false;
+  @State private interestReady: boolean = false;
+  @State private interested: boolean = false;
   @State private userId: number = 0;
   @State private role: string = '';
   @State private responses: DemandResponseSummary[] = [];
@@ -49,6 +53,23 @@ export struct DemandDetailPage {
     this.requestVersion++;
     this.appClient.apiService.cancelDemandDetail();
     this.appClient.apiService.cancelDemandActions(this.demandId);
+    this.appClient.apiService.cancelDemandInterests(this.demandId);
+  }
+
+  private async loadDemand(version: number): Promise<DemandSummary> {
+    const demandId = this.demandId;
+    const identity = this.appClient.sessionManager.getSessionVersion();
+    try { return await this.appClient.apiService.getDemand(demandId); }
+    catch (error) {
+      // Closed intentions retain a read-only history, with access decided again by the server.
+      if (version === this.requestVersion && identity === this.appClient.sessionManager.getSessionVersion() &&
+        this.appClient.sessionManager.isAuthenticated()) {
+        const state = await this.appClient.apiService.getDemandInterest(demandId);
+        if (state?.interested === true && state.targetType === 'DEMAND' &&
+          state.demandId === demandId && state.demand?.demandId === demandId) { return state.demand; }
+      }
+      throw error instanceof Error ? error : new Error(String(error));
+    }
   }
 
   private async load(): Promise<void> {
@@ -56,6 +77,7 @@ export struct DemandDetailPage {
     this.loading = true;
     this.demand = null;
     this.actionBusy = false;
+    this.interestBusy = false; this.interested = false; this.interestReady = false;
     this.responseMessage = '';
     this.responsePrice = '';
     this.errorMessage = '';
@@ -66,7 +88,7 @@ export struct DemandDetailPage {
     this.responses = [];
     this.ownResponse = null;
     try {
-      const result = await this.appClient.apiService.getDemand(this.demandId);
+      const result = await this.loadDemand(version);
       if (version === this.requestVersion) {
         this.demand = result;
         if (this.appClient.sessionManager.isAuthenticated()) {
@@ -84,6 +106,11 @@ export struct DemandDetailPage {
                   this.responses = Array.isArray(responses) ? responses : [];
                 }
               } else if (this.role.trim().toUpperCase() === 'PROVIDER') {
+                const state = await this.appClient.apiService.getDemandInterest(this.demandId);
+                if (version !== this.requestVersion || sessionVersion !== this.appClient.sessionManager.getSessionVersion()) { return; }
+                if (!state || state.demandId !== this.demandId || state.targetType !== 'DEMAND' ||
+                  typeof state.interested !== 'boolean') { throw new Error('需求意向状态异常'); }
+                this.interested = state.interested; this.interestReady = true;
                 const responses = await this.appClient.apiService.listMyDemandResponses();
                 if (version === this.requestVersion &&
                   sessionVersion === this.appClient.sessionManager.getSessionVersion() && Array.isArray(responses)) {
@@ -109,6 +136,35 @@ export struct DemandDetailPage {
         this.loading = false;
       }
     }
+  }
+
+  private async toggleInterest(): Promise<void> {
+    if (this.interestBusy) { return; }
+    if (!this.appClient.sessionManager.isAuthenticated()) { this.onRequireLogin?.(); return; }
+    if (this.role.trim().toUpperCase() !== 'PROVIDER' || this.userId === this.demand?.customerId) {
+      this.actionError = '仅摄影师可以将其他用户的需求加入意向'; return;
+    }
+    if (!this.interestReady) { this.actionError = '意向状态尚未读取，请刷新详情后重试'; return; }
+    if (!this.interested && this.demand?.status !== 'OPEN') { this.actionError = '此需求当前不可加入意向'; return; }
+    const version = this.requestVersion;
+    const identity = this.appClient.sessionManager.getSessionVersion();
+    const next = !this.interested;
+    this.interestBusy = true; this.actionError = '';
+    try {
+      if (next) {
+        const result = await this.appClient.apiService.addDemandInterest(this.demandId);
+        if (!result || result.demandId !== this.demandId || result.targetType !== 'DEMAND' || result.interested !== true ||
+          !Number.isSafeInteger(result.interestId ?? 0) || (result.interestId ?? 0) <= 0) { throw new Error('需求意向结果异常'); }
+      } else { await this.appClient.apiService.removeDemandInterest(this.demandId); }
+      if (version !== this.requestVersion || identity !== this.appClient.sessionManager.getSessionVersion()) { return; }
+      this.interested = next;
+      ContentChanges.publish('demand-interest');
+      promptAction.showToast({ message: next ? '已加入我的意向' : '已移出我的意向' });
+    } catch (error) {
+      if (version === this.requestVersion && identity === this.appClient.sessionManager.getSessionVersion()) {
+        this.actionError = (error as PortraError).message || '意向操作失败，请刷新确认状态';
+      }
+    } finally { if (version === this.requestVersion) { this.interestBusy = false; } }
   }
 
   private async respond(): Promise<void> {
@@ -314,8 +370,10 @@ export struct DemandDetailPage {
           }.width('100%')
         }.layoutWeight(1).scrollBar(BarState.Off)
         JournalActions({ service: false, price: HallTextFormatter.budget(this.demand.budgetMinCent, this.demand.budgetMaxCent),
-          chatEnabled: !this.actionBusy, notice: this.actionError, onChat: () => this.startChat(),
-          onStar: () => { promptAction.showToast({ message: '此需求暂不支持加入意向，可直接咨询需求方' }); } })
+          selected: this.interested, starEnabled: !this.interestBusy,
+          chatEnabled: !this.actionBusy && (this.demand.status === 'OPEN' || this.ownResponse?.status === 'ACCEPTED'),
+          notice: this.actionError, onChat: () => this.startChat(),
+          onStar: () => this.toggleInterest() })
       }
     }.width('100%').height('100%').backgroundColor(JournalStyle.paper)
   }

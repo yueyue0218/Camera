@@ -186,7 +186,7 @@ export struct JournalActions {
             .width(28).height(28).objectFit(ImageFit.Contain)
         }.width(48).height(48).padding(0).backgroundColor(Color.Transparent).stateEffect(false)
           .flexShrink(0)
-          .accessibilityText(this.service ? (this.selected ? '移出我的意向' : '加入我的意向') : '此需求暂不支持加入意向').enabled(this.starEnabled).onClick(() => this.onStar?.()).onTouch((event: TouchEvent) => event.stopPropagation())
+          .accessibilityText(this.selected ? '移出我的意向' : '加入我的意向').enabled(this.starEnabled).onClick(() => this.onStar?.()).onTouch((event: TouchEvent) => event.stopPropagation())
         Button(this.service ? '和摄影师聊聊' : '和需求方聊聊').layoutWeight(1).height(46).padding({ left: 7, right: 7 })
           .fontSize(12).fontWeight(FontWeight.Bold).fontColor(Color.White).backgroundColor(JournalStyle.blue).borderRadius(13)
           .enabled(this.chatEnabled).onClick(() => this.onChat?.()).onTouch((event: TouchEvent) => event.stopPropagation())

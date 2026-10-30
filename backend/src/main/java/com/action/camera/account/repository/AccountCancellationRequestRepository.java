@@ -16,6 +16,10 @@ public interface AccountCancellationRequestRepository
 
     Optional<AccountCancellationRequest> findByUserId(Long userId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select request from AccountCancellationRequest request where request.userId = :userId")
+    Optional<AccountCancellationRequest> findByUserIdForUpdate(@Param("userId") Long userId);
+
     Page<AccountCancellationRequest> findAllByOrderByRequestedAtDesc(Pageable pageable);
 
     Page<AccountCancellationRequest> findAllByStatusOrderByRequestedAtDesc(

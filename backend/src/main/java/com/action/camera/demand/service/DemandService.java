@@ -309,7 +309,7 @@ public class DemandService {
     public DemandDto getDemand(Long demandId, CurrentUser user) {
         Demand demand = findDemand(demandId);
         boolean ownerOrAdmin = isOwner(user, demand) || isAdmin(user);
-        if (!demand.isModerationVisible() && !ownerOrAdmin) {
+        if ((!demand.isModerationVisible() || Boolean.TRUE.equals(demand.getHiddenByCustomer())) && !ownerOrAdmin) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "需求不存在");
         }
         if (ownerOrAdmin) {

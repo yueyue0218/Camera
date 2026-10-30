@@ -1,3 +1,5 @@
+import { PrivacySettingsPage } from '../privacy/PrivacySettingsPage';
+import { DemandInterestList } from '../features/user/DemandInterestList';
 import { ProvinceLocation } from '../common/location/ProvinceLocation';
 import { common } from '@kit.AbilityKit';
 import { UiPerf } from '../common/performance/UiPerf';
@@ -13,18 +15,9 @@ import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraLoading } from '../common/components/PortraLoading';
 import { MomentCard } from '../features/moments/MomentCard';
 import { MomentFeedFormatter } from '../features/moments/MomentFeedModels';
-import { AccountCancellationSummary, DemandSummary, MomentSummary, OrderSummary, ServicePackageSummary, SocialUserBrief, UserProfileSummary } from '../model/ApiModels';
+import { DemandSummary, MomentSummary, OrderSummary, ServicePackageSummary, SocialUserBrief, UserProfileSummary } from '../model/ApiModels';
 import { PortraError } from '../network/ErrorMapper';
-import {
-  CROSS_BORDER_CONSENT_SECTIONS,
-  CROSS_BORDER_CONSENT_TITLE,
-  LegalDocumentKind,
-  LegalSection,
-  PRIVACY_POLICY_SECTIONS,
-  PRIVACY_POLICY_TITLE,
-  USER_AGREEMENT_SECTIONS,
-  USER_AGREEMENT_TITLE
-} from '../privacy/LegalDocumentContent';
+
 import { PortraTheme } from '../theme/PortraTheme';
 
 @Component
@@ -92,22 +85,11 @@ export struct ProfilePage {
   @State private favoriteTotal: number = 0;
   @State private loadingMoreMoments: boolean = false;
   @State private loadingMoreFavorites: boolean = false;
-  @State private activeLegalDocument: LegalDocumentKind = LegalDocumentKind.NONE;
-  @State private withdrawalConfirmVisible: boolean = false;
-  @State private withdrawingConsent: boolean = false;
-  @State private cancellationInfoVisible: boolean = false;
-  @State private privacyActionError: string = '';
-  @State private cancellationLoading: boolean = false;
-  @State private cancellationSubmitting: boolean = false;
-  @State private cancellationReason: string = '';
-  @State private cancellationStatus: string = 'NOT_REQUESTED';
-  @State private cancellationRequestedAt: string = '';
-  @State private cancellationResolutionNote: string = '';
   private readonly appClient: AppClient = AppClient.shared;
   private loadVersion: number = 0;
-  private cancellationRequestVersion: number = 0;
   private roleSwitchVersion: number = 0;
   onBack?: () => void;
+  onBrowseHall?: () => void;
   onSignedOut?: () => void;
   onIdentityChanged?: () => void;
   onRequireLogin?: () => void;
@@ -143,14 +125,12 @@ export struct ProfilePage {
     ProvinceLocation.unobserve(this.locationChanged);
     this.loadVersion++;
     this.socialGeneration++;
-    this.cancellationRequestVersion++;
     this.roleSwitchVersion++;
     this.interestGeneration++;
     this.likedGeneration++;
     ContentChanges.unobserve(this.changed);
     this.appClient.apiService.cancelCurrentSession();
     this.appClient.apiService.cancelUserSystemRequests(this.userId);
-    this.appClient.apiService.cancelAccountCancellationRequests();
   }
 
   private async load(resetNavigation: boolean = true): Promise<void> {
@@ -554,10 +534,10 @@ export struct ProfilePage {
     if (section === 'credit') { this.onOpenCredit?.(); return; }
     if (section === 'orders') { this.onOpenOrders?.(); return; }
     if (section === 'messages') { this.onOpenMessages?.(); return; }
-    if (section === 'intent' && this.role !== 'CUSTOMER') { return; }
+    if (section === 'intent' && this.role !== 'CUSTOMER' && this.role !== 'PROVIDER') { return; }
     this.section = section;
     this.detailScroller.scrollTo({ xOffset: 0, yOffset: 0 });
-    if (section === 'intent') { this.loadInterests(); }
+    if (section === 'intent' && this.role === 'CUSTOMER') { this.loadInterests(); }
     if (section === 'likes') { this.loadLikes(); }
   }
 
@@ -641,126 +621,6 @@ export struct ProfilePage {
       return '约拍用户';
     }
     return '用户';
-  }
-
-  private legalDocumentTitle(): string {
-    if (this.activeLegalDocument === LegalDocumentKind.USER_AGREEMENT) {
-      return USER_AGREEMENT_TITLE;
-    }
-    if (this.activeLegalDocument === LegalDocumentKind.PRIVACY_POLICY) {
-      return PRIVACY_POLICY_TITLE;
-    }
-    return CROSS_BORDER_CONSENT_TITLE;
-  }
-
-  private legalDocumentSections(): LegalSection[] {
-    if (this.activeLegalDocument === LegalDocumentKind.USER_AGREEMENT) {
-      return USER_AGREEMENT_SECTIONS;
-    }
-    if (this.activeLegalDocument === LegalDocumentKind.PRIVACY_POLICY) {
-      return PRIVACY_POLICY_SECTIONS;
-    }
-    return CROSS_BORDER_CONSENT_SECTIONS;
-  }
-
-  private async withdrawPrivacyConsent(): Promise<void> {
-    if (this.withdrawingConsent) {
-      return;
-    }
-    this.withdrawingConsent = true;
-    this.privacyActionError = '';
-    const signedOut = await this.appClient.sessionManager.signOut();
-    if (!signedOut) {
-      this.privacyActionError = '本机登录信息清除失败，尚未撤回，请重试';
-      this.withdrawingConsent = false;
-      return;
-    }
-    try {
-      this.appClient.withdrawRequiredPrivacyConsent();
-      this.onPrivacyConsentWithdrawn?.();
-    } catch {
-      this.privacyActionError = '同意记录清除失败，请检查设备存储后重试';
-      this.withdrawingConsent = false;
-    }
-  }
-
-  private openCancellationInformation(): void {
-    this.cancellationInfoVisible = true;
-    this.privacyActionError = '';
-    this.loadCancellationStatus();
-  }
-
-  private closeCancellationInformation(): void {
-    this.cancellationRequestVersion++;
-    this.appClient.apiService.cancelAccountCancellationRequests();
-    this.cancellationInfoVisible = false;
-    this.privacyActionError = '';
-  }
-
-  private async loadCancellationStatus(): Promise<void> {
-    const version = ++this.cancellationRequestVersion;
-    this.cancellationLoading = true;
-    this.privacyActionError = '';
-    try {
-      const result = await this.appClient.apiService.getAccountCancellation();
-      if (version === this.cancellationRequestVersion) {
-        this.applyCancellationSummary(result);
-      }
-    } catch (error) {
-      if (version === this.cancellationRequestVersion) {
-        this.privacyActionError = (error as PortraError).message || '注销申请状态加载失败，请重试';
-      }
-    } finally {
-      if (version === this.cancellationRequestVersion) {
-        this.cancellationLoading = false;
-      }
-    }
-  }
-
-  private async submitCancellationRequest(): Promise<void> {
-    if (this.cancellationSubmitting ||
-      this.cancellationStatus !== 'NOT_REQUESTED' && this.cancellationStatus !== 'REJECTED') {
-      return;
-    }
-    const version = ++this.cancellationRequestVersion;
-    this.cancellationSubmitting = true;
-    this.privacyActionError = '';
-    try {
-      const result = await this.appClient.apiService.requestAccountCancellation(this.cancellationReason);
-      if (version === this.cancellationRequestVersion) {
-        this.applyCancellationSummary(result);
-      }
-    } catch (error) {
-      if (version === this.cancellationRequestVersion) {
-        this.privacyActionError = (error as PortraError).message || '注销申请提交失败，请重试';
-      }
-    } finally {
-      if (version === this.cancellationRequestVersion) {
-        this.cancellationSubmitting = false;
-      }
-    }
-  }
-
-  private applyCancellationSummary(summary: AccountCancellationSummary): void {
-    const validStatus = summary !== null &&
-      ['NOT_REQUESTED', 'PENDING', 'PROCESSING', 'COMPLETED', 'REJECTED'].includes(summary.status);
-    const validRequestId = summary.requestId === null || summary.requestId === undefined ||
-      Number.isSafeInteger(summary.requestId) && (summary.requestId ?? 0) > 0;
-    if (!validStatus || !validRequestId) {
-      throw new Error('账号注销申请状态异常');
-    }
-    this.cancellationStatus = summary.status;
-    this.cancellationReason = summary.reason?.trim() ?? '';
-    this.cancellationRequestedAt = summary.requestedAt?.trim() ?? '';
-    this.cancellationResolutionNote = summary.resolutionNote?.trim() ?? '';
-  }
-
-  private cancellationStatusLabel(): string {
-    if (this.cancellationStatus === 'PENDING') { return '申请已提交，等待核验'; }
-    if (this.cancellationStatus === 'PROCESSING') { return '申请正在处理中'; }
-    if (this.cancellationStatus === 'COMPLETED') { return '账号注销已完成'; }
-    if (this.cancellationStatus === 'REJECTED') { return '申请暂未通过'; }
-    return '尚未提交注销申请';
   }
 
   private async signOut(): Promise<void> {
@@ -1126,7 +986,6 @@ export struct ProfilePage {
             .backgroundColor('#FFFDF9')
             .shadow({ radius: 28, color: '#10512D2A', offsetY: 9 })
           // Two compact shortcuts sit directly below the role-specific workspace.
-          // Intent is customer-only because the backend enforces CUSTOMER for this endpoint.
           Row({ space: 10 }) {
             Row({ space: 7 }) {
               Column({ space: 3 }) {
@@ -1138,11 +997,11 @@ export struct ProfilePage {
             }.layoutWeight(1).height(58).padding({ left: 11, right: 9 })
               .backgroundColor('#FFFDF9').border({ width: 1, color: '#E5DED7' })
               .borderRadius(14).onClick(() => this.openSection('collections'))
-            if (this.role === 'CUSTOMER') {
+            if (this.role === 'CUSTOMER' || this.role === 'PROVIDER') {
               Row({ space: 7 }) {
                 Column({ space: 3 }) {
                   Text('我的意向').fontSize(12).fontWeight(FontWeight.Medium).fontColor('#3D3D41')
-                  Text('感兴趣的橱窗').fontSize(9.5).fontColor('#9A938D')
+                  Text(this.role === 'PROVIDER' ? '感兴趣的需求' : '感兴趣的橱窗').fontSize(9.5).fontColor('#9A938D')
                     .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
                 }.layoutWeight(1).alignItems(HorizontalAlign.Start)
                 Text('›').fontSize(18).fontColor('#AAA39D')
@@ -1185,151 +1044,6 @@ export struct ProfilePage {
   }
 
   @Builder
-  private PrivacyPageHeader(title: string, onBack: () => void) {
-    Row({ space: 10 }) {
-      Button('‹').width(38).height(38).padding(0).fontSize(29)
-        .fontColor('#625D58').backgroundColor(Color.Transparent)
-        .accessibilityText('返回').onClick(() => onBack())
-      Text(title).fontSize(22).fontWeight(FontWeight.Bold)
-        .fontColor(PortraTheme.primaryText).layoutWeight(1)
-    }.width('100%').height(58).padding({ left: 16, right: 16 })
-      .backgroundColor(PortraTheme.pageBackground)
-  }
-
-  @Builder
-  private PrivacyCenter() {
-    Column({ space: 13 }) {
-      Column() {
-        this.MenuRow('Portra 用户协议', '查看当前版本与服务规则',
-          () => this.activeLegalDocument = LegalDocumentKind.USER_AGREEMENT)
-        Divider().color(PortraTheme.border).padding({ left: 18, right: 18 })
-        this.MenuRow('Portra 隐私政策', '了解个人信息的收集、使用与保存',
-          () => this.activeLegalDocument = LegalDocumentKind.PRIVACY_POLICY)
-        Divider().color(PortraTheme.border).padding({ left: 18, right: 18 })
-        this.MenuRow('个人信息出境单独同意书', '查看中国香港服务器相关说明',
-          () => this.activeLegalDocument = LegalDocumentKind.CROSS_BORDER_CONSENT)
-      }.width('100%').borderRadius(14).clip(true)
-        .border({ width: 1, color: PortraTheme.border })
-
-      Column() {
-        this.MenuRow('撤回隐私及出境同意', '退出登录并返回首次同意页面', () => {
-          this.privacyActionError = '';
-          this.withdrawalConfirmVisible = true;
-        })
-        Divider().color(PortraTheme.border).padding({ left: 18, right: 18 })
-        this.MenuRow('申请注销账号', '在线提交申请并查询处理状态',
-          () => this.openCancellationInformation())
-      }.width('100%').borderRadius(14).clip(true)
-        .border({ width: 1, color: PortraTheme.border })
-
-      Text('运营主体联系人：王雯 · 3336578810@qq.com')
-        .width('100%').fontSize(12).fontColor(PortraTheme.secondaryText)
-      if (this.privacyActionError.length > 0) {
-        Text(this.privacyActionError).width('100%').fontSize(12).fontColor(PortraTheme.danger)
-      }
-    }.width('100%').alignItems(HorizontalAlign.Start)
-  }
-
-  @Builder
-  private LegalDocumentView() {
-    Column() {
-      this.PrivacyPageHeader(this.legalDocumentTitle(), () => this.activeLegalDocument = LegalDocumentKind.NONE)
-      Scroll() {
-        Column({ space: 22 }) {
-          ForEach(this.legalDocumentSections(), (section: LegalSection) => {
-            Column({ space: 8 }) {
-              Text(section.title).width('100%').fontSize(17)
-                .fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
-              Text(section.body).width('100%').fontSize(13).lineHeight(22)
-                .fontColor(PortraTheme.secondaryText)
-            }.width('100%').alignItems(HorizontalAlign.Start)
-          }, (section: LegalSection) => section.title)
-          Button('阅读完成，返回').width('100%').height(46)
-            .fontColor(Color.White).backgroundColor(PortraTheme.primary).borderRadius(12)
-            .margin({ top: 8, bottom: 30 })
-            .onClick(() => this.activeLegalDocument = LegalDocumentKind.NONE)
-        }.width('100%').padding({ left: 18, right: 18, top: 18 })
-          .alignItems(HorizontalAlign.Start)
-      }.layoutWeight(1).scrollBar(BarState.Off)
-    }.width('100%').height('100%').backgroundColor(PortraTheme.pageBackground)
-  }
-
-  @Builder
-  private WithdrawalConfirmation() {
-    Column() {
-      this.PrivacyPageHeader('撤回同意', () => {
-        if (!this.withdrawingConsent) {
-          this.withdrawalConfirmVisible = false;
-          this.privacyActionError = '';
-        }
-      })
-      Column({ space: 16 }) {
-        Text('撤回后将退出当前账号，并返回首次启动的协议确认页面。在重新同意前，应用不会初始化设备标识或恢复登录会话。')
-          .width('100%').fontSize(14).lineHeight(23).fontColor(PortraTheme.primaryText)
-        if (this.privacyActionError.length > 0) {
-          Text(this.privacyActionError).width('100%').fontSize(12).fontColor(PortraTheme.danger)
-        }
-        Button(this.withdrawingConsent ? '正在撤回…' : '确认撤回并退出登录')
-          .width('100%').height(48).fontColor(Color.White).backgroundColor(PortraTheme.danger)
-          .borderRadius(12).enabled(!this.withdrawingConsent)
-          .onClick(() => this.withdrawPrivacyConsent())
-        Button('暂不撤回').width('100%').height(44).fontColor(PortraTheme.primaryText)
-          .backgroundColor(Color.Transparent).enabled(!this.withdrawingConsent)
-          .onClick(() => { this.withdrawalConfirmVisible = false; this.privacyActionError = ''; })
-      }.width('100%').padding(20).alignItems(HorizontalAlign.Start)
-    }.width('100%').height('100%').backgroundColor(PortraTheme.pageBackground)
-  }
-
-  @Builder
-  private CancellationInformation() {
-    Column() {
-      this.PrivacyPageHeader('申请注销账号', () => this.closeCancellationInformation())
-      Scroll() {
-        Column({ space: 16 }) {
-          Text(this.cancellationStatusLabel()).width('100%').fontSize(21)
-            .fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
-          if (this.cancellationLoading) {
-            PortraLoading({ label: '正在查询注销申请' })
-          } else {
-            Text(this.cancellationRequestedAt.length > 0 ?
-              `提交时间：${this.cancellationRequestedAt}` : '当前没有待处理的注销申请')
-              .width('100%').fontSize(13).fontColor(PortraTheme.secondaryText)
-            if (this.cancellationResolutionNote.length > 0) {
-              Text(`处理说明：${this.cancellationResolutionNote}`)
-                .width('100%').fontSize(13).fontColor(PortraTheme.secondaryText)
-            }
-          }
-          if (!this.cancellationLoading &&
-            (this.cancellationStatus === 'NOT_REQUESTED' || this.cancellationStatus === 'REJECTED')) {
-            Text('注销原因（选填）').width('100%').fontSize(14)
-              .fontWeight(FontWeight.Medium).fontColor(PortraTheme.primaryText)
-            TextArea({ text: this.cancellationReason, placeholder: '可简要说明原因，不超过 500 字' })
-              .width('100%').height(110).maxLength(500).enabled(!this.cancellationSubmitting)
-              .backgroundColor(PortraTheme.surface).border({ width: 1, color: PortraTheme.border })
-              .borderRadius(12).padding(12)
-              .onChange((value: string) => { this.cancellationReason = value; this.privacyActionError = ''; })
-            Button(this.cancellationSubmitting ? '正在提交…' :
-              this.cancellationStatus === 'REJECTED' ? '重新提交注销申请' : '提交注销申请')
-              .width('100%').height(48).fontColor(Color.White).backgroundColor(PortraTheme.danger)
-              .borderRadius(12).enabled(!this.cancellationSubmitting)
-              .onClick(() => this.submitCancellationRequest())
-          }
-          if (this.privacyActionError.length > 0) {
-            Text(this.privacyActionError).width('100%').fontSize(12).fontColor(PortraTheme.danger)
-          }
-          Button('刷新处理状态').width('100%').height(44)
-            .fontColor(PortraTheme.primary).backgroundColor(PortraTheme.primarySoft)
-            .enabled(!this.cancellationLoading && !this.cancellationSubmitting)
-            .onClick(() => this.loadCancellationStatus())
-          Text('核验通过且不存在依法需要先处理的事项后，我们原则上在 15 个工作日内完成账号注销及相应个人信息删除或匿名化。未完成订单、未解决争议以及依法需要保存的交易和安全记录，将在必要期限内限制处理并继续保存。')
-            .width('100%').fontSize(12).lineHeight(20).fontColor(PortraTheme.secondaryText)
-        }.width('100%').padding({ left: 18, right: 18, top: 18, bottom: 30 })
-          .alignItems(HorizontalAlign.Start)
-      }.layoutWeight(1).scrollBar(BarState.Off)
-    }.width('100%').height('100%').backgroundColor(PortraTheme.pageBackground)
-  }
-
-  @Builder
   private Details() {
     Column({ space: 0 }) {
       this.SubviewHeader()
@@ -1339,13 +1053,14 @@ export struct ProfilePage {
             ProfileWorkspace({ profile: this.profile, editOnly: true,
               onSaved: () => { this.section = 'home'; this.load(); } })
             this.QuickLink('切换身份', this.role === 'PROVIDER' ? '当前摄影师身份' : '当前约拍用户身份', 'identity')
-            this.QuickLink('隐私与协议', '协议查看、同意撤回与账号注销', 'privacy')
+            this.QuickLink('隐私与授权管理', '查看协议与中国香港数据出境授权', 'privacy')
+            this.QuickLink('个人信息权利申请', '查询、复制、更正或删除个人信息', 'rights')
+            this.QuickLink('注销账号', '核验绑定手机号后注销账号', 'closure')
             Button(this.signingOut ? '退出中…' : '退出登录')
               .width('100%').height(46).fontColor(PortraTheme.danger)
               .backgroundColor(PortraTheme.surface).borderRadius(12)
               .enabled(!this.signingOut).onClick(() => this.signOut())
-          } else if (this.section === 'privacy') {
-            this.PrivacyCenter()
+
           } else if (this.section === 'identity') {
             Text(`当前身份：${this.roleLabel()}`).fontSize(15).fontColor(PortraTheme.primaryText)
             Button(this.switchingRole ? '切换中…' : this.role === 'PROVIDER' ? '切换为约拍用户' : '切换为摄影师')
@@ -1380,7 +1095,10 @@ export struct ProfilePage {
               onOpenDemand: this.onOpenDemand, onOpenService: this.onOpenService,
               onEditDemand: this.onEditDemand, onEditService: this.onEditService,
               onSaved: () => this.load() })
-          } else if (this.section === 'intent') {
+          } else if (this.section === 'intent' && this.role === 'PROVIDER') {
+            DemandInterestList({ identityKey: `${this.userId}:${this.role}:${this.sessionEpoch}`,
+              onOpenDemand: this.onOpenDemand, onBrowse: this.onBrowseHall })
+          } else if (this.section === 'intent' && this.role === 'CUSTOMER') {
             Text('加入意向不会自动形成订单').fontSize(12).fontColor(PortraTheme.secondaryText)
             if (this.interestLoading) {
               Text('正在读取我的意向…').fontSize(13)
@@ -1433,12 +1151,10 @@ export struct ProfilePage {
   }
 
   build() {
-    if (this.activeLegalDocument !== LegalDocumentKind.NONE) {
-      this.LegalDocumentView()
-    } else if (this.withdrawalConfirmVisible) {
-      this.WithdrawalConfirmation()
-    } else if (this.cancellationInfoVisible) {
-      this.CancellationInformation()
+    if (this.section === 'privacy' || this.section === 'rights' || this.section === 'closure') {
+      PrivacySettingsPage({ initialView: this.section, onBack: () => this.section = 'settings',
+        onWithdrawn: this.onPrivacyConsentWithdrawn,
+        onClosed: () => { this.section = 'home'; this.onSignedOut?.(); this.load(); } })
     } else {
       Column() {
       if (this.loading) {

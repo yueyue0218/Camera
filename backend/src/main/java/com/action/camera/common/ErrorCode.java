@@ -25,6 +25,7 @@ public enum ErrorCode {
 
     // --- 403 权限 ---
     FORBIDDEN(40301, "无权限执行该操作"),
+    PRIVACY_CONSENT_REQUIRED(40302, "请先完成个人信息出境授权；隐私说明与权利申请仍可访问"),
 
     // --- 404 ---
     NOT_FOUND(40401, "资源不存在"),

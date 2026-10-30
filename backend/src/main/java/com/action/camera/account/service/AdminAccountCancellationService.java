@@ -97,6 +97,7 @@ public class AdminAccountCancellationService {
         if ("DELETED".equals(user.getStatus())) {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT, "账号已经注销");
         }
+        cleanupRepository.lockParticipantQuotes(userId);
         long blockingOrders = cleanupRepository.countBlockingOrders(userId);
         long openDisputes = cleanupRepository.countOpenDisputes(userId);
         if (blockingOrders > 0 || openDisputes > 0) {
@@ -109,7 +110,7 @@ public class AdminAccountCancellationService {
         userRepository.save(user);
     }
 
-    private void anonymize(User user) {
+    static void anonymize(User user) {
         user.setStudentNo(null);
         user.setPasswordHash(null);
         user.setMobileCipher(null);

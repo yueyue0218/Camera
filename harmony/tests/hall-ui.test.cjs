@@ -89,7 +89,9 @@ test('runtime hall state is data-driven instead of copying prototype examples', 
     '../entry/src/main/ets/features/hall/components/HallControls.ets'), 'utf8');
   const cards = fs.readFileSync(path.resolve(__dirname,
     '../entry/src/main/ets/features/hall/components/HallCards.ets'), 'utf8');
-  assert.match(appBar, /showNoticeDot: boolean = false/);
+  assert.match(appBar, /unreadCount: number = 0/);
+  assert.match(appBar, /this\.unreadCount > 0/);
+  assert.match(appBar, /通知，无未读/);
   assert.doesNotMatch(controls, /label: '南京'.*active: true/);
   assert.match(cards, /isFavorited === true/);
   assert.match(cards, /favoritedByCurrentUser === true/);

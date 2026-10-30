@@ -35,6 +35,7 @@ function load(relative, page = false) {
     if (name.endsWith('/HallFilterState')) return load('features/hall/HallFilterState.ets');
     if (name.endsWith('/HallUiModels')) return load('features/hall/HallUiModels.ets');
     if (name.endsWith('/HallDataPolicy')) return load('features/hall/HallDataPolicy.ets');
+    if (name.endsWith('/HallUnreadCounter')) return load('features/notifications/HallUnreadCounter.ets');
     return {};
   };
   m._compile(ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021}}).outputText, filename);

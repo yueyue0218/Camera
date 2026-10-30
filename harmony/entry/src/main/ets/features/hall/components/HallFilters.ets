@@ -1,5 +1,5 @@
 import { promptAction } from '@kit.ArkUI';
-import { ProvinceLocation } from '../../../common/location/ProvinceLocation';
+import { LocationFailure, ProvinceLocation } from '../../../common/location/ProvinceLocation';
 import { common } from '@kit.AbilityKit';
 import { HallChannel } from '../HallUiModels';
 import { HallFilterState } from '../HallFilterState';
@@ -20,7 +20,7 @@ export struct HallFilters {
   @State private locating: boolean = false;
   private locationGeneration: number = 0;
   aboutToDisappear(): void { this.locationGeneration++; }
-  private async locate(): Promise<void> {
+  private async locate(usePermissionSettings: boolean = false): Promise<void> {
     if (this.locating) { return; }
     const generation = ++this.locationGeneration;
     const channel = this.channel;
@@ -28,13 +28,28 @@ export struct HallFilters {
     this.locating = true;
     try {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      if (usePermissionSettings) { await ProvinceLocation.authorizeOnSettings(context); }
       const region = await ProvinceLocation.locate(context);
       if (generation !== this.locationGeneration || channel !== this.channel || filters !== this.filters) { return; }
       const next = this.filters.copy(); next.city = region.province;
       this.onChange?.(next); this.close();
     } catch (error) {
-      if (generation === this.locationGeneration) { promptAction.showToast({ message: (error as Error).message || '定位失败，可手动选择' }); }
+      if (generation === this.locationGeneration) { this.showLocationFailure(error); }
     } finally { this.locating = false; }
+  }
+  private showLocationFailure(error: Object): void {
+    const failure = error as LocationFailure;
+    if (failure instanceof LocationFailure && failure.permissionSettingsRequired) {
+      AlertDialog.show({ title: '允许大致位置权限',
+        message: '系统不再弹出首次授权窗口。你可以在接下来的系统权限设置中允许大致位置；拒绝后仍可手动选择地区。',
+        primaryButton: { value: '手动选择', action: () => {} },
+        secondaryButton: { value: '权限设置', action: () => this.locate(true) } });
+    } else if (failure instanceof LocationFailure && failure.phase === 'switch') {
+      AlertDialog.show({ title: '开启系统位置服务',
+        message: '应用的位置权限与手机的位置服务总开关相互独立。请在手机系统设置中找到“位置”或“定位服务”并自行开启，返回后再次点击定位；也可继续手动选择。',
+        primaryButton: { value: '继续手动选择', action: () => {} },
+        secondaryButton: { value: '知道了', action: () => {} } });
+    } else { promptAction.showToast({ message: failure.message || '定位失败，可手动选择' }); }
   }
   private confirmLocation(): void {
     if (this.locating) { return; }

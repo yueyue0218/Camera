@@ -148,11 +148,12 @@ export struct LoginPage {
         this.errorMessage = '登录信息保存失败，请重试';
         return;
       }
+      await this.appClient.synchronizePrivacyConsent();
+      if (version !== this.requestVersion || signedInVersion !== this.appClient.sessionManager.getSessionVersion()) { return; }
       this.code = '';
       this.onSuccess?.();
     } catch (error) {
-      if (version === this.requestVersion &&
-        sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
+      if (version === this.requestVersion) {
         const mapped = error as PortraError;
         this.errorMessage = mapped.businessCode === 40002 ? '验证码错误或已过期，请重新获取' :
           (mapped.message || '登录失败，请稍后重试');

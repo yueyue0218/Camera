@@ -5,6 +5,7 @@ import { EnvironmentConfig } from '../common/config/EnvironmentConfig';
 import { ApiEnvelope } from '../model/ApiModels';
 import { AuthInterceptor } from './AuthInterceptor';
 import { ErrorMapper, PortraError } from './ErrorMapper';
+import { PrivacyRequestGuard } from '../privacy/PrivacyRequestGuard';
 
 export interface UploadedImage { fileId: number; originalName: string; }
 
@@ -21,6 +22,7 @@ export class HttpClient implements AuthTokenController {
   private sessionEpoch: number = 0;
   private tokenRevision: number = 0;
   private readonly identityListeners: Set<() => void> = new Set<() => void>();
+  private readonly privacyGuard?: PrivacyRequestGuard;
 
   observeIdentity(listener: () => void): void { this.identityListeners.add(listener); }
   unobserveIdentity(listener: () => void): void { this.identityListeners.delete(listener); }
@@ -35,17 +37,21 @@ export class HttpClient implements AuthTokenController {
   private readonly recoveries: Map<number, Promise<boolean>> = new Map<number, Promise<boolean>>();
 
   constructor(authInterceptor: AuthInterceptor = new AuthInterceptor(),
-    authenticationExpiredHandler?: AuthenticationExpiredHandler) {
+    authenticationExpiredHandler?: AuthenticationExpiredHandler,
+    privacyGuard?: PrivacyRequestGuard) {
+    this.privacyGuard = privacyGuard;
     this.authInterceptor = authInterceptor;
     this.authenticationExpiredHandler = authenticationExpiredHandler;
   }
 
   setAccessToken(token: string): void {
+    if (this.authInterceptor.authorizationHeader() !== `Bearer ${token}`) { this.privacyGuard?.identityChanged(); }
     this.invalidateSessionRequests();
     this.replaceAccessToken(token);
   }
 
   clearAccessToken(): void {
+    this.privacyGuard?.identityChanged();
     this.invalidateSessionRequests();
     this.tokenRevision++;
     this.authInterceptor.clearAccessToken();
@@ -134,6 +140,7 @@ export class HttpClient implements AuthTokenController {
 
   private async request<T>(method: http.RequestMethod, path: string, requestKey: string,
     authenticated: boolean, body?: Object, binary: boolean = false, parts?: http.MultiFormData[]): Promise<T> {
+    this.privacyGuard?.assertRequest(path, this.authInterceptor.authorizationHeader().length > 0);
     const profile = EnvironmentConfig.current();
     if (!EnvironmentConfig.isUsable(profile)) {
       throw ErrorMapper.config('暂时无法连接服务。');
@@ -157,6 +164,7 @@ export class HttpClient implements AuthTokenController {
     try {
       for (let attempt = 0; attempt < 2; attempt++) {
         this.assertCurrent(requestKey, requestVersion, epoch, scoped);
+        this.privacyGuard?.assertRequest(path, this.authInterceptor.authorizationHeader().length > 0);
         const revision = this.tokenRevision;
         const authorization = authenticated ? this.authInterceptor.authorizationHeader() : '';
         try {
@@ -167,6 +175,11 @@ export class HttpClient implements AuthTokenController {
         } catch (error) {
           this.assertCurrent(requestKey, requestVersion, epoch, scoped);
           const mapped = error as PortraError;
+          if (mapped.businessCode === 40302) {
+            this.privacyGuard?.violate();
+            this.cancelAllRequests();
+            throw mapped;
+          }
           if (attempt > 0 || !authenticated || logout || authorization.length === 0 ||
             !ErrorMapper.isAuthenticationExpired(mapped)) {
             throw this.normalizeThrownError(error);
@@ -229,6 +242,10 @@ export class HttpClient implements AuthTokenController {
     };
     if (authorization.length > 0) {
       headers['Authorization'] = authorization;
+    }
+    const consentHeaders = this.privacyGuard?.headers();
+    if (consentHeaders !== undefined) {
+      Object.keys(consentHeaders).forEach((key: string) => { headers[key] = consentHeaders[key]; });
     }
     const options: http.HttpRequestOptions = {
       method: method,

@@ -52,6 +52,7 @@ const {JournalText} = load('features/publish/JournalText.ets');
 const {PublishPage} = load('pages/PublishPage.ets',true);
 const {ServiceDetailPage} = load('pages/ServiceDetailPage.ets',true);
 const {DemandDetailPage} = load('pages/DemandDetailPage.ets',true);
+const {DemandInterestList} = load('features/user/DemandInterestList.ets',true);
 const {PublishDraftStore} = load('features/publish/PublishDraftStore.ets');
 const {ApiService} = load('network/ApiService.ets');
 function deferred() {let resolve,reject; const promise=new Promise((a,b)=>{resolve=a;reject=b;}); return {promise,resolve,reject};}
@@ -183,7 +184,8 @@ test('four-page UI includes native cover, dynamic titles, 28vp SVG intention sta
   for(const s of [service,demand]) assert.match(s,/journal: true, moduleHeight: 304/);
   const ui=read('features/publish/JournalUI.ets');assert.match(read('../resources/base/media/intention_star_selected.svg'), /#F5C522/i);assert.match(ui,/width\(28\)\.height\(28\)/);assert.match(ui,/width\(48\)\.height\(48\)/);
   assert.ok(ui.indexOf('onStar?.()')<ui.indexOf('onChat?.()'));
-  assert.match(demand,/此需求暂不支持加入意向/);
+  assert.match(demand,/onStar: \(\) => this\.toggleInterest\(\)/);
+  assert.match(demand,/selected: this\.interested/);
   for(const label of ['橱窗介绍','拍摄想法','拍摄服务','时间与地点','预约与交付','预算预期','作品影集','灵感参考','预览橱窗','预览需求'])assert.ok(publish.includes(label),label);
   assert.doesNotMatch(service+demand+publish,/WebView|localStorage|unsplash/);
   const shell=read('features/shell/PortraAppShell.ets');assert.match(shell,/onPublish:.*AppRoute.PUBLISH/);assert.match(shell,/onOpenPublish:.*AppRoute.PUBLISH/);
@@ -301,4 +303,60 @@ test('intention and chat have independent duplicate guards and pending UI state'
   interest.resolve({serviceId:3});await a;
   assert.equal(p.interested,true);assert.equal(p.interestBusy,false);assert.equal(p.chatBusy,true);
   chat.resolve({serviceId:3,conversationId:33});await b;assert.equal(p.chatBusy,false);
+});
+
+test('demand intention waits for persisted server acknowledgement, prevents duplicate click and can be removed',async()=>{
+ const p=new DemandDetailPage();Object.assign(p,{demandId:12,userId:7,role:'PROVIDER',interestReady:true,
+  demand:{customerId:8,status:'OPEN'}});
+ let adds=0,removes=0;const write=deferred();const previousEvents=events;
+ app.apiService.addDemandInterest=()=>{adds++;return write.promise};
+ app.apiService.removeDemandInterest=async id=>{assert.equal(id,12);removes++};
+ const pending=p.toggleInterest();await p.toggleInterest();
+ assert.equal(adds,1);assert.equal(p.interested,false);assert.equal(p.interestBusy,true);assert.equal(events,previousEvents);
+ write.resolve({interestId:123,demandId:12,targetType:'DEMAND',interested:true});await pending;
+ assert.equal(p.interested,true);assert.equal(events,previousEvents+1);
+ p.demand.status='CLOSED';await p.toggleInterest();assert.equal(removes,1);assert.equal(p.interested,false);
+});
+test('demand intention failure, malformed confirmation and stale identity never show success',async()=>{
+ for(const mode of ['failure','malformed','logout']){
+  const p=new DemandDetailPage();Object.assign(p,{demandId:12,userId:7,role:'PROVIDER',interestReady:true,
+   demand:{customerId:8,status:'OPEN'}});const write=deferred();const previousEvents=events;
+  app.apiService.addDemandInterest=()=>write.promise;const pending=p.toggleInterest();
+  if(mode==='failure')write.reject(new Error('offline'));
+  else {if(mode==='logout')epoch++;write.resolve({interestId:123,demandId:mode==='malformed'?99:12,targetType:'DEMAND',interested:true})}
+  await pending;assert.equal(p.interested,false);assert.equal(events,previousEvents);
+  if(mode!=='logout')assert.ok(p.actionError);
+ }
+});
+test('demand intention respects role, target owner, remote-state readiness and closed target',async()=>{
+ let writes=0;app.apiService.addDemandInterest=async()=>writes++;
+ for(const props of [{role:'CUSTOMER'},{userId:8},{interestReady:false},{demand:{customerId:8,status:'CLOSED'}}]){
+  const p=new DemandDetailPage();Object.assign(p,{demandId:12,userId:7,role:'PROVIDER',interestReady:true,
+   demand:{customerId:8,status:'OPEN'}},props);await p.toggleInterest();assert.ok(p.actionError);
+ }
+ assert.equal(writes,0);
+});
+test('demand interest adapter preserves authenticated real routes and target payloads',async()=>{
+ const calls=[];const api=new ApiService({get:async p=>{calls.push(['GET',p]);return{}},
+  post:async(p,b)=>{calls.push(['POST',p,b]);return{}},delete:async p=>{calls.push(['DELETE',p])}});
+ await api.getDemandInterest(12);await api.addDemandInterest(12);await api.removeDemandInterest(12);await api.listDemandInterests(2,10);
+ assert.deepEqual(calls,[['GET','/demands/12/interest'],['POST','/demands/12/interest',undefined],
+  ['DELETE','/demands/12/interest'],['GET','/me/demand-interests?page=2&size=10']]);
+});
+test('demand interest pagination uses server total, retains rows on append failure and drops stale account responses',async()=>{
+ const p=new DemandInterestList();const row={interestId:5,demandId:12,targetType:'DEMAND',interested:true,status:'CLOSED',demand:{demandId:12}};
+ app.apiService.listDemandInterests=async page=>({page,size:10,total:11,records:[row]});
+ await p.load();assert.equal(p.records.length,1);assert.equal(p.total,11);assert.equal(p.page,1);
+ app.apiService.listDemandInterests=async()=>{throw new Error('offline')};await p.load(true);
+ assert.equal(p.records.length,1);assert.equal(p.page,1);assert.equal(p.error,'offline');
+ const pending=deferred();app.apiService.listDemandInterests=()=>pending.promise;
+ const read=p.load();epoch++;pending.resolve({page:1,size:10,total:11,records:[row]});await read;
+ assert.equal(p.records.length,0);
+});
+test('demand interest list rejects showcase targets and malformed private target snapshots',async()=>{
+ for(const row of [{targetType:'SERVICE_PACKAGE',interested:true,demandId:12},
+  {targetType:'DEMAND',interested:true,demandId:12,demand:{demandId:99}}]){
+  const p=new DemandInterestList();app.apiService.listDemandInterests=async()=>({page:1,size:10,total:1,records:[row]});
+  await p.load();assert.equal(p.records.length,0);assert.ok(p.error);
+ }
 });

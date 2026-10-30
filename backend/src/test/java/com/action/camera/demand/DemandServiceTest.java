@@ -91,6 +91,18 @@ class DemandServiceTest {
     }
 
     @Test
+    void deletedDemandDetailsAreNotExposedToVisitorsOrProviders() {
+        var published = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        demandService.deleteDemand(published.getDemandId(), customer);
+        assertThatThrownBy(() -> demandService.getDemand(published.getDemandId(), null))
+                .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> demandService.getDemand(published.getDemandId(), provider))
+                .isInstanceOf(BusinessException.class);
+        assertThat(demandService.getDemand(published.getDemandId(), customer).getDemandId())
+                .isEqualTo(published.getDemandId());
+    }
+
+    @Test
     void ownerPublicationsAreBoundToAuthenticatedIdentity() {
         DemandDto own = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
         demandService.createDemand(otherCustomer, demandRequest("PORTRAIT", "NJU"));

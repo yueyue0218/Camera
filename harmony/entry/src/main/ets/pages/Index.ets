@@ -27,6 +27,7 @@ import { ProfilePage } from './ProfilePage';
 import { PublishPage } from './PublishPage';
 import { PortraTheme } from '../theme/PortraTheme';
 import { PrivacyConsentPage } from '../privacy/PrivacyConsentPage';
+import { PrivacySettingsPage } from '../privacy/PrivacySettingsPage';
 
 const EMPTY_ROUTE_PARAM: NavigationRouteParam = {};
 
@@ -45,6 +46,11 @@ struct Index {
   private restorePromise?: Promise<void>;
   @State private consentGateState: ConsentGateState = ConsentGateState.CHECKING;
   @State private consentError: string = '';
+  @State private privacyRightsVisible: boolean = false;
+  private readonly privacyRestricted: () => void = () => {
+    this.onPrivacyConsentWithdrawn();
+    this.consentError = '服务端授权状态已变化，业务请求已暂停，请重新确认或进入个人信息权利申请。';
+  };
   @State private mainTab: number = 0;
   @State private sessionEpoch: number = 0;
   @State private orderReloadEpoch: number = 0;
@@ -55,6 +61,7 @@ struct Index {
   private aftercareBackHandler?: () => boolean;
 
   aboutToAppear(): void {
+    this.appClient.observePrivacyRestriction(this.privacyRestricted);
     if (this.appClient.hasRequiredPrivacyConsent()) {
       this.consentGateState = ConsentGateState.ACCEPTED;
       this.beginPostConsentBootstrap();
@@ -62,6 +69,8 @@ struct Index {
       this.consentGateState = ConsentGateState.REQUIRED;
     }
   }
+
+  aboutToDisappear(): void { this.appClient.unobservePrivacyRestriction(this.privacyRestricted); }
 
   private acceptPrivacyConsent(): void {
     this.consentError = '';
@@ -76,6 +85,9 @@ struct Index {
 
   private declinePrivacyConsent(): void {
     this.consentError = '';
+    try { this.appClient.recordPrivacyRefusal(); } catch {
+      this.consentError = '拒绝状态保存失败；未开启业务请求';
+    }
     this.appClient.terminateApplication().catch(() => {
       this.consentError = '暂时无法退出应用，请使用系统返回桌面';
     });
@@ -91,10 +103,13 @@ struct Index {
   }
 
   private beginPostConsentBootstrap(): void {
+    this.consentGateState = ConsentGateState.CHECKING;
     const bootstrap = this.appClient.bootstrapAfterPrivacyConsent().then(() => {
+      this.consentGateState = ConsentGateState.ACCEPTED;
       this.sessionEpoch++;
-    }).catch(() => {
-      this.consentError = '设备信息初始化失败，登录功能暂时不可用';
+    }).catch((error: Error) => {
+      this.consentGateState = ConsentGateState.REQUIRED;
+      this.consentError = error.message || '授权状态核验失败，请重试；业务请求尚未开启';
     });
     this.restorePromise = bootstrap;
   }
@@ -166,6 +181,8 @@ struct Index {
         this.PublicProfileDestination(param);
       } else if (name === AppRoute.PROFILE) {
         ProfilePage({
+          onBrowseHall: () => this.openPage(AppRoute.HALL),
+          onPrivacyConsentWithdrawn: () => this.onPrivacyConsentWithdrawn(),
           onBack: () => this.appPathStack.pop(),
           onSignedOut: () => this.appPathStack.pop(),
           onRequireLogin: () => {
@@ -550,7 +567,11 @@ struct Index {
   }
 
   build() {
-    if (this.consentGateState === ConsentGateState.CHECKING) {
+    if (this.privacyRightsVisible) {
+      PrivacySettingsPage({ initialView: 'rights', onBack: () => this.privacyRightsVisible = false,
+        onWithdrawn: () => this.onPrivacyConsentWithdrawn(),
+        onClosed: () => this.onPrivacyConsentWithdrawn() })
+    } else if (this.consentGateState === ConsentGateState.CHECKING) {
       Column({ space: 12 }) {
         Text('PORTRA')
           .fontSize(18)
@@ -567,6 +588,7 @@ struct Index {
     } else if (this.consentGateState === ConsentGateState.REQUIRED) {
       PrivacyConsentPage({
         errorMessage: this.consentError,
+        onOpenPrivacyRights: () => this.privacyRightsVisible = true,
         onAccept: () => this.acceptPrivacyConsent(),
         onDecline: () => this.declinePrivacyConsent()
       })

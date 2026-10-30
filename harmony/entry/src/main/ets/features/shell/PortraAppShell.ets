@@ -83,6 +83,7 @@ export struct PortraAppShell {
       }
       if (this.profileVisited || this.selectedTab === 3) {
         ProfilePage({ activeTab: this.selectedTab === 3, sessionEpoch: this.sessionEpoch,
+          onBrowseHall: () => this.selectTab(0),
           onRequireLogin: () => this.onRequireTabLogin?.(3), onSignedOut: this.onSignedOut,
           onIdentityChanged: this.onIdentityChanged,
           onOpenDemand: (id: number) => this.onOpenRoute?.(AppRoute.DEMAND_DETAIL, id),

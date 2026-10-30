@@ -146,7 +146,7 @@ public class PhoneSmsService {
         if (smsSender instanceof SmsCloudVerifier cloudVerifier) {
             // The provider generated this code; the local challenge still enforces expiry,
             // attempt count, and one-time consumption in our application.
-            verified = cloudVerifier.verifyCode(phone, code);
+            verified = purpose == SmsPurpose.LOGIN ? cloudVerifier.verifyCode(phone, code) : cloudVerifier.verifyCode(phone, purpose, code);
         } else {
             verified = codeHasher.matches(phone, purpose, code, challenge.getCodeHash());
         }

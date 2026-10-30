@@ -158,19 +158,20 @@ test('profile exposes privacy controls and server-backed account cancellation', 
   const profile = read('pages/ProfilePage.ets');
   const index = read('pages/Index.ets');
   const appClient = read('app/AppClient.ets');
-  assert.match(profile, /Portra 用户协议/);
-  assert.match(profile, /Portra 隐私政策/);
-  assert.match(profile, /个人信息出境单独同意书/);
-  assert.match(profile, /撤回隐私及出境同意/);
-  assert.match(profile, /在线提交申请并查询处理状态/);
-  assert.match(profile, /getAccountCancellation\(\)/);
-  assert.match(profile, /requestAccountCancellation/);
-  assert.match(profile, /3336578810@qq\.com/);
-  assert.match(profile, /await this\.appClient\.sessionManager\.signOut\(\)/);
-  assert.match(profile, /this\.appClient\.withdrawRequiredPrivacyConsent\(\)/);
-  assert.ok(profile.indexOf('await this.appClient.sessionManager.signOut()') <
-    profile.indexOf('this.appClient.withdrawRequiredPrivacyConsent()'));
-  assert.match(appClient, /PrivacyConsentStore\.clear/);
+  const privacy = read('privacy/PrivacySettingsPage.ets');
+  assert.match(profile, /PrivacySettingsPage/);
+  for (const entry of ['隐私与授权管理', '个人信息权利申请', '注销账号']) { assert.ok(profile.includes(entry)); }
+  assert.match(privacy, /Portra 用户协议/);
+  assert.match(privacy, /Portra 隐私政策/);
+  assert.match(privacy, /个人信息出境单独同意书/);
+  assert.match(privacy, /3336578810@qq\.com/);
+  assert.match(privacy, /privacyApi\.submitRight/);
+  assert.match(privacy, /privacyApi\.closeAccount/);
+  const withdraw = appClient.slice(appClient.indexOf('async withdrawRequiredPrivacyConsent'), appClient.indexOf('recordPrivacyRefusal'));
+  assert.match(withdraw, /await this\.privacyApi\.updateConsent/);
+  assert.match(withdraw, /PrivacyConsentStore\.recordStatus/);
+  assert.doesNotMatch(withdraw, /signOut\(/);
+  assert.ok(withdraw.indexOf('await this.privacyApi.updateConsent') < withdraw.indexOf('PrivacyConsentStore.recordStatus'));
   assert.match(index, /consentGateState = ConsentGateState\.REQUIRED/);
   assert.doesNotMatch(profile, /deleteAccount\(/);
 });

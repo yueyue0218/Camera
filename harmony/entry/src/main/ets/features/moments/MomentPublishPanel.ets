@@ -10,6 +10,7 @@ import { MomentFeedCache } from './MomentFeedModels';
 import { MomentSessionBinding } from './MomentInteractionBindings';
 import { MomentPublishApiBinding } from './MomentPublishApiBinding';
 import { MomentPublishController, MomentPublishSnapshot } from './MomentPublishController';
+import { InlineImagePolicy, PublicImagePolicy } from '../../common/components/ComponentPolicy';
 
 @Component
 export struct MomentPublishPanel {
@@ -17,19 +18,32 @@ export struct MomentPublishPanel {
   @State private state: MomentPublishSnapshot = new MomentPublishSnapshot();
   @State private picking: boolean = false;
   @State private topInset: number = 40;
+  @State private networkAllowed: boolean = false;
   private controller?: MomentPublishController;
   private active: boolean = false;
   onClose?: () => void;
   onRequireLogin?: () => void;
   onPublished?: (item: MomentSummary) => void;
+  private readonly privacyChanged: () => void = () => {
+    this.networkAllowed = AppClient.shared.canUseBusinessNetwork();
+  };
+  private canDisplayImage(source: string): boolean {
+    return InlineImagePolicy.accepts(source) && (!PublicImagePolicy.accepts(source) || this.networkAllowed);
+  }
   aboutToAppear(): void {
     this.active = true; this.readSafeArea();
+    AppClient.shared.observePrivacyAccess(this.privacyChanged);
+    this.privacyChanged();
     this.controller = new MomentPublishController(new MomentPublishApiBinding(AppClient.shared.apiService),
       new MomentSessionBinding(AppClient.shared.sessionManager), MomentFeedCache.shared,
       (value: MomentPublishSnapshot) => this.state = value, (item: MomentSummary) => this.onPublished?.(item));
     this.controller.open(this.editingId);
   }
-  aboutToDisappear(): void { this.active = false; this.controller?.close(); this.controller = undefined; }
+  aboutToDisappear(): void {
+    this.active = false;
+    AppClient.shared.unobservePrivacyAccess(this.privacyChanged);
+    this.controller?.close(); this.controller = undefined;
+  }
 
   private editingTargetChanged(): void { this.picking = false; this.controller?.open(this.editingId); }
   private async readSafeArea(): Promise<void> {
@@ -138,7 +152,9 @@ export struct MomentPublishPanel {
           Flex({ wrap: FlexWrap.Wrap }) {
             ForEach(this.state.images, (source: string, index: number) => {
               Stack({ alignContent: Alignment.TopEnd }) {
-                Image(source).width('100%').height('100%').objectFit(ImageFit.Cover)
+                if (this.canDisplayImage(source)) {
+                  Image(source).width('100%').height('100%').objectFit(ImageFit.Cover)
+                } else { Text('授权后可查看图片').fontSize(11).fontColor('#77736F').padding(8) }
                 Button('×').width(40).height(40).fontColor('#FFFFFF').backgroundColor('#88000000')
                   .enabled(!this.state.submitting && !this.state.uncertain).accessibilityText(`移除第${index + 1}张照片`)
                   .onClick(() => this.controller?.removeImage(index))
@@ -150,7 +166,7 @@ export struct MomentPublishPanel {
       Row({ space: 12 }) {
         Button('取消').height(48).fontColor('#67615A').backgroundColor('#EEE8DF').layoutWeight(1).onClick(() => this.onClose?.())
         Button(this.state.submitting ? (this.editingId > 0 ? '保存中…' : '发布中…') : (this.editingId > 0 ? '保存修改' : '发布动态')).height(48).fontColor('#FFFFFF').backgroundColor('#1746C5')
-          .layoutWeight(2).enabled(this.state.canSubmit && !this.picking).onClick(() => this.controller?.submit())
+          .layoutWeight(2).enabled(this.networkAllowed && this.state.canSubmit && !this.picking).onClick(() => this.controller?.submit())
       }.width('100%').padding(20).border({ width: { top: 1 }, color: '#E8E2DB' })
     }.width('100%').height('100%').padding({ top: this.topInset + 8 }).backgroundColor('#FBF7EF')
   }

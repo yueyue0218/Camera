@@ -16,6 +16,7 @@ export struct PrivacyConsentPage {
   @State private activeDocument: LegalDocumentKind = LegalDocumentKind.NONE;
   onAccept?: () => void;
   onDecline?: () => void;
+  onOpenPrivacyRights?: () => void;
 
   private canAccept(): boolean {
     return this.privacyAccepted && this.crossBorderAccepted;
@@ -98,12 +99,12 @@ export struct PrivacyConsentPage {
           .margin({ top: 10 })
 
         Column({ space: 8 }) {
-          Text('同意前不会发生')
+          Text('同意前的保护')
             .width('100%')
             .fontSize(13)
             .fontWeight(FontWeight.Bold)
             .fontColor(PortraTheme.primaryText)
-          Text('不会创建设备 UUID，不会恢复历史会话，也不会访问中国香港服务器。')
+          Text('不会新建设备标识，也不会发起大厅、消息和约拍等业务请求。您主动进入个人信息权利申请渠道时，仅进行必要的身份核验和申请处理。')
             .width('100%')
             .fontSize(13)
             .lineHeight(21)
@@ -174,6 +175,10 @@ export struct PrivacyConsentPage {
           .backgroundColor(Color.Transparent)
           .margin({ top: 8, bottom: 30 })
           .onClick(() => this.onDecline?.())
+
+        Button('个人信息权利申请与联系渠道')
+          .width('100%').height(44).fontSize(13).fontColor(PortraTheme.primary)
+          .backgroundColor(Color.Transparent).onClick(() => this.onOpenPrivacyRights?.())
 
         Text('运营者：王雯 · 联系邮箱：3336578810@qq.com')
           .width('100%')

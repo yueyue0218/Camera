@@ -55,9 +55,12 @@ public final class DypnsSmsSender implements SmsSender, SmsCloudVerifier {
 
     @Override
     public SmsDeliveryReceipt send(SmsMessage message) {
-        if (message.purpose() != SmsPurpose.LOGIN) {
+        if (message.purpose() != SmsPurpose.LOGIN && message.purpose() != SmsPurpose.REAUTH) {
             throw new SmsDeliveryException("Unsupported SMS purpose for PNVS");
         }
+        String scheme = schemeFor(message.purpose());
+        String template = message.purpose() == SmsPurpose.REAUTH ? properties.getReauthTemplateId() : properties.getLoginTemplateId();
+        if (template == null || template.isBlank()) throw new SmsDeliveryException("No approved SMS template for purpose");
         // Important: The locally generated SmsMessage.code() is NOT sent or verified in this mode.
         // The cloud service owns the issued code when TemplateParam contains ##code##.
         final String templateParam;
@@ -68,11 +71,11 @@ public final class DypnsSmsSender implements SmsSender, SmsCloudVerifier {
             throw new SmsDeliveryException("Unable to serialize PNVS template parameters", e);
         }
         SendSmsVerifyCodeRequest request = new SendSmsVerifyCodeRequest()
-                .setSchemeName(PNVS_SCHEME_NAME)
+                .setSchemeName(scheme)
                 .setPhoneNumber(toDomesticPhone(message.phone()))
                 .setCountryCode("86")
                 .setSignName(properties.getSignName())
-                .setTemplateCode(properties.getLoginTemplateId())
+                .setTemplateCode(template)
                 .setTemplateParam(templateParam)
                 .setCodeType(1L)
                 .setCodeLength(6L)
@@ -119,10 +122,24 @@ public final class DypnsSmsSender implements SmsSender, SmsCloudVerifier {
         }
     }
 
+    private String schemeFor(SmsPurpose purpose) {
+        if (purpose == SmsPurpose.LOGIN) return PNVS_SCHEME_NAME;
+        String scheme = properties.getReauthSchemeName();
+        if (purpose != SmsPurpose.REAUTH || scheme == null || scheme.isBlank() || PNVS_SCHEME_NAME.equals(scheme)) {
+            throw new SmsDeliveryException("A separate approved PNVS reauthentication scheme is required");
+        }
+        return scheme;
+    }
+
     @Override
     public boolean verifyCode(String normalizedPhone, String code) {
+        return verifyCode(normalizedPhone, SmsPurpose.LOGIN, code);
+    }
+
+    @Override
+    public boolean verifyCode(String normalizedPhone, SmsPurpose purpose, String code) {
         CheckSmsVerifyCodeRequest request = new CheckSmsVerifyCodeRequest()
-                .setSchemeName(PNVS_SCHEME_NAME)
+                .setSchemeName(schemeFor(purpose))
                 .setPhoneNumber(toDomesticPhone(normalizedPhone))
                 .setVerifyCode(code);
         try {

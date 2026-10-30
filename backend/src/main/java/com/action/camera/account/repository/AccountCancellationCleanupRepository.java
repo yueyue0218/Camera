@@ -39,7 +39,15 @@ public class AccountCancellationCleanupRepository {
         return count == null ? 0 : count;
     }
 
+    /** Lock quotes before checking orders so an already pending agreement cannot be accepted during closure. */
+    public void lockParticipantQuotes(Long userId) {
+        jdbcTemplate.queryForList("SELECT id FROM quotes WHERE customer_id = ? OR provider_user_id = ? ORDER BY id FOR UPDATE", Long.class, userId, userId);
+    }
+
     public void cleanupUserData(Long userId, String mobileHash, LocalDateTime now) {
+        jdbcTemplate.update("UPDATE quotes SET status = 'REJECTED', updated_at = ? WHERE (customer_id = ? OR provider_user_id = ?) AND status = 'PENDING_CONFIRM'", now, userId, userId);
+        // Remove public access while retaining business evidence for participants/admins.
+        jdbcTemplate.update("UPDATE files SET visibility = 'PRIVATE' WHERE uploader_id = ?", userId);
         jdbcTemplate.update("""
                 UPDATE user_sessions SET revoked_at = ?, revoke_reason = 'ACCOUNT_DELETED'
                 WHERE user_id = ? AND revoked_at IS NULL

@@ -44,6 +44,10 @@ export class ErrorMapper {
   }
 
   static fromBusinessCode(code: number, message: string): PortraError {
+    if (code === 40302) {
+      return new PortraError(ErrorKind.BUSINESS,
+        '请先完成中国香港个人信息出境授权；可继续查看协议及提交个人信息权利申请。', 200, code);
+    }
     if (code === 40101) {
       return new PortraError(ErrorKind.BUSINESS, '登录状态已失效，请重新登录。', 200, code);
     }

@@ -1,4 +1,5 @@
-import { InlineImagePolicy } from '../../common/components/ComponentPolicy';
+import { InlineImagePolicy, PublicImagePolicy } from '../../common/components/ComponentPolicy';
+import { AppClient } from '../../app/AppClient';
 import { PortraLoading } from '../../common/components/PortraLoading';
 import { MomentSummary } from '../../model/ApiModels';
 import { MomentAuthor } from './MomentAuthor';
@@ -22,6 +23,7 @@ export struct MomentDetailPanel {
   @State private imageRatio: number = 1;
   @State private imageFrameVersion: number = 0;
   @State private albumSizing: boolean = false;
+  @State private networkAllowed: boolean = false;
   private albumSources: string[] = [];
   private dimensions: Map<number, number> = new Map<number, number>();
   private completed: Set<number> = new Set<number>();
@@ -41,7 +43,19 @@ export struct MomentDetailPanel {
   onToggleFavorite?: (item: MomentSummary) => void;
   onToggleLike?: (item: MomentSummary) => void;
   onOpenAuthor?: (item: MomentSummary) => void;
-  aboutToAppear(): void { this.onStateChanged(); }
+  private readonly privacyChanged: () => void = () => {
+    const allowed = AppClient.shared.canUseBusinessNetwork();
+    if (allowed !== this.networkAllowed) { this.networkAllowed = allowed; this.albumSources = []; }
+    this.onStateChanged();
+  };
+  aboutToAppear(): void {
+    AppClient.shared.observePrivacyAccess(this.privacyChanged);
+    this.privacyChanged();
+  }
+  aboutToDisappear(): void { AppClient.shared.unobservePrivacyAccess(this.privacyChanged); }
+  private canDisplayImage(source: string): boolean {
+    return InlineImagePolicy.accepts(source) && (!PublicImagePolicy.accepts(source) || this.networkAllowed);
+  }
   private onStateChanged(): void {
     const targetChanged = this.lastTargetId !== this.state.targetId;
     if (targetChanged) { this.ownerMenuOpen = false; this.imageIndex = 0; this.lastTargetId = this.state.targetId; }
@@ -52,7 +66,7 @@ export struct MomentDetailPanel {
       this.dimensions.clear(); this.completed.clear(); this.failedImages.clear();
       this.albumSizing = this.albumSources.length > 0; this.imageRatio = 1;
       this.albumSources.forEach((source: string, index: number) => {
-        if (!InlineImagePolicy.accepts(source)) { this.completed.add(index); this.failedImages.add(index); }
+        if (!this.canDisplayImage(source)) { this.completed.add(index); this.failedImages.add(index); }
       });
       this.finishAlbumSizing();
     }
@@ -82,7 +96,7 @@ export struct MomentDetailPanel {
   private imageFrames(): MomentImageFrame[] {
     return this.albumSources.map((source: string, index: number) =>
       new MomentImageFrame(`${this.state.targetId}:${this.imageFrameVersion}:${index}`, source, index, this.imageFrameVersion))
-      .filter((frame: MomentImageFrame) => InlineImagePolicy.accepts(frame.source));
+      .filter((frame: MomentImageFrame) => this.canDisplayImage(frame.source));
   }
 
   @Builder

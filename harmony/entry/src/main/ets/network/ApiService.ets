@@ -1,4 +1,5 @@
 import { CreateMomentPayload } from '../model/ApiModels';
+import { DemandInterestSummary } from '../model/ApiModels';
 import { OrderEngagementSummary, ReviewSummary, ReviewComplaintSummary, DisputeSummary, CreateReviewPayload, ReviewTextPayload, CreateReviewComplaintPayload, DisputeReasonPayload } from '../model/ApiModels';
 import { NotificationSummary, CreditSummary, CreditRecordSummary } from '../model/ApiModels';
 import { NativeSessionApi } from '../auth/NativeSessionApi';
@@ -104,6 +105,29 @@ export class ApiService implements NativeSessionApi {
 
   cancelDemandDetail(): void {
     this.client.cancelRequest('demands.detail');
+  }
+
+  getDemandInterest(demandId: number): Promise<DemandInterestSummary> {
+    return this.client.get<DemandInterestSummary>(`/demands/${demandId}/interest`, `demands.${demandId}.interestState`);
+  }
+
+  addDemandInterest(demandId: number): Promise<DemandInterestSummary> {
+    return this.client.post<DemandInterestSummary>(`/demands/${demandId}/interest`, undefined, `demands.${demandId}.interest`);
+  }
+
+  removeDemandInterest(demandId: number): Promise<void> {
+    return this.client.delete<void>(`/demands/${demandId}/interest`, `demands.${demandId}.interest`);
+  }
+
+  listDemandInterests(page: number = 1, size: number = 10): Promise<PageResult<DemandInterestSummary>> {
+    return this.client.get<PageResult<DemandInterestSummary>>(
+      `/me/demand-interests?page=${this.safePage(page)}&size=${this.safeSize(size)}`, 'demands.interests');
+  }
+
+  cancelDemandInterests(demandId: number = 0): void {
+    this.client.cancelRequest('demands.interests');
+    this.client.cancelRequest(`demands.${demandId}.interestState`);
+    this.client.cancelRequest(`demands.${demandId}.interest`);
   }
 
   createDemand(payload: CreateDemandPayload): Promise<DemandSummary> {

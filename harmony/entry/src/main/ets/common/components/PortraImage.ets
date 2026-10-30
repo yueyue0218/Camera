@@ -20,6 +20,7 @@ export struct PortraImage {
   @Prop contentDescription: string = '图片';
   @Prop allowInlineData: boolean = false;
   @State private loadFailed: boolean = false;
+  @State private networkAllowed: boolean = false;
 
   @State private pixelMap: image.PixelMap | undefined = undefined;
   @State private loading: boolean = false;
@@ -32,16 +33,22 @@ export struct PortraImage {
     // HttpClient completes token replacement synchronously before this microtask.
     Promise.resolve().then(() => this.reload());
   };
+  private readonly privacyChanged: () => void = () => {
+    this.networkAllowed = AppClient.shared.canUseBusinessNetwork();
+    this.reload();
+  };
 
   aboutToAppear(): void {
     this.alive = true;
     AppClient.shared.fileImages.observe(this.identityChanged);
-    this.reload();
+    AppClient.shared.observePrivacyAccess(this.privacyChanged);
+    this.privacyChanged();
   }
 
   aboutToDisappear(): void {
     this.alive = false;
     AppClient.shared.fileImages.unobserve(this.identityChanged);
+    AppClient.shared.unobservePrivacyAccess(this.privacyChanged);
     this.clearImage();
   }
 
@@ -59,7 +66,7 @@ export struct PortraImage {
     this.loadFailed = false;
     this.failure = '';
     this.loading = false;
-    if (!this.alive || this.resolvedFileId() === 0) { return; }
+    if (!this.alive || !this.networkAllowed || this.resolvedFileId() === 0) { return; }
     const version = this.generation;
     const service = AppClient.shared.fileImages;
     const epoch = service.epoch();
@@ -113,12 +120,13 @@ export struct PortraImage {
     if (typeof this.source !== 'string') {
       return true;
     }
+    if (PublicImagePolicy.accepts(this.source) && !this.networkAllowed) { return false; }
     return this.allowInlineData ? InlineImagePolicy.accepts(this.source) : PublicImagePolicy.accepts(this.source);
   }
 
   build() {
     Stack() {
-      if (this.resolvedFileId() !== 0 && this.pixelMap !== undefined) {
+      if (this.networkAllowed && this.resolvedFileId() !== 0 && this.pixelMap !== undefined) {
         Image(this.pixelMap)
           .width('100%').height('100%')
           .objectFit(this.contain ? ImageFit.Contain : ImageFit.Cover)

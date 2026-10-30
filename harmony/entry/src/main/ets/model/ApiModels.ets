@@ -671,3 +671,12 @@ export interface CreateReviewPayload { readonly rating: number; readonly content
 export interface ReviewTextPayload { readonly content: string; }
 export interface CreateReviewComplaintPayload { readonly reason: string; readonly evidenceFileIds: string; }
 export interface DisputeReasonPayload { readonly reason: string; }
+export interface DemandInterestSummary {
+  readonly interestId?: number;
+  readonly demandId: number;
+  readonly targetType: string;
+  readonly interested: boolean;
+  readonly status: string;
+  readonly demand?: DemandSummary | null;
+  readonly createdAt?: string;
+}

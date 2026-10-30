@@ -27,6 +27,7 @@ require.extensions['.ets'] = (m, file) => m._compile(ts.transpileModule(fs.readF
 const { HallFilterState } = require(path.join(root, 'features/hall/HallFilterState.ets'));
 const { HallDataPolicy } = require(path.join(root, 'features/hall/HallDataPolicy.ets'));
 const { HallContentState } = require(path.join(root, 'features/hall/HallUiModels.ets'));
+const { HallUnreadCounter } = require(path.join(root, 'features/notifications/HallUnreadCounter.ets'));
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
 test('filters use separate real API fields, cents, exact dates and stable paging', () => {
@@ -74,8 +75,10 @@ function fixture() {
     api[`list${kind}ByQuery`] = query => new Promise((resolve, reject) => requests.push({ kind, query, resolve, reject }));
     api[`cancel${kind}`] = () => {};
   }
-  const context = { HallFilterState, HallDataPolicy, HallContentState,
-    AppClient: { shared: { apiService: api } }, ErrorMapper: { isStale: () => false } };
+  const context = { HallFilterState, HallDataPolicy, HallContentState, HallUnreadCounter,
+    AppClient: { shared: { apiService: api, sessionManager: {
+      getSessionVersion: () => 1, isAuthenticated: () => false
+    } } }, ErrorMapper: { isStale: () => false } };
   vm.createContext(context);
   vm.runInContext(ts.transpileModule(source + '\nglobalThis.Page = HallPage;', {
     compilerOptions: { target: ts.ScriptTarget.ES2021 }
@@ -89,8 +92,8 @@ test('late first page and load-more responses cannot replace new filters; retry 
   requests[0].resolve({ records: [{ serviceId: 1 }], page: 1, size: 20, total: 40 });
   requests[1].resolve({ records: [{ demandId: 1 }], page: 1, size: 20, total: 40 });
   await tick();
-  page.loadServices(page.loadVersion, 2, true);
-  page.loadDemands(page.loadVersion, 2, true);
+  page.loadServices(page.serviceVersion, 2, true);
+  page.loadDemands(page.demandVersion, 2, true);
   page.serviceFilters.city = '310000'; page.demandFilters.style = '人像';
   page.reload();
   assert.equal(requests[4].query.page, 1);
