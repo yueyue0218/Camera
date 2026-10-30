@@ -26,6 +26,8 @@ export class NotificationSnapshot {
 export class NotificationFormat {
   static category(item: NotificationSummary): string {
     const types = `${item.type} ${item.eventType ?? ''} ${item.relatedType ?? ''} ${item.targetType ?? ''}`.toUpperCase();
+    if(item.type==='MODERATION_RESULT'||item.eventType==='MODERATION_RESULT'){return 'moderation';}
+    if(item.type==='REPORT_RESOLVED'||item.eventType==='REPORT_RESOLVED'){return 'report';}
     if (types.includes('REVIEW_COMPLAINT') || types.includes('DISPUTE')) { return 'appeal'; }
     if (types.includes('ORDER_') || types.includes('DEMAND_RESPONSE_') || types.includes('CONVERSATION_STARTED') ||
       types.includes('DELIVERY_UPLOADED')) { return 'order'; }
@@ -35,6 +37,7 @@ export class NotificationFormat {
   }
   static label(item: NotificationSummary): string {
     const category = NotificationFormat.category(item);
+    if(category==='report'){return '举报';}if(category==='moderation'){return '平台处理';}
     return category === 'appeal' ? '申诉' : category === 'order' ? '订单' : category === 'review' ? '评价' :
       category === 'dynamic' ? '动态' : item.type.includes('CREDIT') ? '信用' : '通知';
   }
@@ -142,6 +145,9 @@ export class NotificationController {
     } finally {
       if (this.current(epoch, version) && read === this.readVersion) { this.state.loadingMore = false; this.publish(); }
     }
+  }
+  canOpenReports(): boolean {
+    return this.active && this.identityCurrent() && this.session.isAuthenticated();
   }
   canOpen(id: number): boolean {
     if (!this.active || !this.identityCurrent() || !this.session.isAuthenticated() || this.state.loading || this.state.busy) { return false; }

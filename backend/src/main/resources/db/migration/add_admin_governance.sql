@@ -180,6 +180,8 @@ CREATE TABLE IF NOT EXISTS reports (
     admin_id BIGINT NULL,
     resolution VARCHAR(30) NULL,
     admin_comment VARCHAR(1000) NULL,
+    public_message VARCHAR(200) NULL,
+    follow_up_required TINYINT(1) NOT NULL DEFAULT 0,
     active_dedupe_key VARCHAR(160) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
