@@ -114,3 +114,26 @@ test('late relationship responses cannot overwrite another account or send subse
   const read = f.page.loadSocial(); f.changeSession(); resolve([]); await read;
   assert.equal(f.page.following, rows); assert.equal(requests, 0);
 });
+
+test('returning to the mounted profile tab refreshes counts even when the login session is unchanged', () => {
+  const refreshSource = source.slice(source.indexOf('  private readonly changed:'),
+    source.indexOf('  @State private loading:'));
+  const output = ts.transpileModule(`class Page { ${refreshSource} }; module.exports = Page;`, {
+    compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS }
+  }).outputText;
+  const loaded = { exports: {} }; new Function('module', output)(loaded);
+  const page = new loaded.exports(); const calls = [];
+  Object.assign(page, { activeTab: true, loadedSessionVersion: 4,
+    appClient: { sessionManager: { getSessionVersion: () => 4 } },
+    load(resetNavigation) { calls.push(resetNavigation); } });
+  page.refreshTab();
+  assert.deepEqual(calls, [false]);
+});
+
+test('every order status mutation notifies the mounted profile summary', () => {
+  const pages = ['QuoteDetailPage.ets', 'OrderDetailPage.ets', 'DeliveryUploadPage.ets', 'DeliveryGalleryPage.ets'];
+  pages.forEach(file => {
+    const pageSource = fs.readFileSync(path.join(__dirname, '../entry/src/main/ets/pages', file), 'utf8');
+    assert.match(pageSource, /ContentChanges\.publish\('orders'\)/, `${file} must refresh profile order counts`);
+  });
+});

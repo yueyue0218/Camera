@@ -5,6 +5,7 @@ import { PortraPageHeading } from '../common/components/PortraPageHeading';
 import { QuoteDetailContent } from '../features/conversation/QuoteDetailContent';
 import { ConversationListModel } from '../features/conversation/ConversationListModel';
 import { QuoteWorkflow } from '../features/conversation/QuoteWorkflow';
+import { ContentChanges } from '../features/user/ContentChanges';
 import { OrderSummary, QuoteSummary } from '../model/ApiModels';
 import { PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
@@ -81,6 +82,7 @@ export struct QuoteDetailPage {
       if (!this.active || version !== this.requestVersion) return;
       if (result.orderId > 0) {
         this.orderId = result.orderId;
+        ContentChanges.publish('orders');
         this.onConfirmed?.();
       } else {
         await this.load();

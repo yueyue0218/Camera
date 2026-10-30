@@ -6,6 +6,7 @@ import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraLoading } from '../common/components/PortraLoading';
 import { PortraPageHeading } from '../common/components/PortraPageHeading';
 import { OrderWorkflow } from '../features/conversation/OrderWorkflow';
+import { ContentChanges } from '../features/user/ContentChanges';
 import { DeliveryTransfer } from '../features/delivery/DeliveryTransfer';
 import { DeliveryFileSummary, DeliverySummary, OrderStatusLogSummary, OrderSummary } from '../model/ApiModels';
 import { PortraError } from '../network/ErrorMapper';
@@ -218,6 +219,7 @@ export struct DeliveryGalleryPage {
       await this.api.confirmReceipt(this.orderId);
       this.receiptOpen = false;
       await this.load();
+      ContentChanges.publish('orders');
       this.notice = '已确认收片';
     } catch (error) {
       const message = (error as PortraError).message || '操作未完成，请重试';
@@ -240,6 +242,7 @@ export struct DeliveryGalleryPage {
       this.reworkOpen = false;
       this.reworkText = '';
       await this.load();
+      ContentChanges.publish('orders');
       this.notice = '返修要求已提交';
     } catch (error) {
       const message = (error as PortraError).message || '操作未完成，请重试';

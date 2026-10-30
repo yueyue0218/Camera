@@ -3,6 +3,7 @@ import { AppClient } from '../app/AppClient';
 import { PortraPageHeading } from '../common/components/PortraPageHeading';
 import { DeliveryTransfer, SelectedDeliveryFile } from '../features/delivery/DeliveryTransfer';
 import { OrderWorkflow } from '../features/conversation/OrderWorkflow';
+import { ContentChanges } from '../features/user/ContentChanges';
 import { DeliverySummary, OrderSummary } from '../model/ApiModels';
 import { PortraTheme } from '../theme/PortraTheme';
 
@@ -92,6 +93,7 @@ export struct DeliveryUploadPage {
         order.status === 'DELIVERED_PENDING_CONFIRM') {
         this.selected = [];
         this.uncertain = false;
+        ContentChanges.publish('orders');
         this.onUploaded?.();
         return;
       }

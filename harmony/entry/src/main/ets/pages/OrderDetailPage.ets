@@ -8,6 +8,7 @@ import { PortraPageHeading } from '../common/components/PortraPageHeading';
 import { MockPaymentConfirm } from '../features/conversation/MockPaymentConfirm';
 import { OrderWorkflow } from '../features/conversation/OrderWorkflow';
 import { QuoteWorkflow } from '../features/conversation/QuoteWorkflow';
+import { ContentChanges } from '../features/user/ContentChanges';
 import { OrderStatusLogSummary, OrderSummary } from '../model/ApiModels';
 import { ErrorKind, PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
@@ -182,6 +183,7 @@ export struct OrderDetailPage {
       this.showPay = false;
       await this.load();
       if (!this.active || identity !== this.loadedIdentity || target !== this.orderId) { return; }
+      ContentChanges.publish('orders');
       this.notice = this.order?.status === 'PAID_PENDING_SHOOT' ? '' : '正在核对支付结果';
       this.paymentUncertain = this.order?.status === 'PENDING_PAYMENT';
       if (this.order?.status === 'PAID_PENDING_SHOOT') this.showSelfPaymentNotice();
@@ -231,7 +233,10 @@ export struct OrderDetailPage {
       if (!this.current(version, identity)) { return; }
       this.showCancel = false;
       await this.load();
-      if (this.active && identity === this.loadedIdentity && target === this.orderId) { this.notice = '约拍已取消'; }
+      if (this.active && identity === this.loadedIdentity && target === this.orderId) {
+        ContentChanges.publish('orders');
+        this.notice = '约拍已取消';
+      }
     } catch (error) {
       if (!this.current(version, identity)) { return; }
       const message = (error as PortraError).message || '操作未完成，请重试';

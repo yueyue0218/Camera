@@ -59,9 +59,11 @@ export struct ProfilePage {
   private socialGeneration: number = 0;
 
   private refreshTab(): void {
-    if (this.activeTab && this.loadedSessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
-      this.load();
-    }
+    if (!this.activeTab) { return; }
+    const identityChanged = this.loadedSessionVersion !== this.appClient.sessionManager.getSessionVersion();
+    // A tab can stay mounted while follow/order changes happen elsewhere. Always
+    // re-read the server when it becomes visible instead of relying on session changes.
+    this.load(identityChanged);
   }
 
   @State private loading: boolean = true;
