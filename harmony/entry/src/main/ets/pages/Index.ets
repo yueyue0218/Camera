@@ -176,10 +176,9 @@ struct Index {
         onOpenQuote: (quoteId: number) => this.openPage(AppRoute.QUOTE_DETAIL,
           { conversationId: this.validConversationId(param), quoteId: quoteId }),
         onOpenOrder: (orderId: number) => this.openPage(AppRoute.ORDER_DETAIL,
-          { orderId: orderId, conversationId: this.validConversationId(param), fromConversation: true }),
+          { orderId: orderId, conversationId: this.validConversationId(param) }),
         onPayOrder: (orderId: number) => this.openPage(AppRoute.ORDER_DETAIL,
-          { orderId: orderId, conversationId: this.validConversationId(param), fromConversation: true,
-            openPayment: true }) });
+          { orderId: orderId, conversationId: this.validConversationId(param), openPayment: true }) });
     }
   }
 
@@ -224,12 +223,7 @@ struct Index {
         openPayment: (param as NavigationRouteParam).openPayment === true,
         onBack: () => this.appPathStack.pop(),
         onOpenConversation: (conversationId: number) => {
-          if ((param as NavigationRouteParam).fromConversation === true &&
-            (param as NavigationRouteParam).conversationId === conversationId) {
-            this.appPathStack.pop();
-          } else {
-            this.openPage(AppRoute.CONVERSATION_DETAIL, { conversationId: conversationId });
-          }
+          this.returnToConversation(conversationId);
         } });
     }
   }
@@ -250,11 +244,21 @@ struct Index {
     this.appPathStack.pushPathByName(route, param);
   }
 
+  private returnToConversation(conversationId: number): void {
+    const index = NavigationPolicy.conversationPathIndex(this.appPathStack.getAllPathName(),
+      (pathIndex: number) => this.appPathStack.getParamByIndex(pathIndex) as NavigationRouteParam | undefined,
+      conversationId);
+    if (index >= 0) {
+      this.appPathStack.popToIndex(index);
+      return;
+    }
+    this.openPage(AppRoute.CONVERSATION_DETAIL, { conversationId: conversationId });
+  }
+
   private openLoginFor(route: AppRoute, param: NavigationRouteParam): void {
     const loginParam: NavigationRouteParam = {
       returnRoute: route, demandId: param.demandId, serviceId: param.serviceId,
       conversationId: param.conversationId, quoteId: param.quoteId, orderId: param.orderId,
-      fromConversation: param.fromConversation,
       openPayment: param.openPayment
     };
     this.pushRoute(AppRoute.LOGIN, loginParam);
@@ -271,7 +275,7 @@ struct Index {
         demandId: param.demandId,
         serviceId: param.serviceId,
         conversationId: param.conversationId,
-        quoteId: param.quoteId, orderId: param.orderId, fromConversation: param.fromConversation,
+        quoteId: param.quoteId, orderId: param.orderId,
         openPayment: param.openPayment
       };
       this.pushRoute(returnRoute, returnParam);

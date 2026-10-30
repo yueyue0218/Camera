@@ -38,7 +38,6 @@ export class NavigationPolicy {
           conversationId: param.conversationId,
           quoteId: param.quoteId,
           orderId: param.orderId,
-          fromConversation: param.fromConversation,
           openPayment: param.openPayment
         }
       };
@@ -75,6 +74,17 @@ export class NavigationPolicy {
 
   static validOrderId(param: NavigationRouteParam): number | undefined {
     return NavigationPolicy.positiveId(param.orderId);
+  }
+
+  static conversationPathIndex(pathNames: string[],
+    paramAt: (index: number) => NavigationRouteParam | undefined, conversationId: number): number {
+    for (let index = pathNames.length - 1; index >= 0; index--) {
+      if (pathNames[index] === AppRoute.CONVERSATION_DETAIL &&
+        paramAt(index)?.conversationId === conversationId) {
+        return index;
+      }
+    }
+    return -1;
   }
 
   private static positiveId(id: number | undefined): number | undefined {

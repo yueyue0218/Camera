@@ -85,6 +85,16 @@ test('quote and order targets preserve real IDs through login', () => {
   assert.equal(route.param.quoteId, 22);
 });
 
+test('returning from an order targets the matching existing conversation', () => {
+  const names = [AppRoute.MESSAGE, AppRoute.CONVERSATION_DETAIL, AppRoute.QUOTE_DETAIL,
+    AppRoute.CONVERSATION_DETAIL, AppRoute.ORDER_DETAIL];
+  const params = [{}, { conversationId: 7 }, { quoteId: 9 }, { conversationId: 8 }, { orderId: 4 }];
+  const paramAt = (index) => params[index];
+  assert.equal(NavigationPolicy.conversationPathIndex(names, paramAt, 7), 1);
+  assert.equal(NavigationPolicy.conversationPathIndex(names, paramAt, 8), 3);
+  assert.equal(NavigationPolicy.conversationPathIndex(names, paramAt, 9), -1);
+});
+
 test('route labels and direct login description are deterministic', () => {
   for (const route of NavigationPolicy.routes) {
     assert.notEqual(NavigationPolicy.label(route), '目标页面');

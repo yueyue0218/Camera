@@ -23,7 +23,6 @@ export interface NavigationRouteParam {
   readonly conversationId?: number;
   readonly quoteId?: number;
   readonly orderId?: number;
-  readonly fromConversation?: boolean;
   readonly openPayment?: boolean;
   /** Protected destination requested before authentication. */
   readonly returnRoute?: AppRoute;
