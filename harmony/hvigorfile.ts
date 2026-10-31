@@ -73,6 +73,7 @@ const environmentPlugin: HvigorPlugin = {
     selected.buildOption = selected.buildOption ?? {};
     selected.buildOption.arkOptions = selected.buildOption.arkOptions ?? {};
     selected.buildOption.arkOptions.buildProfileFields = {
+      PORTRA_SOURCE_SHA: process.env.PORTRA_SOURCE_SHA || 'uncommitted',
       ...(selected.buildOption.arkOptions.buildProfileFields ?? {}),
       PORTRA_ENVIRONMENT: environment,
       PORTRA_BASE_URL: baseUrl

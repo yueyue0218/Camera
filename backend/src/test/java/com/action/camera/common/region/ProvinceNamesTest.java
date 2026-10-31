@@ -1,26 +1,31 @@
 package com.action.camera.common.region;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-import static org.assertj.core.api.Assertions.assertThat;
+import java.util.List;
+import static org.assertj.core.api.Assertions.*;
 
 class ProvinceNamesTest {
-    @ParameterizedTest
-    @ValueSource(strings={"南京","南京市","苏州","苏州市","NJ","320100","江苏","江苏省"})
-    void locatedAndLegacyRegionsNormalizeToTheSameProvince(String region) {
-        assertThat(ProvinceNames.normalize(region)).isEqualTo("江苏省");
+    @Test void completeUniqueCatalogue() {
+        assertThat(ProvinceNames.ALL).hasSize(34);
+        assertThat(ProvinceNames.ALL.stream().map(ProvinceNames.Province::code).distinct()).hasSize(34);
+        assertThat(ProvinceNames.ALL.stream().filter(p -> p.name().endsWith("省"))).hasSize(23);
+        assertThat(ProvinceNames.ALL.stream().filter(p -> p.name().endsWith("自治区"))).hasSize(5);
+        assertThat(ProvinceNames.ALL.stream().filter(p -> p.name().endsWith("市"))).hasSize(4);
+        assertThat(ProvinceNames.ALL.stream().filter(p -> p.name().endsWith("特别行政区"))).hasSize(2);
     }
-    @Test void queryAliasesAreSeparateValuesRatherThanPipeJoinedStrings() {
-        assertThat(ProvinceNames.lowerCode("江苏省")).isEqualTo("320000");
-        assertThat(ProvinceNames.upperCode("江苏省")).isEqualTo("329999");
-        assertThat(ProvinceNames.queryAliases("江苏省")).contains("南京","南京市","苏州","苏州市","nj","js","江苏省");
-        assertThat(ProvinceNames.queryAliases("浙江省")).contains("杭州","杭州市","宁波","宁波市");
-        assertThat(ProvinceNames.queryAliases("江苏省")).noneMatch(value -> value.contains("|"));
-    }
-    @Test void unknownRegionsRetainExactMatchingSemantics() {
-        assertThat(ProvinceNames.normalize("  Custom Campus ")).isEqualTo("custom campus");
-        assertThat(ProvinceNames.queryAliases("Custom Campus")).containsExactly("custom campus");
-        assertThat(ProvinceNames.queryAliases("南京")).containsExactly("南京");
+    @Test void normalizeKnownAliasesWithoutDefaultingUnknownValues() {
+        for (String alias : List.of("JS", "js", "南京", "南京市", "NJ", "江苏", "江苏省", "320102")) {
+            assertThat(ProvinceNames.normalize(alias)).isEqualTo("JS");
+            assertThat(ProvinceNames.matches(alias, "江苏省")).isTrue();
+        }
+        assertThat(ProvinceNames.normalize("杭州市")).isEqualTo("ZJ");
+        assertThat(ProvinceNames.normalize("深圳市")).isEqualTo("GD");
+        assertThat(ProvinceNames.normalize("320ABC")).isEmpty();
+        assertThat(ProvinceNames.normalize("unknown")).isEmpty();
+        assertThat(ProvinceNames.query(" ")).isNull();
+        assertThat(ProvinceNames.query("unknown")).isEqualTo("unknown");
+        assertThat(ProvinceNames.codeOrOriginal("unknown")).isEqualTo("unknown");
+        assertThat(ProvinceNames.matches("unknown", "JS")).isFalse();
+        assertThatThrownBy(() -> ProvinceNames.requireCode("unknown")).hasMessageContaining("省级地区");
     }
 }

@@ -41,7 +41,7 @@ for (const kind of ['service', 'demand']) {
     filters.city = '320100';
     p.refreshChannel(channel); p.refreshChannel(channel);
     assert.equal(calls[kind].length, 1); assert.equal(calls[kind][0].query.page, 1);
-    assert.equal(calls[kind][0].query.cityCode, '320100'); assert.equal(p[kind + 'Filters'], filters);
+    assert.equal(calls[kind][0].query.cityCode, 'JS'); assert.equal(p[kind + 'Filters'], filters);
     assert.equal(p[kind + 'Items'][0][kind + 'Id'], 1); assert.equal(p[kind + 'Page'], 0);
     await p[load](p[kind + 'Version'], 1, true); assert.equal(calls[kind].length, 1);
     calls[kind][0].resolve(result(kind, [2, 2])); await tick();

@@ -1,3 +1,5 @@
+import BuildProfile from 'entry/BuildProfile';
+import { ProvinceLocation } from '../common/location/ProvinceLocation';
 import { AbilityConstant, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
@@ -11,7 +13,9 @@ export default class EntryAbility extends UIAbility {
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
     // Binding context is side-effect free. Device identity and session restore are
     // deliberately deferred until the first-launch privacy gate has succeeded.
+    hilog.info(DOMAIN, 'PortraBuild', '%{public}s', BuildProfile.PORTRA_SOURCE_SHA);
     AppClient.shared.bindContext(this.context);
+    ProvinceLocation.bind();
   }
 
   onDestroy(): void {
@@ -46,11 +50,13 @@ export default class EntryAbility extends UIAbility {
     // Ability has brought to foreground
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onForeground');
     ConversationVisibility.setForeground(true);
+    ProvinceLocation.onForeground(this.context);
   }
 
   onBackground(): void {
     // Ability has back to background
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onBackground');
     ConversationVisibility.setForeground(false);
+    ProvinceLocation.onBackground();
   }
 }

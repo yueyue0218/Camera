@@ -97,7 +97,7 @@ test('late first page and load-more responses cannot replace new filters; retry 
   page.serviceFilters.city = '310000'; page.demandFilters.style = '人像';
   page.reload();
   assert.equal(requests[4].query.page, 1);
-  assert.equal(requests[4].query.cityCode, '310000');
+  assert.equal(requests[4].query.cityCode, 'SH');
   assert.equal(requests[5].query.styleTag, '人像');
   requests[4].resolve({ records: [{ serviceId: 9 }], page: 1, size: 20, total: 1 });
   requests[5].resolve({ records: [], page: 1, size: 20, total: 0 });
@@ -113,10 +113,10 @@ test('late first page and load-more responses cannot replace new filters; retry 
   requests[6].reject(new Error('offline')); requests[7].reject(new Error('offline'));
   await tick(); assert.equal(page.serviceState, 'error');
   page.reload();
-  assert.equal(requests[8].query.cityCode, '310000');
+  assert.equal(requests[8].query.cityCode, 'SH');
   assert.equal(requests[9].query.styleTag, '人像');
   page.serviceFilters = new HallFilterState(); page.reload();
   requests[8].resolve({ records: [{ serviceId: 88 }], page: 1, size: 20, total: 1 });
   await tick(); assert.notEqual(page.serviceItems[0]?.serviceId, 88);
-  assert.equal(requests[10].query.cityCode, '');
+  assert.equal(requests[10].query.cityCode, undefined);
 });

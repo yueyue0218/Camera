@@ -1,3 +1,5 @@
+import { RegionControl } from '../common/region/RegionControl';
+import { ProvinceCatalog } from '../common/region/ProvinceCatalog';
 import { PrivacySettingsPage } from '../privacy/PrivacySettingsPage';
 import { DemandInterestList } from '../features/user/DemandInterestList';
 import { ProvinceLocation } from '../common/location/ProvinceLocation';
@@ -105,6 +107,7 @@ export struct ProfilePage {
   onEditService?: (id: number) => void;
   onPrivacyConsentWithdrawn?: () => void;
 
+  @State private selectedRegion: string = '';
   @State private locatedRegionLabel: string = '尚未定位';
   private readonly locationChanged: () => void = () => this.readLocatedRegion();
   private readLocatedRegion(): void {
@@ -476,6 +479,7 @@ export struct ProfilePage {
   }
 
   private async switchRole(): Promise<void> {
+    ProvinceLocation.clear();
     if (this.switchingRole) { return; }
     if (this.role !== 'CUSTOMER' && this.role !== 'PROVIDER') {
       this.roleSwitchError = '当前身份尚未加载成功，请重新读取账号资料。';
@@ -624,6 +628,7 @@ export struct ProfilePage {
   }
 
   private async signOut(): Promise<void> {
+    ProvinceLocation.clear();
     if (this.signingOut) {
       return;
     }
@@ -839,7 +844,7 @@ export struct ProfilePage {
               Text(item.scene?.trim() || `约拍需求 #${item.demandId}`)
                 .fontSize(12.5).fontWeight(FontWeight.Medium).fontColor('#313236')
                 .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-              Text(item.cityCode ?? '地区未填写').fontSize(10).fontColor('#918A84')
+              Text(ProvinceCatalog.display(item.cityCode)).fontSize(10).fontColor('#918A84')
               Text(item.status ?? '查看详情').fontSize(9.5).fontColor(PortraTheme.primary)
             }.alignItems(HorizontalAlign.Start).layoutWeight(1)
           }.width('100%').height(88).padding({ left: 12, right: 12 })
@@ -855,7 +860,7 @@ export struct ProfilePage {
               Text(item.title?.trim() || `橱窗 #${item.serviceId}`)
                 .fontSize(12.5).fontWeight(FontWeight.Medium).fontColor('#313236')
                 .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-              Text(item.cityCode ?? '地区未填写').fontSize(10).fontColor('#918A84')
+              Text(ProvinceCatalog.display(item.cityCode)).fontSize(10).fontColor('#918A84')
               Text(item.status ?? '查看详情').fontSize(9.5).fontColor(PortraTheme.primary)
             }.alignItems(HorizontalAlign.Start).layoutWeight(1)
           }.width('100%').height(88).padding({ left: 12, right: 12 })
@@ -910,6 +915,7 @@ export struct ProfilePage {
             identityLine: this.profileLocationLine(), bio: this.profileBio(), owner: true,
             creditLabel: this.profile?.creditScore === null || this.profile?.creditScore === undefined ? '—' : `${this.profile?.creditScore}`,
             onEdit: () => this.openSection('settings'), onOpenCredit: this.onOpenCredit })
+          RegionControl({ value: this.selectedRegion, onChange: (code: string) => { this.selectedRegion = code; } })
           // Social stats belong directly under the profile and above the role-specific workspace.
           Row({ space: 28 }) {
             this.StatLink(this.socialLoaded ? `${this.following.length}` : '—', '关注', 'following')

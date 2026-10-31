@@ -165,7 +165,7 @@ export function ShowcaseAside({ selectedService, currentUser, interests }) {
             />
             <div className="photographer-card-info">
               <strong className="photographer-card-name">{selectedService.photographerNickname || '暂无昵称'}</strong>
-              <div className="photographer-card-location">{cityName(selectedService.cityName || selectedService.cityCode) || selectedService.serviceArea || '暂无城市'}</div>
+              <div className="photographer-card-location">{cityName(selectedService.cityName || selectedService.cityCode) || selectedService.serviceArea || '地区未填写'}</div>
               <div className="photographer-card-credit">{hasCreditScore ? `信用 ${credit}` : '暂无信用评分'}</div>
             </div>
           </div>

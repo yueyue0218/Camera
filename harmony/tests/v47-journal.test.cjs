@@ -37,6 +37,7 @@ function load(relative, page = false) {
     if(name.endsWith('/EnvironmentConfig')) return {EnvironmentConfig:{current:()=>({cacheNamespace:'dev',baseUrl:origin})}};
     if(name.endsWith('/ContentChanges')) return {ContentChanges:{publish:()=>events++}};
     if(name.endsWith('/JournalUI')) return {JournalStyle:{paper:'#F6F3EE'}};
+    if(name.endsWith('/ProvincePayload')) return load('common/region/ProvincePayload.ets');
     if(name.endsWith('/ProvinceCatalog')) return load('common/region/ProvinceCatalog.ets');
     if(name.endsWith('/JournalText')) return load('features/publish/JournalText.ets');
     if(name.endsWith('/ReportSubmissionStore')) return load('features/user/ReportSubmissionStore.ets');
@@ -292,9 +293,11 @@ test('detail report prevents own target and requires authentication before write
 
 test('existing edit and offline adapters retain exact verbs, paths and payloads',async()=>{
   const calls=[];const api=new ApiService({put:async(path,body)=>{calls.push(['PUT',path,body]);return {}},patch:async(path,body)=>{calls.push(['PATCH',path,body]);return {}}});
-  const service={title:'改',portfolioIds:[13,10]},demand={scene:'改',referenceFileIds:[21]};
+  const service={title:'改',cityCode:'南京',portfolioIds:[13,10]},demand={scene:'改',cityCode:'杭州市',referenceFileIds:[21]};
   await api.updateService(12,service);await api.updateDemand(23,demand);await api.offlineService(12);await api.closeDemand(23);
-  assert.deepEqual(calls,[['PUT','/service-packages/12',service],['PUT','/demands/23',demand],['PATCH','/service-packages/12/offline',undefined],['PATCH','/demands/23/close',undefined]]);
+  assert.equal(calls[0][1],'/service-packages/12');assert.equal(calls[0][2].cityCode,'JS');assert.deepEqual(calls[0][2].portfolioIds,[13,10]);
+  assert.equal(calls[1][1],'/demands/23');assert.equal(calls[1][2].cityCode,'ZJ');assert.deepEqual(calls[1][2].referenceFileIds,[21]);
+  assert.deepEqual(calls.slice(2),[['PATCH','/service-packages/12/offline',undefined],['PATCH','/demands/23/close',undefined]]);
 });
 
 

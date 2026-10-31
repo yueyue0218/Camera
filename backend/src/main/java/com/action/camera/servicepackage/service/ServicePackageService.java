@@ -119,7 +119,7 @@ public class ServicePackageService {
         ServicePackage servicePackage = new ServicePackage();
         servicePackage.setProviderId(currentUser.getUserId());
         servicePackage.setTitle(trim(request.getTitle()));
-        servicePackage.setCityCode(trim(request.getCityCode()));
+        servicePackage.setCityCode(ProvinceNames.requireCode(request.getCityCode()));
         servicePackage.setServiceArea(trimToNull(request.getServiceArea()));
         servicePackage.setScene(trim(request.getScene()));
         servicePackage.setStyleTags(normalizeTags(request.getStyleTags()));
@@ -189,7 +189,7 @@ public class ServicePackageService {
                                                           CurrentUser currentUser) {
         int safePage = Math.max(page, 1);
         int safeSize = Math.max(1, Math.min(size, MAX_PAGE_SIZE));
-        String normalizedCity = normalizeFilter(cityCode);
+        String normalizedCity = ProvinceNames.query(cityCode);
         String normalizedScene = normalizeFilter(scene);
         String normalizedStyle = normalizeFilter(style);
         String normalizedTimeTag = normalizeTimeTagFilter(timeTag);
@@ -628,7 +628,7 @@ public class ServicePackageService {
             servicePackage.setTitle(trim(request.getTitle()));
         }
         if (request.getCityCode() != null) {
-            servicePackage.setCityCode(trim(request.getCityCode()));
+            servicePackage.setCityCode(ProvinceNames.requireCode(request.getCityCode()));
         }
         if (request.getServiceArea() != null) {
             servicePackage.setServiceArea(trimToNull(request.getServiceArea()));

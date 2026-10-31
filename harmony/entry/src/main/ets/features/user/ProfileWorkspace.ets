@@ -1,3 +1,4 @@
+import { ProvinceCatalog } from '../../common/region/ProvinceCatalog';
 import { AppClient } from '../../app/AppClient';
 import { DemandSummary, ServicePackageSummary, UserProfileSummary, UpdateProfilePayload } from '../../model/ApiModels';
 import { PortraError } from '../../network/ErrorMapper';
@@ -212,7 +213,7 @@ export struct ProfileWorkspace {
         Column({ space: 6 }) {
           Text(item.title?.trim() || `摄影橱窗 #${item.serviceId}`).fontSize(14)
             .fontWeight(FontWeight.Medium).fontColor(PortraTheme.primaryText).maxLines(2)
-          Text(`${item.cityCode ?? '地区未填写'} · ${item.status ?? '状态未知'}`)
+          Text(`${ProvinceCatalog.display(item.cityCode)} · ${item.status ?? '状态未知'}`)
             .fontSize(11).fontColor(PortraTheme.secondaryText)
           Text(item.moderation?.status ?? '审核状态以后台为准')
             .fontSize(10).fontColor(PortraTheme.primary)

@@ -1,3 +1,4 @@
+import { ProvinceCatalog } from '../../common/region/ProvinceCatalog';
 import { PortraAvatar } from '../../common/components/PortraAvatar';
 
 export class JournalStyle {
@@ -75,7 +76,7 @@ export struct JournalFacts {
   }
   build() {
     Row() {
-      this.Cell('拍摄城市', this.city, false)
+      this.Cell(this.service ? '服务地区' : '拍摄地区', ProvinceCatalog.display(this.city), false)
       Divider().vertical(true).height(34).color(JournalStyle.line)
       this.Cell(this.middleLabel, this.middle, false)
       Divider().vertical(true).height(34).color(JournalStyle.line)

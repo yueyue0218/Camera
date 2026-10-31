@@ -28,6 +28,7 @@ function load(relative, page = false) {
     if (name.endsWith('/AppClient')) return {AppClient: {shared: app}};
     if (name === '@kit.MediaLibraryKit') return {photoAccessHelper: picker};
     if (name === '@kit.CoreFileKit') return {fileIo};
+    if (name.endsWith('/ProvinceCatalog')) return load('common/region/ProvinceCatalog.ets');
     if (name.endsWith('/JournalText')) return load('features/publish/JournalText.ets');
     if (name.endsWith('/ImageUpload')) return {ImageUpload};
     if (name.endsWith('/ErrorMapper')) return errors;

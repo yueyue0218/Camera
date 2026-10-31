@@ -1,3 +1,4 @@
+import { ProvinceCatalog } from '../../common/region/ProvinceCatalog';
 import { DemandListQuery, ServicePackageListQuery } from '../../model/ApiModels';
 
 export class HallFilterState {
@@ -18,6 +19,7 @@ export class HallFilterState {
   }
 
   validate(): string {
+    if (this.city && !ProvinceCatalog.code(this.city)) { return '请选择有效的省级地区'; }
     for (const amount of [this.minYuan, this.maxYuan]) {
       if (amount.length > 0 && (!/^\d+(\.\d{1,2})?$/.test(amount) ||
         Number(amount) * 100 > 2147483647)) {
@@ -43,13 +45,13 @@ export class HallFilterState {
 
   serviceQuery(page: number, size: number, seed: string): ServicePackageListQuery {
     return { page: page, size: size, sort: 'recommend', feedSeed: seed,
-      cityCode: this.city, style: this.style, minPriceCent: this.cents(this.minYuan),
+      cityCode: this.city ? ProvinceCatalog.requireCode(this.city) : undefined, style: this.style, minPriceCent: this.cents(this.minYuan),
       maxPriceCent: this.cents(this.maxYuan), availableDate: this.date };
   }
 
   demandQuery(page: number, size: number, seed: string): DemandListQuery {
     return { page: page, size: size, status: 'OPEN', sort: 'latest', feedSeed: seed,
-      cityCode: this.city, styleTag: this.style, minBudgetCent: this.cents(this.minYuan),
+      cityCode: this.city ? ProvinceCatalog.requireCode(this.city) : undefined, styleTag: this.style, minBudgetCent: this.cents(this.minYuan),
       maxBudgetCent: this.cents(this.maxYuan), expectedDate: this.date };
   }
 }

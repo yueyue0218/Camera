@@ -1,5 +1,7 @@
 package com.action.camera.provider.service.impl;
 
+import com.action.camera.common.region.ProvinceNames;
+
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
 import com.action.camera.credit.service.CreditSnapshotService;
@@ -54,7 +56,7 @@ public class ProviderProfileServiceImpl implements ProviderProfileService {
 
         if (dto.getDisplayName() != null)  profile.setDisplayName(dto.getDisplayName());
         if (dto.getBio() != null)           profile.setBio(dto.getBio());
-        if (dto.getCityCode() != null)      profile.setCityCode(dto.getCityCode());
+        if (dto.getCityCode() != null)      profile.setCityCode(dto.getCityCode().isBlank() ? null : ProvinceNames.requireCode(dto.getCityCode()));
         if (dto.getCityArea() != null)      profile.setCityArea(dto.getCityArea());
         if (dto.getPriceMin() != null)      profile.setPriceMin(dto.getPriceMin());
         if (dto.getPriceMax() != null)      profile.setPriceMax(dto.getPriceMax());
@@ -82,6 +84,7 @@ public class ProviderProfileServiceImpl implements ProviderProfileService {
             vo.setStyleTags(vo.getStyleTags().stream().filter(t -> t != null).toList());
         }
         vo.setCreditScore(creditSnapshotService.getDisplayCreditScore(providerUserId));
+        vo.setCityCode(ProvinceNames.codeOrOriginal(vo.getCityCode()));
         return vo;
     }
 }

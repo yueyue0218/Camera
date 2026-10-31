@@ -43,8 +43,9 @@ export function DemandForm({ form, uploading, onChange, onSubmit, onSaveDraft, o
               </select>
             </div>
             <div className="field">
-              <label>城市</label>
+              <label>拍摄地区</label>
               <select value={form.cityCode} onChange={event => onChange('cityCode', event.target.value)}>
+                <option value="">请选择省级地区</option>
                 {CITY_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </div>
@@ -112,7 +113,7 @@ export function DemandForm({ form, uploading, onChange, onSubmit, onSaveDraft, o
       <aside className="panel-card preview-ticket">
         <div className="preview-title">订单预览</div>
         <div className="preview-line"><span>标题</span><b>{form.title || form.scene || '想拍一组毕业照'}</b></div>
-        <div className="preview-line"><span>城市</span><b>{CITY_OPTIONS.find(option => option.value === form.cityCode)?.label || form.cityCode}</b></div>
+        <div className="preview-line"><span>拍摄地区</span><b>{CITY_OPTIONS.find(option => option.value === form.cityCode)?.label || '请选择省级地区'}</b></div>
         <div className="preview-line"><span>类型</span><b>{TYPE_OPTIONS.find(option => option.value === form.scene)?.label || form.scene}</b></div>
         <div className="preview-line"><span>预算</span><b>{Number(form.budgetMinYuan) === 0 && Number(form.budgetMaxYuan) === 0 ? '互勉' : `¥${form.budgetMinYuan}-${form.budgetMaxYuan}`}</b></div>
         <div className="preview-line"><span>时间描述</span><b>{form.timeDescription || form.timeSlot || '待沟通'}</b></div>

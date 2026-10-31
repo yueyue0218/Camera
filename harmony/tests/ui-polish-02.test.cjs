@@ -28,7 +28,7 @@ test('province and style menus reject historical values and share canonical valu
   const options = HallFilterOptions.cities(['南京','南京市','北京市','LEGACY']);
   assert.equal(options.length, 35); assert.equal(options[0].label, '不限地区');
   assert.equal(new Set(options.map(o=>o.value)).size, 35);
-  assert.equal(options.filter(o=>o.value==='江苏省').length, 1);
+  assert.equal(options.filter(o=>o.value==='JS').length, 1);
   for (const value of ['南京','南京市','JS','320100','苏州','苏州市']) assert.equal(ProvinceCatalog.normalize(value),'江苏省');
   assert.equal(ProvinceCatalog.normalize('北京市'),'北京市');
   assert.equal(ProvinceCatalog.normalize('LEGACY'),'');

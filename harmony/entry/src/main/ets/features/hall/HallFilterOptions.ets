@@ -13,9 +13,9 @@ export class HallFilterOption {
 
 export class HallFilterOptions {
   static cities(_observed: string[] = []): HallFilterOption[] {
-    return [new HallFilterOption('不限地区', ''), ...ProvinceCatalog.all.map((p: ProvinceOption) => new HallFilterOption(p.name, p.name))];
+    return [new HallFilterOption('不限地区', ''), ...ProvinceCatalog.all.map((p: ProvinceOption) => new HallFilterOption(p.name, p.code))];
   }
-  static cityLabel(value: string): string { return ProvinceCatalog.normalize(value) || value; }
+  static cityLabel(value: string): string { return ProvinceCatalog.display(value); }
   static styleLabel(value: string): string { return value; }
   static styles(_tags: string[] = []): HallFilterOption[] {
     const presets: string[] = ['日系清新', '胶片复古', '情绪人像', '自然光', '校园写真',

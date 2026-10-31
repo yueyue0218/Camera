@@ -1,5 +1,7 @@
 package com.action.camera.application;
 
+import com.action.camera.common.region.ProvinceNames;
+
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.JwtUtil;
 import com.action.camera.common.exception.BusinessException;
@@ -106,14 +108,7 @@ public class UserService {
             dirty = true;
         }
 
-        // 最大努力更新 IP 归属地
-        try {
-            String province = ipLocationService.resolveProvince(clientIp);
-            if (province != null && !province.equals(user.getCityCode())) {
-                user.setCityCode(province);
-                dirty = true;
-            }
-        } catch (Exception ignored) {}
+        // Public region changes only through explicit profile updates.
 
         if (dirty) {
             userRepository.save(user);
@@ -187,7 +182,7 @@ public class UserService {
         resp.setBirthdayVisible(user.getBirthdayVisible());
         resp.setLocationDisplay(user.getLocationDisplay());
         resp.setLocationVisible(user.getLocationVisible());
-        resp.setCityCode(user.getCityCode());
+        resp.setCityCode(ProvinceNames.codeOrOriginal(user.getCityCode()));
         resp.setBio(user.getBio());
         resp.setAvatarFileId(user.getAvatarFileId());
         resp.setCurrentRole(user.getCurrentRole());
@@ -315,7 +310,7 @@ public class UserService {
         }
         // Location and privacy belong to the account and are editable from either identity.
         if (req.getCityCode() != null && !req.getCityCode().isBlank()) {
-            user.setCityCode(req.getCityCode().trim());
+            user.setCityCode(ProvinceNames.requireCode(req.getCityCode()));
         }
         if (req.getGender() != null) {
             user.setGender(req.getGender().isBlank() ? null : req.getGender().trim());

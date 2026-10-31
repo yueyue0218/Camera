@@ -10,7 +10,7 @@ const method = source.slice(source.indexOf('  private async switchRole()'), sour
 const code = ts.transpileModule(`class Page { ${method} }; module.exports = Page;`, {
   compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS }
 }).outputText;
-const mod = { exports: {} }; new Function('module', 'UiPerf', code)(mod, {mark() {}, elapsed() {}});
+const mod = { exports: {} }; new Function('module', 'UiPerf', 'ProvinceLocation', code)(mod, {mark() {}, elapsed() {}}, {clear() {}});
 function fixture() {
   let epoch = 10, requests = 0, broadcasts = 0, loads = 0, resolve, reject;
   const page = new mod.exports();

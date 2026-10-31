@@ -1,3 +1,4 @@
+import { ProvinceCatalog } from '../common/region/ProvinceCatalog';
 import { UiPerf } from '../common/performance/UiPerf';
 import { ContentChanges } from '../features/user/ContentChanges';
 import { DemandSummary, ServicePackageSummary } from '../model/ApiModels';
@@ -286,7 +287,7 @@ export struct PublicProfilePage {
                 Row({ space: 11 }) {
                   PortraImage({ source: item.coverImage ?? '', imageWidth: 64, imageHeight: 68,
                     cornerRadius: 10, fallbackText: '橱窗', contentDescription: '公开橱窗封面' })
-                  this.PublicationText(item.title?.trim() || '摄影橱窗', item.cityCode ?? '')
+                  this.PublicationText(item.title?.trim() || '摄影橱窗', ProvinceCatalog.display(item.cityCode))
                 }.width('100%').padding(12).backgroundColor(PortraTheme.surface)
                   .borderRadius(16).border({ width: 1, color: PortraTheme.border })
                   .onClick(() => this.onOpenService?.(item.serviceId))
@@ -295,7 +296,7 @@ export struct PublicProfilePage {
                 Row({ space: 11 }) {
                   PortraImage({ fileId: item.referenceFileIds?.[0] ?? 0, imageWidth: 64, imageHeight: 68,
                     cornerRadius: 10, fallbackText: '需求', contentDescription: '公开需求图片' })
-                  this.PublicationText(item.scene?.trim() || '约拍需求', item.cityCode ?? '')
+                  this.PublicationText(item.scene?.trim() || '约拍需求', ProvinceCatalog.display(item.cityCode))
                 }.width('100%').padding(12).backgroundColor(PortraTheme.surface)
                   .borderRadius(16).border({ width: 1, color: PortraTheme.border })
                   .onClick(() => this.onOpenDemand?.(item.demandId))

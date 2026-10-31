@@ -104,7 +104,7 @@ public class DemandService {
                 trim(request.getTimeSlot()),
                 trim(request.getTimeDescription()),
                 normalizeTimeTags(request.getTimeTags()),
-                trim(request.getCityCode()),
+                ProvinceNames.requireCode(request.getCityCode()),
                 trim(request.getLocation()),
                 request.getBudgetMinCent(),
                 request.getBudgetMaxCent(),
@@ -169,7 +169,7 @@ public class DemandService {
         int safePage = Math.max(page, 1);
         int safeSize = Math.max(1, Math.min(size, 50));
         String normalizedTag = isBlank(styleTag) ? null : styleTag.trim().toLowerCase(Locale.ROOT);
-        String normalizedCity = normalizeTextFilter(cityCode);
+        String normalizedCity = ProvinceNames.query(cityCode);
         String normalizedScene = normalizeTextFilter(scene);
         String normalizedTimeTag = normalizeTimeTagFilter(timeTag);
         String normalizedSort = normalizeDemandSort(sort);
@@ -637,7 +637,7 @@ public class DemandService {
         }
         if (request.getCityCode() != null) {
             requireText(request.getCityCode(), "cityCode must not be blank");
-            demand.setCityCode(trim(request.getCityCode()));
+            demand.setCityCode(ProvinceNames.requireCode(request.getCityCode()));
         }
         if (request.getLocation() != null) {
             requireText(request.getLocation(), "location must not be blank");
