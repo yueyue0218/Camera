@@ -1,3 +1,6 @@
+import { ProvincePayload } from '../common/region/ProvincePayload';
+import { UploadedImage } from '../model/ApiModels';
+import { ProvinceCatalog } from '../common/region/ProvinceCatalog';
 import { CreateMomentPayload } from '../model/ApiModels';
 import { OrderEngagementSummary, ReviewSummary, ReviewComplaintSummary, DisputeSummary, CreateReviewPayload, ReviewTextPayload, CreateReviewComplaintPayload, DisputeReasonPayload } from '../model/ApiModels';
 import { NotificationSummary, CreditSummary, CreditRecordSummary } from '../model/ApiModels';
@@ -19,6 +22,10 @@ export class ApiService implements NativeSessionApi {
 
   constructor(client: HttpClient = new HttpClient()) {
     this.client = client;
+  }
+
+  uploadImage(data: ArrayBuffer, bizType: string, mime: string, filename: string): Promise<UploadedImage> {
+    return this.client.uploadImage(data, bizType, mime, filename);
   }
 
   createMoment(payload: CreateMomentPayload, requestKey: string = 'moments.create'): Promise<MomentSummary> {
@@ -64,7 +71,7 @@ export class ApiService implements NativeSessionApi {
   listDemandsByQuery(query: DemandListQuery, requestKey: string = 'demands.list'):
     Promise<PageResult<DemandSummary>> {
     const params: string[] = [`page=${this.safePage(query.page)}`, `size=${this.safeSize(query.size)}`];
-    this.appendText(params, 'cityCode', query.cityCode);
+    this.appendText(params, 'cityCode', query.cityCode?.trim() ? ProvinceCatalog.requireCode(query.cityCode) : undefined);
     this.appendText(params, 'scene', query.scene);
     this.appendText(params, 'status', query.status);
     this.appendDate(params, 'expectedDate', query.expectedDate);
@@ -98,7 +105,17 @@ export class ApiService implements NativeSessionApi {
   }
 
   createDemand(payload: CreateDemandPayload): Promise<DemandSummary> {
-    return this.client.post<DemandSummary>('/demands', payload, 'demands.create');
+    ProvinceCatalog.requireCode(payload.cityCode);
+    return this.client.post<DemandSummary>('/demands', ProvincePayload.demand(payload), 'demands.create');
+  }
+
+  updateDemand(id: number, payload: CreateDemandPayload): Promise<DemandSummary> {
+    ProvinceCatalog.requireCode(payload.cityCode);
+    return this.client.put<DemandSummary>(`/demands/${id}`, ProvincePayload.demand(payload), 'demands.update');
+  }
+  updateService(id: number, payload: CreateServicePackagePayload): Promise<ServicePackageDetail> {
+    ProvinceCatalog.requireCode(payload.cityCode);
+    return this.client.put<ServicePackageDetail>(`/service-packages/${id}`, ProvincePayload.service(payload), 'servicePackages.update');
   }
 
   respondToDemand(demandId: number, message: string, expectedPriceCent?: number): Promise<DemandResponseSummary> {
@@ -138,7 +155,7 @@ export class ApiService implements NativeSessionApi {
   listServicePackagesByQuery(query: ServicePackageListQuery,
     requestKey: string = 'servicePackages.list'): Promise<PageResult<ServicePackageSummary>> {
     const params: string[] = [`page=${this.safePage(query.page)}`, `size=${this.safeSize(query.size)}`];
-    this.appendText(params, 'cityCode', query.cityCode);
+    this.appendText(params, 'cityCode', query.cityCode?.trim() ? ProvinceCatalog.requireCode(query.cityCode) : undefined);
     this.appendText(params, 'scene', query.scene);
     this.appendText(params, 'style', query.style);
     this.appendNonNegative(params, 'minPriceCent', query.minPriceCent);
@@ -167,7 +184,8 @@ export class ApiService implements NativeSessionApi {
   }
 
   createServicePackage(payload: CreateServicePackagePayload): Promise<CreateServicePackageResult> {
-    return this.client.post<CreateServicePackageResult>('/service-packages', payload, 'servicePackages.create');
+    ProvinceCatalog.requireCode(payload.cityCode);
+    return this.client.post<CreateServicePackageResult>('/service-packages', ProvincePayload.service(payload), 'servicePackages.create');
   }
 
   listServicePackageInterests(page: number = 1, size: number = 100):

@@ -1,5 +1,7 @@
 package com.action.camera.social.service;
 
+import com.action.camera.common.region.ProvinceNames;
+
 import com.action.camera.admin.domain.ModerationStatus;
 import com.action.camera.common.ErrorCode;
 import com.action.camera.common.exception.BusinessException;
@@ -173,7 +175,7 @@ public class SocialRelationService {
                 followedByCurrentUser,
                 momentCount,
                 providerProfile,
-                user.getCityCode()
+                ProvinceNames.codeOrOriginal(user.getCityCode())
         );
     }
 

@@ -2,7 +2,7 @@ import { http } from '@kit.NetworkKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { AuthTokenController } from '../auth/AuthTokenController';
 import { EnvironmentConfig } from '../common/config/EnvironmentConfig';
-import { ApiEnvelope } from '../model/ApiModels';
+import { ApiEnvelope, UploadedImage } from '../model/ApiModels';
 import { AuthInterceptor } from './AuthInterceptor';
 import { ErrorMapper, PortraError } from './ErrorMapper';
 
@@ -16,6 +16,21 @@ export class HttpClient implements AuthTokenController {
   private readonly requestVersions: Map<string, number> = new Map<string, number>();
   private readonly activeRequests: Map<string, http.HttpRequest> = new Map<string, http.HttpRequest>();
   private readonly requestScopes: Map<string, boolean> = new Map<string, boolean>();
+  private readonly identityListeners: Set<() => void> = new Set<() => void>();
+  observeIdentity(listener: () => void): void { this.identityListeners.add(listener); }
+  unobserveIdentity(listener: () => void): void { this.identityListeners.delete(listener); }
+  getIdentityEpoch(): number { return this.sessionEpoch; }
+  getImage(path: string, key: string): Promise<ArrayBuffer> {
+    return this.request<ArrayBuffer>(http.RequestMethod.GET, path, key, true, undefined, true);
+  }
+  uploadImage(data: ArrayBuffer, bizType: string, mime: string, filename: string): Promise<UploadedImage> {
+    const parts: http.MultiFormData[] = [
+      { name: 'file', contentType: mime, remoteFileName: filename, data: data },
+      { name: 'bizType', contentType: 'text/plain', data: bizType },
+      { name: 'visibility', contentType: 'text/plain', data: 'PUBLIC' }
+    ];
+    return this.request<UploadedImage>(http.RequestMethod.POST, '/files/upload', 'files.upload', true, undefined, false, parts);
+  }
   private sessionEpoch: number = 0;
   private tokenRevision: number = 0;
   // Keep even a failed recovery while requests sent with that token are pending.
@@ -47,6 +62,7 @@ export class HttpClient implements AuthTokenController {
 
   private invalidateSessionRequests(): void {
     this.sessionEpoch++;
+    this.identityListeners.forEach((listener: () => void) => { try { listener(); } catch (_) {} });
     // Public GETs carry no account state. In particular, startup restore must
     // not cancel the hall feed. Pending refresh waiters are invalidated too.
     this.requestScopes.forEach((scoped: boolean, key: string) => {
@@ -105,7 +121,7 @@ export class HttpClient implements AuthTokenController {
   }
 
   private async request<T>(method: http.RequestMethod, path: string, requestKey: string,
-    authenticated: boolean, body?: Object): Promise<T> {
+    authenticated: boolean, body?: Object, binary: boolean = false, parts?: http.MultiFormData[]): Promise<T> {
     const profile = EnvironmentConfig.current();
     if (!EnvironmentConfig.isUsable(profile)) {
       throw ErrorMapper.config(`当前环境 ${profile.name} 没有可用的服务端地址。`);
@@ -133,7 +149,7 @@ export class HttpClient implements AuthTokenController {
         const authorization = authenticated ? this.authInterceptor.authorizationHeader() : '';
         try {
           const result = await this.requestOnce<T>(method, path, requestKey, requestVersion,
-            profile.baseUrl, authorization, body);
+            profile.baseUrl, authorization, body, binary, parts);
           this.assertCurrent(requestKey, requestVersion, epoch, scoped);
           return result;
         } catch (error) {
@@ -191,33 +207,35 @@ export class HttpClient implements AuthTokenController {
   }
 
   private async requestOnce<T>(method: http.RequestMethod, path: string, requestKey: string,
-    requestVersion: number, baseUrl: string, authorization: string, body?: Object): Promise<T> {
+    requestVersion: number, baseUrl: string, authorization: string, body?: Object, binary: boolean = false, parts?: http.MultiFormData[]): Promise<T> {
     const request = http.createHttp();
     this.activeRequests.set(requestKey, request);
     const content = body === undefined ? undefined : JSON.stringify(body);
     const options: http.HttpRequestOptions = authorization.length === 0
       ? {
         method: method,
-        header: { 'Content-Type': 'application/json' },
-        expectDataType: http.HttpDataType.STRING,
+        header: { 'Content-Type': parts ? 'multipart/form-data' : 'application/json' },
+        expectDataType: binary ? http.HttpDataType.ARRAY_BUFFER : http.HttpDataType.STRING,
         connectTimeout: 10000,
         readTimeout: 15000,
         maxRedirects: 0,
         usingCache: false,
-        extraData: content
+        extraData: content,
+        multiFormDataList: parts
       }
       : {
         method: method,
         header: {
-          'Content-Type': 'application/json',
+          'Content-Type': parts ? 'multipart/form-data' : 'application/json',
           'Authorization': authorization
         },
-        expectDataType: http.HttpDataType.STRING,
+        expectDataType: binary ? http.HttpDataType.ARRAY_BUFFER : http.HttpDataType.STRING,
         connectTimeout: 10000,
         readTimeout: 15000,
         maxRedirects: 0,
         usingCache: false,
-        extraData: content
+        extraData: content,
+        multiFormDataList: parts
       };
 
     let response: http.HttpResponse;
@@ -242,6 +260,10 @@ export class HttpClient implements AuthTokenController {
       throw ErrorMapper.fromHttpStatus(response.responseCode);
     }
 
+    if (binary) {
+      if (!(response.result instanceof ArrayBuffer) || response.result.byteLength === 0 || response.result.byteLength > 10 * 1024 * 1024) { throw ErrorMapper.parse(); }
+      return response.result as T;
+    }
     let envelope: ApiEnvelope<T>;
     try {
       if (typeof response.result !== 'string') {

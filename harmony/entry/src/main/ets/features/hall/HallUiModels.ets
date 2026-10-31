@@ -1,3 +1,4 @@
+import { ProvinceCatalog } from '../../common/region/ProvinceCatalog';
 export enum HallContentState {
   LOADING = 'loading',
   CONTENT = 'content',
@@ -17,14 +18,7 @@ export class HallTextFormatter {
   }
 
   static city(value: string | undefined): string {
-    const normalized = value?.trim() ?? '';
-    const knownCities: Record<string, string> = {
-      '320100': '南京',
-      '320500': '苏州',
-      '310000': '上海',
-      '330100': '杭州'
-    };
-    return knownCities[normalized] ?? (normalized.length > 0 ? normalized : '城市待定');
+    return ProvinceCatalog.display(value);
   }
 
   static price(priceRange: string | undefined, basePriceCent: number | undefined): string {

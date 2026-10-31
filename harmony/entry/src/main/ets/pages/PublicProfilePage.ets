@@ -1,3 +1,4 @@
+import { ProvinceCatalog } from '../common/region/ProvinceCatalog';
 import { AppClient } from '../app/AppClient';
 import { PortraAvatar } from '../common/components/PortraAvatar';
 import { PortraLoading } from '../common/components/PortraLoading';

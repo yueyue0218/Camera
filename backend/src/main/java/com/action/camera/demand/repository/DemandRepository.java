@@ -3,6 +3,7 @@ package com.action.camera.demand.repository;
 import com.action.camera.admin.domain.ModerationStatus;
 import com.action.camera.demand.domain.Demand;
 import com.action.camera.demand.domain.DemandStatus;
+import com.action.camera.common.region.ProvinceSql;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -27,7 +28,8 @@ public interface DemandRepository extends JpaRepository<Demand, Long> {
             where d.status = 'OPEN'
               and d.moderation_status = 'VISIBLE'
               and coalesce(d.hidden_by_customer, false) = false
-              and (:cityCode is null or lower(d.city_code) = lower(:cityCode))
+              and """ + ProvinceSql.DEMAND + """
+
               and (:scene is null or lower(d.scene) = lower(:scene))
               and (:styleTag is null or instr(lower(coalesce(d.style_tags, '')), concat('\"', lower(:styleTag), '\"')) > 0)
               and (:expectedDate is null or d.expected_date = :expectedDate)
@@ -61,7 +63,8 @@ public interface DemandRepository extends JpaRepository<Demand, Long> {
             where d.status = 'OPEN'
               and d.moderation_status = 'VISIBLE'
               and coalesce(d.hidden_by_customer, false) = false
-              and (:cityCode is null or lower(d.city_code) = lower(:cityCode))
+              and """ + ProvinceSql.DEMAND + """
+
               and (:scene is null or lower(d.scene) = lower(:scene))
               and (:styleTag is null or instr(lower(coalesce(d.style_tags, '')), concat('\"', lower(:styleTag), '\"')) > 0)
               and (:expectedDate is null or d.expected_date = :expectedDate)

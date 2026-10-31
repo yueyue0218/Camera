@@ -1,3 +1,4 @@
+import { ProvinceCatalog, provinceName } from '../../../common/region/ProvinceCatalog.js'
 export const TIME_TAG_OPTIONS = [
   { label: '时间标签', value: '' },
   { label: '不限时间', value: '' },
@@ -13,42 +14,7 @@ export const TIME_STYLE_OPTIONS = [
   { label: '近一个月', value: 'NEAR_1_MONTH' }
 ]
 
-export const CITY_OPTIONS = [
-  { label: '北京', value: 'BJ' },
-  { label: '天津', value: 'TJ' },
-  { label: '河北', value: 'HE' },
-  { label: '山西', value: 'SX' },
-  { label: '内蒙古', value: 'NM' },
-  { label: '辽宁', value: 'LN' },
-  { label: '吉林', value: 'JL' },
-  { label: '黑龙江', value: 'HL' },
-  { label: '上海', value: 'SH' },
-  { label: '江苏', value: 'JS' },
-  { label: '浙江', value: 'ZJ' },
-  { label: '安徽', value: 'AH' },
-  { label: '福建', value: 'FJ' },
-  { label: '江西', value: 'JX' },
-  { label: '山东', value: 'SD' },
-  { label: '河南', value: 'HA' },
-  { label: '湖北', value: 'HB' },
-  { label: '湖南', value: 'HN' },
-  { label: '广东', value: 'GD' },
-  { label: '广西', value: 'GX' },
-  { label: '海南', value: 'HI' },
-  { label: '重庆', value: 'CQ' },
-  { label: '四川', value: 'SC' },
-  { label: '贵州', value: 'GZ' },
-  { label: '云南', value: 'YN' },
-  { label: '西藏', value: 'XZ' },
-  { label: '陕西', value: 'SN' },
-  { label: '甘肃', value: 'GS' },
-  { label: '青海', value: 'QH' },
-  { label: '宁夏', value: 'NX' },
-  { label: '新疆', value: 'XJ' },
-  { label: '香港', value: 'HK' },
-  { label: '澳门', value: 'MO' },
-  { label: '台湾', value: 'TW' }
-]
+export const CITY_OPTIONS = ProvinceCatalog.map(p => ({ label: p.name, value: p.code }))
 
 export const TYPE_OPTIONS = [
   { label: '毕业照', value: '毕业照' },
@@ -58,7 +24,7 @@ export const TYPE_OPTIONS = [
   { label: '其他', value: '其他' }
 ]
 
-export const DEFAULT_CITY_CODE = 'JS'
+export const DEFAULT_CITY_CODE = ''
 export const DEFAULT_TYPE = '毕业照'
 export const DEFAULT_BUDGET_MIN_YUAN = 300
 export const DEFAULT_BUDGET_MAX_YUAN = 500
@@ -72,39 +38,7 @@ export const demandStatusText = {
   REJECTED: '已拒绝'
 }
 
-export const cityNameMap = {
-  NJU: '南京大学',
-  NJ: '南京',
-  NKG: '南京',
-  NANJING: '南京',
-  nanjing: '南京',
-  南京: '南京',
-  SH: '上海',
-  SHA: '上海',
-  SHANGHAI: '上海',
-  shanghai: '上海',
-  上海: '上海',
-  JS: '江苏',
-  JIANGSU: '江苏',
-  jiangsu: '江苏',
-  江苏: '江苏',
-  ZJ: '浙江',
-  ZHEJIANG: '浙江',
-  浙江: '浙江',
-  GD: '广东',
-  GUANGDONG: '广东',
-  广东: '广东',
-  BJ: '北京',
-  PEK: '北京',
-  BEIJING: '北京',
-  beijing: '北京',
-  北京: '北京',
-  HZ: '杭州',
-  HGH: '杭州',
-  HANGZHOU: '杭州',
-  hangzhou: '杭州',
-  杭州: '杭州'
-}
+export const cityNameMap = Object.fromEntries(ProvinceCatalog.flatMap(p => [p.code, p.name, ...p.aliases].map(value => [value, p.name])))
 
 const gradients = [
   'linear-gradient(135deg,#d7c3b4,#9aa6a7 48%,#f3dfc0)',
@@ -136,11 +70,7 @@ export function firstText(...values) {
 }
 
 export function cityName(value) {
-  return CITY_OPTIONS.find(option => option.value === value)?.label ||
-    cityNameMap[value] ||
-    cityNameMap[String(value || '').toUpperCase()] ||
-    value ||
-    ''
+  return value ? provinceName(value) : ''
 }
 
 export function countText(value, unit = '') {

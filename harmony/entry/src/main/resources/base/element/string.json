@@ -11,6 +11,10 @@
     {
       "name": "EntryAbility_label",
       "value": "label"
+    },
+    {
+      "name": "province_location_reason",
+      "value": "用于解析省级地区，支持手动选择，不保存精确位置"
     }
   ]
 }

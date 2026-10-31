@@ -28,6 +28,7 @@ export struct DemandDetailPage {
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
   onBack?: () => void;
+  onEdit?: (id: number) => void;
   onRequireLogin?: () => void;
   onOpenConversation?: (conversationId: number) => void;
 
@@ -276,10 +277,13 @@ export struct DemandDetailPage {
               })
             }
 
+            if (this.userId === this.demand.customerId && this.role === 'CUSTOMER' && this.demand.status === 'OPEN') {
+              Button('编辑需求').onClick(() => this.onEdit?.(this.demandId))
+            }
             Column() {
               Row() {
                 this.Fact('预算', HallTextFormatter.budget(this.demand.budgetMinCent, this.demand.budgetMaxCent))
-                this.Fact('拍摄城市', HallTextFormatter.city(this.demand.cityCode))
+                this.Fact('拍摄地区', HallTextFormatter.city(this.demand.cityCode))
               }
               Row() {
                 this.Fact('拍摄时间', HallTextFormatter.nonEmpty(this.demand.timeDescription,

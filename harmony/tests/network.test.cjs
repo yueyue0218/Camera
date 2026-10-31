@@ -318,7 +318,7 @@ test('hall queries forward only supported backend filters and stable sorting', a
     timeTag: 'weekend', keyword: '校园 写真', sort: 'recommend', feedSeed: 'device-a' });
   let call = calls.at(-1);
   assert.equal(call.url, EnvironmentConfig.current().baseUrl +
-    '/service-packages?page=2&size=20&cityCode=320100&scene=%E4%BA%BA%E5%83%8F&style=%E8%87%AA%E7%84%B6' +
+    '/service-packages?page=2&size=20&cityCode=JS&scene=%E4%BA%BA%E5%83%8F&style=%E8%87%AA%E7%84%B6' +
     '&minPriceCent=10000&maxPriceCent=80000&availableDate=2026-11-01&timeTag=weekend' +
     '&keyword=%E6%A0%A1%E5%9B%AD%20%E5%86%99%E7%9C%9F&sort=recommend&feedSeed=device-a');
   complete(call, { records: [], page: 2, size: 20, total: 0 });
@@ -328,7 +328,7 @@ test('hall queries forward only supported backend filters and stable sorting', a
     styleTag: '纪实', minBudgetCent: 20000, sort: 'latest', feedSeed: 'device-a' });
   call = calls.at(-1);
   assert.equal(call.url, EnvironmentConfig.current().baseUrl +
-    '/demands?page=1&size=20&cityCode=310000&status=OPEN&styleTag=%E7%BA%AA%E5%AE%9E' +
+    '/demands?page=1&size=20&cityCode=SH&status=OPEN&styleTag=%E7%BA%AA%E5%AE%9E' +
     '&minBudgetCent=20000&sort=latest&feedSeed=device-a');
   complete(call, { records: [], page: 1, size: 20, total: 0 });
   await demands;

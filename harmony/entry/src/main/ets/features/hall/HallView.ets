@@ -5,11 +5,15 @@ import { PortraErrorView } from '../../common/components/PortraErrorView';
 import { PortraLoading } from '../../common/components/PortraLoading';
 import { PortraTheme } from '../../theme/PortraTheme';
 import { DemandCard, PortraPublishBanner, ShowcaseCard } from './components/HallCards';
-import { HallFilters, HallSegmentedControl } from './components/HallControls';
+import { HallSegmentedControl } from './components/HallControls';
+import { HallFilters } from './components/HallFilters';
+import { HallFilterState } from './HallFilterState';
 import { HallChannel, HallContentState } from './HallUiModels';
 
 @Component
 export struct HallView {
+  @Prop filters: HallFilterState = new HallFilterState();
+  onFilterChange?: (filters: HallFilterState) => void;
   @Prop serviceState: HallContentState = HallContentState.LOADING;
   @Prop demandState: HallContentState = HallContentState.LOADING;
   @Prop serviceItems: ServicePackageSummary[] = [];
@@ -141,6 +145,7 @@ export struct HallView {
           onChange: (channel: HallChannel) => this.selectChannel(channel)
         })
         HallFilters({
+          filters: this.filters, onChange: this.onFilterChange,
           channel: this.channel,
           serviceSort: this.serviceSort,
           demandSort: this.demandSort,

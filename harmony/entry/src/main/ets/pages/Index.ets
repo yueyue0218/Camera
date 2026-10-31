@@ -1,3 +1,5 @@
+import { PrivacyConsentPage } from '../privacy/PrivacyConsentPage';
+import { ProvinceLocation } from '../common/location/ProvinceLocation';
 import { OrderEngagementPage } from './OrderEngagementPage';
 import { NotificationTarget } from '../features/notifications/NotificationTargetResolver';
 import { NotificationPage } from './NotificationPage';
@@ -31,8 +33,20 @@ struct Index {
   private restorePromise?: Promise<void>;
   @State private orderReloadEpoch: number = 0;
 
+  @State private privacyAccepted: boolean = false;
+  @State private privacyError: string = '';
+  private readonly privacyChanged: () => void = () => {
+    this.privacyAccepted = this.appClient.hasRequiredPrivacyConsent();
+    if (!this.privacyAccepted) { this.appPathStack.clear(); ProvinceLocation.clear(); }
+  };
   aboutToAppear(): void {
-    this.restorePromise = this.appClient.restoreSession();
+    this.appClient.observePrivacyAccess(this.privacyChanged); this.privacyChanged();
+    if (this.privacyAccepted) { this.appClient.preparePrivacyIdentity(); this.restorePromise = this.appClient.restoreSession(); }
+  }
+  aboutToDisappear(): void { this.appClient.unobservePrivacyAccess(this.privacyChanged); }
+  private acceptPrivacy(): void {
+    try { this.appClient.acceptRequiredPrivacyConsent(); this.privacyChanged(); this.restorePromise = this.appClient.restoreSession(); }
+    catch (_) { this.privacyError = '隐私授权保存失败，请重试'; }
   }
 
   @Builder
@@ -54,6 +68,9 @@ struct Index {
         this.ConversationDetailDestination(param);
       } else if (name === AppRoute.PUBLISH) {
         PublishPage({
+          demandId: (param as NavigationRouteParam).demandId ?? 0,
+          serviceId: (param as NavigationRouteParam).serviceId ?? 0,
+          onServicePublished: (id: number) => { this.appPathStack.pop(); this.pushRoute(AppRoute.SERVICE_DETAIL, { serviceId: id }); },
           onBack: () => this.appPathStack.pop(),
           onPublished: (demandId: number) => {
             this.appPathStack.pop();
@@ -166,6 +183,7 @@ struct Index {
       this.PlaceholderPage('需求详情', '无效的需求编号');
     } else {
       DemandDetailPage({
+        onEdit: (id: number) => this.openPage(AppRoute.PUBLISH, { demandId: id }),
         demandId: this.validDemandId(param),
         onBack: () => this.appPathStack.pop(),
         onRequireLogin: () => this.openLoginFor(AppRoute.DEMAND_DETAIL,
@@ -182,6 +200,7 @@ struct Index {
       this.PlaceholderPage('摄影橱窗', '无效的橱窗编号');
     } else {
       ServiceDetailPage({
+        onEdit: (id: number) => this.openPage(AppRoute.PUBLISH, { serviceId: id }),
         serviceId: this.validServiceId(param),
         onBack: () => this.appPathStack.pop(),
         onRequireLogin: () => this.openLoginFor(AppRoute.SERVICE_DETAIL,
@@ -285,11 +304,16 @@ struct Index {
   }
 
   build() {
+    if (!this.privacyAccepted) {
+      PrivacyConsentPage({ errorMessage: this.privacyError, onAccept: () => this.acceptPrivacy(),
+        onDecline: () => { this.privacyError = '尚未同意隐私授权，定位保持关闭'; } })
+    } else {
     Navigation(this.appPathStack) {
       this.AppShell()
     }
     .navDestination(this.PageMap)
     .hideTitleBar(true)
     .mode(NavigationMode.Stack)
+    }
   }
 }

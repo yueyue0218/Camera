@@ -31,6 +31,23 @@ class ServicePackageRepositoryPaginationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
+    void provinceAliasesAreFilteredBeforePagingAndCounting() {
+        LocalDate date = LocalDate.of(2026, 10, 1);
+        for (String value : List.of("JS", "南京", "南京市", "NJ", "江苏", "江苏省", "320102", "苏州市")) {
+            repository.save(servicePackage(900L, value, 30000L, date, ModerationStatus.VISIBLE, false));
+        }
+        repository.save(servicePackage(900L, "上海市", 30000L, date, ModerationStatus.VISIBLE, false));
+        repository.save(servicePackage(900L, "320ABC", 30000L, date, ModerationStatus.VISIBLE, false));
+        repository.flush();
+        for (String selected : List.of("JS", "江苏省", "南京")) {
+            Page<ServicePackage> page = repository.findPublicPage(selected, null, null, null, null, null, null, null, "latest", PageRequest.of(1, 3));
+            assertThat(page.getTotalElements()).isEqualTo(8);
+            assertThat(page.getContent()).hasSize(3);
+            assertThat(page.getContent()).allMatch(s -> com.action.camera.common.region.ProvinceNames.matches(s.getCityCode(), "JS"));
+        }
+    }
+
+    @Test
     void publicPageFiltersCountsSortsAndPagesInDatabase() {
         LocalDate availableDate = LocalDate.of(2026, 9, 6);
         repository.saveAll(List.of(

@@ -1,6 +1,7 @@
 package com.action.camera.servicepackage.mapper;
 
 import com.action.camera.admin.dto.ModerationView;
+import com.action.camera.common.region.ProvinceNames;
 import com.action.camera.servicepackage.domain.ServicePackage;
 import com.action.camera.servicepackage.dto.CreateServicePackageResult;
 import com.action.camera.servicepackage.dto.ServicePackageCardDto;
@@ -52,7 +53,7 @@ public final class ServicePackageMapper {
                 avatarUrl(photographerInfo),
                 creditScore(photographerInfo),
                 servicePackage.getTitle(),
-                servicePackage.getCityCode(),
+                ProvinceNames.codeOrOriginal(servicePackage.getCityCode()),
                 servicePackage.getScene(),
                 servicePackage.getStyleTags(),
                 coverImage,
@@ -94,7 +95,7 @@ public final class ServicePackageMapper {
                 avatarUrl(photographerInfo),
                 creditScore(photographerInfo),
                 servicePackage.getTitle(),
-                servicePackage.getCityCode(),
+                ProvinceNames.codeOrOriginal(servicePackage.getCityCode()),
                 servicePackage.getServiceArea(),
                 servicePackage.getScene(),
                 servicePackage.getStyleTags(),

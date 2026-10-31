@@ -3,6 +3,7 @@ package com.action.camera.servicepackage.repository;
 import com.action.camera.admin.domain.ModerationStatus;
 import com.action.camera.servicepackage.domain.ServicePackage;
 import com.action.camera.servicepackage.domain.ServicePackageStatus;
+import com.action.camera.common.region.ProvinceSql;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -30,7 +31,8 @@ public interface ServicePackageRepository extends JpaRepository<ServicePackage, 
             where sp.status = 'ONLINE'
               and sp.moderation_status = 'VISIBLE'
               and coalesce(sp.hidden_by_provider, false) = false
-              and (:cityCode is null or lower(sp.city_code) = lower(:cityCode))
+              and """ + ProvinceSql.SERVICE + """
+
               and (:scene is null or lower(sp.scene) = lower(:scene))
               and (:style is null or instr(lower(coalesce(sp.style_tags, '')), concat('\"', lower(:style), '\"')) > 0)
               and (:minPriceCent is null or sp.base_price_cent >= :minPriceCent)
@@ -71,7 +73,8 @@ public interface ServicePackageRepository extends JpaRepository<ServicePackage, 
             where sp.status = 'ONLINE'
               and sp.moderation_status = 'VISIBLE'
               and coalesce(sp.hidden_by_provider, false) = false
-              and (:cityCode is null or lower(sp.city_code) = lower(:cityCode))
+              and """ + ProvinceSql.SERVICE + """
+
               and (:scene is null or lower(sp.scene) = lower(:scene))
               and (:style is null or instr(lower(coalesce(sp.style_tags, '')), concat('\"', lower(:style), '\"')) > 0)
               and (:minPriceCent is null or sp.base_price_cent >= :minPriceCent)

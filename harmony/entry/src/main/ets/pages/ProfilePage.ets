@@ -1,3 +1,6 @@
+import { RegionControl } from '../common/region/RegionControl';
+import { ProvinceLocation } from '../common/location/ProvinceLocation';
+import { ProvinceCatalog } from '../common/region/ProvinceCatalog';
 import { AppClient } from '../app/AppClient';
 import { PortraAvatar } from '../common/components/PortraAvatar';
 import { PortraButton } from '../common/components/PortraButton';
@@ -12,6 +15,7 @@ import { PortraTheme } from '../theme/PortraTheme';
 
 @Component
 export struct ProfilePage {
+  @State private selectedRegion: string = '';
   @State private loading: boolean = true;
   @State private signingOut: boolean = false;
   @State private switchingRole: boolean = false;
@@ -266,6 +270,7 @@ export struct ProfilePage {
   }
 
   private async switchRole(): Promise<void> {
+    ProvinceLocation.clear();
     if (this.switchingRole || (this.role !== 'CUSTOMER' && this.role !== 'PROVIDER')) {
       return;
     }
@@ -319,6 +324,7 @@ export struct ProfilePage {
   }
 
   private async signOut(): Promise<void> {
+    ProvinceLocation.clear();
     if (this.signingOut) {
       return;
     }
@@ -517,10 +523,11 @@ export struct ProfilePage {
                   .onClick(() => this.switchRole())
               }
               .width('100%')
+              RegionControl({ value: this.selectedRegion, onChange: (code: string) => { this.selectedRegion = code; } })
               if (this.profile !== null) {
                 Column({ space: 5 }) {
                   if (this.profile.locationVisible !== false && this.profile.locationDisplay?.trim()) {
-                    Text(`地点  ${this.profile.locationDisplay}`)
+                    Text(`地区  ${ProvinceCatalog.display(this.profile.cityCode || this.profile.locationDisplay)}`)
                       .fontSize(12).fontColor(PortraTheme.secondaryText)
                   }
                   if (this.profile.genderVisible !== false && this.profile.gender?.trim()) {
@@ -602,6 +609,10 @@ export struct ProfilePage {
               .enabled(!this.signingOut)
               .margin({ top: 12 })
               .onClick(() => this.signOut())
+            Button('撤回隐私与定位同意').onClick(() => {
+              try { this.appClient.withdrawRequiredPrivacyConsent(); } catch (_) { this.errorMessage = '已暂停定位，隐私记录清理失败，请重试'; }
+              ProvinceLocation.clear();
+            })
           }
           .width('100%')
           .padding({ left: 20, right: 20, top: 16, bottom: 32 })

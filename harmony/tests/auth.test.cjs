@@ -62,9 +62,17 @@ class ArkTextDecoder {
   static create() { return new ArkTextDecoder(); }
   decodeToString(value) { return new TextDecoder('utf-8', { fatal: true }).decode(value); }
 }
+const preferenceStores = new Map();
+let preferenceClearFailure = false;
 const mocks = {
+  '@kit.ArkData': { preferences: { getPreferencesSync(_context, {name}) {
+    if (!preferenceStores.has(name)) preferenceStores.set(name, new Map());
+    const values=preferenceStores.get(name);
+    return { getSync:(key,fallback)=>values.has(key)?values.get(key):fallback,
+      putSync:(key,value)=>values.set(key,value), deleteSync(key) { if(preferenceClearFailure) throw new Error('synthetic storage failure'); values.delete(key); }, flushSync() {} };
+  } } },
   '@kit.NetworkKit': { http }, '@kit.AssetStoreKit': { asset },
-  '@kit.ArkTS': { util: { TextEncoder: ArkTextEncoder, TextDecoder: ArkTextDecoder } },
+  '@kit.ArkTS': { util: { TextEncoder: ArkTextEncoder, TextDecoder: ArkTextDecoder, generateRandomUUID: () => '00000000-0000-4000-8000-000000000001' } },
   '@kit.BasicServicesKit': { BusinessError: class BusinessError extends Error {} }
 };
 class TestBuildProfile {
@@ -540,4 +548,23 @@ test('a retry that finds no credential clears the preceding storage error', asyn
   assert.equal(app.sessionManager.getStatus(), AuthStatus.GUEST);
   assert.equal(app.sessionManager.getCredentialError(), null);
   assert.equal(calls.length, before);
+});
+test('privacy gate requires separate recorded consent and withdrawal notifies subscribers', () => {
+  preferenceStores.clear(); const client=new AppClient(); const context={applicationInfo:{accessTokenId:1}};
+  client.bindContext(context); assert.equal(client.canUseBusinessNetwork(),false);
+  let notifications=0; client.observePrivacyAccess(()=>{throw new Error('synthetic observer failure')});
+  client.observePrivacyAccess(()=>notifications++);
+  client.acceptRequiredPrivacyConsent(); assert.equal(client.hasRequiredPrivacyConsent(),true);
+  assert.equal(client.canUseBusinessNetwork(),true);
+  const returning=new AppClient(); returning.bindContext(context); returning.preparePrivacyIdentity();
+  assert.equal(returning.getDeviceId(),client.getDeviceId());
+  client.withdrawRequiredPrivacyConsent(); assert.equal(client.canUseBusinessNetwork(),false);
+  assert.equal(notifications,2);
+});
+test('withdrawal suspends location access even when persisting the withdrawal fails', () => {
+  preferenceStores.clear(); const client=new AppClient(); client.bindContext({}); client.acceptRequiredPrivacyConsent();
+  let notified=false; client.observePrivacyAccess(()=>{notified=true}); preferenceClearFailure=true;
+  try { assert.throws(()=>client.withdrawRequiredPrivacyConsent()); assert.equal(client.hasRequiredPrivacyConsent(),false);
+    assert.equal(client.canUseBusinessNetwork(),false); assert.equal(notified,true); }
+  finally { preferenceClearFailure=false; }
 });

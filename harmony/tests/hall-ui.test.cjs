@@ -18,8 +18,8 @@ const { HallTextFormatter } = require('../entry/src/main/ets/features/hall/HallU
 test('hall copy formatter keeps API fallbacks deterministic', () => {
   assert.equal(HallTextFormatter.nonEmpty('  校园写真  ', '橱窗'), '校园写真');
   assert.equal(HallTextFormatter.nonEmpty('  ', '橱窗'), '橱窗');
-  assert.equal(HallTextFormatter.city('320100'), '南京');
-  assert.equal(HallTextFormatter.city(undefined), '城市待定');
+  assert.equal(HallTextFormatter.city('320100'), '江苏省');
+  assert.equal(HallTextFormatter.city(undefined), '地区未填写');
 });
 
 test('hall prices use backend cents without manufacturing values', () => {

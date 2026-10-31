@@ -1,3 +1,4 @@
+import { ProvinceCatalog } from '../common/region/ProvinceCatalog';
 import { AppClient } from '../app/AppClient';
 import { PortraImage } from '../common/components/PortraImage';
 import { PortraErrorView } from '../common/components/PortraErrorView';
@@ -23,6 +24,7 @@ export struct ServiceDetailPage {
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
   onBack?: () => void;
+  onEdit?: (id: number) => void;
   onRequireLogin?: () => void;
   onOpenConversation?: (conversationId: number) => void;
 
@@ -182,8 +184,11 @@ export struct ServiceDetailPage {
             Divider().color(PortraTheme.border)
             Text(this.detail.description ?? '暂无服务说明')
               .fontSize(14).lineHeight(23).fontColor(PortraTheme.primaryText).width('100%')
-            Text(`城市  ${this.detail.cityCode ?? '待沟通'}`)
+            Text(`服务地区  ${ProvinceCatalog.display(this.detail.cityCode)}`)
               .fontSize(13).fontColor(PortraTheme.secondaryText).width('100%')
+            if (this.userId === this.detail.providerId && this.role === 'PROVIDER') {
+              Button('编辑橱窗').onClick(() => this.onEdit?.(this.serviceId))
+            }
             Text(`服务区域  ${this.detail.serviceArea ?? '待沟通'}`)
               .fontSize(13).fontColor(PortraTheme.secondaryText).width('100%')
             Text(`拍摄时长  ${this.detail.durationMinutes ?? 0} 分钟`)

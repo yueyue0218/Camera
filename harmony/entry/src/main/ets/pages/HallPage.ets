@@ -1,3 +1,5 @@
+import { HallFilterState } from '../features/hall/HallFilterState';
+import { ContentChanges } from '../features/user/ContentChanges';
 import { AppClient } from '../app/AppClient';
 import { HallView } from '../features/hall/HallView';
 import { HallDataPolicy } from '../features/hall/HallDataPolicy';
@@ -8,6 +10,8 @@ import { ErrorMapper, PortraError } from '../network/ErrorMapper';
 
 @Component
 export struct HallPage {
+  @State private filters: HallFilterState = new HallFilterState();
+  private readonly contentChanged: () => void = () => this.reload();
   @State private serviceState: HallContentState = HallContentState.LOADING;
   @State private demandState: HallContentState = HallContentState.LOADING;
   @State private serviceItems: ServicePackageSummary[] = [];
@@ -33,10 +37,12 @@ export struct HallPage {
   onOpenDemand?: (demandId: number) => void;
 
   aboutToAppear(): void {
+    ContentChanges.observe(this.contentChanged);
     this.reload();
   }
 
   aboutToDisappear(): void {
+    ContentChanges.unobserve(this.contentChanged);
     this.loadVersion++;
     this.apiService.cancelServicePackages();
     this.apiService.cancelDemands();
@@ -67,7 +73,7 @@ export struct HallPage {
     }
     try {
       const query: ServicePackageListQuery = {
-        page: page, size: this.pageSize, sort: this.serviceSort, feedSeed: this.feedSeed
+        page: page, size: this.pageSize, cityCode: this.filters.city || undefined, sort: this.serviceSort, feedSeed: this.feedSeed
       };
       const result: PageResult<ServicePackageSummary> = await this.apiService.listServicePackagesByQuery(query);
       if (version !== this.loadVersion) {
@@ -105,7 +111,7 @@ export struct HallPage {
     }
     try {
       const query: DemandListQuery = {
-        page: page, size: this.pageSize, status: 'OPEN', sort: this.demandSort, feedSeed: this.feedSeed
+        page: page, size: this.pageSize, cityCode: this.filters.city || undefined, status: 'OPEN', sort: this.demandSort, feedSeed: this.feedSeed
       };
       const result: PageResult<DemandSummary> = await this.apiService.listDemandsByQuery(query);
       if (version !== this.loadVersion) {
@@ -161,6 +167,10 @@ export struct HallPage {
 
   build() {
     HallView({
+      filters: this.filters, onFilterChange: (filters: HallFilterState) => {
+        if (filters.validate()) { return; }
+        this.filters = filters; this.reload();
+      },
       serviceState: this.serviceState,
       demandState: this.demandState,
       serviceItems: this.serviceItems,

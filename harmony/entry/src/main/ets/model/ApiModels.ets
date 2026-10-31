@@ -511,3 +511,5 @@ export interface CreateReviewPayload { readonly rating: number; readonly content
 export interface ReviewTextPayload { readonly content: string; }
 export interface CreateReviewComplaintPayload { readonly reason: string; readonly evidenceFileIds: string; }
 export interface DisputeReasonPayload { readonly reason: string; }
+
+export interface UploadedImage { readonly fileId: number; }
