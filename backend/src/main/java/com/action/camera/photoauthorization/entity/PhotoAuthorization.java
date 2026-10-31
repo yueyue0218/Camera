@@ -23,6 +23,7 @@ public class PhotoAuthorization {
     public static final String STATUS_PENDING = "PENDING";
     public static final String STATUS_GRANTED = "GRANTED";
     public static final String STATUS_REJECTED = "REJECTED";
+    public static final String STATUS_REVOKED = "REVOKED";
     public static final String USAGE_SCOPE_PORTFOLIO_DISPLAY = "PORTFOLIO_DISPLAY";
 
     @Id

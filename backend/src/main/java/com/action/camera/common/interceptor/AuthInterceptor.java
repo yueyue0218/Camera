@@ -69,7 +69,10 @@ public class AuthInterceptor implements HandlerInterceptor {
             return false;
         }
         String uri = request.getRequestURI();
-        return uri.equals("/service-packages")
+        return uri.matches("^/users/\\d+/public-profile$")
+                || uri.equals("/moments/profile")
+                || uri.matches("^/(demands|service-packages)/by-user/\\d+$")
+                || uri.equals("/service-packages")
                 || uri.equals("/services")
                 || uri.equals("/demands")
                 || uri.matches("^/api/v1/providers/\\d+/profile$")

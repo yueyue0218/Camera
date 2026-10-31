@@ -34,17 +34,17 @@
             pp.id                       AS profile_id,
             pp.user_id                  AS provider_id,
             COALESCE(pp.display_name, u.nickname) AS nickname,
-            u.gender,
+            CASE WHEN u.gender_visible = true THEN u.gender END AS gender,
             COALESCE(pf.url, f.url)     AS avatar_url,
             pp.provider_avatar_file_id,
             pp.bio                      AS provider_bio,
-            pp.city_code,
-            pp.city_area,
+            CASE WHEN u.location_visible = true THEN pp.city_code END AS city_code,
+            CASE WHEN u.location_visible = true THEN pp.city_area END AS city_area,
             u.credit_score,
             pp.avg_rating,
             pp.completed_orders,
             pp.equipment,
-            pp.age,
+            CASE WHEN u.birthday_visible = true THEN pp.age END AS age,
             pp.price_min,
             pp.price_max,
             pp.accepting_orders,
@@ -53,7 +53,7 @@
         JOIN  users u ON u.id = pp.user_id
         LEFT JOIN files f  ON f.id  = u.avatar_file_id
         LEFT JOIN files pf ON pf.id = pp.provider_avatar_file_id
-        WHERE pp.user_id = #{providerUserId}
+        WHERE pp.user_id = #{providerUserId} AND u.status = 'ACTIVE'
     </select>
 
     <select id="selectTagNamesByProfileId" resultType="String">

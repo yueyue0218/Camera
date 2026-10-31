@@ -4,6 +4,8 @@ import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraLoading } from '../common/components/PortraLoading';
 import { PortraPageHeading } from '../common/components/PortraPageHeading';
 import { OrderSummary } from '../model/ApiModels';
+import { OrderWorkflow } from '../features/conversation/OrderWorkflow';
+import { ConversationVisibility } from '../features/conversation/ConversationVisibility';
 import { PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
 
@@ -13,65 +15,79 @@ export struct OrderPage {
   @State private loading: boolean = true;
   @State private errorMessage: string = '';
   @State private orders: OrderSummary[] = [];
+  @State private role: string = '';
   @State private filter: number = 0;
-  @State private selectedOrderId: number = 0;
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
+  private loadedIdentity: number = -1;
+  private refreshing: boolean = false;
+  private readonly identityChanged: () => void = () => {
+    this.requestVersion++; this.refreshing = false; this.orders = []; this.role = '';
+    this.loadedIdentity = -1; this.loading = false; this.errorMessage = '身份已变化，请重新打开订单';
+  };
   onBack?: () => void;
-  onOpenEngagement?: (orderId: number) => void;
+  onOpenOrder?: (orderId: number) => void;
 
   private onReloadRequested(): void {
     // Initial appearance already loads; retained destinations reload on real Navigation show.
-    if (!this.loading) { this.load(); }
+    // Visibility is the single reload owner; onShown also updates this compatibility prop.
   }
 
   aboutToAppear(): void {
-    this.load();
+    if (this.loadedIdentity !== -1 && this.loadedIdentity !== this.appClient.sessionManager.getSessionVersion()) { this.identityChanged(); }
+    this.appClient.sessionManager.observeIdentity(this.identityChanged);
+    ConversationVisibility.subscribe('orders', (visible: boolean) => {
+      if (visible) this.load();
+      else {
+        this.requestVersion++; this.refreshing = false;
+        this.appClient.apiService.cancelOrders();
+        this.appClient.apiService.cancelCurrentSession('orders.identity');
+      }
+    });
   }
 
   aboutToDisappear(): void {
+    this.appClient.sessionManager.unobserveIdentity(this.identityChanged);
+    ConversationVisibility.unsubscribe('orders');
     this.requestVersion++;
     this.appClient.apiService.cancelOrders();
+    this.appClient.apiService.cancelCurrentSession('orders.identity');
   }
 
   private async load(): Promise<void> {
+    const identity = this.appClient.sessionManager.getSessionVersion();
+    if (this.refreshing && this.loadedIdentity === identity) { return; }
+    if (this.loadedIdentity !== identity) { this.orders = []; this.role = ''; }
+    this.loadedIdentity = identity;
+    this.refreshing = true;
     const version = ++this.requestVersion;
-    this.loading = true;
+    const epoch = this.appClient.sessionManager.getSessionVersion();
+    this.loading = this.orders.length === 0;
     this.errorMessage = '';
     try {
-      const result = await this.appClient.apiService.listOrders();
-      if (version === this.requestVersion) {
+      const session = await this.appClient.apiService.currentSession('orders.identity');
+      if (version !== this.requestVersion || epoch !== this.appClient.sessionManager.getSessionVersion()) { return; }
+      if (this.role !== '' && this.role !== session.role) { this.orders = []; }
+      if (session.role !== 'CUSTOMER' && session.role !== 'PROVIDER') { throw new Error('当前身份不能查看约拍订单'); }
+      this.role = session.role;
+      const result = await this.appClient.apiService.listOrders(session.role);
+      if (version === this.requestVersion && epoch === this.appClient.sessionManager.getSessionVersion()) {
         if (!Array.isArray(result)) {
-          this.errorMessage = '订单数据格式异常';
+          this.orders = []; this.errorMessage = '订单暂时无法查看';
         } else {
           this.orders = result.filter((item: OrderSummary) => item !== null &&
             Number.isSafeInteger(item.orderId) && item.orderId > 0);
         }
       }
     } catch (error) {
-      if (version === this.requestVersion) {
+      if (version === this.requestVersion && epoch === this.appClient.sessionManager.getSessionVersion()) {
+        this.orders = [];
         this.errorMessage = (error as PortraError).message || '订单加载失败';
       }
     } finally {
       if (version === this.requestVersion) {
-        this.loading = false;
+        this.loading = false; this.refreshing = false;
       }
-    }
-  }
-
-  private statusText(status: string | undefined): string {
-    switch (status) {
-      case 'PENDING_PAYMENT': return '约定已确认';
-      case 'PAID_PENDING_SHOOT': return '待拍摄';
-      case 'SHOOTING': return '拍摄中';
-      case 'PENDING_DELIVERY': return '待交付';
-      case 'DELIVERED_PENDING_CONFIRM': return '待确认';
-      case 'COMPLETED': return '已完成';
-      case 'CANCELLED': return '已取消';
-      case 'REFUNDED': return '已退款';
-      case 'APPEALING': return '申诉中';
-      case 'REWORK_REQUIRED': return '待返修';
-      default: return '状态待同步';
     }
   }
 
@@ -101,7 +117,7 @@ export struct OrderPage {
 
   build() {
     Column() {
-      PortraPageHeading({ title: '我的订单', eyebrow: 'ORDERS / PORTRA', onBack: this.onBack })
+      PortraPageHeading({ title: this.role === 'PROVIDER' ? '摄影订单' : '我的订单', eyebrow: 'ORDERS / PORTRA', onBack: this.onBack })
       Row({ space: 8 }) {
         this.FilterTab('全部', 0)
         this.FilterTab('进行中', 1)
@@ -122,13 +138,14 @@ export struct OrderPage {
             ForEach(this.visibleOrders(), (item: OrderSummary) => {
               Column({ space: 13 }) {
                 Row() {
-                  Text(item.orderNo || `订单 #${item.orderId}`)
+                  Text([item.customerNickname, item.providerNickname].filter((name: string | undefined) =>
+                    typeof name === 'string' && name.trim().length > 0).join(' · ') || '约拍双方')
                     .layoutWeight(1)
                     .fontSize(12)
                     .fontColor(PortraTheme.secondaryText)
                     .maxLines(1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  Text(this.statusText(item.status))
+                  Text(OrderWorkflow.status(item.status))
                     .fontSize(12)
                     .fontWeight(FontWeight.Bold)
                     .fontColor(this.isClosed(item.status) ? PortraTheme.secondaryText : PortraTheme.primary)
@@ -136,20 +153,18 @@ export struct OrderPage {
                 .width('100%')
                 Row() {
                   Column({ space: 5 }) {
-                    Text('约拍订单')
+                    Text('约拍')
                       .fontSize(17)
                       .fontWeight(FontWeight.Bold)
                       .fontColor(PortraTheme.primaryText)
-                    Text([item.customerNickname, item.providerNickname].filter((name: string | undefined) =>
-                      typeof name === 'string' && name.trim().length > 0).join(' · ') || '约拍双方')
+                    Text((item.shootStartTime ?? '').replace('T', ' ').slice(0, 16) || '拍摄时间待定')
                       .fontSize(12)
                       .fontColor(PortraTheme.secondaryText)
                       .maxLines(1)
                       .textOverflow({ overflow: TextOverflow.Ellipsis })
                   }
                   .layoutWeight(1)
-                  Text(item.amountCent !== undefined && Number.isFinite(item.amountCent) ?
-                    `¥${(item.amountCent / 100).toFixed(2)}` : '金额待同步')
+                  Text(OrderWorkflow.money(item.amountCent))
                     .fontSize(17)
                     .fontWeight(FontWeight.Bold)
                     .fontColor(PortraTheme.primaryText)
@@ -160,39 +175,23 @@ export struct OrderPage {
                 .width('100%')
                 Divider().color(PortraTheme.border)
                 Row() {
-                  Text(typeof item.createdAt === 'string' ? item.createdAt.slice(0, 10) : '')
+                  Text(item.shootLocation ?? '')
                     .layoutWeight(1)
                     .fontSize(11)
                     .fontColor(PortraTheme.mutedText)
-                  Text(this.selectedOrderId === item.orderId ? '收起详情 ↑' : '查看详情 →')
+                  Text('查看详情 ›')
                     .fontSize(12)
                     .fontColor(PortraTheme.primary)
                 }
                 .width('100%')
-                if (this.selectedOrderId === item.orderId) {
-                  Column({ space: 6 }) {
-                    Text(`当前进度  ${this.statusText(item.status)}`)
-                      .fontSize(13)
-                      .fontColor(PortraTheme.primaryText)
-                    Text('这笔订单的操作暂不可用')
-                      .fontSize(11)
-                      .fontColor(PortraTheme.secondaryText)
-                  }
-                  .width('100%')
-                  .alignItems(HorizontalAlign.Start)
-                  .padding({ top: 10 })
-                }
               }
               .width('100%')
               .padding(16)
               .backgroundColor(PortraTheme.surface)
               .borderRadius(8)
               .border({ width: 1, color: PortraTheme.border })
-              .onClick(() => {
-                if (this.onOpenEngagement !== undefined) { this.onOpenEngagement(item.orderId); }
-                else { this.selectedOrderId = this.selectedOrderId === item.orderId ? 0 : item.orderId; }
-              })
-            }, (item: OrderSummary) => `${item.orderId}:${this.requestVersion}`)
+              .onClick(() => this.onOpenOrder?.(item.orderId))
+            }, (item: OrderSummary) => item.orderId.toString())
           }
           .width('100%')
           .padding({ left: 20, right: 20, bottom: 24 })

@@ -18,8 +18,8 @@ const { HallTextFormatter } = require('../entry/src/main/ets/features/hall/HallU
 test('hall copy formatter keeps API fallbacks deterministic', () => {
   assert.equal(HallTextFormatter.nonEmpty('  校园写真  ', '橱窗'), '校园写真');
   assert.equal(HallTextFormatter.nonEmpty('  ', '橱窗'), '橱窗');
-  assert.equal(HallTextFormatter.city('320100'), '南京');
-  assert.equal(HallTextFormatter.city(undefined), '城市待定');
+  assert.equal(HallTextFormatter.city('320100'), '江苏省');
+  assert.equal(HallTextFormatter.city(undefined), '地区未填写');
 });
 
 test('hall prices use backend cents without manufacturing values', () => {
@@ -89,7 +89,9 @@ test('runtime hall state is data-driven instead of copying prototype examples', 
     '../entry/src/main/ets/features/hall/components/HallControls.ets'), 'utf8');
   const cards = fs.readFileSync(path.resolve(__dirname,
     '../entry/src/main/ets/features/hall/components/HallCards.ets'), 'utf8');
-  assert.match(appBar, /showNoticeDot: boolean = false/);
+  assert.match(appBar, /unreadCount: number = 0/);
+  assert.match(appBar, /this\.unreadCount > 0/);
+  assert.match(appBar, /通知，无未读/);
   assert.doesNotMatch(controls, /label: '南京'.*active: true/);
   assert.match(cards, /isFavorited === true/);
   assert.match(cards, /favoritedByCurrentUser === true/);

@@ -65,6 +65,18 @@ public class DemandController {
                 expectedDate, styleTag, minBudgetCent, maxBudgetCent, timeTag, keyword, sort, feedSeed, currentUser));
     }
 
+    @GetMapping("/by-user/{userId}")
+    public Result<PageResult<DemandDto>> publicByUser(@PathVariable Long userId,
+            @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "12") int size) {
+        return Result.success(demandService.listPublicByUser(userId, page, size));
+    }
+
+    @GetMapping("/me/publications")
+    public Result<PageResult<DemandDto>> myPublications(@RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size, HttpServletRequest request) {
+        return Result.success(demandService.listMyPublications(currentUserProvider.getCurrentUser(request), page, size));
+    }
+
     @GetMapping("/me/history")
     public Result<List<DemandDto>> listMyDemandHistory(HttpServletRequest httpRequest) {
         CurrentUser currentUser = currentUserProvider.getCurrentUser(httpRequest);

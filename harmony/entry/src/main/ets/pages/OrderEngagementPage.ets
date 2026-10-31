@@ -62,11 +62,11 @@ export struct OrderEngagementPage {
       case 'SHOOTING': return '拍摄中'; case 'PENDING_DELIVERY': return '待交付';
       case 'DELIVERED_PENDING_CONFIRM': return '待确认'; case 'COMPLETED': return '已完成';
       case 'CANCELLED': return '已取消'; case 'REFUNDED': return '已退款';
-      case 'APPEALING': return '申诉中'; case 'REWORK_REQUIRED': return '待返修'; default: return '状态待同步';
+      case 'APPEALING': return '投诉处理中'; case 'REWORK_REQUIRED': return '待返修'; default: return '状态待同步';
     }
   }
   private complaintResult(result: string): string {
-    return result==='REVIEW_HIDDEN'?'申诉通过，评价已隐藏':result==='REJECTED'?'申诉驳回':'处理结果待核实';
+    return result==='REVIEW_HIDDEN'?'投诉成立，评价已隐藏':result==='REJECTED'?'投诉未成立':'处理结果待核实';
   }
   @Builder private SmallAction(label:string,action:()=>void) {
     Button(label).constraintSize({minHeight:44}).fontSize(13).fontColor(PortraTheme.primary).backgroundColor(PortraTheme.primarySoft)
@@ -74,7 +74,7 @@ export struct OrderEngagementPage {
   }
   @Builder private Complaint(item:ReviewComplaintSummary) {
     Column({space:8}) {
-      Text(`评价申诉 #${item.complaintId} · ${item.status==='PENDING'?'待处理':item.status==='CANCELLED'?'已取消':'已处理'}`)
+      Text(`评价投诉 · ${item.status==='PENDING'?'待处理':item.status==='CANCELED'||item.status==='CANCELLED'?'已撤回':'已处理'}`)
         .fontSize(14).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
       Text(item.reason).fontSize(14).fontColor(PortraTheme.primaryText)
       if(item.arbitrationComment){Text(`处理说明：${item.arbitrationComment}`).fontSize(13).fontColor(PortraTheme.secondaryText)}
@@ -85,11 +85,11 @@ export struct OrderEngagementPage {
   @Builder private Review(item:ReviewSummary) {
     Column({space:12}) {
       Row({space:10}) {
-        Text(item.reviewerNickname||`用户 #${item.reviewerId}`).fontSize(14).fontWeight(FontWeight.Bold).layoutWeight(1)
+        Text(item.reviewerNickname||'约拍伙伴').fontSize(14).fontWeight(FontWeight.Bold).layoutWeight(1)
         Text(`${item.rating} ★`).fontSize(16).fontColor(PortraTheme.primary)
       }.width('100%')
       Text(item.content||'对方没有留下文字评价').fontSize(15).fontColor(PortraTheme.primaryText)
-      Text(`评价对象：${item.targetUserNickname||`用户 #${item.targetUserId}`}`).fontSize(12).fontColor(PortraTheme.secondaryText)
+      Text(`评价对象：${item.targetUserNickname||'约拍伙伴'}`).fontSize(12).fontColor(PortraTheme.secondaryText)
       if(item.isVisible===false){Text('该评价已隐藏，仅按当前账号权限展示。').fontSize(12).fontColor(PortraTheme.danger)}
       if(item.replyContent){
         Column({space:6}) {
@@ -99,7 +99,7 @@ export struct OrderEngagementPage {
       }
       Flex({wrap:FlexWrap.Wrap}) {
         if(item.reviewerId===this.state.userId&&item.isVisible!==false){this.SmallAction('追加追评',()=>this.controller?.open('followup',item.reviewId))}
-        if(item.targetUserId===this.state.userId&&item.isVisible!==false){this.SmallAction('发起评价申诉',()=>this.controller?.open('complaint',item.reviewId))}
+        if(item.targetUserId===this.state.userId&&item.isVisible!==false){this.SmallAction('投诉这条评价',()=>this.controller?.open('complaint',item.reviewId))}
       }
       ReportPanel({targetType:'REVIEW',targetId:item.reviewId,ownerId:item.reviewerId,currentUserId:this.state.userId,onRequireLogin:this.onRequireLogin})
       ForEach(this.state.complaints.filter((c:ReviewComplaintSummary)=>c.reviewId===item.reviewId&&
@@ -109,15 +109,15 @@ export struct OrderEngagementPage {
   }
   @Builder private Dispute(item:DisputeSummary) {
     Column({space:10}) {
-      Text(`订单申诉 #${item.id} · ${item.status==='OPEN'?'待回复':item.status==='REPLIED'?'已回复':'已处理'}`)
+      Text(`订单投诉 · ${item.status==='OPEN'?'待回复':item.status==='REPLIED'?'已回复':'已处理'}`)
         .fontSize(15).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
       Text(item.reason).fontSize(14).fontColor(PortraTheme.primaryText)
       ForEach(item.replies||[],(reply:DisputeReplySummary)=>{
-        Text(`用户 #${reply.replierId}：${reply.content}`).width('100%').fontSize(14).fontColor(PortraTheme.secondaryText)
+        Text(`${reply.replierId===this.state.userId?'我':'对方'}：${reply.content}`).width('100%').fontSize(14).fontColor(PortraTheme.secondaryText)
           .padding(12).backgroundColor(PortraTheme.pageBackground).borderRadius(10)
       },(reply:DisputeReplySummary)=>reply.id.toString())
       if(item.adminComment){Text(`处理说明：${item.adminComment}`).fontSize(13).fontColor(PortraTheme.secondaryText)}
-      if(EngagementPolicy.canReply(item,this.state.userId)){this.SmallAction('回复申诉',()=>this.controller?.open('reply',item.id))}
+      if(EngagementPolicy.canReply(item,this.state.userId)){this.SmallAction('回复投诉',()=>this.controller?.open('reply',item.id))}
     }.width('100%').alignItems(HorizontalAlign.Start).padding(16).backgroundColor(PortraTheme.surface).borderRadius(16)
       .border({width:this.targetKind==='dispute'&&this.targetId===item.id?2:1,color:this.targetKind==='dispute'&&this.targetId===item.id?PortraTheme.primary:PortraTheme.border})
   }
@@ -130,38 +130,36 @@ export struct OrderEngagementPage {
     } else {
       Column() {
         Row({space:12}) {
-          Text('评价与申诉').fontSize(21).fontWeight(FontWeight.Bold).layoutWeight(1).fontColor(PortraTheme.primaryText)
+          Text(this.targetKind==='dispute'?'订单投诉':'本次评价').fontSize(21).fontWeight(FontWeight.Bold).layoutWeight(1).fontColor(PortraTheme.primaryText)
           Button('关闭').constraintSize({minHeight:44}).fontSize(14).backgroundColor(PortraTheme.surface).fontColor(PortraTheme.secondaryText).onClick(()=>this.sheetOpen=false)
         }.width('100%').padding(20)
         Divider().color(PortraTheme.border)
         Scroll() {
           Column({space:16}) {
-            Text('这里集中展示本次合作的评价、追加追评与申诉处理记录。').fontSize(13).fontColor(PortraTheme.secondaryText)
             if(this.state.message){Text(this.state.message).fontSize(14).fontColor(PortraTheme.primary)}
             if(this.state.recordsError){Text(this.state.recordsError).fontSize(13).fontColor(PortraTheme.danger)}
+            if(this.targetKind==='dispute') {
+              if(this.disputes().length===0){Text('暂无投诉记录').fontSize(14).fontColor(PortraTheme.secondaryText)}
+              ForEach(this.disputes(),(item:DisputeSummary)=>{this.Dispute(item)},(item:DisputeSummary)=>item.id.toString())
+            } else {
             ForEach(this.state.complaints.filter((c:ReviewComplaintSummary)=>this.targetKind==='complaint'&&c.complaintId===this.targetId),(item:ReviewComplaintSummary)=>{
               this.Complaint(item)
             },(item:ReviewComplaintSummary)=>item.complaintId.toString())
-            if(this.targetKind==='dispute') {
-              ForEach(this.disputes(),(item:DisputeSummary)=>{this.Dispute(item)},(item:DisputeSummary)=>item.id.toString())
-            }
             if(this.state.reviews.length===0){Text('暂无可展示的评价').fontSize(14).fontColor(PortraTheme.secondaryText).padding(20)}
             ForEach(this.state.complaints.filter((c:ReviewComplaintSummary)=>!(this.targetKind==='complaint'&&this.targetId===c.complaintId)&&!this.state.reviews.some((r:ReviewSummary)=>r.reviewId===c.reviewId)),(item:ReviewComplaintSummary)=>{
-              Text('对应评价暂未在列表展示，以下为当前账号可查看的申诉记录。').fontSize(13).fontColor(PortraTheme.secondaryText)
+              Text('这条评价暂不可见').fontSize(13).fontColor(PortraTheme.secondaryText)
               this.Complaint(item)
             },(item:ReviewComplaintSummary)=>item.complaintId.toString())
             ForEach(this.reviews(),(item:ReviewSummary)=>{this.Review(item)},(item:ReviewSummary)=>item.reviewId.toString())
-            if(this.targetKind!=='dispute') {
-              ForEach(this.disputes(),(item:DisputeSummary)=>{this.Dispute(item)},(item:DisputeSummary)=>item.id.toString())
             }
           }.width('100%').alignItems(HorizontalAlign.Start).padding(16)
         }.width('100%').layoutWeight(1).align(Alignment.TopStart).scrollBar(BarState.Auto)
         Row({space:12}) {
-          if(this.state.order&&EngagementPolicy.canReview(this.state.order,this.state.userId,this.state.reviews)) {
+          if(this.targetKind!=='dispute'&&this.state.order&&EngagementPolicy.canReview(this.state.order,this.state.userId,this.state.reviews)) {
             this.SmallAction('评价',()=>this.controller?.open('review',this.state.order?.orderId??0))
           }
           if(this.state.order&&EngagementPolicy.canDispute(this.state.order,this.state.disputes)) {
-            this.SmallAction('发起订单申诉',()=>this.controller?.open('dispute',this.state.order?.orderId??0))
+            this.SmallAction('投诉本次订单',()=>this.controller?.open('dispute',this.state.order?.orderId??0))
           }
         }.width('100%').padding({left:20,right:20,top:12,bottom:28}).backgroundColor(PortraTheme.pageBackground)
       }.width('100%').height('100%').backgroundColor(PortraTheme.surface)
@@ -179,18 +177,16 @@ export struct OrderEngagementPage {
       }.width('100%').padding({left:12,right:20,top:12,bottom:14})
       Scroll() {
         Column({space:18}) {
-          if(this.state.loginRequired){Text('登录后查看本次约拍的评价与申诉').fontSize(15);Button('去登录').onClick(()=>this.onRequireLogin?.())}
+          if(this.state.loginRequired){Text('登录后查看本次约拍').fontSize(15);Button('去登录').onClick(()=>this.onRequireLogin?.())}
           else if(this.state.loading){LoadingProgress().width(36).height(36);Text('正在读取本次约拍…').fontSize(14)}
           else if(this.state.error){Text(this.state.error).fontSize(14).fontColor(PortraTheme.danger)}
           else if(this.state.order){
             Column({space:14}) {
-              Text('ORDER / PORTRA').fontSize(12).fontColor(PortraTheme.primary)
-              Text(this.state.order.orderNo||`订单 #${this.state.order.orderId}`).fontSize(24).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
-              Text(`${this.state.order.customerNickname||`用户 #${this.state.order.customerId}`} · ${this.state.order.providerNickname||`用户 #${this.state.order.providerUserId}`}`)
+              Text(this.state.order.orderNo||'本次约拍').fontSize(20).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
+              Text(`${this.state.order.customerNickname||'客户'} · ${this.state.order.providerNickname||'摄影师'}`)
                 .fontSize(14).fontColor(PortraTheme.secondaryText)
               Text(`当前进度：${this.statusText(this.state.order.status)}`).fontSize(14).fontColor(PortraTheme.primary)
-              Text('查看本次合作的评价、追评与申诉，所有结果以平台实际记录为准。').fontSize(14).fontColor(PortraTheme.secondaryText)
-              Button('评价与申诉').width('100%').constraintSize({minHeight:48}).fontSize(15).backgroundColor(PortraTheme.primary).fontColor(PortraTheme.white).onClick(()=>this.sheetOpen=true)
+              Button(this.targetKind==='dispute'?'查看订单投诉':'查看评价').width('100%').constraintSize({minHeight:48}).fontSize(15).backgroundColor(PortraTheme.primary).fontColor(PortraTheme.white).onClick(()=>this.sheetOpen=true)
             }.width('100%').alignItems(HorizontalAlign.Start).padding(22).backgroundColor(PortraTheme.surface).borderRadius(20)
             if(this.state.message){Text(this.state.message).fontSize(14).fontColor(PortraTheme.primary)}
             if(this.state.recordsError){Text(this.state.recordsError).fontSize(14).fontColor(PortraTheme.danger)}

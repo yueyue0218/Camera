@@ -71,6 +71,21 @@ class AliyunSmsSenderTest {
     }
 
     @Test
+    void usesSeparateApprovedReauthenticationTemplateWithoutChangingLoginTemplate() {
+        SmsProperties properties=new SmsProperties();
+        properties.setSignName("Approved Portra Sign"); properties.setLoginTemplateId("SMS_LOGIN");
+        properties.setReauthTemplateId("SMS_REAUTH");
+        sender=new AliyunSmsSender(gateway,properties,new ObjectMapper());
+        when(gateway.send("+8613800138000","Approved Portra Sign","SMS_REAUTH","{\"code\":\"123456\"}"))
+                .thenReturn(new AliyunSmsResult("OK","request-id","reauth-biz"));
+        assertThat(sender.send(new SmsMessage("+8613800138000",SmsPurpose.REAUTH,"123456",Duration.ofMinutes(5))).providerMessageId())
+                .isEqualTo("reauth-biz");
+        verify(gateway).send("+8613800138000","Approved Portra Sign","SMS_REAUTH","{\"code\":\"123456\"}");
+        verify(gateway,never()).send(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.eq("SMS_LOGIN"),org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
     void refusesPurposeWithoutAnApprovedTemplate() {
         assertThatThrownBy(() -> sender.send(new SmsMessage(
                 "+8613800138000", SmsPurpose.REAUTH, "123456", Duration.ofMinutes(5))))

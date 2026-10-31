@@ -16,7 +16,10 @@ export interface PageResult<T> {
   readonly total: number;
 }
 
+export interface ContentModeration { readonly status: string; readonly reason?: string; }
+
 export interface DemandSummary {
+  readonly moderation?: ContentModeration;
   readonly demandId: number;
   readonly customerId?: number;
   readonly customerNickname?: string;
@@ -55,10 +58,13 @@ export interface DemandSummary {
 }
 
 export interface ServicePackageSummary {
+  readonly moderation?: ContentModeration;
   readonly serviceId: number;
   readonly providerId?: number;
   readonly photographerId?: number;
   readonly photographerNickname?: string;
+  readonly photographerAvatarFileId?: number;
+  readonly coverPortfolioId?: number;
   readonly photographerAvatarUrl?: string;
   readonly photographerAvatar?: string;
   readonly title?: string;
@@ -234,12 +240,20 @@ export interface MessageSummary {
   readonly messageType: string;
   readonly content?: string;
   readonly fileName?: string;
+  readonly fileId?: number;
+  readonly mimeType?: string;
+  readonly size?: number;
+  readonly localUri?: string;
   readonly createdAt?: string;
+  readonly quotationId?: number;
+  readonly orderId?: number;
+  readonly deliveryStatus?: string;
 }
 
 export interface SendTextMessagePayload {
   readonly messageType: string;
   readonly content: string;
+  readonly fileId?: number;
 }
 
 export interface StartServiceChatPayload {
@@ -258,6 +272,15 @@ export interface QuoteSummary {
   readonly location: string;
   readonly serviceContent: string;
   readonly status: string;
+  readonly createdAt?: string;
+  readonly expireTime?: string;
+  readonly originalCount?: number;
+  readonly refinedCount?: number;
+  readonly photoUsageScope?: string;
+  readonly terms?: string;
+  readonly contractTerms?: string;
+  readonly safetyNoticeVersion?: string;
+  readonly remark?: string;
 }
 
 export interface CreateQuotePayload {
@@ -268,6 +291,14 @@ export interface CreateQuotePayload {
   readonly deliveryDeadline: string;
   readonly location: string;
   readonly serviceContent: string;
+  readonly originalCount?: number;
+  readonly refinedCount?: number;
+  readonly photoUsageScope?: string;
+  readonly terms?: string;
+  readonly contractTerms?: string;
+  readonly safetyNoticeVersion?: string;
+  readonly expireTime?: string;
+  readonly remark?: string;
 }
 
 export interface ConfirmQuoteResult {
@@ -276,6 +307,101 @@ export interface ConfirmQuoteResult {
   readonly orderId: number;
   readonly orderNo?: string;
   readonly orderStatus: string;
+}
+
+export interface RejectQuoteResult {
+  readonly quotationId: number;
+  readonly quotationStatus: string;
+}
+
+export interface RejectQuotePayload {
+  readonly rejectReason: string;
+}
+
+export interface MockPaymentPayload {
+  readonly payMethod: string;
+  readonly amountCent: number;
+}
+
+export interface PaymentResult {
+  readonly paymentId: number;
+  readonly orderId: number;
+  readonly orderStatus: string;
+  readonly paymentStatus: string;
+  readonly amountCent: number;
+}
+
+export interface OrderStatusLogSummary {
+  readonly logId?: number;
+  readonly orderId?: number;
+  readonly toStatus: string;
+  readonly createdAt?: string;
+  readonly reason?: string;
+  readonly operatorId?: number;
+}
+
+export interface DeliveryFileSummary {
+  readonly fileId: number;
+  readonly fileName?: string;
+  readonly mimeType?: string;
+  readonly fileSize?: number;
+  readonly fileType?: string;
+  readonly sortOrder?: number;
+}
+
+export interface DeliverySummary {
+  readonly deliveryId: number;
+  readonly orderId: number;
+  readonly deliveryRound: number;
+  readonly isLatest?: boolean;
+  readonly originalCount?: number;
+  readonly refinedCount?: number;
+  readonly remark?: string;
+  readonly uploadTime?: string;
+  readonly files?: DeliveryFileSummary[];
+}
+
+export interface PhotoAuthorizationFileSummary {
+  readonly fileId: number;
+  readonly deliveryId?: number;
+  readonly fileName?: string;
+  readonly fileType?: string;
+  readonly mimeType?: string;
+}
+
+export interface PhotoAuthorizationSummary {
+  readonly id: number;
+  readonly orderId: number;
+  readonly customerId: number;
+  readonly providerUserId: number;
+  readonly photoUsageScope: string;
+  readonly status: string;
+  readonly remark?: string;
+  readonly authorizedAt?: string;
+  readonly files: PhotoAuthorizationFileSummary[];
+}
+
+export interface PhotoAuthorizationPayload {
+  readonly fileIds: number[];
+  readonly remark: string;
+}
+
+export interface PhotoAuthorizationDecisionPayload {
+  readonly remark: string;
+}
+
+export interface StatusTransitionResult {
+  readonly toStatus: string;
+  readonly createdAt?: string;
+}
+
+export interface ReworkPayload {
+  readonly reason: string;
+}
+
+export interface OrderTransitionPayload {
+  readonly targetStatus: string;
+  readonly reason: string;
 }
 
 export interface StartServiceChatResult {
@@ -312,12 +438,21 @@ export interface SessionSummary {
   readonly userId: number;
   readonly nickname: string;
   readonly role: string;
-  readonly adminCapable: boolean;
-  readonly sessionId: string;
-  readonly deviceId: string;
-  readonly deviceName: string;
+  // These fields are supplied by /auth/session. When /users/me is used as
+  // a verified identity fallback, session metadata is deliberately absent.
+  readonly adminCapable?: boolean;
+  readonly sessionId?: string;
+  readonly deviceId?: string;
+  readonly deviceName?: string;
   readonly createdAt?: string;
   readonly expiresAt?: string;
+}
+
+export interface UpdateProfilePayload {
+  nickname: string; bio: string; role: string; avatarFileId?: number;
+  locationDisplay?: string;
+  locationVisible?: boolean;
+  birthdayVisible?: boolean;
 }
 
 export interface UserProfileSummary {
@@ -425,6 +560,12 @@ export interface ConversationSummary {
   readonly createdAt?: string;
 }
 
+export interface UserBrief {
+  readonly userId: number;
+  readonly nickname?: string;
+  readonly avatarFileId?: number;
+}
+
 export interface OrderSummary {
   readonly orderId: number;
   readonly orderNo?: string;
@@ -434,6 +575,29 @@ export interface OrderSummary {
   readonly amountCent?: number;
   readonly createdAt?: string;
   readonly demandId?: number;
+  readonly quoteId?: number;
+  readonly conversationId?: number;
+  readonly customerId?: number;
+  readonly providerUserId?: number;
+  readonly shootStartTime?: string;
+  readonly shootEndTime?: string;
+  readonly deliveryDeadline?: string;
+  readonly shootLocation?: string;
+  readonly escrowStatus?: string;
+}
+
+export interface AccountCancellationPayload {
+  readonly reason?: string;
+}
+
+export interface AccountCancellationSummary {
+  readonly requestId?: number;
+  readonly status: string;
+  readonly reason?: string;
+  readonly requestedAt?: string;
+  readonly updatedAt?: string;
+  readonly processedAt?: string;
+  readonly resolutionNote?: string;
 }
 
 export interface NotificationSummary {
@@ -500,6 +664,7 @@ export interface ReviewComplaintSummary {
   readonly complaintId: number; readonly reviewId: number; readonly orderId: number; readonly complainantId: number;
   readonly respondentId?: number; readonly reason: string; readonly status: string;
   readonly arbitrationResult?: string; readonly arbitrationComment?: string; readonly createdAt?: string; readonly handledAt?: string;
+  readonly evidenceFileIds?: string; readonly updatedAt?: string;
 }
 export interface DisputeReplySummary { readonly id: number; readonly disputeId: number; readonly replierId: number; readonly content: string; readonly createdAt?: string; }
 export interface DisputeSummary {
@@ -511,3 +676,12 @@ export interface CreateReviewPayload { readonly rating: number; readonly content
 export interface ReviewTextPayload { readonly content: string; }
 export interface CreateReviewComplaintPayload { readonly reason: string; readonly evidenceFileIds: string; }
 export interface DisputeReasonPayload { readonly reason: string; }
+export interface DemandInterestSummary {
+  readonly interestId?: number;
+  readonly demandId: number;
+  readonly targetType: string;
+  readonly interested: boolean;
+  readonly status: string;
+  readonly demand?: DemandSummary | null;
+  readonly createdAt?: string;
+}

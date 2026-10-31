@@ -4,10 +4,12 @@ import { PortraTheme } from '../../theme/PortraTheme';
 export struct PortraPageHeading {
   @Prop title: string = '';
   @Prop eyebrow: string = '';
+  @Prop compact: boolean = false;
   onBack?: () => void;
 
   build() {
     Row({ space: 12 }) {
+      if (this.onBack !== undefined) {
       Button('‹')
         .width(36)
         .height(36)
@@ -17,6 +19,7 @@ export struct PortraPageHeading {
         .borderRadius(18)
         .accessibilityText('返回')
         .onClick(() => this.onBack?.())
+      }
       Column({ space: 2 }) {
         if (this.eyebrow.length > 0) {
           Text(this.eyebrow)
@@ -24,7 +27,7 @@ export struct PortraPageHeading {
             .fontColor(PortraTheme.secondaryText)
         }
         Text(this.title)
-          .fontSize(22)
+          .fontSize(this.compact ? 16 : 22)
           .fontWeight(FontWeight.Bold)
           .fontColor(PortraTheme.primaryText)
           .maxLines(1)
@@ -34,8 +37,9 @@ export struct PortraPageHeading {
       .alignItems(HorizontalAlign.Start)
     }
     .width('100%')
-    .height(64)
+    .height(this.compact ? 58 : 64)
     .padding({ left: 12, right: 20 })
-    .backgroundColor(PortraTheme.pageBackground)
+    .backgroundColor(this.compact ? PortraTheme.surface : PortraTheme.pageBackground)
+    .border({ width: { bottom: this.compact ? 1 : 0 }, color: PortraTheme.border })
   }
 }

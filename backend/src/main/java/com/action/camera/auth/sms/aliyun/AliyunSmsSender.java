@@ -31,14 +31,17 @@ public class AliyunSmsSender implements SmsSender {
 
     @Override
     public SmsDeliveryReceipt send(SmsMessage message) {
-        if (message.purpose() != SmsPurpose.LOGIN) {
+        if (message.purpose() != SmsPurpose.LOGIN && message.purpose() != SmsPurpose.REAUTH) {
             throw new SmsDeliveryException("No Alibaba Cloud template configured for SMS purpose");
         }
+
+        String template = message.purpose() == SmsPurpose.REAUTH ? properties.getReauthTemplateId() : properties.getLoginTemplateId();
+        if (template == null || template.isBlank()) throw new SmsDeliveryException("No Alibaba Cloud template configured for SMS purpose");
 
         AliyunSmsResult result = gateway.send(
                 message.phone(),
                 properties.getSignName(),
-                properties.getLoginTemplateId(),
+                template,
                 templateParameters(message.code()));
         if (result == null || !"OK".equals(result.code())) {
             throw new SmsDeliveryException("Alibaba Cloud SMS rejected the request");

@@ -28,6 +28,10 @@ public class SmsProperties {
     private String accessKeySecret = "";
     private String signName = "";
     private String loginTemplateId = "";
+    /** Operator-approved identity re-verification template; blank fails closed. */
+    private String reauthTemplateId = "";
+    /** A separate PNVS scheme prevents a LOGIN challenge authorizing account closure. */
+    private String reauthSchemeName = "";
     private String codeParameterName = "code";
     private String codePepper = "";
     private Duration codeTtl = Duration.ofMinutes(5);

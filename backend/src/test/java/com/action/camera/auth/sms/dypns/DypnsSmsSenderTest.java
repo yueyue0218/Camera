@@ -192,6 +192,26 @@ class DypnsSmsSenderTest {
     }
 
     @Test
+    void reauthenticationRequiresSeparateApprovedSchemeAndUsesItForSendAndVerify() {
+        SmsProperties properties=new SmsProperties(); properties.setSignName("Approved sign");
+        properties.setLoginTemplateId("LOGIN_TEMPLATE"); properties.setReauthTemplateId("REAUTH_TEMPLATE");
+        DypnsSmsSender configured=new DypnsSmsSender(properties,mapper,client);
+        assertThatThrownBy(()->configured.send(new SmsMessage("+8613800138000",SmsPurpose.REAUTH,"123456",Duration.ofMinutes(5))))
+                .isInstanceOf(SmsDeliveryException.class).hasMessageContaining("separate approved PNVS");
+        properties.setReauthSchemeName("默认方案");
+        assertThatThrownBy(()->configured.verifyCode("+8613800138000",SmsPurpose.REAUTH,"123456"))
+                .isInstanceOf(SmsDeliveryException.class);
+        properties.setReauthSchemeName("portra-identity-reauth");
+        assertThat(configured.send(new SmsMessage("+8613800138000",SmsPurpose.REAUTH,"123456",Duration.ofMinutes(5))).providerMessageId())
+                .isEqualTo("mock-biz");
+        assertThat(client.query).containsEntry("SchemeName","portra-identity-reauth").containsEntry("TemplateCode","REAUTH_TEMPLATE");
+        assertThat(configured.verifyCode("+8613800138000",SmsPurpose.REAUTH,"123456")).isTrue();
+        assertThat(client.query).containsEntry("SchemeName","portra-identity-reauth");
+        assertThat(configured.verifyCode("+8613800138000","123456")).isTrue();
+        assertThat(client.query).containsEntry("SchemeName","默认方案");
+    }
+
+    @Test
     void documentedUnknownResultMeansInvalidCode() {
         client.verifyResult = "UNKNOWN";
         assertThat(sender.verifyCode("+8613800138000", "123456")).isFalse();

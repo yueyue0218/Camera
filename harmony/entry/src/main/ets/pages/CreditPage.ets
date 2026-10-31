@@ -38,10 +38,18 @@ export struct CreditPage {
       this.lifecycle.start();
     } catch { this.snapshot.error = '页面状态监听不可用，请返回后重试。'; }
   }
+  private metricValue(kind: string): string {
+    const summary = this.snapshot.summary;
+    if (summary === undefined) { return this.snapshot.error.length > 0 ? '加载失败' : '加载中'; }
+    if (kind === 'orders') { return CreditFormat.metric(summary.effectiveOrderCount); }
+    if (kind === 'risks') { return CreditFormat.metric(summary.riskRecordCount); }
+    if (kind === 'reviews') { return summary.goodReviewRate === null ? '暂无评价' : CreditFormat.percent(summary.goodReviewRate); }
+    return summary.defaultRate === null ? '暂无计分合作' : CreditFormat.percent(summary.defaultRate);
+  }
   @Builder
-  private Metric(value: string, label: string) {
+  private Metric(kind: string, label: string) {
     Column({ space: 8 }) {
-      Text(value).fontSize(23).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
+      Text(this.metricValue(kind)).fontSize(19).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
       Text(label).fontSize(11).fontColor(PortraTheme.secondaryText)
     }.width('47%').padding({ top: 18, bottom: 18 }).backgroundColor(PortraTheme.surface).borderRadius(16)
   }
@@ -100,7 +108,7 @@ export struct CreditPage {
                     .padding({ left: 12, right: 12, top: 7, bottom: 7 }).backgroundColor(PortraTheme.accent).borderRadius(30)
                 }
               }.width('100%')
-              Text(`最近更新：${NotificationFormat.time(this.snapshot.summary?.lastUpdatedAt ?? undefined)}`)
+              Text(`最近更新：${this.snapshot.summary?.lastUpdatedAt ? NotificationFormat.time(this.snapshot.summary.lastUpdatedAt) : '暂无分数变更'}`)
                 .width('100%').fontSize(11).fontColor(PortraTheme.secondaryText)
               Text('信用分会参考完成合作后的评价、是否按约以及争议处理情况，近期表现越稳定，分数通常也越稳。')
                 .width('100%').fontSize(13).lineHeight(23).fontColor(PortraTheme.secondaryText)
@@ -114,14 +122,14 @@ export struct CreditPage {
               .border({ width: { left: 4 }, color: PortraTheme.primary })
             Column({ space: 12 }) {
               Row() {
-                this.Metric(CreditFormat.metric(this.snapshot.summary?.effectiveOrderCount), '计分合作')
+                this.Metric('orders', '计分合作')
                 Blank()
-                this.Metric(CreditFormat.percent(this.snapshot.summary?.goodReviewRate), '好评率')
+                this.Metric('reviews', '好评率')
               }.width('100%')
               Row() {
-                this.Metric(CreditFormat.percent(this.snapshot.summary?.defaultRate), '未按约占比')
+                this.Metric('defaults', '未按约占比')
                 Blank()
-                this.Metric(CreditFormat.metric(this.snapshot.summary?.riskRecordCount), '争议记录')
+                this.Metric('risks', '争议记录')
               }.width('100%')
             }.width('100%').padding(14).backgroundColor(PortraTheme.pageBackgroundDeep).borderRadius(22)
             Row() {

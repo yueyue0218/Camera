@@ -639,7 +639,7 @@ export function ServicePackageDetailPage() {
   const timeTags = splitTags(service.timeTags)
   const credit = formatCreditScoreValue(providerCreditScore)
   const hasCreditScore = hasCreditScoreValue(providerCreditScore)
-  const city = cityName(service.cityName || service.cityCode) || service.serviceArea || '暂无城市'
+  const city = cityName(service.cityName || service.cityCode) || service.serviceArea || '地区未填写'
   const price = service.priceRange || `${money(service.basePriceCent)} 起`
   const isServiceOwner = isSameOwner(currentUser, collectServiceOwnerIds(service))
   const isCustomerViewer = currentUser.role === 'CUSTOMER'
