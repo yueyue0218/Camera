@@ -86,6 +86,16 @@ export class ErrorMapper {
     return new PortraError(ErrorKind.PARSE, '服务器返回的数据格式无法识别。');
   }
 
+  static unexpectedContent(status: number, html: boolean): PortraError {
+    return new PortraError(ErrorKind.CONFIG, html ?
+      '服务接口返回了网页，请联系管理员检查 API 路由及后端部署。' :
+      '服务接口未返回 JSON，请联系管理员检查 API 配置。', status);
+  }
+
+  static contract(): PortraError {
+    return new PortraError(ErrorKind.PARSE, '服务器响应结构与客户端不兼容，请联系管理员检查服务版本。');
+  }
+
   static config(message: string): PortraError {
     return new PortraError(ErrorKind.CONFIG, message);
   }

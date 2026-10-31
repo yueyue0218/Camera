@@ -6,6 +6,7 @@ import { ProvinceLocation } from '../common/location/ProvinceLocation';
 import { common } from '@kit.AbilityKit';
 import { UiPerf } from '../common/performance/UiPerf';
 import { ProfileIdentity } from '../features/user/ProfileIdentity';
+import { CreditFormat } from '../features/credit/CreditController';
 import { ProfileHeader } from '../features/user/ProfileHeader';
 import { ProfileWorkspace } from '../features/user/ProfileWorkspace';
 import { AppClient } from '../app/AppClient';
@@ -17,7 +18,7 @@ import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraLoading } from '../common/components/PortraLoading';
 import { MomentCard } from '../features/moments/MomentCard';
 import { MomentFeedFormatter } from '../features/moments/MomentFeedModels';
-import { DemandSummary, MomentSummary, OrderSummary, ServicePackageSummary, SocialUserBrief, UserProfileSummary } from '../model/ApiModels';
+import { DemandSummary, MomentSummary, OrderSummary, ServicePackageSummary, SocialUserBrief, UserProfileSummary, CreditSummary } from '../model/ApiModels';
 import { PortraError } from '../network/ErrorMapper';
 
 import { PortraTheme } from '../theme/PortraTheme';
@@ -47,6 +48,10 @@ export struct ProfilePage {
   @State private interestPage: number = 0;
   @State private favoriteLoaded: boolean = false;
   @State private socialLoaded: boolean = false;
+  @State private publicationError: string = '';
+  @State private orderStatsError: string = '';
+  @State private creditSummary: CreditSummary | undefined = undefined;
+  @State private creditError: string = '';
   private readonly changed: (kind?: string) => void = (kind?: string) => {
     if (!this.activeTab || this.section === 'settings') { return; }
     if (kind === 'relations') { this.loadSocial(); } else { this.load(false); }
@@ -134,6 +139,7 @@ export struct ProfilePage {
     ContentChanges.unobserve(this.changed);
     this.appClient.apiService.cancelCurrentSession();
     this.appClient.apiService.cancelUserSystemRequests(this.userId);
+    this.appClient.apiService.cancelCreditRequests(['profile.credit']);
   }
 
   private async load(resetNavigation: boolean = true): Promise<void> {
@@ -184,6 +190,10 @@ export struct ProfilePage {
     this.favoriteLoaded = false;
     this.socialLoaded = false;
     this.socialError = '';
+    this.publicationError = '';
+    this.orderStatsError = '';
+    this.creditSummary = undefined;
+    this.creditError = '';
     try {
       let profile: UserProfileSummary;
       let degraded = false;
@@ -221,10 +231,10 @@ export struct ProfilePage {
       this.loading = false;
       if (degraded) {
         this.errorMessage = '个人档案接口暂不可用；当前仅显示服务器确认的身份，资料和统计待恢复。';
-        return;
       }
 
       this.loadSocial();
+      this.loadProfileCredit(version, sessionVersion, profile.id);
       // The workspace preview comes from the same authenticated page API as management.
       try {
         if (profile.currentRole === 'CUSTOMER') {
@@ -246,7 +256,8 @@ export struct ProfilePage {
         }
       } catch (error) {
         if (version !== this.loadVersion || sessionVersion !== this.appClient.sessionManager.getSessionVersion()) { return; }
-        this.errorMessage = (error as PortraError).message || '发布记录暂不可用';
+        this.publicationError = this.safeErrorLabel(error, '发布记录暂不可用');
+        this.errorMessage = this.publicationError;
       }
 
       try {
@@ -260,7 +271,8 @@ export struct ProfilePage {
           item.status !== 'COMPLETED' && item.status !== 'CANCELLED' && item.status !== 'REFUNDED').length;
       } catch (error) {
         if (version !== this.loadVersion || sessionVersion !== this.appClient.sessionManager.getSessionVersion()) { return; }
-        this.errorMessage = (error as PortraError).message || '订单概览暂不可用';
+        this.orderStatsError = this.safeErrorLabel(error, '订单概览暂不可用');
+        this.errorMessage = this.orderStatsError;
       }
 
       // The identity card is authoritative even if an optional gallery request fails.
@@ -326,6 +338,36 @@ export struct ProfilePage {
         }
       }
     }
+  }
+
+  private async loadProfileCredit(version: number, epoch: number, userId: number): Promise<void> {
+    try {
+      const summary = await this.appClient.apiService.getCreditSummary(userId, 'profile.credit');
+      if (version !== this.loadVersion || epoch !== this.appClient.sessionManager.getSessionVersion() || userId !== this.userId) { return; }
+      if (summary === null || summary.userId !== userId || (summary.creditScore !== null && summary.creditScore !== undefined &&
+        (typeof summary.creditScore !== 'number' || !Number.isFinite(summary.creditScore)))) { throw new Error('信用数据异常'); }
+      this.creditSummary = summary;
+    } catch (error) {
+      if (version === this.loadVersion && epoch === this.appClient.sessionManager.getSessionVersion() && userId === this.userId) {
+        this.creditError = this.safeErrorLabel(error, '信用分暂不可用');
+      }
+    }
+  }
+
+  private profileCreditLabel(): string {
+    if (this.creditSummary !== undefined) { return CreditFormat.score(this.creditSummary.creditScore); }
+    return this.creditError.length > 0 ? '重试' : '加载中';
+  }
+
+  private socialStatValue(destination: string): string {
+    if (!this.socialLoaded) { return this.socialError.length > 0 ? '重试' : '加载中'; }
+    return `${destination === 'following' ? this.following.length : this.followers.length}`;
+  }
+
+  private businessStatValue(kind: string): string {
+    const value = kind === 'published' ? this.myPublishedTotal : kind === 'ongoing' ? this.ongoingOrderTotal : this.completedOrderTotal;
+    const error = kind === 'published' ? this.publicationError : this.orderStatsError;
+    return value === undefined ? (error.length > 0 ? '重试' : '加载中') : `${value}`;
   }
 
   private profileNickname(profile: UserProfileSummary): string {
@@ -761,17 +803,17 @@ export struct ProfilePage {
 
   // v39 identity statistics are inline, not full-width elevated blocks.
   @Builder
-  private StatLink(value: string, label: string, destination: string) {
+  private StatLink(label: string, destination: string) {
     Row({ space: 4 }) {
-      Text(value).fontSize(14).fontWeight(FontWeight.Bold).fontColor('#2C2D31')
+      Text(this.socialStatValue(destination)).fontSize(14).fontWeight(FontWeight.Bold).fontColor('#2C2D31')
       Text(label).fontSize(10.5).fontColor('#87817B')
     }.padding(0).onClick(() => this.openSection(destination))
   }
 
   @Builder
-  private BusinessStat(value: string, label: string, destination: string) {
+  private BusinessStat(kind: string, label: string, destination: string) {
     Column({ space: 4 }) {
-      Text(value).fontSize(17).fontWeight(FontWeight.Bold).fontColor('#292A2E')
+      Text(this.businessStatValue(kind)).fontSize(17).fontWeight(FontWeight.Bold).fontColor('#292A2E')
       Text(label).fontSize(10).fontColor('#8E8781')
     }.layoutWeight(1).alignItems(HorizontalAlign.Center)
       .justifyContent(FlexAlign.Center).height(64)
@@ -913,14 +955,22 @@ export struct ProfilePage {
         Column({ space: 0 }) {
           ProfileIdentity({ nickname: this.nickname, userId: this.userId, avatarFileId: this.roleAvatarId(),
             identityLine: this.profileLocationLine(), bio: this.profileBio(), owner: true,
-            creditLabel: this.profile?.creditScore === null || this.profile?.creditScore === undefined ? '—' : `${this.profile?.creditScore}`,
+            creditLabel: this.profileCreditLabel(),
             onEdit: () => this.openSection('settings'), onOpenCredit: this.onOpenCredit })
           RegionControl({ value: this.selectedRegion, onChange: (code: string) => { this.selectedRegion = code; } })
           // Social stats belong directly under the profile and above the role-specific workspace.
           Row({ space: 28 }) {
-            this.StatLink(this.socialLoaded ? `${this.following.length}` : '—', '关注', 'following')
-            this.StatLink(this.socialLoaded ? `${this.followers.length}` : '—', '粉丝', 'followers')
+            this.StatLink('关注', 'following')
+            this.StatLink('粉丝', 'followers')
           }.width('100%').margin({ top: 12, bottom: 6 })
+          if (this.socialError.length > 0 || this.publicationError.length > 0 || this.orderStatsError.length > 0 || this.creditError.length > 0) {
+            Row({ space: 8 }) {
+              Text(this.socialError || this.publicationError || this.orderStatsError || this.creditError)
+                .fontSize(11).fontColor(PortraTheme.danger).layoutWeight(1)
+              Button('重试统计').height(30).fontSize(11).fontColor(PortraTheme.primary)
+                .backgroundColor(Color.Transparent).onClick(() => this.load(false))
+            }.width('100%').margin({ top: 8 })
+          }
           // "我的约拍 / 摄影工作" is the single raised card in the reference.
           Column({ space: 0 }) {
             Row({ space: 12 }) {
@@ -938,13 +988,13 @@ export struct ProfilePage {
             }.width('100%')
             Divider().strokeWidth(1).color('#EEE8E1').margin({ top: 14 })
             Row({ space: 0 }) {
-              this.BusinessStat(this.myPublishedTotal === undefined ? '—' : `${this.myPublishedTotal}`,
+              this.BusinessStat('published',
                 this.role === 'PROVIDER' ? '我的橱窗' : '已发布', 'demands')
               Divider().vertical(true).height(29).color('#EEE8E1')
-              this.BusinessStat(this.ongoingOrderTotal === undefined ? '—' : `${this.ongoingOrderTotal}`,
+              this.BusinessStat('ongoing',
                 this.role === 'PROVIDER' ? '进行中' : '进行中', 'orders')
               Divider().vertical(true).height(29).color('#EEE8E1')
-              this.BusinessStat(this.completedOrderTotal === undefined ? '—' : `${this.completedOrderTotal}`,
+              this.BusinessStat('completed',
                 this.role === 'PROVIDER' ? '已完成' : '已完成', 'orders')
             }.width('100%')
             Divider().strokeWidth(1).color('#EEE8E1')

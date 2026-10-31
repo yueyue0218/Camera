@@ -327,19 +327,33 @@ export class HttpClient implements AuthTokenController {
       return response.result as T;
     }
 
+    // A reverse proxy may send the SPA index with HTTP 200 for an unproxied API.
+    // Diagnose that before JSON parsing; never print the response or credentials.
+    const responseHeaders = (response.header ?? {}) as Record<string, string>;
+    const contentTypeKey = Object.keys(responseHeaders)
+      .find((key: string) => key.toLowerCase() === 'content-type');
+    const mime = contentTypeKey === undefined ? '' :
+      String(responseHeaders[contentTypeKey]).split(';')[0].trim().toLowerCase();
+    const html = mime === 'text/html' || mime === 'application/xhtml+xml' ||
+      (typeof response.result === 'string' && /^\s*<(?:!doctype\s+html|html)(?:\s|>)/i.test(response.result));
+    if (html || (mime.length > 0 && mime !== 'application/json' && !mime.endsWith('+json'))) {
+      throw ErrorMapper.unexpectedContent(response.responseCode, html);
+    }
+
     let envelope: ApiEnvelope<T>;
     try {
       if (typeof response.result !== 'string') {
         throw ErrorMapper.parse();
       }
       envelope = JSON.parse(response.result as string) as ApiEnvelope<T>;
-      if (envelope === null || typeof envelope !== 'object' || Array.isArray(envelope) ||
-        !Number.isInteger(envelope.code) || typeof envelope.message !== 'string' ||
-        (envelope.code === 200 && envelope.data === undefined)) {
-        throw ErrorMapper.parse();
-      }
     } catch {
       throw ErrorMapper.parse();
+    }
+
+    if (envelope === null || typeof envelope !== 'object' || Array.isArray(envelope) ||
+      !Number.isInteger(envelope.code) || typeof envelope.message !== 'string' ||
+      (envelope.code === 200 && envelope.data === undefined)) {
+      throw ErrorMapper.contract();
     }
 
     if (envelope.code !== 200) {
