@@ -954,10 +954,10 @@ export struct ProfilePage {
       Scroll() {
         Column({ space: 0 }) {
           ProfileIdentity({ nickname: this.nickname, userId: this.userId, avatarFileId: this.roleAvatarId(),
-            identityLine: this.profileLocationLine(), bio: this.profileBio(), owner: true,
+            identityLine: this.profileLocationLine(), showIdentityLine: false, bio: this.profileBio(), owner: true,
             creditLabel: this.profileCreditLabel(),
             onEdit: () => this.openSection('settings'), onOpenCredit: this.onOpenCredit })
-          RegionControl({ value: this.selectedRegion, onChange: (code: string) => { this.selectedRegion = code; } })
+          RegionControl({ value: this.selectedRegion, compact: true, onChange: (code: string) => { this.selectedRegion = code; } })
           // Social stats belong directly under the profile and above the role-specific workspace.
           Row({ space: 28 }) {
             this.StatLink('关注', 'following')

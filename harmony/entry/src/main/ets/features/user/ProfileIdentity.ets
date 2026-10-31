@@ -7,6 +7,7 @@ export struct ProfileIdentity {
   @Prop userId: number = 0;
   @Prop avatarFileId: number = 0;
   @Prop identityLine: string = '';
+  @Prop showIdentityLine: boolean = true;
   @Prop bio: string = '';
   @Prop owner: boolean = false;
   @Prop creditLabel: string = '—';
@@ -37,8 +38,9 @@ export struct ProfileIdentity {
             }
           }.width('100%')
           Text(`UID ${this.userId}`).fontSize(10.5).fontColor('#98918B')
-          Text(this.identityLine)
-            .fontSize(11.5).fontColor('#68635E')
+          if (this.showIdentityLine && this.identityLine.length > 0) {
+            Text(this.identityLine).fontSize(11.5).fontColor('#68635E')
+          }
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       }.width('100%').height(76)
       if (this.bio.length > 0) {
