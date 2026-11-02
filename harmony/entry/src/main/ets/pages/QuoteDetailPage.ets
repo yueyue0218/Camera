@@ -120,7 +120,7 @@ export struct QuoteDetailPage {
         Scroll() {
           QuoteDetailContent({ quote: this.quote!, providerName: this.providerName })
             .padding({ left: 20, right: 20, top: 20, bottom: 30 })
-        }.layoutWeight(1).scrollBar(BarState.Off)
+        }.align(Alignment.TopStart).layoutWeight(1).scrollBar(BarState.Off)
         if (this.errorMessage) Text(this.errorMessage).fontColor(PortraTheme.danger).fontSize(12)
           .padding({ left: 20, right: 20 })
         if (this.showReject) {

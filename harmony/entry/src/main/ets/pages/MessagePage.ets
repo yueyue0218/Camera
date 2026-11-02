@@ -521,7 +521,7 @@ export struct MessagePage {
 
           }
           .width('100%')
-        }
+        }.align(Alignment.TopStart)
         .layoutWeight(1)
         .scrollBar(BarState.Off)
         .onDidScroll(() => {

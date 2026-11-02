@@ -195,7 +195,7 @@ export struct OrderPage {
           }
           .width('100%')
           .padding({ left: 20, right: 20, bottom: 24 })
-        }
+        }.align(Alignment.TopStart)
         .layoutWeight(1)
         .scrollBar(BarState.Off)
       }

@@ -912,7 +912,7 @@ export struct ConversationDetailPage {
             .onChange((value: string) => this.changeDraft(value))
         }.width('100%').alignItems(HorizontalAlign.Start)
           .padding({ left: 14, right: 14, top: 16, bottom: 20 })
-      }.layoutWeight(1)
+      }.align(Alignment.TopStart).layoutWeight(1)
       Row({ space: 10 }) {
         Button('取消').layoutWeight(1).height(44).backgroundColor('#F2F0ED')
           .fontColor(PortraTheme.primaryText).onClick(() => this.attachmentDraft = [])
@@ -978,7 +978,7 @@ export struct ConversationDetailPage {
               }, (order: OrderSummary) => `reviews:${order.orderId}`)
           }
           .width('100%').padding({ left: 11, right: 11, top: 12, bottom: 20 })
-        }
+        }.align(Alignment.TopStart)
         .layoutWeight(1).backgroundColor('#F3EFE9')
         if (this.currentTask() !== null) {
           Row({ space: 10 }) {

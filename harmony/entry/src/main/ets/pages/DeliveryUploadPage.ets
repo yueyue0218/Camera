@@ -190,7 +190,7 @@ export struct DeliveryUploadPage {
             if (this.busy) Text(`正在上传 ${this.progress}%`).fontSize(13).fontColor(PortraTheme.primary)
             if (this.error) Text(this.error).fontSize(12).fontColor(PortraTheme.danger)
           }.width('100%').padding(18)
-        }.layoutWeight(1)
+        }.align(Alignment.TopStart).layoutWeight(1)
         Button(this.uncertain ? '核对结果' : this.busy ? '上传中' : '确认上传')
           .height(48).width('100%').enabled(!this.busy && (this.uncertain || this.selected.length > 0))
           .onClick(() => this.uncertain ? this.reconcile() : this.upload())

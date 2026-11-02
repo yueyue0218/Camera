@@ -196,7 +196,7 @@ export struct QuoteFormPage {
           this.LongField('备注', this.draft.remark, '选填', 'remark')
         }
         .alignItems(HorizontalAlign.Start).padding({ left: 20, right: 20, top: 18, bottom: 28 })
-      }.layoutWeight(1).scrollBar(BarState.Off)
+      }.align(Alignment.TopStart).layoutWeight(1).scrollBar(BarState.Off)
       if (this.errorMessage) {
         Text(this.errorMessage).fontSize(12).fontColor(PortraTheme.danger).padding({ left: 20, right: 20 })
       }

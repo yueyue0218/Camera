@@ -150,7 +150,7 @@ export struct CreditPage {
               (item: CreditRecordSummary) => `${item.recordId}`)
           }
         }.width('100%').padding({ left: 20, right: 20, top: 6, bottom: 30 })
-      }.width('100%').layoutWeight(1).scrollBar(BarState.Off)
+      }.align(Alignment.TopStart).width('100%').layoutWeight(1).scrollBar(BarState.Off)
     }.width('100%').height('100%').backgroundColor(PortraTheme.pageBackground).onAppear(() => this.observe())
   }
 }
