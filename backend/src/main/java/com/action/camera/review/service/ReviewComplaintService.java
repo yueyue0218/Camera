@@ -81,7 +81,7 @@ public class ReviewComplaintService {
         Long currentUserId = requireCurrentUserId();
         validateCreateRequest(request);
 
-        Review review = reviewRepository.findById(reviewId)
+        Review review = reviewRepository.findByIdForUpdate(reviewId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Review not found"));
         if (!currentUserId.equals(review.getTargetUserId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Only the reviewed user can complain");
@@ -183,7 +183,7 @@ public class ReviewComplaintService {
     @Transactional
     public ReviewComplaintResponse cancel(Long complaintId) {
         Long currentUserId = requireCurrentUserId();
-        ReviewComplaint complaint = complaintRepository.findById(complaintId)
+        ReviewComplaint complaint = complaintRepository.findByIdForUpdate(complaintId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Complaint not found"));
         if (!currentUserId.equals(complaint.getComplainantId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Only complainant can cancel");

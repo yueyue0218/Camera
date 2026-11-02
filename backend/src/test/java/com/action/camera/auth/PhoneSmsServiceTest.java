@@ -1,6 +1,7 @@
 package com.action.camera.auth;
 
 import com.action.camera.auth.domain.SmsChallenge;
+import com.action.camera.auth.config.SmsProperties;
 import com.action.camera.auth.domain.SmsDeliveryStatus;
 import com.action.camera.auth.domain.SmsPurpose;
 import com.action.camera.auth.repository.SmsChallengeRepository;
@@ -16,6 +17,8 @@ import com.action.camera.common.exception.BusinessException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -73,6 +76,9 @@ class PhoneSmsServiceTest {
     @Autowired
     private PhoneIdentityCodec phoneIdentityCodec;
 
+    @Autowired
+    private SmsProperties smsProperties;
+
     @MockBean
     private SmsSender smsSender;
 
@@ -109,7 +115,7 @@ class PhoneSmsServiceTest {
     }
 
     @Test
-    void senderFailureLeavesAnUnusableRateLimitedChallenge() {
+    void senderFailureLeavesAnUnusableChallengeAndShortBackoff() {
         when(smsSender.send(any(SmsMessage.class)))
                 .thenThrow(new SmsDeliveryException("provider unavailable"));
 
@@ -120,6 +126,156 @@ class PhoneSmsServiceTest {
         assertThat(failed.getDeliveryStatus()).isEqualTo(SmsDeliveryStatus.FAILED);
         assertThat(failed.getExpiresAt()).isBeforeOrEqualTo(LocalDateTime.now());
         assertThat(failed.getSentAt()).isNull();
+        assertRateLimited(PHONE, IP, DEVICE);
+        verify(smsSender, times(1)).send(any(SmsMessage.class));
+    }
+
+    @Test
+    void oldFailuresDoNotConsumeAnySuccessfulQuota() {
+        for (int i = 0; i < 21; i++) {
+            SmsChallenge failed = challenge(PHONE, IP, DEVICE, LocalDateTime.now().minusMinutes(2));
+            failed.setDeliveryStatus(SmsDeliveryStatus.FAILED);
+            challengeRepository.saveAndFlush(failed);
+        }
+        // Reproduces the old unfiltered count exceeding both phone quotas.
+        assertThat(challengeRepository.countByPhoneHashAndCreatedAtAfter(
+                phoneIdentityCodec.lookupHash(PHONE), LocalDateTime.now().minusHours(1))).isEqualTo(21);
+        phoneSmsService.sendCode(PHONE, SmsPurpose.LOGIN, IP, DEVICE);
+        verify(smsSender, times(1)).send(any(SmsMessage.class));
+        assertThat(challengeRepository.findAll()).hasSize(22);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"phone", "ip", "device"})
+    void failuresHaveIndependentMinuteBurstLimit(String dimension) {
+        SmsChallenge failed = challenge(
+                dimension.equals("phone") ? PHONE : "+8613900139000",
+                dimension.equals("ip") ? IP : "198.51.100.3",
+                dimension.equals("device") ? DEVICE : "other-device",
+                LocalDateTime.now().minusSeconds(30));
+        failed.setDeliveryStatus(SmsDeliveryStatus.FAILED);
+        challengeRepository.saveAndFlush(failed);
+        assertRateLimited(PHONE, IP, DEVICE);
+        verify(smsSender, times(0)).send(any(SmsMessage.class));
+    }
+
+    @Test
+    void failedRowCannotHideSuccessfulCooldown() {
+        SmsChallenge sent = challenge(PHONE, IP, DEVICE, LocalDateTime.now().minusSeconds(30));
+        sent.setDeliveryStatus(SmsDeliveryStatus.SENT);
+        challengeRepository.saveAndFlush(sent);
+        SmsChallenge failed = challenge(PHONE, IP, DEVICE, LocalDateTime.now().minusSeconds(20));
+        failed.setDeliveryStatus(SmsDeliveryStatus.FAILED);
+        challengeRepository.saveAndFlush(failed);
+        assertRateLimited(PHONE, IP, DEVICE);
+        verify(smsSender, times(0)).send(any(SmsMessage.class));
+    }
+
+    @Test
+    void pendingReservationStillConsumesQuota() {
+        SmsChallenge pending = challenge(PHONE, IP, DEVICE, LocalDateTime.now().minusMinutes(2));
+        pending.setDeliveryStatus(SmsDeliveryStatus.PENDING);
+        challengeRepository.saveAndFlush(pending);
+        assertRateLimited(PHONE, IP, DEVICE);
+    }
+
+    @Test
+    void successfulRecordOutsideAllWindowsAllowsSending() {
+        challengeRepository.saveAndFlush(challenge(PHONE, IP, DEVICE, LocalDateTime.now().minusHours(25)));
+        phoneSmsService.sendCode(PHONE, SmsPurpose.LOGIN, IP, DEVICE);
+        verify(smsSender, times(1)).send(any(SmsMessage.class));
+    }
+
+    @Test
+    void elapsedSuccessfulCooldownAllowsSendBelowQuota() {
+        long previous = smsProperties.getPhoneHourlyLimit();
+        try {
+            smsProperties.setPhoneHourlyLimit(2);
+            saveHistorical(PHONE, "198.51.100.3", "other-device");
+            phoneSmsService.sendCode(PHONE, SmsPurpose.LOGIN, IP, DEVICE);
+            verify(smsSender, times(1)).send(any(SmsMessage.class));
+        } finally {
+            smsProperties.setPhoneHourlyLimit(previous);
+        }
+    }
+
+    @Test
+    void providerFailureReleasesGuardAfterTransactionCommits() throws Exception {
+        long previous = smsProperties.getIpHourlyLimit();
+        try {
+            smsProperties.setIpHourlyLimit(2);
+            when(smsSender.send(any(SmsMessage.class)))
+                    .thenThrow(new SmsDeliveryException("mock provider failure"))
+                    .thenReturn(new SmsDeliveryReceipt("mock recovery"));
+            assertThatThrownBy(() -> phoneSmsService.sendCode(PHONE, SmsPurpose.LOGIN, IP, DEVICE))
+                    .hasMessage("短信暂时无法发送，请稍后重试");
+            ExecutorService executor = Executors.newSingleThreadExecutor();
+            try {
+                executor.submit(() -> phoneSmsService.sendCode("+8613900139000", SmsPurpose.LOGIN,
+                        IP, "other-device")).get(10, TimeUnit.SECONDS);
+            } finally {
+                executor.shutdownNow();
+            }
+            verify(smsSender, times(2)).send(any(SmsMessage.class));
+        } finally {
+            smsProperties.setIpHourlyLimit(previous);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"phone", "ip", "device"})
+    void successfulDailyLimitsRemainIndependent(String dimension) {
+        long phoneDaily = smsProperties.getPhoneDailyLimit();
+        long ipDaily = smsProperties.getIpDailyLimit();
+        long deviceDaily = smsProperties.getDeviceDailyLimit();
+        try {
+            smsProperties.setPhoneDailyLimit(1);
+            smsProperties.setIpDailyLimit(1);
+            smsProperties.setDeviceDailyLimit(1);
+            challengeRepository.saveAndFlush(challenge(
+                    dimension.equals("phone") ? PHONE : "+8613900139000",
+                    dimension.equals("ip") ? IP : "198.51.100.3",
+                    dimension.equals("device") ? DEVICE : "other-device",
+                    LocalDateTime.now().minusHours(2)));
+            assertRateLimited(PHONE, IP, DEVICE);
+            verify(smsSender, times(0)).send(any(SmsMessage.class));
+        } finally {
+            smsProperties.setPhoneDailyLimit(phoneDaily);
+            smsProperties.setIpDailyLimit(ipDaily);
+            smsProperties.setDeviceDailyLimit(deviceDaily);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"phone", "ip", "device"})
+    void concurrentFirstSendsReserveSharedDimensionUntilCommit(String dimension) throws Exception {
+        CountDownLatch enteredProvider = new CountDownLatch(1);
+        CountDownLatch releaseProvider = new CountDownLatch(1);
+        when(smsSender.send(any(SmsMessage.class))).thenAnswer(invocation -> {
+            enteredProvider.countDown();
+            if (!releaseProvider.await(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("Test provider timed out");
+            }
+            return new SmsDeliveryReceipt("mock-only");
+        });
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<?> first = executor.submit(() -> phoneSmsService.sendCode(PHONE, SmsPurpose.LOGIN, IP, DEVICE));
+            assertThat(enteredProvider.await(5, TimeUnit.SECONDS)).isTrue();
+            String secondPhone = dimension.equals("phone") ? PHONE : "+8613900139000";
+            String secondIp = dimension.equals("ip") ? IP : "198.51.100.3";
+            String secondDevice = dimension.equals("device") ? DEVICE : "other-device";
+            assertRateLimited(secondPhone, secondIp, secondDevice);
+            releaseProvider.countDown();
+            first.get(10, TimeUnit.SECONDS);
+            // After commit the persistent successful quota, not merely the guard, blocks it.
+            assertRateLimited(secondPhone, secondIp, secondDevice);
+            verify(smsSender, times(1)).send(any(SmsMessage.class));
+            assertThat(challengeRepository.findAll()).hasSize(1);
+        } finally {
+            releaseProvider.countDown();
+            executor.shutdownNow();
+        }
     }
 
     @Test
@@ -276,6 +432,7 @@ class PhoneSmsServiceTest {
         challenge.setRequestIp(ip);
         challenge.setDeviceId(deviceId);
         challenge.setCreatedAt(createdAt);
+        challenge.setDeliveryStatus(SmsDeliveryStatus.SENT);
         return challenge;
     }
 

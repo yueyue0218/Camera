@@ -30,7 +30,7 @@ readonly expected_origin='https://47.76.106.57'
 # These hashes approve the complete canonical bytes. Changing any root-loaded file
 # requires a reviewed helper update and a new administrator bootstrap.
 readonly approved_nginx_ssl_sha256=f2fadf7671e24ef37feb20e3d2829abb3c2d821d290a23ac5c3cac8ec9d97d98
-readonly approved_nginx_shared_sha256=4d1f7272dec1fe56ae16d77f1015e6cfe549ede3c83a4054b9c9cf80fc8fe9ea
+readonly approved_nginx_shared_sha256=e30ce36e7ce4a79df340f35020ab25f20a39f85b50c383871024768eaedee3f1
 readonly approved_systemd_sha256=24d558f6026f513013f668fb6ec93040046046b13901b19c0aab840464a34a70
 
 readonly nginx_ssl_target=/etc/nginx/conf.d/portra-ssl.conf

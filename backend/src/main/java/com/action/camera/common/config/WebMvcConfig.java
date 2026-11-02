@@ -1,6 +1,7 @@
 package com.action.camera.common.config;
 
 import com.action.camera.common.interceptor.AuthInterceptor;
+import com.action.camera.privacy.service.PrivacyRequestInterceptor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -16,13 +17,16 @@ public class WebMvcConfig implements WebMvcConfigurer {
     private final AuthInterceptor authInterceptor;
     private final CorsProperties corsProperties;
     private final Environment environment;
+    private final PrivacyRequestInterceptor privacyInterceptor;
 
     public WebMvcConfig(AuthInterceptor authInterceptor,
                         CorsProperties corsProperties,
-                        Environment environment) {
+                        Environment environment,
+                        PrivacyRequestInterceptor privacyInterceptor) {
         this.authInterceptor = authInterceptor;
         this.corsProperties = corsProperties;
         this.environment = environment;
+        this.privacyInterceptor = privacyInterceptor;
     }
 
     @Override
@@ -41,6 +45,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/users/login",
                         "/messages/**"
                 );
+        registry.addInterceptor(privacyInterceptor).addPathPatterns("/**").order(1);
         if (environment.acceptsProfiles(Profiles.of("temp-staging"))) {
             registration.excludePathPatterns("/auth/temp-staging/login");
         }

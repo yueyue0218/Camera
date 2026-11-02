@@ -1,3 +1,4 @@
+import { provinceName } from '../../common/region/ProvinceCatalog.js'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
@@ -190,42 +191,6 @@ export function ProfilePage() {
     }
   }, [currentUser.userId, currentUser.role])
 
-  useEffect(() => {
-    const IP_CACHE_KEY = `camera-ip-${currentUser.userId}`
-    const cached = (() => { try { return JSON.parse(localStorage.getItem(IP_CACHE_KEY)) } catch { return null } })()
-    if (cached?.location && Date.now() - (cached.ts || 0) < 24 * 3600 * 1000) {
-      if (cached.location !== currentUser.cityCode) updateProfile({ cityCode: cached.location })
-      return
-    }
-    async function detectIpLocation() {
-      try {
-        const amapKey = import.meta.env.VITE_AMAP_KEY
-        let location = ''
-        if (amapKey) {
-          const res = await fetch(`https://restapi.amap.com/v3/ip?key=${amapKey}&output=json`)
-          const data = await res.json()
-          if (data.status === '1') {
-            const province = typeof data.province === 'string'
-              ? data.province.replace(/(省|市|自治区|特别行政区)$/, '').trim() : ''
-            if (province) location = province
-          }
-        }
-        if (!location) {
-          const res = await fetch('http://ip-api.com/json/?lang=zh-CN&fields=status,regionName')
-          const data = await res.json()
-          if (data.status === 'success' && data.regionName) {
-            location = data.regionName.replace(/(省|市|自治区|特别行政区)$/, '').trim()
-          }
-        }
-        if (!location) return
-        try { localStorage.setItem(IP_CACHE_KEY, JSON.stringify({ location, ts: Date.now() })) } catch { /**/ }
-        if (location === currentUser.cityCode) return
-        updateProfile({ cityCode: location })
-        await userApi.updateMe({ cityCode: location }, currentUser)
-      } catch { /* ignore */ }
-    }
-    detectIpLocation()
-  }, [currentUser.userId])
 
   async function loadProfileData(requestId) {
     const isCurrentRequest = () => profileLoadSeqRef.current === requestId
@@ -547,7 +512,7 @@ export function ProfilePage() {
           </div>
           <p className="profile-uid">用户编号：{currentUser.userId}</p>
           <div className="profile-meta-line">
-            <span>IP属地：{currentUser.cityCode || '未知'}</span>
+            <span>地区：{provinceName(currentUser.cityCode)}</span>
           </div>
           {(() => {
             const chips = []

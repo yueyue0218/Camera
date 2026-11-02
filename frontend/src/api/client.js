@@ -79,6 +79,9 @@ export async function request(path, options = {}, currentUser) {
     if (isAuthenticationFailure(response, payload) && !suppressAuthTimeout) {
       throw authenticationError(payload, response.status)
     }
+    if (Number(payload?.code) === 40302) {
+      window.dispatchEvent(new CustomEvent('portra:consent-required'))
+    }
     const error = new Error(payload.message || '请求失败')
     error.status = response.status
     error.code = payload.code

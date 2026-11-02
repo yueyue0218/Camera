@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "test": "npm run test:auth && npm run test:admin && npm run test:profile-social && npm run test:image-variants && npm run test:image-usage && npm run test:reports && npm run test:routing",
+    "test": "npm run test:auth && npm run test:admin && npm run test:profile-social && npm run test:image-variants && npm run test:image-usage && npm run test:reports && npm run test:routing && npm run test:privacy",
+    "test:privacy": "node --test --test-timeout=30000 tests/privacyConsent.test.mjs tests/privacyGate.test.mjs",
     "test:admin": "node --test tests/adminSurface.test.mjs",
     "test:auth": "node --test tests/authFlow.test.mjs",
     "test:profile-social": "node --test tests/profileSocialLists.test.mjs",

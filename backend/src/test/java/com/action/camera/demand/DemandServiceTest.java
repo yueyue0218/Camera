@@ -91,18 +91,43 @@ class DemandServiceTest {
     }
 
     @Test
+    void deletedDemandDetailsAreNotExposedToVisitorsOrProviders() {
+        var published = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
+        demandService.deleteDemand(published.getDemandId(), customer);
+        assertThatThrownBy(() -> demandService.getDemand(published.getDemandId(), null))
+                .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> demandService.getDemand(published.getDemandId(), provider))
+                .isInstanceOf(BusinessException.class);
+        assertThat(demandService.getDemand(published.getDemandId(), customer).getDemandId())
+                .isEqualTo(published.getDemandId());
+    }
+
+    @Test
+    void ownerPublicationsAreBoundToAuthenticatedIdentity() {
+        DemandDto own = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
+        demandService.createDemand(otherCustomer, demandRequest("PORTRAIT", "JS"));
+        assertThat(demandService.listMyPublications(customer, 1, 10).getRecords())
+                .extracting(DemandDto::getDemandId).containsExactly(own.getDemandId());
+        assertThat(demandService.listMyPublications(admin, 1, 10).getRecords()).isEmpty();
+        assertThatThrownBy(() -> demandService.listMyPublications(provider, 1, 10))
+                .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> demandService.listMyPublications(null, 1, 10))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
     void createDemandStoresOpenDemand() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "JS"));
 
         assertThat(demand.getDemandId()).isNotNull();
         assertThat(demand.getStatus()).isEqualTo(DemandStatus.OPEN.name());
         assertThat(demand.getScene()).isEqualTo("GRADUATION");
-        assertThat(demand.getCityCode()).isEqualTo("NJU");
+        assertThat(demand.getCityCode()).isEqualTo("JS");
     }
 
     @Test
     void createDemandValidatesNormalizedReferenceIdsBeforeSaving() {
-        CreateDemandRequest request = demandRequest("PORTRAIT", "NJU");
+        CreateDemandRequest request = demandRequest("PORTRAIT", "JS");
         request.setReferenceFileIds(List.of(13L, 11L, 13L));
 
         DemandDto created = demandService.createDemand(customer, request);
@@ -114,7 +139,7 @@ class DemandServiceTest {
 
     @Test
     void createDemandRejectsMissingReferenceBeforePersistence() {
-        CreateDemandRequest request = demandRequest("PORTRAIT", "NJU");
+        CreateDemandRequest request = demandRequest("PORTRAIT", "JS");
         request.setReferenceFileIds(List.of(99L));
         doThrow(new BusinessException(ErrorCode.VALIDATION_ERROR, "missing 99"))
                 .when(fileReferenceValidator)
@@ -130,8 +155,8 @@ class DemandServiceTest {
     @Test
     void updateDemandRejectsMissingReferenceBeforeReplacingExistingIds() {
         DemandDto created = demandService.createDemand(
-                customer, demandRequest("PORTRAIT", "NJU"));
-        CreateDemandRequest update = demandRequest("PORTRAIT", "NJU");
+                customer, demandRequest("PORTRAIT", "JS"));
+        CreateDemandRequest update = demandRequest("PORTRAIT", "JS");
         update.setReferenceFileIds(List.of(88L));
         doThrow(new BusinessException(ErrorCode.VALIDATION_ERROR, "missing 88"))
                 .when(fileReferenceValidator)
@@ -148,21 +173,21 @@ class DemandServiceTest {
 
     @Test
     void createDemandTrimsSceneCityLocationAndDescription() {
-        CreateDemandRequest request = demandRequest("  PORTRAIT  ", "  NJU  ");
+        CreateDemandRequest request = demandRequest("  PORTRAIT  ", "  JS  ");
         request.setLocation("  南京大学仙林校区  ");
         request.setDescription("  想拍自然光人像  ");
 
         DemandDto demand = demandService.createDemand(customer, request);
 
         assertThat(demand.getScene()).isEqualTo("PORTRAIT");
-        assertThat(demand.getCityCode()).isEqualTo("NJU");
+        assertThat(demand.getCityCode()).isEqualTo("JS");
         assertThat(demand.getLocation()).isEqualTo("南京大学仙林校区");
         assertThat(demand.getDescription()).isEqualTo("想拍自然光人像");
     }
 
     @Test
     void createDemandNormalizesStyleTags() {
-        CreateDemandRequest request = demandRequest("COSPLAY", "NJU");
+        CreateDemandRequest request = demandRequest("COSPLAY", "JS");
         request.setStyleTags(List.of("Fresh", " fresh ", "校园", "", "校园"));
 
         DemandDto demand = demandService.createDemand(customer, request);
@@ -172,7 +197,7 @@ class DemandServiceTest {
 
     @Test
     void createDemandAllowsNullStyleTagsAsEmptyList() {
-        CreateDemandRequest request = demandRequest("TRAVEL", "NJU");
+        CreateDemandRequest request = demandRequest("TRAVEL", "JS");
         request.setStyleTags(null);
 
         DemandDto demand = demandService.createDemand(customer, request);
@@ -182,7 +207,7 @@ class DemandServiceTest {
 
     @Test
     void createDemandAllowsNullBudgets() {
-        CreateDemandRequest request = demandRequest("TRAVEL", "NJU");
+        CreateDemandRequest request = demandRequest("TRAVEL", "JS");
         request.setBudgetMinCent(null);
         request.setBudgetMaxCent(null);
 
@@ -194,7 +219,7 @@ class DemandServiceTest {
 
     @Test
     void createDemandKeepsReferenceFileIds() {
-        CreateDemandRequest request = demandRequest("GRADUATION", "NJU");
+        CreateDemandRequest request = demandRequest("GRADUATION", "JS");
         request.setReferenceFileIds(List.of(11L, 12L, 13L));
 
         DemandDto demand = demandService.createDemand(customer, request);
@@ -204,7 +229,7 @@ class DemandServiceTest {
 
     @Test
     void createDemandRejectsMoreThanNineReferenceImages() {
-        CreateDemandRequest request = demandRequest("GRADUATION", "NJU");
+        CreateDemandRequest request = demandRequest("GRADUATION", "JS");
         request.setReferenceFileIds(List.of(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L));
 
         assertThatThrownBy(() -> demandService.createDemand(customer, request))
@@ -215,7 +240,7 @@ class DemandServiceTest {
 
     @Test
     void createDemandStoresAndReturnsTimeFields() {
-        CreateDemandRequest request = demandRequest("GRADUATION", "NJU");
+        CreateDemandRequest request = demandRequest("GRADUATION", "JS");
         request.setTimeDescription("July weekends are available");
         request.setTimeTags(List.of("near_7_days", "NEAR_1_MONTH"));
 
@@ -231,7 +256,7 @@ class DemandServiceTest {
 
     @Test
     void createDemandRejectsMissingTimeDescription() {
-        CreateDemandRequest request = demandRequest("GRADUATION", "NJU");
+        CreateDemandRequest request = demandRequest("GRADUATION", "JS");
         request.setTimeDescription(" ");
 
         assertThatThrownBy(() -> demandService.createDemand(customer, request))
@@ -240,14 +265,14 @@ class DemandServiceTest {
 
     @Test
     void createDemandUsesCustomerIdFromCurrentUser() {
-        DemandDto demand = demandService.createDemand(otherCustomer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(otherCustomer, demandRequest("PORTRAIT", "JS"));
 
         assertThat(demand.getCustomerId()).isEqualTo(otherCustomer.getUserId());
     }
 
     @Test
     void createDemandInitialResponseCountIsZero() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
 
         assertThat(demand.getResponseCount()).isZero();
     }
@@ -256,7 +281,7 @@ class DemandServiceTest {
     void createDemandSetsThirtyDayExpiryInRepository() {
         LocalDateTime beforeCreate = LocalDateTime.now();
 
-        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "JS"));
 
         LocalDateTime expireTime = demandRepository.findById(demand.getDemandId()).orElseThrow().getExpireTime();
         Duration distance = Duration.between(beforeCreate.plusDays(30), expireTime).abs();
@@ -271,13 +296,13 @@ class DemandServiceTest {
 
     @Test
     void createDemandRejectsProviderRole() {
-        assertThatThrownBy(() -> demandService.createDemand(provider, demandRequest("PORTRAIT", "NJU")))
+        assertThatThrownBy(() -> demandService.createDemand(provider, demandRequest("PORTRAIT", "JS")))
                 .isInstanceOf(BusinessException.class);
     }
 
     @Test
     void createDemandRejectsBlankScene() {
-        CreateDemandRequest request = demandRequest(" ", "NJU");
+        CreateDemandRequest request = demandRequest(" ", "JS");
 
         assertThatThrownBy(() -> demandService.createDemand(customer, request))
                 .isInstanceOf(BusinessException.class);
@@ -293,7 +318,7 @@ class DemandServiceTest {
 
     @Test
     void createDemandRejectsBlankLocation() {
-        CreateDemandRequest request = demandRequest("PORTRAIT", "NJU");
+        CreateDemandRequest request = demandRequest("PORTRAIT", "JS");
         request.setLocation(" ");
 
         assertThatThrownBy(() -> demandService.createDemand(customer, request))
@@ -302,7 +327,7 @@ class DemandServiceTest {
 
     @Test
     void createDemandRejectsNegativeMinBudget() {
-        CreateDemandRequest request = demandRequest("PORTRAIT", "NJU");
+        CreateDemandRequest request = demandRequest("PORTRAIT", "JS");
         request.setBudgetMinCent(-1);
 
         assertThatThrownBy(() -> demandService.createDemand(customer, request))
@@ -311,7 +336,7 @@ class DemandServiceTest {
 
     @Test
     void createDemandRejectsNegativeMaxBudget() {
-        CreateDemandRequest request = demandRequest("PORTRAIT", "NJU");
+        CreateDemandRequest request = demandRequest("PORTRAIT", "JS");
         request.setBudgetMaxCent(-1);
 
         assertThatThrownBy(() -> demandService.createDemand(customer, request))
@@ -320,7 +345,7 @@ class DemandServiceTest {
 
     @Test
     void createDemandRejectsMaxBudgetBelowMin() {
-        CreateDemandRequest request = demandRequest("PORTRAIT", "NJU");
+        CreateDemandRequest request = demandRequest("PORTRAIT", "JS");
         request.setBudgetMinCent(50000);
         request.setBudgetMaxCent(30000);
 
@@ -330,7 +355,7 @@ class DemandServiceTest {
 
     @Test
     void listDemandsReturnsAllWhenNoFilter() {
-        demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        demandService.createDemand(customer, demandRequest("GRADUATION", "JS"));
         demandService.createDemand(customer, demandRequest("COSPLAY", "SH"));
 
         PageResult<DemandDto> page = demandService.listDemands(1, 10, null, null, null);
@@ -341,18 +366,18 @@ class DemandServiceTest {
 
     @Test
     void listDemandsFiltersByCityIgnoringCase() {
-        DemandDto nju = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandDto nju = demandService.createDemand(customer, demandRequest("GRADUATION", "JS"));
         demandService.createDemand(customer, demandRequest("GRADUATION", "SH"));
 
-        PageResult<DemandDto> page = demandService.listDemands(1, 10, "nju", null, null);
+        PageResult<DemandDto> page = demandService.listDemands(1, 10, "js", null, null);
 
         assertThat(page.getRecords()).extracting(DemandDto::getDemandId).containsExactly(nju.getDemandId());
     }
 
     @Test
     void listDemandsFiltersBySceneIgnoringCase() {
-        DemandDto cosplay = demandService.createDemand(customer, demandRequest("COSPLAY", "NJU"));
-        demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandDto cosplay = demandService.createDemand(customer, demandRequest("COSPLAY", "JS"));
+        demandService.createDemand(customer, demandRequest("GRADUATION", "JS"));
 
         PageResult<DemandDto> page = demandService.listDemands(1, 10, null, "cosplay", null);
 
@@ -361,8 +386,8 @@ class DemandServiceTest {
 
     @Test
     void listDemandsFiltersByOpenStatus() {
-        DemandDto open = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
-        acceptOneResponse(demandService.createDemand(customer, demandRequest("TRAVEL", "NJU")));
+        DemandDto open = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
+        acceptOneResponse(demandService.createDemand(customer, demandRequest("TRAVEL", "JS")));
 
         PageResult<DemandDto> page = demandService.listDemands(1, 10, null, null, "OPEN");
 
@@ -372,9 +397,9 @@ class DemandServiceTest {
 
     @Test
     void listDemandsDoesNotExposeClosedStatusInPublicHall() {
-        DemandDto closedDemand = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
+        DemandDto closedDemand = demandService.createDemand(customer, demandRequest("TRAVEL", "JS"));
         demandService.closeDemand(closedDemand.getDemandId(), customer);
-        DemandDto openDemand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto openDemand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
 
         PageResult<DemandDto> page = demandService.listDemands(1, 10, null, null, "CLOSED");
         PageResult<DemandDto> ordinary = demandService.listDemands(1, 10, null, null, null);
@@ -387,14 +412,14 @@ class DemandServiceTest {
 
     @Test
     void listMyDemandHistoryReturnsOwnOpenAndClosedDemandsExceptHiddenNewestFirst() throws InterruptedException {
-        DemandDto closed = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
+        DemandDto closed = demandService.createDemand(customer, demandRequest("TRAVEL", "JS"));
         demandService.closeDemand(closed.getDemandId(), customer);
         Thread.sleep(25);
-        DemandDto open = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto open = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
         Thread.sleep(25);
-        DemandDto hidden = demandService.createDemand(customer, demandRequest("COSPLAY", "NJU"));
+        DemandDto hidden = demandService.createDemand(customer, demandRequest("COSPLAY", "JS"));
         demandService.deleteDemand(hidden.getDemandId(), customer);
-        demandService.createDemand(otherCustomer, demandRequest("GRADUATION", "NJU"));
+        demandService.createDemand(otherCustomer, demandRequest("GRADUATION", "JS"));
 
         List<DemandDto> history = demandService.listMyDemandHistory(customer);
 
@@ -406,7 +431,7 @@ class DemandServiceTest {
 
     @Test
     void ownerDemandDetailAndHistoryReturnResponseStatusCountsButPublicListDoesNot() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "JS"));
         DemandResponseDto accepted = demandService.respondToDemand(
                 demand.getDemandId(), provider, responseRequest("Accepted response"));
         DemandResponseDto rejected = demandService.respondToDemand(
@@ -440,14 +465,14 @@ class DemandServiceTest {
     @Test
     void listDemandsFiltersByDateTagAndBudget() {
         LocalDate targetDate = LocalDate.now().plusDays(10);
-        CreateDemandRequest targetRequest = demandRequest("PORTRAIT", "NJU");
+        CreateDemandRequest targetRequest = demandRequest("PORTRAIT", "JS");
         targetRequest.setExpectedDate(targetDate);
         targetRequest.setStyleTags(List.of("Fresh", "Campus"));
         targetRequest.setBudgetMinCent(20000);
         targetRequest.setBudgetMaxCent(45000);
         DemandDto target = demandService.createDemand(customer, targetRequest);
 
-        CreateDemandRequest otherRequest = demandRequest("PORTRAIT", "NJU");
+        CreateDemandRequest otherRequest = demandRequest("PORTRAIT", "JS");
         otherRequest.setExpectedDate(targetDate.plusDays(1));
         otherRequest.setStyleTags(List.of("studio"));
         otherRequest.setBudgetMinCent(60000);
@@ -455,18 +480,18 @@ class DemandServiceTest {
         demandService.createDemand(customer, otherRequest);
 
         PageResult<DemandDto> page = demandService.listDemands(
-                1, 10, "NJU", null, "OPEN", targetDate, "fresh", 30000, 50000);
+                1, 10, "JS", null, "OPEN", targetDate, "fresh", 30000, 50000);
 
         assertThat(page.getRecords()).extracting(DemandDto::getDemandId).containsExactly(target.getDemandId());
     }
 
     @Test
     void listDemandsFiltersByTimeTagButOrdinaryListKeepsUntaggedDemand() {
-        CreateDemandRequest taggedRequest = demandRequest("PORTRAIT", "NJU");
+        CreateDemandRequest taggedRequest = demandRequest("PORTRAIT", "JS");
         taggedRequest.setTimeTags(List.of("NEAR_3_DAYS"));
         DemandDto tagged = demandService.createDemand(customer, taggedRequest);
 
-        CreateDemandRequest untaggedRequest = demandRequest("TRAVEL", "NJU");
+        CreateDemandRequest untaggedRequest = demandRequest("TRAVEL", "JS");
         untaggedRequest.setTimeTags(List.of());
         DemandDto untagged = demandService.createDemand(customer, untaggedRequest);
 
@@ -484,9 +509,9 @@ class DemandServiceTest {
 
     @Test
     void listDemandsReturnsTimestampsAndSortsByUpdatedAtDescending() throws InterruptedException {
-        DemandDto first = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto first = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
         Thread.sleep(25);
-        DemandDto second = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
+        DemandDto second = demandService.createDemand(customer, demandRequest("TRAVEL", "JS"));
         Thread.sleep(25);
 
         CreateDemandRequest update = new CreateDemandRequest();
@@ -562,7 +587,7 @@ class DemandServiceTest {
 
     @Test
     void getDemandOwnerCanViewOpenDemand() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
 
         DemandDto detail = demandService.getDemand(demand.getDemandId(), customer);
 
@@ -571,7 +596,7 @@ class DemandServiceTest {
 
     @Test
     void getDemandProviderCanViewOpenDemand() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
 
         DemandDto detail = demandService.getDemand(demand.getDemandId(), provider);
 
@@ -580,7 +605,7 @@ class DemandServiceTest {
 
     @Test
     void getDemandAdminCanViewOpenDemand() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
 
         DemandDto detail = demandService.getDemand(demand.getDemandId(), admin);
 
@@ -589,7 +614,7 @@ class DemandServiceTest {
 
     @Test
     void getDemandOwnerCanViewClosedDemand() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "JS"));
         demandService.closeDemand(demand.getDemandId(), customer);
 
         DemandDto detail = demandService.getDemand(demand.getDemandId(), customer);
@@ -599,7 +624,7 @@ class DemandServiceTest {
 
     @Test
     void getDemandAdminCanViewClosedDemand() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "JS"));
         demandService.closeDemand(demand.getDemandId(), customer);
 
         DemandDto detail = demandService.getDemand(demand.getDemandId(), admin);
@@ -609,7 +634,7 @@ class DemandServiceTest {
 
     @Test
     void getDemandUnrelatedCustomerCannotViewClosedDemand() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "JS"));
         demandService.closeDemand(demand.getDemandId(), customer);
 
         assertThatThrownBy(() -> demandService.getDemand(demand.getDemandId(), otherCustomer))
@@ -618,7 +643,7 @@ class DemandServiceTest {
 
     @Test
     void getDemandUnrelatedProviderCannotViewClosedDemand() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "JS"));
         demandService.closeDemand(demand.getDemandId(), customer);
 
         assertThatThrownBy(() -> demandService.getDemand(demand.getDemandId(), anotherProvider))
@@ -639,7 +664,7 @@ class DemandServiceTest {
 
     @Test
     void ownerCanUpdateDemandTimeFields() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
         CreateDemandRequest update = new CreateDemandRequest();
         update.setTimeDescription("Only mornings this week");
         update.setTimeTags(List.of("near_3_days", "NEAR_7_DAYS"));
@@ -654,7 +679,7 @@ class DemandServiceTest {
 
     @Test
     void nonOwnerCannotUpdateDemand() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
         CreateDemandRequest update = new CreateDemandRequest();
         update.setTimeDescription("Other person edit");
 
@@ -664,7 +689,7 @@ class DemandServiceTest {
 
     @Test
     void ownerCanCloseOpenDemand() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
 
         DemandDto closed = demandService.closeDemand(demand.getDemandId(), customer);
 
@@ -675,7 +700,7 @@ class DemandServiceTest {
 
     @Test
     void nonOwnerCannotCloseDemand() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
 
         assertThatThrownBy(() -> demandService.closeDemand(demand.getDemandId(), otherCustomer))
                 .isInstanceOf(BusinessException.class);
@@ -683,7 +708,7 @@ class DemandServiceTest {
 
     @Test
     void deleteDemandHidesOwnerHistoryWithoutPhysicalDelete() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
 
         demandService.deleteDemand(demand.getDemandId(), customer);
 
@@ -694,7 +719,7 @@ class DemandServiceTest {
 
     @Test
     void deleteDemandRejectsNonOwner() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
 
         assertThatThrownBy(() -> demandService.deleteDemand(demand.getDemandId(), otherCustomer))
                 .isInstanceOf(BusinessException.class);
@@ -702,7 +727,7 @@ class DemandServiceTest {
 
     @Test
     void deleteDemandDoesNotRemoveAcceptedDemandOrResponses() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "JS"));
         acceptOneResponse(demand);
 
         demandService.deleteDemand(demand.getDemandId(), customer);
@@ -713,7 +738,7 @@ class DemandServiceTest {
 
     @Test
     void respondToDemandCreatesPendingResponse() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
 
         DemandResponseDto response = demandService.respondToDemand(
                 demand.getDemandId(), provider, responseRequest("我可以拍自然抓拍风格"));
@@ -724,7 +749,7 @@ class DemandServiceTest {
 
     @Test
     void respondToDemandStoresMessagePriceAndProviderProfile() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
 
         DemandResponseDto response = demandService.respondToDemand(
                 demand.getDemandId(), provider, responseRequest("报价包含 6 张精修"));
@@ -736,7 +761,7 @@ class DemandServiceTest {
 
     @Test
     void respondToDemandDefaultsProviderProfileIdToProviderId() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
         CreateDemandResponseRequest request = responseRequest("未建主页时临时用 userId");
         request.setProviderProfileId(null);
 
@@ -747,7 +772,7 @@ class DemandServiceTest {
 
     @Test
     void respondToDemandIncreasesResponseCount() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
 
         demandService.respondToDemand(demand.getDemandId(), provider, responseRequest("第一位服务方"));
         demandService.respondToDemand(demand.getDemandId(), anotherProvider, responseRequest("第二位服务方"));
@@ -757,7 +782,7 @@ class DemandServiceTest {
 
     @Test
     void respondToDemandListsResponsesNewestFirst() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
         DemandResponseDto first = demandService.respondToDemand(demand.getDemandId(), provider, responseRequest("第一条"));
         DemandResponseDto second = demandService.respondToDemand(demand.getDemandId(), anotherProvider, responseRequest("第二条"));
 
@@ -769,7 +794,7 @@ class DemandServiceTest {
 
     @Test
     void respondToDemandRejectsDuplicateProvider() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
         demandService.respondToDemand(demand.getDemandId(), provider, responseRequest("第一次响应"));
 
         assertThatThrownBy(() -> demandService.respondToDemand(demand.getDemandId(), provider, responseRequest("重复响应")))
@@ -778,7 +803,7 @@ class DemandServiceTest {
 
     @Test
     void respondToDemandRejectsCustomerRole() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
 
         assertThatThrownBy(() -> demandService.respondToDemand(demand.getDemandId(), customer, responseRequest("客户不能响应")))
                 .isInstanceOf(BusinessException.class);
@@ -786,7 +811,7 @@ class DemandServiceTest {
 
     @Test
     void respondToDemandRejectsAdminRole() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
 
         assertThatThrownBy(() -> demandService.respondToDemand(demand.getDemandId(), admin, responseRequest("管理员不接单")))
                 .isInstanceOf(BusinessException.class);
@@ -794,7 +819,7 @@ class DemandServiceTest {
 
     @Test
     void respondToDemandRejectsProviderRespondingToOwnDemand() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
         CurrentUser samePersonAsProvider = new CurrentUser(customer.getUserId(), UserRole.PROVIDER);
 
         assertThatThrownBy(() -> demandService.respondToDemand(
@@ -804,7 +829,7 @@ class DemandServiceTest {
 
     @Test
     void respondToDemandAllowsAnotherProviderAfterAcceptedResponse() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "JS"));
         acceptOneResponse(demand);
 
         DemandResponseDto response = demandService.respondToDemand(
@@ -815,7 +840,7 @@ class DemandServiceTest {
 
     @Test
     void respondToDemandRejectsClosedDemand() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "JS"));
         demandService.closeDemand(demand.getDemandId(), customer);
 
         assertThatThrownBy(() -> demandService.respondToDemand(
@@ -825,7 +850,7 @@ class DemandServiceTest {
 
     @Test
     void respondToDemandRejectsNullRequest() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
 
         assertThatThrownBy(() -> demandService.respondToDemand(demand.getDemandId(), provider, null))
                 .isInstanceOf(BusinessException.class);
@@ -833,7 +858,7 @@ class DemandServiceTest {
 
     @Test
     void respondToDemandRejectsBlankMessage() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
         CreateDemandResponseRequest request = responseRequest(" ");
 
         assertThatThrownBy(() -> demandService.respondToDemand(demand.getDemandId(), provider, request))
@@ -842,7 +867,7 @@ class DemandServiceTest {
 
     @Test
     void respondToDemandRejectsNegativePrice() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
         CreateDemandResponseRequest request = responseRequest("价格非法");
         request.setExpectedPriceCent(-1);
 
@@ -852,7 +877,7 @@ class DemandServiceTest {
 
     @Test
     void respondToDemandAllowsNullPrice() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
         CreateDemandResponseRequest request = responseRequest("先沟通后报价");
         request.setExpectedPriceCent(null);
 
@@ -863,7 +888,7 @@ class DemandServiceTest {
 
     @Test
     void listResponsesAllowsOwner() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
         demandService.respondToDemand(demand.getDemandId(), provider, responseRequest("服务方响应"));
 
         List<DemandResponseDto> responses = demandService.listResponses(demand.getDemandId(), customer);
@@ -873,7 +898,7 @@ class DemandServiceTest {
 
     @Test
     void listResponsesAllowsAdmin() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
         demandService.respondToDemand(demand.getDemandId(), provider, responseRequest("服务方响应"));
 
         List<DemandResponseDto> responses = demandService.listResponses(demand.getDemandId(), admin);
@@ -883,7 +908,7 @@ class DemandServiceTest {
 
     @Test
     void listResponsesRejectsUnrelatedCustomer() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
 
         assertThatThrownBy(() -> demandService.listResponses(demand.getDemandId(), otherCustomer))
                 .isInstanceOf(BusinessException.class);
@@ -891,7 +916,7 @@ class DemandServiceTest {
 
     @Test
     void acceptResponseReturnsCContractSnapshot() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "JS"));
         DemandResponseDto response = demandService.respondToDemand(
                 demand.getDemandId(), provider, responseRequest("毕业照可以拍，含 6 张精修"));
 
@@ -921,7 +946,7 @@ class DemandServiceTest {
 
     @Test
     void acceptResponseKeepsDemandOpenAndMarksResponseAccepted() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "JS"));
         DemandResponseDto response = demandService.respondToDemand(
                 demand.getDemandId(), provider, responseRequest("我来接"));
 
@@ -935,7 +960,7 @@ class DemandServiceTest {
 
     @Test
     void acceptResponseDoesNotRejectOtherPendingResponses() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "JS"));
         DemandResponseDto accepted = demandService.respondToDemand(
                 demand.getDemandId(), provider, responseRequest("第一位服务方"));
         DemandResponseDto rejected = demandService.respondToDemand(
@@ -949,7 +974,7 @@ class DemandServiceTest {
 
     @Test
     void acceptResponseAllowsMultipleAcceptedResponsesForSameDemand() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "JS"));
         DemandResponseDto first = demandService.respondToDemand(
                 demand.getDemandId(), provider, responseRequest("First provider"));
         DemandResponseDto second = demandService.respondToDemand(
@@ -968,7 +993,7 @@ class DemandServiceTest {
 
     @Test
     void rejectResponseMarksPendingResponseRejectedWithoutConversation() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "JS"));
         DemandResponseDto response = demandService.respondToDemand(
                 demand.getDemandId(), provider, responseRequest("Provider response"));
 
@@ -982,7 +1007,7 @@ class DemandServiceTest {
 
     @Test
     void rejectResponseRejectsAcceptedResponse() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "JS"));
         DemandResponseDto response = demandService.respondToDemand(
                 demand.getDemandId(), provider, responseRequest("Provider response"));
         demandService.acceptResponse(demand.getDemandId(), response.getResponseId(), customer);
@@ -993,7 +1018,7 @@ class DemandServiceTest {
 
     @Test
     void listMyResponsesShowsProviderResponseStatusChanges() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "JS"));
         DemandResponseDto response = demandService.respondToDemand(
                 demand.getDemandId(), provider, responseRequest("Provider response"));
         demandService.rejectResponse(demand.getDemandId(), response.getResponseId(), customer);
@@ -1006,7 +1031,7 @@ class DemandServiceTest {
 
     @Test
     void listMyResponsesShowsAcceptedStatusAfterOwnerAccepts() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "JS"));
         DemandResponseDto response = demandService.respondToDemand(
                 demand.getDemandId(), provider, responseRequest("Provider response"));
         demandService.acceptResponse(demand.getDemandId(), response.getResponseId(), customer);
@@ -1019,7 +1044,7 @@ class DemandServiceTest {
 
     @Test
     void acceptResponseRejectsAlreadyAcceptedResponse() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "JS"));
         DemandResponseDto response = demandService.respondToDemand(
                 demand.getDemandId(), provider, responseRequest("我来接"));
 
@@ -1031,7 +1056,7 @@ class DemandServiceTest {
 
     @Test
     void acceptResponseRejectsNonOwnerCustomer() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("TRAVEL", "JS"));
         DemandResponseDto response = demandService.respondToDemand(
                 demand.getDemandId(), provider, responseRequest("旅行跟拍我熟"));
 
@@ -1043,7 +1068,7 @@ class DemandServiceTest {
 
     @Test
     void getAcceptedSnapshotAllowsProviderAfterAccept() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "JS"));
         DemandResponseDto response = demandService.respondToDemand(
                 demand.getDemandId(), provider, responseRequest("我来接"));
         demandService.acceptResponse(demand.getDemandId(), response.getResponseId(), customer);
@@ -1057,7 +1082,7 @@ class DemandServiceTest {
 
     @Test
     void getAcceptedSnapshotRejectsBeforeAccept() {
-        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "NJU"));
+        DemandDto demand = demandService.createDemand(customer, demandRequest("GRADUATION", "JS"));
         DemandResponseDto response = demandService.respondToDemand(
                 demand.getDemandId(), provider, responseRequest("还未接受"));
 
@@ -1067,7 +1092,7 @@ class DemandServiceTest {
 
     @Test
     void hiddenDemandIsAbsentFromPublicList() {
-        DemandDto created = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto created = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
         Demand demand = demandRepository.findById(created.getDemandId()).orElseThrow();
         demand.takeDown(admin.getUserId(), "policy", LocalDateTime.now());
         demandRepository.saveAndFlush(demand);
@@ -1081,7 +1106,7 @@ class DemandServiceTest {
 
     @Test
     void hiddenDemandDetailIsNotFoundForOtherUserButVisibleToOwner() {
-        DemandDto created = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto created = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
         Demand demand = demandRepository.findById(created.getDemandId()).orElseThrow();
         demand.takeDown(admin.getUserId(), "policy", LocalDateTime.now());
         demandRepository.saveAndFlush(demand);
@@ -1097,7 +1122,7 @@ class DemandServiceTest {
 
     @Test
     void hiddenDemandRejectsNewResponse() {
-        DemandDto created = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto created = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
         Demand demand = demandRepository.findById(created.getDemandId()).orElseThrow();
         demand.takeDown(admin.getUserId(), "policy", LocalDateTime.now());
         demandRepository.saveAndFlush(demand);
@@ -1112,7 +1137,7 @@ class DemandServiceTest {
 
     @Test
     void hiddenDemandRejectsAcceptingPendingResponseButAllowsRejectingIt() {
-        DemandDto created = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto created = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
         DemandResponseDto response = demandService.respondToDemand(
                 created.getDemandId(), provider, responseRequest("pending response"));
         Demand demand = demandRepository.findById(created.getDemandId()).orElseThrow();
@@ -1132,7 +1157,7 @@ class DemandServiceTest {
 
     @Test
     void hiddenDemandDoesNotBreakAcceptedSnapshot() {
-        DemandDto created = demandService.createDemand(customer, demandRequest("PORTRAIT", "NJU"));
+        DemandDto created = demandService.createDemand(customer, demandRequest("PORTRAIT", "JS"));
         DemandResponseDto response = demandService.respondToDemand(
                 created.getDemandId(), provider, responseRequest("accepted response"));
         demandService.acceptResponse(created.getDemandId(), response.getResponseId(), customer);
@@ -1169,7 +1194,7 @@ class DemandServiceTest {
 
     private void createManyDemands(int count) {
         for (int i = 0; i < count; i++) {
-            demandService.createDemand(customer, demandRequest("SCENE_" + i, "NJU"));
+            demandService.createDemand(customer, demandRequest("SCENE_" + i, "JS"));
         }
     }
 

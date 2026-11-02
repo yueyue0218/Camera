@@ -17,11 +17,22 @@ import java.time.Duration;
 public class SmsProperties {
 
     private String provider = "";
+    private boolean stagingAliyunEnabled = false;
+    /** Separate opt-in for PNVS; legacy staging dysms flag remains unchanged. */
+    private boolean stagingDypnsEnabled = false;
+    private String dypnsEndpoint = "dypnsapi.aliyuncs.com";
+    private String dypnsRoleName = "";
+
     private String endpoint = "dysmsapi.aliyuncs.com";
     private String accessKeyId = "";
     private String accessKeySecret = "";
     private String signName = "";
     private String loginTemplateId = "";
+    /** Operator-approved identity re-verification template; blank fails closed. */
+    private String reauthTemplateId = "";
+    /** A separate PNVS scheme prevents a LOGIN challenge authorizing account closure. */
+    private String reauthSchemeName = "";
+    private String codeParameterName = "code";
     private String codePepper = "";
     private Duration codeTtl = Duration.ofMinutes(5);
     private Duration resendCooldown = Duration.ofSeconds(60);

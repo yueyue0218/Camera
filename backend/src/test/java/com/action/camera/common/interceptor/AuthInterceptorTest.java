@@ -45,6 +45,21 @@ class AuthInterceptorTest {
     }
 
     @Test
+    void publicProfilesAreAnonymousButPrivateProfilesAndWritesRemainProtected() {
+        AuthInterceptor interceptor = interceptor();
+        for (String path : java.util.List.of("/users/42/public-profile", "/moments/profile", "/demands/by-user/42", "/service-packages/by-user/42")) {
+            when(request.getMethod()).thenReturn("GET"); when(request.getRequestURI()).thenReturn(path);
+            assertThat(interceptor.preHandle(request, response, new Object())).isTrue();
+        }
+        for (String path : java.util.List.of("/users/me", "/demands/me/history", "/service-packages/me/history", "/users/42/followers")) {
+            when(request.getMethod()).thenReturn("GET"); when(request.getRequestURI()).thenReturn(path);
+            assertThatThrownBy(() -> interceptor.preHandle(request, response, new Object())).isInstanceOf(BusinessException.class);
+        }
+        when(request.getMethod()).thenReturn("PATCH");
+        assertThatThrownBy(() -> interceptor.preHandle(request, response, new Object())).isInstanceOf(BusinessException.class);
+    }
+
+    @Test
     void anonymousFileDownloadCanReachFileAccessPolicy() {
         when(request.getMethod()).thenReturn("GET");
         when(request.getRequestURI()).thenReturn("/files/42/download");

@@ -55,7 +55,7 @@ class WebMvcTempStagingCorsContractTest {
 
     private CorsConfiguration configurationFor(CorsProperties properties) {
         WebMvcConfig config = new WebMvcConfig(
-                mock(AuthInterceptor.class), properties, mock(Environment.class));
+                mock(AuthInterceptor.class), properties, mock(Environment.class), mock(com.action.camera.privacy.service.PrivacyRequestInterceptor.class));
         InspectableCorsRegistry registry = new InspectableCorsRegistry();
         config.addCorsMappings(registry);
         return registry.configurations().get("/**");

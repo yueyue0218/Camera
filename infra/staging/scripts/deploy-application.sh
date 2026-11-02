@@ -23,6 +23,10 @@ for value in "$health_url" "$public_url" "$expected_origin"; do
   }
 done
 
+capability_check="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/verify-backend-capabilities.sh"
+[[ -f "$capability_check" && ! -L "$capability_check" ]] || { echo "Capability checker required" >&2; exit 1; }
+bash "$capability_check" "$source_jar"
+
 app_root=/opt/portra/app
 release_root="$app_root/releases"
 release_dir="$release_root/$sha"
@@ -44,7 +48,23 @@ frontend_candidate=""
 frontend_switch_temp=""
 archive_listing=""
 
+cleanup_switch_temps() {
+  # Only the current shell's staging links; never remove any live link.
+  local stale
+  if [[ -n "$frontend_switch_temp" && -L "$frontend_switch_temp" ]]; then
+    rm -f -- "$frontend_switch_temp" || return 1
+  fi
+  frontend_switch_temp=""
+  for stale in "$app_root/current.next.$$" "$app_root/previous.next.$$" \
+      "/home/portra-deploy/current.next.$$" "/home/portra-deploy/previous.next.$$"; do
+    if [[ -L "$stale" ]]; then
+      rm -f -- "$stale" || return 1
+    fi
+  done
+}
+
 cleanup_attempt_files() {
+  cleanup_switch_temps || true
   if [[ -n "$archive_listing" ]]; then
     rm -f -- "$archive_listing"
   fi
@@ -178,6 +198,23 @@ if [[ "$current_backend" == "$release_dir" && -L "$app_root/previous" ]]; then
   previous_backend="$(readlink -f "$app_root/previous")"
 fi
 [[ "$previous_backend" == "$release_root/"* && -f "$previous_backend/portra-backend.jar" ]]
+# A first privacy deployment must not automatically reactivate a pre-privacy JAR.
+command -v python3 >/dev/null || fail "Python 3 is required for privacy cutover inspection"
+privacy_aware_jar() {
+  python3 - "$1" <<'PY'
+import sys, zipfile
+with zipfile.ZipFile(sys.argv[1]) as jar:
+    expected=['BOOT-INF/classes/com/action/camera/privacy/controller/PrivacyController.class',
+              'BOOT-INF/classes/com/action/camera/privacy/service/PrivacyRequestInterceptor.class']
+    good=all(name in jar.namelist() for name in expected)
+    good=good and b'PRIVACY_CONSENT_REQUIRED' in jar.read('BOOT-INF/classes/com/action/camera/common/ErrorCode.class')
+raise SystemExit(0 if good else 1)
+PY
+}
+privacy_aware_jar "$source_jar" || fail "Target JAR does not contain the reviewed privacy boundary"
+previous_privacy_aware=false
+privacy_aware_jar "$previous_backend/portra-backend.jar" && bash "$capability_check" "$previous_backend/portra-backend.jar" && previous_privacy_aware=true
+
 old_previous_app_present=false
 old_previous_app_target=""
 if [[ -L "$app_root/previous" ]]; then
@@ -241,16 +278,18 @@ apply_release() {
   backend_links_touched=true
   atomic_link "$previous_backend" "$app_root/previous" || return 1
   atomic_link "$previous_backend" /home/portra-deploy/previous || return 1
-  atomic_link "$release_dir" "$app_root/current" || return 1
+  # Recovery must be armed before mv, not after it; signals may be trapped between commands.
   backend_switched=true
+  atomic_link "$release_dir" "$app_root/current" || return 1
   atomic_link "$release_dir" /home/portra-deploy/current || return 1
 
   if [[ ! -e "$app_root/app.jar" ]]; then
     ln -s "$app_root/current/portra-backend.jar" "$app_root/app.jar" || return 1
   fi
 
-  atomic_frontend_switch "releases/$sha" || return 1
+  # A failed/aborted frontend rename also requires an idempotent restoration attempt.
   frontend_switched=true
+  atomic_frontend_switch "releases/$sha" || return 1
 
   sudo /usr/bin/systemctl restart portra-backend.service || return 1
   sudo /usr/bin/systemctl is-active portra-backend.service || return 1
@@ -278,6 +317,19 @@ restore_state_file() {
 
 rollback_release() {
   local rollback_failed=false
+  # A pending .next link from an interrupted atomic operation must not block recovery.
+  cleanup_switch_temps || rollback_failed=true
+  # When the switch was merely attempted, inspect the actual live symlink before
+  # forbidding rollback to an older incompatible backend.
+  if [[ "$backend_switched" == true ]] &&
+      [[ "$(readlink -f -- "$app_root/current" 2>/dev/null || true)" == "$release_dir" ]] &&
+      { [[ "$previous_privacy_aware" != true ]] || ! bash "$capability_check" "$previous_backend/portra-backend.jar"; }; then
+    echo "PRIVACY_CUTOVER_REQUIRES_MANUAL_RECOVERY: refusing incompatible PNVS/privacy/interest JAR rollback" >&2
+    # Keep current pointing at the policy-aware target. A restart also terminates
+    # any old process left running if failure preceded the normal restart.
+    sudo /usr/bin/systemctl restart portra-backend.service || true
+    return 1
+  fi
   echo "Application acceptance failed; restoring backend and frontend" >&2
 
   if [[ "$frontend_switched" == true ]]; then
@@ -311,6 +363,16 @@ rollback_release() {
   bash "$health_script" "$health_url" "$public_url" "$expected_origin" || rollback_failed=true
   [[ "$rollback_failed" == false ]]
 }
+
+interrupt_release() {
+  # A graceful cancellation must restore both surfaces and their state receipts.
+  # Ignore subsequent signals while recovery is in progress; EXIT still cleans temps.
+  trap '' INT TERM
+  echo "DEPLOYMENT_INTERRUPTED: restoring the last compatible application" >&2
+  rollback_release || echo "ROLLBACK=FAILED" >&2
+  exit 130
+}
+trap interrupt_release INT TERM
 
 if ! apply_release; then
   rollback_release || echo "ROLLBACK=FAILED" >&2

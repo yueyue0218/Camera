@@ -50,7 +50,7 @@ public class MomentController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "12") int size) {
         return Result.success(momentService.listProfileMoments(
-                currentUser(), authorId, authorRole, page, size));
+                UserContext.getUserId() == null ? null : currentUser(), authorId, authorRole, page, size));
     }
 
     @GetMapping("/me/interactions")

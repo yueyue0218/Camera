@@ -57,7 +57,7 @@ public class UserSocialController {
     @GetMapping("/{userId}/public-profile")
     public Result<PublicProfileResponse> publicProfile(@PathVariable Long userId,
                                                        @RequestParam(required = false) String role) {
-        return Result.success(socialRelationService.getPublicProfile(userId, role, currentUser()));
+        return Result.success(socialRelationService.getPublicProfile(userId, role, UserContext.getUserId() == null ? null : currentUser()));
     }
 
     private CurrentUser currentUser() {
