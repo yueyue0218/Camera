@@ -73,7 +73,6 @@ export function MomentDetailCard({
   return (
     <Paper className="moment-detail" elevation={0}>
       <div className="moment-detail__header">
-        <div className="moment-detail__serial">No. {String(momentId).padStart(6, '0')}</div>
         <div className="moment-detail__stamp">PORTRA FILE</div>
       </div>
 

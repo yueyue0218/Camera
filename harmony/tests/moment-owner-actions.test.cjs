@@ -4,6 +4,7 @@ require.extensions['.ets']=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(
 const {MomentOwnerActions}=require('../entry/src/main/ets/features/moments/MomentOwnerActions.ets');
 const {MomentOwnerAttempts}=require('../entry/src/main/ets/features/moments/MomentOwnerAttempts.ets');
 const {MomentFeedCache}=require('../entry/src/main/ets/features/moments/MomentFeedModels.ets');
+const {ErrorMapper}=require('../entry/src/main/ets/network/ErrorMapper.ets');
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return{promise,resolve,reject}};
 const item=(extra={})=>({momentId:7,authorId:1,authorRole:'CUSTOMER',title:'原题',content:'原文',imageDataList:['data:image/png;base64,AAAA'],likeCount:0,likedByCurrentUser:false,favoriteCount:0,favoritedByCurrentUser:false,status:'PUBLISHED',...extra});
 function fixture(){let version=1,state;const identities=[],reads=[],writes=[],cancels=[],deleted=[],verified=[],cache=new MomentFeedCache();
@@ -21,3 +22,9 @@ test('GET 404 after an unknown deletion removes the unavailable detail',async()=
 test('closing one owner instance never cancels another instance request',async()=>{reset();const a=fixture(),b=fixture();await open(a);await open(b,item({momentId:8}));a.c.requestDelete();b.c.requestDelete();const pa=a.c.deleteConfirmed(),pb=b.c.deleteConfirmed();a.c.close();assert.ok(a.cancels.includes(a.writes[0].key));assert.ok(!a.cancels.includes(b.writes[0].key));a.writes[0].resolve();b.writes[0].resolve();await Promise.all([pa,pb]);assert.deepEqual(a.deleted,[]);assert.deepEqual(b.deleted,[8])});
 test('session change before a menu tap invalidates the old author permission',async()=>{reset();const f=fixture();await open(f);f.change();assert.equal(f.c.beginEdit(),false);f.c.requestDelete();await f.c.deleteConfirmed();assert.equal(f.writes.length,0);assert.equal(f.state.canManage,false)});
 test('the backend author-visible DELETED response also confirms an unavailable detail',async()=>{reset();const f=fixture();await open(f);f.c.requestDelete();const p=f.c.deleteConfirmed();f.writes[0].reject({kind:'timeout'});await p;const verify=f.c.verify();f.reads[0].resolve(item({status:'DELETED'}));await verify;assert.deepEqual(f.deleted,[7]);assert.equal(f.verified.length,0)});
+
+test('a definite deletion rejection keeps the post and reports the actual error without an uncertainty lock',async()=>{
+ reset();const f=fixture();await open(f);f.c.requestDelete();const p=f.c.deleteConfirmed();f.writes[0].reject(ErrorMapper.fromHttpStatus(403));await p;
+ assert.deepEqual(f.deleted,[]);assert.equal(f.state.uncertain,false);assert.equal(f.state.canWrite,true);assert.match(f.state.message,/HTTP 403/);
+ assert.equal(f.writes.length,1);
+});

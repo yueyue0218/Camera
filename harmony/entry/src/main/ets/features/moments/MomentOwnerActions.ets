@@ -3,6 +3,8 @@ import { ErrorMapper, PortraError } from '../../network/ErrorMapper';
 import { MomentInteractionSession } from './MomentInteractions';
 import { createMomentFeedRequestKey, MomentFeedCache, MomentFeedFormatter } from './MomentFeedModels';
 import { MomentOwnerAttempts } from './MomentOwnerAttempts';
+import { MomentWriteFailure } from './MomentWriteFailure';
+import { ContentChanges } from '../user/ContentChanges';
 
 export interface MomentOwnerApi {
   currentSession(key?: string): Promise<SessionSummary>;
@@ -78,10 +80,16 @@ export class MomentOwnerActions {
       const operation = this.api.deleteMoment(id, `${this.key}.delete`);
       this.cache.trackFavorite(operation, version); await operation;
       MomentOwnerAttempts.shared.finish(attempt, true); this.cache.clear();
+      if (version === this.session.getSessionVersion() && this.session.isAuthenticated()) { ContentChanges.publish('moments'); }
       if (this.current(view, version)) { this.deleted(id); }
     } catch (error) {
-      MomentOwnerAttempts.shared.finish(attempt, false); this.cache.clear();
-      if (this.current(view, version)) { this.state.message = '删除结果未确认，请核实服务器状态后再操作。'; }
+      const mapped = error as PortraError;
+      const rejected = MomentWriteFailure.rejected(mapped);
+      MomentOwnerAttempts.shared.finish(attempt, rejected); this.cache.clear();
+      if (this.current(view, version)) {
+        this.state.message = rejected ? MomentWriteFailure.message(mapped, '删除') :
+          `删除结果未确认，请核实服务器状态后再操作。 ${MomentWriteFailure.message(mapped, '删除')}`;
+      }
     } finally { if (this.current(view, version)) { this.state.deleting = false; this.emit(); } }
   }
   async verify(): Promise<void> {
@@ -94,15 +102,16 @@ export class MomentOwnerActions {
       if (!this.current(view, version)) { return; }
       if (!MomentFeedFormatter.isValid(item) || item.momentId !== id || item.authorId !== actor) { throw ErrorMapper.parse(); }
       if (item.status === 'DELETED') {
-        MomentOwnerAttempts.shared.verified(actor, id); this.cache.clear(); this.deleted(id); return;
+        MomentOwnerAttempts.shared.verified(actor, id); this.cache.clear(); ContentChanges.publish('moments'); this.deleted(id); return;
       }
       MomentOwnerAttempts.shared.verified(actor, id); this.cache.clear();
+      ContentChanges.publish('moments');
       this.state.message = '已读取服务器最新状态，请核对后再操作。'; this.reconciled(item);
     } catch (error) {
       if (!this.current(view, version)) { return; }
       const mapped = error as PortraError;
       if (mapped.httpStatus === 404 || mapped.businessCode === 40401) {
-        MomentOwnerAttempts.shared.verified(actor, id); this.cache.clear(); this.deleted(id);
+        MomentOwnerAttempts.shared.verified(actor, id); this.cache.clear(); ContentChanges.publish('moments'); this.deleted(id);
       } else { this.state.message = '状态核实失败，请稍后重新核实；不会自动重发。'; }
     } finally { if (this.current(view, version)) { this.state.verifying = false; this.emit(); } }
   }

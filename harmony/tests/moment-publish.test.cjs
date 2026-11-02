@@ -4,6 +4,8 @@ require.extensions['.ets']=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(
 const {MomentPublishController,MomentPublishAttempts}=require('../entry/src/main/ets/features/moments/MomentPublishController.ets');
 const {MomentOwnerAttempts}=require('../entry/src/main/ets/features/moments/MomentOwnerAttempts.ets');
 const {MomentFeedCache}=require('../entry/src/main/ets/features/moments/MomentFeedModels.ets');
+const {ErrorMapper}=require('../entry/src/main/ets/network/ErrorMapper.ets');
+const {ContentChanges}=require('../entry/src/main/ets/features/user/ContentChanges.ets');
 const image='data:image/png;base64,AAAA';
 const defer=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return{promise,resolve,reject}};
 function fixture(){let version=1,state;const identities=[],writes=[],cancels=[],published=[],cache=new MomentFeedCache();
@@ -53,4 +55,34 @@ test('late edit responses and finally cannot repaint a changed account draft',as
   assert.equal(f.state.actorId,2);assert.equal(f.state.editingId,0);assert.equal(f.state.submitting,true);assert.equal(f.published.length,0);
   f.writes[1].resolve(result({authorId:2,momentId:8}));await fresh;assert.equal(f.published[0].momentId,8);
  }
+});
+
+test('explicit save rejection keeps the draft editable and exposes the real safe error code', async()=>{
+ for(const error of [ErrorMapper.fromHttpStatus(413),ErrorMapper.fromHttpStatus(405),ErrorMapper.fromBusinessCode(40001,'internal details'),ErrorMapper.config('请先完成授权')]){
+  MomentOwnerAttempts.shared=new MomentOwnerAttempts();const f=fixture();await openEdit(f);f.c.updateContent('待保存修改');
+  const save=f.c.submit();f.writes[0].reject(error);await save;
+  assert.equal(f.state.uncertain,false);assert.equal(f.state.canSubmit,true);assert.equal(f.state.content,'待保存修改');
+  assert.ok(f.state.message.includes(error.message));assert.ok(!f.state.message.includes('internal details'));
+  if(error.httpStatus>0)assert.ok(f.state.message.includes(`HTTP ${error.httpStatus}`));
+  assert.equal(MomentOwnerAttempts.shared.get(1,7),undefined);
+  f.c.close();
+ }
+});
+
+test('transport server and parse failures still require verification before another save',async()=>{
+ for(const error of [ErrorMapper.network(),ErrorMapper.fromTransportCode(2300028),ErrorMapper.fromHttpStatus(500),ErrorMapper.parse(),ErrorMapper.writeNotRetried()]){
+  MomentOwnerAttempts.shared=new MomentOwnerAttempts();const f=fixture();await openEdit(f);const save=f.c.submit();f.writes[0].reject(error);await save;
+  assert.equal(f.state.uncertain,true);assert.equal(f.state.canSubmit,false);assert.ok(f.state.message.includes(error.message));
+  await f.c.submit();assert.equal(f.writes.length,1);f.c.close();
+ }
+});
+
+test('saved edits notify other region and profile views even if one observer throws',async()=>{
+ MomentOwnerAttempts.shared=new MomentOwnerAttempts();const events=[];
+ const broken=()=>{throw new Error('detached view')},listener=kind=>events.push(kind);
+ ContentChanges.observe(broken);ContentChanges.observe(listener);
+ try {
+  const f=fixture();await openEdit(f);const save=f.c.submit();f.writes[0].resolve(result());await save;
+  assert.deepEqual(events,['moments']);assert.equal(f.published.length,1);assert.equal(f.state.uncertain,false);f.c.close();
+ } finally {ContentChanges.unobserve(broken);ContentChanges.unobserve(listener)}
 });

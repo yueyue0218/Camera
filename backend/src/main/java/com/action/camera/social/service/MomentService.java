@@ -177,12 +177,17 @@ public class MomentService {
         MomentPost moment = requireEditableMoment(momentId, user);
         validateCreateRequestForEdit(request);
 
+        // Resolve before removing orphans. Omitted/null media preserves the album;
+        // an explicit empty list removes it. Flush deletes before reusing sort_order.
+        List<String> imageDataList = request.getImageDataList() != null || request.getImageData() != null
+                ? normalizeImages(request) : moment.getImageDataList();
+        List<String> mentions = request.getMentions() == null
+                ? List.copyOf(moment.getMentions()) : normalizeMentions(request.getMentions());
         moment.getImages().clear();
         momentPostRepository.flush();
         moment.setTitle(normalizeOptionalText(request.getTitle(), 50, "动态标题"));
         moment.setContent(normalizeOptionalText(request.getContent(), 1000, "动态正文"));
-        moment.replaceMentions(normalizeMentions(request.getMentions()));
-        List<String> imageDataList = resolveImages(request, moment);
+        moment.replaceMentions(mentions);
         moment.replaceImages(imageDataList);
 
         return toDto(momentPostRepository.save(moment), user);

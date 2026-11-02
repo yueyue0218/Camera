@@ -1,4 +1,6 @@
 import { MomentOwnerAttempts } from './MomentOwnerAttempts';
+import { MomentWriteFailure } from './MomentWriteFailure';
+import { ContentChanges } from '../user/ContentChanges';
 import { MomentDetailData } from './MomentInteractions';
 import { MomentPublishLimits } from './MomentPublishLimits';
 import { CreateMomentPayload, MomentSummary, SessionSummary } from '../../model/ApiModels';
@@ -172,12 +174,20 @@ export class MomentPublishController {
         (editing > 0 && result.momentId !== editing)) { throw ErrorMapper.parse(); }
       if (attempt !== undefined) { MomentOwnerAttempts.shared.finish(attempt, true); }
       else { MomentPublishAttempts.shared.finish(actor, true); }
-      this.cache.clear(); if (this.current(view, version)) { this.published(result); }
-    } catch (error) {
-      if (attempt !== undefined) { MomentOwnerAttempts.shared.finish(attempt, false); }
-      else { MomentPublishAttempts.shared.finish(actor, false); }
       this.cache.clear();
-      if (this.current(view, version)) { this.state.uncertain = true; this.state.message = this.unknownMessage(); }
+      if (version === this.session.getSessionVersion() && this.session.isAuthenticated()) { ContentChanges.publish('moments'); }
+      if (this.current(view, version)) { this.published(result); }
+    } catch (error) {
+      const mapped = error as PortraError;
+      const rejected = MomentWriteFailure.rejected(mapped);
+      if (attempt !== undefined) { MomentOwnerAttempts.shared.finish(attempt, rejected); }
+      else { MomentPublishAttempts.shared.finish(actor, rejected); }
+      this.cache.clear();
+      if (this.current(view, version)) {
+        this.state.uncertain = !rejected;
+        this.state.message = rejected ? MomentWriteFailure.message(mapped, editing > 0 ? '保存' : '发布') :
+          `${this.unknownMessage()} ${MomentWriteFailure.message(mapped, editing > 0 ? '保存' : '发布')}`;
+      }
     } finally { if (this.current(view, version)) { this.state.submitting = false; this.emit(); } }
   }
   private hasUnconfirmed(): boolean {

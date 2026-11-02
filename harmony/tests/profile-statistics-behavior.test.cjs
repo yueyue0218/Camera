@@ -57,7 +57,7 @@ test('late credit cannot repaint a changed account',async()=>{
   const pending=f.page.loadProfileCredit(1,1,7);f.changeSession();resolve({userId:7,creditScore:90});await pending;assert.equal(f.page.creditSummary,undefined);
 });
 test('credit metrics read current state and preserve null denominators and zero',()=>{
-  const text=fs.readFileSync(path.join(root,'pages/CreditPage.ets'),'utf8');const page=compile(text.slice(text.indexOf('  private metricValue('),text.indexOf('  @Builder\n  private Metric(')),{CreditFormat});
+  const text=fs.readFileSync(path.join(root,'pages/CreditPage.ets'),'utf8').replace(/\r\n/g,'\n');const page=compile(text.slice(text.indexOf('  private metricValue('),text.indexOf('  @Builder\n  private Metric(')),{CreditFormat});
   page.snapshot={error:''};assert.equal(page.metricValue('orders'),'加载中');
   page.snapshot={summary:{effectiveOrderCount:0,riskRecordCount:0,goodReviewRate:null,defaultRate:null}};
   assert.equal(page.metricValue('orders'),'0');assert.equal(page.metricValue('risks'),'0');assert.equal(page.metricValue('reviews'),'暂无评价');assert.equal(page.metricValue('defaults'),'暂无计分合作');
