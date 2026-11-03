@@ -48,6 +48,40 @@ class BackendCapabilitiesTest(unittest.TestCase):
     def test_complete_structure_is_accepted(self):
         self.check(0)
 
+    def test_legacy_cloud_only_sms_service_is_rejected(self):
+        name = 'BOOT-INF/classes/com/action/camera/auth/service/PhoneSmsService.class'
+        self.entries[name] = b'\xca\xfe\xba\xbe SmsCloudVerifier verifyCode sendCode'
+        self.check(1)
+
+    def test_each_local_challenge_capability_is_required(self):
+        # Independent expectations prevent accidentally removing a requirement from the gate.
+        capabilities = {
+            'auth/service/PhoneSmsService.class': ['createChallenge', 'consumeChallenge', 'requireOwner',
+                'SecureRandom', 'SmsCodeHasher', 'SmsChallengeLocks', 'REQUIRES_NEW',
+                'getOwnerUserId', 'getOwnerSessionId', 'getOperation', 'getConsumedAt',
+                'getInvalidatedAt', 'getExpiresAt', 'getMaxAttempts', 'setConsumedAt'],
+            'auth/domain/SmsChallenge.class': ['challengeId', 'phoneHash', 'purpose', 'codeHash',
+                'ownerUserId', 'ownerSessionId', 'operation', 'expiresAt', 'consumedAt', 'invalidatedAt'],
+            'auth/service/SmsCodeHasher.class': ['getChallengeId', 'getPhoneHash', 'getPurpose',
+                'getOwnerUserId', 'getOwnerSessionId', 'getOperation', 'getCodePepper', 'HmacSHA256', 'matches'],
+            'auth/repository/SmsChallengeRepository.class': ['findByChallengeId', 'PESSIMISTIC_WRITE'],
+            'auth/service/SmsChallengeLocks.class': ['acquire', 'SmsChallengeLockRepository'],
+            'auth/domain/SmsChallengeLock.class': ['sms_challenge_locks', 'lock_key'],
+            'auth/repository/SmsChallengeLockRepository.class': ['INSERT IGNORE INTO sms_challenge_locks', 'FOR UPDATE'],
+        }
+        for relative, markers in capabilities.items():
+            name = 'BOOT-INF/classes/com/action/camera/' + relative
+            original = self.entries[name]
+            with self.subTest(missing_class=relative):
+                del self.entries[name]
+                self.check(1)
+                self.entries[name] = original
+            for marker in markers:
+                with self.subTest(missing_marker=marker, class_name=relative):
+                    self.entries[name] = original.replace(marker.encode(), b'')
+                    self.check(1)
+                    self.entries[name] = original
+
     def test_missing_privacy_is_rejected(self):
         del self.entries['BOOT-INF/classes/com/action/camera/privacy/controller/PrivacyController.class']
         self.check(1)
