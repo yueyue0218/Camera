@@ -12,6 +12,17 @@ import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
 
+    @Query("""
+            select new com.action.camera.social.dto.SocialUserBriefResponse(
+                u.id, u.nickname, u.avatarFileId, u.currentRole, u.bio,
+                case when exists (select f.id from UserFollow f
+                    where f.followerId = :viewerId and f.followingUserId = u.id)
+                    then true else false end)
+            from User u where u.id in :userIds
+            """)
+    List<com.action.camera.social.dto.SocialUserBriefResponse> findSocialBriefs(
+            @Param("viewerId") Long viewerId, @Param("userIds") java.util.Collection<Long> userIds);
+
     boolean existsByStudentNo(String studentNo);
 
     Optional<User> findByStudentNo(String studentNo);

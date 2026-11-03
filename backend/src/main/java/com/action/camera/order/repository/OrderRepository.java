@@ -16,6 +16,37 @@ import java.util.Optional;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
+    @Query("""
+            select o from Order o
+            where ((:role = 'customer' and o.customerId = :userId)
+                or (:role = 'provider' and o.providerUserId = :userId))
+              and ((o.status = :paid and o.shootStartTime <= :now)
+                or (o.status = :shooting and o.shootEndTime <= :now))
+            order by o.updatedAt desc
+            """)
+    List<Order> findTimelineDueForUser(@Param("userId") Long userId, @Param("role") String role,
+                                     @Param("now") LocalDateTime now, @Param("paid") OrderStatus paid,
+                                     @Param("shooting") OrderStatus shooting);
+
+    @Query("""
+            select o.status as status, count(o) as total from Order o
+            where (:role = 'customer' and o.customerId = :userId)
+               or (:role = 'provider' and o.providerUserId = :userId)
+            group by o.status
+            """)
+    List<OrderStatusCount> summarizeForUser(@Param("userId") Long userId, @Param("role") String role);
+
+    @Query("""
+            select o from Order o
+            where ((:role = 'customer' and o.customerId = :userId)
+                or (:role = 'provider' and o.providerUserId = :userId))
+              and (:status is null or o.status = :status)
+            order by o.updatedAt desc
+            """)
+    org.springframework.data.domain.Page<Order> findPageForUser(@Param("userId") Long userId,
+            @Param("role") String role, @Param("status") OrderStatus status,
+            org.springframework.data.domain.Pageable pageable);
+
     Optional<Order> findByQuoteId(Long quoteId);
 
     List<Order> findByCustomerIdOrderByUpdatedAtDesc(Long customerId);

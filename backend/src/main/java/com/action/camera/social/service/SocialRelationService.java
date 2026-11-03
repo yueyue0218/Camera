@@ -25,11 +25,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 @Service
 public class SocialRelationService {
@@ -198,29 +196,16 @@ public class SocialRelationService {
         }
 
         List<Long> distinctUserIds = orderedUserIds.stream().distinct().toList();
-        Map<Long, User> usersById = new HashMap<>();
-        userRepository.findAllById(distinctUserIds).forEach(user -> usersById.put(user.getId(), user));
-        Set<Long> followedUserIds = new HashSet<>(
-                userFollowRepository.findFollowingUserIdsByFollowerIdAndFollowingUserIdIn(currentUserId, distinctUserIds));
-
-        return orderedUserIds.stream()
-                .map(userId -> {
-                    User user = usersById.get(userId);
-                    if (user == null) {
-                        LOGGER.warn("Skipping orphan social relation for missing userId={}", userId);
-                        return null;
-                    }
-                    return new SocialUserBriefResponse(
-                            user.getId(),
-                            user.getNickname(),
-                            user.getAvatarFileId(),
-                            user.getCurrentRole(),
-                            user.getBio(),
-                            followedUserIds.contains(userId)
-                    );
-                })
-                .filter(Objects::nonNull)
-                .toList();
+        Map<Long, SocialUserBriefResponse> usersById = new HashMap<>();
+        // Same user fields and any-role follow membership in one bounded batch.
+        userRepository.findSocialBriefs(currentUserId, distinctUserIds)
+                .forEach(user -> usersById.put(user.getUserId(), user));
+        // Query order is irrelevant: retain relation order and duplicate semantics.
+        return orderedUserIds.stream().map(userId -> {
+            SocialUserBriefResponse user = usersById.get(userId);
+            if (user == null) { LOGGER.warn("Skipping orphan social relation for missing userId={}", userId); }
+            return user;
+        }).filter(Objects::nonNull).toList();
     }
 
     private void validateTargetUser(Long userId) {
