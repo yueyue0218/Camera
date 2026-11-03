@@ -25,6 +25,19 @@ public class SmsCodeHasher {
         this.properties = properties;
     }
 
+    public String hash(com.action.camera.auth.domain.SmsChallenge challenge, String code) {
+        return encoder.encode(pepperedDigest(binding(challenge), challenge.getPurpose(), code));
+    }
+
+    public boolean matches(com.action.camera.auth.domain.SmsChallenge challenge, String code) {
+        return encoder.matches(pepperedDigest(binding(challenge), challenge.getPurpose(), code), challenge.getCodeHash());
+    }
+
+    private String binding(com.action.camera.auth.domain.SmsChallenge c) {
+        return c.getChallengeId()+"\n"+c.getPhoneHash()+"\n"+c.getOwnerUserId()+"\n"
+                +c.getOwnerSessionId()+"\n"+c.getOperation();
+    }
+
     public String hash(String phone, SmsPurpose purpose, String code) {
         return encoder.encode(pepperedDigest(phone, purpose, code));
     }

@@ -9,6 +9,8 @@ export struct LoginPage {
   @Prop contextText: string = '';
   @State private phone: string = '';
   @State private code: string = '';
+  @State private challengeId: string = '';
+  private challengePhone: string = '';
   @State private sendingCode: boolean = false;
   @State private signingIn: boolean = false;
   @State private cooldownSeconds: number = 0;
@@ -69,10 +71,13 @@ export struct LoginPage {
     this.notice = '';
     this.sendingCode = true;
     try {
-      await this.appClient.apiService.sendLoginCode(normalizedPhone, deviceId);
+      this.challengeId = '';
+      const challenge = await this.appClient.apiService.sendLoginCode(normalizedPhone, deviceId);
       if (version !== this.requestVersion) {
         return;
       }
+      this.challengeId = challenge.challengeId;
+      this.challengePhone = normalizedPhone;
       this.notice = '验证码已发送';
       this.startCooldown();
     } catch (error) {
@@ -97,6 +102,10 @@ export struct LoginPage {
       this.errorMessage = '请输入正确的手机号';
       return;
     }
+    if (this.challengeId.length === 0 || this.challengePhone !== normalizedPhone) {
+      this.errorMessage = '请先获取当前手机号的验证码';
+      return;
+    }
     if (!PhoneLoginPolicy.validCode(this.code)) {
       this.errorMessage = '请输入 6 位验证码';
       return;
@@ -110,7 +119,7 @@ export struct LoginPage {
     this.errorMessage = '';
     this.signingIn = true;
     try {
-      const response = await this.appClient.apiService.verifyLoginCode(normalizedPhone, this.code, deviceId);
+      const response = await this.appClient.apiService.verifyLoginCode(normalizedPhone, this.code, deviceId, this.challengeId);
       if (version !== this.requestVersion) {
         return;
       }

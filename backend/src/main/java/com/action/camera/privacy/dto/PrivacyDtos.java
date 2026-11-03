@@ -23,6 +23,10 @@ public final class PrivacyDtos {
             LocalDateTime processedAt,LocalDateTime responseDueAt) {}
     public record ClosureCode(@NotBlank @Size(max=32) String phone,@NotBlank @Size(max=128) String deviceId) {}
     public record ClosureConfirm(@NotBlank @Size(max=32) String phone,
-            @NotBlank @Pattern(regexp="[0-9]{6}") String code,@NotNull @AssertTrue Boolean confirmed) {}
+            @NotBlank @Pattern(regexp="[0-9]{6}") String code,@NotNull @AssertTrue Boolean confirmed,
+            @NotBlank @Pattern(regexp="[0-9a-f-]{36}") String challengeId) {
+        // Old Java callers fail closed because no challenge identity is supplied.
+        public ClosureConfirm(String phone, String code, Boolean confirmed) { this(phone,code,confirmed,null); }
+    }
     public record ClosureView(String status, LocalDateTime closedAt, String retainedDataNotice) {}
 }

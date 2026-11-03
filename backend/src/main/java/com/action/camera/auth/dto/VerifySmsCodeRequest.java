@@ -15,6 +15,10 @@ public class VerifySmsCodeRequest {
     @Size(max = 32, message = "手机号格式不正确")
     private String phone;
 
+    @NotBlank
+    @Pattern(regexp = "[0-9a-f-]{36}")
+    private String challengeId;
+
     @NotBlank(message = "验证码用途不能为空")
     @Pattern(regexp = "LOGIN", message = "当前只支持 LOGIN")
     private String purpose;

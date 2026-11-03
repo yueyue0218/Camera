@@ -29,8 +29,8 @@ public class PrivacyController {
     @GetMapping("/rights") public Result<PageResult<RightView>> mine(@RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="20") int size) {
         return Result.success(rights.mine(UserContext.getUserId(),page,size));
     }
-    @PostMapping("/account-closure/code") public Result<Boolean> code(@Valid @RequestBody ClosureCode input,HttpServletRequest request) {
-        closure.sendCode(UserContext.getUserId(),input,request.getRemoteAddr()); return Result.success(true);
+    @PostMapping("/account-closure/code") public Result<com.action.camera.auth.dto.SmsChallengeResponse> code(@Valid @RequestBody ClosureCode input,HttpServletRequest request) {
+        return Result.success(closure.sendCode(UserContext.getUserId(),input,request.getRemoteAddr()));
     }
     @PostMapping("/account-closure") public Result<ClosureView> close(@Valid @RequestBody ClosureConfirm input) {
         return Result.success(closure.close(UserContext.getUserId(),input));

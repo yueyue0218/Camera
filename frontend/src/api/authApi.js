@@ -13,11 +13,11 @@ export const authApi = {
       body: JSON.stringify({ phone, purpose: SMS_PURPOSE, deviceId })
     })
   },
-  verifySmsCode({ phone, code, deviceId, deviceName }) {
+  verifySmsCode({ phone, code, challengeId, deviceId, deviceName }) {
     return request('/auth/sms/verify', {
       method: 'POST',
       suppressAuthTimeout: true,
-      body: JSON.stringify({ phone, purpose: SMS_PURPOSE, code, deviceId, deviceName })
+      body: JSON.stringify({ phone, purpose: SMS_PURPOSE, code, challengeId, deviceId, deviceName })
     })
   },
   tempStagingLogin({ userId, password, deviceId, deviceName }) {

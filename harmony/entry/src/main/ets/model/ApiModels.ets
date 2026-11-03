@@ -333,7 +333,13 @@ export interface SendSmsCodeRequest {
   readonly deviceId: string;
 }
 
+export interface SmsChallengeResponse {
+  readonly challengeId: string;
+  readonly expiresAt: string;
+}
+
 export interface VerifyNativeSmsCodeRequest extends SendSmsCodeRequest {
+  readonly challengeId: string;
   readonly code: string;
   readonly deviceName: string;
 }

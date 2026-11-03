@@ -30,7 +30,7 @@ public class SmsProperties {
     private String loginTemplateId = "";
     /** Operator-approved identity re-verification template; blank fails closed. */
     private String reauthTemplateId = "";
-    /** A separate PNVS scheme prevents a LOGIN challenge authorizing account closure. */
+    /** Legacy setting, ignored by PNVS custom-code mode; both purposes use the default scheme. */
     private String reauthSchemeName = "";
     private String codeParameterName = "code";
     private String codePepper = "";

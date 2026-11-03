@@ -5,7 +5,7 @@ import { AcceptedDemandResponse, ConfirmQuoteResult, ConversationSummary, Create
   DemandListQuery, DemandResponseSummary, DemandSummary, MessageSummary, NativeRefreshRequest, NativeSessionResponse,
   FollowState, MockPaymentPayload, MomentSummary, OrderStatusLogSummary, OrderSummary, PageResult, PaymentResult,
   ProfileMomentPage, PublicUserProfile, QuoteSummary, RejectQuotePayload, RejectQuoteResult,
-  ReportSummary, SendSmsCodeRequest, ServicePackageDetail, ServicePackageInterest, ServicePackageListQuery,
+  ReportSummary, SendSmsCodeRequest, SmsChallengeResponse, ServicePackageDetail, ServicePackageInterest, ServicePackageListQuery,
   ServicePackageSummary, SocialUserBrief, SwitchRolePayload, SwitchRoleResult, UserProfileSummary,
   SendTextMessagePayload, SessionSummary, StartServiceChatPayload, StartServiceChatResult,
   VerifyNativeSmsCodeRequest } from '../model/ApiModels';
@@ -273,18 +273,18 @@ export class ApiService implements NativeSessionApi {
     this.client.cancelRequest(`users.${userId}.${normalizedRole}.follow`);
   }
 
-  sendLoginCode(phone: string, deviceId: string): Promise<void> {
+  sendLoginCode(phone: string, deviceId: string): Promise<SmsChallengeResponse> {
     const request: SendSmsCodeRequest = { phone: phone, purpose: 'LOGIN', deviceId: deviceId };
-    return this.client.postPublic<void>('/auth/sms/send', request, 'auth.sms.send');
+    return this.client.postPublic<SmsChallengeResponse>('/auth/sms/send', request, 'auth.sms.send');
   }
 
   cancelSendLoginCode(): void {
     this.client.cancelRequest('auth.sms.send');
   }
 
-  async verifyLoginCode(phone: string, code: string, deviceId: string): Promise<NativeSessionResponse> {
+  async verifyLoginCode(phone: string, code: string, deviceId: string, challengeId: string): Promise<NativeSessionResponse> {
     const request: VerifyNativeSmsCodeRequest = {
-      phone: phone, purpose: 'LOGIN', code: code, deviceId: deviceId, deviceName: 'Portra HarmonyOS'
+      phone: phone, purpose: 'LOGIN', code: code, challengeId: challengeId, deviceId: deviceId, deviceName: 'Portra HarmonyOS'
     };
     const response = await this.client.postPublic<NativeSessionResponse>(
       '/auth/native/sms/verify', request, 'auth.sms.verify');
