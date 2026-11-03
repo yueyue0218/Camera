@@ -33,9 +33,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("smoke") @AutoConfigureMockMvc @Timeout(30)
 class PrivacyLifecycleIntegrationTest {
     private static final AtomicInteger PHONE_SEQUENCE=new AtomicInteger(2000);
+    private static final String CHALLENGE_ID="12345678-1234-4123-8123-123456789abc";
     @Autowired UserRepository users;
     @Autowired UserRoleBindingRepository bindings;
     @Autowired AuthSessionService sessions;
+    @Autowired JwtUtil jwt;
     @Autowired PhoneIdentityCodec codec;
     @Autowired PrivacyConsentService consent;
     @Autowired PrivacyConsentEventRepository events;
@@ -51,6 +53,7 @@ class PrivacyLifecycleIntegrationTest {
     private User user;
     private String phone;
     private SessionAuthenticationResult session;
+    private String sessionId;
 
     @BeforeEach void setup() {
         reset(restrictions,sms,cleanup);
@@ -62,6 +65,12 @@ class PrivacyLifecycleIntegrationTest {
         UserRoleBinding binding=new UserRoleBinding(); binding.setUserId(user.getId()); binding.setRole("CUSTOMER");
         binding.setGrantedAt(LocalDateTime.now()); bindings.saveAndFlush(binding);
         session=sessions.issue(user,"CUSTOMER",false,"test-installation","Test device");
+        sessionId=jwt.parseSessionId(session.response().getToken());
+    }
+    @AfterEach void clearContext() { UserContext.clear(); }
+    private void bindClosureSession() {
+        UserContext.setUserId(user.getId());
+        UserContext.setSessionId(sessionId);
     }
     private String bearer() { return "Bearer "+session.response().getToken(); }
     private ConsentUpdate decision(String status,long time) {
@@ -181,8 +190,10 @@ class PrivacyLifecycleIntegrationTest {
                 .andExpect(jsonPath("$.data.resolutionNote").value("本次核验资料不足，请通过受保护渠道补充核验"));
     }
     @Test void successfulClosureAnonymizesAndRevokesAccessAndRefreshCredentials() throws Exception {
-        when(sms.verifyCode(phone,SmsPurpose.REAUTH,"123456")).thenReturn(phone);
-        var result=closure.close(user.getId(),new ClosureConfirm(phone,"123456",true));
+        bindClosureSession();
+        when(sms.consumeChallenge(CHALLENGE_ID,phone,SmsPurpose.REAUTH,"123456",user.getId(),sessionId,"ACCOUNT_CLOSURE")).thenReturn(phone);
+        var result=closure.close(user.getId(),new ClosureConfirm(phone,"123456",true,CHALLENGE_ID));
+        verify(sms).consumeChallenge(CHALLENGE_ID,phone,SmsPurpose.REAUTH,"123456",user.getId(),sessionId,"ACCOUNT_CLOSURE");
         assertThat(result.status()).isEqualTo("CLOSED");
         User deleted=users.findById(user.getId()).orElseThrow();
         assertThat(deleted.getStatus()).isEqualTo("DELETED"); assertThat(deleted.getMobileCipher()).isNull();
@@ -192,27 +203,39 @@ class PrivacyLifecycleIntegrationTest {
         assertThat(bindings.existsByUserIdAndRole(user.getId(),"CUSTOMER")).isFalse();
     }
     @Test void unfinishedAppointmentsAndDatabaseFailureNeverReportClosureSuccess() {
+        bindClosureSession();
         doReturn(1L).when(cleanup).countBlockingOrders(user.getId());
-        assertThatThrownBy(()->closure.close(user.getId(),new ClosureConfirm(phone,"123456",true)))
+        assertThatThrownBy(()->closure.close(user.getId(),new ClosureConfirm(phone,"123456",true,CHALLENGE_ID)))
                 .isInstanceOf(BusinessException.class);
-        verify(sms,never()).verifyCode(anyString(),any(),anyString());
+        verifyNoInteractions(sms);
         reset(cleanup);
-        when(sms.verifyCode(phone,SmsPurpose.REAUTH,"123456")).thenReturn(phone);
+        when(sms.consumeChallenge(CHALLENGE_ID,phone,SmsPurpose.REAUTH,"123456",user.getId(),sessionId,"ACCOUNT_CLOSURE")).thenReturn(phone);
         doAnswer(invocation->{invocation.callRealMethod(); throw new IllegalStateException("cleanup failed");})
                 .when(cleanup).cleanupUserData(eq(user.getId()),anyString(),any());
-        assertThatThrownBy(()->closure.close(user.getId(),new ClosureConfirm(phone,"123456",true)))
+        assertThatThrownBy(()->closure.close(user.getId(),new ClosureConfirm(phone,"123456",true,CHALLENGE_ID)))
                 .isInstanceOf(org.springframework.dao.DataAccessException.class).hasRootCauseInstanceOf(IllegalStateException.class);
+        verify(sms).consumeChallenge(CHALLENGE_ID,phone,SmsPurpose.REAUTH,"123456",user.getId(),sessionId,"ACCOUNT_CLOSURE");
         assertThat(users.findById(user.getId()).orElseThrow().getStatus()).isEqualTo("ACTIVE");
         assertThat(bindings.existsByUserIdAndRole(user.getId(),"CUSTOMER")).isTrue();
         assertThat(sessions.refresh(session.refreshToken()).response().getUserId()).isEqualTo(user.getId());
     }
-    @Test void invalidSmsAndUnconfirmedClosureNeverTerminateAccount() {
-        assertThatThrownBy(()->closure.close(user.getId(),new ClosureConfirm(phone,"123456",false)))
+    @Test void invalidSmsAndUnconfirmedClosureNeverTerminateAccount() throws Exception {
+        bindClosureSession();
+        grant();
+        assertThatThrownBy(()->closure.close(user.getId(),new ClosureConfirm(phone,"123456",false,CHALLENGE_ID)))
                 .isInstanceOf(BusinessException.class);
-        when(sms.verifyCode(phone,SmsPurpose.REAUTH,"000000")).thenThrow(new SmsCodeInvalidException());
-        assertThatThrownBy(()->closure.close(user.getId(),new ClosureConfirm(phone,"000000",true)))
+        verifyNoInteractions(sms);
+        when(sms.consumeChallenge(CHALLENGE_ID,phone,SmsPurpose.REAUTH,"000000",user.getId(),sessionId,"ACCOUNT_CLOSURE"))
+                .thenThrow(new SmsCodeInvalidException());
+        assertThatThrownBy(()->closure.close(user.getId(),new ClosureConfirm(phone,"000000",true,CHALLENGE_ID)))
                 .isInstanceOf(SmsCodeInvalidException.class);
+        verify(sms).consumeChallenge(CHALLENGE_ID,phone,SmsPurpose.REAUTH,"000000",user.getId(),sessionId,"ACCOUNT_CLOSURE");
+        verify(cleanup,never()).cleanupUserData(anyLong(),anyString(),any());
         assertThat(users.findById(user.getId()).orElseThrow().getStatus()).isEqualTo("ACTIVE");
+        assertThat(bindings.existsByUserIdAndRole(user.getId(),"CUSTOMER")).isTrue();
+        assertThat(consent.current(user.getId()).status()).isEqualTo("GRANTED");
+        assertThat(events.findAll().stream().filter(e->e.getUserId().equals(user.getId()))).hasSize(1);
+        mvc.perform(get("/privacy/rights").header("Authorization",bearer())).andExpect(jsonPath("$.code").value(200));
         assertThat(sessions.refresh(session.refreshToken()).response().getUserId()).isEqualTo(user.getId());
     }
 }
