@@ -314,7 +314,7 @@ struct Index {
       this.PlaceholderPage('约拍会话', '无效的会话编号');
     } else {
       ConversationDetailPage({ conversationId: this.validConversationId(param),
-        onOpenSelf: () => this.openOwnProfileFromConversation(),
+        onOpenSelf: () => this.openOwnProfileFromDetail(),
         onOpenPeer: (userId: number, role: string) => this.openPage(AppRoute.PUBLIC_PROFILE,
           { userId: userId, userRole: role }),
         onBackHandler: (handler: (() => boolean) | undefined) => this.conversationBackHandler = handler,
@@ -388,6 +388,9 @@ struct Index {
     } else {
       QuoteDetailPage({ conversationId: this.validConversationId(param),
         quoteId: (param as NavigationRouteParam).quoteId!,
+        onOpenSelf: () => this.openOwnProfileFromDetail(),
+        onOpenProvider: (userId: number) => this.openPage(AppRoute.PUBLIC_PROFILE,
+          { userId: userId, userRole: 'PROVIDER' }),
         onBack: () => this.appPathStack.pop(),
         onEdit: () => this.openPage(AppRoute.QUOTE_FORM, param as NavigationRouteParam),
         onConfirmed: () => this.appPathStack.pop(),
@@ -402,6 +405,9 @@ struct Index {
       this.PlaceholderPage('订单', '无法打开这笔订单');
     } else {
       OrderDetailPage({ orderId: (param as NavigationRouteParam).orderId!,
+        onOpenSelf: () => this.openOwnProfileFromDetail(),
+        onOpenProfile: (userId: number, role: string) => this.openPage(AppRoute.PUBLIC_PROFILE,
+          { userId: userId, userRole: role }),
         openPayment: (param as NavigationRouteParam).openPayment === true,
         onBack: () => this.appPathStack.pop(),
         onOpenReviews: () => this.openPage(AppRoute.ORDER_REVIEWS,
@@ -448,6 +454,9 @@ struct Index {
       this.PlaceholderPage('评价', '无法打开这次约拍');
     } else {
       OrderReviewsPage({ orderId: (param as NavigationRouteParam).orderId!,
+        onOpenSelf: () => this.openOwnProfileFromDetail(),
+        onOpenProfile: (userId: number, role: string) => this.openPage(AppRoute.PUBLIC_PROFILE,
+          { userId: userId, userRole: role }),
         onBackHandler: (handler: (() => boolean) | undefined) => this.aftercareBackHandler = handler,
         onBack: () => this.appPathStack.pop() });
     }
@@ -506,7 +515,7 @@ struct Index {
     this.appPathStack.pushPathByName(route, param);
   }
 
-  private openOwnProfileFromConversation(): void {
+  private openOwnProfileFromDetail(): void {
     if (!this.navigationClickGuard.accept(Date.now())) return;
     const paths = this.appPathStack.getAllPathName();
     if (paths[paths.length - 1] !== AppRoute.PROFILE) this.pushRoute(AppRoute.PROFILE, {});

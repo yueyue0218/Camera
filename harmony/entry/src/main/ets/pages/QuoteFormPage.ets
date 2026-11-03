@@ -234,7 +234,7 @@ export struct QuoteFormPage {
         Button(this.busy ? '正在保存' : this.quoteId > 0 ? '保存修改' : '发送报价')
           .enabled(!this.busy && this.ready).height(48).width('100%').borderRadius(6).onClick(() => this.save())
       }.width('100%').padding({ left: 20, right: 20, top: 10, bottom: 16 })
-      }.width('100%').height('100%').backgroundColor(PortraTheme.pageBackground)
+      }.width('100%').height('100%').backgroundColor(PortraTheme.workflowBackground)
       if (this.confirmDiscard) {
         Column() {
           Blank().layoutWeight(1)

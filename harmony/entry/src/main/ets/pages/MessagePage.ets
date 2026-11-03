@@ -244,7 +244,7 @@ export struct MessagePage {
     const remoteVersion = ++this.remoteVersion;
     try {
     const result = await this.appClient.apiService.listConversations();
-    if (!Array.isArray(result)) throw new Error('会话数据格式异常');
+    if (!Array.isArray(result)) throw new Error('聊天暂时无法打开');
     const current = ConversationMemory.read(token, this.accountId);
     const cached = new Map<number, ConversationListItem>();
     current.forEach((row: ConversationListItem) => cached.set(row.conversation.conversationId, row));
@@ -398,7 +398,7 @@ export struct MessagePage {
         item.conversation.conversationId !== conversationId);
       ConversationMemory.write(token, accountId, this.conversations);
     } catch (error) {
-      this.errorMessage = (error as PortraError).message || '隐藏会话失败';
+      this.errorMessage = (error as PortraError).message || '暂时无法隐藏聊天';
     } finally {
       this.hidingConversationId = 0;
     }
@@ -407,7 +407,7 @@ export struct MessagePage {
   private confirmHide(conversationId: number): void {
     if (this.hidingConversationId !== 0) return;
     this.lastLongPressAt = Date.now();
-    AlertDialog.show({ title: '隐藏会话？', message: '隐藏后可通过与对方再次联系找回。',
+    AlertDialog.show({ title: '隐藏这条聊天？', message: '再次联系对方后仍可找到聊天记录。',
       primaryButton: { value: '取消', action: () => {} },
       secondaryButton: { value: '隐藏', action: () => this.hideConversation(conversationId) } });
   }
@@ -469,13 +469,13 @@ export struct MessagePage {
       } else if (this.requiresLogin) {
         Button('登录后查看消息').margin(24).onClick(() => this.onRequireLogin?.())
       } else if (this.loading) {
-        PortraLoading({ label: '正在读取会话' })
+        PortraLoading({ label: '正在打开消息' })
       } else if (this.errorMessage.length > 0) {
         PortraErrorView({ message: this.errorMessage, onRetry: () => this.load() })
       } else if (this.conversations.length === 0) {
-        PortraEmptyView({ message: '还没有会话' })
+        PortraEmptyView({ message: '还没有聊天' })
       } else if (this.filteredConversations().length === 0) {
-        Text('没有找到相关会话').fontSize(13).fontColor(PortraTheme.secondaryText)
+        Text('没有找到相关聊天').fontSize(13).fontColor(PortraTheme.secondaryText)
           .width('100%').textAlign(TextAlign.Center).padding({ top: 36 })
       } else {
         Scroll(this.listScroller) {

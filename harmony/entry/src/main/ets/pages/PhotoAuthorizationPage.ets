@@ -539,7 +539,7 @@ export struct PhotoAuthorizationPage {
             }.width('100%').padding(12).backgroundColor(PortraTheme.surface)
           }
         }
-      }.width('100%').height('100%').backgroundColor('#F8F6F2')
+      }.width('100%').height('100%').backgroundColor(PortraTheme.workflowBackground)
       if (this.viewerId > 0) {
         Column() {
           Button('返回').alignSelf(ItemAlign.Start).onClick(() => this.viewerId = 0)

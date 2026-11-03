@@ -327,7 +327,7 @@ export struct ConversationDetailPage {
       if (!this.visible || version !== this.requestVersion) return;
       const match = conversations.find((item: ConversationSummary) => item.conversationId === this.conversationId);
       if (match === undefined) {
-        throw new Error('会话不存在或无权查看');
+        throw new Error('聊天暂时无法打开');
       }
       {
         const peerRole = match.otherUserId === match.participantBId ? 'PROVIDER' : 'CUSTOMER';
@@ -355,9 +355,9 @@ export struct ConversationDetailPage {
     } catch (error) {
       if (this.visible && version === this.requestVersion) {
         if (this.conversation !== null) {
-          this.actionError = (error as PortraError).message || '暂时无法更新会话';
+          this.actionError = (error as PortraError).message || '聊天暂时未更新';
         } else {
-          this.errorMessage = (error as PortraError).message || '会话加载失败';
+          this.errorMessage = (error as PortraError).message || '聊天暂时无法打开';
         }
       }
     } finally {
@@ -929,7 +929,7 @@ export struct ConversationDetailPage {
           .enabled(this.attachmentDraft.length > 0).onClick(() => this.sendSelectedMedia())
       }.width('100%').padding({ left: 14, right: 14, top: 10, bottom: 12 })
         .backgroundColor(PortraTheme.surface)
-    }.width('100%').height('100%').backgroundColor('#F8F6F2')
+    }.width('100%').height('100%').backgroundColor(PortraTheme.workflowBackground)
   }
 
   build() {
@@ -1045,7 +1045,7 @@ export struct ConversationDetailPage {
         .border({ width: { top: 1 }, color: '#E9E5DF' })
       }
     }
-    .width('100%').height('100%').backgroundColor('#F3EFE9')
+    .width('100%').height('100%').backgroundColor(PortraTheme.workflowBackground)
     if (this.attachmentDraft.length > 0) this.MediaPreview()
     if (this.viewerFileId > 0 || this.viewerUri.length > 0) {
       Column() {

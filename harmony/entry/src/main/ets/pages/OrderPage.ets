@@ -202,6 +202,6 @@ export struct OrderPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(PortraTheme.pageBackground)
+    .backgroundColor(PortraTheme.workflowBackground)
   }
 }

@@ -1,3 +1,4 @@
+import { KeyboardAvoidMode } from '@kit.ArkUI';
 import { image } from '@kit.ImageKit';
 import { common } from '@kit.AbilityKit';
 import { AppClient } from '../app/AppClient';
@@ -5,6 +6,7 @@ import { PortraEmptyView } from '../common/components/PortraEmptyView';
 import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraLoading } from '../common/components/PortraLoading';
 import { PortraPageHeading } from '../common/components/PortraPageHeading';
+import { AftercareDraftStore } from '../features/aftercare/AftercareDraftStore';
 import { OrderWorkflow } from '../features/conversation/OrderWorkflow';
 import { ContentChanges } from '../features/user/ContentChanges';
 import { DeliveryTransfer } from '../features/delivery/DeliveryTransfer';
@@ -41,14 +43,21 @@ export struct DeliveryGalleryPage {
   private generation: number = 0;
   private readonly requested: Set<number> = new Set<number>();
   private longPressedAt: number = 0;
+  private previousKeyboardAvoidMode?: KeyboardAvoidMode;
   onBack?: () => void;
   onOpenUpload?: () => void;
 
   aboutToAppear(): void {
+    this.previousKeyboardAvoidMode = this.getUIContext().getKeyboardAvoidMode();
+    this.getUIContext().setKeyboardAvoidMode(KeyboardAvoidMode.RESIZE);
     this.load();
   }
 
   aboutToDisappear(): void {
+    if (this.previousKeyboardAvoidMode !== undefined) {
+      this.getUIContext().setKeyboardAvoidMode(this.previousKeyboardAvoidMode);
+      this.previousKeyboardAvoidMode = undefined;
+    }
     this.generation++;
     this.api.cancelOrderDetail(this.orderId);
     this.transfer.cancel();
@@ -192,6 +201,11 @@ export struct DeliveryGalleryPage {
     else this.reworkOpen = false;
   }
 
+  private openRework(): void {
+    this.reworkText = AftercareDraftStore.read(this.userId, this.orderId, 'rework');
+    this.reworkOpen = true;
+  }
+
   private async download(file: DeliveryFileSummary): Promise<boolean> {
     const token = AppClient.shared.sessionManager.getSession()?.accessToken ?? '';
     if (!token || this.downloadingId !== 0) return false;
@@ -241,6 +255,7 @@ export struct DeliveryGalleryPage {
       await this.api.requestRework(this.orderId, reason);
       this.reworkOpen = false;
       this.reworkText = '';
+      AftercareDraftStore.write(this.userId, this.orderId, 'rework', 0, '');
       await this.load();
       ContentChanges.publish('orders');
       this.notice = '返修要求已提交';
@@ -355,7 +370,7 @@ export struct DeliveryGalleryPage {
           if (OrderWorkflow.canReviewDelivery(this.order!, this.userId)) {
             Row({ space: 12 }) {
               Button('申请返修').layoutWeight(1).height(48).backgroundColor(PortraTheme.surface)
-                .fontColor(PortraTheme.primary).onClick(() => this.reworkOpen = true)
+                .fontColor(PortraTheme.primary).onClick(() => this.openRework())
               Button('确认收片').layoutWeight(1).height(48).onClick(() => this.receiptOpen = true)
             }.width('100%').padding({ left: 18, right: 18, bottom: 16 })
           } else if (OrderWorkflow.canUpload(this.order!, this.userId)) {
@@ -363,7 +378,7 @@ export struct DeliveryGalleryPage {
               .padding({ left: 18, right: 18, bottom: 16 })
           }
         }
-      }.width('100%').height('100%').backgroundColor('#F8F6F2')
+      }.width('100%').height('100%').backgroundColor(PortraTheme.workflowBackground)
       if (this.viewerIndex >= 0) {
         Column() {
           Row() {
@@ -413,7 +428,10 @@ export struct DeliveryGalleryPage {
               .fontSize(18).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
             if (this.reworkOpen) {
               TextArea({ text: this.reworkText, placeholder: '请描述需要修改的地方' })
-                .height(110).maxLength(200).onChange((value: string) => this.reworkText = value)
+                .height(110).maxLength(200).onChange((value: string) => {
+                  this.reworkText = value;
+                  AftercareDraftStore.write(this.userId, this.orderId, 'rework', 0, value);
+                })
               Text(`${this.reworkText.length}/200`).fontSize(11).fontColor(PortraTheme.mutedText)
             } else {
               Text('确认后，本次约拍将完成。').fontSize(13).fontColor(PortraTheme.secondaryText)
@@ -441,6 +459,7 @@ export struct DeliveryGalleryPage {
               Button('放弃').layoutWeight(1).backgroundColor(PortraTheme.surface)
                 .fontColor(PortraTheme.danger).onClick(() => {
                   this.reworkText = ''; this.reworkOpen = false; this.reworkDiscard = false;
+                  AftercareDraftStore.write(this.userId, this.orderId, 'rework', 0, '');
                 })
             }.width('100%')
           }.width('100%').padding(20).backgroundColor(PortraTheme.surface)

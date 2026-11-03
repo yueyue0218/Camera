@@ -33,9 +33,16 @@ test('profile targets use participant IDs and return to the conversation', () =>
   const index = fs.readFileSync(path.join(sourceRoot, 'pages/Index.ets'), 'utf8');
   assert.match(detail, /onOpenPeer\?\.\(this\.conversation\.otherUserId, ConversationListModel\.peerRole/);
   assert.match(detail, /onOpenSelf\?\.\(\)/);
-  assert.match(index, /onOpenSelf: \(\) => this\.openOwnProfileFromConversation\(\)/);
+  assert.match(index, /onOpenSelf: \(\) => this\.openOwnProfileFromDetail\(\)/);
   assert.match(index, /this\.pushRoute\(AppRoute\.PROFILE, \{\}\)/);
   assert.match(index, /onBack: \(\) => this\.appPathStack\.pop\(\)/);
+  const order = fs.readFileSync(path.join(sourceRoot, 'pages/OrderDetailPage.ets'), 'utf8');
+  const quote = fs.readFileSync(path.join(sourceRoot, 'pages/QuoteDetailPage.ets'), 'utf8');
+  const reviews = fs.readFileSync(path.join(sourceRoot, 'pages/OrderReviewsPage.ets'), 'utf8');
+  assert.match(order, /this\.order!\.providerUserId \?\? 0, 'PROVIDER'/);
+  assert.match(order, /this\.order!\.customerId \?\? 0, 'CUSTOMER'/);
+  assert.match(quote, /this\.quote!\.providerUserId === this\.userId/);
+  assert.match(reviews, /review\.reviewerId === this\.order\.providerUserId/);
 });
 
 test('normal Chinese names and image/file previews are preserved', () => {

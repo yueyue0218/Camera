@@ -48,6 +48,15 @@ export struct OrderReviewsPage {
   private previousKeyboardAvoidMode?: KeyboardAvoidMode;
   onBack?: () => void;
   onBackHandler?: (handler: (() => boolean) | undefined) => void;
+  onOpenSelf?: () => void;
+  onOpenProfile?: (userId: number, role: string) => void;
+
+  private openReviewer(review: ReviewSummary): void {
+    if (this.order === null) return;
+    if (review.reviewerId === this.actorId) this.onOpenSelf?.();
+    else if (review.reviewerId === this.order.providerUserId) this.onOpenProfile?.(review.reviewerId, 'PROVIDER');
+    else if (review.reviewerId === this.order.customerId) this.onOpenProfile?.(review.reviewerId, 'CUSTOMER');
+  }
 
   aboutToAppear(): void {
     this.mounted = true;
@@ -362,9 +371,11 @@ export struct OrderReviewsPage {
     Column({ space: 12 }) {
       Row({ space: 9 }) {
         PortraAvatar({ displayName: review.reviewerNickname ?? '约拍伙伴', avatarSize: 34 })
+          .onClick(() => this.openReviewer(review))
         Column({ space: 3 }) {
           Text(review.reviewerNickname ?? '约拍伙伴')
             .fontSize(13).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
+            .onClick(() => this.openReviewer(review))
           if (review.createdAt) Text(review.createdAt.replace('T', ' ').slice(0, 16))
             .fontSize(10).fontColor(PortraTheme.mutedText)
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
@@ -409,8 +420,7 @@ export struct OrderReviewsPage {
           }
         }, (item: ReviewComplaintSummary) => item.complaintId.toString())
     }.width('100%').alignItems(HorizontalAlign.Start).padding(14)
-      .backgroundColor(PortraTheme.surface).borderRadius(14)
-      .border({ width: 1, color: PortraTheme.border })
+      .backgroundColor(PortraTheme.surface).borderRadius(8)
   }
 
   @Builder private Form() {
@@ -498,7 +508,7 @@ export struct OrderReviewsPage {
               .backgroundColor(PortraTheme.surface)
           }
         }
-      }.width('100%').height('100%').backgroundColor('#F8F6F2')
+      }.width('100%').height('100%').backgroundColor(PortraTheme.workflowBackground)
       if (this.discardPrompt || this.cancelId > 0) {
         Column() {
           Blank().layoutWeight(1)

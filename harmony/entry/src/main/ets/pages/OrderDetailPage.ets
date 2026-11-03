@@ -48,6 +48,20 @@ export struct OrderDetailPage {
   onOpenGallery?: () => void;
   onOpenAuthorization?: () => void;
   onOpenUpload?: () => void;
+  onOpenSelf?: () => void;
+  onOpenProfile?: (userId: number, role: string) => void;
+
+  @Builder
+  private ProfileRow(label: string, name: string, userId: number, role: string) {
+    Row({ space: 12 }) {
+      Text(label).fontSize(13).fontColor(PortraTheme.secondaryText).width(72)
+      Text(name).fontSize(14).fontColor(PortraTheme.primaryText).layoutWeight(1)
+      if (userId > 0) Text('›').fontSize(20).fontColor(PortraTheme.mutedText)
+    }.width('100%').onClick(() => {
+      if (userId === this.userId) this.onOpenSelf?.();
+      else if (userId > 0) this.onOpenProfile?.(userId, role);
+    })
+  }
 
   aboutToAppear(): void {
     // A detached instance missed identity events; invalidate before ArkUI renders its retained body.
@@ -301,8 +315,10 @@ export struct OrderDetailPage {
             Column({ space: 14 }) {
               this.Detail('拍摄时间', QuoteWorkflow.dateInput(this.order!.shootStartTime ?? ''))
               this.Detail('拍摄地点', this.order!.shootLocation ?? '待更新')
-              this.Detail('对方', this.userId === this.order!.customerId ?
-                this.order!.providerNickname ?? '摄影师' : this.order!.customerNickname ?? '客户')
+              this.ProfileRow('摄影师', this.order!.providerNickname ?? '摄影师',
+                this.order!.providerUserId ?? 0, 'PROVIDER')
+              this.ProfileRow('客户', this.order!.customerNickname ?? '客户',
+                this.order!.customerId ?? 0, 'CUSTOMER')
             }.width('100%').alignItems(HorizontalAlign.Start).padding(14)
               .backgroundColor(PortraTheme.surface).borderRadius(14)
             Text('订单进度').fontSize(14).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
@@ -377,7 +393,7 @@ export struct OrderDetailPage {
           }.width('100%').padding({ left: 20, right: 20, top: 10, bottom: 16 })
         }
       }
-      }.width('100%').height('100%').backgroundColor('#F8F6F2')
+      }.width('100%').height('100%').backgroundColor(PortraTheme.workflowBackground)
       if (this.showPay && this.order !== null) {
         Column() {
           Blank().layoutWeight(1)

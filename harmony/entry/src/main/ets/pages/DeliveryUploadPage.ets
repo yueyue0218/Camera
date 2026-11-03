@@ -197,7 +197,7 @@ export struct DeliveryUploadPage {
           .height(48).width('100%').enabled(!this.busy && (this.uncertain || this.selected.length > 0))
           .onClick(() => this.uncertain ? this.reconcile() : this.upload())
           .padding({ left: 18, right: 18, bottom: 16 })
-      }.width('100%').height('100%').backgroundColor(PortraTheme.pageBackground)
+      }.width('100%').height('100%').backgroundColor(PortraTheme.workflowBackground)
       if (this.discardOpen) {
         Column() {
           Blank().layoutWeight(1)
