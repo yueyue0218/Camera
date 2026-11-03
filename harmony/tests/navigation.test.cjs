@@ -21,11 +21,15 @@ const { NavigationClickGuard, NavigationPolicy } =
 
 test('all planned destinations have one stable route name', () => {
   assert.deepEqual(NavigationPolicy.routes, [
+    AppRoute.ORDER_ENGAGEMENT,
     AppRoute.LOGIN, AppRoute.HALL, AppRoute.DEMAND_DETAIL, AppRoute.SERVICE_DETAIL,
-    AppRoute.CONVERSATION_DETAIL, AppRoute.QUOTE_FORM, AppRoute.QUOTE_DETAIL, AppRoute.ORDER_DETAIL, AppRoute.PUBLISH,
-    AppRoute.MESSAGE, AppRoute.ORDER, AppRoute.PROFILE
+    AppRoute.CONVERSATION_DETAIL, AppRoute.QUOTE_FORM, AppRoute.QUOTE_DETAIL, AppRoute.ORDER_DETAIL,
+    AppRoute.DELIVERY_GALLERY, AppRoute.DELIVERY_UPLOAD, AppRoute.PHOTO_AUTHORIZATION,
+    AppRoute.ORDER_REVIEWS, AppRoute.PUBLISH,
+    AppRoute.MESSAGE, AppRoute.ORDER, AppRoute.PROFILE, AppRoute.PUBLIC_PROFILE,
+    AppRoute.NOTIFICATIONS, AppRoute.CREDIT, AppRoute.MOMENT_DETAIL
   ]);
-  assert.equal(new Set(NavigationPolicy.routes).size, 12);
+  assert.equal(new Set(NavigationPolicy.routes).size, 21);
 });
 
 test('hall, public details and login remain public', () => {
@@ -39,6 +43,8 @@ test('hall, public details and login remain public', () => {
 test('protected guest destinations redirect to login and preserve the target', () => {
   for (const route of [AppRoute.PUBLISH, AppRoute.MESSAGE, AppRoute.CONVERSATION_DETAIL,
     AppRoute.QUOTE_FORM, AppRoute.QUOTE_DETAIL, AppRoute.ORDER_DETAIL,
+    AppRoute.DELIVERY_GALLERY, AppRoute.DELIVERY_UPLOAD, AppRoute.PHOTO_AUTHORIZATION,
+    AppRoute.ORDER_REVIEWS,
     AppRoute.ORDER, AppRoute.PROFILE]) {
     const result = NavigationPolicy.resolve(route, {}, false);
     assert.equal(result.route, AppRoute.LOGIN);
@@ -50,6 +56,8 @@ test('protected guest destinations redirect to login and preserve the target', (
 test('authenticated sessions can enter protected destinations', () => {
   for (const route of [AppRoute.PUBLISH, AppRoute.MESSAGE, AppRoute.CONVERSATION_DETAIL,
     AppRoute.QUOTE_FORM, AppRoute.QUOTE_DETAIL, AppRoute.ORDER_DETAIL,
+    AppRoute.DELIVERY_GALLERY, AppRoute.DELIVERY_UPLOAD, AppRoute.PHOTO_AUTHORIZATION,
+    AppRoute.ORDER_REVIEWS,
     AppRoute.ORDER, AppRoute.PROFILE]) {
     const result = NavigationPolicy.resolve(route, {}, true);
     assert.equal(result.route, route);
@@ -109,4 +117,20 @@ test('rapid repeated navigation is accepted only after the cooldown', () => {
   assert.equal(guard.accept(1349), false);
   assert.equal(guard.accept(1350), true);
   assert.equal(guard.accept(Number.NaN), false);
+});
+
+test('guest public profile preserves the existing user identity and validates it', () => {
+  const result = NavigationPolicy.resolve(AppRoute.PUBLIC_PROFILE, { userId: 12, userRole: 'PROVIDER' }, false);
+  assert.equal(result.route, AppRoute.PUBLIC_PROFILE); assert.equal(result.param.returnRoute, undefined);
+  assert.equal(result.param.userId, 12); assert.equal(result.param.userRole, 'PROVIDER');
+  assert.equal(NavigationPolicy.validPublicUserId({ userId: 0 }), undefined);
+  assert.equal(NavigationPolicy.validPublicUserRole({ userRole: 'ADMIN' }), undefined);
+});
+
+test('normal Moments login has an explicit HALL tab return without changing other login targets', () => {
+  const models = fs.readFileSync(path.join(sourceRoot, 'pages/Index.ets'), 'utf8');
+  assert.match(models, /onRequireMomentLogin:.*AppRoute.LOGIN, \{ returnRoute: AppRoute.HALL, initialTab: 1 \}/);
+  assert.equal(NavigationPolicy.loginDescription({ returnRoute: AppRoute.HALL, initialTab: 1 }), '登录后继续查看动态');
+  const existing = NavigationPolicy.resolve(AppRoute.CONVERSATION_DETAIL, { conversationId: 42 }, false);
+  assert.equal(existing.param.returnRoute, AppRoute.CONVERSATION_DETAIL); assert.equal(existing.param.conversationId, 42);
 });

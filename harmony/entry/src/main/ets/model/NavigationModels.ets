@@ -7,10 +7,19 @@ export enum AppRoute {
   QUOTE_FORM = 'QuoteForm',
   QUOTE_DETAIL = 'QuoteDetail',
   ORDER_DETAIL = 'OrderDetail',
+  DELIVERY_GALLERY = 'DeliveryGallery',
+  DELIVERY_UPLOAD = 'DeliveryUpload',
+  PHOTO_AUTHORIZATION = 'PhotoAuthorization',
+  ORDER_REVIEWS = 'OrderReviews',
   PUBLISH = 'Publish',
   MESSAGE = 'Message',
   ORDER = 'Order',
-  PROFILE = 'Profile'
+  PROFILE = 'Profile',
+  PUBLIC_PROFILE = 'PublicProfile',
+  NOTIFICATIONS = 'Notifications',
+  CREDIT = 'Credit',
+  ORDER_ENGAGEMENT = 'OrderEngagement',
+  MOMENT_DETAIL = 'MomentDetail'
 }
 
 export interface DemandDetailRouteParam {
@@ -18,11 +27,20 @@ export interface DemandDetailRouteParam {
 }
 
 export interface NavigationRouteParam {
+  readonly targetKind?: string;
+  readonly targetId?: number;
+  readonly orderId?: number;
+  readonly momentId?: number;
+  readonly userId?: number;
+  readonly userRole?: string;
+  /** Existing HALL destination can return a successful Moments login to tab 1. */
+  readonly initialTab?: number;
   readonly demandId?: number;
   readonly serviceId?: number;
   readonly conversationId?: number;
   readonly quoteId?: number;
-  readonly orderId?: number;
+  readonly deliveryId?: number;
+  readonly authorizationId?: number;
   readonly openPayment?: boolean;
   /** Protected destination requested before authentication. */
   readonly returnRoute?: AppRoute;

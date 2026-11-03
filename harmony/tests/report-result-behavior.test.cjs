@@ -1,0 +1,30 @@
+const assert=require('node:assert/strict'),{test}=require('node:test'),fs=require('node:fs'),path=require('node:path');
+const ts=require(path.join(process.env.DEVECO_SDK_HOME,'default/openharmony/ets/build-tools/ets-loader/node_modules/typescript'));
+require.extensions['.ets']=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,f);
+const source='../entry/src/main/ets/features/report/';
+const load=()=>require(source+'ReportResultController.ets');
+const row=(id=41,extra={})=>({reportId:id,reporterId:7,targetType:'MOMENT',targetId:22,reason:'不当内容',description:'仅本人说明',status:'PENDING',createdAt:'2026-10-30T10:00:00',...extra});
+const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject}};
+const tick=()=>new Promise(r=>setImmediate(r));
+function fixture(){const {ReportResultController}=load();let version=1,auth=true,userId=7,state;const reads=[],sessions=[],cancel=[];
+ const session={getSessionVersion:()=>version,isAuthenticated:()=>auth};
+ const api={currentSession:async key=>{sessions.push(key);return {userId,role:'CUSTOMER'}},cancelCurrentSession:key=>cancel.push(key),listMyReports:key=>{const d=deferred();reads.push({key,...d});return d.promise},cancelReports:(...keys)=>cancel.push(...keys)};
+ const c=new ReportResultController(api,session,s=>state=s);c.resume();return {c,reads,sessions,cancel,session,get state(){return state},change(id=8){userId=id;version++},logout(){auth=false;version++}};
+}
+async function done(f,id=0,rows=[row()]){const p=f.c.load(id);await tick();f.reads.at(-1).resolve(rows);await p;}
+test('own report detail reads session first and exact report ID; strips internal fields',async()=>{const f=fixture();await done(f,41,[row(42),row(41,{adminComment:'SECRET',adminId:999})]);assert.equal(f.sessions.length,1);assert.equal(f.state.items.length,1);assert.equal(f.state.items[0].reportId,41);assert.equal(JSON.stringify(f.state).includes('SECRET'),false);assert.equal(JSON.stringify(f.state).includes('999'),false)});
+test('own list never displays another reporter and exact missing ID does not fall back',async()=>{const f=fixture();await done(f,0,[row(41,{reporterId:8})]);assert.equal(f.state.items.length,0);assert.ok(f.state.error);await done(f,99);assert.equal(f.state.items.length,0);assert.ok(f.state.error)});
+test('invalid report IDs do not request; guest only gets login prompt',async()=>{const f=fixture();for(const id of [-1,NaN,Infinity,0.1,Number.MAX_SAFE_INTEGER+1]){await f.c.load(id);assert.ok(f.state.error)}assert.equal(f.sessions.length,0);f.logout();await f.c.load(0);assert.equal(f.state.loginRequired,true);assert.equal(f.reads.length,0)});
+test('same load shares the in-flight read while changing target cancels old result',async()=>{const f=fixture();const p=f.c.load(41),same=f.c.load(41);assert.equal(p,same);await tick();assert.equal(f.reads.length,1);const q=f.c.load(42);await tick();f.reads[1].resolve([row(42)]);await q;f.reads[0].resolve([row(41)]);await p;assert.equal(f.state.items[0].reportId,42);assert.equal(f.state.loading,false)});
+test('hidden or switched identity invalidates old success, catch and finally',async()=>{for(const reject of [false,true]){const f=fixture();const p=f.c.load(41);await tick();f.c.suspend();f.change();f.c.resume();await done(f,42,[row(42,{reporterId:8})]);if(reject)f.reads[0].reject(new Error('old'));else f.reads[0].resolve([row()]);await p;assert.equal(f.state.items[0].reportId,42);assert.equal(f.state.error,'');assert.equal(f.state.loading,false)}});
+test('identity changes without explicit suspend are detected before load/tap/response',async()=>{const f=fixture();await done(f);f.change();assert.equal(f.c.canOpen(41),false);assert.equal(f.state.items.length,0);await done(f,42,[row(42,{reporterId:8})]);assert.equal(f.c.canOpen(42),true);const p=f.c.load(41);await tick();f.change(9);f.reads.at(-1).resolve([row(41,{reporterId:8})]);await p;assert.equal(f.state.items.length,0);assert.equal(f.state.loading,false)});
+test('independent report instances only cancel their own read and unused create keys',async()=>{const a=fixture(),b=fixture();const p=a.c.load(),q=b.c.load();await tick();assert.notEqual(a.reads[0].key,b.reads[0].key);a.c.suspend();assert.ok(a.cancel.every(k=>k.startsWith(a.reads[0].key.split('.my')[0])));assert.ok(!a.cancel.includes(b.reads[0].key));a.reads[0].resolve([]);b.reads[0].resolve([row()]);await Promise.all([p,q]);assert.equal(b.state.items.length,1)});
+test('pending, safe action, recorded follow-up, malformed feedback and legacy have distinct meaning',async()=>{const cases=[
+ [{},'pending','待核查'],
+ [{status:'RESOLVED',resolution:'TAKE_DOWN',publicOutcome:'ACTION_TAKEN',publicMessage:'平台已完成审核，相关动态已下架。'},'action','已处理'],
+ [{status:'RESOLVED',resolution:'IGNORE',publicOutcome:'FOLLOW_UP',followUpRecorded:true,publicMessage:'感谢你的反馈，你的举报我们已收到并记录，后续会重点关注相关情况。'},'followUp','已反馈'],
+ [{status:'RESOLVED',resolution:'IGNORE',publicOutcome:'FOLLOW_UP',followUpRecorded:false,publicMessage:'后续重点关注'},'sync','结果待核对'],
+ [{status:'RESOLVED',resolution:'RESTORE',publicOutcome:'ACTION_TAKEN',publicMessage:'已处罚'},'sync','结果待核对'],
+ [{status:'RESOLVED',resolution:'IGNORE',adminComment:'不可以公开的备注'},'legacy','历史处理信息']
+ ];for(const [extra,outcome,label]of cases){const f=fixture();await done(f,41,[row(41,extra)]);assert.equal(f.state.items[0].outcome,outcome);assert.equal(f.state.items[0].statusLabel,label);if(outcome==='sync'||outcome==='legacy')assert.ok(!f.state.items[0].message.includes('重点关注'));}});
+test('malformed arrays, duplicate IDs, nonnumeric target and failed read stay empty with retryable error',async()=>{for(const rows of [null,[row(),row()],[row(41,{targetId:'22'})]]){const f=fixture();await done(f,41,rows);assert.equal(f.state.items.length,0);assert.ok(f.state.error)}const f=fixture(),p=f.c.load();await tick();f.reads[0].reject(new Error('offline'));await p;assert.equal(f.state.loading,false);assert.ok(f.state.error);await done(f);assert.equal(f.state.error,'')});

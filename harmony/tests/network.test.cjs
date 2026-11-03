@@ -67,23 +67,23 @@ test('avatar binary uses authenticated no-cache GET and rejects stale or oversiz
   assert.equal(call.options.header.Authorization, 'Bearer avatar-token');
   assert.equal(call.options.expectDataType, 2);
   assert.equal(call.options.usingCache, false);
-  call.resolve({ responseCode: 200, result: new ArrayBuffer(12) });
+  call.resolve({ responseCode: 200, header: { 'content-type': 'image/jpeg' }, result: new ArrayBuffer(12) });
   assert.equal((await pending).byteLength, 12);
 
   const oversized = client.getBinary('/files/9/thumbnail', 'avatar.9');
-  calls.at(-1).resolve({ responseCode: 200, result: new ArrayBuffer(2 * 1024 * 1024 + 1) });
+  calls.at(-1).resolve({ responseCode: 200, header: { 'content-type': 'image/jpeg' }, result: new ArrayBuffer(2 * 1024 * 1024 + 1) });
   await assert.rejects(oversized, hasKind('parse'));
 
   const stale = client.getBinary('/files/9/thumbnail', 'avatar.9');
   const oldCall = calls.at(-1);
   const current = client.getBinary('/files/9/thumbnail', 'avatar.9');
-  calls.at(-1).resolve({ responseCode: 200, result: new ArrayBuffer(1) });
-  oldCall.resolve({ responseCode: 200, result: new ArrayBuffer(1) });
+  calls.at(-1).resolve({ responseCode: 200, header: { 'content-type': 'image/jpeg' }, result: new ArrayBuffer(1) });
+  oldCall.resolve({ responseCode: 200, header: { 'content-type': 'image/jpeg' }, result: new ArrayBuffer(1) });
   assert.equal((await current).byteLength, 1);
   await assert.rejects(stale, hasKind('stale'));
 });
 
-for (const result of ['null', '[]', '{}', 'true', '<html>failure</html>',
+for (const result of ['null', '[]', '{}', 'true',
   '{"code":"200","message":"success","data":[]}', '{"code":200,"message":"success"}',
   '{"code":200,"data":[]}', new ArrayBuffer(4)]) {
   test(`malformed envelope is a parse error: ${String(result)}`, async () => {
@@ -96,10 +96,46 @@ for (const result of ['null', '[]', '{}', 'true', '<html>failure</html>',
 }
 
 test('HTTP failures are checked before parsing the body', async () => {
-  for (const status of [401, 403, 404, 503]) {
+  for (const status of [401, 403, 404, 500, 503]) {
     const promise = new HttpClient().get('/test');
     calls.at(-1).resolve({ responseCode: status, result: '<html>error</html>' });
     await assert.rejects(promise, error => error.kind === 'http' && error.httpStatus === status);
+  }
+});
+
+test('HTTP 200 SPA fallback is a routing error, including missing or misleading content-type', async () => {
+  for (const header of [{ 'Content-Type': 'text/html; charset=utf-8' },
+    { 'content-type': 'application/xhtml+xml' }, { 'Content-Type': 'application/json' }, {}]) {
+    const promise = new HttpClient().get('/privacy/consent');
+    calls.at(-1).resolve({ responseCode: 200, header, result: '  <!doctype html><html>private-body</html>' });
+    await assert.rejects(promise, error => error.kind === 'config' && error.httpStatus === 200 &&
+      error.message.includes('API 路由') && !error.message.includes('private-body'));
+  }
+});
+
+test('content-type, JSON syntax and response envelope failures have distinct safe messages', async () => {
+  for (const [header, result, kind, message] of [
+    [{ 'content-type': 'text/plain' }, 'gateway-private-details', 'config', /未返回 JSON/],
+    [{ 'content-type': 'application/json' }, '{broken', 'parse', /格式无法识别/],
+    [{ 'content-type': 'application/json' }, '{"code":"200","message":"ok","data":null}', 'parse', /结构与客户端不兼容/]
+  ]) {
+    const promise = new HttpClient().get('/privacy/consent');
+    calls.at(-1).resolve({ responseCode: 200, header, result });
+    await assert.rejects(promise, error => error.kind === kind && message.test(error.message) &&
+      !error.message.includes('private-details'));
+  }
+});
+
+test('JSON content types preserve the numeric business contract and never accept code zero as consent success', async () => {
+  for (const mime of ['application/json; charset=utf-8', 'application/problem+json']) {
+    for (const code of [0, 200, 40101, 40301, 40302, 40401, 50001]) {
+      const promise = new HttpClient().get('/privacy/consent');
+      calls.at(-1).resolve({ responseCode: 200, header: { 'CONTENT-TYPE': mime },
+        result: JSON.stringify({ code, message: 'SQL private-server-details', data: null }) });
+      if (code === 200) assert.equal(await promise, null);
+      else await assert.rejects(promise, error => error.kind === 'business' && error.businessCode === code &&
+        !error.message.includes('private-server-details'));
+    }
   }
 });
 
@@ -242,7 +278,7 @@ test('business read-only pages use the existing API paths and authentication bou
   const detail = api.getDemand(12);
   let call = calls.at(-1);
   assert.equal(call.url, EnvironmentConfig.current().baseUrl + '/demands/12');
-  assert.equal(call.options.header.Authorization, undefined);
+  assert.equal(call.options.header.Authorization, 'Bearer current-token');
   complete(call, { demandId: 12, scene: '校园摄影' });
   assert.equal((await detail).demandId, 12);
 
@@ -332,7 +368,7 @@ test('appointment flow uses authenticated demand, conversation and quote endpoin
   const service = api.getServicePackage(21);
   const call = calls.at(-1);
   assert.equal(call.url, EnvironmentConfig.current().baseUrl + '/service-packages/21');
-  assert.equal(call.options.header.Authorization, undefined);
+  assert.equal(call.options.header.Authorization, 'Bearer appointment-token');
   complete(call, { serviceId: 21, title: '自然人像' });
   assert.equal((await service).serviceId, 21);
 });
@@ -345,7 +381,7 @@ test('hall queries forward only supported backend filters and stable sorting', a
     timeTag: 'weekend', keyword: '校园 写真', sort: 'recommend', feedSeed: 'device-a' });
   let call = calls.at(-1);
   assert.equal(call.url, EnvironmentConfig.current().baseUrl +
-    '/service-packages?page=2&size=20&cityCode=320100&scene=%E4%BA%BA%E5%83%8F&style=%E8%87%AA%E7%84%B6' +
+    '/service-packages?page=2&size=20&cityCode=JS&scene=%E4%BA%BA%E5%83%8F&style=%E8%87%AA%E7%84%B6' +
     '&minPriceCent=10000&maxPriceCent=80000&availableDate=2026-11-01&timeTag=weekend' +
     '&keyword=%E6%A0%A1%E5%9B%AD%20%E5%86%99%E7%9C%9F&sort=recommend&feedSeed=device-a');
   complete(call, { records: [], page: 2, size: 20, total: 0 });
@@ -355,7 +391,7 @@ test('hall queries forward only supported backend filters and stable sorting', a
     styleTag: '纪实', minBudgetCent: 20000, sort: 'latest', feedSeed: 'device-a' });
   call = calls.at(-1);
   assert.equal(call.url, EnvironmentConfig.current().baseUrl +
-    '/demands?page=1&size=20&cityCode=310000&status=OPEN&styleTag=%E7%BA%AA%E5%AE%9E' +
+    '/demands?page=1&size=20&cityCode=SH&status=OPEN&styleTag=%E7%BA%AA%E5%AE%9E' +
     '&minBudgetCent=20000&sort=latest&feedSeed=device-a');
   complete(call, { records: [], page: 1, size: 20, total: 0 });
   await demands;

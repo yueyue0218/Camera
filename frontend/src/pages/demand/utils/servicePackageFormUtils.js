@@ -1,3 +1,4 @@
+import { provinceCode, requireProvinceCode } from '../../../common/region/ProvinceCatalog.js'
 import { yuanToCent } from '../../../utils/index.js'
 import { fileIdsFromValues } from '../../../api/fileApi.js'
 import {
@@ -79,7 +80,7 @@ export function createDefaultServicePackageForm() {
 export function validateServicePackageForm(form) {
   const errors = []
   if (!form.title.trim()) errors.push('请填写橱窗标题')
-  if (!form.cityCode.trim()) errors.push('请填写城市')
+  if (!provinceCode(form.cityCode)) errors.push('请选择有效的省级地区')
   if (!form.scene.trim()) errors.push('请填写拍摄场景')
   if (!form.timeDescription.trim()) errors.push('请填写时间说明')
   if (Number(form.basePriceYuan) <= 0) errors.push('基础价格必须大于 0')
@@ -109,7 +110,7 @@ export function buildServicePackagePayload(form) {
   const publicImages = manualImages.filter(image => !fileIdsFromValues(image).length)
   return {
     title: form.title.trim(),
-    cityCode: form.cityCode.trim(),
+    cityCode: requireProvinceCode(form.cityCode),
     serviceArea: form.serviceArea.trim() || null,
     scene: form.scene.trim(),
     styleTags: Array.from(styleTags),
@@ -140,7 +141,7 @@ export function servicePackageDetailToForm(service = {}) {
   const maxPriceYuan = maxPriceFromRange(service.priceRange, DEFAULT_BUDGET_MAX_YUAN)
   return {
     title: service.title || '校园写真橱窗',
-    cityCode: service.cityCode || DEFAULT_CITY_CODE,
+    cityCode: provinceCode(service.cityCode),
     serviceArea: service.serviceArea || '',
     scene: service.scene || DEFAULT_TYPE,
     styleTagsText: Array.isArray(service.styleTags) ? service.styleTags.join(',') : '',

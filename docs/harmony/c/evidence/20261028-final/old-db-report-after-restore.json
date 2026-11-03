@@ -1,0 +1,11 @@
+{
+  "origin": "http://127.0.0.1:18088",
+  "database": "portra_c_admin_20261027",
+  "reportId": 2,
+  "reporterId": 3,
+  "targetType": "MOMENT",
+  "targetId": 2,
+  "reason": "C-FINAL-SHARED-REPORT-20261028",
+  "status": "RESOLVED",
+  "readOnlyAfterWebRestore": true
+}

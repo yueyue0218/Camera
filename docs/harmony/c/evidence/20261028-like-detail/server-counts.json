@@ -1,0 +1,54 @@
+[
+  {
+    "stage": "before",
+    "timestamp": "2026-10-28T08:54:42.775Z",
+    "origin": "http://127.0.0.1:18088",
+    "database": "portra_c_admin_20261027",
+    "momentId": 1,
+    "viewerId": 2,
+    "title": "C-NATIVE-20261027-TEST-ONLY",
+    "likeCount": 0,
+    "detailImages": 5,
+    "feedImages": 3,
+    "readOnlyObserver": true
+  },
+  {
+    "stage": "liked",
+    "timestamp": "2026-10-28T08:55:25.926Z",
+    "origin": "http://127.0.0.1:18088",
+    "database": "portra_c_admin_20261027",
+    "momentId": 1,
+    "viewerId": 2,
+    "title": "C-NATIVE-20261027-TEST-ONLY",
+    "likeCount": 1,
+    "detailImages": 5,
+    "feedImages": 3,
+    "readOnlyObserver": true
+  },
+  {
+    "stage": "unliked",
+    "timestamp": "2026-10-28T08:58:17.964Z",
+    "origin": "http://127.0.0.1:18088",
+    "database": "portra_c_admin_20261027",
+    "momentId": 1,
+    "viewerId": 2,
+    "title": "C-NATIVE-20261027-TEST-ONLY",
+    "likeCount": 0,
+    "detailImages": 5,
+    "feedImages": 3,
+    "readOnlyObserver": true
+  },
+  {
+    "stage": "detail",
+    "timestamp": "2026-10-28T09:02:38.906Z",
+    "origin": "http://127.0.0.1:18088",
+    "database": "portra_c_admin_20261027",
+    "momentId": 1,
+    "viewerId": 2,
+    "title": "C-NATIVE-20261027-TEST-ONLY",
+    "likeCount": 0,
+    "detailImages": 5,
+    "feedImages": 3,
+    "readOnlyObserver": true
+  }
+]

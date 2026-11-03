@@ -1,0 +1,82 @@
+node:internal/modules/cjs/loader:1459
+  throw err;
+  ^
+
+Error: Cannot find module '../entry/src/main/ets/features/moments/MomentOwnerActions.ets'
+Require stack:
+- C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\moment-owner-actions.test.cjs
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)
+    at Module._load (node:internal/modules/cjs/loader:1242:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1556:12)
+    at require (node:internal/modules/helpers:152:16)
+    at Object.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\moment-owner-actions.test.cjs:4:28)
+    at Module._compile (node:internal/modules/cjs/loader:1812:14)
+    at Object..js (node:internal/modules/cjs/loader:1943:10) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\LiXiaozhou\\.codex\\worktrees\\harmony-c-ui-polish\\Camera\\harmony\\tests\\moment-owner-actions.test.cjs'
+  ]
+}
+
+Node.js v24.14.1
+✖ harmony\tests\moment-owner-actions.test.cjs (394.7314ms)
+✔ publishing validates and snapshots 50/200 chars and real images, one POST only (2.9745ms)
+✔ image selection is limited to nine and a stale picker cannot add to a reopened draft (0.545ms)
+✔ late success error and finally never alter a new account draft (0.831ms)
+✔ unknown result survives close/reopen and never blindly reposts (0.4243ms)
+✔ close cancels only its own instance keys and a late success cannot report success (0.5365ms)
+✔ wrong author response never creates fake publish success (0.3615ms)
+✔ large unadapted image data never reaches the POST payload (1.04ms)
+✔ a reopened same-account view reacts when an older pending publish settles (0.4881ms)
+✔ identity changes while the same publish view is open clear its old draft and busy state (0.3857ms)
+✖ editing preloads GET complete album and preserves mentions across real update (7.4186ms)
+✖ editing refuses foreign objects and never truncates an existing long body on load (2.6472ms)
+✖ an edit response for another moment cannot confirm success, and edits never replay blindly (0.9606ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 9
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 715.186
+
+✖ failing tests:
+
+test at harmony\tests\moment-owner-actions.test.cjs:1:1
+✖ harmony\tests\moment-owner-actions.test.cjs (394.7314ms)
+  'test failed'
+
+test at harmony\tests\moment-publish.test.cjs:35:1
+✖ editing preloads GET complete album and preserves mentions across real update (7.4186ms)
+  TypeError: Cannot read properties of undefined (reading 'id')
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\moment-publish.test.cjs:37:26)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+
+test at harmony\tests\moment-publish.test.cjs:41:1
+✖ editing refuses foreign objects and never truncates an existing long body on load (2.6472ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  0 !== 201
+
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\moment-publish.test.cjs:43:79)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 201,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at harmony\tests\moment-publish.test.cjs:45:1
+✖ an edit response for another moment cannot confirm success, and edits never replay blindly (0.9606ms)
+  TypeError: Cannot read properties of undefined (reading 'resolve')
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\moment-publish.test.cjs:46:97)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)

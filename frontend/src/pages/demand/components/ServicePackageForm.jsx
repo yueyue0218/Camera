@@ -52,8 +52,9 @@ export function ServicePackageForm({ form, errors, uploading, onChange, onSubmit
               <input value={form.title} onChange={event => onChange('title', event.target.value)} placeholder="例如：清透校园写真 / 南京可约" />
             </div>
             <div className="field">
-              <label>城市</label>
+              <label>服务地区</label>
               <select value={form.cityCode} onChange={event => onChange('cityCode', event.target.value)}>
+                <option value="">请选择省级地区</option>
                 {CITY_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </div>

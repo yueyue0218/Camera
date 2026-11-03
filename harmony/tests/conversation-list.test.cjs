@@ -26,12 +26,48 @@ test('list accepts a participant and rejects malformed or foreign conversations'
   assert.equal(ConversationListModel.validSummary(summary, 3), false);
 });
 
+test('profile targets use participant IDs and return to the conversation', () => {
+  assert.equal(ConversationListModel.peerRole(summary), 'PROVIDER');
+  assert.equal(ConversationListModel.peerRole({ ...summary, otherUserId: 1 }), 'CUSTOMER');
+  const detail = fs.readFileSync(path.join(sourceRoot, 'pages/ConversationDetailPage.ets'), 'utf8');
+  const index = fs.readFileSync(path.join(sourceRoot, 'pages/Index.ets'), 'utf8');
+  assert.match(detail, /onOpenPeer\?\.\(this\.conversation\.otherUserId, ConversationListModel\.peerRole/);
+  assert.match(detail, /onOpenSelf\?\.\(\)/);
+  assert.match(index, /onOpenSelf: \(\) => this\.openOwnProfileFromDetail\(\)/);
+  assert.match(index, /this\.pushRoute\(AppRoute\.PROFILE, \{\}\)/);
+  assert.match(index, /onBack: \(\) => this\.appPathStack\.pop\(\)/);
+  const order = fs.readFileSync(path.join(sourceRoot, 'pages/OrderDetailPage.ets'), 'utf8');
+  const quote = fs.readFileSync(path.join(sourceRoot, 'pages/QuoteDetailPage.ets'), 'utf8');
+  const reviews = fs.readFileSync(path.join(sourceRoot, 'pages/OrderReviewsPage.ets'), 'utf8');
+  assert.match(order, /this\.order!\.providerUserId \?\? 0, 'PROVIDER'/);
+  assert.match(order, /this\.order!\.customerId \?\? 0, 'CUSTOMER'/);
+  assert.match(quote, /this\.quote!\.providerUserId === this\.userId/);
+  assert.match(reviews, /review\.reviewerId === this\.order\.providerUserId/);
+});
+
 test('normal Chinese names and image/file previews are preserved', () => {
   assert.equal(ConversationListModel.safeName({ userId: 2, nickname: '林屿' }), '林屿');
   assert.equal(ConversationListModel.preview([{ messageType: 'IMAGE' }]), '[图片]');
   assert.equal(ConversationListModel.preview([{ messageType: 'FILE', fileName: '作品.zip' }]), '[附件] 作品.zip');
   assert.equal(ConversationListModel.preview([]), '开始对话');
   assert.equal(ConversationListModel.preview([{ messageType: 'TEXT', content: 'online-check provider reply message' }]), null);
+});
+
+test('message list dates use compact familiar labels', () => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 14, 28);
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 20, 14);
+  assert.equal(ConversationListModel.timeLabel(today.toISOString()), '14:28');
+  assert.equal(ConversationListModel.timeLabel(yesterday.toISOString()), '昨天 20:14');
+  assert.equal(ConversationListModel.timeLabel('invalid'), '');
+});
+
+test('message list keeps search and long-press hide without row action buttons', () => {
+  const page = fs.readFileSync(path.join(sourceRoot, 'pages/MessagePage.ets'), 'utf8');
+  assert.match(page, /搜索联系人或最近消息/);
+  assert.match(page, /filteredConversations\(\)/);
+  assert.match(page, /LongPressGesture\(\)\.onAction\(\(\) =>\s*this\.confirmHide/);
+  assert.doesNotMatch(page, /Button\('查看'\)/);
 });
 
 test('memory list cannot be read with another token or account', () => {

@@ -1,0 +1,53 @@
+# Widget Tree Analysis
+
+- **Generated**: 2026-10-28 18:38:22
+- **Mode**: Interactive Only
+
+---
+
+## Widget Tree
+
+- Text 动态 [id:8] [top: 205, left: 70, width: 154, height: 90]
+- Text MOMENTS [id:9] [top: 306, left: 70, width: 192, height: 45]
+- Button 刷新 [id:11] [top: 215, left: 1013, width: 197, height: 126]
+- Button 最新 [id:13] [top: 458, left: 56, width: 371, height: 140]
+- Button 热门 [id:14] [top: 458, left: 455, width: 371, height: 140]
+- Button 关注 [id:15] [top: 458, left: 853, width: 371, height: 140]
+- Scroll [id:16] [top: 633, left: 0, width: 1280, height: 1863]
+  - Text 约 [id:21] [top: -560, left: 136, width: 99, height: 105]
+  - Button 约拍用户 #2 [id:23] [top: -606, left: 297, width: 270, height: 140]
+  - Text 2026-10-28 18:04 [id:24] [top: -455, left: 297, width: 322, height: 45]
+  - Text No. 2 [id:25] [top: -531, left: 1073, width: 92, height: 45]
+  - Text C-FINAL-DUAL-20261028-TEST-ONLY-B [id:26] [top: -368, left: 115, width: 1050, height: 148]
+  - Text Fresh local dual-role and report ambiguity acceptance only. [id:27] [top: -178, left: 115, width: 1050, height: 148]
+  - Text 预览 3 张 [id:31] [top: 633, left: 909, width: 221, height: 79]
+  - Button 点赞 0 [id:33] [top: 820, left: 115, width: 511, height: 140]
+  - Button 收藏 0 [id:34] [top: 820, left: 654, width: 511, height: 140]
+  - Text 约拍记录 [id:36] [top: 1036, left: 115, width: 211, height: 73]
+  - Button 查看详情 [id:38] [top: 1002, left: 659, width: 281, height: 140]
+  - Button 举报 [id:39] [top: 1002, left: 968, width: 197, height: 140]
+  - Text 举报动态 #2 · C-FINAL-DUAL-20261028-TEST-ONLY-B [id:41] [top: 1271, left: 98, width: 1084, height: 49]
+  - Text 举报结果待核实，请勿重复提交 [id:43] [top: 1383, left: 98, width: 589, height: 49]
+  - Button 核实结果 [id:44] [top: 1467, left: 98, width: 336, height: 140]
+  - Text 举报结果未确认，服务器可能已写入。请核实结果，不要重复提交。 [id:45] [top: 1642, left: 98, width: 1084, height: 98]
+  - Button 关闭举报 [id:46] [top: 1803, left: 500, width: 281, height: 140]
+  - Text 约 [id:51] [top: 2146, left: 136, width: 99, height: 105]
+  - Button 约拍用户 #2 [id:53] [top: 2100, left: 297, width: 270, height: 140]
+  - Text 2026-10-28 18:04 [id:54] [top: 2251, left: 297, width: 322, height: 45]
+  - Text No. 1 [id:55] [top: 2175, left: 1073, width: 92, height: 45]
+  - Text C-FINAL-DUAL-20261028-TEST-ONLY-A [id:56] [top: 2338, left: 115, width: 1050, height: 148]
+  - Text Fresh local dual-role and report ambiguity acceptance only. [id:57] [top: 2528, left: 115, width: 1050, height: 148]
+  - Text 预览 3 张 [id:61] [top: 3339, left: 909, width: 221, height: 79]
+  - Button 点赞 0 [id:63] [top: 3526, left: 115, width: 511, height: 140]
+  - Button 收藏 0 [id:64] [top: 3526, left: 654, width: 511, height: 140]
+  - Text 约拍记录 [id:66] [top: 3742, left: 115, width: 211, height: 73]
+  - Button 查看详情 [id:68] [top: 3708, left: 659, width: 281, height: 140]
+  - Button 举报 [id:69] [top: 3708, left: 968, width: 197, height: 140]
+- Button Button [id:71] [top: 2499, left: 70, width: 285, height: 235]
+  - Text 大厅 [id:75] [top: 2652, left: 174, width: 78, height: 45]
+- Button Button [id:76] [top: 2499, left: 355, width: 285, height: 235]
+  - Text 动态 [id:80] [top: 2652, left: 459, width: 78, height: 45]
+- Button Button [id:81] [top: 2499, left: 640, width: 285, height: 235]
+  - Text 消息 [id:85] [top: 2652, left: 744, width: 78, height: 45]
+- Button Button [id:86] [top: 2499, left: 925, width: 285, height: 235]
+  - Text 我的 [id:90] [top: 2652, left: 1029, width: 78, height: 45]

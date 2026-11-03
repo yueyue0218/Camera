@@ -1,5 +1,7 @@
+import { KeyboardAvoidMode } from '@kit.ArkUI';
 import { AppClient } from '../app/AppClient';
 import { PortraPageHeading } from '../common/components/PortraPageHeading';
+import { PortraLoading } from '../common/components/PortraLoading';
 import { QuoteDraftStore } from '../features/conversation/QuoteDraftStore';
 import { QuoteDraft, QuoteWorkflow } from '../features/conversation/QuoteWorkflow';
 import { CreateQuotePayload, QuoteSummary } from '../model/ApiModels';
@@ -21,14 +23,23 @@ export struct QuoteFormPage {
   private requestVersion: number = 0;
   private draftTimer: number = -1;
   private finished: boolean = false;
+  private loadedSessionVersion: number = -1;
+  private previousKeyboardAvoidMode?: KeyboardAvoidMode;
   onBack?: () => void;
   onSaved?: () => void;
 
   aboutToAppear(): void {
+    this.previousKeyboardAvoidMode = this.getUIContext().getKeyboardAvoidMode();
+    this.getUIContext().setKeyboardAvoidMode(KeyboardAvoidMode.RESIZE);
+    if (this.ready && this.loadedSessionVersion === AppClient.shared.sessionManager.getSessionVersion()) return;
     this.load();
   }
 
   aboutToDisappear(): void {
+    if (this.previousKeyboardAvoidMode !== undefined) {
+      this.getUIContext().setKeyboardAvoidMode(this.previousKeyboardAvoidMode);
+      this.previousKeyboardAvoidMode = undefined;
+    }
     this.requestVersion++;
     if (this.draftTimer >= 0) clearTimeout(this.draftTimer);
     this.draftTimer = -1;
@@ -39,9 +50,14 @@ export struct QuoteFormPage {
 
   private async load(): Promise<void> {
     const version = ++this.requestVersion;
+    this.errorMessage = '';
     try {
       const session = await this.api.currentSession();
       if (version !== this.requestVersion) return;
+      if (this.userId !== session.userId) {
+        this.draft = QuoteWorkflow.empty();
+        this.ready = false;
+      }
       this.userId = session.userId;
       if (this.quoteId > 0) {
         const quotes = await this.api.listQuotes(this.conversationId);
@@ -56,6 +72,7 @@ export struct QuoteFormPage {
       this.original = JSON.stringify(this.draft);
       const saved = QuoteDraftStore.read(this.userId, this.conversationId, this.quoteId);
       if (saved !== undefined) this.draft = saved;
+      this.loadedSessionVersion = AppClient.shared.sessionManager.getSessionVersion();
       this.ready = true;
     } catch (error) {
       if (version === this.requestVersion) this.errorMessage = (error as PortraError).message || '暂时无法打开报价';
@@ -78,17 +95,17 @@ export struct QuoteFormPage {
     this.update(QuoteWorkflow.withField(this.draft, name, value));
   }
 
-  private chooseDate(name: string, current: string): void {
-    const parsed = new Date(current.replace(' ', 'T'));
-    const selected = Number.isNaN(parsed.getTime()) ? new Date(Date.now() + 86400000) : parsed;
-    this.getUIContext().showDatePickerDialog({ selected: selected, showTime: true, useMilitaryTime: true,
+  private dateValue(name: string): string {
+    return name === 'shootStart' ? this.draft.shootStart :
+      name === 'shootEnd' ? this.draft.shootEnd : this.draft.delivery;
+  }
+
+  private chooseDate(name: string): void {
+    this.getUIContext().showDatePickerDialog({ selected: QuoteWorkflow.selectedDate(this.draft, name),
+      showTime: true, useMilitaryTime: true,
       onDateAccept: (date: Date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const hour = String(date.getHours()).padStart(2, '0');
-        const minute = String(date.getMinutes()).padStart(2, '0');
-        this.field(name, `${year}-${month}-${day} ${hour}:${minute}`);
+        this.update(QuoteWorkflow.withSelectedDate(this.draft, name, date));
+        if (this.userId > 0) QuoteDraftStore.write(this.userId, this.conversationId, this.quoteId, this.draft);
       } });
   }
 
@@ -125,23 +142,27 @@ export struct QuoteFormPage {
   }
 
   @Builder
-  private Field(label: string, value: string, hint: string, onChange: (text: string) => void) {
+  private Field(label: string, value: string, hint: string, inputType: InputType,
+    onChange: (text: string) => void) {
     Column({ space: 6 }) {
       Text(label).fontSize(13).fontColor(PortraTheme.secondaryText)
       TextInput({ text: value, placeholder: hint })
+        .type(inputType)
         .height(48).enabled(this.ready).backgroundColor(PortraTheme.surface).borderRadius(6)
         .onChange(onChange)
     }.alignItems(HorizontalAlign.Start).width('100%')
   }
 
   @Builder
-  private DateField(label: string, name: string, value: string) {
+  private DateField(label: string, name: string) {
     Column({ space: 6 }) {
       Text(label).fontSize(13).fontColor(PortraTheme.secondaryText)
-      Button(value || '选择日期和时间').height(48).width('100%').borderRadius(6)
-        .enabled(this.ready)
-        .backgroundColor(PortraTheme.surface).fontColor(PortraTheme.primaryText)
-        .onClick(() => this.chooseDate(name, value))
+      Row() {
+        Text(this.dateValue(name) ? this.dateValue(name).replace(/^(\d{4})-(\d{2})-(\d{2}) /, '$1年$2月$3日  ') : '')
+          .fontSize(15).fontColor(PortraTheme.primaryText).layoutWeight(1)
+        Image($r('app.media.ic_calendar')).width(20).height(20)
+      }.height(48).width('100%').padding({ left: 14, right: 14 }).borderRadius(6)
+        .backgroundColor(PortraTheme.surface).onClick(() => { if (this.ready) this.chooseDate(name); })
     }.alignItems(HorizontalAlign.Start).width('100%')
   }
 
@@ -159,25 +180,33 @@ export struct QuoteFormPage {
     Stack({ alignContent: Alignment.Bottom }) {
       Column() {
       PortraPageHeading({ title: this.quoteId > 0 ? '编辑报价' : '发送报价', eyebrow: '', onBack: () => this.close() })
+      if (!this.ready && !this.errorMessage) {
+        PortraLoading({ label: '正在打开报价' }).layoutWeight(1)
+      } else if (!this.ready) {
+        Column({ space: 16 }) {
+          Text(this.errorMessage).fontSize(14).fontColor(PortraTheme.danger)
+          Button('重新打开').onClick(() => this.load())
+        }.width('100%').padding(20).layoutWeight(1)
+      } else {
       Scroll() {
         Column({ space: 16 }) {
           Text('拍摄安排').fontSize(17).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
-          this.DateField('开始时间', 'shootStart', this.draft.shootStart)
-          this.DateField('结束时间', 'shootEnd', this.draft.shootEnd)
-          this.Field('拍摄地点', this.draft.location, '填写见面地点', (value: string) =>
+          this.DateField('开始时间', 'shootStart')
+          this.DateField('结束时间', 'shootEnd')
+          this.Field('拍摄地点', this.draft.location, '', InputType.Normal, (value: string) =>
             this.field('location', value))
           Divider().color(PortraTheme.border)
           Text('服务内容').fontSize(17).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
-          this.Field('费用（元）', this.draft.amount, '0.00', (value: string) =>
+          this.Field('费用（元）', this.draft.amount, '', InputType.NUMBER_DECIMAL, (value: string) =>
             this.field('amount', value))
-          this.LongField('拍摄服务', this.draft.service, '写明拍摄内容', 'service')
-          this.Field('原片数量', this.draft.originals, '0', (value: string) =>
+          this.LongField('拍摄服务', this.draft.service, '', 'service')
+          this.Field('原片数量', this.draft.originals, '', InputType.Number, (value: string) =>
             this.field('originals', value))
-          this.Field('精修数量', this.draft.refined, '0', (value: string) =>
+          this.Field('精修数量', this.draft.refined, '', InputType.Number, (value: string) =>
             this.field('refined', value))
           Divider().color(PortraTheme.border)
           Text('交付约定').fontSize(17).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
-          this.DateField('最晚交付', 'delivery', this.draft.delivery)
+          this.DateField('最晚交付', 'delivery')
           Text('图片使用').fontSize(13).fontColor(PortraTheme.secondaryText)
           Row({ space: 8 }) {
             Button('仅供个人使用').backgroundColor(this.draft.usage === 'PERSONAL_ONLY' ?
@@ -191,12 +220,13 @@ export struct QuoteFormPage {
               .fontColor(this.draft.usage === 'NEGOTIABLE' ? PortraTheme.white : PortraTheme.primaryText)
               .onClick(() => this.field('usage', 'NEGOTIABLE'))
           }
-          this.LongField('服务条款', this.draft.terms, '双方约定的服务内容', 'terms')
-          this.LongField('其他约定', this.draft.contract, '需要明确的事项', 'contract')
+          this.LongField('服务条款', this.draft.terms, '', 'terms')
+          this.LongField('其他约定', this.draft.contract, '', 'contract')
           this.LongField('备注', this.draft.remark, '选填', 'remark')
         }
         .alignItems(HorizontalAlign.Start).padding({ left: 20, right: 20, top: 18, bottom: 28 })
-      }.layoutWeight(1).scrollBar(BarState.Off)
+      }.align(Alignment.TopStart).layoutWeight(1).scrollBar(BarState.Off)
+      }
       if (this.errorMessage) {
         Text(this.errorMessage).fontSize(12).fontColor(PortraTheme.danger).padding({ left: 20, right: 20 })
       }
@@ -204,7 +234,7 @@ export struct QuoteFormPage {
         Button(this.busy ? '正在保存' : this.quoteId > 0 ? '保存修改' : '发送报价')
           .enabled(!this.busy && this.ready).height(48).width('100%').borderRadius(6).onClick(() => this.save())
       }.width('100%').padding({ left: 20, right: 20, top: 10, bottom: 16 })
-      }.width('100%').height('100%').backgroundColor(PortraTheme.pageBackground)
+      }.width('100%').height('100%').backgroundColor(PortraTheme.workflowBackground)
       if (this.confirmDiscard) {
         Column() {
           Blank().layoutWeight(1)
@@ -212,6 +242,10 @@ export struct QuoteFormPage {
             Text('放弃本次修改？').fontSize(17).fontWeight(FontWeight.Bold)
             Row({ space: 12 }) {
               Button('继续编辑').onClick(() => this.confirmDiscard = false)
+              Button('保存草稿').onClick(() => {
+                if (this.userId > 0) QuoteDraftStore.write(this.userId, this.conversationId, this.quoteId, this.draft);
+                this.onBack?.();
+              })
               Button('放弃修改').onClick(() => {
                 this.finished = true;
                 QuoteDraftStore.clear(this.userId, this.conversationId, this.quoteId);

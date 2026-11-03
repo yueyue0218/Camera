@@ -54,3 +54,29 @@ test('failed and uncertain messages keep their original content and ID for retry
     assert.equal(ConversationMessageState.retryForContent([item], 2, '保留'), undefined);
   }
 });
+
+test('picked image keeps its preview and uploaded ID across polling and retry', () => {
+  const pending = ConversationMessageState.pendingAttachment(7, 1, 'IMAGE', 'photo.jpg',
+    'image/jpeg', 2048, 'file://picked/photo.jpg', '', '2026-10-29T14:00:00');
+  const uploaded = ConversationMessageState.uploaded([pending], pending.messageId, 91)[0];
+  const failed = ConversationMessageState.status([uploaded], pending.messageId, SendStatus.FAILED)[0];
+  assert.equal(failed.fileId, 91);
+  assert.equal(failed.localUri, 'file://picked/photo.jpg');
+  assert.equal(ConversationMessageState.retryForContent([failed], 1, ''), undefined);
+  const remote = { messageId: 55, conversationId: 7, senderId: 1, messageType: 'IMAGE',
+    fileId: 91, createdAt: '2026-10-29T14:00:01' };
+  const merged = ConversationMessageState.merge([failed], [remote]);
+  assert.deepEqual(merged.map(item => item.messageId), [55]);
+  assert.equal(merged[0].localUri, 'file://picked/photo.jpg');
+  assert.equal(ConversationMessageState.confirm(merged, pending.messageId, remote)[0].localUri,
+    'file://picked/photo.jpg');
+});
+
+test('simultaneous pending photos remain in picked order', () => {
+  const first = ConversationMessageState.pendingAttachment(7, 1, 'IMAGE', 'one.jpg',
+    'image/jpeg', 10, 'one', '', '2026-10-29T14:00:00');
+  const second = ConversationMessageState.pendingAttachment(7, 1, 'IMAGE', 'two.jpg',
+    'image/jpeg', 10, 'two', '', '2026-10-29T14:00:00');
+  assert.deepEqual(ConversationMessageState.merge([second, first], []).map(item => item.messageId),
+    [first.messageId, second.messageId]);
+});

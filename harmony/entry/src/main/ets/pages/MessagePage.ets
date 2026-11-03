@@ -1,33 +1,57 @@
+import { NotificationTarget } from '../features/notifications/NotificationTargetResolver';
+import { NotificationPage } from './NotificationPage';
 import { image } from '@kit.ImageKit';
+import { uiObserver } from '@kit.ArkUI';
 import { AppClient } from '../app/AppClient';
 import { PortraAvatar } from '../common/components/PortraAvatar';
 import { PortraEmptyView } from '../common/components/PortraEmptyView';
 import { PortraErrorView } from '../common/components/PortraErrorView';
 import { PortraLoading } from '../common/components/PortraLoading';
-import { PortraPageHeading } from '../common/components/PortraPageHeading';
 import { ConversationListItem, ConversationListModel } from '../features/conversation/ConversationListModel';
 import { ConversationMemory } from '../features/conversation/ConversationMemory';
-import { ConversationVisibility } from '../features/conversation/ConversationVisibility';
-import { ConversationSummary } from '../model/ApiModels';
+import { MomentFeedLifecycle } from '../features/moments/MomentFeedLifecycle';
+import { ConversationSummary, UserBrief } from '../model/ApiModels';
 import { ErrorKind, PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
 
 @Component
 export struct MessagePage {
+  @Prop @Watch('refreshTab') activeTab: boolean = true;
+  @Prop @Watch('reloadWhenActive') sessionEpoch: number = 0;
+  private loadedSessionVersion: number = -1;
+
+  private reloadWhenActive(): void {
+    if (this.visible) this.load();
+    else this.loadedSessionVersion = -1;
+  }
+
+  private refreshTab(): void {
+    this.syncVisibility();
+    if (this.visible && this.loadedSessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
+      this.load();
+    }
+  }
+
+  @State private requiresLogin: boolean = false;
   @State private selectedTab: number = 0;
   @State private loading: boolean = true;
   @State private errorMessage: string = '';
   @State private conversations: ConversationListItem[] = [];
+  @State private searchQuery: string = '';
   @State private avatarImages: Map<number, image.PixelMap> = new Map<number, image.PixelMap>();
   @State private hidingConversationId: number = 0;
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
   private remoteVersion: number = 0;
+  private remoteInFlight: boolean = false;
+  private readonly briefRefreshedIds: Set<number> = new Set<number>();
   private accountId: number = 0;
   private activeToken: string = '';
   private refreshTimer: number = -1;
   private readonly listScroller: Scroller = new Scroller();
   private visible: boolean = false;
+  private rootVisible: boolean = false;
+  private lifecycle?: MomentFeedLifecycle;
   private restoreTimer: number = -1;
   private avatarToken: string = '';
   private avatarAccountId: number = 0;
@@ -36,15 +60,40 @@ export struct MessagePage {
   private avatarQueue: number[] = [];
   private avatarWorkers: number = 0;
   private avatarGeneration: number = 0;
+  private lastLongPressAt: number = 0;
   onBack?: () => void;
+  onOpenMoment?: (id: number) => void;
+  onOpenCredit?: () => void;
+  onOpenOrders?: () => void;
+  onOpenTarget?: (target: NotificationTarget) => void;
+  onRequireLogin?: () => void;
   onOpenConversation?: (conversationId: number) => void;
+  onOpenProfile?: (userId: number, role: string) => void;
 
   aboutToAppear(): void {
-    ConversationVisibility.subscribe('list', (visible: boolean) => this.setVisible(visible));
+    try {
+      this.lifecycle = new MomentFeedLifecycle(this.getUIContext(),
+        (update?: uiObserver.NavDestinationInfo) => this.routeVisible(update),
+        (visible: boolean) => { this.rootVisible = visible; this.syncVisibility(); },
+        () => {
+          this.rootVisible = false;
+          this.setVisible(false);
+          this.loading = false;
+          this.errorMessage = '消息暂时无法打开，请重试';
+        });
+      this.lifecycle.start();
+    } catch {
+      this.rootVisible = false;
+      this.setVisible(false);
+      this.loading = false;
+      this.errorMessage = '消息暂时无法打开，请重试';
+    }
   }
 
   aboutToDisappear(): void {
-    ConversationVisibility.unsubscribe('list');
+    this.lifecycle?.stop();
+    this.lifecycle = undefined;
+    this.rootVisible = false;
     this.setVisible(false);
     this.requestVersion++;
     this.remoteVersion++;
@@ -57,12 +106,31 @@ export struct MessagePage {
     }
   }
 
+  private routeVisible(update?: uiObserver.NavDestinationInfo): boolean {
+    const navigation = this.queryNavigationInfo();
+    if (navigation === undefined) throw new Error('Navigation unavailable');
+    let destination = this.queryNavDestinationInfo();
+    if (destination === undefined) return navigation.pathStack.size() === 0;
+    if (update?.navDestinationId === destination.navDestinationId) destination = update;
+    return destination.index === navigation.pathStack.size() - 1 &&
+      destination.state !== uiObserver.NavDestinationState.ON_HIDDEN &&
+      destination.state !== uiObserver.NavDestinationState.ON_WILL_HIDE &&
+      destination.state !== uiObserver.NavDestinationState.ON_DISAPPEAR &&
+      destination.state !== uiObserver.NavDestinationState.ON_WILL_DISAPPEAR;
+  }
+
+  private syncVisibility(): void {
+    this.setVisible(this.rootVisible && this.activeTab && this.selectedTab === 0);
+  }
+
   private setVisible(visible: boolean): void {
     if (this.visible === visible) return;
     this.visible = visible;
     if (visible) {
       const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
-      if (this.accountId > 0 && token === this.activeToken) {
+      if (this.loadedSessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
+        this.load();
+      } else if (this.accountId > 0 && token === this.activeToken) {
         this.conversations = ConversationMemory.read(token, this.accountId);
         this.resetAvatars(token, this.accountId);
         this.refresh();
@@ -75,6 +143,7 @@ export struct MessagePage {
       if (this.refreshTimer >= 0) clearInterval(this.refreshTimer);
       this.refreshTimer = -1;
       this.remoteVersion++;
+      this.remoteInFlight = false;
       this.appClient.apiService.cancelConversations();
       this.avatarQueue = [];
       this.avatarRequests.forEach((fileId: number) => this.appClient.apiService.cancelAvatarThumbnail(fileId));
@@ -92,6 +161,11 @@ export struct MessagePage {
   }
 
   private async load(): Promise<void> {
+    this.remoteVersion++;
+    this.remoteInFlight = false;
+    this.appClient.apiService.cancelConversations();
+    this.loadedSessionVersion = this.appClient.sessionManager.getSessionVersion();
+    const sessionVersion = this.loadedSessionVersion;
     const version = ++this.requestVersion;
     const token = this.appClient.sessionManager.getSession()?.accessToken ?? '';
     if (token !== this.activeToken) {
@@ -103,9 +177,12 @@ export struct MessagePage {
     this.conversations = ConversationMemory.read(token, this.accountId);
     this.loading = this.conversations.length === 0;
     this.errorMessage = '';
+    this.requiresLogin = !this.appClient.sessionManager.isAuthenticated();
+    if (this.requiresLogin) { this.loading = false; return; }
     try {
       const session = await this.appClient.apiService.currentSession();
-      if (!this.visible || version !== this.requestVersion) return;
+      if (!this.visible || version !== this.requestVersion ||
+        sessionVersion !== this.appClient.sessionManager.getSessionVersion()) return;
       this.accountId = session.userId;
       this.resetAvatars(token, session.userId);
       this.conversations = ConversationMemory.read(token, session.userId);
@@ -116,6 +193,8 @@ export struct MessagePage {
     } catch (error) {
       if (version === this.requestVersion) {
         const failure = error as PortraError;
+        this.requiresLogin = !this.appClient.sessionManager.isAuthenticated() ||
+          failure.httpStatus === 401 || failure.businessCode === 40101;
         if (!this.appClient.sessionManager.isAuthenticated() || failure.httpStatus === 403 ||
           failure.businessCode === 40301) {
           this.conversations = [];
@@ -125,7 +204,7 @@ export struct MessagePage {
         this.errorMessage = this.conversations.length ? '' : failure.message || '消息加载失败';
       }
     } finally {
-      if (version === this.requestVersion) {
+      if (version === this.requestVersion && sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
         this.loading = false;
       }
     }
@@ -145,6 +224,7 @@ export struct MessagePage {
       this.load();
       return;
     }
+    if (this.remoteInFlight) return;
     try {
       await this.loadRemote(this.requestVersion, token);
     } catch {
@@ -159,9 +239,12 @@ export struct MessagePage {
   }
 
   private async loadRemote(version: number, token: string): Promise<void> {
+    if (this.remoteInFlight) return;
+    this.remoteInFlight = true;
     const remoteVersion = ++this.remoteVersion;
+    try {
     const result = await this.appClient.apiService.listConversations();
-    if (!Array.isArray(result)) throw new Error('会话数据格式异常');
+    if (!Array.isArray(result)) throw new Error('聊天暂时无法打开');
     const current = ConversationMemory.read(token, this.accountId);
     const cached = new Map<number, ConversationListItem>();
     current.forEach((row: ConversationListItem) => cached.set(row.conversation.conversationId, row));
@@ -173,21 +256,30 @@ export struct MessagePage {
       while (cursor < summaries.length) {
         const item = summaries[cursor++];
         const old = cached.get(item.conversationId);
+        const needsBrief = !this.briefRefreshedIds.has(item.otherUserId);
+        let brief: UserBrief | null = null;
+        if (needsBrief) {
+          const peerRole = ConversationListModel.peerRole(item);
+          brief = await this.appClient.apiService.getUserBrief(item.otherUserId, peerRole,
+            `conversations.list.brief.${item.conversationId}`).catch(() => null);
+          if (brief !== null && token === this.appClient.sessionManager.getSession()?.accessToken &&
+            this.accountId > 0) this.briefRefreshedIds.add(item.otherUserId);
+        }
         if (old && old.conversation.lastMessageTime === item.lastMessageTime) {
-          rows.push({ conversation: item, peerName: old.peerName, avatarFileId: old.avatarFileId,
+          rows.push({ conversation: item,
+            peerName: brief ? ConversationListModel.safeName(brief) : old.peerName,
+            avatarFileId: brief ? brief.avatarFileId : old.avatarFileId,
             preview: old.preview, previewTime: old.previewTime });
           continue;
         }
         try {
-          const peerRole = item.otherUserId === item.participantBId ? 'PROVIDER' : 'CUSTOMER';
-          const brief = old ? null : await this.appClient.apiService.getUserBrief(item.otherUserId, peerRole)
-            .catch(() => null);
           const messages = await this.appClient.apiService.listMessages(item.conversationId,
             `conversations.list.preview.${item.conversationId}`);
           const row = ConversationListModel.row(item, brief, messages);
           if (row !== null) rows.push(old ? {
-            conversation: row.conversation, peerName: old.peerName,
-            avatarFileId: old.avatarFileId, preview: row.preview, previewTime: row.previewTime
+            conversation: row.conversation, peerName: brief ? row.peerName : old.peerName,
+            avatarFileId: brief ? brief.avatarFileId : old.avatarFileId,
+            preview: row.preview, previewTime: row.previewTime
           } : row);
         } catch {
           if (old) rows.push({ conversation: item, peerName: old.peerName,
@@ -212,6 +304,9 @@ export struct MessagePage {
     this.errorMessage = '';
     this.loading = false;
     this.restoreScroll();
+    } finally {
+      if (this.remoteVersion === remoteVersion) this.remoteInFlight = false;
+    }
   }
 
   private resetAvatars(token: string, accountId: number): void {
@@ -223,6 +318,7 @@ export struct MessagePage {
     this.avatarImages.forEach((avatar: image.PixelMap) => avatar.release().catch(() => {}));
     this.avatarImages = new Map<number, image.PixelMap>();
     this.failedAvatars.clear();
+    this.briefRefreshedIds.clear();
     this.avatarToken = token;
     this.avatarAccountId = accountId;
   }
@@ -302,10 +398,25 @@ export struct MessagePage {
         item.conversation.conversationId !== conversationId);
       ConversationMemory.write(token, accountId, this.conversations);
     } catch (error) {
-      this.errorMessage = (error as PortraError).message || '隐藏会话失败';
+      this.errorMessage = (error as PortraError).message || '暂时无法隐藏聊天';
     } finally {
       this.hidingConversationId = 0;
     }
+  }
+
+  private confirmHide(conversationId: number): void {
+    if (this.hidingConversationId !== 0) return;
+    this.lastLongPressAt = Date.now();
+    AlertDialog.show({ title: '隐藏这条聊天？', message: '再次联系对方后仍可找到聊天记录。',
+      primaryButton: { value: '取消', action: () => {} },
+      secondaryButton: { value: '隐藏', action: () => this.hideConversation(conversationId) } });
+  }
+
+  private filteredConversations(): ConversationListItem[] {
+    const query = this.searchQuery.trim().toLocaleLowerCase();
+    return query ? this.conversations.filter((item: ConversationListItem) =>
+      item.peerName.toLocaleLowerCase().includes(query) ||
+      item.preview.toLocaleLowerCase().includes(query)) : this.conversations;
   }
 
   @Builder
@@ -322,87 +433,102 @@ export struct MessagePage {
         .borderRadius(2)
     }
     .width(72)
-    .onClick(() => this.selectedTab = index)
+    .onClick(() => { this.selectedTab = index; this.syncVisibility(); })
   }
 
   build() {
     Column() {
-      PortraPageHeading({ title: '消息', eyebrow: 'CONVERSATIONS', onBack: this.onBack })
-      Row({ space: 20 }) {
+      if (this.selectedTab === 0) {
+      Text('消息').fontSize(30).fontWeight(FontWeight.Bold)
+        .fontColor(PortraTheme.primaryText).width('100%')
+        .padding({ left: 18, right: 18, top: 17, bottom: 13 })
+        .backgroundColor(PortraTheme.surface)
+      Row({ space: 10 }) {
+        Image($r('app.media.ic_search')).width(20).height(20).opacity(0.55)
+        TextInput({ text: this.searchQuery, placeholder: '搜索联系人或最近消息' })
+          .layoutWeight(1).height(42).fontSize(14)
+          .backgroundColor(Color.Transparent)
+          .onChange((value: string) => this.searchQuery = value)
+      }
+      .width('100%').height(46).padding({ left: 14, right: 12 })
+      .backgroundColor('#F1F0EE').borderRadius(11)
+      .margin({ left: 18, right: 18, bottom: 10 })
+      Row({ space: 16 }) {
         this.Tab('聊天', 0)
         this.Tab('通知', 1)
+      }.width('100%').height(42).padding({ left: 14 })
+        .border({ width: { bottom: 1 }, color: '#EAE8E5' })
+        .backgroundColor(PortraTheme.surface)
       }
-      .width('100%')
-      .height(50)
-      .padding({ left: 14 })
-      .border({ width: { bottom: 1 }, color: PortraTheme.border })
 
-      if (this.selectedTab === 1) {
-        PortraEmptyView({ message: '通知列表尚未接入' })
+      if (this.selectedTab === 1 && this.activeTab) {
+        NotificationPage({ onBack: () => { this.selectedTab = 0; this.syncVisibility(); },
+          onOpenMoment: this.onOpenMoment,
+          onOpenCredit: this.onOpenCredit, onOpenOrders: this.onOpenOrders, onOpenTarget: this.onOpenTarget, onRequireLogin: this.onRequireLogin })
+          .layoutWeight(1)
+      } else if (this.requiresLogin) {
+        Button('登录后查看消息').margin(24).onClick(() => this.onRequireLogin?.())
       } else if (this.loading) {
-        PortraLoading({ label: '正在读取会话' })
+        PortraLoading({ label: '正在打开消息' })
       } else if (this.errorMessage.length > 0) {
         PortraErrorView({ message: this.errorMessage, onRetry: () => this.load() })
       } else if (this.conversations.length === 0) {
-        PortraEmptyView({ message: '还没有会话' })
+        PortraEmptyView({ message: '还没有聊天' })
+      } else if (this.filteredConversations().length === 0) {
+        Text('没有找到相关聊天').fontSize(13).fontColor(PortraTheme.secondaryText)
+          .width('100%').textAlign(TextAlign.Center).padding({ top: 36 })
       } else {
         Scroll(this.listScroller) {
           Column({ space: 0 }) {
-            Row() {
-              Text('最近消息').fontSize(18).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
-              Blank()
-              Text(`${this.conversations.length} 个会话`)
-                .fontSize(12)
-                .fontColor(PortraTheme.secondaryText)
-            }
-            .width('100%')
-            .padding({ left: 20, right: 20, top: 20, bottom: 10 })
-
-            ForEach(this.conversations, (item: ConversationListItem) => {
+            ForEach(this.filteredConversations(), (item: ConversationListItem) => {
               Row({ space: 12 }) {
                 if (this.avatarImages.has(item.avatarFileId ?? 0)) {
                   Image(this.avatarImages.get(item.avatarFileId ?? 0) as image.PixelMap)
-                    .width(48).height(48).borderRadius(24).objectFit(ImageFit.Cover)
+                    .width(50).height(50).borderRadius(25).objectFit(ImageFit.Cover)
+                    .onClick(() => this.onOpenProfile?.(item.conversation.otherUserId,
+                      ConversationListModel.peerRole(item.conversation)))
+                    .onTouch((event: TouchEvent) => event.stopPropagation())
                 } else {
-                  PortraAvatar({ displayName: item.peerName, avatarSize: 48 })
+                  PortraAvatar({ displayName: item.peerName, avatarSize: 50 })
+                    .onClick(() => this.onOpenProfile?.(item.conversation.otherUserId,
+                      ConversationListModel.peerRole(item.conversation)))
+                    .onTouch((event: TouchEvent) => event.stopPropagation())
                 }
-                Column({ space: 5 }) {
-                  Text(item.peerName)
-                    .fontSize(15)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor(PortraTheme.primaryText)
+                Column({ space: 6 }) {
+                  Row({ space: 8 }) {
+                    Text(item.peerName)
+                      .fontSize(16).fontWeight(FontWeight.Bold)
+                      .fontColor(PortraTheme.primaryText)
+                      .layoutWeight(1).maxLines(1)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    Text(ConversationListModel.timeLabel(item.previewTime))
+                      .fontSize(11).fontColor(PortraTheme.mutedText)
+                  }.width('100%')
                   Text(item.preview)
-                    .fontSize(12)
+                    .fontSize(13)
                     .fontColor(PortraTheme.secondaryText)
                     .maxLines(1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                 }
                 .layoutWeight(1)
                 .alignItems(HorizontalAlign.Start)
-                .onClick(() => this.onOpenConversation?.(item.conversation.conversationId))
-                Column({ space: 6 }) {
-                  Text(ConversationListModel.timeLabel(item.previewTime))
-                    .fontSize(11)
-                    .fontColor(PortraTheme.mutedText)
-                  Button('查看').height(28).fontSize(11).backgroundColor(PortraTheme.primarySoft)
-                    .fontColor(PortraTheme.primary)
-                    .onClick(() => this.onOpenConversation?.(item.conversation.conversationId))
-                  Button(this.hidingConversationId === item.conversation.conversationId ? '隐藏中' : '隐藏')
-                    .height(28).fontSize(11).backgroundColor(PortraTheme.surface)
-                    .fontColor(PortraTheme.secondaryText).enabled(this.hidingConversationId === 0)
-                    .onClick(() => this.hideConversation(item.conversation.conversationId))
-                }
               }
               .width('100%')
-              .height(94)
-              .padding({ left: 20, right: 20 })
+              .height(78)
+              .padding({ left: 18, right: 18 })
               .backgroundColor(PortraTheme.surface)
-              Divider().color(PortraTheme.border).padding({ left: 80 })
+              .onClick(() => {
+                if (Date.now() - this.lastLongPressAt < 600) return;
+                this.onOpenConversation?.(item.conversation.conversationId);
+              })
+              .gesture(LongPressGesture().onAction(() =>
+                this.confirmHide(item.conversation.conversationId)))
+              Divider().color('#ECEBE8').padding({ left: 80, right: 18 })
             }, (item: ConversationListItem) => item.conversation.conversationId.toString())
 
           }
           .width('100%')
-        }
+        }.align(Alignment.TopStart)
         .layoutWeight(1)
         .scrollBar(BarState.Off)
         .onDidScroll(() => {
@@ -413,6 +539,6 @@ export struct MessagePage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(PortraTheme.pageBackground)
+    .backgroundColor(PortraTheme.surface)
   }
 }

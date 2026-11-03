@@ -59,6 +59,28 @@ export class QuoteWorkflow {
     return typeof value === 'string' ? value.replace('T', ' ').slice(0, 16) : '';
   }
 
+  static selectedDate(draft: QuoteDraft, field: string): Date {
+    const value = field === 'shootStart' ? draft.shootStart :
+      field === 'shootEnd' ? draft.shootEnd : draft.delivery;
+    const parsed = new Date(value.replace(' ', 'T'));
+    if (value && !Number.isNaN(parsed.getTime())) return parsed;
+    const next = new Date();
+    next.setDate(next.getDate() + 1);
+    next.setMinutes(0, 0, 0);
+    return next;
+  }
+
+  static withSelectedDate(draft: QuoteDraft, field: string, date: Date): QuoteDraft {
+    if (field !== 'shootStart' && field !== 'shootEnd' && field !== 'delivery') return draft;
+    if (Number.isNaN(date.getTime())) return draft;
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hour = String(date.getHours()).padStart(2, '0');
+    const minute = String(date.getMinutes()).padStart(2, '0');
+    return QuoteWorkflow.withField(draft, field, `${year}-${month}-${day} ${hour}:${minute}`);
+  }
+
   static status(quote: QuoteSummary): string {
     if (quote.status === 'PENDING_CONFIRM' && quote.expireTime !== undefined &&
       Date.parse(quote.expireTime) <= Date.now()) return '已过期';
@@ -109,7 +131,8 @@ export class QuoteWorkflow {
     if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return undefined;
     const parsed = new Date(`${value}:00`);
     if (Number.isNaN(parsed.getTime()) || parsed.getFullYear() !== Number(value.slice(0, 4)) ||
-      parsed.getMonth() + 1 !== Number(value.slice(5, 7)) || parsed.getDate() !== Number(value.slice(8, 10))) {
+      parsed.getMonth() + 1 !== Number(value.slice(5, 7)) || parsed.getDate() !== Number(value.slice(8, 10)) ||
+      parsed.getHours() !== Number(value.slice(11, 13)) || parsed.getMinutes() !== Number(value.slice(14, 16))) {
       return undefined;
     }
     return `${value}:00`;
@@ -117,7 +140,7 @@ export class QuoteWorkflow {
 
   private static count(value: string): number | undefined {
     const text = value.trim();
-    if (!text) return 0;
+    if (!text) return undefined;
     const count = Number(text);
     return /^\d+$/.test(text) && Number.isSafeInteger(count) && count <= 10000 ? count : undefined;
   }

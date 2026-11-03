@@ -36,3 +36,13 @@ test('duplicate IDs and explicit quote-linked messages do not duplicate events',
   assert.deepEqual(ConversationTimeline.build(messages, [{ quotationId: 7, providerUserId: 2,
     createdAt: '2026-10-29T10:02:00' }]).map(item => item.key), ['message:1', 'quote:7']);
 });
+
+test('same-second messages keep numeric order and time separators follow gaps', () => {
+  const messages = [11, 2, 10].map(messageId => ({ messageId, senderId: 1,
+    messageType: 'TEXT', createdAt: messageId === 11 ? '2026-10-29T10:07:00' : '2026-10-29T10:00:00' }));
+  const timeline = ConversationTimeline.build(messages, []);
+  assert.deepEqual(timeline.map(item => item.key), ['message:2', 'message:10', 'message:11']);
+  assert.ok(timeline[0].timeLabel);
+  assert.equal(timeline[1].timeLabel, undefined);
+  assert.ok(timeline[2].timeLabel);
+});

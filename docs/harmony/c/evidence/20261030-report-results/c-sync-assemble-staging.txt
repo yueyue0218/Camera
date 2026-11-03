@@ -1,0 +1,178 @@
+> hvigor [32mFinished :entry:clean... after 6 ms [39m
+> hvigor [32mFinished :entry:staging@PreBuild... after 365 ms [39m
+> hvigor [32mFinished :entry:staging@CreateModuleInfo... after 2 ms [39m
+> hvigor [32mFinished :entry:staging@GenerateMetadata... after 12 ms [39m
+> hvigor [32mFinished :entry:staging@ConfigureCmake... after 1 ms [39m
+> hvigor [32mFinished :entry:staging@MergeProfile... after 72 ms [39m
+> hvigor [32mFinished :entry:staging@CreateBuildProfile... after 7 ms [39m
+> hvigor [32mFinished :entry:staging@PreCheckSyscap... after 1 ms [39m
+> hvigor [32mFinished :entry:staging@GeneratePkgContextInfo... after 15 ms [39m
+> hvigor [32mFinished :entry:staging@GeneratePkgSdkInfo... after 12 ms [39m
+> hvigor [32mFinished :entry:staging@ProcessIntegratedHsp... after 1 ms [39m
+> hvigor [32mFinished :entry:staging@BuildNativeWithCmake... after 1 ms [39m
+> hvigor [32mFinished :entry:staging@MakePackInfo... after 11 ms [39m
+> hvigor [32mFinished :entry:staging@SyscapTransform... after 4 ms [39m
+> hvigor [32mFinished :entry:staging@ProcessProfile... after 260 ms [39m
+> hvigor [32mFinished :entry:staging@ProcessRouterMap... after 30 ms [39m
+> hvigor [32mFinished :entry:staging@ProcessShareConfig... after 9 ms [39m
+> hvigor [32mFinished :entry:staging@ProcessStartupConfig... after 9 ms [39m
+> hvigor [32mFinished :entry:staging@BuildNativeWithNinja... after 5 ms [39m
+> hvigor [32mFinished :entry:staging@ProcessResource... after 11 ms [39m
+> hvigor [32mFinished :entry:staging@GenerateLoaderJson... after 63 ms [39m
+> hvigor [32mFinished :entry:staging@ProcessLibs... after 14 ms [39m
+> hvigor [32mFinished :entry:staging@CompileResource... after 553 ms [39m
+> hvigor [32mFinished :entry:staging@DoNativeStrip... after 7 ms [39m
+> hvigor [32mFinished :entry:staging@BuildJS... after 17 ms [39m
+> hvigor [32mFinished :entry:staging@CacheNativeLibs... after 23 ms [39m
+> hvigor WARN: WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/moments/MomentPublishPanel.ets:45:31
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/moments/MomentPublishPanel.ets:47:33
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/moments/MomentPublishPanel.ets:50:34
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/moments/MomentPublishPanel.ets:69:43
+ 'packing' has been deprecated.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/moments/MomentPublishPanel.ets:78:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/network/ImageUpload.ets:15:36
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/network/ImageUpload.ets:22:31
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/network/ImageUpload.ets:24:33
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/network/ImageUpload.ets:30:36
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/network/ImageUpload.ets:47:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/user/ProfileWorkspace.ets:117:5
+ 'AlertDialog' has been deprecated.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/user/ProfileWorkspace.ets:117:17
+ 'show' has been deprecated.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/user/ProfileWorkspace.ets:206:24
+ 'AlertDialog' has been deprecated.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/user/ProfileWorkspace.ets:206:36
+ 'show' has been deprecated.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/publish/PublicationActions.ets:34:5
+ 'AlertDialog' has been deprecated.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/publish/PublicationActions.ets:34:17
+ 'show' has been deprecated.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/pages/ServiceDetailPage.ets:147:20
+ 'showToast' has been deprecated.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/delivery/DeliveryTransfer.ets:26:66
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/delivery/DeliveryTransfer.ets:50:25
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/delivery/DeliveryTransfer.ets:52:25
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/delivery/DeliveryTransfer.ets:59:14
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/delivery/DeliveryTransfer.ets:83:15
+ The system capacity of this api 'request' is not supported on all devices
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/delivery/DeliveryTransfer.ets:84:13
+ The system capacity of this api 'request' is not supported on all devices
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/delivery/DeliveryTransfer.ets:90:24
+ The system capacity of this api 'request' is not supported on all devices
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/delivery/DeliveryTransfer.ets:90:38
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/delivery/DeliveryTransfer.ets:111:7
+ The system capacity of this api 'request' is not supported on all devices
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/delivery/DeliveryTransfer.ets:124:15
+ The system capacity of this api 'request' is not supported on all devices
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/delivery/DeliveryTransfer.ets:125:13
+ The system capacity of this api 'request' is not supported on all devices
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/delivery/DeliveryTransfer.ets:134:20
+ The system capacity of this api 'request' is not supported on all devices
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/delivery/DeliveryTransfer.ets:134:34
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/delivery/DeliveryTransfer.ets:153:38
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/delivery/DeliveryTransfer.ets:156:31
+ The system capacity of this api 'request' is not supported on all devices
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:15:31
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:15:103
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:19:31
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:20:11
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:21:11
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:24:31
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:25:11
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:26:11
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:30:17
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:30:46
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:32:33
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/features/publish/PublishDraftStore.ets:41:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/pages/PublishPage.ets:382:65
+ 'showToast' has been deprecated.
+
+WARN: ArkTS:WARN File: C:/Users/LiXiaozhou/.codex/worktrees/harmony-c-sync-reports-20261030/Camera/harmony/entry/src/main/ets/pages/PublishPage.ets:452:22
+ 'show' has been deprecated.
+
+
+> hvigor [32mFinished :entry:staging@CompileArkTS... after 36 s 293 ms [39m
+> hvigor [32mFinished :entry:staging@GeneratePkgModuleJson... after 8 ms [39m
+> hvigor [32mFinished :entry:staging@ProcessCompiledResources... after 6 ms [39m
+> hvigor [32mFinished :entry:staging@PackageHap... after 856 ms [39m
+> hvigor [32mFinished :entry:staging@PackingCheck... after 21 ms [39m
+> hvigor WARN: Will skip sign 'hos_hap'. No signingConfigs profile is configured in current project.
+             If needed, configure the signingConfigs in C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-sync-reports-20261030\Camera\harmony\build-profile.json5.
+> hvigor [32mFinished :entry:staging@SignHap... after 3 ms [39m
+> hvigor [32mFinished :entry:staging@CollectDebugSymbol... after 4 ms [39m
+> hvigor [32mFinished :entry:assembleHap... after 1 ms [39m
+> hvigor [32mBUILD SUCCESSFUL in 46 s 802 ms [39m
+
+34 tasks in total: 34 executed, 0 up-to-date

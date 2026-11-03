@@ -1,0 +1,94 @@
+✔ detail starts empty and uses full GET response, not the Feed preview (2.4598ms)
+✔ switch target ignores old success, old catch and old finally (0.4505ms)
+✔ close and reopen requests again; late response cannot resurrect the closed detail (0.3063ms)
+✔ account change or background clears images and rejects old completion (0.4277ms)
+✔ like uses server state/count, blocks repeated tap and then DELETEs (0.6191ms)
+✔ uncertain like blocks resubmission until an explicit GET verifies the object (0.4305ms)
+✔ late like never updates another account or releases a newer request busy flag (0.3263ms)
+✔ malformed or mismatched detail is never rendered as a partial album (0.5485ms)
+✔ an explicit empty detail album stays empty, duplicate images preserve server order (1.0252ms)
+✔ shared pending write barrier and unique request keys protect two Feed instances (0.4988ms)
+✔ detail waits for another view write before requesting authoritative state (0.3045ms)
+✔ GET issued before another view write cannot clear its uncertain result (6.365ms)
+✔ 404 state is cleared before a later successful detail can reconcile Feed (0.3165ms)
+✔ an old GET 404 cannot hide an object after another view completed a newer write (0.8981ms)
+✔ detail favorite and cancel use current server state/count and retain the full album (0.7897ms)
+✔ unknown favorite survives a new page instance and requires a real GET before retry (0.3154ms)
+✔ hidden favorite response cannot reopen detail and another instance waits for the write (1.389ms)
+✔ favorite old success/error/finally cannot alter a different account request (0.4851ms)
+✖ a DELETED detail readable by its author never restores obsolete content or actions (1.897ms)
+✔ only the authenticated actual author can manage, regardless of current role (1.9131ms)
+✔ deletion requires explicit confirmation and only sends once (1.8173ms)
+✔ old account delete success error and finally cannot alter a new view (0.6614ms)
+✔ unknown deletion cannot replay before GET verification and pending work cannot be verified away (0.7836ms)
+✔ GET 404 after an unknown deletion removes the unavailable detail (0.3949ms)
+✔ closing one owner instance never cancels another instance request (0.5253ms)
+✔ session change before a menu tap invalidates the old author permission (0.2681ms)
+✖ the backend author-visible DELETED response also confirms an unavailable detail (1.5976ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 25
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 661.2339
+
+✖ failing tests:
+
+test at harmony\tests\moment-interactions.test.cjs:210:1
+✖ a DELETED detail readable by its author never restores obsolete content or actions (1.897ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + {
+  +   authorId: 12,
+  +   authorRole: 'CUSTOMER',
+  +   favoriteCount: 1,
+  +   favoritedByCurrentUser: false,
+  +   imageDataList: [
+  +     '1',
+  +     '2',
+  +     '3',
+  +     '4',
+  +     '5'
+  +   ],
+  +   likeCount: 3,
+  +   likedByCurrentUser: false,
+  +   momentId: 7,
+  +   status: 'DELETED',
+  +   title: 'test'
+  + }
+  - undefined
+
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\moment-interactions.test.cjs:210:216)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { momentId: 7, authorId: 12, authorRole: 'CUSTOMER', title: 'test', imageDataList: [ '1', '2', '3', '4', '5' ], likeCount: 3, likedByCurrentUser: false, favoriteCount: 1, favoritedByCurrentUser: false, status: 'DELETED' },
+    expected: undefined,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at harmony\tests\moment-owner-actions.test.cjs:23:1
+✖ the backend author-visible DELETED response also confirms an unavailable detail (1.5976ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+  + []
+  - [
+  -   7
+  - ]
+
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\moment-owner-actions.test.cjs:23:324)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ 7 ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,5 @@
+[ERROR] Tests run: 19, Failures: 4, Errors: 0, Skipped: 0, Time elapsed: 35.93 s <<< FAILURE! -- in com.action.camera.integration.ReportNotificationPrivacyTest
+[ERROR] Tests run: 19, Failures: 4, Errors: 0, Skipped: 0
+[INFO] BUILD FAILURE
+[INFO] Total time:  01:12 min
+[INFO] Finished at: 2026-10-30T13:10:32+08:00

@@ -1,0 +1,51 @@
+# Widget Tree Analysis
+
+- **Generated**: 2026-10-28 18:05:30
+- **Mode**: Interactive Only
+
+---
+
+## Widget Tree
+
+- Text 动态 [id:8] [top: 205, left: 70, width: 154, height: 90]
+- Text MOMENTS [id:9] [top: 306, left: 70, width: 192, height: 45]
+- Button 刷新 [id:11] [top: 215, left: 1013, width: 197, height: 126]
+- Button 最新 [id:13] [top: 458, left: 56, width: 371, height: 140]
+- Button 热门 [id:14] [top: 458, left: 455, width: 371, height: 140]
+- Button 关注 [id:15] [top: 458, left: 853, width: 371, height: 140]
+- Scroll [id:16] [top: 633, left: 0, width: 1280, height: 1863]
+  - Text 约 [id:21] [top: -1052, left: 136, width: 99, height: 105]
+  - Button 约拍用户 #2 [id:23] [top: -1098, left: 297, width: 270, height: 140]
+  - Text 2026-10-28 18:01 [id:24] [top: -947, left: 297, width: 322, height: 45]
+  - Text No. 2 [id:25] [top: -1023, left: 1073, width: 92, height: 45]
+  - Text C-FINAL-SHARED-20261028-TEST-ONLY [id:26] [top: -860, left: 115, width: 1050, height: 148]
+  - Text Final shared report and public author acceptance. Local disposable content only. [id:27] [top: -670, left: 115, width: 1050, height: 148]
+  - Text 预览 3 张 [id:31] [top: 141, left: 909, width: 221, height: 79]
+  - Button 点赞 0 [id:33] [top: 328, left: 115, width: 511, height: 140]
+  - Button 收藏 0 [id:34] [top: 328, left: 654, width: 511, height: 140]
+  - Text 约拍记录 [id:36] [top: 544, left: 115, width: 211, height: 73]
+  - Button 查看详情 [id:38] [top: 510, left: 659, width: 281, height: 140]
+  - Button 举报 [id:39] [top: 510, left: 968, width: 197, height: 140]
+  - Text 举报动态 #2 · C-FINAL-SHARED-20261028-TEST-ONLY [id:41] [top: 779, left: 98, width: 1084, height: 49]
+  - Text 举报已提交，平台将按流程处理 [id:43] [top: 891, left: 98, width: 1084, height: 49]
+  - Button 关闭举报 [id:44] [top: 1003, left: 500, width: 281, height: 140]
+  - Text 约 [id:49] [top: 1346, left: 136, width: 99, height: 105]
+  - Button 约拍用户 #2 [id:51] [top: 1300, left: 297, width: 270, height: 140]
+  - Text 2026-10-27 20:19 [id:52] [top: 1451, left: 297, width: 322, height: 45]
+  - Text No. 1 [id:53] [top: 1375, left: 1073, width: 92, height: 45]
+  - Text C-NATIVE-20261027-TEST-ONLY [id:54] [top: 1538, left: 115, width: 1050, height: 74]
+  - Text Isolated local H2 acceptance. Disposable test content only. [id:55] [top: 1654, left: 115, width: 1050, height: 148]
+  - Text 预览 3 张 [id:59] [top: 2465, left: 909, width: 221, height: 79]
+  - Button 点赞 0 [id:61] [top: 2652, left: 115, width: 511, height: 140]
+  - Button 已收藏 1 [id:62] [top: 2652, left: 654, width: 511, height: 140]
+  - Text 约拍记录 [id:64] [top: 2868, left: 115, width: 211, height: 73]
+  - Button 查看详情 [id:66] [top: 2834, left: 659, width: 281, height: 140]
+  - Button 举报 [id:67] [top: 2834, left: 968, width: 197, height: 140]
+- Button Button [id:69] [top: 2499, left: 70, width: 285, height: 235]
+  - Text 大厅 [id:73] [top: 2652, left: 174, width: 78, height: 45]
+- Button Button [id:74] [top: 2499, left: 355, width: 285, height: 235]
+  - Text 动态 [id:78] [top: 2652, left: 459, width: 78, height: 45]
+- Button Button [id:79] [top: 2499, left: 640, width: 285, height: 235]
+  - Text 消息 [id:83] [top: 2652, left: 744, width: 78, height: 45]
+- Button Button [id:84] [top: 2499, left: 925, width: 285, height: 235]
+  - Text 我的 [id:88] [top: 2652, left: 1029, width: 78, height: 45]

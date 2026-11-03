@@ -9,29 +9,25 @@ export struct QuoteEventCard {
   onOpen?: () => void;
 
   build() {
-    Column({ space: 8 }) {
+    Column({ space: 9 }) {
       Row() {
-        Text('约拍报价').fontSize(14).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
+        Text('正式报价').fontSize(13).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
         Blank()
         Text(QuoteWorkflow.status(this.quote)).fontSize(12)
           .fontColor(this.quote.status === 'PENDING_CONFIRM' ? PortraTheme.attention :
             this.quote.status === 'CONFIRMED' ? PortraTheme.success : PortraTheme.secondaryText)
+          .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+          .backgroundColor(PortraTheme.primarySoft).borderRadius(12)
       }.width('100%')
-      Text(OrderWorkflow.money(this.quote.amountCent)).fontSize(22).fontWeight(FontWeight.Bold)
-        .fontColor(PortraTheme.primaryText)
-      Text(QuoteWorkflow.dateInput(this.quote.shootStartTime))
+      Text(`${this.quote.location} · ${OrderWorkflow.money(this.quote.amountCent)} · ${QuoteWorkflow.dateInput(this.quote.shootStartTime)}`)
         .fontSize(12).fontColor(PortraTheme.secondaryText)
-      Text(this.quote.location).fontSize(12).fontColor(PortraTheme.secondaryText)
         .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-      Divider().color(PortraTheme.border)
-      Row() {
-        Blank()
-        Text('查看报价  ›').fontSize(13).fontColor(PortraTheme.primary)
-      }.width('100%')
+      Button('查看报价 ›').width('100%').height(36).fontSize(12)
+        .backgroundColor('#F2F3F5').fontColor(PortraTheme.primary)
+        .borderRadius(8).onClick(() => this.onOpen?.())
     }
-    .width('100%').alignItems(HorizontalAlign.Start).padding(14)
-    .backgroundColor(PortraTheme.surface).borderRadius(8)
-    .border({ width: 1, color: PortraTheme.border })
-    .onClick(() => this.onOpen?.())
+    .width('100%').constraintSize({ maxWidth: 275 }).alignItems(HorizontalAlign.Start).padding(13)
+    .backgroundColor(PortraTheme.surface).borderRadius(16)
+    .border({ width: 1, color: '#ECE9E3' })
   }
 }

@@ -1,0 +1,27 @@
+diff --git a/harmony/entry/src/main/ets/model/ApiModels.ets b/harmony/entry/src/main/ets/model/ApiModels.ets
+index dd68b5a..96fc99a 100644
+--- a/harmony/entry/src/main/ets/model/ApiModels.ets
++++ b/harmony/entry/src/main/ets/model/ApiModels.ets
+@@ -0,0 +1,7 @@
++export interface CreateMomentPayload {
++  readonly title: string;
++  readonly content: string;
++  readonly imageDataList: string[];
++  readonly mentions?: string[];
++}
++
+diff --git a/harmony/entry/src/main/ets/network/ApiService.ets b/harmony/entry/src/main/ets/network/ApiService.ets
+index 1cbbe45..47e2cf5 100644
+--- a/harmony/entry/src/main/ets/network/ApiService.ets
++++ b/harmony/entry/src/main/ets/network/ApiService.ets
+@@ -0,0 +1 @@
++import { CreateMomentPayload } from '../model/ApiModels';
+@@ -22,0 +24,8 @@ export class ApiService implements NativeSessionApi {
++  createMoment(payload: CreateMomentPayload, requestKey: string = 'moments.create'): Promise<MomentSummary> {
++    return this.client.post<MomentSummary>('/moments', payload, requestKey);
++  }
++
++  cancelMomentCreate(requestKey: string = 'moments.create'): void {
++    this.client.cancelRequest(requestKey);
++  }
++

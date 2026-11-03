@@ -1,9 +1,7 @@
 /**
  * Adds the current bearer token to authenticated requests.
  *
- * Token persistence is deliberately not implemented here. D10 will connect
- * this in-memory boundary to the selected secure storage API after the auth
- * contract is confirmed with B.
+ * Access tokens stay in memory; AuthSessionManager owns refresh and Asset Store.
  */
 export class AuthInterceptor {
   private accessToken: string = '';
@@ -14,6 +12,10 @@ export class AuthInterceptor {
 
   clearAccessToken(): void {
     this.accessToken = '';
+  }
+
+  replaceAccessToken(token: string): void {
+    this.setAccessToken(token);
   }
 
   authorizationHeader(): string {

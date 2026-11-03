@@ -1,0 +1,1137 @@
+diff --git a/harmony/entry/src/main/ets/model/ApiModels.ets b/harmony/entry/src/main/ets/model/ApiModels.ets
+index e38a3a8..dd68b5a 100644
+--- a/harmony/entry/src/main/ets/model/ApiModels.ets
++++ b/harmony/entry/src/main/ets/model/ApiModels.ets
+@@ -475,0 +476,27 @@ export interface CreditRecordSummary {
++
++export interface OrderEngagementSummary extends OrderSummary {
++  readonly customerId: number;
++  readonly providerUserId: number;
++  readonly refundStatus?: string;
++}
++export interface ReviewSummary {
++  readonly reviewId: number; readonly orderId: number; readonly reviewerId: number;
++  readonly targetUserId: number; readonly reviewerNickname?: string; readonly targetUserNickname?: string;
++  readonly direction?: string; readonly rating: number; readonly content: string; readonly isVisible: boolean;
++  readonly replyContent?: string; readonly replyTime?: string; readonly createdAt?: string; readonly complaintStatus?: string;
++}
++export interface ReviewComplaintSummary {
++  readonly complaintId: number; readonly reviewId: number; readonly orderId: number; readonly complainantId: number;
++  readonly respondentId?: number; readonly reason: string; readonly status: string;
++  readonly arbitrationResult?: string; readonly arbitrationComment?: string; readonly createdAt?: string; readonly handledAt?: string;
++}
++export interface DisputeReplySummary { readonly id: number; readonly disputeId: number; readonly replierId: number; readonly content: string; readonly createdAt?: string; }
++export interface DisputeSummary {
++  readonly id: number; readonly orderId: number; readonly initiatorId: number; readonly reason: string; readonly status: string;
++  readonly resolution?: string; readonly responsibility?: string; readonly adminComment?: string;
++  readonly createdAt?: string; readonly resolvedAt?: string; readonly replies: DisputeReplySummary[];
++}
++export interface CreateReviewPayload { readonly rating: number; readonly content: string; }
++export interface ReviewTextPayload { readonly content: string; }
++export interface CreateReviewComplaintPayload { readonly reason: string; readonly evidenceFileIds: string; }
++export interface DisputeReasonPayload { readonly reason: string; }
+diff --git a/harmony/entry/src/main/ets/network/ApiService.ets b/harmony/entry/src/main/ets/network/ApiService.ets
+index 0088675..1cbbe45 100644
+--- a/harmony/entry/src/main/ets/network/ApiService.ets
++++ b/harmony/entry/src/main/ets/network/ApiService.ets
+@@ -0,0 +1 @@
++import { OrderEngagementSummary, ReviewSummary, ReviewComplaintSummary, DisputeSummary, CreateReviewPayload, ReviewTextPayload, CreateReviewComplaintPayload, DisputeReasonPayload } from '../model/ApiModels';
+@@ -444,0 +446,50 @@ export class ApiService implements NativeSessionApi {
++  getOrder(id: number, requestKey: string = 'engagement.getOrder'): Promise<OrderEngagementSummary> {
++    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
++    return this.client.get<OrderEngagementSummary>(`/orders/${id}`, requestKey);
++  }
++  listOrderReviews(id: number, requestKey: string = 'engagement.listOrderReviews'): Promise<ReviewSummary[]> {
++    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
++    return this.client.get<ReviewSummary[]>(`/orders/${id}/reviews`, requestKey);
++  }
++  getReview(id: number, requestKey: string = 'engagement.getReview'): Promise<ReviewSummary> {
++    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
++    return this.client.get<ReviewSummary>(`/reviews/${id}`, requestKey);
++  }
++  listReviewComplaints(id: number, requestKey: string = 'engagement.listReviewComplaints'): Promise<ReviewComplaintSummary[]> {
++    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
++    return this.client.get<ReviewComplaintSummary[]>(`/reviews/${id}/complaints`, requestKey);
++  }
++  getReviewComplaint(id: number, requestKey: string = 'engagement.getReviewComplaint'): Promise<ReviewComplaintSummary> {
++    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
++    return this.client.get<ReviewComplaintSummary>(`/reviews/complaints/${id}`, requestKey);
++  }
++  listOrderDisputes(id: number, requestKey: string = 'engagement.listOrderDisputes'): Promise<DisputeSummary[]> {
++    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
++    return this.client.get<DisputeSummary[]>(`/orders/${id}/disputes`, requestKey);
++  }
++  getDispute(id: number, requestKey: string = 'engagement.getDispute'): Promise<DisputeSummary> {
++    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
++    return this.client.get<DisputeSummary>(`/disputes/${id}`, requestKey);
++  }
++  createReview(id: number, payload: CreateReviewPayload, requestKey: string = 'engagement.createReview'): Promise<ReviewSummary> {
++    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
++    return this.client.post<ReviewSummary>(`/orders/${id}/reviews`, payload, requestKey);
++  }
++  followUpReview(id: number, payload: ReviewTextPayload, requestKey: string = 'engagement.followUpReview'): Promise<ReviewSummary> {
++    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
++    return this.client.post<ReviewSummary>(`/reviews/${id}/follow-up`, payload, requestKey);
++  }
++  createReviewComplaint(id: number, payload: CreateReviewComplaintPayload, requestKey: string = 'engagement.createReviewComplaint'): Promise<ReviewComplaintSummary> {
++    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
++    return this.client.post<ReviewComplaintSummary>(`/reviews/${id}/complaints`, payload, requestKey);
++  }
++  createDispute(id: number, payload: DisputeReasonPayload, requestKey: string = 'engagement.createDispute'): Promise<DisputeSummary> {
++    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
++    return this.client.post<DisputeSummary>(`/orders/${id}/disputes`, payload, requestKey);
++  }
++  replyDispute(id: number, payload: ReviewTextPayload, requestKey: string = 'engagement.replyDispute'): Promise<DisputeSummary> {
++    if (!Number.isSafeInteger(id) || id <= 0) { return Promise.reject(ErrorMapper.parse()); }
++    return this.client.post<DisputeSummary>(`/disputes/${id}/replies`, payload, requestKey);
++  }
++  cancelEngagementRequests(keys: string[]): void { keys.forEach((key: string) => this.client.cancelRequest(key)); }
++
+diff --git a/harmony/entry/src/main/ets/model/NavigationModels.ets b/harmony/entry/src/main/ets/model/NavigationModels.ets
+index 4edd7aa..2389c2c 100644
+--- a/harmony/entry/src/main/ets/model/NavigationModels.ets
++++ b/harmony/entry/src/main/ets/model/NavigationModels.ets
+@@ -13,0 +14 @@ export enum AppRoute {
++  ORDER_ENGAGEMENT = 'OrderEngagement',
+@@ -21,0 +23,3 @@ export interface NavigationRouteParam {
++  readonly targetKind?: string;
++  readonly targetId?: number;
++  readonly orderId?: number;
+diff --git a/harmony/entry/src/main/ets/navigation/NavigationPolicy.ets b/harmony/entry/src/main/ets/navigation/NavigationPolicy.ets
+index 9a7903c..1b3e0a1 100644
+--- a/harmony/entry/src/main/ets/navigation/NavigationPolicy.ets
++++ b/harmony/entry/src/main/ets/navigation/NavigationPolicy.ets
+@@ -10,0 +11 @@ export class NavigationPolicy {
++    AppRoute.ORDER_ENGAGEMENT,
+@@ -24 +25 @@ export class NavigationPolicy {
+-    return route === AppRoute.PUBLISH || route === AppRoute.CONVERSATION_DETAIL || route === AppRoute.MESSAGE ||
++    return route === AppRoute.ORDER_ENGAGEMENT || route === AppRoute.PUBLISH || route === AppRoute.CONVERSATION_DETAIL || route === AppRoute.MESSAGE ||
+@@ -34 +35 @@ export class NavigationPolicy {
+-          returnRoute: route,
++          returnRoute: route, targetKind: param.targetKind, targetId: param.targetId, orderId: param.orderId,
+@@ -83,0 +85 @@ export class NavigationPolicy {
++      case AppRoute.ORDER_ENGAGEMENT: return '本次约拍的评价与申诉';
+diff --git a/harmony/entry/src/main/ets/pages/Index.ets b/harmony/entry/src/main/ets/pages/Index.ets
+index c29d04c..aa48052 100644
+--- a/harmony/entry/src/main/ets/pages/Index.ets
++++ b/harmony/entry/src/main/ets/pages/Index.ets
+@@ -0,0 +1,2 @@
++import { OrderEngagementPage } from './OrderEngagementPage';
++import { NotificationTarget } from '../features/notifications/NotificationTargetResolver';
+@@ -29,0 +32 @@ struct Index {
++  @State private orderReloadEpoch: number = 0;
+@@ -64 +67,8 @@ struct Index {
+-          onOpenCredit: () => this.openPage(AppRoute.CREDIT), onOpenOrders: () => this.openPage(AppRoute.ORDER) });
++          onOpenCredit: () => this.openPage(AppRoute.CREDIT), onOpenTarget: (target: NotificationTarget) => this.openNotificationTarget(target), onOpenOrders: () => this.openPage(AppRoute.ORDER) });
++      } else if (name === AppRoute.ORDER_ENGAGEMENT) {
++        OrderEngagementPage({ targetKind: (param as NavigationRouteParam).targetKind ?? 'order',
++          targetId: (param as NavigationRouteParam).targetId ?? 0, expectedOrderId: (param as NavigationRouteParam).orderId ?? 0,
++          onBack: () => this.appPathStack.pop(),
++          onRequireLogin: () => this.openPage(AppRoute.LOGIN, { returnRoute: AppRoute.ORDER_ENGAGEMENT,
++            targetKind: (param as NavigationRouteParam).targetKind, targetId: (param as NavigationRouteParam).targetId,
++            orderId: (param as NavigationRouteParam).orderId }) });
+@@ -76 +86 @@ struct Index {
+-          onOpenCredit: () => this.openPage(AppRoute.CREDIT), onOpenOrders: () => this.openPage(AppRoute.ORDER),
++          onOpenCredit: () => this.openPage(AppRoute.CREDIT), onOpenTarget: (target: NotificationTarget) => this.openNotificationTarget(target), onOpenOrders: () => this.openPage(AppRoute.ORDER),
+@@ -83 +93,2 @@ struct Index {
+-        OrderPage({ onBack: () => this.appPathStack.pop() });
++        OrderPage({ reloadEpoch: this.orderReloadEpoch, onBack: () => this.appPathStack.pop(),
++          onOpenEngagement: (id: number) => this.openPage(AppRoute.ORDER_ENGAGEMENT, { targetKind: 'order', targetId: id }) });
+@@ -103,0 +115,3 @@ struct Index {
++    .onShown(() => {
++      if (name === AppRoute.ORDER) { this.orderReloadEpoch++; }
++    })
+@@ -223,0 +238,3 @@ struct Index {
++  private openNotificationTarget(target: NotificationTarget): void {
++    this.openPage(AppRoute.ORDER_ENGAGEMENT, { targetKind: target.kind, targetId: target.id, orderId: target.orderId });
++  }
+@@ -230 +247 @@ struct Index {
+-      returnRoute: route, momentId: param.momentId, demandId: param.demandId, serviceId: param.serviceId,
++      returnRoute: route, targetKind: param.targetKind, targetId: param.targetId, orderId: param.orderId, momentId: param.momentId, demandId: param.demandId, serviceId: param.serviceId,
+@@ -247,0 +265 @@ struct Index {
++        targetKind: param.targetKind, targetId: param.targetId, orderId: param.orderId,
+diff --git a/harmony/entry/src/main/ets/pages/MessagePage.ets b/harmony/entry/src/main/ets/pages/MessagePage.ets
+index d07c15a..dbc0abc 100644
+--- a/harmony/entry/src/main/ets/pages/MessagePage.ets
++++ b/harmony/entry/src/main/ets/pages/MessagePage.ets
+@@ -0,0 +1 @@
++import { NotificationTarget } from '../features/notifications/NotificationTargetResolver';
+@@ -24,0 +26 @@ export struct MessagePage {
++  onOpenTarget?: (target: NotificationTarget) => void;
+@@ -144 +146 @@ export struct MessagePage {
+-          onOpenCredit: this.onOpenCredit, onOpenOrders: this.onOpenOrders, onRequireLogin: this.onRequireLogin })
++          onOpenCredit: this.onOpenCredit, onOpenOrders: this.onOpenOrders, onOpenTarget: this.onOpenTarget, onRequireLogin: this.onRequireLogin })
+diff --git a/harmony/entry/src/main/ets/pages/OrderPage.ets b/harmony/entry/src/main/ets/pages/OrderPage.ets
+index d14cd31..762344a 100644
+--- a/harmony/entry/src/main/ets/pages/OrderPage.ets
++++ b/harmony/entry/src/main/ets/pages/OrderPage.ets
+@@ -11,0 +12 @@ export struct OrderPage {
++  @Prop @Watch('onReloadRequested') reloadEpoch: number = 0;
+@@ -19,0 +21,6 @@ export struct OrderPage {
++  onOpenEngagement?: (orderId: number) => void;
++
++  private onReloadRequested(): void {
++    // Initial appearance already loads; retained destinations reload on real Navigation show.
++    if (!this.loading) { this.load(); }
++  }
+@@ -184,2 +191,5 @@ export struct OrderPage {
+-              .onClick(() => this.selectedOrderId = this.selectedOrderId === item.orderId ? 0 : item.orderId)
+-            }, (item: OrderSummary) => item.orderId.toString())
++              .onClick(() => {
++                if (this.onOpenEngagement !== undefined) { this.onOpenEngagement(item.orderId); }
++                else { this.selectedOrderId = this.selectedOrderId === item.orderId ? 0 : item.orderId; }
++              })
++            }, (item: OrderSummary) => `${item.orderId}:${this.requestVersion}`)
+diff --git a/harmony/entry/src/main/ets/features/user/ReportPanel.ets b/harmony/entry/src/main/ets/features/user/ReportPanel.ets
+index cbf3509..d250d31 100644
+--- a/harmony/entry/src/main/ets/features/user/ReportPanel.ets
++++ b/harmony/entry/src/main/ets/features/user/ReportPanel.ets
+@@ -0,0 +1 @@
++import { ReportDialogBody } from './ReportDialogBody';
+@@ -155,2 +156,5 @@ export struct ReportPanel {
+-    if (normalizedDescription.length > 1000) {
+-      this.errorMessage = '补充说明不能超过 1000 字';
++    if (this.description.length > 0 && normalizedDescription.length === 0) {
++      this.errorMessage = '补充说明不能只包含空白字符。'; return;
++    }
++    if (normalizedDescription.length > 200) {
++      this.errorMessage = '补充说明不能超过 200 字';
+@@ -195,0 +200 @@ export struct ReportPanel {
++      if (this.unconfirmed) { this.expanded = false; }
+@@ -207,2 +212 @@ export struct ReportPanel {
+-    this.expanded = false;
+-    this.errorMessage = '';
++    this.clearForm();
+@@ -255,4 +259 @@ export struct ReportPanel {
+-          Text('举报已提交，平台将按流程处理')
+-            .width('100%')
+-            .fontSize(12)
+-            .fontColor(PortraTheme.secondaryText)
++          Text('举报已提交，平台将按流程处理').fontSize(13).fontColor(PortraTheme.secondaryText)
+@@ -260,12 +261,4 @@ export struct ReportPanel {
+-          Text('举报结果待核实，请勿重复提交')
+-            .fontSize(12)
+-            .fontColor(PortraTheme.secondaryText)
+-          Button(this.busy ? '核实中' : '核实结果')
+-            .enabled(!this.busy)
+-            .onClick(() => this.verifySubmission())
+-          if (this.verificationMessage.length > 0) {
+-            Text(this.verificationMessage)
+-              .fontSize(12)
+-              .fontColor(PortraTheme.secondaryText)
+-          }
+-        } else if (!this.expanded) {
++          Text('举报结果待核实，请勿重复提交').fontSize(13).fontColor(PortraTheme.secondaryText)
++          Button(this.busy ? '核实中' : '核实结果').constraintSize({ minHeight: 44 }).enabled(!this.busy).onClick(() => this.verifySubmission())
++          if (this.verificationMessage) { Text(this.verificationMessage).fontSize(13).fontColor(PortraTheme.secondaryText) }
++        } else {
+@@ -273,5 +266,2 @@ export struct ReportPanel {
+-            .height(36)
+-            .fontSize(12)
+-            .fontColor(PortraTheme.secondaryText)
+-            .backgroundColor(PortraTheme.surface)
+-            .border({ width: 1, color: PortraTheme.border })
++            .constraintSize({ minHeight: 44 }).fontSize(13).fontColor(PortraTheme.secondaryText).backgroundColor(PortraTheme.surface)
++            .border({ width: 1, color: PortraTheme.border }).borderRadius(10)
+@@ -279,5 +269,3 @@ export struct ReportPanel {
+-              if (!this.appClient.sessionManager.isAuthenticated()) {
+-                this.onRequireLogin?.();
+-              } else {
+-                this.expanded = true;
+-              }
++              if (!this.synchronizeIdentity()) { return; }
++              if (!this.appClient.sessionManager.isAuthenticated()) { this.onRequireLogin?.(); }
++              else { this.expanded = true; }
+@@ -285,33 +272,0 @@ export struct ReportPanel {
+-        } else {
+-          TextInput({ text: this.reason, placeholder: '举报原因（必填）' })
+-            .height(44)
+-            .backgroundColor(PortraTheme.surface)
+-            .borderRadius(8)
+-            .onChange((value: string) => this.reason = value)
+-          TextArea({ text: this.description, placeholder: '补充说明（可选）' })
+-            .height(82)
+-            .backgroundColor(PortraTheme.surface)
+-            .borderRadius(8)
+-            .onChange((value: string) => this.description = value)
+-          Row({ space: 10 }) {
+-            Button('取消')
+-              .layoutWeight(1)
+-              .height(40)
+-              .backgroundColor(PortraTheme.surface)
+-              .fontColor(PortraTheme.secondaryText)
+-              .onClick(() => {
+-                this.cancelForm();
+-              })
+-            Button(this.busy ? '提交中' : '提交举报')
+-              .layoutWeight(1)
+-              .height(40)
+-              .enabled(!this.busy)
+-              .onClick(() => this.submit())
+-          }
+-          .width('100%')
+-        }
+-        if (this.errorMessage.length > 0) {
+-          Text(this.errorMessage)
+-            .width('100%')
+-            .fontSize(12)
+-            .fontColor(PortraTheme.danger)
+@@ -319,4 +274,5 @@ export struct ReportPanel {
+-      }
+-      .width('100%')
+-      .alignItems(HorizontalAlign.Start)
+-      .padding({ top: 10, bottom: 10 })
++        if (this.errorMessage && !this.expanded) { Text(this.errorMessage).fontSize(13).fontColor(PortraTheme.danger) }
++      }.width('100%').alignItems(HorizontalAlign.Start).padding({ top: 10, bottom: 10 })
++        .bindSheet(this.expanded, this.FormBody(), { height: SheetSize.LARGE, showClose: false,
++          backgroundColor: PortraTheme.surface, keyboardAvoidMode: SheetKeyboardAvoidMode.RESIZE_ONLY,
++          onWillDismiss: (action: DismissSheetAction) => { this.cancelForm(); action.dismiss(); } })
+@@ -324,0 +281,7 @@ export struct ReportPanel {
++  @Builder private FormBody() {
++    ReportDialogBody({ reason: this.reason, description: this.description, busy: this.busy,
++      error: this.errorMessage, groupKey: this.instanceKey,
++      onReason: (value: string) => { if (this.synchronizeIdentity() && !this.busy) { this.reason=value; this.errorMessage=''; } },
++      onDescription: (value: string) => { if (this.synchronizeIdentity() && !this.busy) { this.description=value; this.errorMessage=''; } },
++      onCancel: () => this.cancelForm(), onSubmit: () => this.submit() })
++  }
+diff --git a/harmony/entry/src/main/ets/features/user/ReportDialogBody.ets b/harmony/entry/src/main/ets/features/user/ReportDialogBody.ets
+new file mode 100644
+index 0000000..c390de9
+--- /dev/null
++++ b/harmony/entry/src/main/ets/features/user/ReportDialogBody.ets
+@@ -0,0 +1,47 @@
++import { PortraTheme } from '../../theme/PortraTheme';
++
++/** Presentation only; the shared ReportPanel owns every request and reliability guard. */
++@Component
++export struct ReportDialogBody {
++  @Prop reason: string = ''; @Prop description: string = ''; @Prop busy: boolean = false;
++  @Prop error: string = ''; groupKey: string = 'report';
++  onReason?: (value:string)=>void;onDescription?: (value:string)=>void;onCancel?:()=>void;onSubmit?:()=>void;
++  private readonly reasons: string[] = ['虚假或误导性信息','广告或垃圾信息','侵权或盗用他人作品','骚扰或不当行为','其他违规行为'];
++  build() {
++    Column() {
++      Row({space:12}) {
++        Text('举报此内容').fontSize(21).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText).layoutWeight(1)
++        Button('×').width(44).height(44).padding(0).fontSize(25).fontColor(PortraTheme.secondaryText).backgroundColor(Color.Transparent)
++          .accessibilityText('关闭举报').onClick(()=>this.onCancel?.())
++      }.width('100%').padding({left:20,right:12,top:14,bottom:12})
++      Divider().color(PortraTheme.border)
++      Scroll() {
++        Column({space:12}) {
++          Text('请选择举报原因，平台管理员将根据实际情况核查处理。').fontSize(14).lineHeight(22).fontColor(PortraTheme.secondaryText)
++          if(this.error){Text(this.error).width('100%').padding(12).fontSize(13).fontColor(PortraTheme.danger).backgroundColor(PortraTheme.accentSoft).borderRadius(10)}
++          Text('举报原因').fontSize(14).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
++          ForEach(this.reasons,(reason:string)=>{
++            Row({space:10}) {
++              Radio({value:reason,group:this.groupKey}).checked(this.reason===reason).enabled(!this.busy)
++                .onChange((checked:boolean)=>{if(checked){this.onReason?.(reason);}})
++              Text(reason).fontSize(14).fontColor(PortraTheme.primaryText).layoutWeight(1)
++            }.width('100%').constraintSize({minHeight:48}).onClick(()=>{if(!this.busy){this.onReason?.(reason);}})
++          },(reason:string)=>reason)
++          Text('补充说明（选填）').fontSize(14).fontColor(PortraTheme.primaryText)
++          TextArea({text:this.description,placeholder:'补充说明（选填）'}).width('100%').height(130).maxLength(200).fontSize(15)
++            .padding(12).backgroundColor(PortraTheme.surface).border({width:1,color:PortraTheme.border}).borderRadius(12)
++            .enabled(!this.busy).onChange((value:string)=>this.onDescription?.(value))
++          Text(`还可输入 ${200-this.description.length} 字`).width('100%').textAlign(TextAlign.End).fontSize(12).fontColor(PortraTheme.secondaryText)
++          if(this.busy){Text('正在提交，请等待服务器确认…').fontSize(13).fontColor(PortraTheme.secondaryText)}
++        }.width('100%').alignItems(HorizontalAlign.Start).padding(20)
++      }.width('100%').layoutWeight(1).align(Alignment.TopStart).scrollBar(BarState.Auto)
++      Divider().color(PortraTheme.border)
++      Row({space:12}) {
++        Button('取消').layoutWeight(1).constraintSize({minHeight:48}).fontSize(14).fontColor(PortraTheme.secondaryText)
++          .backgroundColor(PortraTheme.surface).border({width:1,color:PortraTheme.border}).borderRadius(12).enabled(!this.busy).onClick(()=>this.onCancel?.())
++        Button(this.busy?'提交中…':'提交举报').layoutWeight(1).constraintSize({minHeight:48}).fontSize(14).fontColor(PortraTheme.white)
++          .backgroundColor(PortraTheme.primary).borderRadius(12).enabled(!this.busy&&this.reason.length>0).onClick(()=>this.onSubmit?.())
++      }.width('100%').padding({left:20,right:20,top:14,bottom:28}).backgroundColor(PortraTheme.pageBackground)
++    }.width('100%').height('100%').backgroundColor(PortraTheme.surface)
++  }
++}
+diff --git a/harmony/entry/src/main/ets/features/engagement/EngagementController.ets b/harmony/entry/src/main/ets/features/engagement/EngagementController.ets
+new file mode 100644
+index 0000000..931e115
+--- /dev/null
++++ b/harmony/entry/src/main/ets/features/engagement/EngagementController.ets
+@@ -0,0 +1,259 @@
++import { SessionSummary, OrderEngagementSummary, ReviewSummary, ReviewComplaintSummary, DisputeSummary,
++  CreateReviewPayload, ReviewTextPayload, CreateReviewComplaintPayload, DisputeReasonPayload, DisputeReplySummary } from '../../model/ApiModels';
++import { NotificationSession } from '../notifications/NotificationController';
++
++export interface EngagementApi {
++  currentSession(key?: string): Promise<SessionSummary>;
++  cancelCurrentSession(key?: string): void;
++  getOrder(id: number, key: string): Promise<OrderEngagementSummary>;
++  listOrderReviews(id: number, key: string): Promise<ReviewSummary[]>;
++  listReviewComplaints(id: number, key: string): Promise<ReviewComplaintSummary[]>;
++  listOrderDisputes(id: number, key: string): Promise<DisputeSummary[]>;
++  getReview(id: number, key: string): Promise<ReviewSummary>;
++  getReviewComplaint(id: number, key: string): Promise<ReviewComplaintSummary>;
++  getDispute(id: number, key: string): Promise<DisputeSummary>;
++  createReview(id: number, payload: CreateReviewPayload, key: string): Promise<ReviewSummary>;
++  followUpReview(id: number, payload: ReviewTextPayload, key: string): Promise<ReviewSummary>;
++  createReviewComplaint(id: number, payload: CreateReviewComplaintPayload, key: string): Promise<ReviewComplaintSummary>;
++  createDispute(id: number, payload: DisputeReasonPayload, key: string): Promise<DisputeSummary>;
++  replyDispute(id: number, payload: ReviewTextPayload, key: string): Promise<DisputeSummary>;
++  cancelEngagementRequests(keys: string[]): void;
++}
++export class EngagementForm {
++  mode: string = ''; targetId: number = 0; rating: number = 5; content: string = ''; reason: string = '评价内容不实';
++  error: string = ''; busy: boolean = false; uncertain: boolean = false; discardPrompt: boolean = false;
++}
++export class EngagementSnapshot {
++  order?: OrderEngagementSummary; userId: number = 0; reviews: ReviewSummary[] = [];
++  complaints: ReviewComplaintSummary[] = []; disputes: DisputeSummary[] = [];
++  loading: boolean = false; error: string = ''; recordsError: string = ''; loginRequired: boolean = false;
++  message: string = ''; form: EngagementForm = new EngagementForm();
++}
++class Submission {
++  baselineRevision: string = ''; baselineIds: number[] = [];
++  key: string; mode: string; targetId: number; orderId: number; actorId: number; content: string; reason: string; rating: number;
++  constructor(key: string, form: EngagementForm, orderId: number, actorId: number) {
++    this.key=key; this.mode=form.mode; this.targetId=form.targetId; this.orderId=orderId; this.actorId=actorId;
++    this.content=form.content.trim(); this.reason=form.reason; this.rating=form.rating;
++  }
++}
++export class EngagementPendingStore {
++  static readonly shared: EngagementPendingStore = new EngagementPendingStore();
++  readonly entries: Map<string, Submission> = new Map<string, Submission>();
++}
++export class EngagementPolicy {
++  static readonly complaintReasons: string[] = ['评价内容不实','评价包含攻击性表述','评价与订单无关','其他评价争议'];
++  static maxLength(mode: string, reason: string=''): number { return 200; }
++  static validate(mode: string, rating: number, content: string, reason: string): string {
++    if (!['review','followup','complaint','dispute','reply'].includes(mode)) { return '无效的表单'; }
++    if (content.trim().length === 0) { return '请填写内容，不能只包含空白字符。'; }
++    if (content.trim().length > EngagementPolicy.maxLength(mode,reason)) { return '内容不能超过 200 字。'; }
++    if (mode === 'review' && (!Number.isInteger(rating) || rating < 1 || rating > 5)) { return '请选择 1 至 5 星评分。'; }
++    if (mode === 'complaint' && !EngagementPolicy.complaintReasons.includes(reason)) { return '请选择申诉原因。'; }
++    return '';
++  }
++  static canReview(order: OrderEngagementSummary, actor: number, reviews: ReviewSummary[]): boolean {
++    if (![order.customerId,order.providerUserId].includes(actor) || order.customerId === order.providerUserId ||
++      reviews.some((item: ReviewSummary)=>item.reviewerId === actor)) { return false; }
++    if (order.status === 'COMPLETED') { return true; }
++    if (order.status !== 'REFUNDED') { return false; }
++    const status = (order.refundStatus ?? '').replace('REFUNDED_','');
++    return status === 'BOTH_FAULT' || (status === 'PROVIDER_FAULT' && actor === order.customerId) ||
++      (status === 'CUSTOMER_FAULT' && actor === order.providerUserId);
++  }
++  static canDispute(order: OrderEngagementSummary, disputes: DisputeSummary[]): boolean {
++    return !['COMPLETED','CANCELLED','REFUNDED','APPEALING'].includes(order.status ?? '') &&
++      !disputes.some((item: DisputeSummary)=>['OPEN','REPLIED'].includes(item.status));
++  }
++  static canReply(dispute: DisputeSummary, actor: number): boolean {
++    return actor > 0 && dispute.status === 'OPEN' && dispute.initiatorId !== actor;
++  }
++}
++let nextEngagementInstance: number = 0;
++export class EngagementController {
++  private state: EngagementSnapshot = new EngagementSnapshot();
++  private readonly api: EngagementApi; private readonly session: NotificationSession;
++  private readonly changed: (value: EngagementSnapshot)=>void;
++  private active: boolean = false; private generation: number = 0; private loadedVersion: number = -1;
++  private readonly key: string = `engagement.c.${++nextEngagementInstance}`;
++  private keys: string[] = []; private readonly pending: Map<string,Submission> = EngagementPendingStore.shared.entries;
++  constructor(api: EngagementApi, session: NotificationSession, changed: (value: EngagementSnapshot)=>void) {
++    this.api=api; this.session=session; this.changed=changed;
++  }
++  resume(): void { this.active=true; this.state.loginRequired=!this.session.isAuthenticated(); this.publish(); }
++  suspend(): void {
++    this.active=false; this.generation++; this.api.cancelEngagementRequests(this.keys.slice());
++    this.api.cancelCurrentSession(`${this.key}.session`); this.keys=[]; this.state=new EngagementSnapshot(); this.publish();
++  }
++  private publish(): void {
++    const next=new EngagementSnapshot(); next.order=this.state.order; next.userId=this.state.userId;
++    next.reviews=this.state.reviews.slice();next.complaints=this.state.complaints.slice();next.disputes=this.state.disputes.slice();
++    next.loading=this.state.loading;next.error=this.state.error;next.recordsError=this.state.recordsError;
++    next.loginRequired=this.state.loginRequired;next.message=this.state.message;
++    const f=this.state.form,copy=new EngagementForm();copy.mode=f.mode;copy.targetId=f.targetId;copy.rating=f.rating;
++    copy.content=f.content;copy.reason=f.reason;copy.error=f.error;copy.busy=f.busy;copy.uncertain=f.uncertain;copy.discardPrompt=f.discardPrompt;
++    next.form=copy; this.changed(next);
++  }
++  private current(epoch: number, version: number): boolean {
++    if(epoch!==this.generation){return false;}
++    if(version!==this.session.getSessionVersion()){this.suspend();this.resume();return false;}
++    return this.active;
++  }
++  private identity(): boolean {
++    if(!this.active){return false;}
++    if(!this.session.isAuthenticated() || this.loadedVersion!==this.session.getSessionVersion()){
++      this.suspend();this.resume();return false;
++    }
++    return true;
++  }
++  private requestKey(suffix: string): string { const key=`${this.key}.${suffix}`;this.keys.push(key);return key; }
++  async loadTarget(kind: string,id: number,expectedOrderId: number=0): Promise<void> {
++    if(!this.active||this.state.loading||!this.session.isAuthenticated()){return;}
++    if(!Number.isSafeInteger(id)||id<=0){this.state.error='无效的通知对象';this.publish();return;}
++    if(kind==='order'){await this.load(id);return;}
++    const epoch=++this.generation,version=this.session.getSessionVersion();this.state.loading=true;this.publish();
++    let orderId=0; let targetReview: ReviewSummary | undefined; let targetComplaint: ReviewComplaintSummary | undefined;
++    try {
++      if(kind==='review') {const item=await this.api.getReview(id,this.requestKey(`target.${epoch}`));if(item.reviewId!==id){throw new Error('评价对象不一致');}orderId=item.orderId;targetReview=item;}
++      else if(kind==='complaint'){const item=await this.api.getReviewComplaint(id,this.requestKey(`target.${epoch}`));if(item.complaintId!==id){throw new Error('申诉对象不一致');}orderId=item.orderId;targetComplaint=item;}
++      else if(kind==='dispute'){const item=await this.api.getDispute(id,this.requestKey(`target.${epoch}`));if(item.id!==id){throw new Error('订单申诉对象不一致');}orderId=item.orderId;}
++      else {throw new Error('暂不支持此通知对象');}
++      if(!this.current(epoch,version)){return;}
++      if(!Number.isSafeInteger(orderId)||orderId<=0||(expectedOrderId>0&&expectedOrderId!==orderId)){throw new Error('关联订单信息不一致');}
++      this.state.loading=false;await this.load(orderId,targetReview,targetComplaint);
++    }catch(error){if(this.current(epoch,version)){this.state.error=(error as Error).message||'对应内容暂时无法打开';this.state.loading=false;this.publish();}}
++  }
++  async load(orderId: number, targetReview?: ReviewSummary, targetComplaint?: ReviewComplaintSummary): Promise<void> {
++    if(!this.active || this.state.loading || this.state.form.busy){return;}
++    if(!this.session.isAuthenticated()){this.suspend();this.resume();return;}
++    if(!Number.isSafeInteger(orderId)||orderId<=0){this.state.error='无效的订单';this.publish();return;}
++    const epoch=++this.generation,version=this.session.getSessionVersion();
++    const sameContext=this.state.order?.orderId===orderId&&this.loadedVersion===version;
++    const form=sameContext?this.state.form:new EngagementForm();const message=sameContext?this.state.message:'';
++    this.state=new EngagementSnapshot();this.state.form=form;this.state.message=message;this.state.loading=true;this.publish();
++    try {
++      const actor=await this.api.currentSession(`${this.key}.session`);if(!this.current(epoch,version)){return;}
++      const order=await this.api.getOrder(orderId,this.requestKey(`order.${epoch}`));if(!this.current(epoch,version)){return;}
++      if(order?.orderId!==orderId||!Number.isSafeInteger(actor.userId)||actor.userId<=0||
++        ![order.customerId,order.providerUserId].includes(actor.userId)){throw new Error('无权查看这笔订单');}
++      this.state.order=order;this.state.userId=actor.userId;this.loadedVersion=version;
++      const reviews=await this.api.listOrderReviews(orderId,this.requestKey(`reviews.${epoch}`));if(!this.current(epoch,version)){return;}
++      if(!Array.isArray(reviews)||reviews.some((r: ReviewSummary)=>r.orderId!==orderId||!Number.isSafeInteger(r.reviewId)||r.reviewId<=0)){throw new Error('评价数据异常');}
++      this.state.reviews=reviews;
++      if(targetReview!==undefined&&!reviews.some((r:ReviewSummary)=>r.reviewId===targetReview.reviewId)) {
++        if(targetReview.orderId!==orderId){throw new Error('评价关联订单不一致');}
++        this.state.reviews.push(targetReview);
++      }
++      if(targetComplaint!==undefined) {
++        if(targetComplaint.orderId!==orderId||!Number.isSafeInteger(targetComplaint.reviewId)||targetComplaint.reviewId<=0||
++          ![targetComplaint.complainantId,targetComplaint.respondentId].includes(actor.userId)){throw new Error('无权查看这条申诉');}
++        this.state.complaints.push(targetComplaint);
++      }
++      try {
++        const disputes=await this.api.listOrderDisputes(orderId,this.requestKey(`disputes.${epoch}`));if(!this.current(epoch,version)){return;}
++        if(!Array.isArray(disputes)||disputes.some((d: DisputeSummary)=>d.orderId!==orderId||!Number.isSafeInteger(d.id)||d.id<=0)){throw new Error('订单申诉数据异常');}
++        this.state.disputes=disputes;
++        for(const review of reviews){
++          const list=await this.api.listReviewComplaints(review.reviewId,this.requestKey(`complaints.${epoch}.${review.reviewId}`));
++          if(!this.current(epoch,version)){return;}
++          if(!Array.isArray(list)||list.some((r: ReviewComplaintSummary)=>r.orderId!==orderId||r.reviewId!==review.reviewId||!Number.isSafeInteger(r.complaintId)||r.complaintId<=0)){throw new Error('评价申诉数据异常');}
++          list.forEach((item:ReviewComplaintSummary)=>{
++            if(!this.state.complaints.some((r:ReviewComplaintSummary)=>r.complaintId===item.complaintId)){this.state.complaints.push(item);}
++          });
++        }
++      }catch(error){if(this.current(epoch,version)){this.state.recordsError='申诉记录暂时加载失败，请刷新后再操作。';}}
++    }catch(error){if(this.current(epoch,version)){this.state.error=(error as Error).message||'订单评价暂时打不开';}}
++    finally {if(this.current(epoch,version)){this.state.loading=false;this.publish();}}
++  }
++  private ledgerKey(mode: string,targetId: number): string { return `${this.state.userId}:${this.state.order?.orderId}:${mode}:${targetId}`; }
++  open(mode: string, targetId: number): void {
++    if(!this.identity()||this.state.form.busy||this.state.loading){return;}
++    this.generation++;const form=new EngagementForm();form.mode=mode;form.targetId=targetId;this.state.form=form;this.state.message='';
++    if(this.pending.has(this.ledgerKey(mode,targetId))){form.uncertain=true;form.error='上次提交结果待核实，请先刷新核实，勿重复提交。';}
++    this.publish();
++  }
++  setContent(value: string): void {if(this.identity()&&!this.state.form.busy){this.state.form.content=value.slice(0,EngagementPolicy.maxLength(this.state.form.mode,this.state.form.reason));this.state.form.error='';this.publish();}}
++  setRating(value: number): void {if(this.identity()&&!this.state.form.busy){this.state.form.rating=value;this.publish();}}
++  setReason(value: string): void {if(this.identity()&&!this.state.form.busy){this.state.form.reason=value;this.publish();}}
++  requestClose(): boolean {
++    if((this.state.form.content.trim().length>0||this.state.form.rating!==5||this.state.form.reason!=='评价内容不实')&&!this.state.form.busy){this.state.form.discardPrompt=true;this.publish();return false;}
++    this.confirmDiscard();return true;
++  }
++  cancelDiscard(): void {this.state.form.discardPrompt=false;this.publish();}
++  confirmDiscard(): void {
++    const reading=this.state.loading;
++    this.generation++;this.api.cancelEngagementRequests(this.keys.slice());this.keys=[];
++    this.state.loading=false;
++    if(reading){this.state.order=undefined;this.state.reviews=[];this.state.complaints=[];this.state.disputes=[];this.state.error='已停止读取，请刷新后继续。';}
++    this.state.form=new EngagementForm();this.publish();
++  }
++  private permitted(mode: string,targetId: number): boolean {
++    const order=this.state.order,actor=this.state.userId;if(order===undefined||this.state.error.length>0||this.state.recordsError.length>0){return false;}
++    if(mode==='review'){return targetId===order.orderId&&EngagementPolicy.canReview(order,actor,this.state.reviews);}
++    const review=this.state.reviews.find((r: ReviewSummary)=>r.reviewId===targetId);
++    if(mode==='followup'){return review!==undefined&&review.reviewerId===actor&&review.isVisible!==false;}
++    if(mode==='complaint'){return review!==undefined&&review.targetUserId===actor&&review.isVisible!==false&&
++      !this.state.complaints.some((r: ReviewComplaintSummary)=>r.reviewId===targetId&&r.status==='PENDING');}
++    if(mode==='dispute'){return targetId===order.orderId&&EngagementPolicy.canDispute(order,this.state.disputes);}
++    if(mode==='reply'){return this.state.disputes.some((r: DisputeSummary)=>r.id===targetId&&EngagementPolicy.canReply(r,actor));}
++    return false;
++  }
++  async submit(): Promise<void> {
++    if(!this.identity()||this.state.form.busy||this.state.loading){return;}
++    const form=this.state.form,key=this.ledgerKey(form.mode,form.targetId);
++    if(this.pending.has(key)){form.uncertain=true;form.error='提交结果待核实，请先核实，勿重复提交。';this.publish();return;}
++    form.error=EngagementPolicy.validate(form.mode,form.rating,form.content,form.reason);
++    if(!this.permitted(form.mode,form.targetId)){form.error='当前账号或对象状态不允许此操作，请刷新核实。';}
++    if(form.error.length>0){this.publish();return;}
++    const epoch=++this.generation,version=this.session.getSessionVersion();
++    const command=new Submission(this.requestKey(`write.${epoch}`),form,this.state.order!.orderId,this.state.userId);
++    const previous=this.state.reviews.find((r:ReviewSummary)=>r.reviewId===form.targetId);
++    command.baselineRevision=JSON.stringify([previous?.replyContent??'',previous?.replyTime??'']);
++    command.baselineIds=form.mode==='complaint'?this.state.complaints.map((r:ReviewComplaintSummary)=>r.complaintId):
++      form.mode==='reply'?(this.state.disputes.find((r:DisputeSummary)=>r.id===form.targetId)?.replies??[]).map((r:DisputeReplySummary)=>r.id):this.state.disputes.map((r:DisputeSummary)=>r.id);
++    this.pending.set(key,command);form.busy=true;this.publish();
++    try {
++      await this.send(command);if(this.pending.get(key)===command){this.pending.delete(key);}
++      if(!this.current(epoch,version)){return;}
++      this.state.form=new EngagementForm();this.state.message=command.mode==='review'?'评价已提交':command.mode==='followup'?'追评已提交':command.mode==='complaint'?'评价申诉已提交':command.mode==='dispute'?'订单申诉已提交':'申诉回复已提交';
++      this.publish();await this.load(command.orderId);
++    }catch(error){
++      const mapped=error as FormFailure;
++      const rejected=(mapped.httpStatus??0)>=400&&(mapped.httpStatus??0)<500||mapped.kind==='business'&&(mapped.businessCode??0)>=40000&&(mapped.businessCode??0)<50000;
++      if(rejected&&this.pending.get(key)===command){this.pending.delete(key);}
++      if(!this.current(epoch,version)){return;}
++      form.uncertain=!rejected;form.error=rejected?(mapped.message||'提交未被接受，请核对内容。'):'结果未确认，服务器可能已写入。请先核实，勿重复提交。';
++    }finally {if(this.current(epoch,version)){this.state.form.busy=false;this.publish();}}
++  }
++  private async send(c: Submission): Promise<void> {
++    if(c.mode==='review'||c.mode==='followup'){
++      const r=c.mode==='review'?await this.api.createReview(c.targetId,{rating:c.rating,content:c.content},c.key):
++        await this.api.followUpReview(c.targetId,{content:c.content},c.key);
++      if(!r||!Number.isSafeInteger(r.reviewId)||r.reviewId<=0||r.orderId!==c.orderId||r.reviewerId!==c.actorId||
++        (c.mode==='review'&&(r.content!==c.content||r.rating!==c.rating))||
++        (c.mode==='followup'&&(r.reviewId!==c.targetId||r.replyContent!==c.content))){throw new Error('评价响应异常');}
++    }else if(c.mode==='complaint'){
++      const r=await this.api.createReviewComplaint(c.targetId,{reason:`${c.reason}：${c.content}`,evidenceFileIds:''},c.key);
++      if(!r||!Number.isSafeInteger(r.complaintId)||r.complaintId<=0||r.reviewId!==c.targetId||r.orderId!==c.orderId||r.complainantId!==c.actorId){throw new Error('申诉响应异常');}
++    }else {
++      const r=c.mode==='dispute'?await this.api.createDispute(c.targetId,{reason:c.content},c.key):await this.api.replyDispute(c.targetId,{content:c.content},c.key);
++      if(!r||!Number.isSafeInteger(r.id)||r.id<=0||r.orderId!==c.orderId||(c.mode==='dispute'&&r.initiatorId!==c.actorId)||
++        (c.mode==='reply'&&(r.id!==c.targetId||!r.replies?.some((reply: DisputeReplySummary)=>reply.replierId===c.actorId&&reply.content===c.content)))){throw new Error('订单申诉响应异常');}
++    }
++  }
++  async verify(): Promise<void> {
++    if(!this.identity()||this.state.form.busy||this.state.loading){return;}
++    const key=this.ledgerKey(this.state.form.mode,this.state.form.targetId),c=this.pending.get(key);if(c===undefined){return;}
++    const form=this.state.form;
++    await this.load(c.orderId);if(!this.identity()||this.state.error||this.state.recordsError||this.state.form!==form||this.pending.get(key)!==c){return;}
++    const found=c.mode==='review'?this.state.reviews.some((r: ReviewSummary)=>r.reviewerId===c.actorId&&r.content===c.content&&r.rating===c.rating):
++      c.mode==='followup'?this.state.reviews.some((r: ReviewSummary)=>r.reviewId===c.targetId&&r.reviewerId===c.actorId&&r.replyContent===c.content&&JSON.stringify([r.replyContent??'',r.replyTime??''])!==c.baselineRevision):
++      c.mode==='complaint'?this.state.complaints.some((r: ReviewComplaintSummary)=>!c.baselineIds.includes(r.complaintId)&&r.reviewId===c.targetId&&r.complainantId===c.actorId&&r.reason===`${c.reason}：${c.content}`):
++      c.mode==='dispute'?this.state.disputes.some((r: DisputeSummary)=>!c.baselineIds.includes(r.id)&&r.initiatorId===c.actorId&&r.reason===c.content):
++      this.state.disputes.some((r: DisputeSummary)=>r.id===c.targetId&&r.replies?.some((reply: DisputeReplySummary)=>!c.baselineIds.includes(reply.id)&&reply.replierId===c.actorId&&reply.content===c.content));
++    if(found){this.pending.delete(key);this.state.form=new EngagementForm();this.state.message='已重新读取并核实记录，请核对时间与内容。';}
++    else {this.state.form.uncertain=true;this.state.form.error='暂未查到本次记录，不能据此判断未写入，请稍后核实或联系平台，勿重复提交。';}
++    this.publish();
++  }
++}
++interface FormFailure { httpStatus?: number; kind?: string; businessCode?: number; message?: string; }
+diff --git a/harmony/entry/src/main/ets/features/engagement/EngagementDialogs.ets b/harmony/entry/src/main/ets/features/engagement/EngagementDialogs.ets
+new file mode 100644
+index 0000000..5ba154a
+--- /dev/null
++++ b/harmony/entry/src/main/ets/features/engagement/EngagementDialogs.ets
+@@ -0,0 +1,92 @@
++import { EngagementForm, EngagementPolicy } from './EngagementController';
++import { PortraTheme } from '../../theme/PortraTheme';
++
++/** Phone sheet body. Header/footer remain reachable while the input region scrolls. */
++@Component
++export struct EngagementDialogs {
++  @Prop form: EngagementForm = new EngagementForm();
++  orderId: number = 0;
++  onContent?: (value: string)=>void; onRating?: (value: number)=>void; onReason?: (value: string)=>void;
++  onClose?: ()=>void; onSubmit?: ()=>void; onVerify?: ()=>void; onKeep?: ()=>void; onDiscard?: ()=>void;
++  private title(): string {
++    return this.form.mode==='review'?'评价本次合作':this.form.mode==='followup'?'追加追评':
++      this.form.mode==='complaint'?'发起评价申诉':this.form.mode==='dispute'?'发起订单申诉':'回复订单申诉';
++  }
++  private help(): string {
++    return this.form.mode==='review'?'评分会影响对方在平台上的合作信用，请基于真实履约体验填写。':
++      this.form.mode==='followup'?'补充你对这次合作的后续感受，追评会直接展示在原评价下方。':
++      this.form.mode==='complaint'?'请说明你认为评价不实或存在争议的原因，处理结果会记录在本次约拍的评价区。':
++      this.form.mode==='dispute'?'请说明本次订单的争议和诉求，平台将按实际情况核查处理。':'请基于真实合作情况补充说明，回复会保留在本次订单申诉记录中。';
++  }
++  private submitLabel(): string {
++    return this.form.mode==='review'?'提交评价':this.form.mode==='followup'?'提交追评':this.form.mode==='reply'?'提交回复':'提交申诉';
++  }
++  build() {
++    Column() {
++      Row({space:8}) {
++        Text(this.form.discardPrompt?'放弃填写？':this.title()).fontSize(21).fontWeight(FontWeight.Bold)
++          .fontColor(PortraTheme.primaryText).layoutWeight(1)
++        Button('×').width(44).height(44).padding(0).fontSize(25).fontColor(PortraTheme.secondaryText)
++          .backgroundColor(Color.Transparent).accessibilityText('关闭表单').onClick(()=>this.onClose?.())
++      }.width('100%').padding({left:20,right:12,top:14,bottom:12})
++      Divider().color(PortraTheme.border)
++      Scroll() {
++        Column({space:16}) {
++          if(this.form.discardPrompt) {
++            Text('当前内容尚未提交，关闭后将丢弃已填写内容。确定关闭吗？').fontSize(15).fontColor(PortraTheme.primaryText)
++            Text('提交结果待核实时，关闭仍会保留防重记录，之后请先核实。').fontSize(13).fontColor(PortraTheme.secondaryText)
++          } else {
++            Text(`本次约拍 · 订单 #${this.orderId}`).fontSize(12).fontColor(PortraTheme.secondaryText)
++            Text(this.help()).width('100%').fontSize(13).lineHeight(21).fontColor(PortraTheme.primary)
++              .padding(14).backgroundColor(PortraTheme.primarySoft).borderRadius(12)
++            if(this.form.mode==='review') {
++              Text('评分').fontSize(14).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
++              Row({space:0}) {
++                ForEach([1,2,3,4,5],(star:number)=>{
++                  Button(star<=this.form.rating?'★':'☆').layoutWeight(1).constraintSize({minHeight:48})
++                    .padding(0).fontSize(30).fontColor(PortraTheme.accent).backgroundColor(Color.Transparent)
++                    .enabled(!this.form.busy&&!this.form.uncertain).accessibilityText(`${star}星`).onClick(()=>this.onRating?.(star))
++                },(star:number)=>star.toString())
++              }.width('100%')
++            }
++            if(this.form.mode==='complaint') {
++              Text('申诉原因').fontSize(14).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
++              ForEach(EngagementPolicy.complaintReasons,(reason:string)=>{
++                Row({space:10}) {
++                  Radio({value:reason,group:'engagement-complaint-reason'}).checked(this.form.reason===reason)
++                    .enabled(!this.form.busy&&!this.form.uncertain).onChange((checked:boolean)=>{if(checked){this.onReason?.(reason);}})
++                  Text(reason).fontSize(14).fontColor(PortraTheme.primaryText).layoutWeight(1)
++                }.width('100%').constraintSize({minHeight:48})
++                  .onClick(()=>{if(!this.form.busy&&!this.form.uncertain){this.onReason?.(reason);}})
++              },(reason:string)=>reason)
++            }
++            Text(this.form.mode==='review'?'评价内容':this.form.mode==='followup'?'追评内容':this.form.mode==='complaint'?'补充说明':'申诉说明')
++              .fontSize(14).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
++            TextArea({text:this.form.content,placeholder:'请基于真实合作情况填写'}).width('100%').height(156)
++              .fontSize(15).padding(12).backgroundColor(PortraTheme.surface).borderRadius(12)
++              .border({width:1,color:PortraTheme.border}).maxLength(EngagementPolicy.maxLength(this.form.mode,this.form.reason)).enabled(!this.form.busy&&!this.form.uncertain)
++              .onChange((value:string)=>this.onContent?.(value))
++            Text(`还可输入 ${Math.max(0,EngagementPolicy.maxLength(this.form.mode,this.form.reason)-this.form.content.length)} 字`).fontSize(12).fontColor(PortraTheme.secondaryText).width('100%').textAlign(TextAlign.End)
++            if(this.form.error) {
++              Text(this.form.error).width('100%').fontSize(13).lineHeight(20).fontColor(PortraTheme.danger)
++                .padding(12).backgroundColor(PortraTheme.accentSoft).borderRadius(10)
++            }
++            if(this.form.busy) { Text('正在提交，请等待服务器确认…').fontSize(13).fontColor(PortraTheme.secondaryText) }
++          }
++        }.width('100%').alignItems(HorizontalAlign.Start).padding(20)
++      }.layoutWeight(1).width('100%').align(Alignment.TopStart).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring)
++      Divider().color(PortraTheme.border)
++      Row({space:12}) {
++        Button(this.form.discardPrompt?'继续填写':'取消').layoutWeight(1).constraintSize({minHeight:48}).fontSize(14)
++          .fontColor(PortraTheme.primaryText).backgroundColor(PortraTheme.surface)
++          .border({width:1,color:PortraTheme.border}).borderRadius(12).enabled(this.form.discardPrompt||!this.form.busy)
++          .onClick(()=>{if(this.form.discardPrompt){this.onKeep?.();}else{this.onClose?.();}})
++        Button(this.form.discardPrompt?'放弃填写':this.form.busy?'提交中…':this.form.uncertain?'核实结果':this.submitLabel())
++          .layoutWeight(1).constraintSize({minHeight:48}).fontSize(14).fontWeight(FontWeight.Medium).fontColor(PortraTheme.white)
++          .backgroundColor(this.form.discardPrompt||this.form.mode==='complaint'?PortraTheme.danger:PortraTheme.primary).borderRadius(12)
++          .enabled(this.form.discardPrompt||(!this.form.busy&&(this.form.uncertain||this.form.content.trim().length>0)))
++          .onClick(()=>{if(this.form.discardPrompt){this.onDiscard?.();}else if(this.form.uncertain){this.onVerify?.();}else{this.onSubmit?.();}})
++      }.width('100%').padding({left:20,right:20,top:14,bottom:28}).backgroundColor(PortraTheme.pageBackground)
++    }.width('100%').height('100%').backgroundColor(PortraTheme.surface)
++  }
++}
+diff --git a/harmony/entry/src/main/ets/features/engagement/EngagementApiBinding.ets b/harmony/entry/src/main/ets/features/engagement/EngagementApiBinding.ets
+new file mode 100644
+index 0000000..6941770
+--- /dev/null
++++ b/harmony/entry/src/main/ets/features/engagement/EngagementApiBinding.ets
+@@ -0,0 +1,22 @@
++import { ApiService } from '../../network/ApiService';
++import { OrderEngagementSummary, ReviewSummary, ReviewComplaintSummary, DisputeSummary, CreateReviewPayload, ReviewTextPayload, CreateReviewComplaintPayload, DisputeReasonPayload, SessionSummary } from '../../model/ApiModels';
++import { EngagementApi } from './EngagementController';
++export class EngagementApiBinding implements EngagementApi {
++  private readonly api: ApiService;
++  constructor(api: ApiService) { this.api=api; }
++  currentSession(key?: string): Promise<SessionSummary> { return this.api.currentSession(key); }
++  cancelCurrentSession(key?: string): void { this.api.cancelCurrentSession(key); }
++  cancelEngagementRequests(keys: string[]): void { this.api.cancelEngagementRequests(keys); }
++  getOrder(id: number, requestKey: string): Promise<OrderEngagementSummary> { return this.api.getOrder(id, requestKey); }
++  listOrderReviews(id: number, requestKey: string): Promise<ReviewSummary[]> { return this.api.listOrderReviews(id, requestKey); }
++  getReview(id: number, requestKey: string): Promise<ReviewSummary> { return this.api.getReview(id, requestKey); }
++  listReviewComplaints(id: number, requestKey: string): Promise<ReviewComplaintSummary[]> { return this.api.listReviewComplaints(id, requestKey); }
++  getReviewComplaint(id: number, requestKey: string): Promise<ReviewComplaintSummary> { return this.api.getReviewComplaint(id, requestKey); }
++  listOrderDisputes(id: number, requestKey: string): Promise<DisputeSummary[]> { return this.api.listOrderDisputes(id, requestKey); }
++  getDispute(id: number, requestKey: string): Promise<DisputeSummary> { return this.api.getDispute(id, requestKey); }
++  createReview(id: number, payload: CreateReviewPayload, requestKey: string): Promise<ReviewSummary> { return this.api.createReview(id, payload, requestKey); }
++  followUpReview(id: number, payload: ReviewTextPayload, requestKey: string): Promise<ReviewSummary> { return this.api.followUpReview(id, payload, requestKey); }
++  createReviewComplaint(id: number, payload: CreateReviewComplaintPayload, requestKey: string): Promise<ReviewComplaintSummary> { return this.api.createReviewComplaint(id, payload, requestKey); }
++  createDispute(id: number, payload: DisputeReasonPayload, requestKey: string): Promise<DisputeSummary> { return this.api.createDispute(id, payload, requestKey); }
++  replyDispute(id: number, payload: ReviewTextPayload, requestKey: string): Promise<DisputeSummary> { return this.api.replyDispute(id, payload, requestKey); }
++}
+diff --git a/harmony/entry/src/main/ets/features/notifications/NotificationTargetResolver.ets b/harmony/entry/src/main/ets/features/notifications/NotificationTargetResolver.ets
+new file mode 100644
+index 0000000..d50032d
+--- /dev/null
++++ b/harmony/entry/src/main/ets/features/notifications/NotificationTargetResolver.ets
+@@ -0,0 +1,29 @@
++import { NotificationSummary } from '../../model/ApiModels';
++interface TargetMetadata { orderId?: number; reviewId?: number; complaintId?: number; disputeId?: number; reportId?: number; }
++export class NotificationTarget { kind: string; id: number; orderId: number;
++  constructor(kind: string,id: number,orderId: number=0){this.kind=kind;this.id=id;this.orderId=orderId;}
++}
++export class NotificationTargetResolver {
++  static resolve(item: NotificationSummary): NotificationTarget | undefined {
++    if(item.navigationPath && (!item.navigationPath.startsWith('/')||item.navigationPath.startsWith('//'))){return undefined;}
++    let metadata: TargetMetadata={};
++    try {if(item.metadataJson){metadata=JSON.parse(item.metadataJson) as TargetMetadata;if(metadata===null||typeof metadata!=='object'||Array.isArray(metadata)){return undefined;}}}catch{return undefined;}
++    const type=(item.eventType||item.type||'').toUpperCase(),related=(item.relatedType??'').toUpperCase();
++    const orderId=NotificationTargetResolver.id(metadata.orderId)??0;
++    if(type.includes('CREDIT')){return new NotificationTarget('credit',0);}
++    let kind='',relation='',id: number|undefined;
++    if(type.includes('REVIEW_COMPLAINT')){kind='complaint';relation='REVIEW_COMPLAINT';id=metadata.complaintId;}
++    else if(type.includes('DISPUTE')){kind='dispute';relation='DISPUTE';id=metadata.disputeId;}
++    else if(type.startsWith('REVIEW_')){kind='review';relation='REVIEW';id=metadata.reviewId;}
++    else if(type.startsWith('REPORT_')){kind='report';relation='REPORT';id=metadata.reportId;}
++    else if(type.startsWith('MOMENT_')){kind='moment';relation='MOMENT';}
++    else if(type.startsWith('ORDER_')){kind='order';relation='ORDER';id=metadata.orderId;}
++    else {return undefined;}
++    if(related && related!==relation){return undefined;}
++    if(id!==undefined && item.relatedId!==undefined&&item.relatedId!==null&&id!==item.relatedId){return undefined;}
++    const targetId=NotificationTargetResolver.id(id??item.relatedId);if(targetId===undefined){return undefined;}
++    if(metadata.orderId!==undefined&&orderId===0){return undefined;}
++    return new NotificationTarget(kind,targetId,kind==='order'?targetId:orderId);
++  }
++  private static id(value?: number|null): number|undefined {return typeof value==='number'&&Number.isSafeInteger(value)&&value>0?value:undefined;}
++}
+diff --git a/harmony/entry/src/main/ets/pages/OrderEngagementPage.ets b/harmony/entry/src/main/ets/pages/OrderEngagementPage.ets
+new file mode 100644
+index 0000000..72f4a41
+--- /dev/null
++++ b/harmony/entry/src/main/ets/pages/OrderEngagementPage.ets
+@@ -0,0 +1,199 @@
++import { uiObserver } from '@kit.ArkUI';
++import { AppClient } from '../app/AppClient';
++import { EngagementController, EngagementSnapshot, EngagementPolicy } from '../features/engagement/EngagementController';
++import { EngagementApiBinding } from '../features/engagement/EngagementApiBinding';
++import { EngagementDialogs } from '../features/engagement/EngagementDialogs';
++import { ActivitySessionBinding } from '../features/notifications/ActivityApiBindings';
++import { MomentFeedLifecycle } from '../features/moments/MomentFeedLifecycle';
++import { ReportPanel } from '../features/user/ReportPanel';
++import { ReviewSummary, ReviewComplaintSummary, DisputeSummary, DisputeReplySummary } from '../model/ApiModels';
++import { PortraTheme } from '../theme/PortraTheme';
++
++@Component
++export struct OrderEngagementPage {
++  targetKind: string = 'order'; targetId: number = 0; expectedOrderId: number = 0;
++  onBack?: ()=>void; onRequireLogin?: ()=>void;
++  @State private state: EngagementSnapshot = new EngagementSnapshot();
++  @State private sheetOpen: boolean = false;
++  private controller?: EngagementController; private lifecycle?: MomentFeedLifecycle;
++  private visible: boolean = false; private focusOpened: boolean = false;
++  aboutToAppear(): void {
++    this.controller=new EngagementController(new EngagementApiBinding(AppClient.shared.apiService),new ActivitySessionBinding(AppClient.shared.sessionManager),
++      (value: EngagementSnapshot)=>{
++        this.state=value;
++        if(value.order===undefined&&!value.loading){this.sheetOpen=false;}
++        if(value.form.mode){this.sheetOpen=true;}
++        if(!this.focusOpened&&this.targetKind!=='order'&&value.order!==undefined&&!value.loading&&!value.error){this.focusOpened=true;this.sheetOpen=true;}
++      });
++  }
++  aboutToDisappear(): void {this.lifecycle?.stop();this.lifecycle=undefined;this.controller?.suspend();}
++  private load(): void {this.controller?.loadTarget(this.targetKind,this.targetId,this.expectedOrderId);}
++  private observe(): void {
++    if(this.lifecycle!==undefined){return;}
++    try {
++      this.lifecycle=new MomentFeedLifecycle(this.getUIContext(),(update?:uiObserver.NavDestinationInfo)=>{
++        const navigation=this.queryNavigationInfo();let destination=this.queryNavDestinationInfo();
++        if(navigation===undefined||destination===undefined){throw new Error('Navigation unavailable');}
++        if(update?.navDestinationId===destination.navDestinationId){destination=update;}
++        return destination.index===navigation.pathStack.size()-1&&destination.state!==uiObserver.NavDestinationState.ON_HIDDEN&&
++          destination.state!==uiObserver.NavDestinationState.ON_WILL_HIDE&&destination.state!==uiObserver.NavDestinationState.ON_DISAPPEAR&&destination.state!==uiObserver.NavDestinationState.ON_WILL_DISAPPEAR;
++      },(visible:boolean)=>{if(this.visible===visible){return;}this.visible=visible;this.sheetOpen=false;
++        if(visible){this.controller?.resume();this.load();}else{this.controller?.suspend();}},
++      ()=>{this.controller?.suspend();this.state.error='页面状态监听不可用，请返回后重试。';});
++      this.lifecycle.start();
++    }catch{this.state.error='页面状态监听不可用，请返回后重试。';}
++  }
++  private reviews(): ReviewSummary[] {
++    const focusedReviewId=this.targetKind==='complaint'?
++      this.state.complaints.find((c:ReviewComplaintSummary)=>c.complaintId===this.targetId)?.reviewId:this.targetKind==='review'?this.targetId:0;
++    return this.state.reviews.slice().sort((a:ReviewSummary,b:ReviewSummary)=>
++      (b.reviewId===focusedReviewId?1:0)-(a.reviewId===focusedReviewId?1:0));
++  }
++  private disputes(): DisputeSummary[] {
++    return this.state.disputes.slice().sort((a:DisputeSummary,b:DisputeSummary)=>
++      (b.id===this.targetId&&this.targetKind==='dispute'?1:0)-(a.id===this.targetId&&this.targetKind==='dispute'?1:0));
++  }
++  private statusText(status?: string): string {
++    switch(status) {
++      case 'PENDING_PAYMENT': return '约定已确认'; case 'PAID_PENDING_SHOOT': return '待拍摄';
++      case 'SHOOTING': return '拍摄中'; case 'PENDING_DELIVERY': return '待交付';
++      case 'DELIVERED_PENDING_CONFIRM': return '待确认'; case 'COMPLETED': return '已完成';
++      case 'CANCELLED': return '已取消'; case 'REFUNDED': return '已退款';
++      case 'APPEALING': return '申诉中'; case 'REWORK_REQUIRED': return '待返修'; default: return '状态待同步';
++    }
++  }
++  private complaintResult(result: string): string {
++    return result==='REVIEW_HIDDEN'?'申诉通过，评价已隐藏':result==='REJECTED'?'申诉驳回':'处理结果待核实';
++  }
++  @Builder private SmallAction(label:string,action:()=>void) {
++    Button(label).constraintSize({minHeight:44}).fontSize(13).fontColor(PortraTheme.primary).backgroundColor(PortraTheme.primarySoft)
++      .borderRadius(10).enabled(!this.state.loading&&!this.state.form.busy&&(label==='刷新'||!this.state.recordsError)).onClick(action)
++  }
++  @Builder private Complaint(item:ReviewComplaintSummary) {
++    Column({space:8}) {
++      Text(`评价申诉 #${item.complaintId} · ${item.status==='PENDING'?'待处理':item.status==='CANCELLED'?'已取消':'已处理'}`)
++        .fontSize(14).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
++      Text(item.reason).fontSize(14).fontColor(PortraTheme.primaryText)
++      if(item.arbitrationComment){Text(`处理说明：${item.arbitrationComment}`).fontSize(13).fontColor(PortraTheme.secondaryText)}
++      if(item.arbitrationResult){Text(`裁定结果：${this.complaintResult(item.arbitrationResult)}`).fontSize(13).fontColor(PortraTheme.secondaryText)}
++    }.width('100%').alignItems(HorizontalAlign.Start).padding(14).backgroundColor(PortraTheme.pageBackground)
++      .border({width:this.targetKind==='complaint'&&this.targetId===item.complaintId?2:1,color:this.targetKind==='complaint'&&this.targetId===item.complaintId?PortraTheme.primary:PortraTheme.border}).borderRadius(12)
++  }
++  @Builder private Review(item:ReviewSummary) {
++    Column({space:12}) {
++      Row({space:10}) {
++        Text(item.reviewerNickname||`用户 #${item.reviewerId}`).fontSize(14).fontWeight(FontWeight.Bold).layoutWeight(1)
++        Text(`${item.rating} ★`).fontSize(16).fontColor(PortraTheme.primary)
++      }.width('100%')
++      Text(item.content||'对方没有留下文字评价').fontSize(15).fontColor(PortraTheme.primaryText)
++      Text(`评价对象：${item.targetUserNickname||`用户 #${item.targetUserId}`}`).fontSize(12).fontColor(PortraTheme.secondaryText)
++      if(item.isVisible===false){Text('该评价已隐藏，仅按当前账号权限展示。').fontSize(12).fontColor(PortraTheme.danger)}
++      if(item.replyContent){
++        Column({space:6}) {
++          Text('追加追评').fontWeight(FontWeight.Bold).fontSize(13).fontColor(PortraTheme.primary)
++          Text(item.replyContent).fontSize(14).fontColor(PortraTheme.primaryText)
++        }.width('100%').alignItems(HorizontalAlign.Start).padding(14).backgroundColor(PortraTheme.primarySoft).borderRadius(12)
++      }
++      Flex({wrap:FlexWrap.Wrap}) {
++        if(item.reviewerId===this.state.userId&&item.isVisible!==false){this.SmallAction('追加追评',()=>this.controller?.open('followup',item.reviewId))}
++        if(item.targetUserId===this.state.userId&&item.isVisible!==false){this.SmallAction('发起评价申诉',()=>this.controller?.open('complaint',item.reviewId))}
++      }
++      ReportPanel({targetType:'REVIEW',targetId:item.reviewId,ownerId:item.reviewerId,currentUserId:this.state.userId,onRequireLogin:this.onRequireLogin})
++      ForEach(this.state.complaints.filter((c:ReviewComplaintSummary)=>c.reviewId===item.reviewId&&
++        !(this.targetKind==='complaint'&&this.targetId===c.complaintId)),(c:ReviewComplaintSummary)=>{this.Complaint(c)},(c:ReviewComplaintSummary)=>c.complaintId.toString())
++    }.width('100%').alignItems(HorizontalAlign.Start).padding(16).backgroundColor(PortraTheme.surface).borderRadius(16)
++      .border({width:this.targetKind==='review'&&this.targetId===item.reviewId?2:1,color:this.targetKind==='review'&&this.targetId===item.reviewId?PortraTheme.primary:PortraTheme.border})
++  }
++  @Builder private Dispute(item:DisputeSummary) {
++    Column({space:10}) {
++      Text(`订单申诉 #${item.id} · ${item.status==='OPEN'?'待回复':item.status==='REPLIED'?'已回复':'已处理'}`)
++        .fontSize(15).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
++      Text(item.reason).fontSize(14).fontColor(PortraTheme.primaryText)
++      ForEach(item.replies||[],(reply:DisputeReplySummary)=>{
++        Text(`用户 #${reply.replierId}：${reply.content}`).width('100%').fontSize(14).fontColor(PortraTheme.secondaryText)
++          .padding(12).backgroundColor(PortraTheme.pageBackground).borderRadius(10)
++      },(reply:DisputeReplySummary)=>reply.id.toString())
++      if(item.adminComment){Text(`处理说明：${item.adminComment}`).fontSize(13).fontColor(PortraTheme.secondaryText)}
++      if(EngagementPolicy.canReply(item,this.state.userId)){this.SmallAction('回复申诉',()=>this.controller?.open('reply',item.id))}
++    }.width('100%').alignItems(HorizontalAlign.Start).padding(16).backgroundColor(PortraTheme.surface).borderRadius(16)
++      .border({width:this.targetKind==='dispute'&&this.targetId===item.id?2:1,color:this.targetKind==='dispute'&&this.targetId===item.id?PortraTheme.primary:PortraTheme.border})
++  }
++  @Builder private SheetBody() {
++    if(this.state.form.mode) {
++      EngagementDialogs({form:this.state.form,orderId:this.state.order?.orderId??0,
++        onContent:(value:string)=>this.controller?.setContent(value),onRating:(value:number)=>this.controller?.setRating(value),
++        onReason:(value:string)=>this.controller?.setReason(value),onClose:()=>this.controller?.requestClose(),onSubmit:()=>this.controller?.submit(),
++        onVerify:()=>this.controller?.verify(),onKeep:()=>this.controller?.cancelDiscard(),onDiscard:()=>this.controller?.confirmDiscard()})
++    } else {
++      Column() {
++        Row({space:12}) {
++          Text('评价与申诉').fontSize(21).fontWeight(FontWeight.Bold).layoutWeight(1).fontColor(PortraTheme.primaryText)
++          Button('关闭').constraintSize({minHeight:44}).fontSize(14).backgroundColor(PortraTheme.surface).fontColor(PortraTheme.secondaryText).onClick(()=>this.sheetOpen=false)
++        }.width('100%').padding(20)
++        Divider().color(PortraTheme.border)
++        Scroll() {
++          Column({space:16}) {
++            Text('这里集中展示本次合作的评价、追加追评与申诉处理记录。').fontSize(13).fontColor(PortraTheme.secondaryText)
++            if(this.state.message){Text(this.state.message).fontSize(14).fontColor(PortraTheme.primary)}
++            if(this.state.recordsError){Text(this.state.recordsError).fontSize(13).fontColor(PortraTheme.danger)}
++            ForEach(this.state.complaints.filter((c:ReviewComplaintSummary)=>this.targetKind==='complaint'&&c.complaintId===this.targetId),(item:ReviewComplaintSummary)=>{
++              this.Complaint(item)
++            },(item:ReviewComplaintSummary)=>item.complaintId.toString())
++            if(this.targetKind==='dispute') {
++              ForEach(this.disputes(),(item:DisputeSummary)=>{this.Dispute(item)},(item:DisputeSummary)=>item.id.toString())
++            }
++            if(this.state.reviews.length===0){Text('暂无可展示的评价').fontSize(14).fontColor(PortraTheme.secondaryText).padding(20)}
++            ForEach(this.state.complaints.filter((c:ReviewComplaintSummary)=>!(this.targetKind==='complaint'&&this.targetId===c.complaintId)&&!this.state.reviews.some((r:ReviewSummary)=>r.reviewId===c.reviewId)),(item:ReviewComplaintSummary)=>{
++              Text('对应评价暂未在列表展示，以下为当前账号可查看的申诉记录。').fontSize(13).fontColor(PortraTheme.secondaryText)
++              this.Complaint(item)
++            },(item:ReviewComplaintSummary)=>item.complaintId.toString())
++            ForEach(this.reviews(),(item:ReviewSummary)=>{this.Review(item)},(item:ReviewSummary)=>item.reviewId.toString())
++            if(this.targetKind!=='dispute') {
++              ForEach(this.disputes(),(item:DisputeSummary)=>{this.Dispute(item)},(item:DisputeSummary)=>item.id.toString())
++            }
++          }.width('100%').alignItems(HorizontalAlign.Start).padding(16)
++        }.width('100%').layoutWeight(1).align(Alignment.TopStart).scrollBar(BarState.Auto)
++        Row({space:12}) {
++          if(this.state.order&&EngagementPolicy.canReview(this.state.order,this.state.userId,this.state.reviews)) {
++            this.SmallAction('评价',()=>this.controller?.open('review',this.state.order?.orderId??0))
++          }
++          if(this.state.order&&EngagementPolicy.canDispute(this.state.order,this.state.disputes)) {
++            this.SmallAction('发起订单申诉',()=>this.controller?.open('dispute',this.state.order?.orderId??0))
++          }
++        }.width('100%').padding({left:20,right:20,top:12,bottom:28}).backgroundColor(PortraTheme.pageBackground)
++      }.width('100%').height('100%').backgroundColor(PortraTheme.surface)
++    }
++  }
++  build() {
++    Column() {
++      Row({space:10}) {
++        Button('‹').width(44).height(44).padding(0).fontSize(30).fontColor(PortraTheme.primaryText).backgroundColor(Color.Transparent).onClick(()=>this.onBack?.())
++        Text('本次约拍').fontSize(19).fontWeight(FontWeight.Bold).layoutWeight(1).fontColor(PortraTheme.primaryText)
++        this.SmallAction('刷新',()=>this.load())
++      }.width('100%').padding({left:12,right:20,top:12,bottom:14})
++      Scroll() {
++        Column({space:18}) {
++          if(this.state.loginRequired){Text('登录后查看本次约拍的评价与申诉').fontSize(15);Button('去登录').onClick(()=>this.onRequireLogin?.())}
++          else if(this.state.loading){LoadingProgress().width(36).height(36);Text('正在读取本次约拍…').fontSize(14)}
++          else if(this.state.error){Text(this.state.error).fontSize(14).fontColor(PortraTheme.danger)}
++          else if(this.state.order){
++            Column({space:14}) {
++              Text('ORDER / PORTRA').fontSize(12).fontColor(PortraTheme.primary)
++              Text(this.state.order.orderNo||`订单 #${this.state.order.orderId}`).fontSize(24).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
++              Text(`${this.state.order.customerNickname||`用户 #${this.state.order.customerId}`} · ${this.state.order.providerNickname||`用户 #${this.state.order.providerUserId}`}`)
++                .fontSize(14).fontColor(PortraTheme.secondaryText)
++              Text(`当前进度：${this.statusText(this.state.order.status)}`).fontSize(14).fontColor(PortraTheme.primary)
++              Text('查看本次合作的评价、追评与申诉，所有结果以平台实际记录为准。').fontSize(14).fontColor(PortraTheme.secondaryText)
++              Button('评价与申诉').width('100%').constraintSize({minHeight:48}).fontSize(15).backgroundColor(PortraTheme.primary).fontColor(PortraTheme.white).onClick(()=>this.sheetOpen=true)
++            }.width('100%').alignItems(HorizontalAlign.Start).padding(22).backgroundColor(PortraTheme.surface).borderRadius(20)
++            if(this.state.message){Text(this.state.message).fontSize(14).fontColor(PortraTheme.primary)}
++            if(this.state.recordsError){Text(this.state.recordsError).fontSize(14).fontColor(PortraTheme.danger)}
++          }
++        }.width('100%').padding(20).alignItems(HorizontalAlign.Start)
++      }.width('100%').layoutWeight(1).align(Alignment.TopStart)
++    }.width('100%').height('100%').backgroundColor(PortraTheme.pageBackground).onAppear(()=>this.observe())
++      .bindSheet(this.sheetOpen,this.SheetBody(),{height:SheetSize.LARGE,showClose:false,backgroundColor:PortraTheme.surface,
++        keyboardAvoidMode:SheetKeyboardAvoidMode.RESIZE_ONLY,
++        onWillDismiss:(action:DismissSheetAction)=>{if(!this.state.form.mode||this.controller?.requestClose()){this.sheetOpen=false;action.dismiss();}}})
++  }
++}
+diff --git a/harmony/entry/src/main/ets/pages/NotificationPage.ets b/harmony/entry/src/main/ets/pages/NotificationPage.ets
+index 6eb5a71..11e6a3b 100644
+--- a/harmony/entry/src/main/ets/pages/NotificationPage.ets
++++ b/harmony/entry/src/main/ets/pages/NotificationPage.ets
+@@ -0,0 +1 @@
++import { NotificationTarget, NotificationTargetResolver } from '../features/notifications/NotificationTargetResolver';
+@@ -21,0 +23 @@ export struct NotificationPage {
++  onOpenTarget?: (target: NotificationTarget) => void;
+@@ -63,6 +65,4 @@ export struct NotificationPage {
+-    // Only implemented native destinations; never execute a server-provided URL.
+-    if (item.type.includes('MOMENT') && Number.isSafeInteger(item.relatedId) && (item.relatedId ?? 0) > 0) {
+-      this.onOpenMoment?.(item.relatedId as number);
+-    } else if (item.type.includes('CREDIT')) { this.onOpenCredit?.(); }
+-    else if (NotificationFormat.category(item) === 'order' || NotificationFormat.category(item) === 'appeal' ||
+-      NotificationFormat.category(item) === 'review') { this.onOpenOrders?.(); }
++    const target = NotificationTargetResolver.resolve(item); if (target === undefined) { return; }
++    if (target.kind === 'moment') { this.onOpenMoment?.(target.id); }
++    else if (target.kind === 'credit') { this.onOpenCredit?.(); }
++    else if (['order','review','complaint','dispute'].includes(target.kind)) { this.onOpenTarget?.(target); }
+@@ -71,2 +71,3 @@ export struct NotificationPage {
+-    return (item.type.includes('MOMENT') && Number.isSafeInteger(item.relatedId) && (item.relatedId ?? 0) > 0) ||
+-      item.type.includes('CREDIT') || ['order', 'appeal', 'review'].includes(NotificationFormat.category(item));
++    const target = NotificationTargetResolver.resolve(item); if (target === undefined) { return false; }
++    return target.kind === 'moment' || target.kind === 'credit' ||
++      (this.onOpenTarget !== undefined && ['order','review','complaint','dispute'].includes(target.kind));
+diff --git a/harmony/tests/engagement-behavior.test.cjs b/harmony/tests/engagement-behavior.test.cjs
+new file mode 100644
+index 0000000..6f2ddb4
+--- /dev/null
++++ b/harmony/tests/engagement-behavior.test.cjs
+@@ -0,0 +1,35 @@
++const assert=require('node:assert/strict'),{test}=require('node:test'),fs=require('node:fs'),path=require('node:path');
++const ts=require(path.join(process.env.DEVECO_SDK_HOME,'default/openharmony/ets/build-tools/ets-loader/node_modules/typescript'));
++require.extensions['.ets']=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,f);
++const {EngagementController,EngagementPolicy,EngagementPendingStore}=require('../entry/src/main/ets/features/engagement/EngagementController.ets');
++const tick=()=>new Promise(r=>setImmediate(r));
++function deferred(){let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject};}
++const order=(id=11)=>({orderId:id,customerId:1,providerUserId:2,status:'COMPLETED',orderNo:'TEST-'+id});
++const review=(id=22)=>({reviewId:id,orderId:11,reviewerId:1,targetUserId:2,rating:5,content:'真实评价',isVisible:true});
++function fixture(reset=true){if(reset)EngagementPendingStore.shared.entries.clear();let version=1,state;const calls=[],cancel=[];let reviews=[review()],complaints=[],disputes=[];
++ const api={currentSession:async()=>({userId:1,role:'CUSTOMER'}),getOrder:async id=>order(id),listOrderReviews:async()=>reviews,listReviewComplaints:async()=>complaints,listOrderDisputes:async()=>disputes,cancelEngagementRequests:keys=>cancel.push(keys),cancelCurrentSession:key=>cancel.push([key]),
++ createReview(id,payload,key){const d=deferred();calls.push({mode:'review',id,payload,key,...d});return d.promise},followUpReview(id,payload,key){const d=deferred();calls.push({mode:'followup',id,payload,key,...d});return d.promise},createReviewComplaint(id,payload,key){const d=deferred();calls.push({mode:'complaint',id,payload,key,...d});return d.promise},createDispute(id,payload,key){const d=deferred();calls.push({mode:'dispute',id,payload,key,...d});return d.promise},replyDispute(id,payload,key){const d=deferred();calls.push({mode:'reply',id,payload,key,...d});return d.promise}};
++ const c=new EngagementController(api,{isAuthenticated:()=>true,getSessionVersion:()=>version},s=>state=s);c.resume();
++ return {c,api,calls,cancel,get state(){return state},change(){version++},setReviews(v){reviews=v},setOrder(v){api.getOrder=async()=>v},setDisputes(v){disputes=v}};
++}
++test('mobile form resets stars, text and error when target changes',async()=>{const f=fixture();await f.c.load(11);f.c.open('followup',22);f.c.setContent('旧草稿');assert.equal(f.state.form.content,'旧草稿');f.c.open('followup',23);assert.equal(f.state.form.content,'');assert.equal(f.state.form.rating,5);});
++test('empty or whitespace followup does not submit',async()=>{const f=fixture();await f.c.load(11);f.c.open('followup',22);f.c.setContent('  ');await f.c.submit();assert.equal(f.calls.length,0);assert.ok(f.state.form.error);});
++test('star rating is an integer from one to five and content has length limit',()=>{for(const n of [0,1.5,6,NaN])assert.ok(EngagementPolicy.validate('review',n,'评价','').length);assert.equal(EngagementPolicy.validate('review',5,'评价',''),'');assert.ok(EngagementPolicy.validate('followup',5,'字'.repeat(2001),'').length);});
++test('review permission uses real completion and refund responsibility',()=>{assert.equal(EngagementPolicy.canReview(order(),1,[]),true);assert.equal(EngagementPolicy.canReview({...order(),status:'SHOOTING'},1,[]),false);assert.equal(EngagementPolicy.canReview({...order(),status:'REFUNDED',refundStatus:'PROVIDER_FAULT'},1,[]),true);assert.equal(EngagementPolicy.canReview({...order(),status:'REFUNDED',refundStatus:'NO_FAULT'},1,[]),false);assert.equal(EngagementPolicy.canReview(order(),1,[review()]),false);});
++test('dirty mobile close asks before discarding, cancel keeps input and confirm clears it',async()=>{const f=fixture();await f.c.load(11);f.c.open('followup',22);f.c.setContent('输入中');assert.equal(f.c.requestClose(),false);assert.equal(f.state.form.discardPrompt,true);f.c.cancelDiscard();assert.equal(f.state.form.content,'输入中');f.c.requestClose();f.c.confirmDiscard();assert.equal(f.state.form.mode,'');assert.equal(f.state.form.content,'');});
++test('submit captures target and payload once and prevents double tapping',async()=>{const f=fixture();await f.c.load(11);f.c.open('followup',22);f.c.setContent('  补充感受  ');const p=f.c.submit();f.c.submit();assert.equal(f.calls.length,1);assert.equal(f.calls[0].id,22);assert.equal(f.calls[0].payload.content,'补充感受');f.calls[0].resolve({...review(),replyContent:'补充感受'});await p;assert.equal(f.state.form.mode,'');});
++test('old success catch and finally never update a different target form',async()=>{for(const failure of [false,true]){const f=fixture();await f.c.load(11);f.c.open('followup',22);f.c.setContent('旧提交');const p=f.c.submit();f.c.confirmDiscard();f.setReviews([review(23)]);await f.c.load(11);f.c.open('followup',23);f.c.setContent('新草稿');if(failure)f.calls[0].reject(new Error('timeout'));else f.calls[0].resolve({...review(),replyContent:'旧提交'});await p;assert.equal(f.state.form.content,'新草稿');assert.equal(f.state.form.busy,false);assert.equal(f.state.form.mode,'followup');}});
++test('identity changed just before submit clears the old form and sends nothing',async()=>{const f=fixture();await f.c.load(11);f.c.open('followup',22);f.c.setContent('旧身份');f.change();await f.c.submit();assert.equal(f.calls.length,0);assert.equal(f.state.form.mode,'');assert.equal(f.state.order,undefined);});
++test('timeout survives form close and blocks blind replay until GET confirms current state',async()=>{const f=fixture();await f.c.load(11);f.c.open('followup',22);f.c.setContent('未知结果');const p=f.c.submit();f.calls[0].reject(new Error('timeout'));await p;assert.equal(f.state.form.uncertain,true);f.c.confirmDiscard();f.c.open('followup',22);f.c.setContent('未知结果');await f.c.submit();assert.equal(f.calls.length,1);assert.equal(f.state.form.uncertain,true);f.setReviews([{...review(),replyContent:'未知结果'}]);await f.c.verify();assert.equal(f.state.form.uncertain,false);assert.equal(f.state.form.mode,'');});
++test('definitive business rejection keeps draft and permits correction',async()=>{const f=fixture();await f.c.load(11);f.c.open('followup',22);f.c.setContent('草稿');const p=f.c.submit();f.calls[0].reject({kind:'business',businessCode:40001,message:'内容不合要求'});await p;assert.equal(f.state.form.content,'草稿');assert.equal(f.state.form.uncertain,false);assert.match(f.state.form.error,/内容不合要求/);});
++test('two instances cancel only their own keys',async()=>{const a=fixture(),b=fixture();await Promise.all([a.c.load(11),b.c.load(11)]);a.c.suspend();assert.ok(a.cancel.flat().every(x=>!b.cancel.flat().includes(x)));});
++test('complaint requires a real received review and original web reason plus description',async()=>{const f=fixture();f.setReviews([{...review(),reviewerId:2,targetUserId:1}]);await f.c.load(11);f.c.open('complaint',22);f.c.setReason('评价内容不实');f.c.setContent('与实际合作不符');const p=f.c.submit();assert.equal(f.calls[0].payload.reason,'评价内容不实：与实际合作不符');assert.equal(f.calls[0].payload.evidenceFileIds,'');f.calls[0].resolve({complaintId:33,reviewId:22,orderId:11,complainantId:1,status:'PENDING'});await p;assert.equal(f.state.form.mode,'');});
++test('reply and new order dispute keep order/dispute IDs distinct',async()=>{const f=fixture();f.setOrder({...order(),status:'SHOOTING'});await f.c.load(11);f.c.open('dispute',11);f.c.setContent('说明订单争议');const p=f.c.submit();assert.equal(f.calls[0].id,11);f.calls[0].resolve({id:44,orderId:11,initiatorId:1,status:'OPEN',reason:'说明订单争议',replies:[]});await p;});
++test('all mobile review followup appeal and reply bodies are capped at 200 characters',()=>{for(const mode of ['review','followup','complaint','dispute','reply']){assert.equal(EngagementPolicy.validate(mode,5,'字'.repeat(200),'评价内容不实'),'');assert.ok(EngagementPolicy.validate(mode,5,'字'.repeat(201),'评价内容不实').length);}});
++test('same historical followup text is not proof of a timed out new submission',async()=>{const f=fixture();f.setReviews([{...review(),replyContent:'同样正文',replyTime:'2026-10-20T10:00:00'}]);await f.c.load(11);f.c.open('followup',22);f.c.setContent('同样正文');const p=f.c.submit();f.calls[0].reject(new Error('timeout'));await p;await f.c.verify();assert.equal(f.state.form.uncertain,true);assert.equal(f.state.form.mode,'followup');});
++test('changing only stars also needs discard confirmation',async()=>{const f=fixture();f.setReviews([]);await f.c.load(11);f.c.open('review',11);f.c.setRating(4);assert.equal(f.c.requestClose(),false);assert.equal(f.state.form.discardPrompt,true);});
++test('only the non initiator may reply while an order dispute is OPEN',async()=>{for(const [initiator,status,allowed]of [[1,'OPEN',false],[2,'REPLIED',false],[2,'OPEN',true]]){const f=fixture();f.setDisputes([{id:44,orderId:11,initiatorId:initiator,status,reason:'订单争议',replies:[]}]);await f.c.load(11);f.c.open('reply',44);f.c.setContent('真实回复');const p=f.c.submit();if(f.calls.length)f.calls[0].resolve({id:44,orderId:11,initiatorId:initiator,status:'REPLIED',replies:[{id:55,disputeId:44,replierId:1,content:'真实回复'}]});await p;assert.equal(f.calls.length,allowed?1:0);}});
++test('resolved complaint remains visible when its review is hidden from the order list',async()=>{const f=fixture();f.setReviews([]);f.api.getReviewComplaint=async()=>({complaintId:33,reviewId:22,orderId:11,complainantId:1,respondentId:2,reason:'评价内容不实',status:'RESOLVED',arbitrationResult:'REVIEW_HIDDEN',arbitrationComment:'经核查已隐藏'});await f.c.loadTarget('complaint',33,11);assert.equal(f.state.complaints[0]?.complaintId,33);assert.equal(f.state.complaints[0]?.arbitrationComment,'经核查已隐藏');});
++test('old active request cannot delete a newer pending submission after GET verification',async()=>{const a=fixture();await a.c.load(11);a.c.open('followup',22);a.c.setContent('第一条');const first=a.c.submit();const b=fixture(false);b.setReviews([{...review(),replyContent:'第一条'}]);await b.c.load(11);b.c.open('followup',22);await b.c.verify();b.c.open('followup',22);b.c.setContent('第二条');const second=b.c.submit();assert.equal(b.calls.length,1);a.calls[0].resolve({...review(),replyContent:'第一条'});await first;const remaining=EngagementPendingStore.shared.entries.size;b.calls[0].resolve({...review(),replyContent:'第二条'});await second;assert.equal(remaining,1);});
++test('closing while verifying stops loading and cannot restore an old uncertain form',async()=>{const f=fixture();await f.c.load(11);f.c.open('followup',22);f.c.setContent('待核实');const sent=f.c.submit();f.calls[0].reject(new Error('timeout'));await sent;const d=deferred();f.api.listOrderReviews=()=>d.promise;const verify=f.c.verify();await tick();f.c.confirmDiscard();d.resolve([review()]);await verify;assert.equal(f.state.loading,false);assert.equal(f.state.form.mode,'');assert.equal(f.state.form.uncertain,false);});
++test('confirmed success feedback survives record refresh and clears for a new form',async()=>{const f=fixture();await f.c.load(11);f.c.open('followup',22);f.c.setContent('服务器已确认的追评');const p=f.c.submit();f.calls[0].resolve({...review(),replyContent:'服务器已确认的追评'});await p;assert.equal(f.state.message,'追评已提交');f.c.open('followup',22);assert.equal(f.state.message,'');});
+diff --git a/harmony/tests/engagement-api.test.cjs b/harmony/tests/engagement-api.test.cjs
+new file mode 100644
+index 0000000..16eccf7
+--- /dev/null
++++ b/harmony/tests/engagement-api.test.cjs
+@@ -0,0 +1,23 @@
++const assert=require('node:assert/strict'),{test}=require('node:test'),fs=require('node:fs'),path=require('node:path');
++const ts=require(path.join(process.env.DEVECO_SDK_HOME,'default/openharmony/ets/build-tools/ets-loader/node_modules/typescript'));
++const root=process.env.PORTRA_API_TEST_SOURCE||path.resolve(__dirname,'../entry/src/main/ets');
++const calls=[];
++const http={RequestMethod:{GET:'GET',POST:'POST',PUT:'PUT',DELETE:'DELETE',PATCH:'PATCH'},HttpDataType:{STRING:1},createHttp(){const c={};calls.push(c);return {request(url,options){Object.assign(c,{url,options});return new Promise((resolve,reject)=>Object.assign(c,{resolve,reject}))},destroy(){c.destroyed=true}}}};
++require.extensions['.ets']=(m,f)=>{const original=m.require.bind(m);m.require=n=>n==='@kit.NetworkKit'?{http}:n.endsWith('/BuildProfile')?{default:{PORTRA_ENVIRONMENT:'staging',PORTRA_BASE_URL:'https://test.invalid'}}:original(n);m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,f)};
++const {HttpClient}=require(path.join(root,'network/HttpClient.ets'));
++const {ApiService}=require(path.join(root,'network/ApiService.ets'));
++const client=new HttpClient();client.setAccessToken('test-token-not-a-real-credential');const api=new ApiService(client);
++const respond=(data)=>calls.at(-1).resolve({responseCode:200,result:JSON.stringify({code:200,message:'success',data})});
++
++test('engagement reads exact real user paths through authenticated HttpClient',async()=>{
++ for(const [method,id,suffix] of [['getOrder',11,'/orders/11'],['listOrderReviews',11,'/orders/11/reviews'],['getReview',22,'/reviews/22'],['listReviewComplaints',22,'/reviews/22/complaints'],['getReviewComplaint',33,'/reviews/complaints/33'],['listOrderDisputes',11,'/orders/11/disputes'],['getDispute',44,'/disputes/44']]){
++  assert.equal(typeof api[method],'function',method+' missing');const p=api[method](id,'read.'+method);assert.ok(calls.at(-1).url.endsWith(suffix));assert.equal(calls.at(-1).options.method,'GET');assert.equal(calls.at(-1).options.header.Authorization,'Bearer test-token-not-a-real-credential');respond({});await p;
++ }
++});
++test('review followup complaint dispute and reply preserve exact POST payload and IDs',async()=>{
++ for(const [method,id,suffix,payload] of [['createReview',11,'/orders/11/reviews',{rating:5,content:'评价'}],['followUpReview',22,'/reviews/22/follow-up',{content:'追评'}],['createReviewComplaint',22,'/reviews/22/complaints',{reason:'评价内容不实：说明',evidenceFileIds:''}],['createDispute',11,'/orders/11/disputes',{reason:'订单争议'}],['replyDispute',44,'/disputes/44/replies',{content:'回复说明'}]]){
++  assert.equal(typeof api[method],'function',method+' missing');const p=api[method](id,payload,'write.'+method);assert.ok(calls.at(-1).url.endsWith(suffix));assert.equal(calls.at(-1).options.method,'POST');assert.deepEqual(JSON.parse(calls.at(-1).options.extraData),payload);respond({});await p;
++ }
++});
++test('unsafe business IDs make no HTTP request',async()=>{assert.equal(typeof api.getOrder,'function');const count=calls.length;for(const id of [0,-1,NaN,Number.MAX_SAFE_INTEGER+1])await assert.rejects(api.getOrder(id,'bad'));assert.equal(calls.length,count);});
++test('cancel engagement A preserves B and legacy orders list',async()=>{assert.equal(typeof api.cancelEngagementRequests,'function');const a=api.getOrder(11,'a.order'),b=api.getOrder(12,'b.order'),legacy=api.listOrders();const first=calls.at(-3),second=calls.at(-2),last=calls.at(-1);api.cancelEngagementRequests(['a.order']);first.resolve({responseCode:200,result:JSON.stringify({code:200,message:'success',data:{}})});await assert.rejects(a);assert.notEqual(second.destroyed,true);assert.notEqual(last.destroyed,true);second.resolve({responseCode:200,result:JSON.stringify({code:200,message:'success',data:{}})});last.resolve({responseCode:200,result:JSON.stringify({code:200,message:'success',data:[]})});await Promise.all([b,legacy]);});
+diff --git a/harmony/tests/notification-target.test.cjs b/harmony/tests/notification-target.test.cjs
+new file mode 100644
+index 0000000..e4d48ef
+--- /dev/null
++++ b/harmony/tests/notification-target.test.cjs
+@@ -0,0 +1,9 @@
++const assert=require('node:assert/strict'),{test}=require('node:test'),fs=require('node:fs'),path=require('node:path');
++const ts=require(path.join(process.env.DEVECO_SDK_HOME,'default/openharmony/ets/build-tools/ets-loader/node_modules/typescript'));
++require.extensions['.ets']=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,f);
++const {NotificationTargetResolver}=require('../entry/src/main/ets/features/notifications/NotificationTargetResolver.ets');
++const n=(type,relatedType,id,metadata={})=>({type,relatedType,relatedId:id,metadataJson:JSON.stringify(metadata)});
++test('review and both appeal IDs do not become order IDs',()=>{for(const [type,related,id,kind] of [['REVIEW_RECEIVED','REVIEW',22,'review'],['REVIEW_COMPLAINT_RESOLVED','REVIEW_COMPLAINT',33,'complaint'],['DISPUTE_REPLIED','DISPUTE',44,'dispute']]){const t=NotificationTargetResolver.resolve(n(type,related,id,{orderId:11}));assert.equal(t.kind,kind);assert.equal(t.id,id);assert.equal(t.orderId,11);}});
++test('order and moment resolve exact typed IDs',()=>{assert.equal(NotificationTargetResolver.resolve(n('ORDER_PAID','ORDER',11)).id,11);assert.equal(NotificationTargetResolver.resolve(n('MOMENT_LIKED','MOMENT',99)).kind,'moment');});
++test('corrupt metadata unsafe IDs conflicting types and arbitrary URLs fail closed',()=>{for(const item of [{...n('REVIEW_RECEIVED','REVIEW',22),metadataJson:'{'},n('ORDER_PAID','ORDER',-1),n('ORDER_PAID','ORDER',Number.MAX_SAFE_INTEGER+1),n('REVIEW_RECEIVED','ORDER',22),{...n('ORDER_PAID','ORDER',11),navigationPath:'https://evil.invalid/a'}])assert.equal(NotificationTargetResolver.resolve(item),undefined);});
++test('credit only opens own summary; missing follower role never invents a profile role',()=>{assert.equal(NotificationTargetResolver.resolve(n('CREDIT_CHANGED','CREDIT',1)).kind,'credit');assert.equal(NotificationTargetResolver.resolve(n('FOLLOWED','USER',2)),undefined);});
+diff --git a/harmony/tests/moment-report-contract.test.cjs b/harmony/tests/moment-report-contract.test.cjs
+index 071f6b3..48ce419 100644
+--- a/harmony/tests/moment-report-contract.test.cjs
++++ b/harmony/tests/moment-report-contract.test.cjs
+@@ -97 +97 @@ test('report validates trimmed reason and description limits before sending', as
+-    { reason: '字'.repeat(500), description: '文'.repeat(1000), sent: true },
++    { reason: '字'.repeat(500), description: '文'.repeat(200), sent: true },
+@@ -99 +99 @@ test('report validates trimmed reason and description limits before sending', as
+-    { reason: '字', description: '文'.repeat(1001), sent: false }
++    { reason: '字', description: '文'.repeat(201), sent: false }
+@@ -318,0 +319,26 @@ test('a second version change while verifying ignores old records and clears bus
++
++test('unknown report result closes editable dialog and keeps the shared verification guard', async () => {
++  const f=panelFixture();f.panel.expanded=true;
++  const sent=f.panel.submit();f.requests[0].reject(ErrorMapper.network());await sent;
++  assert.equal(f.panel.expanded,false);assert.equal(f.panel.unconfirmed,true);
++  const retry=f.panel.submit();await retry;assert.equal(f.requests.length,1);
++});
++
++test('cancel clears editable report fields without losing an uncertain submission guard', async () => {
++  const f = panelFixture();
++  Object.assign(f.panel, { expanded: true, description: '未提交的旧说明' });
++  f.panel.cancelForm();
++  assert.equal(f.panel.expanded, false);
++  assert.equal(f.panel.reason, '');
++  assert.equal(f.panel.description, '');
++  assert.equal(f.panel.busy, false);
++  f.panel.reason = '真实提交原因'; f.panel.description = '真实说明';
++  const sent = f.panel.submit();
++  f.panel.cancelForm();
++  assert.equal(f.panel.description, '');
++  assert.equal(f.panel.reason, '');
++  assert.equal(f.panel.unconfirmed, true);
++  f.requests[0].reject(ErrorMapper.network()); await sent;
++  await f.panel.submit();
++  assert.equal(f.requests.length, 1);
++});
+\ No newline at end of file
+diff --git a/harmony/tests/navigation.test.cjs b/harmony/tests/navigation.test.cjs
+index 99ff167..7e21987 100644
+--- a/harmony/tests/navigation.test.cjs
++++ b/harmony/tests/navigation.test.cjs
+@@ -23,0 +24 @@ test('all planned destinations have one stable route name', () => {
++    AppRoute.ORDER_ENGAGEMENT,
+@@ -29 +30 @@ test('all planned destinations have one stable route name', () => {
+-  assert.equal(new Set(NavigationPolicy.routes).size, 13);
++  assert.equal(new Set(NavigationPolicy.routes).size, 14);

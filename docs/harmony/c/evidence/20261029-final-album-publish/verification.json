@@ -1,0 +1,47 @@
+{
+  "scope": "C moments UI and authorized publish API",
+  "headBeforeDelivery": "dccbf70",
+  "pr": "https://github.com/yueyue0218/Camera/pull/26",
+  "base": "integration/harmony-v1",
+  "suite": {
+    "tests": 260,
+    "pass": 255,
+    "fail": 5,
+    "exit": 1,
+    "baselineAuthFailuresSame": true,
+    "baselineAuth": {
+      "tests": 10,
+      "pass": 5,
+      "fail": 5
+    },
+    "failureNames": [
+      "✖ 401 and 40101 expire a shared HTTP session; 403 does not",
+      "✖ application session restore deduplicates concurrency and retries after a transient failure",
+      "✖ concurrent expiration clears the credential once",
+      "✖ restore accepts only a valid credential from the current environment",
+      "✖ storage failures never create an in-memory authenticated session"
+    ]
+  },
+  "build": {
+    "command": "hvigorw.bat assembleHap --no-daemon -p product=dev",
+    "environment": "dev",
+    "baseUrl": "http://127.0.0.1:18090",
+    "exit": 0,
+    "seconds": 15.72,
+    "unsigned": true,
+    "sha256": "83F6B5B10040D04645C7851004D5D4C8D056678ED7650E19777827675CDD58C6"
+  },
+  "device": {
+    "name": "Mate 90 Pro",
+    "api": 26,
+    "resolution": "1280x2832",
+    "fixedTextY": [
+      1741,
+      1741
+    ],
+    "realPullGestureServerUpdateAndRestore": true,
+    "publisherCaptionY": 242,
+    "publisherFooterBottom": 2664,
+    "publishPostFromDevice": "not performed; only UI/controller/compile validated"
+  }
+}

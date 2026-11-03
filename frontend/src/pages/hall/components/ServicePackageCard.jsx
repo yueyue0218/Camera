@@ -69,7 +69,7 @@ export const ServicePackageCard = memo(function ServicePackageCard({ service, cu
           />
         )}
         <span className="price-tag">{service.priceRange || `${money(service.basePriceCent)} 起`}</span>
-        <span className="city-tag">{cityName(service.cityName || service.cityCode) || '暂无城市'}</span>
+        <span className="city-tag">{cityName(service.cityName || service.cityCode) || '地区未填写'}</span>
       </div>
       <div className="show-info">
         <div className="provider-card-row">

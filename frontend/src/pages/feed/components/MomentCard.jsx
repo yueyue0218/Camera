@@ -44,7 +44,6 @@ export function MomentCard({
   return (
     <Paper className="moment-card" elevation={0}>
       <div className="moment-card__side">
-        <div className="moment-card__serial">No. {String(momentId).padStart(6, '0')}</div>
         <div className="moment-card__avatar-shell" onClick={() => onOpenProfile(moment.authorId, moment.authorRole)}>
           <Avatar src={authorAvatar || undefined} className="moment-card__avatar">
             {(authorName || roleLabel(moment.authorRole)).slice(0, 1)}

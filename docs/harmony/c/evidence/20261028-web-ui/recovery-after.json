@@ -1,0 +1,38 @@
+{
+  "origin": "http://127.0.0.1:18090",
+  "database": "portra_c_final_20261028",
+  "actorId": 1,
+  "role": "CUSTOMER",
+  "unread": 0,
+  "notificationIds": [
+    {
+      "notificationId": 2,
+      "type": "FOLLOWED",
+      "relatedId": 2,
+      "isRead": true
+    },
+    {
+      "notificationId": 1,
+      "type": "MOMENT_LIKED",
+      "relatedId": 1,
+      "isRead": true
+    }
+  ],
+  "credit": {
+    "userId": 1,
+    "creditScore": 80,
+    "creditLevel": "待积累",
+    "recordCount": 0,
+    "lastUpdatedAt": null,
+    "effectiveOrderCount": 0,
+    "completedOrderCount": 0,
+    "goodReviewRate": null,
+    "defaultRate": null,
+    "riskRecordCount": 0,
+    "receivedReviewCount": 0,
+    "averageRating": null
+  },
+  "recordCount": 0,
+  "otherUserPrivateRecordsDenied": 40301,
+  "observerPerformedReadMutations": false
+}
