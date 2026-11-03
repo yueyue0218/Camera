@@ -11,6 +11,10 @@ export interface ConversationListItem {
 const LEAKED_TEST_TEXT = /online[-_\s]*check\s+provider\s+reply\s+message|闯€/i;
 
 export class ConversationListModel {
+  static peerRole(item: ConversationSummary): string {
+    return item.otherUserId === item.participantBId ? 'PROVIDER' : 'CUSTOMER';
+  }
+
   static validSummary(item: ConversationSummary, userId: number): boolean {
     return item !== null && Number.isSafeInteger(item.conversationId) && item.conversationId > 0 &&
       Number.isSafeInteger(item.otherUserId) && item.otherUserId > 0 &&

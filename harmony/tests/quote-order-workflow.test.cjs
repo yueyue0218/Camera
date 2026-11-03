@@ -31,8 +31,30 @@ test('quote form converts money to cents and validates dates and counts', () => 
   assert.throws(() => QuoteWorkflow.payload(7, QuoteWorkflow.withField(draft, 'shootEnd', '2026-11-08 13:00')));
   assert.throws(() => QuoteWorkflow.payload(7, QuoteWorkflow.withField(draft, 'delivery', '2026-02-30 18:00')));
   assert.throws(() => QuoteWorkflow.payload(7, QuoteWorkflow.withField(draft, 'refined', '-1')));
+  assert.throws(() => QuoteWorkflow.payload(7, QuoteWorkflow.withField(draft, 'refined', '')));
+  assert.equal(QuoteWorkflow.payload(7, QuoteWorkflow.withField(draft, 'refined', '0')).refinedCount, 0);
   assert.equal(QuoteWorkflow.isDraft(draft), true);
   assert.equal(QuoteWorkflow.isDraft({ amount: '1' }), false);
+});
+
+test('date confirmation updates only the chosen field and survives draft restoration', () => {
+  const empty = QuoteWorkflow.empty();
+  const start = new Date(2026, 10, 8, 14, 5);
+  const picked = QuoteWorkflow.withSelectedDate(empty, 'shootStart', start);
+  assert.equal(picked.shootStart, '2026-11-08 14:05');
+  assert.equal(picked.shootEnd, '');
+  assert.equal(picked.delivery, '');
+  assert.deepEqual(empty, QuoteWorkflow.empty());
+  assert.equal(QuoteWorkflow.selectedDate(picked, 'shootStart').getTime(), start.getTime());
+  const end = QuoteWorkflow.withSelectedDate(picked, 'shootEnd', new Date(2026, 10, 8, 16, 0));
+  const restored = JSON.parse(JSON.stringify(QuoteWorkflow.withSelectedDate(end, 'delivery',
+    new Date(2026, 10, 15, 18, 0))));
+  assert.equal(QuoteWorkflow.selectedDate(restored, 'delivery').getHours(), 18);
+  assert.equal(QuoteWorkflow.selectedDate(restored, 'shootStart').getMinutes(), 5);
+  const completed = { ...restored, amount: '299.00', location: '城市公园', service: '双人写真',
+    originals: '20', refined: '5' };
+  assert.equal(QuoteWorkflow.payload(7, completed).shootStartTime, '2026-11-08T14:05:00');
+  assert.equal(QuoteWorkflow.payload(7, completed).deliveryDeadline, '2026-11-15T18:00:00');
 });
 
 test('quote role matrix and expired state are consistent', () => {

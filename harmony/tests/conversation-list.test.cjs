@@ -26,6 +26,18 @@ test('list accepts a participant and rejects malformed or foreign conversations'
   assert.equal(ConversationListModel.validSummary(summary, 3), false);
 });
 
+test('profile targets use participant IDs and return to the conversation', () => {
+  assert.equal(ConversationListModel.peerRole(summary), 'PROVIDER');
+  assert.equal(ConversationListModel.peerRole({ ...summary, otherUserId: 1 }), 'CUSTOMER');
+  const detail = fs.readFileSync(path.join(sourceRoot, 'pages/ConversationDetailPage.ets'), 'utf8');
+  const index = fs.readFileSync(path.join(sourceRoot, 'pages/Index.ets'), 'utf8');
+  assert.match(detail, /onOpenPeer\?\.\(this\.conversation\.otherUserId, ConversationListModel\.peerRole/);
+  assert.match(detail, /onOpenSelf\?\.\(\)/);
+  assert.match(index, /onOpenSelf: \(\) => this\.openOwnProfileFromConversation\(\)/);
+  assert.match(index, /this\.pushRoute\(AppRoute\.PROFILE, \{\}\)/);
+  assert.match(index, /onBack: \(\) => this\.appPathStack\.pop\(\)/);
+});
+
 test('normal Chinese names and image/file previews are preserved', () => {
   assert.equal(ConversationListModel.safeName({ userId: 2, nickname: '林屿' }), '林屿');
   assert.equal(ConversationListModel.preview([{ messageType: 'IMAGE' }]), '[图片]');

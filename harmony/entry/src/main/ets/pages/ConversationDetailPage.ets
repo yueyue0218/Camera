@@ -112,7 +112,14 @@ export struct ConversationDetailPage {
   onOpenUpload?: (orderId: number) => void;
   onOpenAuthorization?: (orderId: number, authorizationId: number) => void;
   onOpenReviews?: (orderId: number) => void;
+  onOpenSelf?: () => void;
+  onOpenPeer?: (userId: number, role: string) => void;
   onBackHandler?: (handler: (() => boolean) | undefined) => void;
+
+  private openPeer(): void {
+    if (this.conversation === null || !ConversationListModel.validSummary(this.conversation, this.userId)) return;
+    this.onOpenPeer?.(this.conversation.otherUserId, ConversationListModel.peerRole(this.conversation));
+  }
 
   aboutToAppear(): void {
     this.busy = false;
@@ -759,6 +766,7 @@ export struct ConversationDetailPage {
       Row({ space: 8 }) {
       if (item.senderId !== this.userId) {
         PortraAvatar({ fileId: this.peerAvatarFileId, displayName: this.peerName, avatarSize: 34 })
+          .onClick(() => this.openPeer())
       } else {
         Blank().layoutWeight(1)
       }
@@ -805,6 +813,7 @@ export struct ConversationDetailPage {
         Blank().layoutWeight(1)
       } else {
         PortraAvatar({ fileId: this.selfAvatarFileId, displayName: this.selfName, avatarSize: 34 })
+          .onClick(() => this.onOpenSelf?.())
       }
       }
       .width('100%').alignItems(VerticalAlign.Top)
@@ -932,10 +941,12 @@ export struct ConversationDetailPage {
             if (!this.handleBack()) this.onBack?.();
           })
         PortraAvatar({ fileId: this.peerAvatarFileId, displayName: this.peerName, avatarSize: 36 })
+          .onClick(() => this.openPeer())
         Column({ space: 3 }) {
           Text(this.peerName).fontSize(15).fontWeight(FontWeight.Bold)
             .fontColor(PortraTheme.primaryText).maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .onClick(() => this.openPeer())
           Text('拍摄沟通').fontSize(10).fontColor(PortraTheme.mutedText)
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
         if (this.orders.length > 0) {

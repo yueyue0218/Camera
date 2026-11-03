@@ -77,6 +77,7 @@ export struct PortraAppShell {
           onOpenMoment: (id: number) => this.onOpenRoute?.(AppRoute.MOMENT_DETAIL, id),
           onOpenCredit: () => this.onOpenRoute?.(AppRoute.CREDIT),
           onOpenOrders: () => this.onOpenRoute?.(AppRoute.ORDER), onOpenTarget: this.onOpenTarget,
+          onOpenProfile: this.onOpenAuthor,
           onOpenConversation: (id: number) => this.onOpenRoute?.(AppRoute.CONVERSATION_DETAIL, id) })
           .onAppear(() => this.messageVisited = true)
           .visibility(this.selectedTab === 2 ? Visibility.Visible : Visibility.None)

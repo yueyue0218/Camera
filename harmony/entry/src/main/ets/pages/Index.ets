@@ -314,6 +314,9 @@ struct Index {
       this.PlaceholderPage('约拍会话', '无效的会话编号');
     } else {
       ConversationDetailPage({ conversationId: this.validConversationId(param),
+        onOpenSelf: () => this.openOwnProfileFromConversation(),
+        onOpenPeer: (userId: number, role: string) => this.openPage(AppRoute.PUBLIC_PROFILE,
+          { userId: userId, userRole: role }),
         onBackHandler: (handler: (() => boolean) | undefined) => this.conversationBackHandler = handler,
         onBack: () => { this.appPathStack.pop(); this.sessionEpoch++; },
         onCreateQuote: () => this.openPage(AppRoute.QUOTE_FORM,
@@ -501,6 +504,12 @@ struct Index {
   }
   private pushRoute(route: AppRoute, param: NavigationRouteParam): void {
     this.appPathStack.pushPathByName(route, param);
+  }
+
+  private openOwnProfileFromConversation(): void {
+    if (!this.navigationClickGuard.accept(Date.now())) return;
+    const paths = this.appPathStack.getAllPathName();
+    if (paths[paths.length - 1] !== AppRoute.PROFILE) this.pushRoute(AppRoute.PROFILE, {});
   }
 
   private returnToConversation(conversationId: number): void {

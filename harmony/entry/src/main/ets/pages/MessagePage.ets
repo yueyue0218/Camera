@@ -68,6 +68,7 @@ export struct MessagePage {
   onOpenTarget?: (target: NotificationTarget) => void;
   onRequireLogin?: () => void;
   onOpenConversation?: (conversationId: number) => void;
+  onOpenProfile?: (userId: number, role: string) => void;
 
   aboutToAppear(): void {
     try {
@@ -258,7 +259,7 @@ export struct MessagePage {
         const needsBrief = !this.briefRefreshedIds.has(item.otherUserId);
         let brief: UserBrief | null = null;
         if (needsBrief) {
-          const peerRole = item.otherUserId === item.participantBId ? 'PROVIDER' : 'CUSTOMER';
+          const peerRole = ConversationListModel.peerRole(item);
           brief = await this.appClient.apiService.getUserBrief(item.otherUserId, peerRole,
             `conversations.list.brief.${item.conversationId}`).catch(() => null);
           if (brief !== null && token === this.appClient.sessionManager.getSession()?.accessToken &&
@@ -484,8 +485,14 @@ export struct MessagePage {
                 if (this.avatarImages.has(item.avatarFileId ?? 0)) {
                   Image(this.avatarImages.get(item.avatarFileId ?? 0) as image.PixelMap)
                     .width(50).height(50).borderRadius(25).objectFit(ImageFit.Cover)
+                    .onClick(() => this.onOpenProfile?.(item.conversation.otherUserId,
+                      ConversationListModel.peerRole(item.conversation)))
+                    .onTouch((event: TouchEvent) => event.stopPropagation())
                 } else {
                   PortraAvatar({ displayName: item.peerName, avatarSize: 50 })
+                    .onClick(() => this.onOpenProfile?.(item.conversation.otherUserId,
+                      ConversationListModel.peerRole(item.conversation)))
+                    .onTouch((event: TouchEvent) => event.stopPropagation())
                 }
                 Column({ space: 6 }) {
                   Row({ space: 8 }) {
