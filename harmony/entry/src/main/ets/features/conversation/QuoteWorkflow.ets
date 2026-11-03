@@ -131,7 +131,8 @@ export class QuoteWorkflow {
     if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return undefined;
     const parsed = new Date(`${value}:00`);
     if (Number.isNaN(parsed.getTime()) || parsed.getFullYear() !== Number(value.slice(0, 4)) ||
-      parsed.getMonth() + 1 !== Number(value.slice(5, 7)) || parsed.getDate() !== Number(value.slice(8, 10))) {
+      parsed.getMonth() + 1 !== Number(value.slice(5, 7)) || parsed.getDate() !== Number(value.slice(8, 10)) ||
+      parsed.getHours() !== Number(value.slice(11, 13)) || parsed.getMinutes() !== Number(value.slice(14, 16))) {
       return undefined;
     }
     return `${value}:00`;

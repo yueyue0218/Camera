@@ -30,6 +30,7 @@ test('quote form converts money to cents and validates dates and counts', () => 
   assert.throws(() => QuoteWorkflow.payload(7, QuoteWorkflow.withField(draft, 'amount', '299.999')));
   assert.throws(() => QuoteWorkflow.payload(7, QuoteWorkflow.withField(draft, 'shootEnd', '2026-11-08 13:00')));
   assert.throws(() => QuoteWorkflow.payload(7, QuoteWorkflow.withField(draft, 'delivery', '2026-02-30 18:00')));
+  assert.throws(() => QuoteWorkflow.payload(7, QuoteWorkflow.withField(draft, 'delivery', '2026-11-15 24:61')));
   assert.throws(() => QuoteWorkflow.payload(7, QuoteWorkflow.withField(draft, 'refined', '-1')));
   assert.throws(() => QuoteWorkflow.payload(7, QuoteWorkflow.withField(draft, 'refined', '')));
   assert.equal(QuoteWorkflow.payload(7, QuoteWorkflow.withField(draft, 'refined', '0')).refinedCount, 0);

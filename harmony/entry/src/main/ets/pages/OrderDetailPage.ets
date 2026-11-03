@@ -51,18 +51,6 @@ export struct OrderDetailPage {
   onOpenSelf?: () => void;
   onOpenProfile?: (userId: number, role: string) => void;
 
-  @Builder
-  private ProfileRow(label: string, name: string, userId: number, role: string) {
-    Row({ space: 12 }) {
-      Text(label).fontSize(13).fontColor(PortraTheme.secondaryText).width(72)
-      Text(name).fontSize(14).fontColor(PortraTheme.primaryText).layoutWeight(1)
-      if (userId > 0) Text('›').fontSize(20).fontColor(PortraTheme.mutedText)
-    }.width('100%').onClick(() => {
-      if (userId === this.userId) this.onOpenSelf?.();
-      else if (userId > 0) this.onOpenProfile?.(userId, role);
-    })
-  }
-
   aboutToAppear(): void {
     // A detached instance missed identity events; invalidate before ArkUI renders its retained body.
     if (this.loadedIdentity !== -1 && (this.loadedIdentity !== this.appClient.sessionManager.getSessionVersion() ||
@@ -262,6 +250,19 @@ export struct OrderDetailPage {
   private showSelfPaymentNotice(): void {
     AlertDialog.show({ title: '支付', message: '请自行支付',
       primaryButton: { value: '知道了', action: () => {} } });
+  }
+
+  @Builder
+  private ProfileRow(label: string, name: string, userId: number, role: string) {
+    Row({ space: 12 }) {
+      Text(label).fontSize(13).fontColor(PortraTheme.secondaryText).width(72)
+      Text(name).fontSize(14).fontColor(PortraTheme.primaryText).layoutWeight(1)
+      if (userId > 0) Text('›').fontSize(20).fontColor(PortraTheme.mutedText)
+    }.width('100%').onClick(() => {
+      if (userId <= 0) return;
+      if (userId === this.userId) this.onOpenSelf?.();
+      else this.onOpenProfile?.(userId, role);
+    })
   }
 
   @Builder
