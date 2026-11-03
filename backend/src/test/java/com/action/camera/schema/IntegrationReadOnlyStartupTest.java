@@ -36,7 +36,7 @@ class IntegrationReadOnlyStartupTest {
             assertThat(context.getBeansOfType(MomentSchemaInitializer.class)).isEmpty();
             EntityManagerFactory emf = context.getBean(EntityManagerFactory.class);
             assertThat(emf.getProperties().get("hibernate.hbm2ddl.auto")).isEqualTo("validate");
-            assertThat(emf.getMetamodel().getEntities()).hasSize(37);
+            assertThat(emf.getMetamodel().getEntities()).hasSize(38);
             assertThat(guard.ddlAttempts).isEmpty();
         }
         // Closing the context must not issue create-drop cleanup either.
