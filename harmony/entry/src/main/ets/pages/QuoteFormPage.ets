@@ -1,5 +1,7 @@
+import { KeyboardAvoidMode } from '@kit.ArkUI';
 import { AppClient } from '../app/AppClient';
 import { PortraPageHeading } from '../common/components/PortraPageHeading';
+import { PortraLoading } from '../common/components/PortraLoading';
 import { QuoteDraftStore } from '../features/conversation/QuoteDraftStore';
 import { QuoteDraft, QuoteWorkflow } from '../features/conversation/QuoteWorkflow';
 import { CreateQuotePayload, QuoteSummary } from '../model/ApiModels';
@@ -21,14 +23,23 @@ export struct QuoteFormPage {
   private requestVersion: number = 0;
   private draftTimer: number = -1;
   private finished: boolean = false;
+  private loadedSessionVersion: number = -1;
+  private previousKeyboardAvoidMode?: KeyboardAvoidMode;
   onBack?: () => void;
   onSaved?: () => void;
 
   aboutToAppear(): void {
+    this.previousKeyboardAvoidMode = this.getUIContext().getKeyboardAvoidMode();
+    this.getUIContext().setKeyboardAvoidMode(KeyboardAvoidMode.RESIZE);
+    if (this.ready && this.loadedSessionVersion === AppClient.shared.sessionManager.getSessionVersion()) return;
     this.load();
   }
 
   aboutToDisappear(): void {
+    if (this.previousKeyboardAvoidMode !== undefined) {
+      this.getUIContext().setKeyboardAvoidMode(this.previousKeyboardAvoidMode);
+      this.previousKeyboardAvoidMode = undefined;
+    }
     this.requestVersion++;
     if (this.draftTimer >= 0) clearTimeout(this.draftTimer);
     this.draftTimer = -1;
@@ -39,9 +50,14 @@ export struct QuoteFormPage {
 
   private async load(): Promise<void> {
     const version = ++this.requestVersion;
+    this.errorMessage = '';
     try {
       const session = await this.api.currentSession();
       if (version !== this.requestVersion) return;
+      if (this.userId !== session.userId) {
+        this.draft = QuoteWorkflow.empty();
+        this.ready = false;
+      }
       this.userId = session.userId;
       if (this.quoteId > 0) {
         const quotes = await this.api.listQuotes(this.conversationId);
@@ -56,6 +72,7 @@ export struct QuoteFormPage {
       this.original = JSON.stringify(this.draft);
       const saved = QuoteDraftStore.read(this.userId, this.conversationId, this.quoteId);
       if (saved !== undefined) this.draft = saved;
+      this.loadedSessionVersion = AppClient.shared.sessionManager.getSessionVersion();
       this.ready = true;
     } catch (error) {
       if (version === this.requestVersion) this.errorMessage = (error as PortraError).message || '暂时无法打开报价';
@@ -163,6 +180,14 @@ export struct QuoteFormPage {
     Stack({ alignContent: Alignment.Bottom }) {
       Column() {
       PortraPageHeading({ title: this.quoteId > 0 ? '编辑报价' : '发送报价', eyebrow: '', onBack: () => this.close() })
+      if (!this.ready && !this.errorMessage) {
+        PortraLoading({ label: '正在打开报价' }).layoutWeight(1)
+      } else if (!this.ready) {
+        Column({ space: 16 }) {
+          Text(this.errorMessage).fontSize(14).fontColor(PortraTheme.danger)
+          Button('重新打开').onClick(() => this.load())
+        }.width('100%').padding(20).layoutWeight(1)
+      } else {
       Scroll() {
         Column({ space: 16 }) {
           Text('拍摄安排').fontSize(17).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
@@ -201,6 +226,7 @@ export struct QuoteFormPage {
         }
         .alignItems(HorizontalAlign.Start).padding({ left: 20, right: 20, top: 18, bottom: 28 })
       }.align(Alignment.TopStart).layoutWeight(1).scrollBar(BarState.Off)
+      }
       if (this.errorMessage) {
         Text(this.errorMessage).fontSize(12).fontColor(PortraTheme.danger).padding({ left: 20, right: 20 })
       }
@@ -216,6 +242,10 @@ export struct QuoteFormPage {
             Text('放弃本次修改？').fontSize(17).fontWeight(FontWeight.Bold)
             Row({ space: 12 }) {
               Button('继续编辑').onClick(() => this.confirmDiscard = false)
+              Button('保存草稿').onClick(() => {
+                if (this.userId > 0) QuoteDraftStore.write(this.userId, this.conversationId, this.quoteId, this.draft);
+                this.onBack?.();
+              })
               Button('放弃修改').onClick(() => {
                 this.finished = true;
                 QuoteDraftStore.clear(this.userId, this.conversationId, this.quoteId);
