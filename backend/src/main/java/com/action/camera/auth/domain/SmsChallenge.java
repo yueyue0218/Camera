@@ -30,6 +30,22 @@ public class SmsChallenge {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // Nullable only for legacy rows; those rows are never accepted by the new API.
+    @Column(name = "challenge_id", length = 36, unique = true)
+    private String challengeId;
+
+    @Column(name = "owner_user_id")
+    private Long ownerUserId;
+
+    @Column(name = "owner_session_id", length = 128)
+    private String ownerSessionId;
+
+    @Column(name = "operation", length = 32)
+    private String operation;
+
+    @Column(name = "invalidated_at")
+    private LocalDateTime invalidatedAt;
+
     @Column(name = "phone_hash", nullable = false, length = 64)
     private String phoneHash;
 

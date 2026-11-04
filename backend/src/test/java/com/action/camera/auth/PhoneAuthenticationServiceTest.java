@@ -85,6 +85,8 @@ class PhoneAuthenticationServiceTest {
     @MockBean
     private SmsSender smsSender;
 
+    private String challengeId;
+
     @BeforeEach
     void setUp() {
         sessionRepository.deleteAll();
@@ -109,7 +111,7 @@ class PhoneAuthenticationServiceTest {
         String code = sendAndCaptureCode();
 
         SessionAuthenticationResult result = authenticationService.verifyAndLogin(
-                PHONE, SmsPurpose.LOGIN, code, DEVICE_ID, "Chrome on Windows");
+                challengeId, PHONE, SmsPurpose.LOGIN, code, DEVICE_ID, "Chrome on Windows");
 
         User user = userRepository.findByMobileHash(phoneIdentityCodec.lookupHash(PHONE)).orElseThrow();
         assertThat(phoneIdentityCodec.decrypt(user.getMobileCipher())).isEqualTo(PHONE);
@@ -144,7 +146,7 @@ class PhoneAuthenticationServiceTest {
         String code = sendAndCaptureCode();
 
         SessionAuthenticationResult result = authenticationService.verifyAndLogin(
-                PHONE, SmsPurpose.LOGIN, code, DEVICE_ID, null);
+                challengeId, PHONE, SmsPurpose.LOGIN, code, DEVICE_ID, null);
 
         assertThat(userRepository.count()).isEqualTo(1);
         User reloaded = userRepository.findById(existing.getId()).orElseThrow();
@@ -167,7 +169,7 @@ class PhoneAuthenticationServiceTest {
         String code = sendAndCaptureCode();
 
         SessionAuthenticationResult result = authenticationService.verifyAndLogin(
-                PHONE, SmsPurpose.LOGIN, code, DEVICE_ID, null);
+                challengeId, PHONE, SmsPurpose.LOGIN, code, DEVICE_ID, null);
 
         assertThat(result.response().getRole()).isEqualTo("CUSTOMER");
         assertThat(result.response().isAdminCapable()).isFalse();
@@ -185,7 +187,7 @@ class PhoneAuthenticationServiceTest {
         String code = sendAndCaptureCode();
 
         assertThatThrownBy(() -> authenticationService.verifyAndLogin(
-                PHONE, SmsPurpose.LOGIN, code, DEVICE_ID, null))
+                challengeId, PHONE, SmsPurpose.LOGIN, code, DEVICE_ID, null))
                 .isInstanceOf(PhoneLoginRejectedException.class)
                 .hasMessage("暂时无法登录");
 
@@ -199,7 +201,7 @@ class PhoneAuthenticationServiceTest {
         String wrongCode = code.equals("999999") ? "888888" : "999999";
 
         assertThatThrownBy(() -> authenticationService.verifyAndLogin(
-                PHONE, SmsPurpose.LOGIN, wrongCode, DEVICE_ID, null))
+                challengeId, PHONE, SmsPurpose.LOGIN, wrongCode, DEVICE_ID, null))
                 .isInstanceOf(SmsCodeInvalidException.class)
                 .hasMessage("验证码无效或已过期");
 
@@ -210,7 +212,7 @@ class PhoneAuthenticationServiceTest {
     }
 
     private String sendAndCaptureCode() {
-        phoneSmsService.sendCode(PHONE, SmsPurpose.LOGIN, IP, DEVICE_ID);
+        challengeId = phoneSmsService.createChallenge(PHONE, SmsPurpose.LOGIN, IP, DEVICE_ID, null, null, "LOGIN").challengeId();
         var captor = org.mockito.ArgumentCaptor.forClass(SmsMessage.class);
         verify(smsSender).send(captor.capture());
         return captor.getValue().code();

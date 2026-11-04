@@ -63,10 +63,10 @@ class DypnsSmsSenderTest {
                 .containsEntry("DuplicatePolicy", "1").containsEntry("Interval", "60")
                 .containsEntry("ReturnVerifyCode", "false");
         assertThat(mapper.readTree(client.query.get("TemplateParam")))
-                .isEqualTo(mapper.readTree("{\"code\":\"##code##\",\"min\":\"5\"}"));
+                .isEqualTo(mapper.readTree("{\"code\":\"654321\",\"min\":\"5\"}"));
         assertThat(client.query).containsEntry("SchemeName", "默认方案").hasSize(12)
                 .doesNotContainKeys("AutoRetry", "AccessKeyId", "SecurityToken");
-        assertThat(client.query.get("TemplateParam")).doesNotContain("654321");
+        assertThat(client.query.get("TemplateParam")).doesNotContain("##code##");
         assertThat(client.query.get("PhoneNumber")).matches("[0-9]{11}");
         assertThat(client.lastSend.getCodeLength()).isInstanceOf(Long.class);
         assertThat(client.lastSend.getReturnVerifyCode()).isInstanceOf(Boolean.class);
@@ -176,54 +176,55 @@ class DypnsSmsSenderTest {
     }
 
     @Test
-    void realSdkSerializesVerificationForSameDomesticPhone() {
-        assertThat(sender.verifyCode("+8613800138000", "123456")).isTrue();
-        assertThat(client.params.getAction()).isEqualTo("CheckSmsVerifyCode");
-        assertThat(client.query).containsExactlyInAnyOrderEntriesOf(
-                Map.of("PhoneNumber", "13800138000", "VerifyCode", "123456", "SchemeName", "默认方案"));
-        com.aliyun.tea.TeaRequest request = new com.aliyun.tea.TeaRequest();
-        request.protocol = "https";
-        request.pathname = "/";
-        request.headers = Map.of("host", "dypnsapi.aliyuncs.com");
-        request.query = client.query;
-        String url = org.springframework.test.util.ReflectionTestUtils.invokeMethod(
-                com.aliyun.tea.Tea.class, "composeUrl", request);
-        assertThat(url).contains("SchemeName=");
+    void customCodeVerificationIsRejectedBeforeSdkOrCredentialsAreCalled() {
+        assertThatThrownBy(() -> sender.verifyCode("+8613800138000", "123456"))
+                .isInstanceOf(SmsDeliveryException.class)
+                .hasMessage("Custom SMS codes require local challenge verification");
+        assertThat(client.params).isNull();
+        assertThat(client.query).isNull();
+        verifyNoInteractions(client.credentials);
     }
 
     @Test
-    void reauthenticationRequiresSeparateApprovedSchemeAndUsesItForSendAndVerify() {
+    void reauthenticationRequiresApprovedTemplateButSharesDefaultSchemeWithoutCloudVerification() {
         SmsProperties properties=new SmsProperties(); properties.setSignName("Approved sign");
-        properties.setLoginTemplateId("LOGIN_TEMPLATE"); properties.setReauthTemplateId("REAUTH_TEMPLATE");
+        properties.setLoginTemplateId("LOGIN_TEMPLATE"); properties.setReauthTemplateId("");
         DypnsSmsSender configured=new DypnsSmsSender(properties,mapper,client);
         assertThatThrownBy(()->configured.send(new SmsMessage("+8613800138000",SmsPurpose.REAUTH,"123456",Duration.ofMinutes(5))))
-                .isInstanceOf(SmsDeliveryException.class).hasMessageContaining("separate approved PNVS");
+                .isInstanceOf(SmsDeliveryException.class).hasMessageContaining("No approved SMS template");
+        assertThat(client.params).isNull();
+        properties.setReauthTemplateId("REAUTH_TEMPLATE");
         properties.setReauthSchemeName("默认方案");
         assertThatThrownBy(()->configured.verifyCode("+8613800138000",SmsPurpose.REAUTH,"123456"))
                 .isInstanceOf(SmsDeliveryException.class);
-        properties.setReauthSchemeName("portra-identity-reauth");
         assertThat(configured.send(new SmsMessage("+8613800138000",SmsPurpose.REAUTH,"123456",Duration.ofMinutes(5))).providerMessageId())
                 .isEqualTo("mock-biz");
-        assertThat(client.query).containsEntry("SchemeName","portra-identity-reauth").containsEntry("TemplateCode","REAUTH_TEMPLATE");
-        assertThat(configured.verifyCode("+8613800138000",SmsPurpose.REAUTH,"123456")).isTrue();
-        assertThat(client.query).containsEntry("SchemeName","portra-identity-reauth");
-        assertThat(configured.verifyCode("+8613800138000","123456")).isTrue();
-        assertThat(client.query).containsEntry("SchemeName","默认方案");
+        assertThat(client.query).containsEntry("SchemeName","默认方案").containsEntry("TemplateCode","REAUTH_TEMPLATE");
+        assertThatThrownBy(() -> configured.verifyCode("+8613800138000",SmsPurpose.REAUTH,"123456"))
+                .isInstanceOf(SmsDeliveryException.class);
+        assertThatThrownBy(() -> configured.verifyCode("+8613800138000","123456"))
+                .isInstanceOf(SmsDeliveryException.class);
+        assertThat(client.params.getAction()).isEqualTo("SendSmsVerifyCode");
+        configured.send(new SmsMessage("+8613800138000",SmsPurpose.LOGIN,"654321",Duration.ofMinutes(5)));
+        assertThat(client.query).containsEntry("SchemeName","默认方案").containsEntry("TemplateCode","LOGIN_TEMPLATE");
     }
 
     @Test
-    void documentedUnknownResultMeansInvalidCode() {
+    void unknownCloudResultCannotBeUsedToVerifyCustomCode() {
         client.verifyResult = "UNKNOWN";
-        assertThat(sender.verifyCode("+8613800138000", "123456")).isFalse();
+        assertThatThrownBy(() -> sender.verifyCode("+8613800138000", "123456"))
+                .isInstanceOf(SmsDeliveryException.class).hasMessage("Custom SMS codes require local challenge verification");
+        assertThat(client.params).isNull();
     }
 
     @ParameterizedTest
     @NullAndEmptySource
     @ValueSource(strings = {"UNEXPECTED", "FAIL"})
-    void malformedResultIsProviderFailureNotWrongUserCode(String result) {
+    void malformedCloudResultIsNeverRequestedOrInterpretedAsLocalCodeResult(String result) {
         client.verifyResult = result;
         assertThatThrownBy(() -> sender.verifyCode("+8613800138000", "123456"))
-                .isInstanceOf(SmsDeliveryException.class);
+                .isInstanceOf(SmsDeliveryException.class).hasMessage("Custom SMS codes require local challenge verification");
+        assertThat(client.params).isNull();
     }
 
     @Test
@@ -241,7 +242,8 @@ class DypnsSmsSenderTest {
                 .hasNoCause().hasMessage("PNVS SMS send failed");
         assertThatThrownBy(() -> sender.verifyCode("+8613800138000", "123456"))
                 .isInstanceOf(SmsDeliveryException.class).hasNoCause()
-                .hasMessage("PNVS SMS verification failed");
+                .hasMessage("Custom SMS codes require local challenge verification");
+        assertThat(client.params.getAction()).isEqualTo("SendSmsVerifyCode");
     }
 
     /** Runs the installed generated SDK through query serialization; stops before signing/HTTP. */

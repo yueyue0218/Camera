@@ -32,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class PhoneSmsControllerTest {
 
+    private static final String ID="12345678-1234-4123-8123-123456789abc";
     private PhoneSmsService phoneSmsService;
     private PhoneAuthenticationService phoneAuthenticationService;
     private AuthSessionService sessionService;
@@ -51,7 +52,9 @@ class PhoneSmsControllerTest {
     }
 
     @Test
-    void sendEndpointUsesServerObservedIpAndReturnsGenericSuccess() throws Exception {
+    void sendEndpointUsesServerObservedIpAndReturnsChallengeWithoutSecrets() throws Exception {
+        when(phoneSmsService.createChallenge("13800138000", SmsPurpose.LOGIN, "203.0.113.25", "browser-device-b2", null, null, "LOGIN"))
+                .thenReturn(new com.action.camera.auth.dto.SmsChallengeResponse(ID, java.time.LocalDateTime.now().plusMinutes(5)));
         mockMvc.perform(MockMvcRequestBuilders.post("/auth/sms/send")
                         .with(request -> {
                             request.setRemoteAddr("203.0.113.25");
@@ -68,10 +71,12 @@ class PhoneSmsControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("success"))
-                .andExpect(jsonPath("$.data").doesNotExist());
+                .andExpect(jsonPath("$.data.challengeId").value(ID))
+                .andExpect(jsonPath("$.data.code").doesNotExist())
+                .andExpect(jsonPath("$.data.codeHash").doesNotExist());
 
-        verify(phoneSmsService).sendCode(
-                "13800138000", SmsPurpose.LOGIN, "203.0.113.25", "browser-device-b2");
+        verify(phoneSmsService).createChallenge(
+                "13800138000", SmsPurpose.LOGIN, "203.0.113.25", "browser-device-b2", null, null, "LOGIN");
     }
 
     @Test
@@ -88,17 +93,13 @@ class PhoneSmsControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(40001));
 
-        verify(phoneSmsService, never()).sendCode(
-                org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.anyString());
+        org.mockito.Mockito.verifyNoInteractions(phoneSmsService);
     }
 
     @Test
     void verifyEndpointKeepsRefreshTokenOutOfBodyAndSetsSecureCookie() throws Exception {
         when(phoneAuthenticationService.verifyAndLogin(
-                anyString(), any(SmsPurpose.class), anyString(), anyString(), any()))
+                org.mockito.ArgumentMatchers.eq(ID), anyString(), any(SmsPurpose.class), anyString(), anyString(), any()))
                 .thenReturn(new SessionAuthenticationResult(
                         new LoginResponse("access-token", 42L, "新用户", "CUSTOMER", false),
                         "raw-refresh-token",
@@ -111,6 +112,7 @@ class PhoneSmsControllerTest {
                                 {
                                   "phone": "13800138000",
                                   "purpose": "LOGIN",
+                                  "challengeId": "12345678-1234-4123-8123-123456789abc",
                                   "code": "123456",
                                   "deviceId": "browser-device-b2",
                                   "deviceName": "Chrome on Windows"
@@ -128,7 +130,7 @@ class PhoneSmsControllerTest {
                 .andExpect(header().string("Set-Cookie", containsString("SameSite=Lax")));
 
         verify(phoneAuthenticationService).verifyAndLogin(
-                "13800138000", SmsPurpose.LOGIN, "123456", "browser-device-b2", "Chrome on Windows");
+                ID, "13800138000", SmsPurpose.LOGIN, "123456", "browser-device-b2", "Chrome on Windows");
     }
 
     @Test
@@ -139,6 +141,7 @@ class PhoneSmsControllerTest {
                                 {
                                   "phone": "13800138000",
                                   "purpose": "LOGIN",
+                                  "challengeId": "12345678-1234-4123-8123-123456789abc",
                                   "code": "1234",
                                   "deviceId": "browser-device-b2"
                                 }
@@ -147,7 +150,7 @@ class PhoneSmsControllerTest {
                 .andExpect(jsonPath("$.code").value(40001));
 
         verify(phoneAuthenticationService, never()).verifyAndLogin(
-                anyString(), any(), anyString(), anyString(), any());
+                anyString(), anyString(), any(), anyString(), anyString(), any());
     }
 
     @Test
@@ -155,7 +158,7 @@ class PhoneSmsControllerTest {
         LoginResponse login = new LoginResponse("native-access", 84L, "鸿蒙用户", "CUSTOMER", false);
         login.setNewUser(true);
         when(phoneAuthenticationService.verifyAndLogin(
-                anyString(), any(SmsPurpose.class), anyString(), anyString(), any()))
+                org.mockito.ArgumentMatchers.eq(ID), anyString(), any(SmsPurpose.class), anyString(), anyString(), any()))
                 .thenReturn(new SessionAuthenticationResult(
                         login, "native-refresh", "camera_refresh", Duration.ofDays(30)));
 
@@ -165,6 +168,7 @@ class PhoneSmsControllerTest {
                                 {
                                   "phone": "13800138000",
                                   "purpose": "LOGIN",
+                                  "challengeId": "12345678-1234-4123-8123-123456789abc",
                                   "code": "123456",
                                   "deviceId": "harmony-device",
                                   "deviceName": "HarmonyOS"

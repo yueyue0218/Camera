@@ -60,6 +60,40 @@ class FileControllerTest {
     }
 
     @Test
+    void conditionalThumbnailStillChecksAccessAndCurrentPublicClassification() throws Exception {
+        FileRecord record = imageRecord();
+        when(fileService.getForDownload(eq(42L), any(), any())).thenReturn(record);
+        when(fileService.isPubliclyCacheable(record)).thenReturn(true);
+        when(imageVariantService.load(record, ImageVariant.THUMBNAIL))
+                .thenReturn(new ImageBinary(new ByteArrayResource("webp".getBytes()), "image/webp"));
+        String version = mockMvc.perform(get("/files/42/thumbnail")).andReturn()
+                .getResponse().getHeader(HttpHeaders.ETAG);
+        mockMvc.perform(get("/files/42/thumbnail").header(HttpHeaders.IF_NONE_MATCH, version))
+                .andExpect(status().isNotModified()).andExpect(content().bytes(new byte[0]));
+        when(fileService.isPubliclyCacheable(record)).thenReturn(false);
+        mockMvc.perform(get("/files/42/thumbnail").header(HttpHeaders.IF_NONE_MATCH, version))
+                .andExpect(status().isOk()).andExpect(header().doesNotExist(HttpHeaders.ETAG))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, PRIVATE_NO_STORE_CACHE));
+        when(fileService.getForDownload(eq(42L), any(), any()))
+                .thenThrow(new BusinessException(ErrorCode.FORBIDDEN, "无权访问"));
+        mockMvc.perform(get("/files/42/thumbnail").header(HttpHeaders.IF_NONE_MATCH, version))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void thumbnailVersionChangesWithRepresentationBytes() throws Exception {
+        FileRecord record = imageRecord();
+        when(fileService.getForDownload(eq(42L), any(), any())).thenReturn(record);
+        when(fileService.isPubliclyCacheable(record)).thenReturn(true);
+        when(imageVariantService.load(record, ImageVariant.THUMBNAIL))
+                .thenReturn(new ImageBinary(new ByteArrayResource("one".getBytes()), "image/webp"))
+                .thenReturn(new ImageBinary(new ByteArrayResource("two".getBytes()), "image/webp"));
+        String version = mockMvc.perform(get("/files/42/thumbnail")).andReturn().getResponse().getHeader(HttpHeaders.ETAG);
+        mockMvc.perform(get("/files/42/thumbnail").header(HttpHeaders.IF_NONE_MATCH, version))
+                .andExpect(status().isOk()).andExpect(content().bytes("two".getBytes()));
+    }
+
+    @Test
     void thumbnailReturnsInlineImageWithTruthfulMime() throws Exception {
         FileRecord record = imageRecord();
         when(fileService.getForDownload(eq(42L), any(), any())).thenReturn(record);

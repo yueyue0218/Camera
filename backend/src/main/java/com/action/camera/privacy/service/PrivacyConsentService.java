@@ -13,6 +13,8 @@ import java.time.*;
 
 @Service
 public class PrivacyConsentService {
+    /** Release compatibility marker: all authenticated clients require an account grant. */
+    public static final String ACCESS_CONTRACT = "ACCOUNT_CONSENT_REQUIRED_ALL_CLIENTS_V1";
     public static final String VERSION = "2026-10-29-v1";
     private final PrivacyConsentRepository consents;
     private final PrivacyConsentEventRepository events;
@@ -70,9 +72,10 @@ public class PrivacyConsentService {
     @Transactional(readOnly=true)
     public void requireBusinessConsent(Long userId, boolean harmonyClient) {
         PrivacyConsent state=consents.findById(userId).orElse(null);
-        if ((state!=null && "WITHDRAWN".equals(state.getStatus())) || (harmonyClient &&
-                (state==null || !"GRANTED".equals(state.getStatus()) || !VERSION.equals(state.getPrivacyPolicyVersion())
-                || !VERSION.equals(state.getCrossBorderConsentVersion())))) {
+        // The account record is authoritative for every session and client.
+        // Keep the parameter for source compatibility; it never grants an exemption.
+        if (state==null || !"GRANTED".equals(state.getStatus()) || !VERSION.equals(state.getPrivacyPolicyVersion())
+                || !VERSION.equals(state.getCrossBorderConsentVersion())) {
             throw new BusinessException(ErrorCode.PRIVACY_CONSENT_REQUIRED);
         }
     }

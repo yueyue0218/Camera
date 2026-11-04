@@ -47,6 +47,21 @@ public class OrderController {
         return Result.success(orders);
     }
 
+    @GetMapping("/orders/summary")
+    public Result<com.action.camera.order.dto.OrderSummaryResponse> summary(@RequestParam String role) {
+        return Result.success(orderService.summarizeMyOrders(currentUserId(), role));
+    }
+
+    @GetMapping("/orders/page")
+    public Result<com.action.camera.common.page.PageResult<OrderResponse>> page(
+            @RequestParam String role, @RequestParam(required = false) OrderStatus status,
+            @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size) {
+        var result = orderService.pageMyOrders(currentUserId(), role, status, page, size);
+        return Result.success(new com.action.camera.common.page.PageResult<>(
+                result.getRecords().stream().map(this::toOrderResponse).toList(),
+                result.getPage(), result.getSize(), result.getTotal()));
+    }
+
     @GetMapping("/orders/{orderId}")
     public Result<OrderResponse> getOrder(@PathVariable Long orderId) {
         Long operatorId = currentUserId();

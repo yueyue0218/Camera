@@ -14,6 +14,8 @@ public class TestAuthTokens {
     private final UserRepository userRepository;
     private final UserRoleBindingRepository roleBindingRepository;
     private final AuthSessionService sessionService;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.action.camera.privacy.service.PrivacyConsentService consent;
 
     public TestAuthTokens(UserRepository userRepository,
                           UserRoleBindingRepository roleBindingRepository,
@@ -26,6 +28,11 @@ public class TestAuthTokens {
     public String generateToken(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Test user does not exist: " + userId));
+        if ("ACTIVE".equals(user.getStatus()) && "NOT_RECORDED".equals(consent.current(userId).status())) {
+            consent.update(userId, new com.action.camera.privacy.dto.PrivacyDtos.ConsentUpdate(
+                "GRANTED", com.action.camera.privacy.service.PrivacyConsentService.VERSION,
+                com.action.camera.privacy.service.PrivacyConsentService.VERSION, "business-test-fixture", System.currentTimeMillis()));
+        }
         UserRole role = UserRole.parse(user.getCurrentRole(), UserRole.CUSTOMER);
         ensureBinding(userId, role);
         boolean admin = roleBindingRepository.existsByUserIdAndRole(userId, UserRole.ADMIN.name());

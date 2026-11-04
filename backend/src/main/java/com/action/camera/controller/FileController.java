@@ -18,7 +18,15 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.charset.StandardCharsets;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
+import com.action.camera.common.ErrorCode;
+import com.action.camera.common.exception.BusinessException;
 
 @RestController
 @RequestMapping("/files")
@@ -103,12 +111,31 @@ public class FileController {
                 UserContext.getCurrentRole()
         );
         ImageBinary binary = imageVariantService.load(record, parsed);
-        return ResponseEntity.ok()
+        String cache = cacheControl(record, parsed);
+        ResponseEntity.BodyBuilder response = ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
-                .header(HttpHeaders.CACHE_CONTROL, cacheControl(record, parsed))
+                .header(HttpHeaders.CACHE_CONTROL, cache)
                 .header(X_CONTENT_TYPE_OPTIONS, NOSNIFF)
-                .contentType(MediaType.parseMediaType(binary.contentType()))
-                .body(binary.resource());
+                .contentType(MediaType.parseMediaType(binary.contentType()));
+        // Spring evaluates If-None-Match only after this method has performed
+        // the current download authorization and verified the representation.
+        if (parsed == ImageVariant.THUMBNAIL && PUBLIC_IMMUTABLE_CACHE.equals(cache)) {
+            response.eTag(thumbnailVersion(binary));
+        }
+        return response.body(binary.resource());
+    }
+
+    private String thumbnailVersion(ImageBinary binary) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            digest.update(binary.contentType().getBytes(StandardCharsets.UTF_8));
+            try (DigestInputStream input = new DigestInputStream(binary.resource().getInputStream(), digest)) {
+                input.transferTo(OutputStream.nullOutputStream());
+            }
+            return '"' + HexFormat.of().formatHex(digest.digest()) + '"';
+        } catch (IOException | NoSuchAlgorithmException error) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "图片读取失败");
+        }
     }
 
     private String cacheControl(FileRecord record, ImageVariant variant) {

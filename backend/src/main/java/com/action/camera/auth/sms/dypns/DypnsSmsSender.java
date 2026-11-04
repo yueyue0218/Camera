@@ -2,14 +2,11 @@ package com.action.camera.auth.sms.dypns;
 
 import com.action.camera.auth.config.SmsProperties;
 import com.action.camera.auth.domain.SmsPurpose;
-import com.action.camera.auth.sms.SmsCloudVerifier;
 import com.action.camera.auth.sms.SmsDeliveryException;
 import com.action.camera.auth.sms.SmsDeliveryReceipt;
 import com.action.camera.auth.sms.SmsMessage;
 import com.action.camera.auth.sms.SmsSender;
 import com.aliyun.dypnsapi20170525.Client;
-import com.aliyun.dypnsapi20170525.models.CheckSmsVerifyCodeRequest;
-import com.aliyun.dypnsapi20170525.models.CheckSmsVerifyCodeResponse;
 import com.aliyun.dypnsapi20170525.models.SendSmsVerifyCodeRequest;
 import com.aliyun.dypnsapi20170525.models.SendSmsVerifyCodeResponse;
 import com.aliyun.teaopenapi.models.Config;
@@ -19,7 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
 
 /** Staging-only adapter. Not a Spring component; installed by StagingSmsConfiguration. */
-public final class DypnsSmsSender implements SmsSender, SmsCloudVerifier {
+public final class DypnsSmsSender implements SmsSender {
     private static final String PNVS_SCHEME_NAME = "默认方案";
 
     private final Client client;
@@ -60,13 +57,13 @@ public final class DypnsSmsSender implements SmsSender, SmsCloudVerifier {
         }
         String scheme = schemeFor(message.purpose());
         String template = message.purpose() == SmsPurpose.REAUTH ? properties.getReauthTemplateId() : properties.getLoginTemplateId();
-        if (template == null || template.isBlank()) throw new SmsDeliveryException("No approved SMS template for purpose");
-        // Important: The locally generated SmsMessage.code() is NOT sent or verified in this mode.
-        // The cloud service owns the issued code when TemplateParam contains ##code##.
+        if (template == null || template.isBlank() || template.startsWith("REPLACE_ME")) throw new SmsDeliveryException("No approved SMS template for purpose");
+        // Portra owns generation, challenge binding, verification and consumption.
+        if (message.code() == null || !message.code().matches("[0-9]{6}")) throw new SmsDeliveryException("Invalid SMS code format");
         final String templateParam;
         try {
             long minutes = properties.getCodeTtl().toMinutes();
-            templateParam = objectMapper.writeValueAsString(Map.of("code", "##code##", "min", Long.toString(minutes)));
+            templateParam = objectMapper.writeValueAsString(Map.of("code", message.code(), "min", Long.toString(minutes)));
         } catch (JsonProcessingException e) {
             throw new SmsDeliveryException("Unable to serialize PNVS template parameters", e);
         }
@@ -123,47 +120,18 @@ public final class DypnsSmsSender implements SmsSender, SmsCloudVerifier {
     }
 
     private String schemeFor(SmsPurpose purpose) {
-        if (purpose == SmsPurpose.LOGIN) return PNVS_SCHEME_NAME;
-        String scheme = properties.getReauthSchemeName();
-        if (purpose != SmsPurpose.REAUTH || scheme == null || scheme.isBlank() || PNVS_SCHEME_NAME.equals(scheme)) {
-            throw new SmsDeliveryException("A separate approved PNVS reauthentication scheme is required");
-        }
-        return scheme;
+        if (purpose != SmsPurpose.LOGIN && purpose != SmsPurpose.REAUTH) throw new SmsDeliveryException("Unsupported purpose");
+        return PNVS_SCHEME_NAME;
     }
 
-    @Override
-    public boolean verifyCode(String normalizedPhone, String code) {
-        return verifyCode(normalizedPhone, SmsPurpose.LOGIN, code);
+    /** Kept source-compatible for callers; custom codes must NEVER use cloud verification. */
+    @Deprecated
+    public boolean verifyCode(String phone, String code) {
+        throw new SmsDeliveryException("Custom SMS codes require local challenge verification");
     }
-
-    @Override
-    public boolean verifyCode(String normalizedPhone, SmsPurpose purpose, String code) {
-        CheckSmsVerifyCodeRequest request = new CheckSmsVerifyCodeRequest()
-                .setSchemeName(schemeFor(purpose))
-                .setPhoneNumber(toDomesticPhone(normalizedPhone))
-                .setVerifyCode(code);
-        try {
-            CheckSmsVerifyCodeResponse response = client.checkSmsVerifyCode(request);
-            if (response == null || response.getBody() == null
-                    || !Boolean.TRUE.equals(response.getBody().getSuccess())
-                    || !"OK".equals(response.getBody().getCode())
-                    || response.getBody().getModel() == null) {
-                throw new SmsDeliveryException("PNVS SMS verification unavailable");
-            }
-            String result = response.getBody().getModel().getVerifyResult();
-            if ("PASS".equals(result)) {
-                return true;
-            }
-            if ("UNKNOWN".equals(result)) {
-                return false;
-            }
-            // Missing/unrecognized provider data is not a wrong user code.
-            throw new SmsDeliveryException("PNVS SMS verification returned an invalid result");
-        } catch (SmsDeliveryException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new SmsDeliveryException("PNVS SMS verification failed");
-        }
+    @Deprecated
+    public boolean verifyCode(String phone, SmsPurpose purpose, String code) {
+        throw new SmsDeliveryException("Custom SMS codes require local challenge verification");
     }
 
     private static long elapsedMs(long started) {

@@ -32,10 +32,10 @@ public class SelfAccountClosureService {
         this.requests=requests; this.cleanup=cleanup; this.permissions=permissions;
     }
     @Transactional(noRollbackFor=SmsSendFailedException.class)
-    public void sendCode(Long userId,ClosureCode input,String requestIp) {
+    public com.action.camera.auth.dto.SmsChallengeResponse sendCode(Long userId,ClosureCode input,String requestIp) {
         User user=active(userId,false);
         String phone=verifyBoundPhone(user,input.phone());
-        sms.sendCode(phone,SmsPurpose.REAUTH,requestIp,input.deviceId());
+        return sms.createChallenge(phone,SmsPurpose.REAUTH,requestIp,input.deviceId(),userId,com.action.camera.common.UserContext.getSessionId(),"ACCOUNT_CLOSURE");
     }
     @Transactional(noRollbackFor=SmsCodeInvalidException.class)
     public ClosureView close(Long userId,ClosureConfirm input) {
@@ -49,7 +49,7 @@ public class SelfAccountClosureService {
         cleanup.lockParticipantQuotes(userId);
         if(cleanup.countBlockingOrders(userId)>0 || cleanup.countOpenDisputes(userId)>0)
             throw new BusinessException(ErrorCode.STATUS_CONFLICT,"仍有进行中的约拍约定或未解决争议，请先处理或提交权利申请");
-        sms.verifyCode(phone,SmsPurpose.REAUTH,input.code());
+        sms.consumeChallenge(input.challengeId(),phone,SmsPurpose.REAUTH,input.code(),userId,com.action.camera.common.UserContext.getSessionId(),"ACCOUNT_CLOSURE");
         LocalDateTime now=LocalDateTime.now();
         cleanup.cleanupUserData(userId,user.getMobileHash(),now);
         AdminAccountCancellationService.anonymize(user);

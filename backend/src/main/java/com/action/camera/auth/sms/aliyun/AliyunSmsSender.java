@@ -36,7 +36,8 @@ public class AliyunSmsSender implements SmsSender {
         }
 
         String template = message.purpose() == SmsPurpose.REAUTH ? properties.getReauthTemplateId() : properties.getLoginTemplateId();
-        if (template == null || template.isBlank()) throw new SmsDeliveryException("No Alibaba Cloud template configured for SMS purpose");
+        if (template == null || template.isBlank() || template.startsWith("REPLACE_ME")
+                || (message.purpose() == SmsPurpose.REAUTH && template.equals(properties.getLoginTemplateId()))) throw new SmsDeliveryException("No Alibaba Cloud template configured for SMS purpose");
 
         AliyunSmsResult result = gateway.send(
                 message.phone(),

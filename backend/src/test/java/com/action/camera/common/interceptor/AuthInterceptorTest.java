@@ -45,6 +45,16 @@ class AuthInterceptorTest {
     }
 
     @Test
+    void additivePerformanceReadsRemainAuthenticated() {
+        when(request.getMethod()).thenReturn("GET");
+        for (String path : java.util.List.of("/orders/summary", "/orders/page", "/moments/page",
+                "/service-packages/42/intent-state")) {
+            when(request.getRequestURI()).thenReturn(path);
+            assertUnauthorizedAndEmptyContext(interceptor());
+        }
+    }
+
+    @Test
     void publicProfilesAreAnonymousButPrivateProfilesAndWritesRemainProtected() {
         AuthInterceptor interceptor = interceptor();
         for (String path : java.util.List.of("/users/42/public-profile", "/moments/profile", "/demands/by-user/42", "/service-packages/by-user/42")) {
