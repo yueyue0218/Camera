@@ -24,6 +24,27 @@ class ReportMySqlIsolationGuardTest {
     private static final String EXPECTED_DIRECTORY =
             "C:/Users/LiXiaozhou/.codex/test-environments/portra-mysql-3307/data/";
 
+    @Test void stage3RejectsWrongIdentityBeforeAnyWrite() throws Exception {
+        String previous=System.getProperty("portra.mysql.stage3");
+        System.setProperty("portra.mysql.stage3","true");
+        try {
+            for (String mismatch : java.util.List.of("port","schema","url","directory")) {
+                var checked=new AtomicBoolean();
+                Connection c=connection("MySQL", "C:/Users/ww/.codex/visualizations/2026/11/02/01a19cf9-7d01-7590-847b-50ac5e651d24/portra-backend-integration/evidence/stage2/mysql-data/",checked);
+                when(c.getMetaData().getURL()).thenReturn("jdbc:mysql://127.0.0.1:33367/portragovp0test?sslMode=DISABLED");
+                var rs=c.createStatement().executeQuery("SELECT @@port, @@datadir");
+                when(rs.getInt(1)).thenReturn(33367);
+                switch(mismatch) {
+                    case "port" -> when(rs.getInt(1)).thenReturn(3306);
+                    case "schema" -> when(c.getCatalog()).thenReturn("production");
+                    case "url" -> when(c.getMetaData().getURL()).thenReturn("jdbc:mysql://remote:33367/portragovp0test");
+                    case "directory" -> when(rs.getString(2)).thenReturn("C:/other/mysql");
+                }
+                assertThatThrownBy(()->ReportMySqlClosureIT.validateStartupIdentity(c)).isInstanceOf(IllegalStateException.class);
+            }
+        } finally { if(previous==null) System.clearProperty("portra.mysql.stage3"); else System.setProperty("portra.mysql.stage3",previous); }
+    }
+
     @Test
     void wrongDataDirectoryIsRejectedBeforeAnyDatasourcePropertyIsRegistered() throws Exception {
         rejected("MySQL", "C:/unrelated/data/");
@@ -75,7 +96,7 @@ class ReportMySqlIsolationGuardTest {
         var result = mock(ResultSet.class);
         when(connection.getMetaData()).thenReturn(metadata);
         when(metadata.getDatabaseProductName()).thenReturn(product);
-        when(metadata.getURL()).thenReturn("jdbc:mysql://127.0.0.1:3307/portragovp0test");
+        when(metadata.getURL()).thenReturn("jdbc:mysql://127.0.0.1:3307/portragovp0test?sslMode=DISABLED");
         when(connection.getCatalog()).thenReturn("portragovp0test");
         when(connection.createStatement()).thenReturn(statement);
         when(statement.executeQuery(anyString())).thenReturn(result);

@@ -39,11 +39,11 @@ class WebMvcTempStagingAuthContractTest {
                                                     Environment environment) {
         InterceptorRegistry registry = mock(InterceptorRegistry.class);
         InterceptorRegistration registration = mock(InterceptorRegistration.class);
-        when(registry.addInterceptor(authInterceptor)).thenReturn(registration);
+        when(registry.addInterceptor(any(org.springframework.web.servlet.HandlerInterceptor.class))).thenReturn(registration);
         when(registration.addPathPatterns(any(String[].class))).thenReturn(registration);
         when(registration.excludePathPatterns(any(String[].class))).thenReturn(registration);
 
-        new WebMvcConfig(authInterceptor, new CorsProperties(), environment).addInterceptors(registry);
+        new WebMvcConfig(authInterceptor, new CorsProperties(), environment, org.mockito.Mockito.mock(com.action.camera.privacy.service.PrivacyRequestInterceptor.class)).addInterceptors(registry);
         return registration;
     }
 }

@@ -14,10 +14,6 @@ import com.action.camera.message.repository.ConversationRepository;
 import com.action.camera.message.repository.MessageRepository;
 import com.action.camera.order.entity.Order;
 import com.action.camera.order.repository.OrderRepository;
-import com.action.camera.photoauthorization.entity.PhotoAuthorization;
-import com.action.camera.photoauthorization.entity.PhotoAuthorizationFile;
-import com.action.camera.photoauthorization.repository.PhotoAuthorizationFileRepository;
-import com.action.camera.photoauthorization.repository.PhotoAuthorizationRepository;
 import com.action.camera.repository.UserRoleBindingRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,8 +41,6 @@ class FileAccessPolicyTest {
     @Mock private DeliveryFileRepository deliveryFileRepository;
     @Mock private DeliveryRepository deliveryRepository;
     @Mock private OrderRepository orderRepository;
-    @Mock private PhotoAuthorizationFileRepository photoAuthorizationFileRepository;
-    @Mock private PhotoAuthorizationRepository photoAuthorizationRepository;
     @Mock private MessageRepository messageRepository;
     @Mock private ConversationRepository conversationRepository;
     @Mock private UserRoleBindingRepository userRoleBindingRepository;
@@ -59,8 +53,6 @@ class FileAccessPolicyTest {
                 deliveryFileRepository,
                 deliveryRepository,
                 orderRepository,
-                photoAuthorizationFileRepository,
-                photoAuthorizationRepository,
                 messageRepository,
                 conversationRepository,
                 userRoleBindingRepository
@@ -127,8 +119,6 @@ class FileAccessPolicyTest {
 
     @Test
     void deliveryCannotBecomePublicOnlyBecauseVisibilitySaysPublic() {
-        when(photoAuthorizationFileRepository.findByFileIdIn(List.of(FILE_ID))).thenReturn(List.of());
-
         assertThatThrownBy(() -> policy.assertCanDownload(publicFile("DELIVERY"), null, null))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
@@ -151,7 +141,6 @@ class FileAccessPolicyTest {
         when(deliveryFileRepository.findByFileId(FILE_ID)).thenReturn(List.of(deliveryFile));
         when(deliveryRepository.findAllById(any())).thenReturn(List.of(delivery));
         when(orderRepository.findAllById(any())).thenReturn(List.of(order));
-        when(photoAuthorizationFileRepository.findByFileIdIn(List.of(FILE_ID))).thenReturn(List.of());
         when(messageRepository.findByFileId(FILE_ID)).thenReturn(List.of());
 
         assertThatCode(() -> policy.assertCanDownload(privateFile("DELIVERY"), CUSTOMER_ID, UserRole.CUSTOMER))
@@ -165,19 +154,11 @@ class FileAccessPolicyTest {
     }
 
     @Test
-    void grantedPhotoAuthorizationAllowsPublicDisplayOfDeliveryFile() {
-        PhotoAuthorizationFile authorizationFile = new PhotoAuthorizationFile();
-        authorizationFile.setAuthorizationId(50L);
-        authorizationFile.setFileId(FILE_ID);
-        PhotoAuthorization authorization = new PhotoAuthorization();
-        authorization.setId(50L);
-        authorization.setStatus(PhotoAuthorization.STATUS_GRANTED);
-        authorization.setPhotoUsageScope(PhotoAuthorization.USAGE_SCOPE_PORTFOLIO_DISPLAY);
-        when(photoAuthorizationFileRepository.findByFileIdIn(List.of(FILE_ID))).thenReturn(List.of(authorizationFile));
-        when(photoAuthorizationRepository.findAllById(any())).thenReturn(List.of(authorization));
-
-        assertThatCode(() -> policy.assertCanDownload(privateFile("DELIVERY"), null, null))
-                .doesNotThrowAnyException();
+    void displayConsentDoesNotMakePrivateDeliveryAvailableToAnonymousUsers() {
+        assertThatThrownBy(() -> policy.assertCanDownload(privateFile("DELIVERY"), null, null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.UNAUTHORIZED);
     }
 
     @Test
@@ -190,7 +171,6 @@ class FileAccessPolicyTest {
         conversation.setParticipantAId(CUSTOMER_ID);
         conversation.setParticipantBId(PROVIDER_ID);
         when(deliveryFileRepository.findByFileId(FILE_ID)).thenReturn(List.of());
-        when(photoAuthorizationFileRepository.findByFileIdIn(List.of(FILE_ID))).thenReturn(List.of());
         when(messageRepository.findByFileId(FILE_ID)).thenReturn(List.of(message));
         when(conversationRepository.findAllById(any())).thenReturn(List.of(conversation));
 
@@ -217,7 +197,6 @@ class FileAccessPolicyTest {
 
     private void stubNoBusinessRelationship() {
         when(deliveryFileRepository.findByFileId(FILE_ID)).thenReturn(List.of());
-        when(photoAuthorizationFileRepository.findByFileIdIn(List.of(FILE_ID))).thenReturn(List.of());
         when(messageRepository.findByFileId(FILE_ID)).thenReturn(List.of());
     }
 

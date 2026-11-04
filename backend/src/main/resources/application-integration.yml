@@ -1,0 +1,14 @@
+# Apply together with staging for the independently configured PNVS environment.
+# No credentials, datasource URL, port or storage path are inherited from staging here.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  sql:
+    init:
+      mode: never
+
+camera:
+  integration:
+    # Read-only startup contract: true is rejected, not an opt-in to DDL.
+    runtime-ddl-enabled: false

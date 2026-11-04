@@ -83,6 +83,19 @@ public class ReportTargetValidator {
         }
     }
 
+    /** Content IDs are never recipient user IDs. */
+    public Long targetOwnerId(ReportTargetType type, Long id) {
+        if (type == null || id == null || id <= 0) { throw new BusinessException(ErrorCode.VALIDATION_ERROR); }
+        return switch (type) {
+            case USER -> userRepository.findById(id).orElseThrow(() -> missingTarget()).getId();
+            case DEMAND -> demandRepository.findById(id).orElseThrow(() -> missingTarget()).getCustomerId();
+            case SERVICE_PACKAGE -> servicePackageRepository.findById(id).orElseThrow(() -> missingTarget()).getProviderId();
+            case MOMENT -> momentPostRepository.findById(id).orElseThrow(() -> missingTarget()).getAuthorId();
+            case REVIEW -> reviewRepository.findById(id).orElseThrow(() -> missingTarget()).getReviewerId();
+        };
+    }
+    private BusinessException missingTarget() { return new BusinessException(ErrorCode.NOT_FOUND, "Moderation target not found"); }
+
     private void validateUser(Long targetId, Long reporterId) {
         if (!userRepository.existsById(targetId)) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "User not found");

@@ -20,11 +20,13 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @Entity
 @Table(name = "service_package_interests",
-        uniqueConstraints = @UniqueConstraint(
+        uniqueConstraints = {@UniqueConstraint(
                 name = "uk_service_package_interest_user_package",
                 columnNames = {"user_id", "service_package_id"}),
+                @UniqueConstraint(name = "uk_interest_user_demand", columnNames = {"user_id", "demand_id"})},
         indexes = {
                 @Index(name = "idx_service_package_interest_user", columnList = "user_id,created_at"),
+                @Index(name = "idx_interest_user_target_time", columnList = "user_id,target_type,created_at,id"),
                 @Index(name = "idx_service_package_interest_package", columnList = "service_package_id")
         })
 public class ServicePackageInterest {
@@ -36,8 +38,15 @@ public class ServicePackageInterest {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(name = "service_package_id", nullable = false)
+    @Column(name = "service_package_id")
     private Long servicePackageId;
+
+    /** Both roles use the same intention business; the target distinguishes the lists. */
+    @Column(name = "target_type", nullable = false, length = 20)
+    private String targetType = "SERVICE_PACKAGE";
+
+    @Column(name = "demand_id", unique = false)
+    private Long demandId;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

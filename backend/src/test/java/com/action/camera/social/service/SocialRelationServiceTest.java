@@ -62,6 +62,9 @@ class SocialRelationServiceTest {
     @Autowired
     private EntityManagerFactory entityManagerFactory;
 
+    @Autowired
+    private org.mybatis.spring.SqlSessionTemplate sqlSession;
+
     private Statistics statistics;
 
     @BeforeEach
@@ -79,6 +82,42 @@ class SocialRelationServiceTest {
     @AfterEach
     void tearDown() {
         // no-op, transaction rolls back
+    }
+
+    @Test
+    void publicProfilesHonorPrivacyFlagsIncludingLegacyNull() {
+        for (Boolean visible : new Boolean[] {false, null, true}) {
+            jdbcTemplate.update("update users set gender = 'F', city_code = 'PRIVATE_CITY', gender_visible = ?, birthday_visible = ?, location_visible = ? where id = ?", visible, visible, visible, PROVIDER_ID);
+            jdbcTemplate.update("update provider_profiles set age = 28, city_code = 'PRIVATE_CITY', city_area = 'PRIVATE_AREA' where user_id = ?", PROVIDER_ID);
+            entityManager.clear();
+            sqlSession.clearCache();
+            var profile = socialRelationService.getPublicProfile(PROVIDER_ID, "PROVIDER", null);
+            var provider = profile.getProviderProfile();
+            if (Boolean.TRUE.equals(visible)) {
+                assertThat(profile.getCityCode()).isEqualTo("PRIVATE_CITY");
+                assertThat(provider.getGender()).isEqualTo("F");
+                assertThat(provider.getAge()).isEqualTo(28);
+                assertThat(provider.getCityArea()).isEqualTo("PRIVATE_AREA");
+            } else {
+                assertThat(profile.getCityCode()).isNull();
+                assertThat(provider.getGender()).isNull();
+                assertThat(provider.getAge()).isNull();
+                assertThat(provider.getCityCode()).isNull();
+                assertThat(provider.getCityArea()).isNull();
+            }
+        }
+    }
+
+    @Test
+    void guestReadsOnlyPublicProfileAndVisibleMoments() throws Exception {
+        PublicProfileResponse profile = socialRelationService.getPublicProfile(PROVIDER_ID, "PROVIDER", null);
+        assertThat(profile.getUserId()).isEqualTo(PROVIDER_ID);
+        assertThat(profile.isFollowedByCurrentUser()).isFalse();
+        String json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(profile);
+        assertThat(json).doesNotContain("phone", "token", "sessionId", "studentNo", "birthday");
+        assertThat(momentService.listProfileMoments(null, PROVIDER_ID, "PROVIDER", 1, 12).records()).isEmpty();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> socialRelationService.getPublicProfile(PROVIDER_ID, "ADMIN", null))
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
