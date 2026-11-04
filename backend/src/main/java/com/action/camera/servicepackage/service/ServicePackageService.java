@@ -28,6 +28,7 @@ import com.action.camera.servicepackage.dto.CreateServicePackageResult;
 import com.action.camera.servicepackage.dto.ReserveServicePackageRequest;
 import com.action.camera.servicepackage.dto.ReserveServicePackageResult;
 import com.action.camera.servicepackage.dto.ServicePackageInterestDto;
+import com.action.camera.servicepackage.dto.ServicePackageIntentState;
 import com.action.camera.servicepackage.dto.ServicePackageCardDto;
 import com.action.camera.servicepackage.dto.ServicePackageDetailDto;
 import com.action.camera.servicepackage.dto.StartServicePackageChatRequest;
@@ -55,6 +56,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.List;
@@ -242,6 +244,7 @@ public class ServicePackageService {
                         photographerInfos.get(servicePackage.getProviderId()),
                         keyword))
                 .toList();
+        long rankingStarted = System.nanoTime();
         CustomerPreference preference = serviceRecommendationPreference(
                 currentUser, normalizedCity, normalizedScene, normalizedStyle,
                 minPriceCent, maxPriceCent, normalizedTimeTag);
@@ -264,7 +267,14 @@ public class ServicePackageService {
         if ("recommend".equals(normalizedSort)) {
             sortedPackages = diversifyServicePackages(sortedPackages);
         }
-        List<ServicePackageCardDto> filtered = sortedPackages.stream()
+        long rankingNanos = System.nanoTime() - rankingStarted;
+        int total = sortedPackages.size();
+        int fromIndex = Math.min((safePage - 1) * safeSize, total);
+        int toIndex = Math.min(fromIndex + safeSize, total);
+        long mappingStarted = System.nanoTime();
+        // Ranking/diversity still sees every eligible candidate. Only presentation
+        // mapping is page-local; do not truncate candidates before ranking.
+        List<ServicePackageCardDto> records = sortedPackages.subList(fromIndex, toIndex).stream()
                 .map(servicePackage -> ServicePackageMapper.toCard(
                         servicePackage,
                         photographerInfos.get(servicePackage.getProviderId()),
@@ -273,9 +283,11 @@ public class ServicePackageService {
                                 : recommendations.get(servicePackage.getId()).limitedReasons()))
                 .toList();
 
-        int fromIndex = Math.min((safePage - 1) * safeSize, filtered.size());
-        int toIndex = Math.min(fromIndex + safeSize, filtered.size());
-        return new PageResult<>(filtered.subList(fromIndex, toIndex), safePage, safeSize, filtered.size());
+        if (servicePackagePerformanceProbeEnabled) {
+            LOGGER.info("service-recommend candidateCount={} pageSize={} resultCount={} rankingNanos={} mappingNanos={}",
+                    candidates.size(), safeSize, records.size(), rankingNanos, System.nanoTime() - mappingStarted);
+        }
+        return new PageResult<>(records, safePage, safeSize, total);
     }
 
     private PageResult<ServicePackageCardDto> listOrdinaryServices(int safePage,
@@ -437,6 +449,26 @@ public class ServicePackageService {
     public void cancelInterest(Long serviceId, CurrentUser currentUser) {
         ensureCustomer(currentUser);
         interestRepository.deleteByUserIdAndServicePackageId(currentUser.getUserId(), serviceId);
+    }
+
+    @Transactional(readOnly = true)
+    public ServicePackageIntentState getIntentState(Long serviceId, CurrentUser currentUser) {
+        ensureCustomer(currentUser);
+        ServicePackage target = getServicePackage(serviceId);
+        boolean privileged = canViewRestrictedServicePackage(target, currentUser);
+        if (!target.isModerationVisible() && !privileged) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "Service package not found: " + serviceId);
+        }
+        // Match listMyInterests membership, including offline history. Do not
+        // apply the stricter add-interest eligibility to a read of existing state.
+        boolean interested = target.isModerationVisible() && interestRepository
+                .existsByUserIdAndServicePackageIdAndTargetType(currentUser.getUserId(), serviceId, "SERVICE_PACKAGE");
+        // A user's own offline interest history was already visible in the old
+        // list. Other users must not use this endpoint to discover offline ids.
+        if (target.getStatus() == ServicePackageStatus.OFFLINE && !privileged && !interested) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "Service package is offline");
+        }
+        return new ServicePackageIntentState(serviceId, interested);
     }
 
     @Transactional(readOnly = true)
@@ -1036,7 +1068,9 @@ public class ServicePackageService {
         if (sortedPackages == null || sortedPackages.size() < 3) {
             return sortedPackages;
         }
-        List<ServicePackage> pool = new ArrayList<>(sortedPackages);
+        // Only indices 0..7 are examined/removed. A linked pool preserves that
+        // exact sequence without shifting the entire remaining array per result.
+        List<ServicePackage> pool = new LinkedList<>(sortedPackages);
         List<ServicePackage> result = new ArrayList<>(sortedPackages.size());
         while (!pool.isEmpty()) {
             int selectedIndex = 0;

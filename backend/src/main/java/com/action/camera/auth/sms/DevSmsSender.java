@@ -13,8 +13,7 @@ public class DevSmsSender implements SmsSender {
 
     @Override
     public SmsDeliveryReceipt send(SmsMessage message) {
-        log.info("Development SMS code for {} ({}): {}",
-                maskPhone(message.phone()), message.purpose(), message.code());
+        log.info("Development SMS delivery simulated for {} ({})", maskPhone(message.phone()), message.purpose());
         return new SmsDeliveryReceipt("dev-local");
     }
 

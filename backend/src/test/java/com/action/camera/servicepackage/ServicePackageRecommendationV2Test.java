@@ -38,6 +38,92 @@ import static org.mockito.Mockito.mock;
 class ServicePackageRecommendationV2Test {
 
     @Test
+    void mappingWorkIsPageBoundedAndMatchesTheLegacyFullMapping() {
+        List<ServicePackage> candidates = new ArrayList<>();
+        for (long id = 1; id <= 5000; id++) {
+            candidates.add(servicePackage(id, 201L, "NJ", "PORTRAIT", List.of("natural"), 100_000L));
+        }
+        ServicePackageService service = context(candidates, List.of(), List.of(), List.of()).service();
+        @SuppressWarnings("unchecked")
+        Map<Long, com.action.camera.servicepackage.mapper.PhotographerInfo> infos =
+                org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "photographerInfos", candidates);
+        AtomicInteger mappings = new AtomicInteger();
+        try (var ignored = org.mockito.Mockito.mockStatic(com.action.camera.servicepackage.mapper.ServicePackageMapper.class,
+                invocation -> {
+                    if (invocation.getMethod().getName().equals("toCard") && invocation.getArguments().length == 4) {
+                        mappings.incrementAndGet();
+                    }
+                    return invocation.callRealMethod();
+                })) {
+            var legacy = candidates.stream().sorted(java.util.Comparator.comparing(ServicePackage::getId).reversed())
+                    .map(item -> com.action.camera.servicepackage.mapper.ServicePackageMapper.toCard(
+                            item, infos.get(item.getProviderId()), List.of("作品完整", "价格合适"))).toList();
+            int before = mappings.getAndSet(0);
+            var result = service.listServices(2, 20, null, null, null, null, null,
+                    null, null, null, "recommend", null, null);
+            assertThat(result.getRecords()).usingRecursiveComparison().isEqualTo(legacy.subList(20, 40));
+            assertThat(before).isEqualTo(5000); assertThat(mappings).hasValue(20);
+            System.out.printf("RECOMMEND_MAPPING candidateCount=5000 before=%d after=%d pageSize=20%n", before, mappings.get());
+        }
+    }
+
+    @Test
+    void scaledPagesMatchLegacyRankingIncludingDiversificationAndReasons() {
+        for (int count : List.of(7, 400, 5000)) {
+            List<ServicePackage> candidates = new ArrayList<>();
+            for (long id = 1; id <= count; id++) {
+                ServicePackage item = servicePackage(id, 201L + id % 11,
+                        "C" + id % 5, "PORTRAIT", List.of("style" + id % 7), 100_000L);
+                // Same timestamp forces the documented id tie-breaker.
+                item.setUpdatedAt(LocalDateTime.of(2020, 1, 1, 0, 0));
+                candidates.add(item);
+            }
+            ServicePackageService service = context(candidates, List.of(), List.of(), List.of()).service();
+            String seed = "scaled-stable-seed";
+            // This fixture has equal price/completeness/freshness/credit points.
+            // Preserve the pre-optimization full sort and ArrayList window selection as oracle.
+            List<ServicePackage> pool = new ArrayList<>(candidates.stream().sorted(
+                    java.util.Comparator.<ServicePackage>comparingInt(item ->
+                            Math.floorMod(java.util.Objects.hash(seed, item.getId()), 11) - 5).reversed()
+                            .thenComparing(ServicePackage::getId, java.util.Comparator.reverseOrder())).toList());
+            List<ServicePackage> expected = new ArrayList<>();
+            while (!pool.isEmpty()) {
+                int selected = 0;
+                for (int i = 0; i < Math.min(pool.size(), 8); i++) {
+                    if (!Boolean.TRUE.equals(org.springframework.test.util.ReflectionTestUtils.invokeMethod(
+                            service, "isTooSimilarServicePackage", pool.get(i), expected))) {
+                        selected = i;
+                        break;
+                    }
+                }
+                expected.add(pool.remove(selected));
+            }
+            List<Long> actual = new ArrayList<>();
+            int size = 20;
+            for (int page = 1; page <= (count + size - 1) / size; page++) {
+                var result = service.listServices(page, size, null, null, null, null, null,
+                        null, null, null, "recommend", seed, null);
+                int from = (page - 1) * size;
+                assertThat(result.getTotal()).isEqualTo(count);
+                assertThat(ids(result)).containsExactlyElementsOf(expected.subList(from,
+                        Math.min(from + size, count)).stream().map(ServicePackage::getId).toList());
+                assertThat(result.getRecords()).allSatisfy(card ->
+                        assertThat(card.getRecommendReasons()).containsExactly("作品完整", "价格合适"));
+                actual.addAll(ids(result));
+            }
+            assertThat(actual).hasSize(count).doesNotHaveDuplicates();
+            var first = service.listServices(1, size, null, null, null, null, null,
+                    null, null, null, "recommend", seed, null);
+            assertThat(ids(service.listServices(0, size, null, null, null, null, null,
+                    null, null, null, "recommend", seed, null))).isEqualTo(ids(first));
+            assertThat(ids(service.listServices(1, size, null, null, null, null, null,
+                    null, null, null, "recommend", seed, null))).isEqualTo(ids(first));
+            assertThat(service.listServices(count + 1, size, null, null, null, null, null,
+                    null, null, null, "recommend", seed, null).getRecords()).isEmpty();
+        }
+    }
+
+    @Test
     void cityAndStyleProfilesProduceDifferentOrdersForDifferentCustomers() {
         List<ServicePackage> candidates = List.of(
                 servicePackage(1L, 201L, "NJ", "PORTRAIT", List.of("natural"), 120_000L),

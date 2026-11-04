@@ -45,6 +45,8 @@ import static org.mockito.Mockito.doThrow;
     "jwt.secret=test-secret-key-for-unit-testing-purposes-only"
 })
 class UserServiceTest {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.action.camera.privacy.service.PrivacyConsentService consent;
 
     @Autowired
     private org.springframework.test.web.servlet.MockMvc mvc;
@@ -432,6 +434,9 @@ class UserServiceTest {
     void roleSwitch_httpRoundTripPersistsAndProtectsPrivileges() throws Exception {
         User user = createTestUser("241880181", "test123456", "ACTIVE");
         grantRoleBinding(user.getId(), "CUSTOMER");
+        consent.update(user.getId(), new com.action.camera.privacy.dto.PrivacyDtos.ConsentUpdate(
+                "GRANTED", com.action.camera.privacy.service.PrivacyConsentService.VERSION,
+                com.action.camera.privacy.service.PrivacyConsentService.VERSION, "role-test", System.currentTimeMillis()));
         var login = sessions.issue(user, "CUSTOMER", false, "role-test", "JUnit");
         String bearer = "Bearer " + login.response().getToken();
         for (String role : List.of("PROVIDER", "PROVIDER", "CUSTOMER", "PROVIDER")) {

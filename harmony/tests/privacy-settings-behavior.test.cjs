@@ -44,6 +44,8 @@ function fixture() {
   const page = new loaded.exports.PrivacySettingsPage();
   page.getUIContext = () => ({ getHostContext: () => ({}) });
   page.authenticated = true;
+  page.challengeId = '12345678-1234-1234-1234-123456789abc';
+  page.challengePhone = '13800138000';
   page.onWithdrawn = () => withdrawnEvents++; page.onClosed = () => closedEvents++;
   return { page, app, rights, withdrawals, closures, stored,
     get finish() { return finish; }, get withdrawnEvents() { return withdrawnEvents; },

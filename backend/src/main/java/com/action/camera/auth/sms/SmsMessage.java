@@ -10,4 +10,5 @@ public record SmsMessage(
         String code,
         Duration expiresIn
 ) {
+    @Override public String toString() { return "SmsMessage[REDACTED]"; }
 }

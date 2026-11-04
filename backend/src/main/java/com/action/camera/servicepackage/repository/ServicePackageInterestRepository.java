@@ -16,6 +16,7 @@ public interface ServicePackageInterestRepository extends JpaRepository<ServiceP
     Optional<ServicePackageInterest> findByUserIdAndServicePackageId(Long userId, Long servicePackageId);
 
     boolean existsByUserIdAndServicePackageId(Long userId, Long servicePackageId);
+    boolean existsByUserIdAndServicePackageIdAndTargetType(Long userId, Long servicePackageId, String targetType);
 
     void deleteByUserIdAndServicePackageId(Long userId, Long servicePackageId);
 

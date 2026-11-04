@@ -5,6 +5,8 @@ import com.action.camera.common.page.PageResult;
 import com.action.camera.common.security.CurrentUser;
 import com.action.camera.common.security.CurrentUserProvider;
 import com.action.camera.servicepackage.dto.ServicePackageCardDto;
+import com.action.camera.servicepackage.dto.ServicePackageIntentState;
+import org.springframework.web.bind.annotation.PathVariable;
 import com.action.camera.servicepackage.service.ServicePackageService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +23,13 @@ public class ServicePackageInterestController {
                                             CurrentUserProvider currentUserProvider) {
         this.servicePackageService = servicePackageService;
         this.currentUserProvider = currentUserProvider;
+    }
+
+    @GetMapping("/service-packages/{serviceId}/intent-state")
+    public Result<ServicePackageIntentState> getIntentState(@PathVariable Long serviceId,
+                                                            HttpServletRequest request) {
+        return Result.success(servicePackageService.getIntentState(serviceId,
+                currentUserProvider.getCurrentUser(request)));
     }
 
     @GetMapping("/me/service-package-interests")

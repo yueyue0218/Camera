@@ -37,8 +37,13 @@ public class PhoneAuthenticationService {
         this.sessionService = sessionService;
     }
 
+    @Deprecated
+    public SessionAuthenticationResult verifyAndLogin(String phone, SmsPurpose purpose, String code, String deviceId, String deviceName) {
+        throw new SmsCodeInvalidException();
+    }
+
     @Transactional(noRollbackFor = {SmsCodeInvalidException.class, PhoneLoginRejectedException.class})
-    public SessionAuthenticationResult verifyAndLogin(String rawPhone,
+    public SessionAuthenticationResult verifyAndLogin(String challengeId, String rawPhone,
                                                       SmsPurpose purpose,
                                                       String code,
                                                       String deviceId,
@@ -48,7 +53,7 @@ public class PhoneAuthenticationService {
         }
         String normalizedDeviceId = requireDeviceId(deviceId);
         String normalizedDeviceName = normalizeDeviceName(deviceName);
-        String phone = phoneSmsService.verifyCode(rawPhone, purpose, code);
+        String phone = phoneSmsService.consumeChallenge(challengeId, rawPhone, purpose, code, null, null, "LOGIN");
         String mobileHash = phoneIdentityCodec.lookupHash(phone);
         LocalDateTime now = LocalDateTime.now();
 

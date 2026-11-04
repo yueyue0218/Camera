@@ -52,8 +52,13 @@ import static org.mockito.Mockito.mockingDetails;
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class ReportMySqlClosureIT extends ReportClosureIntegrationTest {
     private static final String SCHEMA = "portragovp0test";
-    private static final String DATA_DIRECTORY =
-            "c:/users/lixiaozhou/.codex/test-environments/portra-mysql-3307/data";
+    // Explicit second allowlisted instance; never accept arbitrary connection identities.
+    private static int isolatedPort() { return Boolean.getBoolean("portra.mysql.stage3") ? 33367 : 3307; }
+    private static String isolatedDirectory() {
+        return Boolean.getBoolean("portra.mysql.stage3")
+            ? "c:/users/ww/.codex/visualizations/2026/11/02/01a19cf9-7d01-7590-847b-50ac5e651d24/portra-backend-integration/evidence/stage2/mysql-data"
+            : "c:/users/lixiaozhou/.codex/test-environments/portra-mysql-3307/data";
+    }
 
     @Autowired JdbcTemplate jdbc;
     @Autowired DataSource dataSource;
@@ -76,12 +81,12 @@ class ReportMySqlClosureIT extends ReportClosureIntegrationTest {
                 if (separator > 0) client.put(value.substring(0, separator).trim(), value.substring(separator + 1).trim());
             }
         }
-        if (!"127.0.0.1".equals(client.get("host")) || !"3307".equals(client.get("port"))
+        if (!"127.0.0.1".equals(client.get("host")) || !Integer.toString(isolatedPort()).equals(client.get("port"))
                 || !SCHEMA.equals(client.get("database")) || !"portra_gov_test".equals(client.get("user"))
                 || client.getOrDefault("password", "").isBlank()) {
             throw new IllegalStateException("Refusing a connection outside the approved isolated MySQL instance");
         }
-        String url = "jdbc:mysql://127.0.0.1:3307/" + SCHEMA
+        String url = "jdbc:mysql://127.0.0.1:" + isolatedPort() + "/" + SCHEMA
                 + "?sslMode=DISABLED&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8";
         // Validate with SELECT only, before Spring creates a datasource or runs any initializer.
         try (Connection connection = DriverManager.getConnection(url, client.get("user"), client.get("password"))) {
@@ -100,20 +105,20 @@ class ReportMySqlClosureIT extends ReportClosureIntegrationTest {
         registry.add("logging.level.org.hibernate.orm.jdbc.bind", () -> "OFF");
     }
 
-    private static void validateStartupIdentity(Connection connection) throws Exception {
+    static void validateStartupIdentity(Connection connection) throws Exception {
         if (!"MySQL".equals(connection.getMetaData().getDatabaseProductName())
                 || !SCHEMA.equals(connection.getCatalog())
-                || !connection.getMetaData().getURL().startsWith("jdbc:mysql://127.0.0.1:3307/" + SCHEMA)) {
+                || !connection.getMetaData().getURL().startsWith("jdbc:mysql://127.0.0.1:" + isolatedPort() + "/" + SCHEMA + "?")) {
             throw new IllegalStateException("Refusing an unverified database before Spring startup");
         }
         try (var statement = connection.createStatement();
              var identity = statement.executeQuery("SELECT @@port, @@datadir")) {
-            if (!identity.next() || identity.getInt(1) != 3307) {
+            if (!identity.next() || identity.getInt(1) != isolatedPort()) {
                 throw new IllegalStateException("Unexpected isolated database port");
             }
             String directory = identity.getString(2).replace('\\', '/').replaceAll("/+$", "")
                     .toLowerCase(java.util.Locale.ROOT);
-            if (!DATA_DIRECTORY.equals(directory)) {
+            if (!isolatedDirectory().equals(directory)) {
                 throw new IllegalStateException("Refusing another data directory before Spring startup");
             }
         }
@@ -125,7 +130,7 @@ class ReportMySqlClosureIT extends ReportClosureIntegrationTest {
         assertIsolatedDatabase();
         // Clear only this suite's fixtures in the approved standalone schema.
         // Keep foreign-key checks enabled; never drop or recreate the migrated schema.
-        for (String table : List.of("reports", "audit_records", "demand_responses",
+        for (String table : List.of("notifications", "privacy_consent_events", "privacy_consents", "reports", "audit_records", "demand_responses",
                 "service_package_interests", "user_sessions", "user_role_bindings",
                 "demands", "service_packages", "users")) {
             jdbc.update("DELETE FROM " + table);
@@ -137,14 +142,14 @@ class ReportMySqlClosureIT extends ReportClosureIntegrationTest {
         try (var connection = dataSource.getConnection()) {
             assertThat(connection.getMetaData().getDatabaseProductName()).isEqualTo("MySQL");
             assertThat(connection.getCatalog()).isEqualTo(SCHEMA);
-            assertThat(connection.getMetaData().getURL()).startsWith("jdbc:mysql://127.0.0.1:3307/" + SCHEMA);
+            assertThat(connection.getMetaData().getURL()).startsWith("jdbc:mysql://127.0.0.1:" + isolatedPort() + "/" + SCHEMA + "?");
         } catch (java.sql.SQLException exception) {
             throw new IllegalStateException("Unable to verify isolated MySQL identity", exception);
         }
-        assertThat(jdbc.queryForObject("SELECT @@port", Integer.class)).isEqualTo(3307);
+        assertThat(jdbc.queryForObject("SELECT @@port", Integer.class)).isEqualTo(isolatedPort());
         String directory = jdbc.queryForObject("SELECT @@datadir", String.class);
         assertThat(directory.replace('\\', '/').replaceAll("/+$", "").toLowerCase(java.util.Locale.ROOT))
-                .isEqualTo(DATA_DIRECTORY);
+                .isEqualTo(isolatedDirectory());
         assertThat(jdbc.queryForObject("SELECT @@foreign_key_checks", Integer.class)).isEqualTo(1);
     }
 
@@ -280,7 +285,10 @@ class ReportMySqlClosureIT extends ReportClosureIntegrationTest {
         var reportAudit = records.stream().filter(audit -> audit.getAuditType().equals("REPORT")).findFirst().orElseThrow();
         assertThat(targetAudit.getTargetId()).isEqualTo(id);
         assertThat(targetAudit.getAuditResult()).isEqualTo(type.equals("USER") ? "DISABLE" : "TAKE_DOWN");
-        assertThat(targetAudit.getRemark()).isEqualTo("reviewed");
+        // S deliberately keeps internal moderator comments off the target-facing audit.
+        assertThat(targetAudit.getRemark()).isEqualTo(type.equals("USER")
+                ? "平台已完成审核，你的账号已按规则限制使用。"
+                : "平台已完成审核，你发布的相关内容已被下架。");
         assertThat(reportAudit.getTargetId()).isEqualTo(reportId);
         assertThat(reportAudit.getAuditResult()).isEqualTo("RESOLVE");
         assertThat(reportAudit.getRemark()).isEqualTo(resolution + ": reviewed");

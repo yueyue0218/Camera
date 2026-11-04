@@ -1,6 +1,40 @@
 # SQL 执行顺序说明
 
+## 统一候选阶段 2 增量顺序与回滚边界
+
+完成下方 Path A 的步骤 1–13，或经审核的 Path B 的步骤 1–17 后，按顺序执行：
+
+1. `migration/add_account_cancellation_requests.sql`（账号注销）
+2. `migration/add_privacy_rights_and_consent.sql`（账户授权、事件及权利请求，依赖账号/会话结构）
+3. `migration/add_demand_interest_targets.sql`（意向类型和 nullable service_package_id）
+4. `migration/add_report_result_feedback.sql`（既有 reports 反馈字段；fresh 表已有时无操作）
+
+这四项纳入发布凭据 SHA 集合。每次修改 SQL 后必须重新核验摘要，旧三项凭据不能放行。
+2026-11-03 已在任务专用 MySQL 8.0.41 测试实例验证 Path A、合成 prior-main 结构升级、四项重复执行、唯一约束及索引；不是生产旧库或任意 P3 历史结构验收。
+所有历史地区值保持原样，不以迁移批量改写。真实旧库须先核对下方 Path B 的结构和数据前置条件，不得把合成测试代替备份恢复演练。
+
+回滚只允许经过兼容核验的 JAR：保留 PNVS、统一账户授权（无头也检查）、WITHDRAWN 限制和 SERVICE_PACKAGE 类型过滤。旧 main 查询会混入 DEMAND 行，禁止回滚到旧 main。保留新表、新列和审计数据；匿名化、撤回下线不会因 JAR 回滚自动恢复。不得通过删除 DEMAND 行恢复 NOT NULL。
+发布仍需明确批准、精确 SHA 双门禁与 root-owned 迁移/恢复凭据；本任务不执行生产迁移或发布。
+
 ## 执行环境要求
+
+### 8081 challenge 增量（43 → 44 表）
+
+上述四项增量已完成的 43 表基线，还需要人工批准
+`migration/V20261103__sms_challenge_binding.sql`。该文件只面向
+`portra_integration`，新增五个 nullable challenge 绑定列、唯一索引及
+`sms_challenge_locks`。不能向共享库执行，也不能在这里重跑历史初始化脚本。
+
+该增量**不是幂等脚本**。MySQL DDL 隐式提交，不能用事务回滚保证整文件原子性：
+尚未应用、完整应用、部分应用必须先区分；完整应用时停止重复执行；部分应用时
+保留数据与证据，核对已有列/索引/锁表后仅批准缺失 DDL，禁止直接重跑整文件。
+应用回退必须保留新增结构并使用支持 challenge 协议的兼容 JAR，不删除新增列或记录。
+
+本地隔离复验入口：`backend/scripts/test-integration-migration.py`。
+它新建专用 datadir，以 Windows shared memory 连接且禁用 TCP，不能接入既有服务。
+2026-11-04 在 MySQL 8.0.41 验证了 fresh 43 表 → 44 表、合成既有用户行保留、
+新增列与唯一索引、锁键唯一性和重复执行拒绝。它不代表 ECS 8.0.46、历史生产数据
+兼容或真实备份恢复演练；本轮未执行 ECS 迁移。
 
 - **MySQL 8.0+**（依赖 `utf8mb4_unicode_ci` / `utf8mb4_0900_ai_ci` 排序规则和存储过程语法）
 - **执行工具**：必须使用 `mysql` CLI 或 MySQL Workbench，**不可使用**普通 JDBC 单语句执行器  
@@ -92,7 +126,7 @@ B 已在 `docs/data/b-auth-final-contract.md` 冻结 A5 所需业务规则。Sta
 
 ## 自动部署前数据库闸门
 
-push 到 `main` 会在 CI 成功后自动替换后端 JAR 并重启服务，部署流程不会执行数据库迁移。旧库发布必须在 push 前进入维护窗口并完成：
+仅当发布开关和精确 SHA 门禁均获批准时，CI 才允许部署；部署流程不会执行数据库迁移。旧库发布必须在获准维护窗口完成：
 
 1. 备份数据库。
 2. 执行 `add_admin_governance.sql`；脚本按字段和索引逐项检查 `information_schema`，可安全重复执行。
@@ -108,7 +142,7 @@ push 到 `main` 会在 CI 成功后自动替换后端 JAR 并重启服务，部�
 12. 执行 `add_provider_style_catalog.sql`，确认 `style_tags` 与 `provider_style_tags` 的唯一键和外键完整。
 13. 执行 `sync_current_main_schema.sql`。如果出现 `SCHEMA SYNC BLOCKED`，停止发布并人工处理报告的超长值或 NULL；不得用脚本伪造回填。
 14. 执行 `add_account_cancellation_requests.sql`，确认 `uk_account_cancellation_user` 唯一约束和状态时间索引存在。
-15. 检查所有迁移均成功且没有半迁移状态，再 push `main` 部署代码。
+15. 检查全部依赖迁移及上述四项增量均成功、无半迁移状态，并取得摘要与恢复核验凭据；不得以 push main 代替发布批准。
 16. 部署后验证重复支付、争议驳回恢复、公开作品和交付文件权限，以及手机号登录、Session 刷新、撤销和账号注销申请流程。
 
 `previous_order_status` 的 `NOT NULL` 收紧属于第二阶段维护操作。只有在新代码已稳定运行、确认所有历史与新增 dispute 均无 null 后才可执行，不得与本次自动部署绑定。

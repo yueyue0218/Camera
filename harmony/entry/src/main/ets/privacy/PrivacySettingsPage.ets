@@ -38,6 +38,8 @@ export struct PrivacySettingsPage {
   @State private code: string = '';
   @State private cooldown: number = 0;
   private timer: number = -1;
+  private challengeId: string = '';
+  private challengePhone: string = '';
   private generation: number = 0;
   private readonly app: AppClient = AppClient.shared;
   private readonly types: string[] = ['ACCESS', 'COPY', 'CORRECT', 'DELETE'];
@@ -48,6 +50,7 @@ export struct PrivacySettingsPage {
 
   aboutToAppear(): void { this.view = this.initialView; this.load(); }
   aboutToDisappear(): void {
+    this.challengeId = '';
     this.generation++;
     this.app.privacyApi.cancelReads();
     if (this.timer >= 0) { clearInterval(this.timer); this.timer = -1; }
@@ -143,12 +146,15 @@ export struct PrivacySettingsPage {
   private validPhone(): boolean { return /^1[3-9]\d{9}$/.test(this.phone.trim()); }
   private async sendCode(): Promise<void> {
     if (this.busy || !this.authenticated || this.cooldown > 0 || !this.validPhone()) { return; }
+    this.challengeId = ''; this.code = ''; this.confirmClosure = false;
     this.busy = true; this.error = ''; this.notice = '';
     const version = this.generation;
     try {
       const sent = await this.app.privacyApi.closureCode(this.phone.trim(), this.app.getDeviceId());
-      if (sent !== true) { throw new Error('服务器未确认验证码发送成功，请重试'); }
+      if (!sent || !/^[0-9a-f-]{36}$/.test(sent.challengeId)) { throw new Error('服务器未确认验证码发送成功，请重试'); }
       if (version !== this.generation) { return; }
+      this.challengeId = sent.challengeId;
+      this.challengePhone = this.phone.trim();
       this.notice = '注销验证码已发送至账号绑定手机号。'; this.cooldown = 60;
       this.timer = setInterval(() => {
         this.cooldown--;
@@ -162,7 +168,8 @@ export struct PrivacySettingsPage {
     const version = this.generation;
     this.busy = true; this.error = ''; this.notice = '';
     try {
-      const result = await this.app.privacyApi.closeAccount(this.phone.trim(), this.code);
+      if (!this.challengeId || this.challengePhone !== this.phone.trim()) { throw new Error('请为当前手机号重新获取验证码'); }
+      const result = await this.app.privacyApi.closeAccount(this.phone.trim(), this.code, this.challengeId);
       if (result.status !== 'CLOSED') { throw new Error('服务器未确认账号注销，请勿重复操作，联系运营者核实。'); }
       await this.app.finishAccountClosure();
       if (version !== this.generation) { return; }
@@ -242,7 +249,7 @@ export struct PrivacySettingsPage {
     Text('注销后将无法继续使用该账号。账号资料及相关个人信息将按处理规则删除或匿名化；涉及其他用户权益、争议处理及必要保存的业务和安全记录会限制处理。未完成的约拍约定可能阻止注销，请先处理。注销不等于退出登录。')
       .fontSize(14).lineHeight(24).fontColor(PortraTheme.primaryText)
     TextInput({ text: this.phone, placeholder: '输入账号绑定的手机号' }).type(InputType.PhoneNumber).maxLength(11)
-      .enabled(!this.busy).onChange((value: string) => { this.phone = value; this.confirmClosure = false; })
+      .enabled(!this.busy).onChange((value: string) => { this.challengeId = ''; this.phone = value; this.confirmClosure = false; })
     Button(this.cooldown > 0 ? `${this.cooldown}秒后重发` : '发送注销验证码').privacyAction()
       .enabled(this.authenticated && !this.busy && this.cooldown === 0 && this.validPhone()).onClick(() => this.sendCode())
     TextInput({ text: this.code, placeholder: '6位注销验证码' }).type(InputType.Number).maxLength(6)

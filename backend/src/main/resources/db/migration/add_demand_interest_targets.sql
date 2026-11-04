@@ -18,6 +18,7 @@ SET @sql = (SELECT IF(COUNT(*)=0,
  'ALTER TABLE service_package_interests ADD KEY idx_interest_user_target_time (user_id, target_type, created_at, id)', 'SELECT 1')
  FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=@schema_name AND TABLE_NAME='service_package_interests' AND INDEX_NAME='idx_interest_user_target_time');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
--- Rollback: roll application code back first. Keep the additive columns/indexes and nullable
--- service_package_id; old code reads only service_package_id targets. Do not DROP or DELETE
+-- Rollback: only a compatibility-reviewed binary with target_type filtering is allowed.
+-- Pre-migration main reads DEMAND rows too; it is NOT a compatible rollback target.
+-- Keep the additive columns/indexes and nullable service_package_id. Do not DROP or DELETE
 -- DEMAND records. Restoring NOT NULL requires an approved archive/export of those records.

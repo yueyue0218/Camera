@@ -31,7 +31,7 @@ public class PrivacyRequestInterceptor implements HandlerInterceptor {
         if(path.equals("/auth/native/sms/verify") || (harmony && path.equals("/auth/sms/send"))) {
             validateNativeEvidence(request); return true;
         }
-        if(UserContext.getUserId()!=null) consent.requireBusinessConsent(UserContext.getUserId(),harmony);
+        if(UserContext.getUserId()!=null) consent.requireBusinessConsent(UserContext.getUserId(),true);
         return true;
     }
     private void validateNativeEvidence(HttpServletRequest request) {

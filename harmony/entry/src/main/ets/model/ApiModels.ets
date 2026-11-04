@@ -413,6 +413,11 @@ export interface NativeRefreshRequest {
   readonly refreshToken: string;
 }
 
+export interface SmsChallengeResponse {
+  readonly challengeId: string;
+  readonly expiresAt: string;
+}
+
 export interface SendSmsCodeRequest {
   readonly phone: string;
   readonly purpose: string;
@@ -420,6 +425,7 @@ export interface SendSmsCodeRequest {
 }
 
 export interface VerifyNativeSmsCodeRequest extends SendSmsCodeRequest {
+  challengeId: string;
   readonly code: string;
   readonly deviceName: string;
 }

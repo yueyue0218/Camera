@@ -80,6 +80,11 @@ camera:
   sms:
     provider: ${SMS_PROVIDER:}
     staging-aliyun-enabled: ${SMS_STAGING_ALIYUN_ENABLED:false}
+    staging-dypns-enabled: ${SMS_STAGING_DYPNS_ENABLED:false}
+    dypns-role-name: ${SMS_DYPNS_ROLE_NAME:}
+    dypns-endpoint: ${SMS_DYPNS_ENDPOINT:dypnsapi.aliyuncs.com}
+    reauth-template-id: ${SMS_REAUTH_TEMPLATE_ID:}
+    reauth-scheme-name: ${SMS_REAUTH_SCHEME_NAME:}
     endpoint: ${SMS_ENDPOINT:dysmsapi.aliyuncs.com}
     access-key-id: ${SMS_ACCESS_KEY_ID:}
     access-key-secret: ${SMS_ACCESS_KEY_SECRET:}

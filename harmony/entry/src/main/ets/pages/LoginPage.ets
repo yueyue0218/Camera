@@ -27,6 +27,9 @@ export struct LoginPage {
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
   private cooldownTimer: number = -1;
+  private challengeId: string = '';
+  private challengePhone: string = '';
+  private challengeDevice: string = '';
   onBack?: () => void;
   onSuccess?: () => void;
 
@@ -37,6 +40,7 @@ export struct LoginPage {
   }
 
   aboutToDisappear(): void {
+    this.challengeId = '';
     this.requestVersion++;
     this.appClient.apiService.cancelSendLoginCode();
     this.appClient.apiService.cancelVerifyLoginCode();
@@ -84,12 +88,20 @@ export struct LoginPage {
     this.errorMessage = '';
     this.notice = '';
     this.sendingCode = true;
+    this.challengeId = '';
+    this.code = '';
     try {
-      await this.appClient.apiService.sendLoginCode(normalizedPhone, deviceId);
+      const challenge = await this.appClient.apiService.sendLoginCode(normalizedPhone, deviceId);
       if (version !== this.requestVersion ||
         sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
         return;
       }
+      if (!challenge || !/^[0-9a-f-]{36}$/.test(challenge.challengeId)) {
+        throw new Error('未取得有效短信挑战，请重新获取验证码');
+      }
+      this.challengeId = challenge.challengeId;
+      this.challengePhone = normalizedPhone;
+      this.challengeDevice = deviceId;
       this.notice = '验证码已发送';
       this.startCooldown();
     } catch (error) {
@@ -132,12 +144,16 @@ export struct LoginPage {
     this.errorMessage = '';
     this.signingIn = true;
     try {
-      const response = await this.appClient.apiService.verifyLoginCode(normalizedPhone, this.code, deviceId);
+      if (this.challengeId.length === 0 || this.challengePhone !== normalizedPhone || this.challengeDevice !== deviceId) {
+        throw new Error('请为当前手机号重新获取验证码');
+      }
+      const response = await this.appClient.apiService.verifyLoginCode(normalizedPhone, this.code, deviceId, this.challengeId);
       if (version !== this.requestVersion ||
         sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
         return;
       }
       const signingIn = this.appClient.sessionManager.signIn(response.accessToken, response.refreshToken);
+      this.challengeId = '';
       const signedInVersion = this.appClient.sessionManager.getSessionVersion();
       const saved = await signingIn;
       if (version !== this.requestVersion ||
@@ -246,6 +262,7 @@ export struct LoginPage {
           .borderRadius(8)
           .padding({ left: 16, right: 16 })
           .onChange((value: string) => {
+            this.challengeId = '';
             this.phone = value;
             this.code = '';
             this.errorMessage = '';

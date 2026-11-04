@@ -26,7 +26,7 @@ final class PnvsSendDiagnostics {
                         + "phoneLength={} phoneDigitsOnly={} phoneMainlandFormat={} countryCode={} "
                         + "schemeState={} signLength={} templateIdLength={} "
                         + "codeType={} codeLength={} validTime={} interval={} duplicatePolicy={} "
-                        + "returnVerifyCode={} templateMode=CLOUD_CODE_AND_MIN endpoint={} providerElapsedMs={}",
+                        + "returnVerifyCode={} templateMode=LOCAL_CHALLENGE_CODE_AND_MIN endpoint={} providerElapsedMs={}",
                 safeCode(code), safeMessage(message), safeRequestId(requestId), httpStatus,
                 phone == null ? 0 : phone.length(), phone != null && phone.matches("[0-9]+"),
                 phone != null && phone.matches("1[3-9][0-9]{9}"),
