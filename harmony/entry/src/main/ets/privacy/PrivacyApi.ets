@@ -1,4 +1,5 @@
 import { HttpClient } from '../network/HttpClient';
+import { SmsChallengeResponse } from '../model/ApiModels';
 
 export interface ServerConsent {
   status: string;
@@ -33,7 +34,7 @@ export interface InformationRightsPage {
 export interface RightsSubmission { type: string; description: string; idempotencyKey: string; }
 export interface AccountClosureResult { status: string; closedAt: string; retainedDataNotice: string; }
 interface ClosureCodePayload { phone: string; deviceId: string; }
-interface AccountClosurePayload { phone: string; code: string; confirmed: boolean; }
+interface AccountClosurePayload { phone: string; code: string; confirmed: boolean; challengeId: string; }
 
 export class PrivacyApi {
   private readonly client: HttpClient;
@@ -48,12 +49,12 @@ export class PrivacyApi {
   submitRight(body: RightsSubmission): Promise<InformationRight> {
     return this.client.post<InformationRight>('/privacy/rights', body, 'privacy.rights.submit');
   }
-  closureCode(phone: string, deviceId: string): Promise<boolean> {
+  closureCode(phone: string, deviceId: string): Promise<SmsChallengeResponse> {
     const payload: ClosureCodePayload = { phone: phone, deviceId: deviceId };
-    return this.client.post<boolean>('/privacy/account-closure/code', payload, 'privacy.closure.code');
+    return this.client.post<SmsChallengeResponse>('/privacy/account-closure/code', payload, 'privacy.closure.code');
   }
-  closeAccount(phone: string, code: string): Promise<AccountClosureResult> {
-    const payload: AccountClosurePayload = { phone: phone, code: code, confirmed: true };
+  closeAccount(phone: string, code: string, challengeId: string): Promise<AccountClosureResult> {
+    const payload: AccountClosurePayload = { phone: phone, code: code, confirmed: true, challengeId: challengeId };
     return this.client.post<AccountClosureResult>('/privacy/account-closure', payload, 'privacy.closure');
   }
   cancelReads(): void {

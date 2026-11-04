@@ -1,6 +1,6 @@
 import { ProvinceCatalog } from '../common/region/ProvinceCatalog';
 import { ProvincePayload } from '../common/region/ProvincePayload';
-import { CreateMomentPayload } from '../model/ApiModels';
+import { CreateMomentPayload, SmsChallengeResponse } from '../model/ApiModels';
 import { DemandInterestSummary } from '../model/ApiModels';
 import { OrderEngagementSummary, ReviewSummary, ReviewComplaintSummary, DisputeSummary, CreateReviewPayload, ReviewTextPayload, CreateReviewComplaintPayload, DisputeReasonPayload } from '../model/ApiModels';
 import { NotificationSummary, CreditSummary, CreditRecordSummary } from '../model/ApiModels';
@@ -451,18 +451,21 @@ export class ApiService implements NativeSessionApi {
     this.client.cancelRequest(`users.${userId}.${normalizedRole}.follow`);
   }
 
-  sendLoginCode(phone: string, deviceId: string): Promise<void> {
+  async sendLoginCode(phone: string, deviceId: string): Promise<SmsChallengeResponse> {
     const request: SendSmsCodeRequest = { phone: phone, purpose: 'LOGIN', deviceId: deviceId };
-    return this.client.postPublic<void>('/auth/sms/send', request, 'auth.sms.send');
+    const response = await this.client.postPublic<SmsChallengeResponse>('/auth/sms/send', request, 'auth.sms.send');
+    if (!response || !/^[0-9a-f-]{36}$/.test(response.challengeId)) { throw ErrorMapper.parse(); }
+    return response;
   }
 
   cancelSendLoginCode(): void {
     this.client.cancelRequest('auth.sms.send');
   }
 
-  async verifyLoginCode(phone: string, code: string, deviceId: string): Promise<NativeSessionResponse> {
+  async verifyLoginCode(phone: string, code: string, deviceId: string, challengeId: string): Promise<NativeSessionResponse> {
+    if (!challengeId || !/^[0-9a-f-]{36}$/.test(challengeId)) { throw ErrorMapper.parse(); }
     const request: VerifyNativeSmsCodeRequest = {
-      phone: phone, purpose: 'LOGIN', code: code, deviceId: deviceId, deviceName: 'Portra HarmonyOS'
+      phone: phone, purpose: 'LOGIN', code: code, deviceId: deviceId, deviceName: 'Portra HarmonyOS', challengeId: challengeId
     };
     const response = await this.client.postPublic<NativeSessionResponse>(
       '/auth/native/sms/verify', request, 'auth.sms.verify');
