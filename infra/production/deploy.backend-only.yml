@@ -1,0 +1,116 @@
+name: Deploy approved backend only
+on:
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: portra-production-backend
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main' && vars.PRODUCTION_BACKEND_ENABLED == 'true' && vars.PRODUCTION_BACKEND_APPROVED_SHA == github.sha
+    runs-on: ubuntu-latest
+    outputs:
+      jar_sha256: ${{ steps.seal.outputs.jar_sha256 }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify approved revision
+        env:
+          REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$REVISION" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$REVISION"
+      - name: Configure verified read connection
+        env:
+          PRIVATE_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.STAGING_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$PRIVATE_KEY" && test -n "$KNOWN_HOSTS"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$PRIVATE_KEY" > ~/.ssh/production
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/production ~/.ssh/known_hosts
+      - name: Retrieve the already-tested immutable backend
+        env:
+          HOST: ${{ vars.STAGING_HOST }}
+          REVISION: ${{ github.sha }}
+          EXPECTED_JAR: ${{ vars.PRODUCTION_BACKEND_APPROVED_JAR_SHA256 }}
+          EXPECTED_MANIFEST: ${{ vars.PRODUCTION_BACKEND_MANIFEST_SHA256 }}
+        run: |
+          set -euo pipefail
+          [[ "$HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$EXPECTED_JAR" =~ ^[0-9a-f]{64}$ && "$EXPECTED_MANIFEST" =~ ^[0-9a-f]{64}$ ]]
+          mkdir release
+          ssh_args=(-i "$HOME/.ssh/production" -o BatchMode=yes -o StrictHostKeyChecking=yes)
+          scp "${ssh_args[@]}" "portra-deploy@$HOST:/home/portra-deploy/incoming/$REVISION/backend.jar" release/backend.jar
+          scp "${ssh_args[@]}" "portra-deploy@$HOST:/home/portra-deploy/incoming/$REVISION/backend-build.json" release/backend-build.json
+          python3 infra/production/verify-prebuilt.py release/backend.jar release/backend-build.json "$EXPECTED_JAR" "$EXPECTED_MANIFEST"
+      - name: Seal backend artifact
+        id: seal
+        env:
+          REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          cp infra/production/deploy-backend.py release/deploy-backend.py
+          python3 infra/production/verify-release-jar.py release/backend.jar
+          printf '%s\n' "$REVISION" > release/revision.txt
+          (cd release && sha256sum backend.jar backend-build.json deploy-backend.py revision.txt > SHA256SUMS)
+          echo "jar_sha256=$(sha256sum release/backend.jar | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-${{ github.sha }}-${{ github.run_id }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 90
+  deploy:
+    needs: prepare
+    if: github.ref == 'refs/heads/main' && vars.PRODUCTION_BACKEND_ENABLED == 'true' && vars.PRODUCTION_BACKEND_APPROVED_SHA == github.sha
+    runs-on: ubuntu-latest
+    # Existing environment/connection already targets the approved ECS 8080 service.
+    # It has no reviewer rule; authorization is the exact-SHA opt-in plus root receipt.
+    environment: staging
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: backend-${{ github.sha }}-${{ github.run_id }}
+          path: release
+      - name: Configure verified SSH
+        env:
+          PRIVATE_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.STAGING_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$PRIVATE_KEY" && test -n "$KNOWN_HOSTS"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$PRIVATE_KEY" > ~/.ssh/production
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/production ~/.ssh/known_hosts
+      - name: Upload and activate only approved backend
+        env:
+          HOST: ${{ vars.STAGING_HOST }}
+          REVISION: ${{ github.sha }}
+          APPROVED_JAR: ${{ needs.prepare.outputs.jar_sha256 }}
+        run: |
+          set -euo pipefail
+          [[ "$HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$APPROVED_JAR" =~ ^[0-9a-f]{64}$ ]]
+          actual=$(sha256sum release/backend.jar | cut -d' ' -f1)
+          test "$actual" = "$APPROVED_JAR"
+          ssh_args=(-i "$HOME/.ssh/production" -o BatchMode=yes -o StrictHostKeyChecking=yes)
+          target="portra-deploy@$HOST"
+          ssh "${ssh_args[@]}" "$target" "install -d -m 700 /home/portra-deploy/incoming/$REVISION"
+          scp "${ssh_args[@]}" release/deploy-backend.py release/revision.txt release/SHA256SUMS "$target:/home/portra-deploy/incoming/$REVISION/"
+          ssh "${ssh_args[@]}" "$target" "cd /home/portra-deploy/incoming/$REVISION && sha256sum -c SHA256SUMS && python3 deploy-backend.py '$REVISION' '$APPROVED_JAR'" | tee release/activation.log
+      - name: Retain release result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-result-${{ github.sha }}-${{ github.run_id }}
+          path: release/
+          retention-days: 90

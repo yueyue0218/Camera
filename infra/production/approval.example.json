@@ -1,0 +1,17 @@
+{
+  "revision": "REPLACE_WITH_REVIEWED_MAIN_FULL_SHA",
+  "jarSha256": "REPLACE_WITH_PREPARE_JOB_JAR_SHA256",
+  "previousJarSha256": "REPLACE_WITH_LIVE_8080_JAR_SHA256",
+  "host": "REPLACE_WITH_CONFIRMED_ECS_HOSTNAME",
+  "expiresAtEpoch": 0,
+  "initialServiceState": "inactive",
+  "productionDatabaseVerified": false,
+  "backupRestoreVerified": false,
+  "incrementalSchemaApproved": false,
+  "appProtocolPassed": false,
+  "databaseIdentity": "",
+  "backupEvidence": "",
+  "localHealthUrl": "http://127.0.0.1:8080/demands",
+  "publicHealthUrl": "https://REPLACE_APPROVED_ORIGIN/demands",
+  "previousJarCompatibleAfterMigration": false
+}

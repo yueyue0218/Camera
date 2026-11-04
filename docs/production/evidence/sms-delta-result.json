@@ -1,0 +1,16 @@
+{
+  "mysqlVersion": "8.0.41",
+  "passed": [
+    "DDL identical to validated migration except database qualifier",
+    "fresh absent-delta preflight passes",
+    "nullable/default/length/InnoDB/complete unique indexes match",
+    "legacy row and NULL challenge binding preserved",
+    "already-applied preflight stops",
+    "repeat DDL fails instead of hiding partial migration",
+    "lock primary key rejects duplicates",
+    "challenge unique index rejects duplicate non-NULL values",
+    "partial column metadata fails verification"
+  ],
+  "failed": 0,
+  "productionTouched": false
+}

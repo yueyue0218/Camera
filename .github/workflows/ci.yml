@@ -105,11 +105,9 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  deploy-staging:
-    name: Deploy successful main SHA to staging
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [frontend, backend]
+  deploy-backend:
+    name: Deploy explicitly approved Main backend
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.PRODUCTION_BACKEND_ENABLED == 'true' && vars.PRODUCTION_BACKEND_APPROVED_SHA == github.sha
+    needs: [backend]
     uses: ./.github/workflows/deploy.yml
-    with:
-      deploy_scope: auto
     secrets: inherit

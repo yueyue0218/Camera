@@ -1,0 +1,11 @@
+{
+  "harmony/entry/src/main/ets/model/ApiModels.ets": "a4e17f50e8a053d504eaaf16458781b2306b8ef09d5c57c5d87c86cad79756fa",
+  "harmony/entry/src/main/ets/network/ApiService.ets": "cf85fc76da724c3d5cf09b217ed280a9ad309d02278f396643162e7d24b80219",
+  "harmony/entry/src/main/ets/pages/LoginPage.ets": "af2d1a9ac9ae00e0a977f4fc94748319d52fd391cbd65fa054cf9b85f2025d60",
+  "harmony/entry/src/main/ets/privacy/PrivacyApi.ets": "6dac00f87317eddd17073a96499bae54b6401881568315bfbf3605fc660ce987",
+  "harmony/entry/src/main/ets/privacy/PrivacySettingsPage.ets": "512777ced574624ee731c500902202ded3acc91cfb1d2fb1535d88226c4ba1c6",
+  "harmony/tests/network.test.cjs": "90cdf00d827cf27a1be6bdf26f0ff3eee0ab31d700b2dae01a66e90efcec816e",
+  "harmony/tests/privacy-settings-behavior.test.cjs": "de76d967ab7409ddba5dc689012516dd280c8edbc4b151855b8c2e0f093ff278",
+  "harmony/tests/login-challenge.test.cjs": "d111d3abb72a76c7b951d70a1a53255eb74763ee731aeac4c49d53a1a3334bce",
+  "harmony/tests/challenge-real-backend.cjs": "693f408148d73a707ce0ad14027e80891d3eac85330394085f4eeb74d90715ff"
+}

@@ -1,0 +1,11 @@
+{
+  "jarSha256": "c855e73e0a5a579a910e3d266d2a3c9dfbac6bf71440be37cc38e532ab1432b3",
+  "classes": {
+    "auth/sms/aliyun/AliyunSdkSmsGateway": "11ad8a710ee0148ee6790d1d4f2037abfe513a34711583af34047be69a6acabc",
+    "auth/sms/aliyun/AliyunSmsSender": "71ab03892151ee76cb474aa64fa0e649be20383acd03f1d53165145cda7f1d85",
+    "auth/sms/dypns/DypnsSmsSender": "5f2161ce18c22f197e6ae41ff02fb9aa7e6cbc358ac22b840bbab33eba957243",
+    "auth/service/PhoneSmsService": "37e76b37053f694b2b0560427fcafdece445ca2ee6b98a160b9a5ac932337cfb",
+    "auth/dto/VerifySmsCodeRequest": "88abc71cf157ccff96dd38ae81553145eda92b57fa10b4476ae66abf30b795c9",
+    "privacy/service/PrivacyConsentService": "44e1b57e19d18536171d3e2b9020e1730e485da8b08ae63091162f136693633f"
+  }
+}

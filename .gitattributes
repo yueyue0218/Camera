@@ -1,0 +1,4 @@
+# Release artifacts must retain identical bytes on Windows and Linux.
+/infra/production/*.py text eol=lf
+/infra/production/*.sql text eol=lf
+/docs/production/backend-build.json text eol=lf

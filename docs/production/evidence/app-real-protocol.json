@@ -1,0 +1,23 @@
+{
+  "passed": [
+    "real controller rejects missing challengeId",
+    "App reads real send challenge envelope",
+    "resend invalidates prior challenge",
+    "challenge cannot authenticate another phone",
+    "incorrect code rejected",
+    "real authentication issues native session through App API",
+    "consumed challenge cannot be replayed",
+    "server requires account consent without client headers",
+    "App saves consent and accesses authenticated business API",
+    "withdrawn consent blocks business",
+    "privacy entry remains accessible after withdrawal",
+    "account closure challenge cannot be used as login challenge",
+    "App closure request carries the bound challenge"
+  ],
+  "failed": 0,
+  "requests": 17,
+  "transport": "real loopback HTTP",
+  "database": "isolated in-memory H2",
+  "sms": "test transport",
+  "productionTouched": false
+}

@@ -1,0 +1,10 @@
+{
+  "jarSha256": "c855e73e0a5a579a910e3d266d2a3c9dfbac6bf71440be37cc38e532ab1432b3",
+  "existingSurefire": {
+    "tests": 954,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 2
+  },
+  "rerun": false
+}
