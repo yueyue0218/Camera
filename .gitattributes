@@ -1,0 +1,4 @@
+# Deployment helpers validate canonical bytes; CRLF checkout changes their hashes.
+infra/staging/** text eol=lf
+deploy/nginx/*.conf text eol=lf
+.github/workflows/*.yml text eol=lf

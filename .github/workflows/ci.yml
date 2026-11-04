@@ -84,6 +84,12 @@ jobs:
         working-directory: backend
         run: ./mvnw -B clean verify
 
+      - name: Verify backend release capability floor
+        run: |
+          bash infra/staging/scripts/validate-repository-infra.sh
+          python3 -m unittest discover -s infra/staging/tests -p 'test_*.py'
+          bash infra/staging/scripts/verify-backend-capabilities.sh backend/target/camera-0.0.1-SNAPSHOT.jar
+
       - name: Upload backend test and coverage evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -107,7 +113,7 @@ jobs:
 
   deploy-staging:
     name: Deploy successful main SHA to staging
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.STAGING_DEPLOY_ENABLED == 'true' && vars.STAGING_RELEASE_SHA == github.sha
     needs: [frontend, backend]
     uses: ./.github/workflows/deploy.yml
     with:

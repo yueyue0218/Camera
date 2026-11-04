@@ -85,6 +85,33 @@ class ServicePackageShowcaseContractTest {
     }
 
     @Test
+    void ownerPublicationsIgnoreSpoofedOwnerAndRejectAnonymousOrWrongRole() {
+        Long own = createServicePackage();
+        createServicePackageFor(OTHER_PROVIDER_ID);
+        var mine = rest.exchange("/service-packages/me/publications?userId=" + OTHER_PROVIDER_ID,
+                HttpMethod.GET, providerEntity(null), Map.class);
+        assertThat(serviceIds(mine)).containsExactly(own);
+        assertThat(rest.getForEntity("/service-packages/me/publications", Map.class).getBody().get("code"))
+                .isEqualTo(40101);
+        assertThat(rest.exchange("/service-packages/me/publications", HttpMethod.GET,
+                customerEntity(CUSTOMER_ID, null), Map.class).getBody().get("code")).isEqualTo(40301);
+    }
+
+    @Test
+    void anonymousAuthorFeedFiltersOwnerAndOfflineWhileOwnerDetailStillWorks() {
+        Long own = createServicePackage();
+        createServicePackageFor(OTHER_PROVIDER_ID);
+        assertThat(serviceIds(rest.getForEntity("/service-packages/by-user/" + PROVIDER_ID + "?page=1&size=1", Map.class))).containsExactly(own);
+        var offline = rest.exchange("/service-packages/" + own + "/offline", HttpMethod.PATCH, providerEntity(null), Map.class);
+        assertThat(offline.getBody().get("code")).isEqualTo(200);
+        assertThat(serviceIds(rest.getForEntity("/service-packages/by-user/" + PROVIDER_ID, Map.class))).isEmpty();
+        var ownerDetail = rest.exchange("/service-packages/" + own, HttpMethod.GET, providerEntity(null), Map.class);
+        assertThat(ownerDetail.getBody().get("code")).isEqualTo(200);
+        assertThat(rest.getForEntity("/service-packages/" + own, Map.class).getBody().get("code")).isNotEqualTo(200);
+        assertThat(rest.getForEntity("/users/" + CUSTOMER_ID + "/public-profile?role=CUSTOMER", Map.class).getBody().get("code")).isEqualTo(200);
+    }
+
+    @Test
     void publishListAndDetailExposeShowcaseTimeAndPhotographerContractFields() {
         Long serviceId = createServicePackage();
 

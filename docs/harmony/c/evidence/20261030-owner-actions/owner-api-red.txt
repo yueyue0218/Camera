@@ -1,0 +1,68 @@
+✖ owner update uses authenticated PUT and returns the actual complete album (1.4872ms)
+✖ owner delete uses authenticated DELETE and accepts only the null success payload (0.4957ms)
+✖ owner unsafe IDs never send requests (0.359ms)
+✖ owner update and delete cancellation is isolated by instance (0.447ms)
+✖ owner writes retain shared error handling and never replay (0.3108ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 0
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 784.1987
+
+✖ failing tests:
+
+test at harmony\tests\moment-owner-api.test.cjs:42:1
+✖ owner update uses authenticated PUT and returns the actual complete album (1.4872ms)
+  TypeError: api.updateMoment is not a function
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\moment-owner-api.test.cjs:44:23)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17)
+
+test at harmony\tests\moment-owner-api.test.cjs:51:1
+✖ owner delete uses authenticated DELETE and accepts only the null success payload (0.4957ms)
+  TypeError: api.deleteMoment is not a function
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\moment-owner-api.test.cjs:54:23)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+
+test at harmony\tests\moment-owner-api.test.cjs:60:1
+✖ owner unsafe IDs never send requests (0.359ms)
+  TypeError: api.updateMoment is not a function
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\moment-owner-api.test.cjs:63:28)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+
+test at harmony\tests\moment-owner-api.test.cjs:68:1
+✖ owner update and delete cancellation is isolated by instance (0.447ms)
+  TypeError: api.updateMoment is not a function
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\moment-owner-api.test.cjs:71:33)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+
+test at harmony\tests\moment-owner-api.test.cjs:78:1
+✖ owner writes retain shared error handling and never replay (0.3108ms)
+  TypeError: api[action] is not a function
+      at TestContext.<anonymous> (C:\Users\LiXiaozhou\.codex\worktrees\harmony-c-ui-polish\Camera\harmony\tests\moment-owner-api.test.cjs:81:65)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)

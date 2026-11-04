@@ -1,0 +1,29 @@
+[Unit]
+Description=Portra isolated read-only JPA schema validation (no Spring application)
+After=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=portra-integration
+Group=portra-integration
+WorkingDirectory=/opt/portra-integration/releases/@COMMIT@
+EnvironmentFile=/etc/portra-integration/app.env
+ExecStartPre=/usr/bin/sha256sum -c SHA256SUMS
+ExecStartPre=/usr/bin/python3 /opt/portra-integration/releases/@COMMIT@/check-environment.py
+ExecStartPre=/usr/bin/python3 /opt/portra-integration/releases/@COMMIT@/check-external.py
+ExecStart=/usr/bin/java -Xms64m -Xmx256m -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=48m -XX:ActiveProcessorCount=2 -Duser.timezone=Asia/Shanghai -cp validator:runtime/BOOT-INF/classes:runtime/BOOT-INF/lib/* ValidateJpa
+TimeoutStartSec=120
+Restart=no
+MemoryMax=512M
+MemorySwapMax=0
+TasksMax=64
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+InaccessiblePaths=-/opt/portra -/var/www -/etc/portra-integration/migrator.cnf
+CapabilityBoundingSet=
+StandardOutput=journal
+StandardError=journal

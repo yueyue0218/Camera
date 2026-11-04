@@ -1,6 +1,10 @@
 package com.action.camera.integration;
 
 import com.action.camera.admin.repository.AuditRecordRepository;
+import com.action.camera.privacy.dto.PrivacyDtos.ConsentUpdate;
+import com.action.camera.privacy.repository.PrivacyConsentEventRepository;
+import com.action.camera.privacy.repository.PrivacyConsentRepository;
+import com.action.camera.privacy.service.PrivacyConsentService;
 import com.action.camera.support.TestAuthTokens;
 import com.action.camera.demand.domain.Demand;
 import com.action.camera.demand.domain.DemandResponse;
@@ -19,6 +23,7 @@ import com.action.camera.review.entity.ReviewComplaint;
 import com.action.camera.review.repository.ReviewComplaintRepository;
 import com.action.camera.review.repository.ReviewRepository;
 import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,9 +71,14 @@ class AdminGovernanceIntegrationTest {
     @Autowired private AuditRecordRepository auditRecordRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private PrivacyConsentService privacyConsentService;
+    @Autowired private PrivacyConsentRepository privacyConsentRepository;
+    @Autowired private PrivacyConsentEventRepository privacyConsentEventRepository;
+    private boolean consentFixtureCreated;
 
     @BeforeEach
     void setUp() {
+        consentFixtureCreated = false;
         auditRecordRepository.deleteAll();
         reportRepository.deleteAll();
         reviewComplaintRepository.deleteAll();
@@ -85,8 +95,22 @@ class AdminGovernanceIntegrationTest {
         insertUser(TARGET_ID, "governance-target", "CUSTOMER");
     }
 
+    @AfterEach
+    void tearDownConsentFixture() {
+        if (!consentFixtureCreated) {
+            return;
+        }
+        // Keep test data isolated: remove only this content owner's grant/event rows.
+        privacyConsentEventRepository.deleteAll(
+                privacyConsentEventRepository.findAll().stream()
+                        .filter(event -> CUSTOMER_ID.equals(event.getUserId()))
+                        .toList());
+        privacyConsentRepository.deleteById(CUSTOMER_ID);
+    }
+
     @Test
     void reportTakeDownRestoreUpdatesPublicVisibilityDashboardAndAuditAtomically() throws Exception {
+        grantContentOwnerConsent(CUSTOMER_ID);
         Demand demand = saveDemand(CUSTOMER_ID, "governance lifecycle demand");
         long pendingBefore = dashboardLong("pendingReportCount");
         long removedBefore = dashboardLong("removedContentCount");
@@ -355,6 +379,13 @@ class AdminGovernanceIntegrationTest {
 
     private String bearer(Long userId) {
         return "Bearer " + jwtUtil.generateToken(userId);
+    }
+
+    private void grantContentOwnerConsent(Long ownerId) {
+        consentFixtureCreated = true;
+        privacyConsentService.update(ownerId, new ConsentUpdate(
+                "GRANTED", PrivacyConsentService.VERSION, PrivacyConsentService.VERSION,
+                "governance-admin-restore", System.currentTimeMillis()));
     }
 
     private void insertUser(Long id, String nickname, String role) {

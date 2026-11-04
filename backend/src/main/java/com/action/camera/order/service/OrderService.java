@@ -242,7 +242,7 @@ public class OrderService {
 
     @Transactional
     public Order requestRework(Long orderId, Long customerId, String reason) {
-        Order order = getOrderOrThrow(orderId);
+        Order order = getOrderForUpdateOrThrow(orderId);
         if (!Objects.equals(order.getCustomerId(), customerId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Only the customer can request rework");
         }
@@ -260,7 +260,7 @@ public class OrderService {
 
     @Transactional
     public Order completeReworkDelivery(Long orderId, Long providerId, String reason) {
-        Order order = getOrderOrThrow(orderId);
+        Order order = getOrderForUpdateOrThrow(orderId);
         if (!Objects.equals(order.getProviderUserId(), providerId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Only the provider can upload rework delivery");
         }
@@ -290,7 +290,7 @@ public class OrderService {
 
     @Transactional
     public Order markDeliveryUploaded(Long orderId, Long providerId, String reason) {
-        Order order = getOrderOrThrow(orderId);
+        Order order = getOrderForUpdateOrThrow(orderId);
         if (!Objects.equals(order.getProviderUserId(), providerId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Only the provider can upload delivery");
         }
@@ -307,6 +307,18 @@ public class OrderService {
                 "PROVIDER",
                 reason
         );
+    }
+
+    @Transactional
+    public Order lockForDeliveryUpload(Long orderId, Long providerId) {
+        Order order = getOrderForUpdateOrThrow(orderId);
+        if (!Objects.equals(order.getProviderUserId(), providerId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only the provider can upload delivery");
+        }
+        if (order.getStatus() != OrderStatus.PENDING_DELIVERY && order.getStatus() != OrderStatus.REWORK_REQUIRED) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Order status does not allow delivery upload");
+        }
+        return order;
     }
 
     @Transactional
@@ -525,6 +537,49 @@ public class OrderService {
         orders.addAll(listCustomerOrders(operatorId, null));
         orders.addAll(listProviderOrders(operatorId, null));
         return filterAndSortOrders(syncTimelineStatusesIfDue(orders, now), status);
+    }
+
+    private String requireSummaryRole(Long operatorId, String role) {
+        if (operatorId == null) { throw new BusinessException(ErrorCode.UNAUTHORIZED, "operatorId must not be null"); }
+        if (!"customer".equalsIgnoreCase(role) && !"provider".equalsIgnoreCase(role)) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Unsupported order role");
+        }
+        return role.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private void syncUserTimeline(Long operatorId, String role) {
+        LocalDateTime now = LocalDateTime.now();
+        // Preserve the read-side transitions and notifications performed by
+        // listMyOrders, including due orders outside the requested page.
+        syncTimelineStatusesIfDue(orderRepository.findTimelineDueForUser(operatorId, role, now,
+                OrderStatus.PAID_PENDING_SHOOT, OrderStatus.SHOOTING), now);
+        orderRepository.flush();
+    }
+
+    @Transactional
+    public com.action.camera.order.dto.OrderSummaryResponse summarizeMyOrders(Long operatorId, String role) {
+        String normalizedRole = requireSummaryRole(operatorId, role);
+        syncUserTimeline(operatorId, normalizedRole);
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        for (OrderStatus status : OrderStatus.values()) { counts.put(status.name(), 0L); }
+        for (var row : orderRepository.summarizeForUser(operatorId, normalizedRole)) {
+            counts.put(row.getStatus().name(), row.getTotal());
+        }
+        long total = counts.values().stream().mapToLong(Long::longValue).sum();
+        long completed = counts.get(OrderStatus.COMPLETED.name());
+        long ongoing = total - completed - counts.get(OrderStatus.CANCELLED.name()) - counts.get(OrderStatus.REFUNDED.name());
+        return new com.action.camera.order.dto.OrderSummaryResponse(total, completed, ongoing, counts);
+    }
+
+    @Transactional
+    public com.action.camera.common.page.PageResult<Order> pageMyOrders(Long operatorId, String role,
+                                                                        OrderStatus status, int page, int size) {
+        String normalizedRole = requireSummaryRole(operatorId, role);
+        int safePage = Math.max(page, 1), safeSize = Math.max(1, Math.min(size, 50));
+        syncUserTimeline(operatorId, normalizedRole);
+        var result = orderRepository.findPageForUser(operatorId, normalizedRole, status,
+                org.springframework.data.domain.PageRequest.of(safePage - 1, safeSize));
+        return new com.action.camera.common.page.PageResult<>(result.getContent(), safePage, safeSize, result.getTotalElements());
     }
 
     @Transactional

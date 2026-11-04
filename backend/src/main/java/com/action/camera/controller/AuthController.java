@@ -50,17 +50,16 @@ public class AuthController {
     }
 
     @PostMapping("/sms/send")
-    public Result<Void> sendSmsCode(@Valid @RequestBody SendSmsCodeRequest req,
+    public Result<com.action.camera.auth.dto.SmsChallengeResponse> sendSmsCode(@Valid @RequestBody SendSmsCodeRequest req,
                                     HttpServletRequest request) {
-        phoneSmsService.sendCode(req.getPhone(), req.smsPurpose(), request.getRemoteAddr(), req.getDeviceId());
-        return Result.success(null);
+        return Result.success(phoneSmsService.createChallenge(req.getPhone(), req.smsPurpose(), request.getRemoteAddr(), req.getDeviceId(), null, null, "LOGIN"));
     }
 
     @PostMapping("/sms/verify")
     public Result<LoginResponse> verifySmsCode(@Valid @RequestBody VerifySmsCodeRequest req,
                                                HttpServletResponse response) {
         SessionAuthenticationResult result = phoneAuthenticationService.verifyAndLogin(
-                req.getPhone(), req.smsPurpose(), req.getCode(), req.getDeviceId(), req.getDeviceName());
+                req.getChallengeId(), req.getPhone(), req.smsPurpose(), req.getCode(), req.getDeviceId(), req.getDeviceName());
         response.addHeader(HttpHeaders.SET_COOKIE, cookieService.create(result.refreshToken(), result.refreshTtl()));
         return Result.success(result.response());
     }
@@ -70,7 +69,7 @@ public class AuthController {
     @PostMapping("/native/sms/verify")
     public Result<NativeSessionResponse> verifyNativeSmsCode(@Valid @RequestBody VerifySmsCodeRequest req) {
         SessionAuthenticationResult result = phoneAuthenticationService.verifyAndLogin(
-                req.getPhone(), req.smsPurpose(), req.getCode(), req.getDeviceId(), req.getDeviceName());
+                req.getChallengeId(), req.getPhone(), req.smsPurpose(), req.getCode(), req.getDeviceId(), req.getDeviceName());
         return Result.success(NativeSessionResponse.from(result));
     }
 

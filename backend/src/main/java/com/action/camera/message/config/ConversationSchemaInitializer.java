@@ -1,17 +1,20 @@
 package com.action.camera.message.config;
 
+import com.action.camera.common.config.RuntimeSchemaInitializationCondition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.context.annotation.Conditional;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.util.List;
 
 @Component
+@Conditional(RuntimeSchemaInitializationCondition.class)
 public class ConversationSchemaInitializer implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(ConversationSchemaInitializer.class);

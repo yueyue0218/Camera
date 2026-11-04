@@ -31,14 +31,18 @@ public class AliyunSmsSender implements SmsSender {
 
     @Override
     public SmsDeliveryReceipt send(SmsMessage message) {
-        if (message.purpose() != SmsPurpose.LOGIN) {
+        if (message.purpose() != SmsPurpose.LOGIN && message.purpose() != SmsPurpose.REAUTH) {
             throw new SmsDeliveryException("No Alibaba Cloud template configured for SMS purpose");
         }
+
+        String template = message.purpose() == SmsPurpose.REAUTH ? properties.getReauthTemplateId() : properties.getLoginTemplateId();
+        if (template == null || template.isBlank() || template.startsWith("REPLACE_ME")
+                || (message.purpose() == SmsPurpose.REAUTH && template.equals(properties.getLoginTemplateId()))) throw new SmsDeliveryException("No Alibaba Cloud template configured for SMS purpose");
 
         AliyunSmsResult result = gateway.send(
                 message.phone(),
                 properties.getSignName(),
-                properties.getLoginTemplateId(),
+                template,
                 templateParameters(message.code()));
         if (result == null || !"OK".equals(result.code())) {
             throw new SmsDeliveryException("Alibaba Cloud SMS rejected the request");
@@ -48,7 +52,7 @@ public class AliyunSmsSender implements SmsSender {
 
     private String templateParameters(String code) {
         try {
-            return objectMapper.writeValueAsString(Map.of("code", code));
+            return objectMapper.writeValueAsString(Map.of(properties.getCodeParameterName(), code));
         } catch (JsonProcessingException e) {
             throw new SmsDeliveryException("Unable to serialize SMS template parameters", e);
         }

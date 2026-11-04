@@ -1,0 +1,320 @@
+diff --git a/harmony/entry/src/main/ets/app/AppClient.ets b/harmony/entry/src/main/ets/app/AppClient.ets
+index 6557a88..33e97c7 100644
+--- a/harmony/entry/src/main/ets/app/AppClient.ets
++++ b/harmony/entry/src/main/ets/app/AppClient.ets
+@@ -27,0 +28 @@ export class AppClient {
++  private restoreVersion: number = 0;
+@@ -38,0 +40 @@ export class AppClient {
++    this.restoreVersion = this.sessionManager.getSessionVersion();
+@@ -45 +47,3 @@ export class AppClient {
+-    if (this.restoreStarted || this.sessionManager.isAuthenticated()) {
++    // A changed generation belongs to login, logout or expiration, not startup retry.
++    if (this.sessionManager.isAuthenticated() ||
++      this.restoreVersion !== this.sessionManager.getSessionVersion()) {
+@@ -48 +51,0 @@ export class AppClient {
+-    this.restoreStarted = true;
+@@ -50,2 +53,6 @@ export class AppClient {
+-    const version = this.sessionManager.beginRestore();
+-    const restore = this.restoreAndRelease(version);
++    if (!this.restoreStarted) {
++      this.restoreVersion = this.sessionManager.beginRestore();
++      this.restoreStarted = true;
++    }
++    // Keep the same generation so a rotated credential awaiting persistence is reused.
++    const restore = this.restoreAndRelease(this.restoreVersion);
+diff --git a/harmony/entry/src/main/ets/auth/AuthSessionManager.ets b/harmony/entry/src/main/ets/auth/AuthSessionManager.ets
+index 202f18d..a837ebc 100644
+--- a/harmony/entry/src/main/ets/auth/AuthSessionManager.ets
++++ b/harmony/entry/src/main/ets/auth/AuthSessionManager.ets
+@@ -29,0 +30 @@ export class AuthSessionManager {
++  private expirationPromise?: Promise<boolean>;
+@@ -108,0 +110,4 @@ export class AuthSessionManager {
++    if (this.status === AuthStatus.GUEST) {
++      this.status = AuthStatus.RESTORING;
++      this.credentialError = null;
++    }
+@@ -260,0 +266,3 @@ export class AuthSessionManager {
++    if (this.expirationPromise !== undefined) {
++      return this.expirationPromise;
++    }
+@@ -269 +277,2 @@ export class AuthSessionManager {
+-    return this.clearStoredCredential(version);
++    this.expirationPromise = this.clearStoredCredential(version);
++    return this.expirationPromise;
+@@ -273,0 +283 @@ export class AuthSessionManager {
++    this.expirationPromise = undefined;
+diff --git a/harmony/tests/auth.test.cjs b/harmony/tests/auth.test.cjs
+index b566741..a1a7085 100644
+--- a/harmony/tests/auth.test.cjs
++++ b/harmony/tests/auth.test.cjs
+@@ -12 +12 @@ const http = {
+-  RequestMethod: { GET: 'GET', POST: 'POST' }, HttpDataType: { STRING: 1 },
++  RequestMethod: { GET: 'GET', POST: 'POST', PUT: 'PUT', DELETE: 'DELETE', PATCH: 'PATCH' }, HttpDataType: { STRING: 1 },
+@@ -32,0 +33,2 @@ let assetQueryError = null;
++let assetAddError = null;
++let assetRemoveError = null;
+@@ -40,0 +43 @@ const asset = {
++    if (assetAddError !== null) throw assetAddError;
+@@ -51,0 +55 @@ const asset = {
++    if (assetRemoveError !== null) throw assetRemoveError;
+@@ -92 +96 @@ const { AppClient } = require('../entry/src/main/ets/app/AppClient.ets');
+-const { ErrorKind, PortraError } = require('../entry/src/main/ets/network/ErrorMapper.ets');
++const { ErrorKind, ErrorMapper, PortraError } = require('../entry/src/main/ets/network/ErrorMapper.ets');
+@@ -118,0 +123 @@ function tokenController() {
++    replaceAccessToken(value) { this.token = value.trim(); },
+@@ -197 +202 @@ test('storage failures never create an in-memory authenticated session', async (
+-  const manager = new AuthSessionManager(controller, store, EnvironmentName.DEV);
++  const manager = new AuthSessionManager(controller, store, EnvironmentName.DEV, nativeSessionApi());
+@@ -223,0 +229 @@ test('application session restore deduplicates concurrency and retries after a t
++  const previousCallCount = calls.length;
+@@ -224,0 +231 @@ test('application session restore deduplicates concurrency and retries after a t
++  assert.equal(calls.length, previousCallCount + 1, 'explicit retry must reach the refresh endpoint');
+@@ -231,0 +239,3 @@ test('application session restore deduplicates concurrency and retries after a t
++  const afterRestore = calls.length;
++  await AppClient.shared.restoreSession();
++  assert.equal(calls.length, afterRestore, 'an authenticated session must not rotate again');
+@@ -256,0 +267 @@ test('concurrent expiration clears the credential once', async () => {
++  store.clearCalls = 0;
+@@ -260,0 +272 @@ test('concurrent expiration clears the credential once', async () => {
++  await new Promise(resolve => setImmediate(resolve));
+@@ -268 +280 @@ test('concurrent expiration clears the credential once', async () => {
+-test('401 and 40101 expire a shared HTTP session; 403 does not', async () => {
++test('401 and 40101 try refresh and expire a rejected session; 403 does not refresh', async () => {
+@@ -276 +288 @@ test('401 and 40101 expire a shared HTTP session; 403 does not', async () => {
+-    const handler = { async onExpired() { await manager.markExpired(); } };
++    const handler = { refreshSession() { return manager.refreshAccessToken(); } };
+@@ -278 +290,6 @@ test('401 and 40101 expire a shared HTTP session; 403 does not', async () => {
+-    manager = new AuthSessionManager(client, store, EnvironmentName.DEV);
++    const api = nativeSessionApi();
++    api.refresh = async function (token) {
++      this.refreshCalls.push(token);
++      throw ErrorMapper.fromHttpStatus(401);
++    };
++    manager = new AuthSessionManager(client, store, EnvironmentName.DEV, api);
+@@ -282 +299 @@ test('401 and 40101 expire a shared HTTP session; 403 does not', async () => {
+-    await assert.rejects(request, error => error.httpStatus === 401 || error.businessCode === 40101);
++    await assert.rejects(request, error => ErrorMapper.isStale(error));
+@@ -284 +301,4 @@ test('401 and 40101 expire a shared HTTP session; 403 does not', async () => {
+-    assert.equal(store.clearCalls, 1);
++    assert.equal(store.clearCalls, 2, 'sign-in clears the previous credential, expiration clears the rejected one');
++    assert.deepEqual(api.refreshCalls, ['refresh']);
++    assert.equal(store.credential, null);
++    assert.equal(interceptor.authorizationHeader(), '');
+@@ -289 +309 @@ test('401 and 40101 expire a shared HTTP session; 403 does not', async () => {
+-  const handler = { async onExpired() { await manager.markExpired(); } };
++  const handler = { refreshSession() { return manager.refreshAccessToken(); } };
+@@ -291 +311,2 @@ test('401 and 40101 expire a shared HTTP session; 403 does not', async () => {
+-  manager = new AuthSessionManager(client, store, EnvironmentName.DEV);
++  const api = nativeSessionApi();
++  manager = new AuthSessionManager(client, store, EnvironmentName.DEV, api);
+@@ -297 +318,103 @@ test('401 and 40101 expire a shared HTTP session; 403 does not', async () => {
+-  assert.equal(store.clearCalls, 0);
++  assert.equal(store.clearCalls, 1);
++  assert.deepEqual(api.refreshCalls, []);
++});
++
++test('concurrent expiration waits for the same failed deletion result', async () => {
++  const store = new MemoryCredentialStore();
++  const controller = tokenController();
++  const manager = new AuthSessionManager(controller, store, EnvironmentName.DEV);
++  await manager.signIn('token', 'refresh');
++  store.clearCalls = 0;
++  let release;
++  store.clearBarrier = new Promise(resolve => { release = resolve; });
++  store.clearError = new CredentialStoreError(CredentialOperation.CLEAR, 24000008);
++  const first = manager.markExpired();
++  const second = manager.markExpired();
++  let settled = false;
++  second.then(() => { settled = true; });
++  await new Promise(resolve => setImmediate(resolve));
++  assert.equal(settled, false, 'a concurrent caller must not report success while deletion is pending');
++  assert.equal(controller.token, '');
++  assert.equal(manager.getStatus(), AuthStatus.EXPIRED);
++  assert.equal(store.clearCalls, 1);
++  release();
++  assert.deepEqual(await Promise.all([first, second]), [false, false]);
++  assert.equal(await manager.markExpired(), false);
++  assert.equal(manager.getCredentialError().code, 24000008);
++});
++
++test('an old expiration completion cannot expire a newer signed-in identity', async () => {
++  const store = new MemoryCredentialStore();
++  const controller = tokenController();
++  const manager = new AuthSessionManager(controller, store, EnvironmentName.DEV);
++  await manager.signIn('old', 'old-refresh');
++  let release;
++  store.clearBarrier = new Promise(resolve => { release = resolve; });
++  const expired = manager.markExpired();
++  await new Promise(resolve => setImmediate(resolve));
++  const signIn = manager.signIn('new', 'new-refresh');
++  release();
++  assert.equal(await expired, false);
++  assert.equal(await signIn, true);
++  assert.equal(controller.token, 'new');
++  assert.equal(store.credential.refreshToken, 'new-refresh');
++  assert.equal(manager.getStatus(), AuthStatus.AUTHENTICATED);
++  assert.equal(await manager.markExpired(), true);
++  assert.equal(controller.token, '');
++});
++
++test('concurrent expired GETs share one rotation and retry with the new bearer', async () => {
++  const store = new MemoryCredentialStore();
++  const interceptor = new AuthInterceptor();
++  let manager;
++  const client = new HttpClient(interceptor, { refreshSession() { return manager.refreshAccessToken(); } });
++  const api = nativeSessionApi();
++  let finishRefresh;
++  api.refresh = function (token) {
++    this.refreshCalls.push(token);
++    return new Promise(resolve => { finishRefresh = resolve; });
++  };
++  manager = new AuthSessionManager(client, store, EnvironmentName.DEV, api);
++  await manager.signIn('old', 'refresh');
++  const generation = manager.getSessionVersion();
++  const start = calls.length;
++  const a = client.get('/a');
++  const b = client.get('/b');
++  calls[start].resolve({ responseCode: 401, result: '' });
++  calls[start + 1].resolve({ responseCode: 200,
++    result: JSON.stringify({ code: 40101, message: 'expired', data: null }) });
++  await new Promise(resolve => setImmediate(resolve));
++  assert.deepEqual(api.refreshCalls, ['refresh']);
++  finishRefresh({ accessToken: 'rotated', refreshToken: 'rotated-refresh', userId: 1,
++    nickname: '用户', role: 'CUSTOMER', adminCapable: false, newUser: false });
++  await new Promise(resolve => setImmediate(resolve));
++  assert.equal(calls.length, start + 4);
++  for (const call of calls.slice(start + 2)) {
++    assert.equal(call.options.header.Authorization, 'Bearer rotated');
++    call.resolve({ responseCode: 200,
++      result: JSON.stringify({ code: 200, message: 'success', data: 'current' }) });
++  }
++  assert.deepEqual(await Promise.all([a, b]), ['current', 'current']);
++  assert.equal(manager.getSessionVersion(), generation, 'rotation must not act as an identity switch');
++  assert.equal(store.credential.refreshToken, 'rotated-refresh');
++});
++
++test('a recovered POST PUT DELETE or PATCH is never automatically replayed', async () => {
++  for (const method of ['post', 'put', 'delete', 'patch']) {
++    const store = new MemoryCredentialStore();
++    let manager;
++    const client = new HttpClient(new AuthInterceptor(), {
++      refreshSession() { return manager.refreshAccessToken(); }
++    });
++    const api = nativeSessionApi();
++    manager = new AuthSessionManager(client, store, EnvironmentName.DEV, api);
++    await manager.signIn('old', 'refresh');
++    const start = calls.length;
++    const request = client[method]('/mutation');
++    assert.equal(calls[start].options.method, method.toUpperCase());
++    calls[start].resolve({ responseCode: 401, result: '' });
++    await assert.rejects(request, error => error.kind === ErrorKind.BUSINESS && !ErrorMapper.isStale(error));
++    assert.equal(calls.length, start + 1, method + ' must only send once');
++    assert.deepEqual(api.refreshCalls, ['refresh']);
++    assert.equal(manager.isAuthenticated(), true);
++  }
+@@ -316,0 +440,104 @@ test('changing session invalidates the old account request', async () => {
++
++function freshAppClient() {
++  const modulePath = require.resolve('../entry/src/main/ets/app/AppClient.ets');
++  delete require.cache[modulePath];
++  return require(modulePath).AppClient.shared;
++}
++function refreshedEnvelope(accessToken = 'rotated-access', refreshToken = 'rotated-refresh') {
++  return { responseCode: 200, result: JSON.stringify({ code: 200, message: 'success', data: {
++    accessToken, refreshToken, userId: 1, nickname: '用户', role: 'CUSTOMER', adminCapable: false, newUser: false
++  } }) };
++}
++
++test('explicit restore retry persists an already rotated credential without sending the old refresh again', async () => {
++  assets.clear();
++  assetQueryError = assetAddError = assetRemoveError = null;
++  const store = new AssetCredentialStore('dev', 'portra:dev');
++  await store.save({ refreshToken: 'old-refresh', environment: 'dev' });
++  const app = freshAppClient();
++  const start = calls.length;
++  const first = app.restoreSession();
++  await new Promise(resolve => setImmediate(resolve));
++  assert.equal(calls.length, start + 1);
++  assetAddError = { code: 24000008 };
++  calls[start].resolve(refreshedEnvelope());
++  await first;
++  assert.equal(app.sessionManager.getStatus(), AuthStatus.GUEST);
++  assert.equal(app.sessionManager.getCredentialError().operation, CredentialOperation.SAVE);
++  assert.equal((await store.load()).refreshToken, 'old-refresh');
++  assetAddError = null;
++  const retry = app.restoreSession();
++  await new Promise(resolve => setImmediate(resolve));
++  assert.equal(calls.length, start + 1, 'never rotate the already consumed refresh token again');
++  await retry;
++  assert.equal(app.sessionManager.getStatus(), AuthStatus.AUTHENTICATED);
++  assert.equal(app.sessionManager.getSession().accessToken, 'rotated-access');
++  assert.equal((await store.load()).refreshToken, 'rotated-refresh');
++});
++
++test('a lifecycle restore after failed logout deletion cannot restore the signed-out account', async () => {
++  assets.clear();
++  assetQueryError = assetAddError = assetRemoveError = null;
++  const store = new AssetCredentialStore('dev', 'portra:dev');
++  await store.save({ refreshToken: 'old-refresh', environment: 'dev' });
++  const app = freshAppClient();
++  const start = calls.length;
++  const restore = app.restoreSession();
++  await new Promise(resolve => setImmediate(resolve));
++  calls[start].resolve(refreshedEnvelope());
++  await restore;
++  assetRemoveError = { code: 24000008 };
++  try {
++    assert.equal(await app.sessionManager.signOut(), false);
++    assert.equal(app.sessionManager.getStatus(), AuthStatus.GUEST);
++    calls.at(-1).resolve({ responseCode: 200,
++      result: JSON.stringify({ code: 200, message: 'success', data: true }) });
++    const beforeReappear = calls.length;
++    const reappear = app.restoreSession();
++    await new Promise(resolve => setImmediate(resolve));
++    assert.equal(calls.length, beforeReappear, 'returning to Index must not revive a signed-out account');
++    await reappear;
++    assert.equal(app.sessionManager.getSession(), null);
++    assert.equal(app.sessionManager.getStatus(), AuthStatus.GUEST);
++  } finally {
++    assetRemoveError = null;
++  }
++});
++test('a retried restore expires and deletes a credential rejected by the server', async () => {
++  assets.clear();
++  assetQueryError = assetAddError = assetRemoveError = null;
++  const store = new AssetCredentialStore('dev', 'portra:dev');
++  await store.save({ refreshToken: 'retry-refresh', environment: 'dev' });
++  const app = freshAppClient();
++  const start = calls.length;
++  const first = app.restoreSession();
++  await new Promise(resolve => setImmediate(resolve));
++  calls[start].reject({ code: 2300007 });
++  await first;
++  assert.equal(app.sessionManager.getStatus(), AuthStatus.GUEST);
++  const removals = assetCalls.remove.length;
++  const retry = app.restoreSession();
++  await new Promise(resolve => setImmediate(resolve));
++  assert.equal(calls.length, start + 2);
++  calls[start + 1].resolve({ responseCode: 401, result: '' });
++  await retry;
++  assert.equal(app.sessionManager.getStatus(), AuthStatus.EXPIRED);
++  assert.equal(app.sessionManager.getSession(), null);
++  assert.equal(assetCalls.remove.length, removals + 1);
++  assert.equal(await store.load(), null);
++});
++
++test('a retry that finds no credential clears the preceding storage error', async () => {
++  assets.clear();
++  assetQueryError = { code: 24000001 };
++  assetAddError = assetRemoveError = null;
++  const app = freshAppClient();
++  await app.restoreSession();
++  assert.equal(app.sessionManager.getCredentialError().operation, CredentialOperation.LOAD);
++  assetQueryError = null;
++  const before = calls.length;
++  await app.restoreSession();
++  assert.equal(app.sessionManager.getStatus(), AuthStatus.GUEST);
++  assert.equal(app.sessionManager.getCredentialError(), null);
++  assert.equal(calls.length, before);
++});
+\ No newline at end of file

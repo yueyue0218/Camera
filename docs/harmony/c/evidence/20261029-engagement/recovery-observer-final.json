@@ -1,0 +1,320 @@
+{
+  "origin": "http://127.0.0.1:18090",
+  "database": "portra_c_engagement_recovery_20261029",
+  "businessWritesByObserver": false,
+  "reports": [
+    {
+      "reportId": 1,
+      "reporterId": 1,
+      "targetType": "REVIEW",
+      "targetId": 3,
+      "reason": "其他违规行为",
+      "description": "C native report 20261029: local simulator test review, verify before retry.",
+      "status": "PENDING",
+      "adminId": null,
+      "resolution": null,
+      "adminComment": null,
+      "createdAt": "2026-10-29T14:43:38.764104",
+      "resolvedAt": null
+    }
+  ],
+  "reviews": [
+    {
+      "reviewId": 4,
+      "orderId": 2,
+      "reviewerId": 1,
+      "reviewerNickname": "C本地双身份验收用户",
+      "targetUserId": 2,
+      "targetUserNickname": "新用户",
+      "direction": "PROVIDER_TO_CUSTOMER",
+      "rating": 5,
+      "content": "C recovery peer notification preparation only.",
+      "isVisible": true,
+      "createdAt": "2026-10-29T14:32:33.158852",
+      "replyContent": null,
+      "replyTime": null,
+      "complaintStatus": "PENDING"
+    },
+    {
+      "reviewId": 3,
+      "orderId": 2,
+      "reviewerId": 2,
+      "reviewerNickname": "新用户",
+      "targetUserId": 1,
+      "targetUserNickname": "C本地双身份验收用户",
+      "direction": "CUSTOMER_TO_PROVIDER",
+      "rating": 5,
+      "content": "C手机弹窗验收：本次合作记录，仅供本机隔离测试。",
+      "isVisible": true,
+      "createdAt": "2026-10-29T14:32:17.594374",
+      "replyContent": "C local peer followup for precise native notification.",
+      "replyTime": "2026-10-29T14:32:33.183916",
+      "complaintStatus": null
+    }
+  ],
+  "complaints": [
+    {
+      "complaintId": 2,
+      "reviewId": 4,
+      "orderId": 2,
+      "complainantId": 2,
+      "complainantNickname": "新用户",
+      "respondentId": 1,
+      "respondentNickname": "C本地双身份验收用户",
+      "reason": "C isolated peer complaint for native exact routing.",
+      "evidenceFileIds": null,
+      "status": "PENDING",
+      "arbitrationResult": null,
+      "arbitrationComment": null,
+      "handledBy": null,
+      "handledByNickname": null,
+      "createdAt": "2026-10-29T14:34:21.539688",
+      "updatedAt": "2026-10-29T14:34:21.539688",
+      "handledAt": null
+    }
+  ],
+  "disputes": [
+    {
+      "id": 1,
+      "orderId": 4,
+      "initiatorId": 2,
+      "reason": "C mobile local test: customer asks provider to reply.",
+      "status": "REPLIED",
+      "resolution": null,
+      "responsibility": null,
+      "refundAmount": null,
+      "adminId": null,
+      "adminComment": null,
+      "createdAt": "2026-10-29T14:32:17.628468",
+      "updatedAt": "2026-10-29T14:33:26.356258",
+      "resolvedAt": null,
+      "replies": [
+        {
+          "id": 1,
+          "disputeId": 1,
+          "replierId": 1,
+          "content": "C native recovery reply 20261029: local other-party statement.",
+          "createdAt": "2026-10-29T14:33:26.351254"
+        }
+      ]
+    }
+  ],
+  "notifications": [
+    {
+      "notificationId": 48,
+      "type": "REVIEW_COMPLAINT_CREATED",
+      "relatedType": "REVIEW_COMPLAINT",
+      "relatedId": 2,
+      "metadataJson": "{\"orderId\":2,\"reviewId\":4,\"complaintId\":2,\"navigationPath\":\"/orders?orderId=2&section=reviews\"}",
+      "isRead": true
+    },
+    {
+      "notificationId": 47,
+      "type": "REVIEW_COMPLAINT_CREATED",
+      "relatedType": "REVIEW_COMPLAINT",
+      "relatedId": 1,
+      "metadataJson": "{\"orderId\":1,\"reviewId\":2,\"complaintId\":1,\"navigationPath\":\"/orders?orderId=1&section=reviews\"}",
+      "isRead": false
+    },
+    {
+      "notificationId": 45,
+      "type": "REVIEW_FOLLOW_UP_RECEIVED",
+      "relatedType": "REVIEW",
+      "relatedId": 3,
+      "metadataJson": "{\"orderId\":2,\"reviewId\":3,\"navigationPath\":\"/orders?orderId=2&section=reviews\"}",
+      "isRead": true
+    },
+    {
+      "notificationId": 43,
+      "type": "DISPUTE_CREATED",
+      "relatedType": "DISPUTE",
+      "relatedId": 1,
+      "metadataJson": "{\"orderId\":4}",
+      "isRead": false
+    },
+    {
+      "notificationId": 42,
+      "type": "REVIEW_RECEIVED",
+      "relatedType": "REVIEW",
+      "relatedId": 3,
+      "metadataJson": "{\"orderId\":2,\"reviewId\":3,\"navigationPath\":\"/orders?orderId=2&section=reviews\"}",
+      "isRead": false
+    },
+    {
+      "notificationId": 40,
+      "type": "REVIEW_RECEIVED",
+      "relatedType": "REVIEW",
+      "relatedId": 1,
+      "metadataJson": "{\"orderId\":1,\"reviewId\":1,\"navigationPath\":\"/orders?orderId=1&section=reviews\"}",
+      "isRead": false
+    },
+    {
+      "notificationId": 38,
+      "type": "ORDER_PAID",
+      "relatedType": "ORDER",
+      "relatedId": 6,
+      "metadataJson": null,
+      "isRead": false
+    },
+    {
+      "notificationId": 37,
+      "type": "MESSAGE_RECEIVED",
+      "relatedType": "CONVERSATION",
+      "relatedId": 6,
+      "metadataJson": "{\"conversationId\":6,\"messageId\":6,\"actorNickname\":\"新用户\",\"navigationPath\":\"/messages/6\"}",
+      "isRead": false
+    },
+    {
+      "notificationId": 35,
+      "type": "ORDER_COMPLETED",
+      "relatedType": "ORDER",
+      "relatedId": 5,
+      "metadataJson": null,
+      "isRead": false
+    },
+    {
+      "notificationId": 33,
+      "type": "ORDER_PENDING_DELIVERY",
+      "relatedType": "ORDER",
+      "relatedId": 5,
+      "metadataJson": null,
+      "isRead": false
+    },
+    {
+      "notificationId": 31,
+      "type": "ORDER_SHOOTING_STARTED",
+      "relatedType": "ORDER",
+      "relatedId": 5,
+      "metadataJson": null,
+      "isRead": false
+    },
+    {
+      "notificationId": 28,
+      "type": "ORDER_PAID",
+      "relatedType": "ORDER",
+      "relatedId": 5,
+      "metadataJson": null,
+      "isRead": false
+    },
+    {
+      "notificationId": 27,
+      "type": "MESSAGE_RECEIVED",
+      "relatedType": "CONVERSATION",
+      "relatedId": 5,
+      "metadataJson": "{\"conversationId\":5,\"messageId\":5,\"actorNickname\":\"新用户\",\"navigationPath\":\"/messages/5\"}",
+      "isRead": false
+    },
+    {
+      "notificationId": 25,
+      "type": "ORDER_PAID",
+      "relatedType": "ORDER",
+      "relatedId": 4,
+      "metadataJson": null,
+      "isRead": false
+    },
+    {
+      "notificationId": 24,
+      "type": "MESSAGE_RECEIVED",
+      "relatedType": "CONVERSATION",
+      "relatedId": 4,
+      "metadataJson": "{\"conversationId\":4,\"messageId\":4,\"actorNickname\":\"新用户\",\"navigationPath\":\"/messages/4\"}",
+      "isRead": false
+    },
+    {
+      "notificationId": 22,
+      "type": "ORDER_PAID",
+      "relatedType": "ORDER",
+      "relatedId": 3,
+      "metadataJson": null,
+      "isRead": false
+    },
+    {
+      "notificationId": 21,
+      "type": "MESSAGE_RECEIVED",
+      "relatedType": "CONVERSATION",
+      "relatedId": 3,
+      "metadataJson": "{\"conversationId\":3,\"messageId\":3,\"actorNickname\":\"新用户\",\"navigationPath\":\"/messages/3\"}",
+      "isRead": false
+    },
+    {
+      "notificationId": 19,
+      "type": "ORDER_COMPLETED",
+      "relatedType": "ORDER",
+      "relatedId": 2,
+      "metadataJson": null,
+      "isRead": false
+    },
+    {
+      "notificationId": 17,
+      "type": "ORDER_PENDING_DELIVERY",
+      "relatedType": "ORDER",
+      "relatedId": 2,
+      "metadataJson": null,
+      "isRead": false
+    },
+    {
+      "notificationId": 15,
+      "type": "ORDER_SHOOTING_STARTED",
+      "relatedType": "ORDER",
+      "relatedId": 2,
+      "metadataJson": null,
+      "isRead": false
+    },
+    {
+      "notificationId": 12,
+      "type": "ORDER_PAID",
+      "relatedType": "ORDER",
+      "relatedId": 2,
+      "metadataJson": null,
+      "isRead": false
+    },
+    {
+      "notificationId": 11,
+      "type": "MESSAGE_RECEIVED",
+      "relatedType": "CONVERSATION",
+      "relatedId": 2,
+      "metadataJson": "{\"conversationId\":2,\"messageId\":2,\"actorNickname\":\"新用户\",\"navigationPath\":\"/messages/2\"}",
+      "isRead": false
+    },
+    {
+      "notificationId": 9,
+      "type": "ORDER_COMPLETED",
+      "relatedType": "ORDER",
+      "relatedId": 1,
+      "metadataJson": null,
+      "isRead": false
+    },
+    {
+      "notificationId": 7,
+      "type": "ORDER_PENDING_DELIVERY",
+      "relatedType": "ORDER",
+      "relatedId": 1,
+      "metadataJson": null,
+      "isRead": false
+    },
+    {
+      "notificationId": 5,
+      "type": "ORDER_SHOOTING_STARTED",
+      "relatedType": "ORDER",
+      "relatedId": 1,
+      "metadataJson": null,
+      "isRead": false
+    },
+    {
+      "notificationId": 2,
+      "type": "ORDER_PAID",
+      "relatedType": "ORDER",
+      "relatedId": 1,
+      "metadataJson": null,
+      "isRead": false
+    },
+    {
+      "notificationId": 1,
+      "type": "MESSAGE_RECEIVED",
+      "relatedType": "CONVERSATION",
+      "relatedId": 1,
+      "metadataJson": "{\"conversationId\":1,\"messageId\":1,\"actorNickname\":\"新用户\",\"navigationPath\":\"/messages/1\"}",
+      "isRead": false
+    }
+  ]
+}

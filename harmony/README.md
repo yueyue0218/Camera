@@ -32,12 +32,29 @@ AGC 已注册 Portra HarmonyOS 应用，正式 bundleName 为 `com.portra.app`�
 
 ## 环境和接口状态
 
-工程提供 `dev`、`staging`、`production` 三个 Build Product，运行时环境来自生成的 `BuildProfile`，不再固定返回 DEV。地址必须在构建前通过进程环境变量 `PORTRA_BASE_URL` 提供；未提供时网络保持禁用，不会回退到某个开发者的个人 IP。
+工程提供 `dev`、`staging`、`production` 三个 Build Product，`default` 是 `dev` 的别名。`hvigorfile.ts` 根据当前 Product 同时注入 `PORTRA_ENVIRONMENT` 和 `PORTRA_BASE_URL`，再由生成的 `entry/BuildProfile` → `BuildEnvironment` → `EnvironmentConfig.current()/isUsable()` → `HttpClient` 读取。地址优先级为：非空进程变量 `PORTRA_BASE_URL` → 本地文件所选环境的非空地址 → 所选 Product 的 Build Profile 字段。插件不会再用缺失的变量覆盖已有字段。
+
+### DevEco Studio 普通 Run/Debug（推荐本地文件）
+
+1. 用 **File → Open** 打开仓库下的 **harmony 文件夹**，不要打开仓库根目录或仅打开 `entry`。目标 SDK 为 26.0.0。
+2. 在工程根目录复制 `portra-environments.example.json` 为 `portra-environments.local.json`（如已有则直接编辑，不要覆盖）。填写所选环境的 origin；这是标准 JSON，不支持注释。文件已加入 `.gitignore`，不得提交；只保存地址，不保存 Token、密码或签名材料。
+3. 在 **View → Tool Windows → Build Variants** 的 Product 选择器选择 `dev`、`staging` 或 `production`，核对 entry Target 同名；`default` 对应 dev。Build Mode 选 `debug`。不同 IDE 版本如移动了面板，可用 **Find Action** 搜索 `Build Variants`。Product 决定环境，Run/Debug 的启动参数不决定环境。
+4. 修改配置后执行工程 Sync，再由你手动 Run/Debug 到支持真实网络的模拟器或真机。进程环境变量有更高优先级，如提示 override target 不匹配，清除旧变量或同时更新环境名称。Hvigor daemon 可能保留旧进程变量；切换进程变量后需停止旧 daemon 并重启 IDE。本地文件在插件配置时读取，不依赖另一个终端的变量。
+5. 手动检查 `entry/build` 中**本次所选 Product/Target 的生成 BuildProfile**（搜索 `PORTRA_ENVIRONMENT`、`PORTRA_BASE_URL`，不要编辑生成文件）。在 `HttpClient.request()` 的 `request.request(...)` 前设断点，查看 `profile.name`、`profile.baseUrl`、`path`，确认合成地址是 origin + 原有路径。不要输出认证头或 Token。成功收取真实响应后才能判定连接成功；配置正确仍可能受设备网络、TLS 或服务端能力影响。
+
+本次 P0-01 新建的本地文件只填写了 staging；dev、production 均为空。来源是本 README 的既有临时 staging 记录、`../infra/staging/nginx/portra-ssl.conf` 和 `../docs/deploy/C_DEPLOY_01_STAGING_CLOSURE.md`。该 HTTPS IP 是仓库明确标记的 API 入口，不是从 SSH 或数据库配置推断的；本次没有访问该地址。正式 production 域名尚未确认，`portra.example.com` 和旧 API 规范中的示例域名不可当作已部署地址。
+
+dev 请填设备可达的开发后端 origin，允许 HTTP；不能默认填生产地址。staging 请填团队确认的测试 HTTPS origin。production 必须单独填写经确认的正式 HTTPS origin，不会继承 staging 或 dev。三种环境共用一条网络配置链，凭据仍按环境名称隔离。
+
+### 进程变量覆盖（可选）
+
+沿用 `PORTRA_BASE_URL`，同时要求 `PORTRA_ENVIRONMENT` 与所选 Product 一致，防止残留变量在切换 Product 时跨环境覆盖。`PORTRA_ENVIRONMENT` 只是覆盖确认值，不能代替选择 Product。普通 IDE Run/Debug 使用上述本地文件即可，无需配置环境变量输入框；在另一个终端设置变量不会影响已经启动的 IDE。需要变量方式启动 IDE 时，入口为 **Windows 设置 → 系统 → 系统信息/关于 → 高级系统设置 → 环境变量 → 用户变量 → 新建**，添加这两个变量，完全退出并重新启动 DevEco Studio；同时确保旧 Hvigor daemon 已停止。避免把临时覆盖长期保存在用户变量中。
 
 开发设备与电脑处于同一局域网时，先用 `ipconfig` 找到电脑可达的 IPv4 地址，再执行：
 
 ```powershell
 $env:PORTRA_BASE_URL = 'http://<电脑局域网IPv4>:8080'
+$env:PORTRA_ENVIRONMENT = 'dev'
 & "<DevEcoStudio>/tools/hvigor/bin/hvigorw.bat" assembleHap --no-daemon `
   -p product=dev
 ```
@@ -46,7 +63,13 @@ $env:PORTRA_BASE_URL = 'http://<电脑局域网IPv4>:8080'
 
 系统网络策略也按 Product 对应的模块 Target 隔离：`default/dev` 构建才包含允许开发 HTTP 的配置，`staging/production` 构建均显式禁止明文流量；应用层的 `EnvironmentConfig` 还会再次拒绝非 DEV 环境的 HTTP 地址。该配置不关闭或绕过 HTTPS 证书校验。DevEco Studio 中也必须选择与目标一致的 Product。
 
-团队当前临时 Staging 地址为 `https://47.76.106.57`。需要设备联调时，可在当前终端设置 `$env:PORTRA_BASE_URL = 'https://47.76.106.57'`，再以 `-p product=staging` 构建；这只是构建配置示例，不代表该地址已在鸿蒙设备上验证。正式 Production 地址尚未确认，也不要把临时 Staging IP 固化进源码。
+团队当前临时 Staging 地址为 `https://47.76.106.57`。需要设备联调时，选择 staging 并使用本地文件，或在当前终端同时设置 `$env:PORTRA_ENVIRONMENT = 'staging'`、`$env:PORTRA_BASE_URL = 'https://47.76.106.57'`，再以 `-p product=staging` 构建；这只是构建配置，不代表本次已在鸿蒙设备上验证。正式 Production 地址尚未确认，不要把临时 Staging IP 固化进共享配置或 HttpClient。
+
+### Previewer 和应用尝鲜 Release
+
+Previewer 用于布局与视觉预览，不能用来证明真实网络可用。打开 `entry/src/main/ets/preview/HallPreviewEntry.ets`，点击编辑器 Preview 面板，选择 Portra Hall/Demands 的预览组件；演示数据仍只在 `src/ohosTest/ets/preview/HallPreview.ets`，入口未注册到正式 `main_pages.json`。不需要 API 地址。不要用真实 `HallPage` 的网络报错判断预览能力，也不要给正式运行路径加 Mock 回退。
+
+Debug 未填地址时会打印明确的配置警告，运行时继续由 `EnvironmentConfig.isUsable()` 禁止请求；无法在缺少开发服务器地址时安全猜测默认值。Release 则在配置阶段拒绝 `default/dev` 以及空地址，staging/production 仍强制 HTTPS。应用尝鲜分发前必须人工选择获准分发的 staging 或 production 服务并配置地址、核对生成字段与设备请求；临时 staging 不自动等于获准分发环境。本次不执行构建、设备验收、签名或上传。该门槛仅检查配置，不能证明 TLS、短信或业务可用。
 
 当前已核对的公开接口是：
 

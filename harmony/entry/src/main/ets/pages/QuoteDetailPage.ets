@@ -5,6 +5,7 @@ import { PortraPageHeading } from '../common/components/PortraPageHeading';
 import { QuoteDetailContent } from '../features/conversation/QuoteDetailContent';
 import { ConversationListModel } from '../features/conversation/ConversationListModel';
 import { QuoteWorkflow } from '../features/conversation/QuoteWorkflow';
+import { ContentChanges } from '../features/user/ContentChanges';
 import { OrderSummary, QuoteSummary } from '../model/ApiModels';
 import { PortraError } from '../network/ErrorMapper';
 import { PortraTheme } from '../theme/PortraTheme';
@@ -30,6 +31,8 @@ export struct QuoteDetailPage {
   onEdit?: () => void;
   onConfirmed?: () => void;
   onOpenOrder?: (orderId: number) => void;
+  onOpenSelf?: () => void;
+  onOpenProvider?: (userId: number) => void;
 
   aboutToAppear(): void {
     this.active = true;
@@ -81,6 +84,7 @@ export struct QuoteDetailPage {
       if (!this.active || version !== this.requestVersion) return;
       if (result.orderId > 0) {
         this.orderId = result.orderId;
+        ContentChanges.publish('orders');
         this.onConfirmed?.();
       } else {
         await this.load();
@@ -118,9 +122,13 @@ export struct QuoteDetailPage {
         PortraErrorView({ message: this.errorMessage || '报价暂时无法查看', onRetry: () => this.load() })
       } else {
         Scroll() {
-          QuoteDetailContent({ quote: this.quote!, providerName: this.providerName })
+          QuoteDetailContent({ quote: this.quote!, providerName: this.providerName,
+            onOpenProvider: () => {
+              if (this.quote!.providerUserId === this.userId) this.onOpenSelf?.();
+              else this.onOpenProvider?.(this.quote!.providerUserId);
+            } })
             .padding({ left: 20, right: 20, top: 20, bottom: 30 })
-        }.layoutWeight(1).scrollBar(BarState.Off)
+        }.align(Alignment.TopStart).layoutWeight(1).scrollBar(BarState.Off)
         if (this.errorMessage) Text(this.errorMessage).fontColor(PortraTheme.danger).fontSize(12)
           .padding({ left: 20, right: 20 })
         if (this.showReject) {
@@ -150,6 +158,6 @@ export struct QuoteDetailPage {
           Button('查看订单').height(48).margin(20).onClick(() => this.onOpenOrder?.(this.orderId))
         }
       }
-    }.width('100%').height('100%').backgroundColor(PortraTheme.pageBackground)
+    }.width('100%').height('100%').backgroundColor(PortraTheme.workflowBackground)
   }
 }

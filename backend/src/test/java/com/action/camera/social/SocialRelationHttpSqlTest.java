@@ -33,6 +33,9 @@ class SocialRelationHttpSqlTest {
 
     private static final long VIEWER_ID = 981000L;
     private static final long TARGET_ID = 981001L;
+    // The privacy interceptor adds one account-consent lookup to the existing
+    // eight-statement social/authentication budget, independent of card count.
+    private static final int MAX_STATEMENTS_WITH_CONSENT = 9;
 
     @Autowired
     private MockMvc mockMvc;
@@ -74,14 +77,14 @@ class SocialRelationHttpSqlTest {
     }
 
     @Test
-    void twelveUserSocialHttpRequestsStayWithinEightStatementsIncludingAuthentication() throws Exception {
+    void twelveUserSocialHttpRequestsStayWithinNineStatementsIncludingAuthenticationAndConsent() throws Exception {
         long followersSql = measure("/users/" + TARGET_ID + "/followers", "PROVIDER");
         long followingCustomersSql = measure("/users/" + VIEWER_ID + "/following", "CUSTOMER");
         long followingProvidersSql = measure("/users/" + VIEWER_ID + "/following", "PROVIDER");
 
-        assertThat(followersSql).as("followers SQL including authentication").isLessThanOrEqualTo(8);
-        assertThat(followingCustomersSql).as("customer following SQL including authentication").isLessThanOrEqualTo(8);
-        assertThat(followingProvidersSql).as("provider following SQL including authentication").isLessThanOrEqualTo(8);
+        assertThat(followersSql).as("followers SQL including authentication and consent").isLessThanOrEqualTo(MAX_STATEMENTS_WITH_CONSENT);
+        assertThat(followingCustomersSql).as("customer following SQL including authentication and consent").isLessThanOrEqualTo(MAX_STATEMENTS_WITH_CONSENT);
+        assertThat(followingProvidersSql).as("provider following SQL including authentication and consent").isLessThanOrEqualTo(MAX_STATEMENTS_WITH_CONSENT);
         System.out.printf(
                 "PROFILE_SOCIAL_AFTER cards=12 followersSql=%d followingCustomerSql=%d followingProviderSql=%d%n",
                 followersSql, followingCustomersSql, followingProvidersSql);

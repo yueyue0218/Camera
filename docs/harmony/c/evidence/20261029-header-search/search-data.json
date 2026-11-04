@@ -1,0 +1,20 @@
+{
+  "origin": "http://127.0.0.1:18090",
+  "database": "portra_c_engagement_recovery_20261029",
+  "normalUserId": 3,
+  "administratorCreated": false,
+  "normalDemandPost": true,
+  "query": "20261029",
+  "serviceIds": [
+    6,
+    5,
+    4,
+    3,
+    2,
+    1
+  ],
+  "demandId": 1,
+  "demandDescription": "CSearch20261029 普通用户正常发布，仅用于鸿蒙搜索与详情跳转测试。",
+  "emptyQuery": "CNoMatch20261029_9f0d",
+  "emptyTotal": 0
+}

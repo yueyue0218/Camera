@@ -1,0 +1,9 @@
+{
+  "url": "https://47.76.106.57/auth/sms/send",
+  "httpStatus": 200,
+  "code": 200,
+  "message": "success",
+  "recipient": "***3685",
+  "attempts": 1,
+  "time": "2026-10-30T15:59:07.5168076+08:00"
+}

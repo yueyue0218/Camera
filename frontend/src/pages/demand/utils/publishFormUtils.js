@@ -1,3 +1,4 @@
+import { provinceCode, requireProvinceCode } from '../../../common/region/ProvinceCatalog.js'
 import {
   DEFAULT_BUDGET_MAX_YUAN,
   DEFAULT_BUDGET_MIN_YUAN,
@@ -38,6 +39,7 @@ export function createDefaultDemandForm() {
 
 export function validateDemandForm(form) {
   const errors = []
+  if (!provinceCode(form.cityCode)) errors.push('请选择有效的省级地区')
   const min = yuanToValidCent(form.budgetMinYuan)
   const max = yuanToValidCent(form.budgetMaxYuan)
   if (form.budgetMinYuan !== '' && min === null) errors.push('budgetMinYuan must be a valid number')
@@ -65,7 +67,7 @@ export function buildDemandPayload(form) {
   ].filter(Boolean))
   return {
     scene: form.scene,
-    cityCode: form.cityCode,
+    cityCode: requireProvinceCode(form.cityCode),
     location: form.location,
     expectedDate: form.expectedDate || null,
     timeSlot: form.timeSlot,
@@ -86,7 +88,7 @@ export function demandDetailToForm(demand = {}) {
   return {
     title: demand.title || demand.scene || descriptionLines[0] || '想拍一组毕业照',
     scene: demand.scene || DEFAULT_TYPE,
-    cityCode: demand.cityCode || DEFAULT_CITY_CODE,
+    cityCode: provinceCode(demand.cityCode),
     location: demand.location || '',
     expectedDate: demand.expectedDate || '',
     timeSlot: demand.timeSlot || '',

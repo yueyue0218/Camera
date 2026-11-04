@@ -1,11 +1,13 @@
 package com.action.camera.social.config;
 
+import com.action.camera.common.config.RuntimeSchemaInitializationCondition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.context.annotation.Conditional;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -16,6 +18,7 @@ import java.sql.Connection;
  * which rejects compressed base64 uploads from the frontend.
  */
 @Component
+@Conditional(RuntimeSchemaInitializationCondition.class)
 public class MomentSchemaInitializer implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(MomentSchemaInitializer.class);

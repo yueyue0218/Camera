@@ -1,9 +1,18 @@
-import { MessageSummary, OrderSummary, QuoteSummary } from '../../model/ApiModels';
+import { DeliverySummary, MessageSummary, OrderStatusLogSummary, OrderSummary, QuoteSummary } from '../../model/ApiModels';
 
 export enum TimelineKind {
   MESSAGE = 'message',
   QUOTE = 'quote',
-  ORDER = 'order'
+  ORDER = 'order',
+  FULFILLMENT = 'fulfillment'
+}
+
+export interface FulfillmentEvent {
+  readonly orderId: number;
+  readonly title: string;
+  readonly detail: string;
+  readonly openGallery: boolean;
+  readonly photoIds?: number[];
 }
 
 export interface ConversationTimelineItem {
@@ -14,11 +23,14 @@ export interface ConversationTimelineItem {
   readonly message?: MessageSummary;
   readonly quote?: QuoteSummary;
   readonly order?: OrderSummary;
+  readonly event?: FulfillmentEvent;
+  readonly timeLabel?: string;
 }
 
 /** One stable chronological stream; no synthetic backend events. */
 export class ConversationTimeline {
-  static build(messages: MessageSummary[], quotes: QuoteSummary[], orders: OrderSummary[] = []): ConversationTimelineItem[] {
+  static build(messages: MessageSummary[], quotes: QuoteSummary[], orders: OrderSummary[] = [],
+    logs: OrderStatusLogSummary[] = [], deliveries: DeliverySummary[] = []): ConversationTimelineItem[] {
     const items: ConversationTimelineItem[] = [];
     const knownQuotes = new Set<number>();
     quotes.forEach((quote: QuoteSummary) => {
@@ -38,6 +50,35 @@ export class ConversationTimeline {
           createdAt: order.createdAt ?? '', senderId: order.providerUserId ?? 0, order: order });
       }
     });
+    const knownDeliveries = new Set<number>();
+    deliveries.forEach((batch: DeliverySummary) => {
+      const order = orders.find((item: OrderSummary) => item.orderId === batch.orderId);
+      if (order === undefined || !Number.isSafeInteger(batch.deliveryId) || batch.deliveryId <= 0 ||
+        knownDeliveries.has(batch.deliveryId)) return;
+      knownDeliveries.add(batch.deliveryId);
+      const imageCount = (batch.files ?? []).filter(file => file.fileType === 'IMAGE').length;
+      items.push({ key: `delivery:${batch.deliveryId}`, kind: TimelineKind.FULFILLMENT,
+        createdAt: batch.uploadTime ?? '', senderId: order.providerUserId ?? 0,
+        event: { orderId: order.orderId, title: batch.deliveryRound > 1 ? '返修作品已上传' : '作品已上传',
+          detail: `${imageCount} 张照片`, openGallery: true,
+          photoIds: (batch.files ?? []).filter(file => file.fileType === 'IMAGE')
+            .slice(0, 3).map(file => file.fileId) } });
+    });
+    const knownLogs = new Set<number>();
+    logs.forEach((log: OrderStatusLogSummary) => {
+      const order = orders.find((item: OrderSummary) => item.orderId === log.orderId);
+      if (order === undefined || !Number.isSafeInteger(log.logId) || log.logId! <= 0 ||
+        knownLogs.has(log.logId!)) return;
+      knownLogs.add(log.logId!);
+      const title = log.toStatus === 'REWORK_REQUIRED' ? '客户申请返修' :
+        log.toStatus === 'COMPLETED' ? '约拍已完成' :
+        log.toStatus === 'CANCELLED' || log.toStatus === 'REFUNDED' ? '约拍已取消' : '';
+      if (!title) return;
+      items.push({ key: `status:${log.logId}`, kind: TimelineKind.FULFILLMENT,
+        createdAt: log.createdAt ?? '', senderId: log.operatorId ?? 0,
+        event: { orderId: order.orderId, title: title, detail: '',
+          openGallery: log.toStatus === 'REWORK_REQUIRED' } });
+    });
     const knownMessages = new Set<string>();
     messages.forEach((message: MessageSummary) => {
       if (message === null || message.messageId === undefined || message.messageId === null) return;
@@ -51,13 +92,34 @@ export class ConversationTimeline {
       items.push({ key: key, kind: TimelineKind.MESSAGE,
         createdAt: message.createdAt ?? '', senderId: message.senderId, message: message });
     });
-    return items.sort((left: ConversationTimelineItem, right: ConversationTimelineItem) => {
+    const ordered = items.sort((left: ConversationTimelineItem, right: ConversationTimelineItem) => {
       const a = Date.parse(left.createdAt);
       const b = Date.parse(right.createdAt);
       if (Number.isNaN(a) && Number.isNaN(b)) return left.key.localeCompare(right.key);
       if (Number.isNaN(a)) return 1;
       if (Number.isNaN(b)) return -1;
-      return a - b || left.key.localeCompare(right.key);
+      if (a !== b) return a - b;
+      if (left.message !== undefined && right.message !== undefined) {
+        const leftId = left.message.messageId;
+        const rightId = right.message.messageId;
+        if (leftId > 0 && rightId < 0) return -1;
+        if (leftId < 0 && rightId > 0) return 1;
+        return leftId > 0 ? leftId - rightId : rightId - leftId;
+      }
+      return left.key.localeCompare(right.key);
+    });
+    let previousTime = 0;
+    let previousDay = '';
+    return ordered.map((item: ConversationTimelineItem) => {
+      const time = Date.parse(item.createdAt);
+      if (Number.isNaN(time)) return item;
+      const day = item.createdAt.slice(0, 10);
+      const show = previousTime === 0 || day !== previousDay || time - previousTime >= 5 * 60 * 1000;
+      previousTime = time;
+      previousDay = day;
+      return show ? { key: item.key, kind: item.kind, createdAt: item.createdAt,
+        senderId: item.senderId, message: item.message, quote: item.quote, order: item.order,
+        event: item.event, timeLabel: `${item.createdAt.slice(5, 10)} ${item.createdAt.slice(11, 16)}` } : item;
     });
   }
 }

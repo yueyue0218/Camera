@@ -1,0 +1,12 @@
+{
+  "origin": "http://127.0.0.1:18090",
+  "database": "portra_c_engagement_recovery_20261029",
+  "actorId": 1,
+  "peerId": 2,
+  "ownedMomentId": 4,
+  "peerMomentId": 2,
+  "detailImages": 5,
+  "foreignPutAndDeleteForbidden": true,
+  "adminCreated": false,
+  "previousOwnedMomentId": 3
+}

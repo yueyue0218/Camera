@@ -3,6 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../AuthContext.jsx'
 import { AppRoutes, LoginRoutes } from '../routes.jsx'
 import { Navbar } from './Navbar.jsx'
+import PrivacyGate from '../privacy/PrivacyGate.jsx'
 
 export default function AppShell() {
   const location = useLocation()
@@ -61,6 +62,7 @@ export default function AppShell() {
   const isFixedWorkflow = /^\/messages\/[^/]+/.test(location.pathname)
 
   return (
+    <PrivacyGate key={currentUser.token} currentUser={currentUser} logout={logout}>
     <div className="portra-app">
       <Navbar
         activePath={activePath}
@@ -73,5 +75,6 @@ export default function AppShell() {
         <AppRoutes />
       </div>
     </div>
+    </PrivacyGate>
   )
 }

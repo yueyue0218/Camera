@@ -1,0 +1,40 @@
+[Unit]
+Description=Portra isolated 8081 integration backend
+After=network.target
+
+[Service]
+Type=simple
+User=portra-integration
+Group=portra-integration
+WorkingDirectory=/opt/portra-integration/releases/@COMMIT@
+EnvironmentFile=/etc/portra-integration/app.env
+ExecStartPre=/usr/bin/bash /opt/portra-integration/releases/@COMMIT@/start-gate.sh
+ExecStart=/usr/bin/java -Xms128m -Xmx384m -XX:MaxMetaspaceSize=192m -XX:MaxDirectMemorySize=64m -XX:ReservedCodeCacheSize=64m -Xss512k -XX:ActiveProcessorCount=2 -XX:+ExitOnOutOfMemoryError -Duser.timezone=Asia/Shanghai -jar application.jar --spring.profiles.active=staging,integration --spring.config.additional-location=file:/opt/portra-integration/releases/@COMMIT@/application-8081.properties --server.address=127.0.0.1 --server.port=8081 --spring.jpa.hibernate.ddl-auto=validate --spring.sql.init.mode=never --camera.integration.runtime-ddl-enabled=false --spring.datasource.username=portra_int_app --file.storage.local-path=/opt/portra-integration/uploads --camera.order.adapter=local
+Restart=no
+TimeoutStartSec=120
+TimeoutStopSec=45
+KillSignal=SIGTERM
+MemoryAccounting=yes
+MemoryHigh=768M
+MemoryMax=896M
+MemorySwapMax=0
+TasksMax=128
+LimitNOFILE=4096
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/portra-integration/uploads
+InaccessiblePaths=-/opt/portra -/var/www -/etc/portra-integration/migrator.cnf
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=portra-integration
+
+# No Install section: no automatic boot enablement.

@@ -2,6 +2,14 @@ import { AppClient } from '../app/AppClient';
 import { PhoneLoginPolicy } from '../auth/PhoneLoginPolicy';
 import { PortraButton } from '../common/components/PortraButton';
 import { PortraError } from '../network/ErrorMapper';
+import {
+  LegalDocumentKind,
+  LegalSection,
+  PRIVACY_POLICY_SECTIONS,
+  PRIVACY_POLICY_TITLE,
+  USER_AGREEMENT_SECTIONS,
+  USER_AGREEMENT_TITLE
+} from '../privacy/LegalDocumentContent';
 import { PortraTheme } from '../theme/PortraTheme';
 
 @Component
@@ -9,11 +17,15 @@ export struct LoginPage {
   @Prop contextText: string = '';
   @State private phone: string = '';
   @State private code: string = '';
+  @State private challengeId: string = '';
+  private challengePhone: string = '';
   @State private sendingCode: boolean = false;
   @State private signingIn: boolean = false;
   @State private cooldownSeconds: number = 0;
   @State private errorMessage: string = '';
   @State private notice: string = '';
+  @State private agreementsAccepted: boolean = false;
+  @State private activeDocument: LegalDocumentKind = LegalDocumentKind.NONE;
   private readonly appClient: AppClient = AppClient.shared;
   private requestVersion: number = 0;
   private cooldownTimer: number = -1;
@@ -22,6 +34,8 @@ export struct LoginPage {
 
   aboutToAppear(): void {
     this.requestVersion++;
+    this.sendingCode = false;
+    this.signingIn = false;
   }
 
   aboutToDisappear(): void {
@@ -54,6 +68,9 @@ export struct LoginPage {
     if (this.sendingCode || this.signingIn || this.cooldownSeconds > 0) {
       return;
     }
+    if (!this.ensureAgreementsAccepted()) {
+      return;
+    }
     const normalizedPhone = PhoneLoginPolicy.normalizePhone(this.phone);
     if (normalizedPhone === undefined) {
       this.errorMessage = '请输入正确的手机号';
@@ -65,18 +82,24 @@ export struct LoginPage {
       return;
     }
     const version = this.requestVersion;
+    const sessionVersion = this.appClient.sessionManager.getSessionVersion();
     this.errorMessage = '';
     this.notice = '';
     this.sendingCode = true;
     try {
-      await this.appClient.apiService.sendLoginCode(normalizedPhone, deviceId);
-      if (version !== this.requestVersion) {
+      this.challengeId = '';
+      const challenge = await this.appClient.apiService.sendLoginCode(normalizedPhone, deviceId);
+      if (version !== this.requestVersion ||
+        sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
         return;
       }
+      this.challengeId = challenge.challengeId;
+      this.challengePhone = normalizedPhone;
       this.notice = '验证码已发送';
       this.startCooldown();
     } catch (error) {
-      if (version === this.requestVersion) {
+      if (version === this.requestVersion &&
+        sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
         const mapped = error as PortraError;
         this.errorMessage = mapped.businessCode === 50001 ? '验证码暂时无法发送，请稍后重试' :
           (mapped.message || '发送失败，请稍后重试');
@@ -92,9 +115,16 @@ export struct LoginPage {
     if (this.sendingCode || this.signingIn) {
       return;
     }
+    if (!this.ensureAgreementsAccepted()) {
+      return;
+    }
     const normalizedPhone = PhoneLoginPolicy.normalizePhone(this.phone);
     if (normalizedPhone === undefined) {
       this.errorMessage = '请输入正确的手机号';
+      return;
+    }
+    if (this.challengeId.length === 0 || this.challengePhone !== normalizedPhone) {
+      this.errorMessage = '请先获取当前手机号的验证码';
       return;
     }
     if (!PhoneLoginPolicy.validCode(this.code)) {
@@ -107,21 +137,28 @@ export struct LoginPage {
       return;
     }
     const version = this.requestVersion;
+    const sessionVersion = this.appClient.sessionManager.getSessionVersion();
     this.errorMessage = '';
     this.signingIn = true;
     try {
-      const response = await this.appClient.apiService.verifyLoginCode(normalizedPhone, this.code, deviceId);
-      if (version !== this.requestVersion) {
+      const response = await this.appClient.apiService.verifyLoginCode(normalizedPhone, this.code, deviceId, this.challengeId);
+      if (version !== this.requestVersion ||
+        sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
         return;
       }
-      const saved = await this.appClient.sessionManager.signIn(response.accessToken, response.refreshToken);
-      if (version !== this.requestVersion) {
+      const signingIn = this.appClient.sessionManager.signIn(response.accessToken, response.refreshToken);
+      const signedInVersion = this.appClient.sessionManager.getSessionVersion();
+      const saved = await signingIn;
+      if (version !== this.requestVersion ||
+        signedInVersion !== this.appClient.sessionManager.getSessionVersion()) {
         return;
       }
       if (!saved) {
         this.errorMessage = '登录信息保存失败，请重试';
         return;
       }
+      await this.appClient.synchronizePrivacyConsent();
+      if (version !== this.requestVersion || signedInVersion !== this.appClient.sessionManager.getSessionVersion()) { return; }
       this.code = '';
       this.onSuccess?.();
     } catch (error) {
@@ -137,7 +174,26 @@ export struct LoginPage {
     }
   }
 
-  build() {
+  private ensureAgreementsAccepted(): boolean {
+    if (this.agreementsAccepted) {
+      return true;
+    }
+    this.errorMessage = '请先阅读并同意《Portra 用户协议》和《Portra 隐私政策》';
+    return false;
+  }
+
+  private documentTitle(): string {
+    return this.activeDocument === LegalDocumentKind.USER_AGREEMENT ?
+      USER_AGREEMENT_TITLE : PRIVACY_POLICY_TITLE;
+  }
+
+  private documentSections(): LegalSection[] {
+    return this.activeDocument === LegalDocumentKind.USER_AGREEMENT ?
+      USER_AGREEMENT_SECTIONS : PRIVACY_POLICY_SECTIONS;
+  }
+
+  @Builder
+  private LoginForm() {
     Scroll() {
       Column({ space: 0 }) {
         Button('‹')
@@ -200,6 +256,7 @@ export struct LoginPage {
           .padding({ left: 16, right: 16 })
           .onChange((value: string) => {
             this.phone = value;
+            this.challengeId = '';
             this.code = '';
             this.errorMessage = '';
             this.notice = '';
@@ -235,10 +292,53 @@ export struct LoginPage {
             .fontColor(PortraTheme.primary)
             .backgroundColor(PortraTheme.primarySoft)
             .borderRadius(8)
-            .enabled(!this.sendingCode && !this.signingIn && this.cooldownSeconds === 0)
+            .enabled(this.agreementsAccepted && !this.sendingCode && !this.signingIn &&
+              this.cooldownSeconds === 0)
             .onClick(() => this.sendCode())
         }
         .width('100%')
+
+        Row({ space: 10 }) {
+          Checkbox({ name: 'login-legal-agreement', group: 'login-legal-agreement' })
+            .select(this.agreementsAccepted)
+            .selectedColor(PortraTheme.primary)
+            .enabled(!this.sendingCode && !this.signingIn)
+            .onChange((selected: boolean) => {
+              this.agreementsAccepted = selected;
+              if (selected) {
+                this.errorMessage = '';
+              }
+            })
+            .accessibilityText('同意用户协议和隐私政策')
+
+          Column({ space: 5 }) {
+            Text('我已阅读并同意')
+              .width('100%')
+              .fontSize(12)
+              .fontColor(PortraTheme.secondaryText)
+
+            Row() {
+              Text('《Portra 用户协议》')
+                .fontSize(12)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(PortraTheme.primary)
+                .onClick(() => this.activeDocument = LegalDocumentKind.USER_AGREEMENT)
+              Text('和')
+                .fontSize(12)
+                .fontColor(PortraTheme.secondaryText)
+              Text('《Portra 隐私政策》')
+                .fontSize(12)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(PortraTheme.primary)
+                .onClick(() => this.activeDocument = LegalDocumentKind.PRIVACY_POLICY)
+            }
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Center)
+        .margin({ top: 18 })
 
         if (this.errorMessage.length > 0) {
           Text(this.errorMessage)
@@ -255,8 +355,8 @@ export struct LoginPage {
             .margin({ top: 14 })
         }
 
-        PortraButton({ label: '登录 / 注册', loading: this.signingIn, disabled: this.sendingCode,
-          onAction: () => this.signIn() })
+        PortraButton({ label: '登录 / 注册', loading: this.signingIn,
+          disabled: this.sendingCode || !this.agreementsAccepted, onAction: () => this.signIn() })
           .margin({ top: 28 })
         Text('未注册手机号验证成功后将自动创建账号')
           .width('100%')
@@ -272,5 +372,79 @@ export struct LoginPage {
     .width('100%')
     .height('100%')
     .backgroundColor(PortraTheme.pageBackground)
+  }
+
+  @Builder
+  private DocumentView() {
+    Column() {
+      Row({ space: 12 }) {
+        Button('‹')
+          .width(40)
+          .height(40)
+          .fontSize(27)
+          .fontColor(PortraTheme.primaryText)
+          .backgroundColor(Color.Transparent)
+          .accessibilityText('返回登录页面')
+          .onClick(() => this.activeDocument = LegalDocumentKind.NONE)
+
+        Text(this.documentTitle())
+          .layoutWeight(1)
+          .fontSize(18)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(PortraTheme.primaryText)
+      }
+      .width('100%')
+      .height(64)
+      .padding({ left: 12, right: 20 })
+      .backgroundColor(PortraTheme.surface)
+      .border({ width: { bottom: 1 }, color: PortraTheme.border })
+
+      Scroll() {
+        Column({ space: 22 }) {
+          ForEach(this.documentSections(), (section: LegalSection) => {
+            Column({ space: 8 }) {
+              Text(section.title)
+                .width('100%')
+                .fontSize(16)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(PortraTheme.primaryText)
+              Text(section.body)
+                .width('100%')
+                .fontSize(13)
+                .lineHeight(22)
+                .fontColor(PortraTheme.secondaryText)
+            }
+            .width('100%')
+            .alignItems(HorizontalAlign.Start)
+          }, (section: LegalSection) => section.title)
+
+          Button('阅读完成，返回')
+            .width('100%')
+            .height(48)
+            .fontSize(15)
+            .fontColor(PortraTheme.white)
+            .backgroundColor(PortraTheme.primary)
+            .borderRadius(PortraTheme.radius)
+            .margin({ top: 8, bottom: 32 })
+            .onClick(() => this.activeDocument = LegalDocumentKind.NONE)
+        }
+        .width('100%')
+        .padding({ left: 24, right: 24, top: 24 })
+        .alignItems(HorizontalAlign.Start)
+      }
+      .layoutWeight(1)
+      .scrollBar(BarState.Auto)
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(PortraTheme.pageBackground)
+  }
+
+  build() {
+    if (this.activeDocument === LegalDocumentKind.NONE) {
+      this.LoginForm()
+    } else {
+      this.DocumentView()
+    }
   }
 }

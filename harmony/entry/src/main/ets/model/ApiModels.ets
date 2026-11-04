@@ -1,3 +1,10 @@
+export interface CreateMomentPayload {
+  readonly title: string;
+  readonly content: string;
+  readonly imageDataList: string[];
+  readonly mentions?: string[];
+}
+
 /**
  * Minimal API models shared by the network layer and feature pages.
  * Field names follow the current Spring Boot DTOs; this is not mock data.
@@ -9,7 +16,10 @@ export interface PageResult<T> {
   readonly total: number;
 }
 
+export interface ContentModeration { readonly status: string; readonly reason?: string; }
+
 export interface DemandSummary {
+  readonly moderation?: ContentModeration;
   readonly demandId: number;
   readonly customerId?: number;
   readonly customerNickname?: string;
@@ -48,10 +58,13 @@ export interface DemandSummary {
 }
 
 export interface ServicePackageSummary {
+  readonly moderation?: ContentModeration;
   readonly serviceId: number;
   readonly providerId?: number;
   readonly photographerId?: number;
   readonly photographerNickname?: string;
+  readonly photographerAvatarFileId?: number;
+  readonly coverPortfolioId?: number;
   readonly photographerAvatarUrl?: string;
   readonly photographerAvatar?: string;
   readonly title?: string;
@@ -227,6 +240,10 @@ export interface MessageSummary {
   readonly messageType: string;
   readonly content?: string;
   readonly fileName?: string;
+  readonly fileId?: number;
+  readonly mimeType?: string;
+  readonly size?: number;
+  readonly localUri?: string;
   readonly createdAt?: string;
   readonly quotationId?: number;
   readonly orderId?: number;
@@ -236,6 +253,7 @@ export interface MessageSummary {
 export interface SendTextMessagePayload {
   readonly messageType: string;
   readonly content: string;
+  readonly fileId?: number;
 }
 
 export interface StartServiceChatPayload {
@@ -314,8 +332,76 @@ export interface PaymentResult {
 }
 
 export interface OrderStatusLogSummary {
+  readonly logId?: number;
+  readonly orderId?: number;
   readonly toStatus: string;
   readonly createdAt?: string;
+  readonly reason?: string;
+  readonly operatorId?: number;
+}
+
+export interface DeliveryFileSummary {
+  readonly fileId: number;
+  readonly fileName?: string;
+  readonly mimeType?: string;
+  readonly fileSize?: number;
+  readonly fileType?: string;
+  readonly sortOrder?: number;
+}
+
+export interface DeliverySummary {
+  readonly deliveryId: number;
+  readonly orderId: number;
+  readonly deliveryRound: number;
+  readonly isLatest?: boolean;
+  readonly originalCount?: number;
+  readonly refinedCount?: number;
+  readonly remark?: string;
+  readonly uploadTime?: string;
+  readonly files?: DeliveryFileSummary[];
+}
+
+export interface PhotoAuthorizationFileSummary {
+  readonly fileId: number;
+  readonly deliveryId?: number;
+  readonly fileName?: string;
+  readonly fileType?: string;
+  readonly mimeType?: string;
+}
+
+export interface PhotoAuthorizationSummary {
+  readonly id: number;
+  readonly orderId: number;
+  readonly customerId: number;
+  readonly providerUserId: number;
+  readonly photoUsageScope: string;
+  readonly status: string;
+  readonly remark?: string;
+  readonly authorizedAt?: string;
+  readonly files: PhotoAuthorizationFileSummary[];
+}
+
+export interface PhotoAuthorizationPayload {
+  readonly fileIds: number[];
+  readonly remark: string;
+}
+
+export interface PhotoAuthorizationDecisionPayload {
+  readonly remark: string;
+}
+
+export interface StatusTransitionResult {
+  readonly toStatus: string;
+  readonly createdAt?: string;
+}
+
+export interface ReworkPayload {
+  readonly reason: string;
+}
+
+export interface OrderTransitionPayload {
+  readonly targetStatus: string;
+  readonly reason: string;
 }
 
 export interface StartServiceChatResult {
@@ -333,7 +419,13 @@ export interface SendSmsCodeRequest {
   readonly deviceId: string;
 }
 
+export interface SmsChallengeResponse {
+  readonly challengeId: string;
+  readonly expiresAt: string;
+}
+
 export interface VerifyNativeSmsCodeRequest extends SendSmsCodeRequest {
+  readonly challengeId: string;
   readonly code: string;
   readonly deviceName: string;
 }
@@ -352,12 +444,21 @@ export interface SessionSummary {
   readonly userId: number;
   readonly nickname: string;
   readonly role: string;
-  readonly adminCapable: boolean;
-  readonly sessionId: string;
-  readonly deviceId: string;
-  readonly deviceName: string;
+  // These fields are supplied by /auth/session. When /users/me is used as
+  // a verified identity fallback, session metadata is deliberately absent.
+  readonly adminCapable?: boolean;
+  readonly sessionId?: string;
+  readonly deviceId?: string;
+  readonly deviceName?: string;
   readonly createdAt?: string;
   readonly expiresAt?: string;
+}
+
+export interface UpdateProfilePayload {
+  nickname: string; bio: string; role: string; avatarFileId?: number;
+  locationDisplay?: string;
+  locationVisible?: boolean;
+  birthdayVisible?: boolean;
 }
 
 export interface UserProfileSummary {
@@ -438,6 +539,10 @@ export interface CreateReportPayload {
 }
 
 export interface ReportSummary {
+  readonly resolution?: string;
+  readonly publicOutcome?: string;
+  readonly publicMessage?: string;
+  readonly followUpRecorded?: boolean;
   readonly reportId: number;
   readonly reporterId: number;
   readonly targetType: string;
@@ -485,4 +590,104 @@ export interface OrderSummary {
   readonly deliveryDeadline?: string;
   readonly shootLocation?: string;
   readonly escrowStatus?: string;
+}
+
+export interface AccountCancellationPayload {
+  readonly reason?: string;
+}
+
+export interface AccountCancellationSummary {
+  readonly requestId?: number;
+  readonly status: string;
+  readonly reason?: string;
+  readonly requestedAt?: string;
+  readonly updatedAt?: string;
+  readonly processedAt?: string;
+  readonly resolutionNote?: string;
+}
+
+export interface NotificationSummary {
+  readonly notificationId: number;
+  readonly recipientUserId: number;
+  readonly actorUserId?: number | null;
+  readonly title: string;
+  readonly content: string;
+  readonly type: string;
+  readonly eventType?: string;
+  readonly relatedType?: string;
+  readonly relatedId?: number | null;
+  readonly targetType?: string;
+  readonly targetId?: number | null;
+  readonly sourceType?: string;
+  readonly sourceId?: number | null;
+  readonly metadataJson?: string | null;
+  readonly navigationPath?: string | null;
+  readonly isRead: boolean;
+  readonly createdAt?: string;
+}
+export interface CreditSummary {
+  readonly userId: number;
+  readonly creditScore?: number | null;
+  readonly creditLevel?: string;
+  readonly recordCount?: number;
+  readonly lastUpdatedAt?: string | null;
+  readonly effectiveOrderCount?: number;
+  readonly completedOrderCount?: number;
+  readonly goodReviewRate?: number | null;
+  readonly defaultRate?: number | null;
+  readonly riskRecordCount?: number;
+  readonly receivedReviewCount?: number;
+  readonly averageRating?: number | null;
+}
+export interface CreditRecordSummary {
+  readonly recordId: number;
+  readonly userId: number;
+  readonly relatedOrderId?: number | null;
+  readonly eventType?: string;
+  readonly scoreChange?: number | null;
+  readonly beforeScore?: number | null;
+  readonly scoreAfter?: number | null;
+  readonly afterScore?: number | null;
+  readonly appliedScoreChange?: number | null;
+  readonly sourceType?: string | null;
+  readonly sourceId?: number | null;
+  readonly reason?: string;
+  readonly createdAt?: string;
+}
+
+export interface OrderEngagementSummary extends OrderSummary {
+  readonly customerId: number;
+  readonly providerUserId: number;
+  readonly refundStatus?: string;
+}
+export interface ReviewSummary {
+  readonly reviewId: number; readonly orderId: number; readonly reviewerId: number;
+  readonly targetUserId: number; readonly reviewerNickname?: string; readonly targetUserNickname?: string;
+  readonly direction?: string; readonly rating: number; readonly content: string; readonly isVisible: boolean;
+  readonly replyContent?: string; readonly replyTime?: string; readonly createdAt?: string; readonly complaintStatus?: string;
+}
+export interface ReviewComplaintSummary {
+  readonly complaintId: number; readonly reviewId: number; readonly orderId: number; readonly complainantId: number;
+  readonly respondentId?: number; readonly reason: string; readonly status: string;
+  readonly arbitrationResult?: string; readonly arbitrationComment?: string; readonly createdAt?: string; readonly handledAt?: string;
+  readonly evidenceFileIds?: string; readonly updatedAt?: string;
+}
+export interface DisputeReplySummary { readonly id: number; readonly disputeId: number; readonly replierId: number; readonly content: string; readonly createdAt?: string; }
+export interface DisputeSummary {
+  readonly id: number; readonly orderId: number; readonly initiatorId: number; readonly reason: string; readonly status: string;
+  readonly resolution?: string; readonly responsibility?: string; readonly adminComment?: string;
+  readonly createdAt?: string; readonly resolvedAt?: string; readonly replies: DisputeReplySummary[];
+}
+export interface CreateReviewPayload { readonly rating: number; readonly content: string; }
+export interface ReviewTextPayload { readonly content: string; }
+export interface CreateReviewComplaintPayload { readonly reason: string; readonly evidenceFileIds: string; }
+export interface DisputeReasonPayload { readonly reason: string; }
+export interface DemandInterestSummary {
+  readonly interestId?: number;
+  readonly demandId: number;
+  readonly targetType: string;
+  readonly interested: boolean;
+  readonly status: string;
+  readonly demand?: DemandSummary | null;
+  readonly createdAt?: string;
 }

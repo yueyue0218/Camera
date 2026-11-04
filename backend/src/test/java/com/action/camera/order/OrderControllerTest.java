@@ -430,7 +430,7 @@ class OrderControllerTest {
     void reworkRequestRejectsNonDeliveredPendingConfirmStatus() {
         UserContext.setUserId(CUSTOMER_ID);
         Order order = order(OrderStatus.PENDING_DELIVERY);
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
 
         assertThrows(BusinessException.class,
                 () -> orderController.requestRework(ORDER_ID, reworkRequest("还未交付不能返修")));
@@ -443,7 +443,7 @@ class OrderControllerTest {
     @Test
     void reworkRequestRejectsProviderAndStranger() {
         Order order = order(OrderStatus.DELIVERED_PENDING_CONFIRM);
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
 
         UserContext.setUserId(PROVIDER_USER_ID);
         assertThrows(BusinessException.class,
@@ -462,7 +462,7 @@ class OrderControllerTest {
     void reworkRequestRejectsTooLongReason() {
         UserContext.setUserId(CUSTOMER_ID);
         Order order = order(OrderStatus.DELIVERED_PENDING_CONFIRM);
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> orderController.requestRework(ORDER_ID, reworkRequest("x".repeat(201))));

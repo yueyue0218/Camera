@@ -68,6 +68,12 @@ public class Report {
     @Column(name = "admin_comment", length = 1000)
     private String adminComment;
 
+    @Column(name = "public_message", length = 200)
+    private String publicMessage;
+
+    @Column(name = "follow_up_required", nullable = false)
+    private boolean followUpRequired;
+
     @Column(name = "active_dedupe_key", length = 160)
     private String activeDedupeKey;
 
@@ -126,6 +132,14 @@ public class Report {
         this.activeDedupeKey = null;
         this.resolvedAt = resolutionTime;
         this.updatedAt = resolutionTime;
+    }
+
+    public void recordPublicFeedback(String message, boolean followUp) {
+        if (status != ReportStatus.RESOLVED || (followUp && resolution != ReportResolution.IGNORE)) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Public feedback requires matching resolution");
+        }
+        this.publicMessage = normalizeRequired(message, 200, "publicMessage");
+        this.followUpRequired = followUp;
     }
 
     @PrePersist

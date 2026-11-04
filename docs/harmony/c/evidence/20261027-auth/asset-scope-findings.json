@@ -1,0 +1,12 @@
+{
+  "sdkApi": 26,
+  "diagnosticPackageSha256": "D27048A94A34F317AC4DB623EC8C1F79529F620C62D57EBC02D37E869E9F700D",
+  "restoredPackageSha256": "BDF408F49EBA0C853ABBAA7B25359CC376B8C1F5AC572AC831DB0A449AE8C743",
+  "secretRead": false,
+  "publicAuthModified": false,
+  "omittedEncryptedScopeCode": 24000002,
+  "encryptedScopeAttributesCount": 1,
+  "normalHttpRefreshControl": "passed",
+  "immediateColdStart": "guest after normal login, without overwrite or logout",
+  "diagnosticSourceRestored": true
+}

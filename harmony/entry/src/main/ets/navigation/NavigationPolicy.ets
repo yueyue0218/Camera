@@ -8,6 +8,7 @@ const EMPTY_PARAM: NavigationRouteParam = {};
  */
 export class NavigationPolicy {
   static readonly routes: AppRoute[] = [
+    AppRoute.ORDER_ENGAGEMENT,
     AppRoute.LOGIN,
     AppRoute.HALL,
     AppRoute.DEMAND_DETAIL,
@@ -16,16 +17,25 @@ export class NavigationPolicy {
     AppRoute.QUOTE_FORM,
     AppRoute.QUOTE_DETAIL,
     AppRoute.ORDER_DETAIL,
+    AppRoute.DELIVERY_GALLERY,
+    AppRoute.DELIVERY_UPLOAD,
+    AppRoute.PHOTO_AUTHORIZATION,
+    AppRoute.ORDER_REVIEWS,
     AppRoute.PUBLISH,
     AppRoute.MESSAGE,
     AppRoute.ORDER,
-    AppRoute.PROFILE
+    AppRoute.PROFILE,
+    AppRoute.PUBLIC_PROFILE, AppRoute.NOTIFICATIONS, AppRoute.CREDIT, AppRoute.MOMENT_DETAIL
   ];
 
   static requiresAuthentication(route: AppRoute): boolean {
-    return route === AppRoute.PUBLISH || route === AppRoute.CONVERSATION_DETAIL || route === AppRoute.MESSAGE ||
+    return route === AppRoute.ORDER_ENGAGEMENT || route === AppRoute.PUBLISH || route === AppRoute.CONVERSATION_DETAIL || route === AppRoute.MESSAGE ||
       route === AppRoute.QUOTE_FORM || route === AppRoute.QUOTE_DETAIL || route === AppRoute.ORDER_DETAIL ||
-      route === AppRoute.ORDER || route === AppRoute.PROFILE;
+      route === AppRoute.DELIVERY_GALLERY || route === AppRoute.DELIVERY_UPLOAD ||
+      route === AppRoute.PHOTO_AUTHORIZATION ||
+      route === AppRoute.ORDER_REVIEWS ||
+      route === AppRoute.ORDER || route === AppRoute.PROFILE || route === AppRoute.NOTIFICATIONS ||
+      route === AppRoute.CREDIT || route === AppRoute.MOMENT_DETAIL;
   }
 
   static resolve(route: AppRoute, param: NavigationRouteParam = EMPTY_PARAM,
@@ -34,15 +44,24 @@ export class NavigationPolicy {
       return {
         route: AppRoute.LOGIN,
         param: {
-          returnRoute: route,
-          conversationId: param.conversationId,
-          quoteId: param.quoteId,
-          orderId: param.orderId,
-          openPayment: param.openPayment
+          returnRoute: route, demandId: param.demandId, serviceId: param.serviceId, targetKind: param.targetKind, targetId: param.targetId, orderId: param.orderId,
+          conversationId: param.conversationId, momentId: param.momentId,
+          userId: param.userId, userRole: param.userRole, initialTab: param.initialTab,
+          quoteId: param.quoteId, deliveryId: param.deliveryId,
+          authorizationId: param.authorizationId, openPayment: param.openPayment
         }
       };
     }
     return { route: route, param: param };
+  }
+
+  static validPublicUserId(param: NavigationRouteParam): number | undefined {
+    return NavigationPolicy.positiveId(param.userId);
+  }
+
+  static validPublicUserRole(param: NavigationRouteParam): string | undefined {
+    const role = param.userRole?.trim().toUpperCase();
+    return role === 'CUSTOMER' || role === 'PROVIDER' ? role : undefined;
   }
 
   static validDemandId(param: NavigationRouteParam): number | undefined {
@@ -54,6 +73,9 @@ export class NavigationPolicy {
   }
 
   static loginDescription(param: NavigationRouteParam): string {
+    if (param.returnRoute === AppRoute.HALL && param.initialTab === 1) {
+      return '登录后继续查看动态';
+    }
     if (param.returnRoute === undefined) {
       return '';
     }
@@ -93,6 +115,10 @@ export class NavigationPolicy {
 
   static label(route: AppRoute): string {
     switch (route) {
+      case AppRoute.ORDER_ENGAGEMENT: return '本次约拍的评价与申诉';
+      case AppRoute.NOTIFICATIONS: return '通知';
+      case AppRoute.CREDIT: return '信用分';
+      case AppRoute.MOMENT_DETAIL: return '动态详情';
       case AppRoute.LOGIN:
         return '登录';
       case AppRoute.HALL:
@@ -108,12 +134,22 @@ export class NavigationPolicy {
         return '报价';
       case AppRoute.ORDER_DETAIL:
         return '订单详情';
+      case AppRoute.DELIVERY_GALLERY:
+        return '作品相册';
+      case AppRoute.DELIVERY_UPLOAD:
+        return '上传照片';
+      case AppRoute.PHOTO_AUTHORIZATION:
+        return '展示授权';
+      case AppRoute.ORDER_REVIEWS:
+        return '评价';
       case AppRoute.PUBLISH:
         return '发布需求';
       case AppRoute.MESSAGE:
         return '消息';
       case AppRoute.ORDER:
         return '订单';
+      case AppRoute.PUBLIC_PROFILE:
+        return '用户主页';
       case AppRoute.PROFILE:
         return '个人中心';
       default:

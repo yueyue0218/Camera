@@ -31,6 +31,9 @@ export class ErrorMapper {
     if (status === 403) {
       return new PortraError(ErrorKind.HTTP, '当前账号没有权限执行此操作。', status);
     }
+    if (status === 413) {
+      return new PortraError(ErrorKind.HTTP, '图片超过服务器上传大小限制（HTTP 413），请选择较小的图片。', status);
+    }
     if (status === 404) {
       return new PortraError(ErrorKind.HTTP, '请求的内容不存在。', status);
     }
@@ -41,6 +44,10 @@ export class ErrorMapper {
   }
 
   static fromBusinessCode(code: number, message: string): PortraError {
+    if (code === 40302) {
+      return new PortraError(ErrorKind.BUSINESS,
+        '请先完成中国香港个人信息出境授权；可继续查看协议及提交个人信息权利申请。', 200, code);
+    }
     if (code === 40101) {
       return new PortraError(ErrorKind.BUSINESS, '登录状态已失效，请重新登录。', 200, code);
     }
@@ -79,12 +86,27 @@ export class ErrorMapper {
     return new PortraError(ErrorKind.PARSE, '服务器返回的数据格式无法识别。');
   }
 
+  static unexpectedContent(status: number, html: boolean): PortraError {
+    return new PortraError(ErrorKind.CONFIG, html ?
+      '服务接口返回了网页，请联系管理员检查 API 路由及后端部署。' :
+      '服务接口未返回 JSON，请联系管理员检查 API 配置。', status);
+  }
+
+  static contract(): PortraError {
+    return new PortraError(ErrorKind.PARSE, '服务器响应结构与客户端不兼容，请联系管理员检查服务版本。');
+  }
+
   static config(message: string): PortraError {
     return new PortraError(ErrorKind.CONFIG, message);
   }
 
   static stale(): PortraError {
     return new PortraError(ErrorKind.STALE, '请求已被更新，忽略旧响应。');
+  }
+
+  static writeNotRetried(): PortraError {
+    return new PortraError(ErrorKind.BUSINESS,
+      '登录凭据已更新，本次操作未自动重试，请确认结果后手动重试。');
   }
 
   static isStale(error: PortraError): boolean {

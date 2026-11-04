@@ -629,7 +629,7 @@ export function FeedPage() {
         <div className="moment-drawer__head">
           <div>
             <div className="moment-drawer__eyebrow">动态详情</div>
-            <h3>{currentDrawerMoment ? `No. ${String(getMomentId(currentDrawerMoment)).padStart(6, '0')}` : '动态详情'}</h3>
+            <h3>动态详情</h3>
           </div>
           <Button onClick={() => setDrawerMomentId(null)} startIcon={<CloseRoundedIcon />}>关闭</Button>
         </div>

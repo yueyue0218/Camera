@@ -1,0 +1,7 @@
+[INFO] Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 30.56 s -- in com.action.camera.integration.ReportClosureIntegrationTest
+[INFO] Tests run: 20, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 10.77 s -- in com.action.camera.integration.ReportNotificationPrivacyTest
+[INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.236 s -- in com.action.camera.report.ReportServiceTest
+[INFO] Tests run: 52, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+[INFO] Total time:  01:28 min
+[INFO] Finished at: 2026-10-30T13:30:46+08:00

@@ -1,0 +1,59 @@
+{
+  "base": "b42b2a88fa05d36cb6d807167316e2791a407752",
+  "product": "dev",
+  "baseUrl": "http://127.0.0.1:18090",
+  "environmentSource": "Process overrides, user-authorized isolated local tests; not team staging confirmation",
+  "suite": {
+    "tests": 245,
+    "pass": 240,
+    "fail": 5,
+    "skip": 0,
+    "todo": 0,
+    "exit": 1,
+    "failures": [
+      "restore accepts only a valid credential from the current environment",
+      "storage failures never create an in-memory authenticated session",
+      "application session restore deduplicates concurrency and retries after a transient failure",
+      "concurrent expiration clears the credential once",
+      "401 and 40101 expire a shared HTTP session; 403 does not"
+    ]
+  },
+  "related": {
+    "tests": 64,
+    "pass": 64,
+    "exit": 0
+  },
+  "build": {
+    "command": "hvigorw.bat assembleHap --no-daemon -p product=dev",
+    "seconds": 21.306,
+    "exit": 0,
+    "unsigned": true,
+    "sha256": "87424F5F9AA09D596F71D7A44D766767232B7562BC5F1A2CFB5CD529840BD8CE"
+  },
+  "device": {
+    "name": "Mate 90 Pro",
+    "api": 26,
+    "os": "HarmonyOS 7.0.0.107",
+    "resolution": "1280x2832",
+    "installExit": 0,
+    "startExit": 0
+  },
+  "native": {
+    "oneTapDetail": true,
+    "returnAndReopen": true,
+    "likeFavoriteOnOff": true,
+    "serverReadback": true,
+    "detailImages": 5,
+    "feedPreviews": 3,
+    "arrowToImage2": true,
+    "avatarAndNicknameNavigation": true,
+    "reportIdentityRefresh": true,
+    "reportIdentityForeground": true,
+    "reportIdentityNavigationReturn": true
+  },
+  "pr25": {
+    "state": "MERGED",
+    "mergedAt": "2026-10-29T10:07:56Z",
+    "mergedByThisRun": false
+  }
+}

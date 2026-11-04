@@ -4,6 +4,7 @@ import com.action.camera.admin.domain.ModerationStatus;
 import com.action.camera.demand.domain.Demand;
 import com.action.camera.demand.domain.DemandStatus;
 import jakarta.persistence.LockModeType;
+import com.action.camera.common.region.ProvinceSql;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -19,6 +20,12 @@ import java.util.Optional;
 
 public interface DemandRepository extends JpaRepository<Demand, Long> {
 
+    @Query(value = "select e from Demand e where e.customerId = :userId and e.status = com.action.camera.demand.domain.DemandStatus.OPEN and e.moderationStatus = com.action.camera.admin.domain.ModerationStatus.VISIBLE and (e.hiddenByCustomer = false or e.hiddenByCustomer is null) order by e.updatedAt desc, e.id desc")
+    Page<Demand> findPublicByUser(@Param("userId") Long userId, Pageable pageable);
+
+    @Query("select e from Demand e where e.customerId = :userId and (e.hiddenByCustomer = false or e.hiddenByCustomer is null) order by e.updatedAt desc, e.id desc")
+    Page<Demand> findOwnerPage(@Param("userId") Long userId, Pageable pageable);
+
     List<Demand> findByStatus(DemandStatus status);
 
     @Query(value = """
@@ -27,7 +34,8 @@ public interface DemandRepository extends JpaRepository<Demand, Long> {
             where d.status = 'OPEN'
               and d.moderation_status = 'VISIBLE'
               and coalesce(d.hidden_by_customer, false) = false
-              and (:cityCode is null or lower(d.city_code) = lower(:cityCode))
+              and """ + ProvinceSql.DEMAND + """
+
               and (:scene is null or lower(d.scene) = lower(:scene))
               and (:styleTag is null or instr(lower(coalesce(d.style_tags, '')), concat('\"', lower(:styleTag), '\"')) > 0)
               and (:expectedDate is null or d.expected_date = :expectedDate)
@@ -61,7 +69,8 @@ public interface DemandRepository extends JpaRepository<Demand, Long> {
             where d.status = 'OPEN'
               and d.moderation_status = 'VISIBLE'
               and coalesce(d.hidden_by_customer, false) = false
-              and (:cityCode is null or lower(d.city_code) = lower(:cityCode))
+              and """ + ProvinceSql.DEMAND + """
+
               and (:scene is null or lower(d.scene) = lower(:scene))
               and (:styleTag is null or instr(lower(coalesce(d.style_tags, '')), concat('\"', lower(:styleTag), '\"')) > 0)
               and (:expectedDate is null or d.expected_date = :expectedDate)

@@ -764,6 +764,7 @@ function PhoneSmsAuthPage() {
   const [phone, setPhone] = useState('')
   const [code, setCode] = useState('')
   const [codeSent, setCodeSent] = useState(false)
+  const [challengeId, setChallengeId] = useState('')
   const [codeHint, setCodeHint] = useState('')
   const [cooldown, setCooldown] = useState(0)
   const [agreementAccepted, setAgreementAccepted] = useState(false)
@@ -787,7 +788,11 @@ function PhoneSmsAuthPage() {
     }
     setSending(true)
     try {
-      await authApi.sendSmsCode({ phone: phone.trim(), deviceId: getOrCreateDeviceId() })
+      setChallengeId('')
+      setCodeSent(false)
+      const challenge = await authApi.sendSmsCode({ phone: phone.trim(), deviceId: getOrCreateDeviceId() })
+      if (!challenge?.challengeId) throw new Error('请更新客户端后重新获取验证码')
+      setChallengeId(challenge.challengeId)
       setCodeHint('验证码已发送，5 分钟内有效。')
       setCodeSent(true)
       setCooldown(60)
@@ -807,12 +812,13 @@ function PhoneSmsAuthPage() {
   async function verifyCode() {
     setError('')
     if (!isSupportedPhone(phone)) { setError('请输入有效的中国大陆手机号'); return }
-    if (!codeSent) { setError('请先获取验证码'); return }
+    if (!codeSent || !challengeId) { setError('请先获取验证码'); return }
     if (!/^\d{6}$/.test(code)) { setError('请输入 6 位验证码'); return }
     setVerifying(true)
     try {
       const data = await authApi.verifySmsCode({
         phone: phone.trim(),
+        challengeId,
         code,
         deviceId: getOrCreateDeviceId(),
         deviceName: getDeviceName()
@@ -839,6 +845,7 @@ function PhoneSmsAuthPage() {
     const nextPhone = event.target.value
     if (nextPhone !== phone && codeSent) {
       setCodeSent(false)
+      setChallengeId('')
       setCode('')
       setCodeHint('手机号已变更，请重新获取验证码。')
     }

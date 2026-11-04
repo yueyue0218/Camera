@@ -7,6 +7,7 @@ import { QuoteWorkflow } from './QuoteWorkflow';
 export struct QuoteDetailContent {
   @Prop quote: QuoteSummary;
   @Prop providerName: string = '';
+  onOpenProvider?: () => void;
 
   @Builder
   private Detail(label: string, value: string) {
@@ -27,7 +28,11 @@ export struct QuoteDetailContent {
             this.quote.status === 'CONFIRMED' ? PortraTheme.success : PortraTheme.secondaryText)
       }.alignItems(HorizontalAlign.Start).width('100%')
       Divider().color(PortraTheme.border)
-      this.Detail('摄影师', this.providerName || '摄影师')
+      Row({ space: 12 }) {
+        Text('摄影师').fontSize(13).fontColor(PortraTheme.secondaryText).width(72)
+        Text(this.providerName || '摄影师').fontSize(14).fontColor(PortraTheme.primaryText).layoutWeight(1)
+        Text('›').fontSize(20).fontColor(PortraTheme.mutedText)
+      }.width('100%').onClick(() => this.onOpenProvider?.())
       Text('拍摄安排').fontSize(16).fontWeight(FontWeight.Bold).fontColor(PortraTheme.primaryText)
       this.Detail('开始', QuoteWorkflow.dateInput(this.quote.shootStartTime))
       this.Detail('结束', QuoteWorkflow.dateInput(this.quote.shootEndTime))

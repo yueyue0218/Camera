@@ -1,0 +1,15 @@
+{
+  "origin": "http://127.0.0.1:18090",
+  "database": "portra_c_final_20261028",
+  "reportId": 1,
+  "reporterId": 1,
+  "targetType": "MOMENT",
+  "targetId": 2,
+  "reason": "C-FINAL-UNKNOWN-20261028-B",
+  "status": "PENDING",
+  "totalReports": 1,
+  "matchingReports": 1,
+  "serverWriteBeforeDelayedResponse": true,
+  "delayResponseOnceMs": 18000,
+  "observerWritesReport": false
+}

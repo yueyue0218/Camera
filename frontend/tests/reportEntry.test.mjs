@@ -222,9 +222,16 @@ test('late service provider response cannot expose a report for a previous route
   assert.ok(screen.getByRole('button', { name: '更多操作' }))
   const { act } = await import('@testing-library/react')
   await act(async () => completeOldBrief(response({ userId: 21, nickname: '旧发布者' })))
-  await screen.findByRole('heading', { name: '橱窗标题', level: 1 })
-  assert.equal(screen.queryByRole('button', { name: '更多操作' }) === null, true)
-  assert.equal(calls.filter(c => c.path === '/reports').length, 0)
+  // The current implementation ignores stale provider responses entirely.
+  // Keep the new route and assert that its report still targets 457, never 456.
+  await screen.findByRole('heading', { name: '新橱窗', level: 1 })
+  assert.equal(screen.queryByRole('heading', { name: '橱窗标题', level: 1 }), null)
+  await openDialog()
+  fireEvent.click(screen.getByLabelText('虚假或误导性信息'))
+  fireEvent.click(screen.getByRole('button', { name: '提交举报' }))
+  await screen.findByText('举报已提交，平台管理员将核查处理。')
+  assert.equal(JSON.parse(calls.find(c => c.path === '/reports').options.body).targetId, 457)
+  assert.equal(calls.filter(c => c.path === '/reports').length, 1)
 })
 
 test('UTF-16 emoji limit accepts exactly 1000 code units', async () => {

@@ -1,6 +1,10 @@
 package com.action.camera.integration;
 
 import com.action.camera.admin.repository.AuditRecordRepository;
+import com.action.camera.privacy.dto.PrivacyDtos.ConsentUpdate;
+import com.action.camera.privacy.repository.PrivacyConsentEventRepository;
+import com.action.camera.privacy.repository.PrivacyConsentRepository;
+import com.action.camera.privacy.service.PrivacyConsentService;
 import com.action.camera.support.TestAuthTokens;
 import com.action.camera.demand.domain.Demand;
 import com.action.camera.demand.domain.DemandStatus;
@@ -9,6 +13,7 @@ import com.action.camera.report.repository.ReportRepository;
 import com.action.camera.servicepackage.domain.ServicePackage;
 import com.action.camera.servicepackage.domain.ServicePackageStatus;
 import com.action.camera.servicepackage.repository.ServicePackageRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,8 +66,20 @@ class AdminHallModerationIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private PrivacyConsentService privacyConsentService;
+
+    @Autowired
+    private PrivacyConsentRepository privacyConsentRepository;
+
+    @Autowired
+    private PrivacyConsentEventRepository privacyConsentEventRepository;
+
+    private boolean consentFixtureCreated;
+
     @BeforeEach
     void setUp() {
+        consentFixtureCreated = false;
         reportRepository.deleteAll();
         auditRecordRepository.deleteAll();
         demandRepository.deleteAll();
@@ -71,6 +88,19 @@ class AdminHallModerationIntegrationTest {
         insertUser(ADMIN_ID, "admin-integration", "ADMIN");
         insertUser(CUSTOMER_ID, "customer-integration", "CUSTOMER");
         insertUser(PROVIDER_ID, "provider-integration", "PROVIDER");
+    }
+
+    @AfterEach
+    void tearDownConsentFixture() {
+        if (!consentFixtureCreated) {
+            return;
+        }
+        // Keep test data isolated: remove only this content owner's grant/event rows.
+        privacyConsentEventRepository.deleteAll(
+                privacyConsentEventRepository.findAll().stream()
+                        .filter(event -> CUSTOMER_ID.equals(event.getUserId()))
+                        .toList());
+        privacyConsentRepository.deleteById(CUSTOMER_ID);
     }
 
     @Test
@@ -104,6 +134,7 @@ class AdminHallModerationIntegrationTest {
 
     @Test
     void adminRestoreReturnsDemandToGetDemands() throws Exception {
+        grantContentOwnerConsent(CUSTOMER_ID);
         Demand demand = saveDemand();
         demand.takeDown(ADMIN_ID, "initial review", LocalDateTime.of(2026, 9, 1, 10, 0));
         demandRepository.saveAndFlush(demand);
@@ -194,6 +225,13 @@ class AdminHallModerationIntegrationTest {
 
     private String bearer(Long userId) {
         return "Bearer " + jwtUtil.generateToken(userId);
+    }
+
+    private void grantContentOwnerConsent(Long ownerId) {
+        consentFixtureCreated = true;
+        privacyConsentService.update(ownerId, new ConsentUpdate(
+                "GRANTED", PrivacyConsentService.VERSION, PrivacyConsentService.VERSION,
+                "hall-admin-restore", System.currentTimeMillis()));
     }
 
     private void insertUser(Long id, String nickname, String role) {

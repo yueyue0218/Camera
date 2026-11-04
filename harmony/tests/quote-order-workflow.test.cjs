@@ -30,9 +30,32 @@ test('quote form converts money to cents and validates dates and counts', () => 
   assert.throws(() => QuoteWorkflow.payload(7, QuoteWorkflow.withField(draft, 'amount', '299.999')));
   assert.throws(() => QuoteWorkflow.payload(7, QuoteWorkflow.withField(draft, 'shootEnd', '2026-11-08 13:00')));
   assert.throws(() => QuoteWorkflow.payload(7, QuoteWorkflow.withField(draft, 'delivery', '2026-02-30 18:00')));
+  assert.throws(() => QuoteWorkflow.payload(7, QuoteWorkflow.withField(draft, 'delivery', '2026-11-15 24:61')));
   assert.throws(() => QuoteWorkflow.payload(7, QuoteWorkflow.withField(draft, 'refined', '-1')));
+  assert.throws(() => QuoteWorkflow.payload(7, QuoteWorkflow.withField(draft, 'refined', '')));
+  assert.equal(QuoteWorkflow.payload(7, QuoteWorkflow.withField(draft, 'refined', '0')).refinedCount, 0);
   assert.equal(QuoteWorkflow.isDraft(draft), true);
   assert.equal(QuoteWorkflow.isDraft({ amount: '1' }), false);
+});
+
+test('date confirmation updates only the chosen field and survives draft restoration', () => {
+  const empty = QuoteWorkflow.empty();
+  const start = new Date(2026, 10, 8, 14, 5);
+  const picked = QuoteWorkflow.withSelectedDate(empty, 'shootStart', start);
+  assert.equal(picked.shootStart, '2026-11-08 14:05');
+  assert.equal(picked.shootEnd, '');
+  assert.equal(picked.delivery, '');
+  assert.deepEqual(empty, QuoteWorkflow.empty());
+  assert.equal(QuoteWorkflow.selectedDate(picked, 'shootStart').getTime(), start.getTime());
+  const end = QuoteWorkflow.withSelectedDate(picked, 'shootEnd', new Date(2026, 10, 8, 16, 0));
+  const restored = JSON.parse(JSON.stringify(QuoteWorkflow.withSelectedDate(end, 'delivery',
+    new Date(2026, 10, 15, 18, 0))));
+  assert.equal(QuoteWorkflow.selectedDate(restored, 'delivery').getHours(), 18);
+  assert.equal(QuoteWorkflow.selectedDate(restored, 'shootStart').getMinutes(), 5);
+  const completed = { ...restored, amount: '299.00', location: '城市公园', service: '双人写真',
+    originals: '20', refined: '5' };
+  assert.equal(QuoteWorkflow.payload(7, completed).shootStartTime, '2026-11-08T14:05:00');
+  assert.equal(QuoteWorkflow.payload(7, completed).deliveryDeadline, '2026-11-15T18:00:00');
 });
 
 test('quote role matrix and expired state are consistent', () => {
@@ -55,10 +78,36 @@ test('order payment is limited to its customer and pending status', () => {
   assert.deepEqual(OrderWorkflow.inConversation([order, { ...order, orderId: 5, conversationId: 8 }], 7), [order]);
 });
 
+test('delivery actions follow order state and participant', () => {
+  const base = { orderId: 4, customerId: 1, providerUserId: 2, status: 'PENDING_DELIVERY' };
+  assert.equal(OrderWorkflow.canUpload(base, 2), true);
+  assert.equal(OrderWorkflow.canUpload(base, 1), false);
+  assert.equal(OrderWorkflow.hasGallery(base), false);
+  const delivered = { ...base, status: 'DELIVERED_PENDING_CONFIRM' };
+  assert.equal(OrderWorkflow.canReviewDelivery(delivered, 1), true);
+  assert.equal(OrderWorkflow.canReviewDelivery(delivered, 2), false);
+  assert.equal(OrderWorkflow.hasGallery(delivered), true);
+  assert.equal(OrderWorkflow.canUpload({ ...base, status: 'REWORK_REQUIRED' }, 2), true);
+  assert.equal(OrderWorkflow.canCancel({ ...base, status: 'PAID_PENDING_SHOOT' }, 1), true);
+  assert.equal(OrderWorkflow.canCancel(delivered, 1), false);
+});
+
 test('quote and order appear once in chronological conversation stream', () => {
   const order = { orderId: 4, conversationId: 7, providerUserId: 2,
     createdAt: '2026-11-01T10:01:00' };
   const timeline = ConversationTimeline.build([], [quote, quote], [order, order]);
   assert.deepEqual(timeline.map(item => item.key), ['quote:9', 'order:4']);
   assert.equal(timeline[1].kind, TimelineKind.ORDER);
+});
+
+test('real delivery batches and status logs become one event each', () => {
+  const order = { orderId: 4, conversationId: 7, providerUserId: 2,
+    createdAt: '2026-11-01T10:00:00' };
+  const delivery = { deliveryId: 12, orderId: 4, deliveryRound: 2,
+    uploadTime: '2026-11-08T18:00:00', files: [{ fileId: 5, fileType: 'IMAGE' }] };
+  const log = { logId: 13, orderId: 4, toStatus: 'REWORK_REQUIRED', operatorId: 1,
+    createdAt: '2026-11-08T17:00:00' };
+  const timeline = ConversationTimeline.build([], [], [order], [log, log], [delivery, delivery]);
+  assert.deepEqual(timeline.map(item => item.key), ['order:4', 'status:13', 'delivery:12']);
+  assert.equal(timeline[2].event.detail, '1 张照片');
 });

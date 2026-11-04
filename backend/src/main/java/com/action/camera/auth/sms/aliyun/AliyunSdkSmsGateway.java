@@ -23,7 +23,8 @@ public class AliyunSdkSmsGateway implements AliyunSmsGateway {
                     .setEndpoint(properties.getEndpoint());
             this.client = new Client(config);
         } catch (Exception e) {
-            throw new IllegalStateException("Unable to initialize Alibaba Cloud SMS client", e);
+            // SDK exceptions may contain request/credential details; do not retain them.
+            throw new IllegalStateException("Unable to initialize Alibaba Cloud SMS client");
         }
     }
 
@@ -49,7 +50,7 @@ public class AliyunSdkSmsGateway implements AliyunSmsGateway {
         } catch (SmsDeliveryException e) {
             throw e;
         } catch (Exception e) {
-            throw new SmsDeliveryException("Alibaba Cloud SMS request failed", e);
+            throw new SmsDeliveryException("Alibaba Cloud SMS request failed");
         }
     }
 }

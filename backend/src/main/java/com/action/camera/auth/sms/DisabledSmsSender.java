@@ -4,7 +4,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("!prod & !dev & !smoke")
+@Profile("!prod & !dev & !smoke & !staging & !temp-staging")
 public class DisabledSmsSender implements SmsSender {
 
     @Override

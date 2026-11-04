@@ -1,3 +1,4 @@
+import { ProvinceCatalog, provinceName, provinceCode } from '../../common/region/ProvinceCatalog.js'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
@@ -77,7 +78,7 @@ export function ProfilePage() {
     genderVisible: currentUser.genderVisible ?? true,
     birthday: currentUser.birthday || '',
     birthdayVisible: currentUser.birthdayVisible ?? true,
-    locationDisplay: currentUser.locationDisplay || '',
+    locationDisplay: provinceCode(currentUser.locationDisplay || currentUser.cityCode) ? provinceName(currentUser.locationDisplay || currentUser.cityCode) : '',
     locationVisible: currentUser.locationVisible ?? false,
   })
   const [avatarFile, setAvatarFile] = useState(null)
@@ -129,7 +130,7 @@ export function ProfilePage() {
       genderVisible: currentUser.genderVisible ?? true,
       birthday: currentUser.birthday || '',
       birthdayVisible: currentUser.birthdayVisible ?? true,
-      locationDisplay: currentUser.locationDisplay || '',
+      locationDisplay: provinceCode(currentUser.locationDisplay || currentUser.cityCode) ? provinceName(currentUser.locationDisplay || currentUser.cityCode) : '',
       locationVisible: currentUser.locationVisible ?? false,
     })
   }, [currentUser.userId, currentUser.role, currentUser.nickname, currentUser.avatarData,
@@ -190,42 +191,6 @@ export function ProfilePage() {
     }
   }, [currentUser.userId, currentUser.role])
 
-  useEffect(() => {
-    const IP_CACHE_KEY = `camera-ip-${currentUser.userId}`
-    const cached = (() => { try { return JSON.parse(localStorage.getItem(IP_CACHE_KEY)) } catch { return null } })()
-    if (cached?.location && Date.now() - (cached.ts || 0) < 24 * 3600 * 1000) {
-      if (cached.location !== currentUser.cityCode) updateProfile({ cityCode: cached.location })
-      return
-    }
-    async function detectIpLocation() {
-      try {
-        const amapKey = import.meta.env.VITE_AMAP_KEY
-        let location = ''
-        if (amapKey) {
-          const res = await fetch(`https://restapi.amap.com/v3/ip?key=${amapKey}&output=json`)
-          const data = await res.json()
-          if (data.status === '1') {
-            const province = typeof data.province === 'string'
-              ? data.province.replace(/(省|市|自治区|特别行政区)$/, '').trim() : ''
-            if (province) location = province
-          }
-        }
-        if (!location) {
-          const res = await fetch('http://ip-api.com/json/?lang=zh-CN&fields=status,regionName')
-          const data = await res.json()
-          if (data.status === 'success' && data.regionName) {
-            location = data.regionName.replace(/(省|市|自治区|特别行政区)$/, '').trim()
-          }
-        }
-        if (!location) return
-        try { localStorage.setItem(IP_CACHE_KEY, JSON.stringify({ location, ts: Date.now() })) } catch { /**/ }
-        if (location === currentUser.cityCode) return
-        updateProfile({ cityCode: location })
-        await userApi.updateMe({ cityCode: location }, currentUser)
-      } catch { /* ignore */ }
-    }
-    detectIpLocation()
-  }, [currentUser.userId])
 
   async function loadProfileData(requestId) {
     const isCurrentRequest = () => profileLoadSeqRef.current === requestId
@@ -283,7 +248,7 @@ export function ProfilePage() {
         genderVisible: myProfileRes.value.genderVisible ?? currentUser.genderVisible ?? true,
         birthday: myProfileRes.value.birthday ?? currentUser.birthday ?? '',
         birthdayVisible: myProfileRes.value.birthdayVisible ?? currentUser.birthdayVisible ?? true,
-        locationDisplay: myProfileRes.value.locationDisplay ?? currentUser.locationDisplay ?? '',
+        locationDisplay: provinceCode(myProfileRes.value.locationDisplay || myProfileRes.value.cityCode) ? provinceName(myProfileRes.value.locationDisplay || myProfileRes.value.cityCode) : '',
         locationVisible: myProfileRes.value.locationVisible ?? currentUser.locationVisible ?? false,
       })
     }
@@ -424,6 +389,7 @@ export function ProfilePage() {
         birthday: next.birthday,
         birthdayVisible: next.birthdayVisible,
         locationDisplay: next.locationDisplay,
+        ...(next.locationDisplay ? { cityCode: provinceCode(next.locationDisplay) } : {}),
         locationVisible: next.locationVisible,
       }, currentUser)
     } catch (err) {
@@ -547,7 +513,7 @@ export function ProfilePage() {
           </div>
           <p className="profile-uid">用户编号：{currentUser.userId}</p>
           <div className="profile-meta-line">
-            <span>IP属地：{currentUser.cityCode || '未知'}</span>
+            <span>地区：{provinceName(currentUser.cityCode)}</span>
           </div>
           {(() => {
             const chips = []
@@ -558,7 +524,7 @@ export function ProfilePage() {
             } else if (currentUser.birthdayVisible && currentUser.birthday) {
               chips.push(`${calcAge(currentUser.birthday)}岁`)
             }
-            if (currentUser.locationVisible && currentUser.locationDisplay) chips.push(`📍 ${currentUser.locationDisplay}`)
+            if (currentUser.locationVisible && currentUser.locationDisplay) chips.push(`📍 ${provinceName(currentUser.locationDisplay)}`)
             return chips.length ? (
               <div className="profile-tag-row">
                 {chips.map((c, i) => <span key={i} className="profile-tag">{c}</span>)}
@@ -1039,8 +1005,11 @@ export function ProfilePage() {
               </div>
               <div>
                 <label className="pp-label">地区</label>
-                <input className="pp-input" placeholder="填写所在地区，如：苏州" value={profileForm.locationDisplay}
-                  onChange={e => setProfileForm(p => ({...p, locationDisplay: e.target.value}))} />
+                <select className="pp-input" value={profileForm.locationDisplay}
+                  onChange={e => setProfileForm(p => ({...p, locationDisplay: e.target.value}))}>
+                  <option value="">请选择省级地区</option>
+                  {ProvinceCatalog.map(p => <option key={p.code} value={p.name}>{p.name}</option>)}
+                </select>
                 <div className="pp-toggle-row" style={{marginTop:8}}>
                   <span>展示地区标签</span>
                   <label className="pp-toggle">

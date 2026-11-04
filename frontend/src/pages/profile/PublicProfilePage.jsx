@@ -1,3 +1,4 @@
+import { provinceName } from '../../common/region/ProvinceCatalog.js'
 import { useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../AuthContext.jsx'
@@ -182,8 +183,8 @@ export function PublicProfilePage() {
   const bio = publicProfile?.bio || storedProfile.bio || ''
   const creditScore = creditSummary?.creditScore ?? null
   const displayCreditScore = formatCreditScore(creditScore)
-  const cityPin = pp?.cityCode || publicProfile?.cityCode || publicProfile?.school || storedProfile.school || 'Portra'
-  const ipLocation = publicProfile?.cityCode || storedProfile.cityCode || ''
+  const cityPin = provinceName(pp?.cityCode || publicProfile?.cityCode)
+  const ipLocation = provinceName(publicProfile?.cityCode || storedProfile.cityCode)
 
   const momentImages = moments
     .filter(m => m.imageData)
@@ -259,7 +260,7 @@ export function PublicProfilePage() {
       <div className="pp-crumb pp-crumb-report">
         <span><strong>PROFILE</strong> / {nickname} / 个人摄影档案</span>
         <span>
-          {isProvider ? `FRAME ${pp?.completedOrders ?? 0} · ${pp?.cityCode || 'Portra'}` : `CREDIT ${displayCreditScore} · Portra`}
+          {isProvider ? `FRAME ${pp?.completedOrders ?? 0} · ${provinceName(pp?.cityCode)}` : `CREDIT ${displayCreditScore} · Portra`}
         </span>
         {Number(publicProfile?.userId) === profileUserId && <ReportAction key={publicProfile?.userId} targetType="USER" targetId={publicProfile?.userId} ownerId={publicProfile?.userId} currentUser={currentUser} sx={{ position: 'absolute', top: 0, right: 0 }} />}
       </div>
@@ -289,7 +290,7 @@ export function PublicProfilePage() {
             const chips = []
             if (gender === 'FEMALE') chips.push('♀ 女')
             else if (gender === 'MALE') chips.push('♂ 男')
-            if (pp?.cityCode) chips.push(`📍 ${pp.cityCode}`)
+            if (pp?.cityCode) chips.push(`📍 ${provinceName(pp.cityCode)}`)
             return chips.length ? (
               <div className="profile-tag-row">
                 {chips.map((c, i) => <span key={i} className="profile-tag">{c}</span>)}

@@ -1,3 +1,4 @@
+import { provinceName } from '../../../common/region/ProvinceCatalog.js'
 import { AdminActionBar } from './AdminActionBar.jsx'
 import { AdminStatusTag } from './AdminStatusTag.jsx'
 
@@ -16,7 +17,7 @@ export function AdminHallCard({ item, onOpen, onOpenPublisher, onTakeDown, onRes
       <div className="admin-hall-card-content">
         {item.coverImage ? <img src={item.coverImage} alt="" width="640" height="360" loading="lazy" /> : null}
         <h2>{item.title || '未命名内容'}</h2><p>{item.description || '暂无内容说明。'}</p>
-        <p>发布者 #{item.publisherId} · {item.cityCode || '地点未提供'} · {item.scene || '场景未提供'}</p><p>待处理举报 {item.pendingReportCount ?? 0}</p>
+        <p>发布者 #{item.publisherId} · {provinceName(item.cityCode)} · {item.scene || '场景未提供'}</p><p>待处理举报 {item.pendingReportCount ?? 0}</p>
       </div>
       <footer className="admin-hall-card-actions"><AdminActionBar actions={actions} /></footer>
     </article>

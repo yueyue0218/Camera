@@ -1,0 +1,50 @@
+[
+  {
+    "phase": "integrated-feed-on",
+    "at": "2026-10-29T12:15:00.894Z",
+    "actorId": 1,
+    "momentId": 1,
+    "liked": true,
+    "likeCount": 1,
+    "favorited": true,
+    "favoriteCount": 1,
+    "detailImages": 5,
+    "feedPreviews": 3
+  },
+  {
+    "phase": "integrated-detail-off",
+    "at": "2026-10-29T12:15:31.668Z",
+    "actorId": 1,
+    "momentId": 1,
+    "liked": false,
+    "likeCount": 0,
+    "favorited": false,
+    "favoriteCount": 0,
+    "detailImages": 5,
+    "feedPreviews": 3
+  },
+  {
+    "phase": "refined-detail-second-on",
+    "at": "2026-10-29T12:06:23.541Z",
+    "actorId": 1,
+    "momentId": 1,
+    "liked": true,
+    "likeCount": 1,
+    "favorited": true,
+    "favoriteCount": 1,
+    "detailImages": 5,
+    "feedPreviews": 3
+  },
+  {
+    "phase": "refined-feed-final-off",
+    "at": "2026-10-29T12:12:31.793Z",
+    "actorId": 1,
+    "momentId": 1,
+    "liked": false,
+    "likeCount": 0,
+    "favorited": false,
+    "favoriteCount": 0,
+    "detailImages": 5,
+    "feedPreviews": 3
+  }
+]

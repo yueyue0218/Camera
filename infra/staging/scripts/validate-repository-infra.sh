@@ -9,6 +9,7 @@ required=(
   "$infra_root/nginx/portra.conf"
   "$infra_root/systemd/portra-backend.service"
   "$infra_root/sudoers/portra-deploy"
+  "$infra_root/scripts/verify-backend-capabilities.sh"
   "$infra_root/scripts/health-check.sh"
   "$infra_root/scripts/deploy-application.sh"
   "$infra_root/scripts/bootstrap-frontend-release-root.sh"

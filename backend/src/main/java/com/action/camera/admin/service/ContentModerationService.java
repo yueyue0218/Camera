@@ -11,6 +11,8 @@ import com.action.camera.servicepackage.domain.ServicePackage;
 import com.action.camera.servicepackage.repository.ServicePackageRepository;
 import com.action.camera.social.domain.MomentPost;
 import com.action.camera.social.repository.MomentPostRepository;
+import com.action.camera.repository.UserRepository;
+import com.action.camera.privacy.service.PrivacyConsentService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +28,8 @@ public class ContentModerationService {
     private final DemandRepository demandRepository;
     private final ServicePackageRepository servicePackageRepository;
     private final MomentPostRepository momentPostRepository;
+    private final UserRepository userRepository;
+    private final PrivacyConsentService privacyConsentService;
 
     public ContentModerationService(AdminPermissionService adminPermissionService,
                                     AdminAuditService adminAuditService,
@@ -33,7 +37,9 @@ public class ContentModerationService {
                                     AdminMomentService adminMomentService,
                                     DemandRepository demandRepository,
                                     ServicePackageRepository servicePackageRepository,
-                                    MomentPostRepository momentPostRepository) {
+                                    MomentPostRepository momentPostRepository,
+                                    UserRepository userRepository,
+                                    PrivacyConsentService privacyConsentService) {
         this.adminPermissionService = adminPermissionService;
         this.adminAuditService = adminAuditService;
         this.adminHallService = adminHallService;
@@ -41,6 +47,8 @@ public class ContentModerationService {
         this.demandRepository = demandRepository;
         this.servicePackageRepository = servicePackageRepository;
         this.momentPostRepository = momentPostRepository;
+        this.userRepository = userRepository;
+        this.privacyConsentService = privacyConsentService;
     }
 
     @Transactional
@@ -91,6 +99,15 @@ public class ContentModerationService {
                                                String reason,
                                                LocalDateTime now,
                                                boolean restore) {
+        // Read owner without locking content, then lock the user first. This follows
+        // PrivacyConsentService.update(): user lock -> content restriction, preventing
+        // administrator-restoration/withdrawal lock inversion.
+        if (restore) {
+            Long ownerId = demandRepository.findById(id)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Demand not found: " + id))
+                    .getCustomerId();
+            requireRestorationConsent(ownerId);
+        }
         Demand demand = demandRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Demand not found: " + id));
         if (restore) {
@@ -108,6 +125,13 @@ public class ContentModerationService {
                                                        String reason,
                                                        LocalDateTime now,
                                                        boolean restore) {
+        if (restore) {
+            Long ownerId = servicePackageRepository.findById(id)
+                    .orElseThrow(() -> new BusinessException(
+                            ErrorCode.NOT_FOUND, "Service package not found: " + id))
+                    .getProviderId();
+            requireRestorationConsent(ownerId);
+        }
         ServicePackage servicePackage = servicePackageRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.NOT_FOUND, "Service package not found: " + id));
@@ -129,6 +153,12 @@ public class ContentModerationService {
         }
         String normalizedReason = normalizeReason(reason);
         LocalDateTime now = LocalDateTime.now();
+        if (restore) {
+            Long ownerId = momentPostRepository.findById(id)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Moment not found: " + id))
+                    .getAuthorId();
+            requireRestorationConsent(ownerId);
+        }
         MomentPost moment = momentPostRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Moment not found: " + id));
         if (restore) {
@@ -139,6 +169,21 @@ public class ContentModerationService {
         momentPostRepository.save(moment);
         adminAuditService.record("MOMENT", id, adminId, restore ? "RESTORE" : "TAKE_DOWN", normalizedReason);
         return adminMomentService.toResponse(moment);
+    }
+
+    /**
+     * A restored item cannot become publicly visible for a withdrawn account.
+     * The user row lock serializes this check with withdrawal's bulk restrictions.
+     * The caller MUST acquire this lock before locking a content row.
+     */
+    private void requireRestorationConsent(Long ownerId) {
+        if (ownerId == null || ownerId <= 0) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "内容发布者无效，不能恢复公开");
+        }
+        userRepository.findByIdForUpdate(ownerId)
+                .filter(owner -> "ACTIVE".equals(owner.getStatus()))
+                .orElseThrow(() -> new BusinessException(ErrorCode.STATUS_CONFLICT, "内容发布者账号不可恢复公开"));
+        privacyConsentService.requireBusinessConsent(ownerId, true);
     }
 
     private String normalizeReason(String reason) {

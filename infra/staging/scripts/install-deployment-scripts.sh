@@ -13,7 +13,7 @@ install -d -m 700 "$root/releases"
 install -d -m 700 "$release"
 
 for name in health-check.sh deploy-application.sh deploy-backend.sh rollback-backend.sh \
-  install-deployment-scripts.sh; do
+  verify-backend-capabilities.sh install-deployment-scripts.sh; do
   [[ -f "$source_dir/$name" && ! -L "$source_dir/$name" ]]
   install -m 0750 "$source_dir/$name" "$release/$name"
 done
