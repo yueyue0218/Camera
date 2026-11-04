@@ -17,9 +17,9 @@ export class CreditSnapshot {
   userId: number = 0;
 }
 export class CreditFormat {
-  static score(value?: number | null): string { return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(1) : '暂无'; }
-  static metric(value?: number | null): string { return typeof value === 'number' && Number.isFinite(value) ? `${value}` : '--'; }
-  static percent(value?: number | null): string { return typeof value === 'number' && Number.isFinite(value) ? `${value.toFixed(1)}%` : '--'; }
+  static score(value?: number | null): string { return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(1) : '待积累'; }
+  static metric(value?: number | null): string { return typeof value === 'number' && Number.isFinite(value) ? `${value}` : '暂无数据'; }
+  static percent(value?: number | null): string { return typeof value === 'number' && Number.isFinite(value) ? `${value.toFixed(1)}%` : '待积累'; }
   static level(item?: CreditSummary): string {
     if (item?.creditLevel?.trim()) { return item.creditLevel.trim(); }
     return '待积累';

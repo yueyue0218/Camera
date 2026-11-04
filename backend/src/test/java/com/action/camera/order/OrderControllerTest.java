@@ -27,6 +27,7 @@ import com.action.camera.order.repository.OrderRepository;
 import com.action.camera.order.repository.OrderStatusLogRepository;
 import com.action.camera.order.repository.PaymentRecordRepository;
 import com.action.camera.order.service.OrderService;
+import com.action.camera.repository.UserRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -83,6 +84,9 @@ class OrderControllerTest {
     @Mock
     private OrderDisplayService orderDisplayService;
 
+    @Mock
+    private UserRepository userRepository;
+
     private OrderController orderController;
 
     private final List<OrderStatusLog> savedLogs = new ArrayList<>();
@@ -98,7 +102,8 @@ class OrderControllerTest {
                 orderStatusLogRepository,
                 deliveryRepository,
                 userDisplayService,
-                orderDisplayService
+                orderDisplayService,
+                userRepository
         );
         ReflectionTestUtils.setField(orderService, "notificationService", notificationService);
         orderController = new OrderController(orderService, userDisplayService);
@@ -168,7 +173,6 @@ class OrderControllerTest {
     void customerCanMockPayAndFundsAreHeld() {
         UserContext.setUserId(CUSTOMER_ID);
         Order order = order(OrderStatus.PENDING_PAYMENT);
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
         when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
         when(paymentRecordRepository.findByOrderId(ORDER_ID))
                 .thenReturn(Optional.empty())
@@ -426,7 +430,7 @@ class OrderControllerTest {
     void reworkRequestRejectsNonDeliveredPendingConfirmStatus() {
         UserContext.setUserId(CUSTOMER_ID);
         Order order = order(OrderStatus.PENDING_DELIVERY);
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
 
         assertThrows(BusinessException.class,
                 () -> orderController.requestRework(ORDER_ID, reworkRequest("还未交付不能返修")));
@@ -439,7 +443,7 @@ class OrderControllerTest {
     @Test
     void reworkRequestRejectsProviderAndStranger() {
         Order order = order(OrderStatus.DELIVERED_PENDING_CONFIRM);
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
 
         UserContext.setUserId(PROVIDER_USER_ID);
         assertThrows(BusinessException.class,
@@ -458,7 +462,7 @@ class OrderControllerTest {
     void reworkRequestRejectsTooLongReason() {
         UserContext.setUserId(CUSTOMER_ID);
         Order order = order(OrderStatus.DELIVERED_PENDING_CONFIRM);
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> orderController.requestRework(ORDER_ID, reworkRequest("x".repeat(201))));
@@ -534,6 +538,7 @@ class OrderControllerTest {
 
     private void prepareTransitionMocks(Order order) {
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        lenient().when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderStatusLogRepository.save(any(OrderStatusLog.class))).thenAnswer(invocation -> {
             OrderStatusLog log = invocation.getArgument(0);

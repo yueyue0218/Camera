@@ -51,7 +51,7 @@ async function expectRequest(invoke, method, suffix, data, body) {
   const call = calls.at(-1);
   assert.equal(call.options.method, method);
   assert.equal(call.url, TestBuildProfile.PORTRA_BASE_URL + suffix);
-  assert.equal(call.options.header.Authorization, 'Bearer session-token');
+  assert.equal(call.options.header.Authorization, suffix.includes('/public-profile?') ? undefined : 'Bearer session-token');
   if (body !== undefined) assert.deepEqual(JSON.parse(call.options.extraData), body);
   complete(call, data);
   return promise;
@@ -92,6 +92,44 @@ test('conversation hiding and reports preserve server-authoritative results', as
   { targetType: 'DEMAND', targetId: 7, reason: '不当内容' });
 });
 
+test('account cancellation is submitted to and read from the authenticated server', async () => {
+  const client = new HttpClient();
+  client.setAccessToken('session-token');
+  const api = new ApiService(client);
+  await expectRequest(() => api.getAccountCancellation(), 'GET',
+    '/users/me/cancellation-request',
+    { requestId: null, status: 'NOT_REQUESTED' });
+  await expectRequest(() => api.requestAccountCancellation(' no longer needed '), 'POST',
+    '/users/me/cancellation-request',
+    { requestId: 4, status: 'PENDING', reason: 'no longer needed' },
+    { reason: 'no longer needed' });
+});
+
+test('identity permission errors remain visible instead of falling back to a different profile response', async () => {
+  const client = new HttpClient(); client.setAccessToken('session-token'); const api = new ApiService(client);
+  const before = calls.length; const request = api.currentSession('hall.identity');
+  calls.at(-1).resolve({ responseCode: 200, result: JSON.stringify({ code: 40301, message: 'forbidden', data: null }) });
+  await assert.rejects(request, error => error.businessCode === 40301);
+  assert.equal(calls.length, before + 1);
+});
+
+test('profile and order workspace query the confirmed role with independent cancellation keys', async () => {
+  const client = new HttpClient(); client.setAccessToken('session-token'); const api = new ApiService(client);
+  for (const role of ['CUSTOMER', 'PROVIDER']) {
+    await expectRequest(() => api.listOrders(role, 'profile.orders'), 'GET', '/orders?role=' + role, []);
+  }
+});
+
+test('publication preview and management refresh cannot cancel each other', async () => {
+  const client = new HttpClient(); client.setAccessToken('session-token'); const api = new ApiService(client);
+  const preview = api.listMyDemands(1); const first = calls.at(-1);
+  const management = api.listMyDemands(1, 'workspace.demands'); const second = calls.at(-1);
+  assert.equal(first.destroyed, 0);
+  complete(first, { records: [], page: 1, size: 10, total: 0 });
+  complete(second, { records: [], page: 1, size: 10, total: 0 });
+  await Promise.all([preview, management]);
+});
+
 test('pages integrate role isolation, deduplication, follow, favorite and report behavior', () => {
   const read = relative => fs.readFileSync(path.join(sourceRoot, relative), 'utf8');
   const profile = read('pages/ProfilePage.ets');
@@ -103,7 +141,8 @@ test('pages integrate role isolation, deduplication, follow, favorite and report
   assert.match(profile, /listProfileMoments/);
   assert.match(profile, /listFavoriteMoments/);
   assert.match(profile, /this\.role === 'CUSTOMER'/);
-  assert.match(messages, /normalizeConversations/);
+  assert.match(messages, /ConversationListModel\.validSummary/);
+  assert.match(messages, /ConversationMemory\.write/);
   assert.match(messages, /hideConversation/);
   assert.match(feed, /MomentFavoriteWrite\.execute/);
   const favorite = read('features/moments/MomentFavoriteWrite.ets');
@@ -112,4 +151,27 @@ test('pages integrate role isolation, deduplication, follow, favorite and report
   assert.match(follow, /result\.followed === this\.followed/);
   assert.match(report, /\['USER', 'DEMAND', 'SERVICE_PACKAGE', 'MOMENT', 'REVIEW'\]/);
   assert.match(report, /result\.targetType !== payload\.targetType/);
+});
+
+test('profile exposes privacy controls and server-backed account cancellation', () => {
+  const read = relative => fs.readFileSync(path.join(sourceRoot, relative), 'utf8');
+  const profile = read('pages/ProfilePage.ets');
+  const index = read('pages/Index.ets');
+  const appClient = read('app/AppClient.ets');
+  const privacy = read('privacy/PrivacySettingsPage.ets');
+  assert.match(profile, /PrivacySettingsPage/);
+  for (const entry of ['隐私与授权管理', '个人信息权利申请', '注销账号']) { assert.ok(profile.includes(entry)); }
+  assert.match(privacy, /Portra 用户协议/);
+  assert.match(privacy, /Portra 隐私政策/);
+  assert.match(privacy, /个人信息出境单独同意书/);
+  assert.match(privacy, /3336578810@qq\.com/);
+  assert.match(privacy, /privacyApi\.submitRight/);
+  assert.match(privacy, /privacyApi\.closeAccount/);
+  const withdraw = appClient.slice(appClient.indexOf('async withdrawRequiredPrivacyConsent'), appClient.indexOf('recordPrivacyRefusal'));
+  assert.match(withdraw, /await this\.privacyApi\.updateConsent/);
+  assert.match(withdraw, /PrivacyConsentStore\.recordStatus/);
+  assert.doesNotMatch(withdraw, /signOut\(/);
+  assert.ok(withdraw.indexOf('await this.privacyApi.updateConsent') < withdraw.indexOf('PrivacyConsentStore.recordStatus'));
+  assert.match(index, /consentGateState = ConsentGateState\.REQUIRED/);
+  assert.doesNotMatch(profile, /deleteAccount\(/);
 });

@@ -1,3 +1,5 @@
+import { UiPerf } from '../../common/performance/UiPerf';
+import { ContentChanges } from './ContentChanges';
 import { AppClient } from '../../app/AppClient';
 import { PublicUserProfile, SocialUserBrief } from '../../model/ApiModels';
 import { PortraError } from '../../network/ErrorMapper';
@@ -7,6 +9,7 @@ import { PortraTheme } from '../../theme/PortraTheme';
 export struct FollowAction {
   @Prop targetUserId: number = 0;
   @Prop targetRole: string = '';
+  @Prop initialProfile: PublicUserProfile | undefined = undefined;
   @Prop currentUserId: number = 0;
   @State private loading: boolean = true;
   @State private busy: boolean = false;
@@ -14,6 +17,7 @@ export struct FollowAction {
   @State private followerCount: number = 0;
   @State private errorMessage: string = '';
   private readonly appClient: AppClient = AppClient.shared;
+  onChanged?: (followerCount: number) => void;
   private requestVersion: number = 0;
   private sessionVersion: number = -1;
 
@@ -35,13 +39,14 @@ export struct FollowAction {
     this.loading = true;
     this.errorMessage = '';
     try {
-      const result: PublicUserProfile = await this.appClient.apiService.getPublicProfile(
-        this.targetUserId, this.targetRole);
+      const result: PublicUserProfile = this.initialProfile !== undefined &&
+        this.initialProfile.userId === this.targetUserId && this.initialProfile.currentRole === this.targetRole ?
+        this.initialProfile : await this.appClient.apiService.getPublicProfile(this.targetUserId, this.targetRole);
       if (version !== this.requestVersion ||
         sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
         return;
       }
-      const following = await this.appClient.apiService.listFollowing(this.currentUserId, this.targetRole);
+      const following = await UiPerf.request('follow.relationship', () => this.appClient.apiService.listFollowing(this.currentUserId, this.targetRole));
       if (version !== this.requestVersion ||
         sessionVersion !== this.appClient.sessionManager.getSessionVersion()) {
         return;
@@ -57,6 +62,7 @@ export struct FollowAction {
       this.followed = following.some((item: SocialUserBrief) =>
         item !== null && item.userId === this.targetUserId);
       this.followerCount = result.followerCount;
+      this.onChanged?.(result.followerCount);
     } catch (error) {
       if (version === this.requestVersion &&
         sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
@@ -101,6 +107,8 @@ export struct FollowAction {
       }
       this.followed = result.followed;
       this.followerCount = result.followerCount;
+      this.onChanged?.(result.followerCount);
+      ContentChanges.publish('relations');
     } catch (error) {
       if (version === this.requestVersion &&
         sessionVersion === this.appClient.sessionManager.getSessionVersion()) {
@@ -126,7 +134,7 @@ export struct FollowAction {
           .fontColor(this.followed ? PortraTheme.primary : PortraTheme.white)
           .backgroundColor(this.followed ? PortraTheme.primarySoft : PortraTheme.primary)
           .borderRadius(17)
-          .enabled(!this.loading && !this.busy)
+          .enabled(!this.loading && !this.busy && this.errorMessage.length === 0)
           .onClick(() => this.toggle())
       }
       .width('100%')
@@ -135,6 +143,7 @@ export struct FollowAction {
           .width('100%')
           .fontSize(11)
           .fontColor(PortraTheme.danger)
+        Button('重试关注状态').fontSize(11).height(32).onClick(() => this.load())
       }
     }
     .width('100%')

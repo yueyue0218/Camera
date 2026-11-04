@@ -24,9 +24,9 @@ function completion(stack) {
   page.pushRoute = (route, param) => { stack.push(route); pushes.push({ route, param }); };
   return { page, stack, pushes };
 }
-test('root Moments login enters the normal HALL dynamic tab once', () => {
+test('root Moments login selects the existing shell without pushing a HALL destination', () => {
   const f = completion([AppRoute.LOGIN]); f.page.completeLogin({ returnRoute: AppRoute.HALL, initialTab: 1 });
-  assert.deepEqual(f.stack, [AppRoute.HALL]); assert.equal(f.pushes[0].param.initialTab, 1);
+  assert.deepEqual(f.stack, []); assert.equal(f.pushes.length, 0); assert.equal(f.page.mainTab, 1);
 });
 test('logging in from an existing HALL does not grow duplicate HALL destinations', () => {
   const f = completion([AppRoute.HALL, AppRoute.LOGIN]);
@@ -43,3 +43,12 @@ test('other login returns retain prior behavior and author identity parameters',
   assert.deepEqual(demand.stack, [AppRoute.DEMAND_DETAIL]);
 });
 test('notification moment login return preserves the exact real moment ID',()=>{const f=completion([AppRoute.LOGIN]);f.page.completeLogin({returnRoute:AppRoute.MOMENT_DETAIL,momentId:27});assert.equal(f.pushes[0].param.momentId,27);});
+
+
+test('message and profile login returns select the main tab without stacking pages', () => {
+  for (const [route, tab] of [[AppRoute.MESSAGE, 2], [AppRoute.PROFILE, 3]]) {
+    const f = completion([AppRoute.LOGIN]);
+    f.page.completeLogin({ returnRoute: route });
+    assert.deepEqual(f.stack, []); assert.equal(f.pushes.length, 0); assert.equal(f.page.mainTab, tab);
+  }
+});

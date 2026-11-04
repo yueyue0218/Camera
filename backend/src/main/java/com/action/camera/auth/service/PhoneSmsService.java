@@ -6,7 +6,10 @@ import com.action.camera.auth.domain.SmsDeliveryStatus;
 import com.action.camera.auth.domain.SmsPurpose;
 import com.action.camera.auth.repository.SmsChallengeRepository;
 import com.action.camera.auth.sms.SmsDeliveryReceipt;
-import com.action.camera.auth.sms.SmsCloudVerifier;
+import com.action.camera.auth.dto.SmsChallengeResponse;
+import org.springframework.transaction.annotation.Propagation;
+import java.util.Objects;
+import java.util.UUID;
 import com.action.camera.auth.sms.SmsMessage;
 import com.action.camera.auth.sms.SmsSender;
 import com.action.camera.common.ErrorCode;
@@ -36,6 +39,7 @@ public class PhoneSmsService {
     private final SmsProperties properties;
     private final Clock clock;
     private final SecureRandom secureRandom;
+    @Autowired private SmsChallengeLocks databaseLocks;
 
     @Autowired
     public PhoneSmsService(SmsChallengeRepository challengeRepository,
@@ -66,8 +70,16 @@ public class PhoneSmsService {
         this.secureRandom = secureRandom;
     }
 
-    @Transactional(noRollbackFor = SmsSendFailedException.class)
+    // Legacy Java entry point is deliberately fail-closed; no latest-challenge fallback.
+    @Deprecated
     public void sendCode(String rawPhone, SmsPurpose purpose, String requestIp, String deviceId) {
+        throw new SmsCodeInvalidException();
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = SmsSendFailedException.class)
+    public SmsChallengeResponse createChallenge(String rawPhone, SmsPurpose purpose, String requestIp,
+            String deviceId, Long userId, String sessionId, String operation) {
+        requireOwner(purpose, userId, sessionId, operation);
         if (purpose == null) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "验证码用途不能为空");
         }
@@ -78,6 +90,7 @@ public class PhoneSmsService {
         if (!SmsSendConcurrencyGuard.acquireUntilTransactionCompletion(phoneHash, safeIp, safeDeviceId)) {
             throw rateLimited("IN_FLIGHT");
         }
+        databaseLocks.acquire("phone:"+phoneHash, "ip:"+safeIp, "device:"+safeDeviceId);
         LocalDateTime now = LocalDateTime.now(clock);
 
         // Retain the database row lock used by existing verification/send flows.
@@ -94,11 +107,19 @@ public class PhoneSmsService {
 
         enforceRateLimits(phoneHash, safeIp, safeDeviceId, now);
 
+        // Once a replacement is admitted, fail closed even if its delivery fails.
+        for (SmsChallenge old : challengeRepository.findByPhoneHashAndPurposeAndConsumedAtIsNullAndInvalidatedAtIsNull(phoneHash, purpose)) {
+            old.setInvalidatedAt(now);
+        }
         String code = String.format("%06d", secureRandom.nextInt(1_000_000));
         SmsChallenge challenge = new SmsChallenge();
         challenge.setPhoneHash(phoneHash);
         challenge.setPurpose(purpose);
-        challenge.setCodeHash(codeHasher.hash(phone, purpose, code));
+        challenge.setChallengeId(UUID.randomUUID().toString());
+        challenge.setOwnerUserId(userId);
+        challenge.setOwnerSessionId(sessionId);
+        challenge.setOperation(operation);
+        challenge.setCodeHash(codeHasher.hash(challenge, code));
         challenge.setExpiresAt(now.plus(properties.getCodeTtl()));
         challenge.setAttemptCount(0);
         challenge.setMaxAttempts(properties.getMaxAttempts());
@@ -121,35 +142,44 @@ public class PhoneSmsService {
             challengeRepository.saveAndFlush(challenge);
             throw new SmsSendFailedException();
         }
+        return new SmsChallengeResponse(challenge.getChallengeId(), challenge.getExpiresAt());
     }
 
-    @Transactional(noRollbackFor = SmsCodeInvalidException.class)
+    @Deprecated
     public String verifyCode(String rawPhone, SmsPurpose purpose, String code) {
+        throw new SmsCodeInvalidException();
+    }
+
+    // Consumption and wrong-attempt counters survive rollback of any caller/business transaction.
+    @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = SmsCodeInvalidException.class)
+    public String consumeChallenge(String challengeId, String rawPhone, SmsPurpose purpose, String code,
+            Long userId, String sessionId, String operation) {
+        requireOwner(purpose, userId, sessionId, operation);
+        if (challengeId == null || !challengeId.matches("[0-9a-f-]{36}")) throw new SmsCodeInvalidException();
         if (purpose == null || code == null || !code.matches("\\d{6}")) {
             throw new SmsCodeInvalidException();
         }
         String phone = phoneNumberNormalizer.normalize(rawPhone);
         String phoneHash = phoneIdentityCodec.lookupHash(phone);
+        databaseLocks.acquire("phone:"+phoneHash);
         LocalDateTime now = LocalDateTime.now(clock);
         SmsChallenge challenge = challengeRepository
-                .findFirstByPhoneHashAndPurposeOrderByCreatedAtDesc(phoneHash, purpose)
+                .findByChallengeId(challengeId)
                 .orElseThrow(SmsCodeInvalidException::new);
 
-        if (challenge.getConsumedAt() != null
+        if (!phoneHash.equals(challenge.getPhoneHash()) || purpose != challenge.getPurpose()
+                || !Objects.equals(userId, challenge.getOwnerUserId())
+                || !Objects.equals(sessionId, challenge.getOwnerSessionId())
+                || !Objects.equals(operation, challenge.getOperation())
+                || challenge.getInvalidatedAt() != null
+                || challenge.getConsumedAt() != null
                 || challenge.getDeliveryStatus() != SmsDeliveryStatus.SENT
                 || !challenge.getExpiresAt().isAfter(now)
                 || challenge.getAttemptCount() >= challenge.getMaxAttempts()) {
             throw new SmsCodeInvalidException();
         }
 
-        boolean verified;
-        if (smsSender instanceof SmsCloudVerifier cloudVerifier) {
-            // The provider generated this code; the local challenge still enforces expiry,
-            // attempt count, and one-time consumption in our application.
-            verified = cloudVerifier.verifyCode(phone, code);
-        } else {
-            verified = codeHasher.matches(phone, purpose, code, challenge.getCodeHash());
-        }
+        boolean verified = codeHasher.matches(challenge, code);
         if (!verified) {
             challenge.setAttemptCount(challenge.getAttemptCount() + 1);
             challenge.setLastAttemptAt(now);
@@ -161,6 +191,13 @@ public class PhoneSmsService {
         challenge.setLastAttemptAt(now);
         challengeRepository.saveAndFlush(challenge);
         return phone;
+    }
+
+    private void requireOwner(SmsPurpose purpose, Long userId, String sessionId, String operation) {
+        boolean login = purpose == SmsPurpose.LOGIN && userId == null && sessionId == null && "LOGIN".equals(operation);
+        boolean reauth = purpose == SmsPurpose.REAUTH && userId != null && userId > 0
+                && sessionId != null && sessionId.matches("[A-Za-z0-9_-]{1,128}") && "ACCOUNT_CLOSURE".equals(operation);
+        if (!login && !reauth) throw new SmsCodeInvalidException();
     }
 
     private void enforceRateLimits(String phoneHash, String requestIp, String deviceId, LocalDateTime now) {

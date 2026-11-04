@@ -26,6 +26,7 @@ export class AuthSessionManager {
   private status: AuthStatus = AuthStatus.GUEST;
   private session: AuthSession | null = null;
   private restoreVersion: number = 0;
+  private readonly identityListeners: Set<() => void> = new Set<() => void>();
   private credentialError: CredentialStoreError | null = null;
   private expirationPromise?: Promise<boolean>;
   private refreshPromise?: Promise<boolean>;
@@ -57,6 +58,10 @@ export class AuthSessionManager {
   getSessionVersion(): number {
     return this.restoreVersion;
   }
+
+  /** Synchronously invalidate private page snapshots on login, logout, expiry or role change. */
+  observeIdentity(listener: () => void): void { this.identityListeners.add(listener); }
+  unobserveIdentity(listener: () => void): void { this.identityListeners.delete(listener); }
 
   isAuthenticated(): boolean {
     return this.status === AuthStatus.AUTHENTICATED && this.session !== null;
@@ -280,6 +285,7 @@ export class AuthSessionManager {
 
   private invalidateIdentity(): number {
     this.restoreVersion += 1;
+    this.identityListeners.forEach((listener: () => void) => listener());
     this.expirationPromise = undefined;
     this.pendingRotation = undefined;
     this.pendingRotationVersion = -1;

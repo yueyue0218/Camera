@@ -23,6 +23,8 @@ install -d -m 700 "$state_root"
 install -d -m 750 "$release_dir"
 
 expected_checksum_file="${source_jar}.sha256"
+[[ -f "$expected_checksum_file" ]] || { echo "JAR checksum file required" >&2; exit 1; }
+[[ -f "$health_script" ]] || { echo "Health check script required" >&2; exit 1; }
 if [[ -f "$expected_checksum_file" ]]; then
   expected_checksum="$(awk '{print $1}' "$expected_checksum_file")"
   [[ "$expected_checksum" =~ ^[0-9a-f]{64}$ ]]
@@ -76,6 +78,32 @@ elif [[ -f "$app_root/app.jar" && ! -L "$app_root/app.jar" ]]; then
   previous_target="$legacy_dir"
 fi
 
+# Capture and verify the exact previous bytes before changing any live link.
+# Missing Git metadata never means that the previous JAR belongs to the new SHA.
+if [[ -n "$previous_target" ]]; then
+  [[ "$previous_target" == "$release_root/"* && -f "$previous_target/portra-backend.jar" ]]
+  previous_checksum="$(sha256sum "$previous_target/portra-backend.jar" | awk '{print $1}')"
+  if [[ -f "$previous_target/portra-backend.jar.sha256" ]]; then
+    [[ "$(awk '{print $1}' "$previous_target/portra-backend.jar.sha256")" == "$previous_checksum" ]] || {
+      echo "Previous JAR checksum mismatch; refusing deployment" >&2; exit 1;
+    }
+  fi
+  backup_dir="$state_root/backend-backups/$previous_checksum"
+  install -d -m 700 "$backup_dir"
+  if [[ ! -f "$backup_dir/portra-backend.jar" ]]; then
+    cp -- "$previous_target/portra-backend.jar" "$backup_dir/portra-backend.jar"
+  fi
+  [[ "$(sha256sum "$backup_dir/portra-backend.jar" | awk '{print $1}')" == "$previous_checksum" ]]
+  printf '%s\n' "$previous_target" > "$backup_dir/original-target.txt"
+  previous_commit="$(cat "$previous_target/deployed-commit.txt" 2>/dev/null || printf 'UNKNOWN')"
+  [[ "$previous_commit" =~ ^[0-9a-f]{40}$ || "$previous_commit" == UNKNOWN ]] || exit 1
+  printf '%s\n' "$previous_commit" > "$backup_dir/deployed-commit.txt"
+  printf '%s  portra-backend.jar\n' "$previous_checksum" > "$backup_dir/portra-backend.jar.sha256"
+  chmod 0600 "$backup_dir/"*
+  # Legacy release metadata is completed only during an approved deployment.
+  printf '%s  portra-backend.jar\n' "$previous_checksum" > "$previous_target/portra-backend.jar.sha256"
+fi
+
 if [[ -n "$previous_target" && "$previous_target" == "$release_root/"* ]]; then
   atomic_link "$previous_target" "$app_root/previous"
   atomic_link "$previous_target" /home/portra-deploy/previous
@@ -86,15 +114,14 @@ if [[ -f "$app_root/app.jar" && ! -L "$app_root/app.jar" ]]; then
 fi
 atomic_link "$release_dir" "$app_root/current"
 atomic_link "$release_dir" /home/portra-deploy/current
-if [[ ! -L "$app_root/app.jar" ]]; then
-  ln -s "$app_root/current/portra-backend.jar" "$app_root/app.jar"
-fi
+atomic_link "$app_root/current/portra-backend.jar" "$app_root/app.jar"
 
 rollback() {
   if [[ -z "$previous_target" || "$previous_target" != "$release_root/"* ]]; then
     echo "No managed previous release is available" >&2
     return 1
   fi
+  [[ "$(sha256sum "$previous_target/portra-backend.jar" | awk '{print $1}')" == "$previous_checksum" ]] || return 1
   atomic_link "$previous_target" "$app_root/current"
   atomic_link "$previous_target" /home/portra-deploy/current
   sudo /usr/bin/systemctl restart portra-backend.service
@@ -102,6 +129,9 @@ rollback() {
   bash "$health_script" "$health_url" "$public_url" "$expected_origin"
   previous_commit="$(cat "$previous_target/deployed-commit.txt" 2>/dev/null || printf 'UNKNOWN')"
   printf '%s\n' "$previous_commit" > "$state_root/application-commit.txt"
+  printf '%s\n' "$previous_checksum" > "$state_root/application-jar.sha256"
+  printf 'APPLICATION_COMMIT=%s\nJAR_SHA256=%s\n' "$previous_commit" "$previous_checksum" > "$state_root/backend-state.env"
+  chmod 0600 "$state_root/application-commit.txt" "$state_root/application-jar.sha256" "$state_root/backend-state.env"
 }
 
 if ! sudo /usr/bin/systemctl restart portra-backend.service \
@@ -113,9 +143,10 @@ if ! sudo /usr/bin/systemctl restart portra-backend.service \
 fi
 
 printf '%s\n' "$sha" > "$state_root/application-commit.txt"
-printf 'APPLICATION_COMMIT=%s\nDEPLOYED_AT=%s\n' "$sha" "$timestamp" \
+printf '%s\n' "$actual_checksum" > "$state_root/application-jar.sha256"
+printf 'APPLICATION_COMMIT=%s\nDEPLOYED_AT=%s\nJAR_SHA256=%s\n' "$sha" "$timestamp" "$actual_checksum" \
   > "$state_root/backend-state.env"
-chmod 0600 "$state_root/application-commit.txt" "$state_root/backend-state.env"
+chmod 0600 "$state_root/application-commit.txt" "$state_root/application-jar.sha256" "$state_root/backend-state.env"
 
 current_real="$(readlink -f "$app_root/current")"
 previous_real="$(readlink -f "$app_root/previous" 2>/dev/null || true)"

@@ -30,7 +30,8 @@ public class ProductionSecretsValidator implements InitializingBean {
     @Override
     public void afterPropertiesSet() {
         List<String> activeProfiles = Arrays.asList(environment.getActiveProfiles());
-        if (activeProfiles.contains("dev") || activeProfiles.contains("smoke")) {
+        if (activeProfiles.contains("dev") || activeProfiles.contains("smoke")
+                || activeProfiles.contains("staging") || activeProfiles.contains("temp-staging")) {
             throw new IllegalStateException("Production must not run with dev or smoke profiles");
         }
 

@@ -33,8 +33,6 @@ export struct MomentCard {
     Column() {
       Column({ space: 8 }) {
         Row() {
-          Text(`No. ${this.item.momentId.toString().padStart(6, '0')}`)
-            .fontSize(10).letterSpacing(1).fontColor('#67615A')
           Blank()
           Text('PORTRA FILE')
             .fontSize(10).letterSpacing(1).fontWeight(FontWeight.Bold).fontColor('#2864C5')

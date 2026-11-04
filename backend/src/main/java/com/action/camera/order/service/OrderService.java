@@ -14,6 +14,7 @@ import com.action.camera.message.service.ConversationService;
 import com.action.camera.notification.dto.NotificationCreateRequest;
 import com.action.camera.notification.service.NotificationService;
 import com.action.camera.order.entity.Order;
+import com.action.camera.order.dto.PaymentResponse;
 import com.action.camera.order.entity.OrderStatusLog;
 import com.action.camera.order.entity.PaymentRecord;
 import com.action.camera.order.enums.EscrowStatus;
@@ -22,6 +23,7 @@ import com.action.camera.order.repository.OrderRepository;
 import com.action.camera.order.repository.OrderStatusLogRepository;
 import com.action.camera.order.repository.PaymentRecordRepository;
 import com.action.camera.order.statemachine.OrderStatusMachine;
+import com.action.camera.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -80,6 +82,7 @@ public class OrderService {
     private final DeliveryRepository deliveryRepository;
     private final UserDisplayService userDisplayService;
     private final OrderDisplayService orderDisplayService;
+    private final UserRepository userRepository;
 
     @Autowired(required = false)
     private ConversationRepository conversationRepository;
@@ -90,6 +93,11 @@ public class OrderService {
     @Transactional
     public Order createOrderFromConfirmedQuote(Quote quote) {
         validateConfirmedQuote(quote);
+
+        // Serialize reservations for one provider before any consistent-read query.
+        userRepository.findByIdForUpdate(quote.getProviderUserId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND,
+                        "Provider not found: " + quote.getProviderUserId()));
 
         Optional<Order> existingOrder = orderRepository.findByQuoteId(quote.getId());
         if (existingOrder.isPresent()) {
@@ -145,8 +153,27 @@ public class OrderService {
     }
 
     @Transactional
-    public Order changeStatus(Long orderId, Long operatorId, OrderStatus targetStatus, String reason) {
+    public PaymentResponse mockPayForResponse(Long orderId, Long payerId, Long amountCent) {
+        Order paidOrder = mockPay(orderId, payerId, amountCent);
+        PaymentRecord paymentRecord = paymentRecordRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND,
+                        "Payment record not found for order: " + orderId));
+        return PaymentResponse.from(paymentRecord, paidOrder);
+    }
+
+    @Transactional(readOnly = true)
+    public PaymentResponse getPaymentResponseForOrder(Long orderId, Long operatorId) {
         Order order = getOrderOrThrow(orderId);
+        ensureOrderParticipant(order, operatorId);
+        PaymentRecord paymentRecord = paymentRecordRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND,
+                        "Payment record not found for order: " + orderId));
+        return PaymentResponse.from(paymentRecord, order);
+    }
+
+    @Transactional
+    public Order changeStatus(Long orderId, Long operatorId, OrderStatus targetStatus, String reason) {
+        Order order = getOrderForUpdateOrThrow(orderId);
         OrderStatus fromStatus = order.getStatus();
         ensureCanChangeStatus(fromStatus, targetStatus);
         ensureNotManualShootingTransition(fromStatus, targetStatus);
@@ -172,7 +199,7 @@ public class OrderService {
 
     @Transactional
     public Order cancelOrder(Long orderId, Long customerId, String reason, LocalDateTime now) {
-        Order order = getOrderOrThrow(orderId);
+        Order order = getOrderForUpdateOrThrow(orderId);
         if (!Objects.equals(order.getCustomerId(), customerId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Only the customer can cancel this order");
         }
@@ -215,7 +242,7 @@ public class OrderService {
 
     @Transactional
     public Order requestRework(Long orderId, Long customerId, String reason) {
-        Order order = getOrderOrThrow(orderId);
+        Order order = getOrderForUpdateOrThrow(orderId);
         if (!Objects.equals(order.getCustomerId(), customerId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Only the customer can request rework");
         }
@@ -233,7 +260,7 @@ public class OrderService {
 
     @Transactional
     public Order completeReworkDelivery(Long orderId, Long providerId, String reason) {
-        Order order = getOrderOrThrow(orderId);
+        Order order = getOrderForUpdateOrThrow(orderId);
         if (!Objects.equals(order.getProviderUserId(), providerId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Only the provider can upload rework delivery");
         }
@@ -263,7 +290,7 @@ public class OrderService {
 
     @Transactional
     public Order markDeliveryUploaded(Long orderId, Long providerId, String reason) {
-        Order order = getOrderOrThrow(orderId);
+        Order order = getOrderForUpdateOrThrow(orderId);
         if (!Objects.equals(order.getProviderUserId(), providerId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Only the provider can upload delivery");
         }
@@ -280,6 +307,18 @@ public class OrderService {
                 "PROVIDER",
                 reason
         );
+    }
+
+    @Transactional
+    public Order lockForDeliveryUpload(Long orderId, Long providerId) {
+        Order order = getOrderForUpdateOrThrow(orderId);
+        if (!Objects.equals(order.getProviderUserId(), providerId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only the provider can upload delivery");
+        }
+        if (order.getStatus() != OrderStatus.PENDING_DELIVERY && order.getStatus() != OrderStatus.REWORK_REQUIRED) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Order status does not allow delivery upload");
+        }
+        return order;
     }
 
     @Transactional
@@ -498,6 +537,49 @@ public class OrderService {
         orders.addAll(listCustomerOrders(operatorId, null));
         orders.addAll(listProviderOrders(operatorId, null));
         return filterAndSortOrders(syncTimelineStatusesIfDue(orders, now), status);
+    }
+
+    private String requireSummaryRole(Long operatorId, String role) {
+        if (operatorId == null) { throw new BusinessException(ErrorCode.UNAUTHORIZED, "operatorId must not be null"); }
+        if (!"customer".equalsIgnoreCase(role) && !"provider".equalsIgnoreCase(role)) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Unsupported order role");
+        }
+        return role.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private void syncUserTimeline(Long operatorId, String role) {
+        LocalDateTime now = LocalDateTime.now();
+        // Preserve the read-side transitions and notifications performed by
+        // listMyOrders, including due orders outside the requested page.
+        syncTimelineStatusesIfDue(orderRepository.findTimelineDueForUser(operatorId, role, now,
+                OrderStatus.PAID_PENDING_SHOOT, OrderStatus.SHOOTING), now);
+        orderRepository.flush();
+    }
+
+    @Transactional
+    public com.action.camera.order.dto.OrderSummaryResponse summarizeMyOrders(Long operatorId, String role) {
+        String normalizedRole = requireSummaryRole(operatorId, role);
+        syncUserTimeline(operatorId, normalizedRole);
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        for (OrderStatus status : OrderStatus.values()) { counts.put(status.name(), 0L); }
+        for (var row : orderRepository.summarizeForUser(operatorId, normalizedRole)) {
+            counts.put(row.getStatus().name(), row.getTotal());
+        }
+        long total = counts.values().stream().mapToLong(Long::longValue).sum();
+        long completed = counts.get(OrderStatus.COMPLETED.name());
+        long ongoing = total - completed - counts.get(OrderStatus.CANCELLED.name()) - counts.get(OrderStatus.REFUNDED.name());
+        return new com.action.camera.order.dto.OrderSummaryResponse(total, completed, ongoing, counts);
+    }
+
+    @Transactional
+    public com.action.camera.common.page.PageResult<Order> pageMyOrders(Long operatorId, String role,
+                                                                        OrderStatus status, int page, int size) {
+        String normalizedRole = requireSummaryRole(operatorId, role);
+        int safePage = Math.max(page, 1), safeSize = Math.max(1, Math.min(size, 50));
+        syncUserTimeline(operatorId, normalizedRole);
+        var result = orderRepository.findPageForUser(operatorId, normalizedRole, status,
+                org.springframework.data.domain.PageRequest.of(safePage - 1, safeSize));
+        return new com.action.camera.common.page.PageResult<>(result.getContent(), safePage, safeSize, result.getTotalElements());
     }
 
     @Transactional
@@ -767,7 +849,16 @@ public class OrderService {
     }
 
     private Order handleExistingPayment(Order order, PaymentRecord existingPayment, Long amountCent, Long payerId) {
+        if (!MOCK_PAY_METHOD.equals(existingPayment.getPayMethod())
+                || !PAYMENT_SUCCESS.equals(existingPayment.getStatus())) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                    "Existing payment is not an active mock payment for this customer");
+        }
         ensurePaymentAmountMatches(existingPayment, amountCent);
+        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.REFUNDED) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT,
+                    "Cancelled or refunded orders cannot be paid again");
+        }
         if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
             OrderStatus fromStatus = order.getStatus();
             ensureCanChangeStatus(fromStatus, OrderStatus.PAID_PENDING_SHOOT);

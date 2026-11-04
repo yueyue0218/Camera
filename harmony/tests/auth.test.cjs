@@ -30,6 +30,13 @@ const Tag = {
 const assets = new Map();
 const assetCalls = { add: [], query: [], remove: [] };
 let assetQueryError = null;
+const preferenceValues = new Map();
+const preferenceStore = {
+  getSync(key, defaultValue) { return preferenceValues.get(key) ?? defaultValue; },
+  putSync(key, value) { preferenceValues.set(key, value); },
+  deleteSync(key) { preferenceValues.delete(key); },
+  flushSync() {}
+};
 let assetAddError = null;
 let assetRemoveError = null;
 function aliasKey(bytes) { return Buffer.from(bytes).toString('hex'); }
@@ -64,7 +71,11 @@ class ArkTextDecoder {
 }
 const mocks = {
   '@kit.NetworkKit': { http }, '@kit.AssetStoreKit': { asset },
-  '@kit.ArkTS': { util: { TextEncoder: ArkTextEncoder, TextDecoder: ArkTextDecoder } },
+  '@kit.ArkData': { preferences: { getPreferencesSync() { return preferenceStore; } } },
+  '@kit.ArkTS': { util: {
+    TextEncoder: ArkTextEncoder, TextDecoder: ArkTextDecoder,
+    generateRandomUUID() { return '12345678-1234-4123-8123-123456789abc'; }
+  } },
   '@kit.BasicServicesKit': { BusinessError: class BusinessError extends Error {} }
 };
 class TestBuildProfile {
@@ -135,6 +146,40 @@ function nativeSessionApi(accessToken = 'restored-access', nextRefreshToken = 'r
     async logout() { this.logoutCalls++; return true; }
   };
 }
+
+test('role notification waits for in-flight renewal and preserves the rotated credential', async () => {
+  let resolve;
+  const controller = tokenController(), store = new MemoryCredentialStore();
+  const api = nativeSessionApi();
+  api.refresh = () => new Promise(done => { resolve = done; });
+  const manager = new AuthSessionManager(controller, store, EnvironmentName.DEV, api);
+  await manager.signIn('test-access', 'test-refresh');
+  const epoch = manager.getSessionVersion();
+  const renewal = manager.refreshAccessToken();
+  await new Promise(setImmediate);
+  const changed = manager.notifyIdentityChanged();
+  assert.equal(manager.getSessionVersion(), epoch);
+  resolve({ accessToken: 'new-access', refreshToken: 'new-refresh' });
+  assert.equal(await renewal, true); assert.equal(await changed, true);
+  assert.equal(manager.getSessionVersion(), epoch + 1);
+  assert.equal(controller.token, 'new-access'); assert.equal(store.credential.refreshToken, 'new-refresh');
+});
+
+test('logout while role notification waits for renewal cannot resurrect a session', async () => {
+  let resolve;
+  const store = new MemoryCredentialStore(), api = nativeSessionApi();
+  api.refresh = () => new Promise(done => { resolve = done; });
+  const manager = new AuthSessionManager(tokenController(), store, EnvironmentName.DEV, api);
+  await manager.signIn('test-access', 'test-refresh');
+  const renewal = manager.refreshAccessToken();
+  const rejected = assert.rejects(renewal);
+  await new Promise(setImmediate);
+  const changed = manager.notifyIdentityChanged();
+  await manager.signOut();
+  resolve({ accessToken: 'old-access', refreshToken: 'old-refresh' });
+  await rejected; assert.equal(await changed, false);
+  assert.equal(manager.isAuthenticated(), false); assert.equal(store.credential, null);
+});
 
 test('Asset Store keeps an environment-scoped, local, encrypted token record', async () => {
   assets.clear();
@@ -224,7 +269,7 @@ test('application session restore deduplicates concurrency and retries after a t
   assetQueryError = null;
   const store = new AssetCredentialStore('dev', 'portra:dev');
   await store.save({ refreshToken: 'retry-token', environment: 'dev' });
-  const retry = AppClient.shared.restoreSession();
+  const retry = AppClient.shared.sessionManager.restore(AppClient.shared.sessionManager.beginRestore());
   assert.notEqual(retry, first);
   const previousCallCount = calls.length;
   await new Promise(resolve => setImmediate(resolve));
@@ -275,6 +320,7 @@ test('concurrent expiration clears the credential once', async () => {
   assert.equal(controller.token, '');
   releaseClear();
   assert.equal(await first, true);
+  assert.equal(await second, true);
 });
 
 test('401 and 40101 try refresh and expire a rejected session; 403 does not refresh', async () => {
@@ -540,4 +586,14 @@ test('a retry that finds no credential clears the preceding storage error', asyn
   assert.equal(app.sessionManager.getStatus(), AuthStatus.GUEST);
   assert.equal(app.sessionManager.getCredentialError(), null);
   assert.equal(calls.length, before);
+});
+
+test('private snapshot listeners invalidate synchronously for identity changes, not token rotation', async()=>{
+ const manager=new AuthSessionManager(tokenController(),new MemoryCredentialStore(),EnvironmentName.DEV,nativeSessionApi());
+ const versions=[];const listener=()=>versions.push(manager.getSessionVersion());manager.observeIdentity(listener);
+ const login=manager.signIn('test-access','test-refresh');assert.equal(versions.length,1);await login;
+ await manager.refreshAccessToken();assert.equal(versions.length,1);
+ await manager.notifyIdentityChanged();assert.equal(versions.length,2);
+ const expiry=manager.markExpired();assert.equal(versions.length,3);await expiry;
+ manager.unobserveIdentity(listener);await manager.signOut();assert.equal(versions.length,3);
 });

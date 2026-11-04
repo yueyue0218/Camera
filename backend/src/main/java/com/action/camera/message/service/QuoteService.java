@@ -29,18 +29,23 @@ public class QuoteService {
     @Transactional
     public Quote createQuoteFromConversation(CreateQuoteCommand command, Long operatorId) {
         validateCreateQuoteCommand(command);
-        Conversation conversation = conversationRepository.findById(command.getConversationId())
+        Conversation conversation = conversationRepository.findByIdForUpdate(command.getConversationId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND,
                         "Conversation not found: " + command.getConversationId()));
 
         if (!Objects.equals(conversation.getParticipantBId(), operatorId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Only the provider can create quote in this conversation");
         }
-        if (quoteRepository.findFirstByConversationIdAndStatus(
-                command.getConversationId(), QuoteStatus.PENDING_CONFIRM).isPresent()) {
-            throw new BusinessException(ErrorCode.DUPLICATE_OPERATION,
-                    "Conversation already has a pending quote: " + command.getConversationId());
-        }
+        quoteRepository.findFirstByConversationIdAndStatus(command.getConversationId(), QuoteStatus.PENDING_CONFIRM)
+                .ifPresent(existing -> {
+                    if (!isExpired(existing, LocalDateTime.now())) {
+                        throw new BusinessException(ErrorCode.DUPLICATE_OPERATION,
+                                "Conversation already has a pending quote: " + command.getConversationId());
+                    }
+                    existing.setStatus(QuoteStatus.EXPIRED);
+                    existing.setUpdatedAt(LocalDateTime.now());
+                    quoteRepository.save(existing);
+                });
         orderService.ensureProviderTimeAvailable(
                 conversation.getParticipantBId(),
                 command.getShootStartTime(),
@@ -60,6 +65,9 @@ public class QuoteService {
         if (quote.getStatus() != QuoteStatus.PENDING_CONFIRM) {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT,
                     "Only pending quotes can be edited: " + quote.getStatus());
+        }
+        if (isExpired(quote, LocalDateTime.now())) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Quote has expired");
         }
         orderService.ensureProviderTimeAvailable(
                 quote.getProviderUserId(),
@@ -99,10 +107,7 @@ public class QuoteService {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT,
                     "Quote status does not allow confirmation: " + quote.getStatus());
         }
-        if (quote.getExpireTime() != null && quote.getExpireTime().isBefore(LocalDateTime.now())) {
-            quote.setStatus(QuoteStatus.EXPIRED);
-            quote.setUpdatedAt(LocalDateTime.now());
-            quoteRepository.save(quote);
+        if (isExpired(quote, LocalDateTime.now())) {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Quote has expired");
         }
 
@@ -120,6 +125,9 @@ public class QuoteService {
         if (quote.getStatus() != QuoteStatus.PENDING_CONFIRM) {
             throw new BusinessException(ErrorCode.STATUS_CONFLICT,
                     "Quote status does not allow rejection: " + quote.getStatus());
+        }
+        if (isExpired(quote, LocalDateTime.now())) {
+            throw new BusinessException(ErrorCode.STATUS_CONFLICT, "Quote has expired");
         }
 
         quote.setStatus(QuoteStatus.REJECTED);
@@ -149,6 +157,10 @@ public class QuoteService {
         }
         return quoteRepository.findByIdForUpdate(quoteId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Quote not found: " + quoteId));
+    }
+
+    private boolean isExpired(Quote quote, LocalDateTime now) {
+        return quote.getExpireTime() != null && !quote.getExpireTime().isAfter(now);
     }
 
     private void ensureCustomerOperator(Quote quote, Long operatorId) {

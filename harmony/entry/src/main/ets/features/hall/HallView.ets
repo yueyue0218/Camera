@@ -1,3 +1,5 @@
+import { HallFilterState } from './HallFilterState';
+import { HallFilters } from './components/HallFilters';
 import { DemandSummary, ServicePackageSummary } from '../../model/ApiModels';
 import { PortraAppBar } from '../../common/components/PortraAppBar';
 import { PortraEmptyView } from '../../common/components/PortraEmptyView';
@@ -5,11 +7,17 @@ import { PortraErrorView } from '../../common/components/PortraErrorView';
 import { PortraLoading } from '../../common/components/PortraLoading';
 import { PortraTheme } from '../../theme/PortraTheme';
 import { DemandCard, PortraPublishBanner, ShowcaseCard } from './components/HallCards';
-import { HallFilters, HallSegmentedControl } from './components/HallControls';
+import { HallSegmentedControl } from './components/HallControls';
 import { HallChannel, HallContentState } from './HallUiModels';
 
 @Component
 export struct HallView {
+  @Prop @Watch('onHallReselected') reselectEpoch: number = 0;
+  @Prop noticeUnreadCount: number = 0;
+  @Prop noticeArrivalEpoch: number = 0;
+  @Prop serviceRefreshing: boolean = false;
+  @Prop demandRefreshing: boolean = false;
+  onRefresh?: (channel: HallChannel) => void;
   @Prop serviceState: HallContentState = HallContentState.LOADING;
   @Prop demandState: HallContentState = HallContentState.LOADING;
   @Prop serviceItems: ServicePackageSummary[] = [];
@@ -17,27 +25,50 @@ export struct HallView {
   @Prop serviceError: string = '';
   @Prop demandError: string = '';
   @Prop initialChannel: HallChannel = HallChannel.SHOWCASES;
-  @Prop serviceSort: string = 'recommend';
-  @Prop demandSort: string = 'latest';
+  @Prop serviceCities: string[] = [];
+  @Prop demandCities: string[] = [];
+  @Prop serviceStyles: string[] = [];
+  @Prop demandStyles: string[] = [];
+  @Prop serviceFilters: HallFilterState = new HallFilterState();
+  @Prop demandFilters: HallFilterState = new HallFilterState();
   @Prop serviceHasMore: boolean = false;
   @Prop demandHasMore: boolean = false;
   @Prop serviceLoadingMore: boolean = false;
   @Prop demandLoadingMore: boolean = false;
+  @Prop @Watch('onRoleChanged') currentRole: string = '';
+  @Prop roleLoading: boolean = false;
+  @Prop roleError: string = '';
   @State private channel: HallChannel = HallChannel.SHOWCASES;
   private readonly contentScroller: Scroller = new Scroller();
   onSearch?: () => void;
   onNotice?: () => void;
   onPublish?: () => void;
+  onRetryRole?: () => void;
   onRetry?: () => void;
+  onOpenAuthor?: (userId: number, role: string) => void;
   onOpenService?: (serviceId: number) => void;
   onOpenDemand?: (demandId: number) => void;
-  onServiceSortChange?: (sort: string) => void;
-  onDemandSortChange?: (sort: string) => void;
+  onServiceFiltersChange?: (value: HallFilterState) => void;
+  onDemandFiltersChange?: (value: HallFilterState) => void;
   onLoadMoreServices?: () => void;
   onLoadMoreDemands?: () => void;
 
   aboutToAppear(): void {
     this.channel = this.initialChannel;
+    this.onRoleChanged();
+  }
+
+  private onRoleChanged(): void {
+    if (this.currentRole === 'PROVIDER') {
+      this.selectChannel(HallChannel.DEMANDS);
+    } else if (this.currentRole === 'CUSTOMER') {
+      this.selectChannel(HallChannel.SHOWCASES);
+    }
+  }
+
+  private onHallReselected(): void {
+    this.contentScroller.scrollTo({ xOffset: 0, yOffset: 0, animation: { duration: 250, curve: Curve.EaseOut } });
+    this.onRefresh?.(this.channel);
   }
 
   private selectChannel(channel: HallChannel): void {
@@ -73,10 +104,10 @@ export struct HallView {
       ForEach(this.serviceItems, (item: ServicePackageSummary, index: number) => {
         if (index % 2 === 0) {
           Row({ space: PortraTheme.spacingMd }) {
-            ShowcaseCard({ item: item, onOpen: this.onOpenService })
+            ShowcaseCard({ item: item, onOpen: this.onOpenService, onOpenAuthor: this.onOpenAuthor })
               .layoutWeight(1)
             if (index + 1 < this.serviceItems.length) {
-              ShowcaseCard({ item: this.serviceItems[index + 1], onOpen: this.onOpenService })
+              ShowcaseCard({ item: this.serviceItems[index + 1], onOpen: this.onOpenService, onOpenAuthor: this.onOpenAuthor })
                 .layoutWeight(1)
             } else {
               Blank().layoutWeight(1)
@@ -119,7 +150,7 @@ export struct HallView {
     } else {
       Column({ space: PortraTheme.spacingMd }) {
         ForEach(this.demandItems, (item: DemandSummary) => {
-          DemandCard({ item: item, onOpen: this.onOpenDemand })
+          DemandCard({ item: item, onOpen: this.onOpenDemand, onOpenAuthor: this.onOpenAuthor })
         }, (item: DemandSummary) => item.demandId.toString())
         if (this.demandHasMore) {
           Button(this.demandLoadingMore ? '加载中…' : '加载更多需求')
@@ -133,7 +164,8 @@ export struct HallView {
 
   build() {
     Column() {
-      PortraAppBar({ onSearch: this.onSearch, onNotice: this.onNotice })
+      PortraAppBar({ onSearch: this.onSearch, onNotice: this.onNotice,
+        unreadCount: this.noticeUnreadCount, noticeArrivalEpoch: this.noticeArrivalEpoch })
 
       Column({ space: 7 }) {
         HallSegmentedControl({
@@ -142,40 +174,61 @@ export struct HallView {
         })
         HallFilters({
           channel: this.channel,
-          serviceSort: this.serviceSort,
-          demandSort: this.demandSort,
-          onServiceSortChange: this.onServiceSortChange,
-          onDemandSortChange: this.onDemandSortChange
+          cities: this.channel === HallChannel.SHOWCASES ? this.serviceCities : this.demandCities,
+          styles: this.channel === HallChannel.SHOWCASES ? this.serviceStyles : this.demandStyles,
+          filters: this.channel === HallChannel.SHOWCASES ? this.serviceFilters : this.demandFilters,
+          onChange: (value: HallFilterState) => {
+            this.contentScroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false });
+            if (this.channel === HallChannel.SHOWCASES) { this.onServiceFiltersChange?.(value); }
+            else { this.onDemandFiltersChange?.(value); }
+          }
         })
       }
       .width('100%')
-      .padding({ left: PortraTheme.spacingLg, right: PortraTheme.spacingLg, bottom: 5 })
+      .padding({ left: PortraTheme.spacingLg, right: PortraTheme.spacingLg, bottom: 6 })
+      .flexShrink(0)
       .backgroundColor(PortraTheme.pageBackground)
       .border({ width: { bottom: 1 }, color: PortraTheme.border })
 
-      Scroll(this.contentScroller) {
-        Column({ space: PortraTheme.spacingLg }) {
-          if (this.channel === HallChannel.SHOWCASES) {
-            PortraPublishBanner({ onPublish: this.onPublish })
-            this.SectionHeading('精选镜头', '按风格与距离推荐')
-            this.ShowcaseState()
-          } else {
-            this.SectionHeading('约拍需求', '查看最新公开需求')
-            this.DemandState()
+      Refresh({ refreshing: this.channel === HallChannel.SHOWCASES ? this.serviceRefreshing : this.demandRefreshing }) {
+        Scroll(this.contentScroller) {
+          Column({ space: PortraTheme.spacingLg }) {
+            if (this.channel === HallChannel.SHOWCASES) {
+              PortraPublishBanner({ role: this.currentRole, roleLoading: this.roleLoading,
+                roleError: this.roleError, onRetryRole: this.onRetryRole, onPublish: this.onPublish })
+              this.SectionHeading('精选镜头', '按风格与距离推荐')
+              if (this.serviceError.length > 0 && this.serviceState === HallContentState.CONTENT) {
+                Button(this.serviceError + ' 点击重试').onClick(() => this.onRefresh?.(HallChannel.SHOWCASES))
+              }
+              this.ShowcaseState()
+            } else {
+              PortraPublishBanner({ role: this.currentRole, roleLoading: this.roleLoading,
+                roleError: this.roleError, onRetryRole: this.onRetryRole, onPublish: this.onPublish })
+              this.SectionHeading('约拍需求', '查看最新公开需求')
+              if (this.demandError.length > 0 && this.demandState === HallContentState.CONTENT) {
+                Button(this.demandError + ' 点击重试').onClick(() => this.onRefresh?.(HallChannel.DEMANDS))
+              }
+              this.DemandState()
+            }
           }
+          .width('100%')
+          .padding({
+            left: PortraTheme.spacingLg,
+            right: PortraTheme.spacingLg,
+            top: this.channel === HallChannel.SHOWCASES ? 6 : 0,
+            bottom: PortraTheme.spacing2Xl
+          })
         }
+        .height('100%')
         .width('100%')
-        .padding({
-          left: PortraTheme.spacingLg,
-          right: PortraTheme.spacingLg,
-          top: PortraTheme.spacingSm,
-          bottom: PortraTheme.spacing2Xl
-        })
+        .align(Alignment.Top)
+        .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.Spring)
+        .clip(true)
       }
       .layoutWeight(1)
       .width('100%')
-      .scrollBar(BarState.Off)
-      .edgeEffect(EdgeEffect.Spring)
+      .onRefreshing(() => this.onRefresh?.(this.channel))
     }
     .width('100%')
     .height('100%')

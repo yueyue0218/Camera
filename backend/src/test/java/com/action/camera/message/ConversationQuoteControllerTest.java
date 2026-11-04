@@ -302,7 +302,7 @@ class ConversationQuoteControllerTest {
     @Test
     void providerCanCreateQuoteEndpoint() {
         UserContext.setUserId(PROVIDER_USER_ID);
-        when(conversationRepository.findById(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
+        when(conversationRepository.findByIdForUpdate(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
         when(quoteRepository.findFirstByConversationIdAndStatus(CONVERSATION_ID, QuoteStatus.PENDING_CONFIRM))
                 .thenReturn(Optional.empty());
         when(quoteRepository.save(any(Quote.class))).thenAnswer(invocation -> {
@@ -323,7 +323,7 @@ class ConversationQuoteControllerTest {
     @Test
     void customerCannotCreateQuoteEndpoint() {
         UserContext.setUserId(CUSTOMER_ID);
-        when(conversationRepository.findById(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
+        when(conversationRepository.findByIdForUpdate(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
 
         assertThrows(BusinessException.class,
                 () -> quoteController.createQuote(validQuoteRequest()));
@@ -334,7 +334,7 @@ class ConversationQuoteControllerTest {
     @Test
     void strangerCannotCreateQuoteEndpoint() {
         UserContext.setUserId(STRANGER_ID);
-        when(conversationRepository.findById(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
+        when(conversationRepository.findByIdForUpdate(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
 
         assertThrows(BusinessException.class,
                 () -> quoteController.createQuote(validQuoteRequest()));
@@ -345,7 +345,7 @@ class ConversationQuoteControllerTest {
     @Test
     void pendingQuoteBlocksCreateQuoteEndpoint() {
         UserContext.setUserId(PROVIDER_USER_ID);
-        when(conversationRepository.findById(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
+        when(conversationRepository.findByIdForUpdate(CONVERSATION_ID)).thenReturn(Optional.of(conversation()));
         when(quoteRepository.findFirstByConversationIdAndStatus(CONVERSATION_ID, QuoteStatus.PENDING_CONFIRM))
                 .thenReturn(Optional.of(pendingQuote()));
 

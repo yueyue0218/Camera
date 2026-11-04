@@ -10,28 +10,67 @@ import { MomentFeedCache } from './MomentFeedModels';
 import { MomentSessionBinding } from './MomentInteractionBindings';
 import { MomentPublishApiBinding } from './MomentPublishApiBinding';
 import { MomentPublishController, MomentPublishSnapshot } from './MomentPublishController';
+import { InlineImagePolicy, PublicImagePolicy } from '../../common/components/ComponentPolicy';
 
 @Component
 export struct MomentPublishPanel {
   @Prop @Watch('editingTargetChanged') editingId: number = 0;
   @State private state: MomentPublishSnapshot = new MomentPublishSnapshot();
   @State private picking: boolean = false;
+  @State private selectingImages: boolean = false;
+  @State private selectedImageIndexes: number[] = [];
   @State private topInset: number = 40;
+  @State private networkAllowed: boolean = false;
   private controller?: MomentPublishController;
   private active: boolean = false;
+  private lastLongPressAt: number = 0;
   onClose?: () => void;
   onRequireLogin?: () => void;
   onPublished?: (item: MomentSummary) => void;
+  private readonly privacyChanged: () => void = () => {
+    this.networkAllowed = AppClient.shared.canUseBusinessNetwork();
+  };
+  private canDisplayImage(source: string): boolean {
+    return InlineImagePolicy.accepts(source) && (!PublicImagePolicy.accepts(source) || this.networkAllowed);
+  }
   aboutToAppear(): void {
     this.active = true; this.readSafeArea();
+    AppClient.shared.observePrivacyAccess(this.privacyChanged);
+    this.privacyChanged();
     this.controller = new MomentPublishController(new MomentPublishApiBinding(AppClient.shared.apiService),
       new MomentSessionBinding(AppClient.shared.sessionManager), MomentFeedCache.shared,
       (value: MomentPublishSnapshot) => this.state = value, (item: MomentSummary) => this.onPublished?.(item));
     this.controller.open(this.editingId);
   }
-  aboutToDisappear(): void { this.active = false; this.controller?.close(); this.controller = undefined; }
+  aboutToDisappear(): void {
+    this.active = false;
+    AppClient.shared.unobservePrivacyAccess(this.privacyChanged);
+    this.controller?.close(); this.controller = undefined;
+  }
 
-  private editingTargetChanged(): void { this.picking = false; this.controller?.open(this.editingId); }
+  private editingTargetChanged(): void {
+    this.picking = false; this.selectingImages = false; this.selectedImageIndexes = [];
+    this.controller?.open(this.editingId);
+  }
+
+  private toggleImage(index: number): void {
+    this.selectedImageIndexes = this.selectedImageIndexes.includes(index) ?
+      this.selectedImageIndexes.filter((value: number) => value !== index) :
+      [...this.selectedImageIndexes, index];
+  }
+
+  private longPressImage(index: number): void {
+    if (this.state.submitting || this.state.uncertain) return;
+    this.lastLongPressAt = Date.now();
+    this.selectingImages = true;
+    if (!this.selectedImageIndexes.includes(index)) this.toggleImage(index);
+  }
+
+  private removeSelectedImages(): void {
+    this.selectedImageIndexes.slice().sort((a: number, b: number) => b - a)
+      .forEach((index: number) => this.controller?.removeImage(index));
+    this.selectedImageIndexes = []; this.selectingImages = false;
+  }
   private async readSafeArea(): Promise<void> {
     const context = this.getUIContext().getHostContext();
     if (context === undefined) { return; }
@@ -130,6 +169,12 @@ export struct MomentPublishPanel {
           Row() {
             Text(`照片 ${this.state.images.length}/9`).fontSize(14).fontWeight(FontWeight.Medium).fontColor('#242529')
             Blank()
+            if (this.selectingImages) {
+              Button(this.selectedImageIndexes.length > 0 ? `移除所选 ${this.selectedImageIndexes.length} 张` : '取消选择')
+                .height(40).fontSize(12).fontColor('#B65745').backgroundColor('#FFF0EC')
+                .onClick(() => this.selectedImageIndexes.length > 0 ? this.removeSelectedImages() :
+                  (this.selectingImages = false))
+            }
             Button(this.picking ? '读取中…' : '＋ 添加照片').height(40).fontSize(13).fontColor('#1746C5').backgroundColor('#E9EDFF')
               .enabled(this.state.actorId > 0 && !this.picking && !this.state.submitting && !this.state.uncertain && this.state.images.length < 9)
               .onClick(() => this.chooseImages())
@@ -138,11 +183,23 @@ export struct MomentPublishPanel {
           Flex({ wrap: FlexWrap.Wrap }) {
             ForEach(this.state.images, (source: string, index: number) => {
               Stack({ alignContent: Alignment.TopEnd }) {
-                Image(source).width('100%').height('100%').objectFit(ImageFit.Cover)
-                Button('×').width(40).height(40).fontColor('#FFFFFF').backgroundColor('#88000000')
-                  .enabled(!this.state.submitting && !this.state.uncertain).accessibilityText(`移除第${index + 1}张照片`)
-                  .onClick(() => this.controller?.removeImage(index))
+                if (this.canDisplayImage(source)) {
+                  Image(source).width('100%').height('100%').objectFit(ImageFit.Cover)
+                } else { Text('授权后可查看图片').fontSize(11).fontColor('#77736F').padding(8) }
+                if (this.selectingImages) {
+                  Text(this.selectedImageIndexes.includes(index) ? '✓' : '○')
+                    .fontSize(20).fontColor('#FFFFFF').textAlign(TextAlign.Center)
+                    .width(34).height(34).borderRadius(17)
+                    .backgroundColor(this.selectedImageIndexes.includes(index) ? '#1746C5' : '#88000000')
+                    .margin(6)
+                } else {
+                  Button('×').width(40).height(40).fontColor('#FFFFFF').backgroundColor('#88000000')
+                    .enabled(!this.state.submitting && !this.state.uncertain).accessibilityText(`移除第${index + 1}张照片`)
+                    .onClick(() => this.controller?.removeImage(index))
+                }
               }.width('30%').aspectRatio(1).borderRadius(10).clip(true).margin({ right: 8, bottom: 8 })
+                .onClick(() => { if (this.selectingImages && Date.now() - this.lastLongPressAt >= 500) this.toggleImage(index); })
+                .gesture(LongPressGesture().onAction(() => this.longPressImage(index)))
             }, (source: string, index: number) => `${index}:${source}`)
           }.width('100%')
         }.width('100%').alignItems(HorizontalAlign.Start).padding(20)
@@ -150,7 +207,7 @@ export struct MomentPublishPanel {
       Row({ space: 12 }) {
         Button('取消').height(48).fontColor('#67615A').backgroundColor('#EEE8DF').layoutWeight(1).onClick(() => this.onClose?.())
         Button(this.state.submitting ? (this.editingId > 0 ? '保存中…' : '发布中…') : (this.editingId > 0 ? '保存修改' : '发布动态')).height(48).fontColor('#FFFFFF').backgroundColor('#1746C5')
-          .layoutWeight(2).enabled(this.state.canSubmit && !this.picking).onClick(() => this.controller?.submit())
+          .layoutWeight(2).enabled(this.networkAllowed && this.state.canSubmit && !this.picking).onClick(() => this.controller?.submit())
       }.width('100%').padding(20).border({ width: { top: 1 }, color: '#E8E2DB' })
     }.width('100%').height('100%').padding({ top: this.topInset + 8 }).backgroundColor('#FBF7EF')
   }

@@ -14,15 +14,10 @@ import com.action.camera.message.repository.ConversationRepository;
 import com.action.camera.message.repository.MessageRepository;
 import com.action.camera.order.entity.Order;
 import com.action.camera.order.repository.OrderRepository;
-import com.action.camera.photoauthorization.entity.PhotoAuthorization;
-import com.action.camera.photoauthorization.entity.PhotoAuthorizationFile;
-import com.action.camera.photoauthorization.repository.PhotoAuthorizationFileRepository;
-import com.action.camera.photoauthorization.repository.PhotoAuthorizationRepository;
 import com.action.camera.repository.UserRoleBindingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -66,8 +61,6 @@ public class FileAccessPolicy {
     private final DeliveryFileRepository deliveryFileRepository;
     private final DeliveryRepository deliveryRepository;
     private final OrderRepository orderRepository;
-    private final PhotoAuthorizationFileRepository photoAuthorizationFileRepository;
-    private final PhotoAuthorizationRepository photoAuthorizationRepository;
     private final MessageRepository messageRepository;
     private final ConversationRepository conversationRepository;
     private final UserRoleBindingRepository userRoleBindingRepository;
@@ -101,7 +94,6 @@ public class FileAccessPolicy {
                 || hasAdminBinding(currentUserId)
                 || isPubliclyCacheable(file)
                 || canAccessDeliveryFile(file.getId(), currentUserId)
-                || isGrantedPublicAuthorizationFile(file.getId())
                 || canAccessConversationFile(file.getId(), currentUserId)) {
             return;
         }
@@ -143,25 +135,6 @@ public class FileAccessPolicy {
         }
         return orderRepository.findAllById(orderIds).stream()
                 .anyMatch(order -> isOrderParticipant(order, userId));
-    }
-
-    private boolean isGrantedPublicAuthorizationFile(Long fileId) {
-        if (fileId == null) {
-            return false;
-        }
-        Set<Long> authorizationIds = photoAuthorizationFileRepository.findByFileIdIn(List.of(fileId)).stream()
-                .map(PhotoAuthorizationFile::getAuthorizationId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-        if (authorizationIds.isEmpty()) {
-            return false;
-        }
-        return photoAuthorizationRepository.findAllById(authorizationIds).stream()
-                .anyMatch(authorization -> PhotoAuthorization.STATUS_GRANTED.equals(authorization.getStatus())
-                        && PhotoAuthorization.USAGE_SCOPE_PORTFOLIO_DISPLAY.equals(
-                                authorization.getPhotoUsageScope())
-                        && (authorization.getExpireTime() == null
-                                || authorization.getExpireTime().isAfter(LocalDateTime.now())));
     }
 
     private boolean canAccessConversationFile(Long fileId, Long userId) {

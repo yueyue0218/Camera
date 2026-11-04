@@ -15,7 +15,6 @@ import com.action.camera.order.dto.StatusTransitionRequest;
 import com.action.camera.order.dto.StatusTransitionResponse;
 import com.action.camera.order.entity.Order;
 import com.action.camera.order.entity.OrderStatusLog;
-import com.action.camera.order.entity.PaymentRecord;
 import com.action.camera.order.enums.OrderStatus;
 import com.action.camera.order.service.OrderService;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +47,21 @@ public class OrderController {
         return Result.success(orders);
     }
 
+    @GetMapping("/orders/summary")
+    public Result<com.action.camera.order.dto.OrderSummaryResponse> summary(@RequestParam String role) {
+        return Result.success(orderService.summarizeMyOrders(currentUserId(), role));
+    }
+
+    @GetMapping("/orders/page")
+    public Result<com.action.camera.common.page.PageResult<OrderResponse>> page(
+            @RequestParam String role, @RequestParam(required = false) OrderStatus status,
+            @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size) {
+        var result = orderService.pageMyOrders(currentUserId(), role, status, page, size);
+        return Result.success(new com.action.camera.common.page.PageResult<>(
+                result.getRecords().stream().map(this::toOrderResponse).toList(),
+                result.getPage(), result.getSize(), result.getTotal()));
+    }
+
     @GetMapping("/orders/{orderId}")
     public Result<OrderResponse> getOrder(@PathVariable Long orderId) {
         Long operatorId = currentUserId();
@@ -62,9 +76,12 @@ public class OrderController {
         if (!OrderService.MOCK_PAY_METHOD.equals(request.getPayMethod())) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "P4 only supports MOCK_PAY");
         }
-        Order paidOrder = orderService.mockPay(orderId, operatorId, request.getAmountCent());
-        PaymentRecord paymentRecord = orderService.getPaymentRecordForOrder(orderId, operatorId);
-        return Result.success(PaymentResponse.from(paymentRecord, paidOrder));
+        return Result.success(orderService.mockPayForResponse(orderId, operatorId, request.getAmountCent()));
+    }
+
+    @GetMapping("/orders/{orderId}/payments")
+    public Result<PaymentResponse> getPayment(@PathVariable Long orderId) {
+        return Result.success(orderService.getPaymentResponseForOrder(orderId, currentUserId()));
     }
 
     @PostMapping("/orders/{orderId}/status-transitions")

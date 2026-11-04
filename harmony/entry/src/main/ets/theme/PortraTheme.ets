@@ -1,5 +1,6 @@
 export class PortraTheme {
   static readonly pageBackground: string = '#F6F3EE';
+  static readonly workflowBackground: string = '#F7F8FA';
   static readonly pageBackgroundDeep: string = '#ECE8E3';
   static readonly surface: string = '#FFFDF9';
   static readonly primaryText: string = '#242529';
@@ -13,6 +14,8 @@ export class PortraTheme {
   static readonly rose: string = '#E8C7B8';
   static readonly mist: string = '#CBD6DF';
   static readonly danger: string = '#B65745';
+  static readonly attention: string = '#C96A30';
+  static readonly success: string = '#32765B';
   static readonly border: string = '#E8E2DB';
   static readonly white: string = '#FFFFFF';
 

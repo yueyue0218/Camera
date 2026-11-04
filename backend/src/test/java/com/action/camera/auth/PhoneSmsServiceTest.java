@@ -97,7 +97,7 @@ class PhoneSmsServiceTest {
 
     @Test
     void sendNormalizesPhoneAndPersistsOnlyHashedCode() {
-        phoneSmsService.sendCode("138 0013-8000", SmsPurpose.LOGIN, IP, DEVICE);
+        phoneSmsService.createChallenge("138 0013-8000", SmsPurpose.LOGIN, IP, DEVICE, null, null, "LOGIN");
 
         SmsMessage message = captureSingleMessage();
         SmsChallenge challenge = onlyChallenge();
@@ -106,7 +106,7 @@ class PhoneSmsServiceTest {
         assertThat(challenge.getPhoneHash()).isEqualTo(phoneIdentityCodec.lookupHash(PHONE));
         assertThat(challenge.getPhoneHash()).doesNotContain(PHONE);
         assertThat(challenge.getCodeHash()).doesNotContain(message.code());
-        assertThat(codeHasher.matches(PHONE, SmsPurpose.LOGIN, message.code(), challenge.getCodeHash())).isTrue();
+        assertThat(codeHasher.matches(challenge, message.code())).isTrue();
         assertThat(challenge.getDeliveryStatus()).isEqualTo(SmsDeliveryStatus.SENT);
         assertThat(challenge.getProviderMessageId()).isEqualTo("test-provider-message-id");
         assertThat(challenge.getSentAt()).isNotNull();
@@ -119,7 +119,7 @@ class PhoneSmsServiceTest {
         when(smsSender.send(any(SmsMessage.class)))
                 .thenThrow(new SmsDeliveryException("provider unavailable"));
 
-        assertThatThrownBy(() -> phoneSmsService.sendCode(PHONE, SmsPurpose.LOGIN, IP, DEVICE))
+        assertThatThrownBy(() -> phoneSmsService.createChallenge(PHONE, SmsPurpose.LOGIN, IP, DEVICE, null, null, "LOGIN"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("短信暂时无法发送，请稍后重试");
         SmsChallenge failed = onlyChallenge();
@@ -140,7 +140,7 @@ class PhoneSmsServiceTest {
         // Reproduces the old unfiltered count exceeding both phone quotas.
         assertThat(challengeRepository.countByPhoneHashAndCreatedAtAfter(
                 phoneIdentityCodec.lookupHash(PHONE), LocalDateTime.now().minusHours(1))).isEqualTo(21);
-        phoneSmsService.sendCode(PHONE, SmsPurpose.LOGIN, IP, DEVICE);
+        phoneSmsService.createChallenge(PHONE, SmsPurpose.LOGIN, IP, DEVICE, null, null, "LOGIN");
         verify(smsSender, times(1)).send(any(SmsMessage.class));
         assertThat(challengeRepository.findAll()).hasSize(22);
     }
@@ -182,7 +182,7 @@ class PhoneSmsServiceTest {
     @Test
     void successfulRecordOutsideAllWindowsAllowsSending() {
         challengeRepository.saveAndFlush(challenge(PHONE, IP, DEVICE, LocalDateTime.now().minusHours(25)));
-        phoneSmsService.sendCode(PHONE, SmsPurpose.LOGIN, IP, DEVICE);
+        phoneSmsService.createChallenge(PHONE, SmsPurpose.LOGIN, IP, DEVICE, null, null, "LOGIN");
         verify(smsSender, times(1)).send(any(SmsMessage.class));
     }
 
@@ -192,7 +192,7 @@ class PhoneSmsServiceTest {
         try {
             smsProperties.setPhoneHourlyLimit(2);
             saveHistorical(PHONE, "198.51.100.3", "other-device");
-            phoneSmsService.sendCode(PHONE, SmsPurpose.LOGIN, IP, DEVICE);
+            phoneSmsService.createChallenge(PHONE, SmsPurpose.LOGIN, IP, DEVICE, null, null, "LOGIN");
             verify(smsSender, times(1)).send(any(SmsMessage.class));
         } finally {
             smsProperties.setPhoneHourlyLimit(previous);
@@ -207,12 +207,12 @@ class PhoneSmsServiceTest {
             when(smsSender.send(any(SmsMessage.class)))
                     .thenThrow(new SmsDeliveryException("mock provider failure"))
                     .thenReturn(new SmsDeliveryReceipt("mock recovery"));
-            assertThatThrownBy(() -> phoneSmsService.sendCode(PHONE, SmsPurpose.LOGIN, IP, DEVICE))
+            assertThatThrownBy(() -> phoneSmsService.createChallenge(PHONE, SmsPurpose.LOGIN, IP, DEVICE, null, null, "LOGIN"))
                     .hasMessage("短信暂时无法发送，请稍后重试");
             ExecutorService executor = Executors.newSingleThreadExecutor();
             try {
-                executor.submit(() -> phoneSmsService.sendCode("+8613900139000", SmsPurpose.LOGIN,
-                        IP, "other-device")).get(10, TimeUnit.SECONDS);
+                executor.submit(() -> phoneSmsService.createChallenge("+8613900139000", SmsPurpose.LOGIN,
+                        IP, "other-device", null, null, "LOGIN")).get(10, TimeUnit.SECONDS);
             } finally {
                 executor.shutdownNow();
             }
@@ -260,7 +260,7 @@ class PhoneSmsServiceTest {
         });
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
-            Future<?> first = executor.submit(() -> phoneSmsService.sendCode(PHONE, SmsPurpose.LOGIN, IP, DEVICE));
+            Future<?> first = executor.submit(() -> phoneSmsService.createChallenge(PHONE, SmsPurpose.LOGIN, IP, DEVICE, null, null, "LOGIN"));
             assertThat(enteredProvider.await(5, TimeUnit.SECONDS)).isTrue();
             String secondPhone = dimension.equals("phone") ? PHONE : "+8613900139000";
             String secondIp = dimension.equals("ip") ? IP : "198.51.100.3";
@@ -280,9 +280,9 @@ class PhoneSmsServiceTest {
 
     @Test
     void resendCooldownRejectsImmediateSecondRequest() {
-        phoneSmsService.sendCode(PHONE, SmsPurpose.LOGIN, IP, DEVICE);
+        phoneSmsService.createChallenge(PHONE, SmsPurpose.LOGIN, IP, DEVICE, null, null, "LOGIN");
 
-        assertThatThrownBy(() -> phoneSmsService.sendCode(PHONE, SmsPurpose.LOGIN, IP, DEVICE))
+        assertThatThrownBy(() -> phoneSmsService.createChallenge(PHONE, SmsPurpose.LOGIN, IP, DEVICE, null, null, "LOGIN"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("请求过于频繁，请稍后再试");
         verify(smsSender, times(1)).send(any(SmsMessage.class));
@@ -304,23 +304,23 @@ class PhoneSmsServiceTest {
 
     @Test
     void correctCodeIsConsumedOnce() {
-        phoneSmsService.sendCode(PHONE, SmsPurpose.LOGIN, IP, DEVICE);
+        phoneSmsService.createChallenge(PHONE, SmsPurpose.LOGIN, IP, DEVICE, null, null, "LOGIN");
         String code = captureSingleMessage().code();
 
-        assertThat(phoneSmsService.verifyCode(PHONE, SmsPurpose.LOGIN, code)).isEqualTo(PHONE);
+        assertThat(phoneSmsService.consumeChallenge(onlyChallenge().getChallengeId(), PHONE, SmsPurpose.LOGIN, code, null, null, "LOGIN")).isEqualTo(PHONE);
         assertThat(onlyChallenge().getConsumedAt()).isNotNull();
-        assertThatThrownBy(() -> phoneSmsService.verifyCode(PHONE, SmsPurpose.LOGIN, code))
+        assertThatThrownBy(() -> phoneSmsService.consumeChallenge(onlyChallenge().getChallengeId(), PHONE, SmsPurpose.LOGIN, code, null, null, "LOGIN"))
                 .isInstanceOf(SmsCodeInvalidException.class)
                 .hasMessage("验证码无效或已过期");
     }
 
     @Test
     void wrongCodeIncrementsAttemptsEvenThoughRequestFails() {
-        phoneSmsService.sendCode(PHONE, SmsPurpose.LOGIN, IP, DEVICE);
+        phoneSmsService.createChallenge(PHONE, SmsPurpose.LOGIN, IP, DEVICE, null, null, "LOGIN");
         String correctCode = captureSingleMessage().code();
         String wrongCode = correctCode.equals("999999") ? "888888" : "999999";
 
-        assertThatThrownBy(() -> phoneSmsService.verifyCode(PHONE, SmsPurpose.LOGIN, wrongCode))
+        assertThatThrownBy(() -> phoneSmsService.consumeChallenge(onlyChallenge().getChallengeId(), PHONE, SmsPurpose.LOGIN, wrongCode, null, null, "LOGIN"))
                 .isInstanceOf(SmsCodeInvalidException.class);
         assertThat(onlyChallenge().getAttemptCount()).isEqualTo(1);
         assertThat(onlyChallenge().getLastAttemptAt()).isNotNull();
@@ -328,17 +328,17 @@ class PhoneSmsServiceTest {
 
     @Test
     void correctCodeIsRejectedAfterMaximumFailedAttempts() {
-        phoneSmsService.sendCode(PHONE, SmsPurpose.LOGIN, IP, DEVICE);
+        phoneSmsService.createChallenge(PHONE, SmsPurpose.LOGIN, IP, DEVICE, null, null, "LOGIN");
         String correctCode = captureSingleMessage().code();
         String wrongCode = correctCode.equals("999999") ? "888888" : "999999";
 
         for (int i = 0; i < 5; i++) {
-            assertThatThrownBy(() -> phoneSmsService.verifyCode(PHONE, SmsPurpose.LOGIN, wrongCode))
+            assertThatThrownBy(() -> phoneSmsService.consumeChallenge(onlyChallenge().getChallengeId(), PHONE, SmsPurpose.LOGIN, wrongCode, null, null, "LOGIN"))
                     .isInstanceOf(SmsCodeInvalidException.class);
         }
 
         assertThat(onlyChallenge().getAttemptCount()).isEqualTo(5);
-        assertThatThrownBy(() -> phoneSmsService.verifyCode(PHONE, SmsPurpose.LOGIN, correctCode))
+        assertThatThrownBy(() -> phoneSmsService.consumeChallenge(onlyChallenge().getChallengeId(), PHONE, SmsPurpose.LOGIN, correctCode, null, null, "LOGIN"))
                 .isInstanceOf(SmsCodeInvalidException.class);
     }
 
@@ -348,21 +348,21 @@ class PhoneSmsServiceTest {
         expired.setExpiresAt(LocalDateTime.now().minusMinutes(5));
         challengeRepository.saveAndFlush(expired);
 
-        assertThatThrownBy(() -> phoneSmsService.verifyCode(PHONE, SmsPurpose.LOGIN, "123456"))
+        assertThatThrownBy(() -> phoneSmsService.consumeChallenge(onlyChallenge().getChallengeId(), PHONE, SmsPurpose.LOGIN, "123456", null, null, "LOGIN"))
                 .isInstanceOf(SmsCodeInvalidException.class)
                 .hasMessage("验证码无效或已过期");
 
         challengeRepository.deleteAll();
-        phoneSmsService.sendCode(PHONE, SmsPurpose.LOGIN, IP, DEVICE);
+        phoneSmsService.createChallenge(PHONE, SmsPurpose.LOGIN, IP, DEVICE, null, null, "LOGIN");
         String code = captureSingleMessage().code();
-        assertThatThrownBy(() -> phoneSmsService.verifyCode(PHONE, SmsPurpose.REAUTH, code))
+        assertThatThrownBy(() -> phoneSmsService.consumeChallenge(onlyChallenge().getChallengeId(), PHONE, SmsPurpose.REAUTH, code, 1L, "reauth-session", "ACCOUNT_CLOSURE"))
                 .isInstanceOf(SmsCodeInvalidException.class)
                 .hasMessage("验证码无效或已过期");
     }
 
     @Test
     void concurrentVerificationAllowsExactlyOneConsumer() throws Exception {
-        phoneSmsService.sendCode(PHONE, SmsPurpose.LOGIN, IP, DEVICE);
+        phoneSmsService.createChallenge(PHONE, SmsPurpose.LOGIN, IP, DEVICE, null, null, "LOGIN");
         String code = captureSingleMessage().code();
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
@@ -396,7 +396,7 @@ class PhoneSmsServiceTest {
         ready.countDown();
         try {
             start.await(5, TimeUnit.SECONDS);
-            phoneSmsService.verifyCode(PHONE, SmsPurpose.LOGIN, code);
+            phoneSmsService.consumeChallenge(onlyChallenge().getChallengeId(), PHONE, SmsPurpose.LOGIN, code, null, null, "LOGIN");
             successes.incrementAndGet();
         } catch (SmsCodeInvalidException e) {
             failures.incrementAndGet();
@@ -425,7 +425,9 @@ class PhoneSmsServiceTest {
         SmsChallenge challenge = new SmsChallenge();
         challenge.setPhoneHash(phoneIdentityCodec.lookupHash(phone));
         challenge.setPurpose(SmsPurpose.LOGIN);
-        challenge.setCodeHash(codeHasher.hash(phone, SmsPurpose.LOGIN, "123456"));
+        challenge.setChallengeId(java.util.UUID.randomUUID().toString());
+        challenge.setOperation("LOGIN");
+        challenge.setCodeHash(codeHasher.hash(challenge, "123456"));
         challenge.setExpiresAt(createdAt.plusMinutes(5));
         challenge.setAttemptCount(0);
         challenge.setMaxAttempts(5);
@@ -437,7 +439,7 @@ class PhoneSmsServiceTest {
     }
 
     private void assertRateLimited(String phone, String ip, String deviceId) {
-        assertThatThrownBy(() -> phoneSmsService.sendCode(phone, SmsPurpose.LOGIN, ip, deviceId))
+        assertThatThrownBy(() -> phoneSmsService.createChallenge(phone, SmsPurpose.LOGIN, ip, deviceId, null, null, "LOGIN"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("请求过于频繁，请稍后再试");
     }

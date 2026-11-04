@@ -1,3 +1,4 @@
+import { provinceCode } from '../../common/region/ProvinceCatalog.js'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Alert } from '@mui/material'
@@ -30,7 +31,15 @@ export function PublishServicePackagePage() {
   const [uploading, setUploading] = useState(false)
   const [loading, setLoading] = useState(editMode)
   const [blocked, setBlocked] = useState(false)
-  const [form, setForm] = useState(createDefaultServicePackageForm)
+  const [form, setForm] = useState(() => {
+    const fallback = createDefaultServicePackageForm()
+    if (editMode) return fallback
+    try {
+      const saved = JSON.parse(window.localStorage.getItem('portra-service-package-draft'))
+      if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return fallback
+      return { ...fallback, ...saved, cityCode: provinceCode(saved.cityCode) }
+    } catch { return fallback }
+  })
 
   useEffect(() => {
     if (!editMode) return

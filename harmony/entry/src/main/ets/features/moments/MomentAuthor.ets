@@ -38,9 +38,18 @@ export struct MomentAuthor {
         result?.userId === id && result.currentRole === role) { this.profile = result; }
     } catch { /* Truthful role/id fallback; never invent a nickname or avatar URL. */ }
   }
+  private currentProfile(): PublicUserProfile | undefined {
+    return this.active && this.app.sessionManager.isAuthenticated() &&
+      this.version === this.app.sessionManager.getSessionVersion() &&
+      this.profile?.userId === this.item.authorId && this.profile.currentRole === this.item.authorRole ?
+      this.profile : undefined;
+  }
   private name(): string {
-    return this.version === this.app.sessionManager.getSessionVersion() ?
-      this.profile?.nickname?.trim() || MomentFeedFormatter.author(this.item) : MomentFeedFormatter.author(this.item);
+    return this.currentProfile()?.nickname?.trim() || MomentFeedFormatter.author(this.item);
+  }
+  private avatarFileId(): number {
+    const id = this.currentProfile()?.avatarFileId ?? 0;
+    return Number.isSafeInteger(id) && id > 0 ? id : 0;
   }
   private open(): void {
     if (!this.active || this.disabled || this.version !== this.app.sessionManager.getSessionVersion() ||
@@ -50,8 +59,7 @@ export struct MomentAuthor {
   build() {
     Button({ type: ButtonType.Normal }) {
       Row({ space: 10 }) {
-        // Public DTO currently has no usable avatar URL; reuse B's native fallback.
-        PortraAvatar({ displayName: this.name(), avatarSize: 36 })
+        PortraAvatar({ fileId: this.avatarFileId(), displayName: this.name(), avatarSize: 36 })
         Column({ space: 4 }) {
           Text(this.name()).fontSize(14).fontWeight(FontWeight.Medium)
             .fontColor(this.dark ? '#FFFFFF' : '#1746C5').maxLines(1)
