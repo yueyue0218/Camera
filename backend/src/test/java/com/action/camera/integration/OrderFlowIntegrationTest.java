@@ -242,6 +242,39 @@ class OrderFlowIntegrationTest {
     }
 
     @Test
+    void retainedReadRoutesPreserveLegacyDtoTotalsAndAuthentication() {
+        createOrderInStatus(OrderStatus.PENDING_PAYMENT);
+        Map legacy = rest.exchange("/orders?role=customer", HttpMethod.GET,
+                asCustomer(null), Map.class).getBody();
+        List<Map> records = (List<Map>) legacy.get("data");
+        Map summary = rest.exchange("/orders/summary?role=customer", HttpMethod.GET,
+                asCustomer(null), Map.class).getBody();
+        assertThat(summary.get("code")).isEqualTo(200);
+        assertThat(((Number) ((Map) summary.get("data")).get("total")).intValue()).isEqualTo(records.size());
+        Map page = rest.exchange("/orders/page?role=customer&page=1&size=50", HttpMethod.GET,
+                asCustomer(null), Map.class).getBody();
+        assertThat(page.get("code")).isEqualTo(200);
+        Map data = (Map) page.get("data");
+        assertThat(((Number) data.get("total")).intValue()).isEqualTo(records.size());
+        List<Map> paged = (List<Map>) data.get("records");
+        assertThat(paged).isNotEmpty();
+        paged.forEach(row -> {
+            assertThat(((Number) row.get("customerId")).longValue()).isEqualTo(1001L);
+            assertThat(row.keySet()).containsExactlyInAnyOrderElementsOf(records.get(0).keySet());
+        });
+        for (String path : List.of("/orders/summary?role=customer", "/orders/page?role=customer")) {
+            // Existing JSON API uses HTTP 200 plus the business error envelope.
+            ResponseEntity<Map> denied = rest.getForEntity(path, Map.class);
+            assertThat(denied.getStatusCode().value()).isEqualTo(200);
+            assertThat(denied.getBody().get("code")).isEqualTo(40101);
+            assertThat(denied.getBody().get("data")).isNull();
+        }
+        Map invalid = rest.exchange("/orders/summary?role=admin", HttpMethod.GET,
+                asCustomer(null), Map.class).getBody();
+        assertThat(invalid.get("code")).isEqualTo(40001);
+    }
+
+    @Test
     void statusLogs_afterCustomerCompletes_containsLog() {
         Order order = createOrderInStatus(OrderStatus.DELIVERED_PENDING_CONFIRM);
 

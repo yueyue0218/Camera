@@ -231,16 +231,17 @@ test('native phone login uses public SMS endpoints and authenticated session end
   assert.equal(call.options.header.Authorization, undefined);
   assert.deepEqual(JSON.parse(call.options.extraData),
     { phone: '+8613800138000', purpose: 'LOGIN', deviceId: 'device-id' });
-  complete(call);
-  await send;
+  const challenge = { challengeId: '12345678-1234-4123-8123-123456789abc', expiresAt: '2026-11-04T12:00:00' };
+  complete(call, challenge);
+  assert.deepEqual(await send, challenge);
 
-  const verify = api.verifyLoginCode('+8613800138000', '123456', 'device-id');
+  const verify = api.verifyLoginCode('+8613800138000', '123456', 'device-id', challenge.challengeId);
   call = calls.at(-1);
   assert.equal(call.url, EnvironmentConfig.current().baseUrl + '/auth/native/sms/verify');
   assert.equal(call.options.header.Authorization, undefined);
   assert.deepEqual(JSON.parse(call.options.extraData), {
     phone: '+8613800138000', purpose: 'LOGIN', code: '123456',
-    deviceId: 'device-id', deviceName: 'Portra HarmonyOS'
+    deviceId: 'device-id', deviceName: 'Portra HarmonyOS', challengeId: challenge.challengeId
   });
   const session = { accessToken: 'new-token', refreshToken: 'refresh-token', userId: 4,
     nickname: '测试用户', role: 'CUSTOMER', adminCapable: false, newUser: false };

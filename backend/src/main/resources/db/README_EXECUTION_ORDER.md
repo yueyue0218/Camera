@@ -18,6 +18,24 @@
 
 ## 执行环境要求
 
+### 8081 challenge 增量（43 → 44 表）
+
+上述四项增量已完成的 43 表基线，还需要人工批准
+`migration/V20261103__sms_challenge_binding.sql`。该文件只面向
+`portra_integration`，新增五个 nullable challenge 绑定列、唯一索引及
+`sms_challenge_locks`。不能向共享库执行，也不能在这里重跑历史初始化脚本。
+
+该增量**不是幂等脚本**。MySQL DDL 隐式提交，不能用事务回滚保证整文件原子性：
+尚未应用、完整应用、部分应用必须先区分；完整应用时停止重复执行；部分应用时
+保留数据与证据，核对已有列/索引/锁表后仅批准缺失 DDL，禁止直接重跑整文件。
+应用回退必须保留新增结构并使用支持 challenge 协议的兼容 JAR，不删除新增列或记录。
+
+本地隔离复验入口：`backend/scripts/test-integration-migration.py`。
+它新建专用 datadir，以 Windows shared memory 连接且禁用 TCP，不能接入既有服务。
+2026-11-04 在 MySQL 8.0.41 验证了 fresh 43 表 → 44 表、合成既有用户行保留、
+新增列与唯一索引、锁键唯一性和重复执行拒绝。它不代表 ECS 8.0.46、历史生产数据
+兼容或真实备份恢复演练；本轮未执行 ECS 迁移。
+
 - **MySQL 8.0+**（依赖 `utf8mb4_unicode_ci` / `utf8mb4_0900_ai_ci` 排序规则和存储过程语法）
 - **执行工具**：必须使用 `mysql` CLI 或 MySQL Workbench，**不可使用**普通 JDBC 单语句执行器  
   （`conversations_messages.sql`、`add_auth_phone_account.sql`、`add_phone_auth_sessions.sql` 及路径 B 的 `b1_b2_persistence.sql`、`d_line_backend.sql` 均包含 `DELIMITER //` 存储过程定义，单语句执行器无法处理）

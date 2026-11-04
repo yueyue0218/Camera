@@ -26,10 +26,18 @@ test('Harmony API forwards the exact challenge returned by send', async () => {
   const ts = require(path.join(process.env.DEVECO_SDK_HOME, 'default/openharmony/ets/build-tools/ets-loader/node_modules/typescript'));
   const source = fs.readFileSync(path.join(root, 'harmony/entry/src/main/ets/network/ApiService.ets'),'utf8');
   const compiled = ts.transpileModule(source, {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText;
+  function loadRegion(name) {
+    assert.ok(['ProvinceCatalog', 'ProvincePayload'].includes(name));
+    const regionSource=fs.readFileSync(path.join(root,'harmony/entry/src/main/ets/common/region',name+'.ets'),'utf8');
+    const region={exports:{},require: dependency => loadRegion(path.basename(dependency))};
+    vm.runInNewContext(ts.transpileModule(regionSource,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,region);
+    return region.exports;
+  }
   const exports = {};
   const context=vm.createContext({exports, require: name => {
     if(name==='./HttpClient') return {HttpClient:class {}};
     if(name==='./ErrorMapper') return {ErrorMapper:{parse:()=>new Error('parse error')}};
+    if(name.startsWith('../common/region/')) return loadRegion(path.basename(name));
     throw new Error('Unexpected runtime import '+name);
   }});
   vm.runInContext(compiled,context);
@@ -37,11 +45,11 @@ test('Harmony API forwards the exact challenge returned by send', async () => {
   const session={accessToken:'access',refreshToken:'refresh',userId:1,nickname:'test',role:'CUSTOMER',adminCapable:false,newUser:false};
   const api=new exports.ApiService({postPublic:async (url, body) => {
     calls.push({url,body});
-    return url.endsWith('/send')?{challengeId:'native-issued-id',expiresAt:'2026-11-03T12:00:00'}:session;
+    return url.endsWith('/send')?{challengeId:'12345678-1234-4123-8123-123456789abc',expiresAt:'2026-11-03T12:00:00'}:session;
   }});
   const challenge=await api.sendLoginCode('13800138000','native');
   await api.verifyLoginCode('13800138000','123456','native',challenge.challengeId);
   assert.equal(calls[1].url,'/auth/native/sms/verify');
-  assert.equal(calls[1].body.challengeId,'native-issued-id');
+  assert.equal(calls[1].body.challengeId,'12345678-1234-4123-8123-123456789abc');
   assert.equal(calls[1].body.purpose,'LOGIN');
 });

@@ -108,6 +108,41 @@ class ServicePackageServiceTest {
     }
 
     @Test
+    void intentStateReadsOnlyTheRequestedTargetForTheCurrentCustomer() {
+        ServicePackage target = new ServicePackage();
+        target.setId(SERVICE_ID);
+        target.setStatus(ServicePackageStatus.OFFLINE);
+        when(servicePackageRepository.findById(SERVICE_ID)).thenReturn(Optional.of(target));
+        when(interestRepository.existsByUserIdAndServicePackageIdAndTargetType(CUSTOMER_ID, SERVICE_ID, "SERVICE_PACKAGE"))
+                .thenReturn(true);
+        assertThat(servicePackageService.getIntentState(SERVICE_ID, customer()).interested()).isTrue();
+        assertThatThrownBy(() -> servicePackageService.getIntentState(SERVICE_ID,
+                new CurrentUser(9999L, UserRole.CUSTOMER))).isInstanceOf(BusinessException.class);
+        target.setStatus(ServicePackageStatus.ONLINE);
+        assertThat(servicePackageService.getIntentState(SERVICE_ID,
+                new CurrentUser(9999L, UserRole.CUSTOMER)).interested()).isFalse();
+        verify(interestRepository, never()).findByUserIdOrderByCreatedAtDesc(any());
+        verify(servicePackageRepository, never()).findAllById(any());
+        target.setModerationStatus(ModerationStatus.HIDDEN);
+        assertThatThrownBy(() -> servicePackageService.getIntentState(SERVICE_ID, customer()))
+                .isInstanceOf(BusinessException.class);
+        target.setProviderId(CUSTOMER_ID);
+        assertThat(servicePackageService.getIntentState(SERVICE_ID, customer()).interested()).isFalse();
+    }
+
+    @Test
+    void intentStateRejectsWrongRoleMissingTargetAndMissingIdentity() {
+        assertThatThrownBy(() -> servicePackageService.getIntentState(SERVICE_ID, provider()))
+                .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> servicePackageService.getIntentState(SERVICE_ID, null))
+                .isInstanceOf(BusinessException.class);
+        when(servicePackageRepository.findById(SERVICE_ID)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> servicePackageService.getIntentState(SERVICE_ID, customer()))
+                .isInstanceOf(BusinessException.class);
+        verify(interestRepository, never()).existsByUserIdAndServicePackageIdAndTargetType(any(), any(), any());
+    }
+
+    @Test
     void providerPublishesServicePackageWithRequiredTimeFields() {
         when(servicePackageRepository.save(any(ServicePackage.class))).thenAnswer(invocation -> {
             ServicePackage servicePackage = invocation.getArgument(0);
