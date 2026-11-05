@@ -1,0 +1,142 @@
+name: Backend CI and automatic deployment
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'infra/production/**'
+      - '.github/workflows/auto-backend.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'infra/production/**'
+      - '.github/workflows/auto-backend.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Test and seal backend
+    runs-on: ubuntu-24.04
+    outputs:
+      artifact_name: ${{ steps.seal.outputs.artifact_name }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Check release controls
+        run: |
+          python3 infra/production/test_release.py
+          python3 infra/production/test_automatic_backend.py
+      - name: Backend tests, coverage gate and package
+        working-directory: backend
+        run: bash mvnw -B clean verify
+      - name: Retain test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-tests-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            backend/target/surefire-reports/
+            backend/target/site/jacoco/
+          if-no-files-found: warn
+      - name: Seal the tested artifact
+        id: seal
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$REVISION"
+          mkdir release
+          cp backend/target/camera-0.0.1-SNAPSHOT.jar release/backend.jar
+          cp infra/production/deploy-backend.py infra/production/automatic_backend.py release/
+          python3 infra/production/verify-release-jar.py release/backend.jar > release/bytecode-check.json
+          printf '%s\n' "$REVISION" > release/revision.txt
+          (cd release && sha256sum backend.jar deploy-backend.py automatic_backend.py revision.txt bytecode-check.json > SHA256SUMS)
+          echo "artifact_name=automatic-backend-$REVISION-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          name: ${{ steps.seal.outputs.artifact_name }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 30
+
+  deploy:
+    name: Deploy tested main backend
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.PRODUCTION_BACKEND_ENABLED == 'true' && vars.PRODUCTION_BACKEND_AUTOMATIC_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    environment: staging
+    concurrency:
+      group: portra-production-backend
+      cancel-in-progress: false
+    steps:
+      - name: Check this is still the latest main
+        id: current
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          latest=$(gh api repos/yueyue0218/Camera/git/ref/heads/main --jq .object.sha)
+          if [ "$latest" = "$REVISION" ]; then
+            echo 'deploy=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'deploy=false' >> "$GITHUB_OUTPUT"
+            echo 'Newer main exists; skipping this obsolete release.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/download-artifact@v4
+        if: steps.current.outputs.deploy == 'true'
+        with:
+          # Preserve the successful build's attempt when only deploy is rerun.
+          name: ${{ needs.build.outputs.artifact_name }}
+          path: release
+      - name: Configure verified SSH
+        if: steps.current.outputs.deploy == 'true'
+        env:
+          PRIVATE_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.STAGING_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$PRIVATE_KEY" && test -n "$KNOWN_HOSTS"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$PRIVATE_KEY" > ~/.ssh/production
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/production ~/.ssh/known_hosts
+      - name: Activate the tested JAR
+        if: steps.current.outputs.deploy == 'true'
+        env:
+          HOST: ${{ vars.STAGING_HOST }}
+          REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$REVISION" =~ ^[0-9a-f]{40}$ ]]
+          (cd release && sha256sum -c SHA256SUMS)
+          test "$(cat release/revision.txt)" = "$REVISION"
+          jar_hash=$(sha256sum release/backend.jar | cut -d' ' -f1)
+          ssh_args=(-i "$HOME/.ssh/production" -o BatchMode=yes -o StrictHostKeyChecking=yes)
+          target="portra-deploy@$HOST"
+          # A unique staging directory avoids overwriting historical/manual artifacts.
+          staging="/home/portra-deploy/incoming/auto-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          ssh "${ssh_args[@]}" "$target" "install -d -m 700 '$staging'"
+          scp "${ssh_args[@]}" release/* "$target:$staging/"
+          ssh "${ssh_args[@]}" "$target" "cd '$staging' && sha256sum -c SHA256SUMS && python3 deploy-backend.py --automatic '$REVISION' '$jar_hash' '$staging'" | tee release/activation.log
+      - name: Retain activation evidence
+        if: always() && steps.current.outputs.deploy == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: automatic-backend-result-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release/activation.log
+          if-no-files-found: warn
+          retention-days: 30

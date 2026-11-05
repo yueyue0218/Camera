@@ -99,10 +99,16 @@ def load_receipt(path):
     return json.loads(path.read_text())
 
 
-def deploy(revision, jar_hash):
+def deploy(revision, jar_hash, automatic=False, staging=None):
     need(re.fullmatch('[0-9a-f]{40}', revision) and re.fullmatch('[0-9a-f]{64}', jar_hash), 'Invalid release identity')
-    source = INCOMING/revision/'backend.jar'
-    receipt = load_receipt(RECEIPTS/(revision + '.json'))
+    if staging is not None:
+        stage = Path(staging)
+        need(automatic and stage.parent == INCOMING and re.fullmatch(r'auto-[0-9]+-[0-9]+', stage.name), 'Invalid automatic staging path')
+        need(not stage.is_symlink(), 'Automatic staging symlink rejected')
+        source = stage/'backend.jar'
+    else:
+        source = INCOMING/revision/'backend.jar'
+    receipt = load_receipt(Path('/etc/portra/automatic-backend.json') if automatic else RECEIPTS/(revision + '.json'))
     need(source.is_file() and not source.is_symlink() and digest(source) == jar_hash, 'Uploaded JAR hash mismatch')
     current = APP/'current'
     need(current.is_symlink() and (APP/'app.jar').is_symlink(), 'Existing release links required; do not bootstrap automatically')
@@ -110,12 +116,35 @@ def deploy(revision, jar_hash):
     need(previous.parent == APP/'releases', 'Unexpected current release path')
     need((APP/'app.jar').resolve() == previous/'portra-backend.jar', 'Service JAR link differs from current')
     previous_hash = digest(previous/'portra-backend.jar')
-    validate_receipt(receipt, revision, jar_hash, previous_hash)
+    if automatic:
+        from automatic_backend import validate_policy
+        validate_policy(receipt, source, run('hostname'))
+    else:
+        validate_receipt(receipt, revision, jar_hash, previous_hash)
     # A reviewed maintenance window may intentionally leave the old JVM stopped
     # after backup/migration; do not restart an incompatible old binary first.
     initial_state = run('systemctl','show',SERVICE,'--property=ActiveState','--value')
     need(initial_state == receipt.get('initialServiceState', 'active'), 'Service state differs from approval')
     old_pid = run('systemctl','show',SERVICE,'--property=MainPID','--value')
+    # A rerun of a successful automatic release checks health without restarting.
+    if automatic and previous == APP/'releases'/revision:
+        need(previous_hash == jar_hash, 'Existing release differs; immutable identity cannot be reused')
+        need(old_pid.isdigit() and int(old_pid) > 0, 'Running JVM missing')
+        need(b'/opt/portra/app/app.jar' in (Path('/proc')/old_pid/'cmdline').read_bytes().split(b'\0'), 'Unexpected JVM artifact path')
+        evidence_path = STATE/('backend-release-' + revision + '.json')
+        need(evidence_path.is_file(), 'Existing release lacks preservation evidence; review manually')
+        evidence = json.loads(evidence_path.read_text())
+        need(evidence.get('revision') == revision and evidence.get('jarSha256') == jar_hash, 'Existing release evidence differs')
+        need(evidence.get('webTarget') == str(WEB.resolve()) and evidence.get('webAssets') == inventory(WEB), 'Web assets changed; halt')
+        uploads = inventory(UPLOADS)
+        need(bool(evidence.get('uploads')) and all(uploads.get(k) == v for k,v in evidence['uploads'].items()), 'Existing upload changed or missing; halt')
+        health(receipt['localHealthUrl'])
+        health(receipt['publicHealthUrl'])
+        evidence.update(status='BACKEND_HEALTH_PASS_APP_ACCEPTANCE_PENDING', mainPid=old_pid,
+                        webUnchanged=True, existingUploadsPreserved=True)
+        atomic_json(evidence_path, evidence)
+        print(json.dumps({'revision': revision, 'jarSha256': jar_hash, 'status': 'ALREADY_DEPLOYED_HEALTH_PASS'}))
+        return
     web_target = str(WEB.resolve())
     before_web, before_uploads = inventory(WEB), inventory(UPLOADS)
     release = APP/'releases'/revision
@@ -195,4 +224,9 @@ if __name__ == '__main__':
     # Serialize manual and automated invocations, not just GitHub jobs.
     with open('/home/portra-deploy/state/backend-release.lock','a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        deploy(*sys.argv[1:])
+        args = sys.argv[1:]
+        automatic = bool(args and args[0] == '--automatic')
+        if automatic:
+            args = args[1:]
+        need(len(args) == (3 if automatic else 2), 'Usage: deploy-backend.py --automatic REVISION JAR_SHA256 STAGING, or deploy-backend.py REVISION JAR_SHA256')
+        deploy(args[0], args[1], automatic=automatic, staging=args[2] if automatic else None)

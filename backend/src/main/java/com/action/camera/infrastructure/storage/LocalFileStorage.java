@@ -18,6 +18,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFilePermission;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -50,6 +52,7 @@ public class LocalFileStorage implements FileStorage {
             Path target = resolveUnderBase(fileKey);
             Files.createDirectories(target.getParent());
             file.transferTo(target.toAbsolutePath());
+            allowStorageGroupRead(target);
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "文件保存失败: " + e.getMessage());
         }
@@ -117,6 +120,9 @@ public class LocalFileStorage implements FileStorage {
             temporary = Files.createTempFile(
                     target.getParent(), variant.pathValue() + "-", ".tmp");
             Files.write(temporary, rendered.bytes());
+            // createTempFile defaults to 600 on Linux. Publish group-readable
+            // files so the portra deployment group can verify upload preservation.
+            allowStorageGroupRead(temporary);
             movePublished(temporary, target);
             return new StoredImageVariant(resource(target), rendered.contentType());
         } catch (IOException error) {
@@ -129,6 +135,14 @@ public class LocalFileStorage implements FileStorage {
                     // Best-effort cleanup; only the deterministic completed file is discoverable.
                 }
             }
+        }
+    }
+
+    private void allowStorageGroupRead(Path path) throws IOException {
+        if (Files.getFileAttributeView(path, PosixFileAttributeView.class) != null) {
+            var permissions = Files.getPosixFilePermissions(path);
+            permissions.add(PosixFilePermission.GROUP_READ);
+            Files.setPosixFilePermissions(path, permissions);
         }
     }
 
