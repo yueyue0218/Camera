@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,6 +34,13 @@ class LocalImageVariantStorageTest {
         assertThat(stored.resource().exists()).isTrue();
         assertThat(stored.contentType()).isEqualTo("image/png");
         assertThat(expected).hasBinaryContent(bytes);
+        if (Files.getFileAttributeView(expected, PosixFileAttributeView.class) != null) {
+            assertThat(Files.getPosixFilePermissions(expected))
+                    .contains(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE,
+                            PosixFilePermission.GROUP_READ)
+                    .doesNotContain(PosixFilePermission.GROUP_WRITE,
+                            PosixFilePermission.OTHERS_READ, PosixFilePermission.OTHERS_WRITE);
+        }
         try (Stream<Path> files = Files.list(expected.getParent())) {
             assertThat(files).noneMatch(path -> path.getFileName().toString().endsWith(".tmp"));
         }

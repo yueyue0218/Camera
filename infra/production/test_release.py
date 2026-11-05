@@ -22,11 +22,19 @@ def receipt():
 
 
 class ReleaseTests(unittest.TestCase):
-    def activation_scenario(self, mode, initial_state='active'):
+    def activation_scenario(self, mode, initial_state='active', automatic=False):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);app=root/'app';old=app/'releases/old';old.mkdir(parents=True)
             (old/'portra-backend.jar').write_bytes(b'old')
             incoming=root/'incoming';(incoming/SHA).mkdir(parents=True);(incoming/SHA/'backend.jar').write_bytes(b'new')
+            if automatic:
+                import zipfile
+                with zipfile.ZipFile(str(incoming/SHA/'backend.jar'), 'w') as archive:
+                    archive.writestr('BOOT-INF/classes/application.yml', 'spring: {}')
+            staging = incoming/'auto-123-1' if automatic else None
+            if automatic:
+                (incoming/SHA).rename(staging)
+            source = staging/'backend.jar' if automatic else incoming/SHA/'backend.jar'
             web=root/'web';web.mkdir();(web/'index.html').write_bytes(b'web')
             uploads=root/'uploads';uploads.mkdir();(uploads/'photo').write_bytes(b'photo')
             state=root/'state';state.mkdir();live={'target':old,'pid':'100' if initial_state=='active' else '0','state':initial_state}
@@ -50,11 +58,38 @@ class ReleaseTests(unittest.TestCase):
                 raise AssertionError(args)
             def health(url):
                 if mode!='success' and live['target']!=old:raise RuntimeError('unhealthy new backend')
-            r=receipt();r.update(jarSha256=digest(incoming/SHA/'backend.jar'),previousJarSha256=digest(old/'portra-backend.jar'),previousJarCompatibleAfterMigration=mode=='compatible',initialServiceState=initial_state)
+            r=receipt();r.update(jarSha256=digest(source),previousJarSha256=digest(old/'portra-backend.jar'),previousJarCompatibleAfterMigration=mode=='compatible',initialServiceState=initial_state)
+            if automatic:
+                from automatic_backend import schema_fingerprint
+                r.update(enabled=True, repository='yueyue0218/Camera',
+                         schemaFingerprint=schema_fingerprint(source))
+                if mode == 'schema-change':
+                    r['schemaFingerprint'] = 'not-authorized'
             with patch.multiple(d,APP=app,WEB=web,UPLOADS=uploads,STATE=state,INCOMING=incoming),patch.object(d,'load_receipt',return_value=r),patch.object(d,'run',side_effect=command),patch.object(d,'link',side_effect=link),patch.object(d,'digest',side_effect=digest),patch.object(d,'health',side_effect=health),patch.object(d.time,'sleep'),patch.object(Path,'resolve',resolve),patch.object(Path,'is_symlink',symlink),patch.object(Path,'read_bytes',read):
-                if mode=='success':d.deploy(SHA,r['jarSha256'])
+                if mode == 'schema-change':
+                    with self.assertRaisesRegex(RuntimeError, 'changed'):
+                        d.deploy(SHA,r['jarSha256'],automatic=True,staging=str(staging))
+                    self.assertEqual(live['target'], old)
+                    self.assertFalse((app/'releases'/SHA).exists())
+                    self.assertEqual(list(state.iterdir()), [])
+                    return
+                if mode=='success':
+                    d.deploy(SHA,r['jarSha256'],automatic=automatic,staging=str(staging) if automatic else None)
+                    if automatic:
+                        pid = live['pid']
+                        d.deploy(SHA,r['jarSha256'],automatic=True,staging=str(staging))
+                        self.assertEqual(live['pid'], pid) # Rerun never restarts an already active release.
+                        (uploads/'photo').write_bytes(b'unexpected change')
+                        with self.assertRaisesRegex(RuntimeError, 'upload changed'):
+                            d.deploy(SHA,r['jarSha256'],automatic=True,staging=str(staging))
+                        (uploads/'photo').write_bytes(b'photo')
+                        (web/'index.html').write_bytes(b'unexpected change')
+                        with self.assertRaisesRegex(RuntimeError, 'Web assets changed'):
+                            d.deploy(SHA,r['jarSha256'],automatic=True,staging=str(staging))
+                        (web/'index.html').write_bytes(b'web')
+                        self.assertEqual(live['pid'], pid)
                 else:
-                    with self.assertRaisesRegex(RuntimeError,'unhealthy'):d.deploy(SHA,r['jarSha256'])
+                    with self.assertRaisesRegex(RuntimeError,'unhealthy'):d.deploy(SHA,r['jarSha256'],automatic=automatic,staging=str(staging) if automatic else None)
             result=json.loads((state/('backend-release-'+SHA+'.json')).read_text())
             self.assertEqual((web/'index.html').read_bytes(),b'web');self.assertEqual((uploads/'photo').read_bytes(),b'photo')
             if mode=='success':
@@ -70,6 +105,21 @@ class ReleaseTests(unittest.TestCase):
     def test_approved_maintenance_stopped_backend_activates_without_starting_old_jar(self):self.activation_scenario('success','inactive')
     def test_unhealthy_release_rolls_back_only_with_explicit_compatibility(self):self.activation_scenario('compatible')
     def test_unhealthy_release_never_implicitly_restores_old_main(self):self.activation_scenario('incompatible')
+    def test_automatic_release_and_successful_rerun(self):self.activation_scenario('success', automatic=True)
+    def test_automatic_failure_requires_explicit_compatible_rollback(self):self.activation_scenario('compatible', automatic=True)
+    def test_automatic_failure_does_not_assume_rollback_compatibility(self):self.activation_scenario('incompatible', automatic=True)
+    def test_changed_schema_stops_automatic_release_before_any_activation(self):self.activation_scenario('schema-change', automatic=True)
+
+    def test_policy_file_and_ancestors_must_be_root_owned_and_not_writable(self):
+        from types import SimpleNamespace
+        path = Path('/etc/portra/automatic-backend.json')
+        for unsafe in [SimpleNamespace(st_uid=1000,st_mode=0o640), SimpleNamespace(st_uid=0,st_mode=0o660)]:
+            with self.subTest(meta=unsafe), patch.object(Path,'stat',return_value=unsafe), patch.object(Path,'is_symlink',return_value=False):
+                with self.assertRaisesRegex(RuntimeError,'root-owned'):
+                    d.load_receipt(path)
+        with patch.object(Path,'is_symlink',return_value=True):
+            with self.assertRaisesRegex(RuntimeError,'symlink'):
+                d.load_receipt(path)
 
     def test_health_requires_success_status_and_expected_payload(self):
         from unittest.mock import MagicMock
