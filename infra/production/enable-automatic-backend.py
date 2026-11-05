@@ -9,12 +9,58 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-from automatic_backend import schema_fingerprint, validate_policy
+from automatic_backend import schema_fingerprint, validate_policy, upgrade_policy
+
+
+def release_helpers():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('release', str(Path(__file__).with_name('deploy-backend.py')))
+    release = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(release)
+    return release
+
+
+def upgrade_fingerprint(app, current, target=None):
+    release = release_helpers()
+    target = target if target is not None else Path('/etc/portra/automatic-backend.json')
+    original = release.load_receipt(target)
+    host = subprocess.check_output(['hostname'], universal_newlines=True).strip()
+    updated = upgrade_policy(original, current/'portra-backend.jar', host)
+    if subprocess.check_output(['systemctl', 'is-active', 'portra-backend.service'], universal_newlines=True).strip() != 'active':
+        raise RuntimeError('Current baseline backend must be active')
+    release.health(updated['localHealthUrl'])
+    release.health(updated['publicHealthUrl'])
+    if (app/'current').resolve() != current:
+        raise RuntimeError('Current baseline changed during upgrade')
+    # Keep an exclusive, root-readable backup and atomically replace only the
+    # fingerprint version/digest, preserving every other authorization setting.
+    fd, backup = tempfile.mkstemp(prefix='automatic-backend.v1-', suffix='.json', dir=str(target.parent))
+    with os.fdopen(fd, 'w') as stream:
+        json.dump(original, stream, indent=2)
+        stream.flush()
+        os.fsync(stream.fileno())
+    meta = target.stat()
+    fd, temporary = tempfile.mkstemp(prefix='.automatic-backend-v2-', dir=str(target.parent))
+    try:
+        with os.fdopen(fd, 'w') as stream:
+            json.dump(updated, stream, indent=2)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.chown(temporary, meta.st_uid, meta.st_gid)
+        os.chmod(temporary, meta.st_mode & 0o777)
+        os.replace(temporary, str(target))
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    print('Fingerprint policy upgraded to v2; backup: ' + backup)
 
 
 def enable():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--enable', action='store_true', required=True)
+    action = parser.add_mutually_exclusive_group(required=True)
+    action.add_argument('--enable', action='store_true')
+    action.add_argument('--upgrade-fingerprint', action='store_true',
+                        help='Upgrade existing policy using only the authorized current live JAR')
     parser.add_argument('--allow-compatible-rollback', action='store_true',
                         help='Explicitly authorize rollback to the previous schema-compatible JAR')
     args = parser.parse_args()
@@ -24,6 +70,17 @@ def enable():
     current = (app/'current').resolve()
     if current.parent != app/'releases' or (app/'app.jar').resolve() != current/'portra-backend.jar':
         raise RuntimeError('Unexpected release links')
+    if args.upgrade_fingerprint:
+        if args.allow_compatible_rollback:
+            raise RuntimeError('Fingerprint upgrade cannot change rollback authorization')
+        import fcntl
+        # Share the existing deployment lock; do not create root-owned lock files.
+        with open('/home/portra-deploy/state/backend-release.lock', 'r+') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            if (app/'current').resolve() != current:
+                raise RuntimeError('Current baseline changed; retry after inspecting deployment')
+            upgrade_fingerprint(app, current)
+        return
     # Reuse verified baseline metadata, never invent DB/backup approval evidence.
     receipt_path = Path('/etc/portra/releases')/(current.name + '.json')
     for path in [receipt_path] + list(receipt_path.parents):
@@ -46,13 +103,11 @@ def enable():
     policy.update(enabled=True, repository='yueyue0218/Camera', host=subprocess.check_output(['hostname'], universal_newlines=True).strip(),
                   initialServiceState='active', baselineRevision=current.name,
                   schemaFingerprint=schema_fingerprint(current/'portra-backend.jar'),
+                  schemaFingerprintVersion=2,
                   previousJarCompatibleAfterMigration=args.allow_compatible_rollback)
     validate_policy(policy, current/'portra-backend.jar', policy['host'])
     # Import the existing no-redirect, TLS-verifying health implementation.
-    import importlib.util
-    spec = importlib.util.spec_from_file_location('release', str(Path(__file__).with_name('deploy-backend.py')))
-    release = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(release)
+    release = release_helpers()
     release.health(policy['localHealthUrl'])
     release.health(policy['publicHealthUrl'])
     target = Path('/etc/portra/automatic-backend.json')

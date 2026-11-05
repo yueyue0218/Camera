@@ -7,12 +7,14 @@ import re
 import zipfile
 
 
-def schema_fingerprint(jar):
+def schema_fingerprint(jar, version=2):
     """Bind DB mappings, SQL, configuration, initializers and dependency versions.
 
     This is a conservative change detector, not proof of semantic compatibility.
     It deliberately requires renewed authorization for changes to these surfaces.
     """
+    if type(version) is not int or version not in (1, 2):
+        raise RuntimeError('Unsupported schema fingerprint version')
     entries = []
     markers = (b'jakarta/persistence/Entity;', b'jakarta/persistence/Embeddable;',
                b'jakarta/persistence/MappedSuperclass;', b'jakarta/persistence/Converter;',
@@ -24,9 +26,14 @@ def schema_fingerprint(jar):
             if not name.startswith('BOOT-INF/classes/') or name.endswith('/'):
                 continue
             data = archive.read(name)
-            if (name.endswith(('.sql', '.yml', '.yaml', '.properties', '.xml'))
+            text_resource = name.endswith(('.sql', '.yml', '.yaml', '.properties', '.xml'))
+            if (text_resource
                     or 'SchemaInit' in name or '/common/config/' in name
                     or (name.endswith('.class') and any(m in data for m in markers))):
+                # Normalize CRLF only in text resources; keep all other bytes,
+                # including whitespace, lone CR, class files and library names.
+                if version == 2 and text_resource:
+                    data = data.replace(b'\r\n', b'\n')
                 entries.append((name, data))
     if not entries:
         raise RuntimeError('No schema/configuration evidence in JAR')
@@ -42,7 +49,7 @@ def validate_policy(policy, jar, host):
         raise RuntimeError('Automatic backend deployment is not authorized')
     if policy.get('host') != host:
         raise RuntimeError('Automatic policy host mismatch')
-    if policy.get('schemaFingerprint') != schema_fingerprint(jar):
+    if policy.get('schemaFingerprint') != schema_fingerprint(jar, policy.get('schemaFingerprintVersion', 1)):
         raise RuntimeError('Schema/configuration/dependencies changed; review and renew automatic policy')
     if not policy.get('databaseIdentity') or not policy.get('backupEvidence'):
         raise RuntimeError('Reviewed database and backup evidence required')
@@ -52,3 +59,17 @@ def validate_policy(policy, jar, host):
         raise RuntimeError('Invalid automatic local health URL')
     if not re.fullmatch(r'https://[A-Za-z0-9.-]+/[A-Za-z0-9/_-]+', policy.get('publicHealthUrl', '')):
         raise RuntimeError('Invalid automatic public health URL')
+
+
+def upgrade_policy(policy, current_jar, host):
+    """Upgrade only an authorization that still matches the CURRENT live JAR.
+
+    Never derive new authorization from an incoming or failed-release artifact.
+    """
+    validate_policy(policy, current_jar, host)
+    if policy.get('schemaFingerprintVersion', 1) != 1:
+        raise RuntimeError('Fingerprint policy is already upgraded')
+    updated = dict(policy)
+    updated['schemaFingerprintVersion'] = 2
+    updated['schemaFingerprint'] = schema_fingerprint(current_jar, 2)
+    return updated

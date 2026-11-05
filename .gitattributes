@@ -2,3 +2,10 @@
 /infra/production/*.py text eol=lf
 /infra/production/*.sql text eol=lf
 /docs/production/backend-build.json text eol=lf
+
+# Keep packaged database/configuration resources consistent across build hosts.
+/backend/src/main/resources/**/*.sql text eol=lf
+/backend/src/main/resources/**/*.yml text eol=lf
+/backend/src/main/resources/**/*.yaml text eol=lf
+/backend/src/main/resources/**/*.properties text eol=lf
+/backend/src/main/resources/**/*.xml text eol=lf
