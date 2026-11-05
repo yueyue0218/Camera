@@ -68,6 +68,39 @@
 不停止现有后端。紧急时也可由 root 将策略中的 `enabled` 改为 false。
 已开始的部署不受 GitHub 变量变更追溯影响，应先查看当前运行再操作。
 
+## 已有 v1 授权升级：Windows/Linux 换行差异
+
+v1 直接比较资源原始字节，会把 Windows CRLF 和 Linux LF 的差异当成结构变化。
+v2 只对 SQL、YAML、properties、XML 文本资源把 CRLF 转为 LF，其余空白、内容、
+单独 CR、class 字节码和依赖名称仍保持原样比较。新的资源 Git 属性也固定为 LF。
+没有版本字段的既有策略继续使用 v1，绝不自动接受新的不同指纹。
+
+遇到这一问题，先比较新旧 JAR，确认只是换行差异。合并修复 PR 后，由 root 用
+该修复的已审核完整提交替换下面的 SHA，执行一次：
+
+```bash
+(
+  set -eu
+  revision='<已审核的修复提交完整SHA>'
+  setup_dir=$(mktemp -d /root/portra-auto-upgrade.XXXXXX)
+  cd "$setup_dir"
+  for file in automatic_backend.py deploy-backend.py enable-automatic-backend.py; do
+    curl --fail --silent --show-error --location \
+      "https://raw.githubusercontent.com/yueyue0218/Camera/$revision/infra/production/$file" \
+      -o "$file"
+  done
+  python3 enable-automatic-backend.py --upgrade-fingerprint
+)
+```
+
+升级工具持有与部署相同的服务器锁，先确认原授权仍匹配**当前线上 JAR**并验证
+健康，绝不从 incoming 的待发布 JAR 生成新授权。它在 `/etc/portra/` 创建 root
+专用的 `automatic-backend.v1-*.json` 备份，只原子更新 `schemaFingerprint` 与
+`schemaFingerprintVersion`，保留权限、回滚设置和其余审批字段，不重启后端。
+版本已升级、当前版本不再匹配、锁被占用或健康失败时均停止，不要删除授权来
+绕过检查。完成后只重跑**最新 main** 对应运行的失败 deploy job，复用其已封存
+制品；旧提交运行会因为 main 已更新而跳过。
+
 ## 本地验证
 
 ```bash
